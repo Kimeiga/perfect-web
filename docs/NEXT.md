@@ -795,6 +795,15 @@ E14 comes before E11-E13. Its plan, controls and task list are
              without paying, said why; until then no mutant guards them;
 
           Then the language's, found on the way:
+          - **the corpus specifies a quarter of the codes** (the
+            integrator's finding, 2026-10-14, corpus C24): the rejected
+            corpus exercises 54 of the 196 codes; the rest are held by the
+            compiler's own tests where they have them, and the conformance
+            figure and generality score say nothing of them. From C24 on, a track that
+            adds a code adds its rejected fixture and its generality pair,
+            as the scheduled-commands track and C24 did; the 142 before are
+            added a family at a time (Syntax's 22, Resolution's 10, UiState's
+            10 and Capability's 5 first, none exercised);
           - **a program's declaration of another origin** (ADR-0195's
             ruling 13, its last clause; ADR-0333 built the rest): an origin a
             program declares, which its pages' policy allows and PW5052 lets

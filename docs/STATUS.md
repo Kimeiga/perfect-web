@@ -23,6 +23,21 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**2026-10-14: the corpus specifies `invoked_by`** (the integrator's finding;
+corpus C24; track `corpus-invoked`, merged from `64e5ee4e`).
+- NEXT 6c's five codes (PW6401 to PW6405, a command the platform invokes)
+  had no fixture: the corpus, the executable specification, did not say
+  them. C24 adds a rejected fixture for each (R-070 to R-074) and a
+  generality pair for each, a GENERAL witness on the clock's command and a
+  NEIGHBOUR beside it. Generality 54 / 54.
+- Exercising them found two diagnostics that named no boundary span, which
+  charter §16.3 requires: PW6402 and PW6405 name their `invoked_by` clause
+  now, held by a test and two mutants (`invoked_by_mutations.py`, 14 of
+  14). PW6405's invariant says the clock's word as well as a provider's.
+- Measured: the rejected corpus exercises 54 of the 196 codes. NEXT holds
+  the rest, and the rule for a new code.
+Verify TRAIN_RUN green, with train-7.
+
 **ADR-0334, 2026-10-14: a command runs when the clock passes its time**
 (the integrator's; ADR-0332's not-claimed sweep and NEXT 4's third step;
 track `scheduled-commands`, merged from `9bd44dec`).

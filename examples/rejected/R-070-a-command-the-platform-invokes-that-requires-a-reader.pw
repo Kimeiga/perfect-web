@@ -1,0 +1,28 @@
+// @corpus: rejected
+// @id: R-070
+// @category: a command the platform invokes that requires a reader
+// @rule: PW6401
+// @invariant: invoked_command_requires
+// @charter: §7.8
+// @milestone: 14
+// @expect-error: `settle` is invoked by Payments, not by a reader: `requires SignedIn` has no one to hold
+// @expect-error: a command the platform invokes holds no reader to a predicate: it declares no `requires`
+//
+// The host invokes `settle` on its provider's word, in a session of its own
+// on behalf of the reader who began the payment. No reader is there to hold
+// to `SignedIn`.
+
+module payments_corpus.requiring
+
+import domain.{ InteractionId }
+import payments.{ Settled }
+// The deployment's `SignedIn`, as A-005 declares it.
+import cart.commands.{ SignedIn }
+
+command settle(settled: Settled) -> Result<Int, String>
+    invoked_by    Payments
+    requires      SignedIn
+    idempotent_by InteractionId
+{
+    Ok(1)
+}

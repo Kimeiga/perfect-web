@@ -121,7 +121,10 @@ pub fn check(
                     written.join(", ")
                 ),
                 at.clone(),
-                Vec::new(),
+                vec![Related::new(
+                    by.span.clone(),
+                    format!("`invoked_by {invoker}`: the host gives it a payment's outcome"),
+                )],
                 "The host invokes the command with what it has from the provider: which \
                  payment, the order it was begun for, and where it now stands, a \
                  `payments.Settled`. A parameter it has nothing to give would be a value \
@@ -172,7 +175,10 @@ pub fn check(
                     decl.name
                 ),
                 at.clone(),
-                Vec::new(),
+                vec![Related::new(
+                    by.span.clone(),
+                    format!("`invoked_by {invoker}`: its word may come more than once"),
+                )],
                 match invoker {
                     "Clock" => {
                         "A scheduled run is run again where it did not commit: a host stopped \

@@ -1607,3 +1607,13 @@ Each a decision for a track, with its date; a track's ADR records it too.
     run recorded it again; `just ci` refuses committed evidence that
     records a survivor now (`scripts/evidence_survivors.py`, in
     `evidence-gates`).
+- **2026-10-14, corpus-invoked merged** on train-7 (the integrator's finding;
+  corpus C24; from `64e5ee4e`): NEXT 6c's `invoked_by` codes, PW6401 to
+  PW6405, specified by the corpus at last, R-070 to R-074 and five
+  generality pairs; PW6402 and PW6405 name a boundary span. To every
+  worker: **a code you add comes with its rejected fixture and its
+  generality pair** (examples/rejected, examples/generality, a row in
+  docs/CORPUS.md's next version); the corpus exercises 54 of 196 codes, and
+  NEXT holds the rest. The witness library holds every accepted program,
+  so a rule over the whole program (as PW6403's "one command answers a
+  payment") can have no accepted fixture beside its rejected ones.
