@@ -340,27 +340,36 @@ is not a cost.
 - **Per page and command**, each command with its commit (the outbox's
   inserts, the interaction's record, the outbox read back): `add_to_cart`
   10 and 11, `add_address` 6, `choose_tip` 6, the home page 5, the store's
-  page 16, the cart 13, a search 8, the address page 2, the order's page 5;
-  and `place_order` apart, its operations 33, its commit 7, its queries
-  read again 21.
+  page 16, the cart 13, a search 8, the address page 2, the order's page 5.
+- **`place_order`, by scenario** (the integrator's ruling of 2026-10-14,
+  both pinned): (a) a deployment taking no payments, placed at once, its
+  operations 33, its commit 7, its queries read again 21; (b) a deployment
+  taking payments, awaiting, its transaction 35, then `settle_payment` on
+  the provider's word in its own, 16. (b) is the production path, (a) the
+  development store's. "The development provider settles inside
+  `place_order`" was wrong: the one transaction 4b measured first is
+  ADR-0332's path for a deployment that takes no payments, where
+  `begin_payment` answers `NotTaken` and `place_order` settles its order
+  inline, in its own transaction.
 
 ### The first case: one command's repeated reads (the integrator's)
 
-`place_order`, by operation (the layer's tally per operation and per
-transaction; its commit counted with it since 4b's ruling of 2026-10-14):
+`place_order` in scenario (a), by operation (the layer's tally per
+operation and per transaction; its commit counted with it since 4b's ruling
+of 2026-10-14):
 
 | Where | Reads | Statements |
 | --- | --- | --- |
 | its transaction: `closed_in(hours_of_cart(..))` | hours#for-cart: the cart, its items' stores, their names, their hours (3) | 6 |
 | its transaction: `priced_for` | checkout#parts (the cart, its items' stores), fees#for-stores, checkout#chosen | 4 |
 | its transaction: `UserOrders.await_payment` | user-orders#await-payment: the cart again, its reach (the addresses, the items' stores, the stores), the order, its lines and parts, the code, the choices cleared | 16 |
-| its transaction: the development provider settles as the payment begins | user-orders#settle | 7 |
+| its transaction: no payments taken, the order settled at once (ADR-0332) | user-orders#settle | 7 |
 | its commit | the outbox's inserts, the interaction's record, the outbox read back | 7 |
 | after the commit: the session's invalidated queries read again | `Cart` six times (user-carts#current), `CartHours`, `Checkout`, `Order`, the estimate | 21 |
 
-(A correction: `user-orders#settle` runs in `place_order`'s own
-transaction, not in a `settle_payment` of its own; 4b's per-transaction
-tally showed one transaction.)
+In scenario (b), the production path, `place_order`'s transaction (35)
+has no settle among its operations; `settle_payment` runs later, on the
+provider's word, in its own (16).
 
 In one transaction the cart's lines are read three times and their items'
 stores three times, each by a composite that reads them for itself.
@@ -403,4 +412,6 @@ straddle a commit.
   view, which this note takes): it is the host's alone, and no program
   changes. The first case waits on the composites moving above the seam.
 
-With both, `place_order`'s 61 (33 + 7 + 21) becomes 51 (28 + 7 + 16).
+With both, `place_order`'s 61 in scenario (a) (33 + 7 + 21) becomes 51
+(28 + 7 + 16). In scenario (b) the first case's savings are the same reads,
+in `place_order`'s 35.
