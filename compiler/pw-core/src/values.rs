@@ -873,11 +873,39 @@ pub(crate) fn type_of(
     body: &Body,
     e: ExprId,
 ) -> (Ty, String) {
-    let lexical = Lexical::build(decl, body);
-    let typer = Typer::new(sigs, ws, at, module, decl, body, lexical, Vec::new());
-    let t = typer.of(e);
-    let name = typer.display(&t);
-    (t, name)
+    BodyTypes::new(sigs, ws, at, module, decl, body).of(e)
+}
+
+/// **One body's expressions, typed by one typer** (the checker's latency,
+/// 2026-10-13). A typer solves its whole body as it is built, and `type_of`
+/// builds one for the one expression it is asked about: an analysis that
+/// asked about every value a page prints built one for each, and a page of
+/// a few hundred holes solved itself a few hundred times.
+pub(crate) struct BodyTypes<'a> {
+    typer: Typer<'a>,
+}
+
+impl<'a> BodyTypes<'a> {
+    pub(crate) fn new(
+        sigs: &'a Signatures,
+        ws: &'a Workspace,
+        at: UnitId,
+        module: Option<&'a str>,
+        decl: &'a Decl,
+        body: &'a Body,
+    ) -> BodyTypes<'a> {
+        let lexical = Lexical::build(decl, body);
+        BodyTypes {
+            typer: Typer::new(sigs, ws, at, module, decl, body, lexical, Vec::new()),
+        }
+    }
+
+    /// The type the value relations give `e`, and its name.
+    pub(crate) fn of(&self, e: ExprId) -> (Ty, String) {
+        let t = self.typer.of(e);
+        let name = self.typer.display(&t);
+        (t, name)
+    }
 }
 
 /// What a call's written path names.

@@ -301,15 +301,19 @@ e8-wit:
 # E9 gate item 4. How long a check takes, and what an edit costs.
 #
 # Measured BEFORE any incremental query system exists, so the optimization can
-# be attributed if one is ever built. The finding is that it may not need to be:
-# a full check of the 36-file store program is already inside editor-feedback
-# territory.
+# be attributed if one is ever built. In 2026-08 the finding was that it might
+# not need to be: 37 ms for the 36-file store program. In 2026-10 it is near a
+# second for 52 files (NEXT: the checker's latency).
 e9-latency:
     @{ echo "E9 gate item 4 - check latency"; echo; \
-       echo "produced by: just e9-latency"; echo; \
+       echo "produced by: just e9-latency"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; echo; \
        echo "The gate asks for incremental checks fast enough for editor"; \
        echo "feedback. There is no query system: an edit costs a full check."; \
-       echo "The measurement below is why that has not blocked the gate."; echo; \
+       echo "On 2026-08-08 a check of 36 files took 37 ms, and the gate passed"; \
+       echo "on it. Since, every analysis added resolves and types on its own,"; \
+       echo "and nothing is shared: the number below is no longer editor"; \
+       echo "feedback, and NEXT carries the work."; echo; \
        cargo test -p pw-core --test check_latency -- --nocapture 2>&1 \
          | grep -E "^(check-latency|test result)|^---- |panicked at"; \
        echo; echo "Median of 7 runs, in process, on the machine in"; \
