@@ -1496,3 +1496,9 @@ Each a decision for a track, with its date; a track's ADR records it too.
   own local checks green and no run of its own (its push's verify cancelled
   by the coordinator, the integrator's ruling for small tracks); train-5's
   run verifies it. W9 takes NEXT 4b from master once train-5 lands.
+- **2026-10-14, current-evidence merged** on train-6 (the integrator's,
+  ADR-0281 amended (6); track `current-evidence`, from `22afb624`): a push runs
+  no recipe whose committed evidence is current. It went on with its
+  mutation controls green (40 of 40) and one `just ci` over it and
+  check-latency together, each track's code under the whole `just ci`
+  (ADR-0281's correction of 2026-10-13), no run of its own.

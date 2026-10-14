@@ -23,6 +23,24 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0281 amended (6), 2026-10-14: a push runs no recipe whose committed
+evidence is current** (the integrator's; track `current-evidence`, merged
+from `22afb624`).
+- `ci_plan.py --current`, passed at every push, a track's and master's,
+  drops a planned recipe whose every evidence file, as the head holds it,
+  was recorded at one whole commit the head descends from, where nothing the
+  recipe reads changed since, by the planner's own rule. Evidence written
+  from a tree with changes records no commit and never counts; the nightly
+  runs every recipe whatever its evidence says.
+- Found at train-4's landing: master's push planned the whole train again
+  (verify 38494831583, cancelled by hand), as the train's run had failed in
+  one recipe, fixed and run by dispatch, and a dispatch does not count
+  (`verified_base.py`). Replayed on that push: 52 recipes without, none
+  with. A train whose run failed takes the run's evidence with its fix.
+- `scripts/tests/test_ci_scripts.py`'s `CurrentEvidence` (9 tests);
+  `dealt_by_time_mutations.py`, 40 of 40.
+Verify TRAIN_RUN green, with train-6.
+
 **ADR-0329 amended, 2026-10-13: the store switches to what ADR-0330 and
 ADR-0331 allow** (W9's; track `store-switch`, merged from `1d217edc`, on
 the payments track).

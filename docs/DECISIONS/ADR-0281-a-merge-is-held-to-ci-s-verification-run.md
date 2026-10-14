@@ -143,6 +143,23 @@ hold.
      lines that the range changed plans the recipe, as a changed browser
      spec does (`ci_plan.py`'s `reads_what_changed`; a test in
      `test_ci_scripts.py`, a mutant in `dealt_by_time_mutations.py`).
+   - **A push runs no recipe whose committed evidence is current** (the
+     integrator's, 2026-10-13 (6)). Master's push after train-4 planned the
+     whole train again (verify 38494831583, cancelled by hand): the train's
+     run had failed in one recipe, fixed and run again by dispatch, so no
+     push's run passed on its line, and a dispatch does not count. The
+     record was in the tree already: each evidence file names the commit a
+     run passed its recipe at. A push now plans as before, less each recipe
+     whose every evidence file, as the head holds it, was recorded at one
+     whole commit the head descends from, where nothing the recipe reads
+     changed since, by the planner's own rule (`ci_plan.py --current`).
+     Replayed on that push: 52 recipes without, none with. So a train whose
+     run failed takes the run's evidence with its fix, and its push runs
+     what the evidence does not cover, the failed recipe and what the fix
+     reaches: no dispatch and no cancel. Evidence written from a tree with
+     changes records no commit and never counts; the nightly runs every
+     recipe, whatever its evidence says, for what the toolchain or the
+     runners moved.
    - That is a file a recorded command produced, as CLAUDE.md asks.
    - The fetch is a download, so it waits for the owner's yes in the
      integrator's session. Approval relayed through another session does
