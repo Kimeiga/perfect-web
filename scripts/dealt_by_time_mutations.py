@@ -23,7 +23,9 @@ current: evidence not current where what the recipe reads changed since,
 where it was written from a tree with changes, where the head does not
 descend from its commit, or where the recipe's files were recorded at two
 commits or one not at all; the plan dropping what is current only where it
-is asked, and the workflow asking at each push. At least one test of
+is asked, and the workflow asking at each push; and (train-5's finding,
+2026-10-14) a recipe planned by a program its own lines name, a glob read
+segment by segment and a path naming what is under it. At least one test of
 `scripts/tests/test_ci_scripts.py` must then fail.
 
 Run from the repository root; `just e14-dealt-by-time` records the output.
@@ -94,8 +96,10 @@ MUTANTS = [
     (
         "a shell script a recipe runs is not read",
         PLAN,
-        "        if rel in changed:\n            return True\n    for name in re.findall(",
-        "        if False:\n            return True\n    for name in re.findall(",
+        # Re-anchored by train-5's finding: the programs a recipe's own lines
+        # name are read after the shell scripts it runs.
+        "        if rel in changed:\n            return True\n    if any(names_path(",
+        "        if False:\n            return True\n    if any(names_path(",
     ),
     # ADR-0281, amended 2026-10-13: what a run passed at is not run again.
     (
@@ -290,6 +294,26 @@ MUTANTS = [
         PLAN,
         "CEILING = 10_350\n",
         "CEILING = 20_700\n",
+    ),
+    (
+        "a program a recipe's own lines name plans nothing",
+        PLAN,
+        "    if any(names_path(p, c) for p in body_inputs(body) for c in changed):\n        return True\n",
+        "",
+    ),
+    (
+        "a glob's star crosses a directory",
+        PLAN,
+        "    return len(parts) == len(names) and all(\n"
+        "        fnmatch.fnmatchcase(n, p) for p, n in zip(parts, names)\n"
+        "    )\n",
+        "    return fnmatch.fnmatchcase(path, pattern)\n",
+    ),
+    (
+        "a path a recipe names is only itself",
+        PLAN,
+        '        return path == pattern or path.startswith(pattern + "/")\n',
+        "        return path == pattern\n",
     ),
 ]
 

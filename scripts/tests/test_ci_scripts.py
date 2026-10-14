@@ -175,6 +175,30 @@ class Plan(unittest.TestCase):
             plan.recipes_for({"benchmarks/baselines/sveltekit/README.md": [(1, 1)]}, 30, names),
         )
 
+    def test_a_recipe_is_planned_where_its_own_lines_name_a_program_that_changed(self) -> None:
+        # Train-5's finding (2026-10-14): `e10-build` builds
+        # `examples/store/*.pw` in its own lines, and no push planned it
+        # since 2026-10-12; its evidence named an import ADR-0332 removed.
+        names = plan.recipes()
+        planned = plan.recipes_for({"examples/store/app.pw": [(1, 1)]}, 30, names)
+        self.assertIn("e10-build", planned)
+        self.assertIn("e8-wit", planned)
+        self.assertIn("examples/store/*.pw", plan.body_inputs(plan.bodies()["e10-build"]))
+        # A glob's star stays in its segment, as a shell's does; a path
+        # names what is under it.
+        self.assertTrue(plan.names_path("examples/*.pw", "examples/domain.pw"))
+        self.assertFalse(plan.names_path("examples/*.pw", "examples/store/app.pw"))
+        self.assertTrue(plan.names_path("examples/store/*.pw", "examples/store/app.pw"))
+        self.assertTrue(
+            plan.names_path("examples/kiokun/data/han-1char-3", "examples/kiokun/data/han-1char-3/a.json")
+        )
+        self.assertFalse(plan.names_path("examples/kiokun/data/han", "examples/kiokun/data/han-1char-3"))
+        # The control: a program no recipe's lines name plans none of them.
+        self.assertNotIn(
+            "e10-build",
+            plan.recipes_for({"examples/feed/app.pw": [(1, 1)]}, 30, names),
+        )
+
     def test_a_recipe_is_planned_where_a_shell_script_it_runs_changed(self) -> None:
         # Train-3's run (2026-10-13) planned no `e8-host` for a change to
         # `audit.sh`, the script the recipe is: only a `scripts/*.py` was read.

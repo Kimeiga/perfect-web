@@ -160,6 +160,15 @@ hold.
      changes records no commit and never counts; the nightly runs every
      recipe, whatever its evidence says, for what the toolchain or the
      runners moved.
+     **Found at train-5's landing (2026-10-14)**: a recipe whose own lines
+     name a program (`e10-build`'s `examples/store/*.pw`, 50 recipes in
+     all) was planned by no change to it, only by its own lines', its
+     script's or its tests', so its evidence went stale unsaid:
+     `e10-build`'s, recorded at `3fdcf929`, still said `place_order`
+     imports `user-orders#place` after ADR-0332. And `--current` would
+     have called it current. A program a recipe's own lines name, a glob
+     read segment by segment as a shell expands one, or a path and what is
+     under it, plans the recipe now (`body_inputs`).
    - That is a file a recorded command produced, as CLAUDE.md asks.
    - The fetch is a download, so it waits for the owner's yes in the
      integrator's session. Approval relayed through another session does

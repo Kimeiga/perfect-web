@@ -11,7 +11,8 @@ The recipes are `just`'s own list, kept where they record evidence
   whose tests the range changed, a Rust test or a browser spec (ADR-0281);
   each recipe that runs a browser spec the range changed; each recipe whose
   own script changed or reads a program or a benchmark the range changed
-  (`data_inputs`), or runs a shell script the range changed; and each
+  (`data_inputs`), whose own lines name one the range changed
+  (`body_inputs`), or that runs a shell script the range changed; and each
   recipe whose own lines changed; and with `--current`, as a push plans,
   less each recipe whose committed evidence is current at HEAD (`current`,
   ADR-0281, amended 2026-10-13 (6));
@@ -36,6 +37,7 @@ nothing is to run.
 """
 
 import argparse
+import fnmatch
 import importlib.util
 from collections.abc import Callable
 import json
@@ -324,6 +326,25 @@ def data_inputs(script: pathlib.Path) -> list[str]:
     return [p.rstrip("/") for p in named if p.startswith(DATA_ROOTS)]
 
 
+def body_inputs(body: str) -> list[str]:
+    """The programs and benchmarks a recipe's own lines name under
+    `DATA_ROOTS`, a path or a glob: `e10-build`'s `examples/store/*.pw`."""
+    return sorted(set(re.findall(r"(?<![\w./-])((?:examples|benchmarks)/[\w.*?/-]+)", body)))
+
+
+def names_path(pattern: str, path: str) -> bool:
+    """Whether a recipe's `pattern` names `path`: a glob, segment by
+    segment, as a shell expands one (a `*` never crosses a `/`); a path, it
+    or anything under it."""
+    pattern = pattern.rstrip("/")
+    if not any(ch in pattern for ch in "*?["):
+        return path == pattern or path.startswith(pattern + "/")
+    parts, names = pattern.split("/"), path.split("/")
+    return len(parts) == len(names) and all(
+        fnmatch.fnmatchcase(n, p) for p, n in zip(parts, names)
+    )
+
+
 def reads_what_changed(body: str, changed: dict[str, list[tuple[int, int]]]) -> bool:
     """Whether a recipe's own script, one that plants no mutant, changed or
     reads what changed. Until 2026-10-12 neither planned it: holds' merge
@@ -331,10 +352,16 @@ def reads_what_changed(body: str, changed: dict[str, list[tuple[int, int]]]) -> 
     to it, and no verify planned `e14-diffs`, which applies them (W8's
     finding). And a shell script it runs, by its path: until 2026-10-13 a
     change to `spikes/wasmtime-component/audit.sh` planned no `e8-host`,
-    whose script it is (train-3's run planned none)."""
+    whose script it is (train-3's run planned none). And a program its own
+    lines name: until 2026-10-14 `e10-build`, which builds
+    `examples/store/*.pw`, was planned by no push since 2026-10-12, and its
+    evidence said `place_order` imports `user-orders#place` after ADR-0332
+    moved it (train-5's finding)."""
     for rel in re.findall(r"(?<![\w./-])((?:[\w-]+/)+[\w.-]+\.sh)\b", body):
         if rel in changed:
             return True
+    if any(names_path(p, c) for p in body_inputs(body) for c in changed):
+        return True
     for name in re.findall(r"scripts/(\w+\.py)", body):
         if name.endswith("_mutations.py"):
             continue

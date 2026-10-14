@@ -83,8 +83,13 @@ from `22afb624`).
   one recipe, fixed and run by dispatch, and a dispatch does not count
   (`verified_base.py`). Replayed on that push: 52 recipes without, none
   with. A train whose run failed takes the run's evidence with its fix.
-- `scripts/tests/test_ci_scripts.py`'s `CurrentEvidence` (9 tests);
-  `dealt_by_time_mutations.py`, 40 of 40.
+- Found at train-5's landing: a recipe whose own lines name a program
+  (`e10-build`'s `examples/store/*.pw`, 50 in all) was planned by no change
+  to it, so `e10-build`'s evidence still named an import ADR-0332 removed,
+  and `--current` would have called it current. The program a recipe's own
+  lines name plans it now.
+- `scripts/tests/test_ci_scripts.py`'s `CurrentEvidence` (9 tests) and the
+  program a recipe names; `dealt_by_time_mutations.py`, 43 of 43.
 Verify TRAIN_RUN green, with train-6.
 
 **ADR-0329 amended, 2026-10-13: the store switches to what ADR-0330 and
