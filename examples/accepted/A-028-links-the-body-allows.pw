@@ -7,7 +7,8 @@
 // HTML allows a `<link>` in the body when each of its relations is body-ok:
 // a stylesheet, a resource to preload or prefetch, an origin to connect to
 // early (ADR-0189). And an item's property, by `itemprop`. Each is written
-// where it is.
+// where it is. Each that a browser fetches is this origin's, as a page loads
+// from its own (PW5052); an item's property is a value, never fetched.
 
 module store.store_links
 
@@ -18,7 +19,7 @@ page StoreLinks(id: StoreId) !{} {
     view {
         <title>Store</title>
         <link rel="stylesheet" href="/menu.css" />
-        <link rel="preconnect" href="https://images.example.com" />
+        <link rel="preload" href="/images/front.jpg" as="image" />
         <main>
             <h1>Store</h1>
             <div itemscope itemtype="https://schema.org/Offer">

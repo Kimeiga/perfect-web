@@ -669,6 +669,11 @@ codes! {
     // address written as text could name no page, or one served elsewhere.
     CANONICAL_ADDRESS = "PW5051" / canonical_address / 1, Markup,
         "a page's canonical address is a page's, `href={Page(args)}`, served at a route without a query part, each argument a value the page reads or text";
+    // ADR-0195's ruling 13, the build's half: the host's policy allows a
+    // page its own origin alone, so a load written from another built, and
+    // the browser refused it.
+    LOAD_FROM_ANOTHER_ORIGIN = "PW5052" / load_from_another_origin / 1, Markup,
+        "a page loads from its own origin: an address its markup fetches, written as text, is a path, and a `<link>`'s address is written as text";
     // ADR-0221: `<textarea bind:value={draft}>` was written as an attribute
     // a textarea does not have, and a first value showed nothing until the
     // runtime set it; a `<select>`'s likewise. Found by the feed (ADR-0220).

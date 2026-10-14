@@ -68,6 +68,8 @@ const ACCEPTED_CATEGORIES: &[&str] = &[
     "page states its canonical address",
     // ADR-0318 (track `store-accounts`), corpus C20: a `user` query, imported.
     "a user's query read on a user's page of another module",
+    // ADR-0195's ruling 13, corpus C22: a page loads from its own origin.
+    "a page loads from its own origin",
 ];
 
 /// Charter §16.2: "Create at least one minimal file for each".
@@ -165,6 +167,8 @@ const REJECTED_CATEGORIES: &[&str] = &[
     // C21, which made `private` say only "not importable".
     "a user query's record captured into a public manifest from a view's parameter",
     "a user's query's record captured into a public page's manifest",
+    // ADR-0195's ruling 13, corpus C22: PW5052.
+    "a load from another origin",
 ];
 
 /// Milestone 0 gate (charter §14 M0): ">= 10 accepted and 20 rejected".

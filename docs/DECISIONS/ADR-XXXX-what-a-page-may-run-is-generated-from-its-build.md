@@ -1,6 +1,7 @@
 # ADR-XXXX: what a page may run is generated from its build
 
-Status: draft (the integrator's; ADR-0195's ruling 13, the host's half).
+Status: draft (the integrator's; ADR-0195's ruling 13, the host's half and
+the build's).
 Date: 2026-10-14. Milestone: E14. Builds on ADR-0148 (the classic script
 that starts the runtime), ADR-0302 (the page's announcer), ADR-0306 (a
 navigation that keeps its layout), ADR-0332 (a payment's page, framed) and
@@ -112,17 +113,44 @@ ADR-0258 (a sign-in at a provider).
 6. **Tests that ran what a policy refuses** run it otherwise: the
    performance suite's control read layout through `eval`; it reads it
    through a module of this origin now.
+7. **What the policy would refuse, the build refuses** (PW5052,
+   `origins.rs`), where it is written, so no page builds to have a load
+   refused in the browser:
+   - an address a browser fetches, or sends to, written as text, is a path:
+     an image's, a frame's, a media's, an object's, a `<link>`'s, a
+     `formaction`, a `ping`. An address names another origin as a browser's
+     URL parser reads it: a scheme (`https:`, `data:`, `about:`), or a `//`
+     that names a host, its `\` spellings and its tabs and newlines
+     included (WHATWG URL: leading and trailing C0 controls and spaces
+     stripped, every tab and newline removed, a `\` a `/` in an `http`
+     URL). An address built with values is read whole, each value a
+     placeholder that names no scheme, host or separator, so every `srcset`
+     candidate is read, and a value where a host is names another origin;
+   - a `<link>`'s address is written as text: "a literal or a build's
+     asset" (ruling 13), and a build has no assets. Text and a value
+     together are text where they are a path before the first value
+     (`/stores/{id}/menu.css`);
+   - not a navigation (`<a href>`), which no policy governs; not a link that
+     is an item's property (`itemprop`, no `rel`), a value no browser
+     fetches; not a page's canonical address, a page's (PW5051); not a
+     form's `action`, a route that answers its `method` (PW5041);
+   - not an address a value chooses, `<img src={…}>`: the policy holds it
+     in the browser, and no build can read where it points.
+   Corpus C22: R-066, A-035, and the invariant's witnesses; A-028's
+   preconnect to another origin became a preload of its own.
 
 ## Not claimed
 
-- **Ruling 13's other two clauses**: a `<link>`'s `href` a literal or a
-  build's asset, and a cross-origin origin declared by the program. A
-  program that writes a load from another origin builds, and its page's
-  policy refuses the load in the browser, which says so in its console and
-  the suite's check; the build does not say so yet. Step two (NEXT): the
-  build refuses it, and the program's declaration adds its origin.
+- **A program's declaration of another origin** (ruling 13's "a
+  cross-origin one's origin declared by the program"): no program needs
+  one, so none can be made, and a load from another origin is refused. It
+  is built when a program needs one, and adds its origin to the program's
+  pages' policy.
 - **An address a value chooses** (`<img src={…}>`) loads from this origin
   alone, and nothing at build says so.
+- **A `data:` image** is refused, at build (PW5052) as in the browser
+  (`img-src 'self'`). Allowing one costs the policy nothing, as an image's
+  data makes no request; it is allowed when a program needs one.
 - **Reports**: no `report-to`. A refusal is said in the browser's console
   and seen by the suite; a deployment hears of none.
 - **Trusted Types** (`require-trusted-types-for 'script'`): the runtime
@@ -153,6 +181,13 @@ ADR-0258 (a sign-in at a provider).
 ## Acceptance
 
 Recorded by `just e14-page-policy` in `docs/evidence/E14/page-policy.txt`:
+
+- **The compiler's tests** (`tests/origins.rs`): an address's origin as a
+  browser reads it; each load from another origin refused where it is
+  written, in a page and in a view; a `<link>`'s address a value chooses
+  refused; the controls, a path, a navigation, an item's property, an image
+  a value chooses, a link's path built with a value, a page's canonical
+  address. The corpus at C22, `corpus-check` and generality 46 / 46.
 
 - **The server's tests** (`csp.rs`; `tests/page_policy.rs`; the moved
   page's in `tests/redirects.rs`; the identity provider's page's in

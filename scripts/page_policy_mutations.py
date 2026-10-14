@@ -4,6 +4,12 @@
 from the build and the deployment.
 
 Each mutant undoes one piece:
+- the build's refusal (PW5052): a scheme not another origin; a `//` naming
+  no host, or its `\\` spelling not; a tab inside an address, or its
+  leading spaces, kept; a srcset's later candidates not read; an image no
+  load; a link that is an item's property taken as a load; a link's address
+  a value chooses allowed; an address built with a value not read; a
+  link's text before its value taken as known wherever it starts;
 - the hashes: the script that starts the runtime not hashed, the data
   layer's style not hashed, a `<style>` the build writes not hashed, a text
   hashed with its CRs, the runtime's WebAssembly refused;
@@ -24,7 +30,10 @@ Each mutant undoes one piece:
   announcer served styled;
 - the runtime: the announcer, served unstyled, never hidden.
 
-Each must fail the server's policy tests (`csp::`, `tests::page_policy::`,
+A build mutant must fail the compiler's tests of the rule, the link rule's,
+the generality witnesses' and the corpus's (`tests/origins.rs`,
+`links.rs`, `generality.rs`, `checking_source.rs`); a host mutant, the
+server's policy tests (`csp::`, `tests::page_policy::`,
 and the moved page's and the identity provider's page's in
 `tests::redirects::` and `tests::sign_in::`); the runtime's, the
 announcer's test in `e2e/page-policy.spec.mjs`, in Chromium, after the
@@ -50,11 +59,96 @@ IDENTITY = ROOT / "spikes/own-renderer/server/src/identity.rs"
 RENDER = ROOT / "runtime/pw-render/src/lib.rs"
 
 RUNTIME = ROOT / "spikes/own-renderer/public/pw-runtime.mjs"
+ORIGINS = ROOT / "compiler/pw-core/src/origins.rs"
 
-SERVER_TESTS, BROWSER = "server", "browser"
+CORE, SERVER_TESTS, BROWSER = "core", "server", "browser"
 
 # (what is undone, the suite that kills it, file, anchor, replacement)
 MUTANTS = [
+    (
+        "a scheme is not another origin",
+        CORE,
+        ORIGINS,
+        "    if let Some(end) = scheme_end {\n",
+        "    if let Some(end) = scheme_end.filter(|_| false) {\n",
+    ),
+    (
+        "a `//` names no host",
+        CORE,
+        ORIGINS,
+        "        (Some('/' | '\\\\'), Some('/' | '\\\\'))\n",
+        "        (Some('#'), Some('#'))\n",
+    ),
+    (
+        "a `\\` is not a `/`",
+        CORE,
+        ORIGINS,
+        "        (Some('/' | '\\\\'), Some('/' | '\\\\'))\n",
+        "        (Some('/'), Some('/'))\n",
+    ),
+    (
+        "a tab inside an address is kept",
+        CORE,
+        ORIGINS,
+        "        .filter(|c| !matches!(c, '\\t' | '\\n' | '\\r'))\n",
+        "        .filter(|_| true)\n",
+    ),
+    (
+        "an address's leading spaces are kept",
+        CORE,
+        ORIGINS,
+        "    let trimmed = address.trim_matches(|c: char| c <= ' ');\n",
+        "    let trimmed = address;\n",
+    ),
+    (
+        "a srcset's candidates after its first are not read",
+        CORE,
+        ORIGINS,
+        "            .filter_map(|candidate| candidate.split_ascii_whitespace().next())\n            .collect()\n",
+        "            .filter_map(|candidate| candidate.split_ascii_whitespace().next())\n            .take(1)\n            .collect()\n",
+    ),
+    (
+        "an image is no load",
+        CORE,
+        ORIGINS,
+        "    (\"img\", \"src\"),\n",
+        "",
+    ),
+    (
+        "a link that is an item's property is taken as a load",
+        CORE,
+        ORIGINS,
+        "                    && ((!has(\"rel\") && has(\"itemprop\"))\n",
+        "                    && ((false && has(\"itemprop\"))\n",
+    ),
+    (
+        "a link's address a value chooses is allowed",
+        CORE,
+        ORIGINS,
+        "                        _ if element == \"link\" => Some(computed(tag, &a.name, &decl.name)),\n",
+        "",
+    ),
+    (
+        "an address built with a value is not read",
+        CORE,
+        ORIGINS,
+        "                            match written(with_values_unread(unquoted(text)).as_str()) {\n",
+        "                            match None::<String> {\n",
+    ),
+    (
+        "an address built with a value is read only to its first value",
+        CORE,
+        ORIGINS,
+        "                out.push('\\u{2026}');\n                rest = &rest[open + close + 1..];\n",
+        "                rest = \"\";\n                let _ = close;\n",
+    ),
+    (
+        "a link's text before its value is taken as known wherever it starts",
+        CORE,
+        ORIGINS,
+        "                                None if element == \"link\" && !start.contains(['/', '?', '#']) => {\n",
+        "                                None if element == \"link\" && start.is_empty() => {\n",
+    ),
     (
         "the script that starts the runtime is not hashed",
         SERVER_TESTS,
@@ -281,6 +375,11 @@ MUTANTS = [
     ),
 ]
 
+CORE_TESTS = [
+    "cargo", "test", "--locked", "-p", "pw-core",
+    "--test", "origins", "--test", "links", "--test", "generality", "--test", "checking_source",
+]
+
 CARGO = [
     "cargo", "test", "--locked", "-p", "pw-dev-server", "--",
     "csp::", "tests::page_policy::",
@@ -310,9 +409,9 @@ def bounded(cmd, **kw):
         return out, None
 
 
-def server_tests():
-    """(built, passed, failed) for the policy's tests."""
-    out, code = bounded(CARGO, cwd=ROOT)
+def cargo_tests(command):
+    """(built, passed, failed) for a cargo test command."""
+    out, code = bounded(command, cwd=ROOT)
     if code is None:
         return True, 0, 1
     found = re.findall(r"test result: \w+\. (\d+) passed; (\d+) failed", out)
@@ -343,7 +442,17 @@ def browser_tests():
     return passed + failed > 0, passed, failed
 
 
-SUITES = {SERVER_TESTS: server_tests, BROWSER: browser_tests}
+def core_tests():
+    """(built, passed, failed) for the build's refusal and the corpus."""
+    return cargo_tests(CORE_TESTS)
+
+
+def server_tests():
+    """(built, passed, failed) for the policy's tests."""
+    return cargo_tests(CARGO)
+
+
+SUITES = {CORE: core_tests, SERVER_TESTS: server_tests, BROWSER: browser_tests}
 
 
 def main():

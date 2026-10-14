@@ -1,0 +1,12 @@
+// @status: GENERAL
+// @invariant: load_from_another_origin
+//
+// Structurally different from R-066: a `<link>` that preloads, not an
+// image, in a view, not a page, at an address that names its host with
+// `//` and no scheme, which a browser fills in with the page's own.
+
+module generality.foreign_font
+
+view Fonts() !{} {
+    <link rel="preload" href="//fonts.example/store.woff2" as="font" />
+}
