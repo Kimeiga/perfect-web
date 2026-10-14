@@ -10,7 +10,9 @@
 // copy of the store.
 module UserOrders
 
-import domain.{ OrderStatus, OrderError, TrackingError, OrderCharged }
+import domain.{ OrderStatus, OrderError, TrackingError, OrderCharged, AwaitedPayment }
+// NEXT 6c: the payment an order awaits.
+import payments.{ Payment, PaymentStatus }
 import capability.{ User, UserId }
 // The resources these read and write, which their modules name.
 import Carts
@@ -32,3 +34,29 @@ fn place(reader: User<UserId>, charged: OrderCharged, promo: Option<String>) -> 
 // placed, or where it was placed with no charges recorded.
 fn charged(reader: User<UserId>) -> Option<OrderCharged> !{ database.read<Orders> }
     host "store:data/user-orders#charged"
+
+// **An order awaiting its payment** (NEXT 6c): the reader's cart placed as
+// their order, charged, its code used and the cart emptied, as `place` does,
+// awaiting the payment begun for it; its reference, which the payment
+// carries. Refused while an order of the reader's awaits one.
+fn await_payment(reader: User<UserId>, charged: OrderCharged, promo: Option<String>) -> Result<String, OrderError> !{ database.write<Orders>, database.write<Carts> }
+    host "store:data/user-orders#await-payment"
+
+// **The payment the reader's awaiting order awaits**, and the provider's
+// page for it, which the order page frames.
+fn paying(reader: User<UserId>, order: String, payment: Payment) -> Result<OrderStatus, OrderError> !{ database.write<Orders> }
+    host "store:data/user-orders#paying"
+
+// **The reader's order's payment, settled as the provider says it** (NEXT
+// 6c): placed where it succeeded; taken back where it was canceled (step
+// eight), its lines back in the cart and its code's use released; awaiting
+// still where it has not yet; a payment for an order the reader's is no
+// longer changes nothing.
+fn settle(reader: User<UserId>, order: String, status: PaymentStatus) -> Result<OrderStatus, OrderError> !{ database.write<Orders>, database.write<Carts> }
+    host "store:data/user-orders#settle"
+
+// **The payment the reader's order awaits** (step eight): its order's
+// reference and the payment's id, where an order of theirs awaits one the
+// provider has begun.
+fn awaited(reader: User<UserId>) -> Option<AwaitedPayment> !{ database.read<Orders> }
+    host "store:data/user-orders#awaited"

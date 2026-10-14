@@ -761,7 +761,8 @@ E14 comes before E11-E13. Its plan, controls and task list are
              command's transaction, on both layers, and answers a day;
           6. **checkout**, in steps: ~~6a, money rounded only where named~~
              (ADR-0327, merged 2026-10-13); ~~6b the order's total~~ (ADR-0329,
-             merged 2026-10-13, W9's); 6c payment (the integrator's); 6d a Stripe adapter
+             merged 2026-10-13, W9's); ~~6c payment~~ (ADR-0332, merged 2026-10-13);
+             6d a Stripe adapter
              (the owner's approval of each crate). Fees, taxes, a tip and
              promo codes, in money that
              cannot round silently (`Money` is USD's alone, so no other
@@ -825,6 +826,14 @@ E14 comes before E11-E13. Its plan, controls and task list are
             and over ADR-0292's 3.9 GiB bound. Still to measure: an
             opt-level for `cranelift-codegen` and `regalloc2` in the dev
             profile, against what it adds to a cold build and to `target/`;
+          - **a train fixed by a dispatch is verified** (the integrator's
+            finding at train-4's landing, 2026-10-13): `verified_base.py`
+            counts a commit only where a push's or the nightly's verify
+            passed at it, so a train whose run failed in one recipe, fixed
+            and re-run by dispatch, had its master push plan the whole train
+            again (verify 38494831583, cancelled by hand). Count a dispatch
+            at a commit that ran every recipe its train's run failed in and
+            every recipe the fix plans, with a test and its mutants;
           - **a recipe not yet measured is planned at its kind's upper
             quartile** (done, ADR-0290's amendment of 2026-10-09).
           - **a shard dealt within a ceiling under its limit** (done,

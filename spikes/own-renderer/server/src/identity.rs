@@ -281,6 +281,32 @@ struct PrincipalsInner {
     sessions: RwLock<HashMap<String, Principal>>,
 }
 
+/// **A session open on a reader's behalf**, closed when it goes.
+pub(crate) struct OnBehalf {
+    principals: Principals,
+    session: String,
+}
+
+/// **What the name of every session the platform opens on a reader's behalf
+/// begins with** (NEXT 6c, step seven). Its name is no secret (a payment's
+/// settling session is named by the payment, so that its interaction's
+/// record keys it, ADR-0325), so no browser's session may carry it: a cookie
+/// naming one is a new session of its own (`main.rs`'s `session_of`).
+pub(crate) const ON_BEHALF: &str = "on-behalf:";
+
+impl OnBehalf {
+    /// The session's name: [`ON_BEHALF`], then what it was opened for.
+    pub(crate) fn session(&self) -> &str {
+        &self.session
+    }
+}
+
+impl Drop for OnBehalf {
+    fn drop(&mut self) {
+        self.principals.close(&self.session);
+    }
+}
+
 /// **Each session's principal**, shared by the identity and the data layer
 /// that maps a session to its user (`DataLayer::identified_by`).
 #[derive(Debug, Clone, Default)]
@@ -317,6 +343,28 @@ impl Principals {
 
     fn close(&self, session: &str) {
         self.0.sessions.write().expect("principals").remove(session);
+    }
+
+    /// **A session the platform opens on a reader's behalf** (NEXT 6c, step
+    /// seven), named [`ON_BEHALF`] and then `name`: a payment settled as the
+    /// reader who began it, its `current_user()` theirs. Never a browser's:
+    /// no cookie is let name it, and it is closed when the guard goes,
+    /// whatever the command answered.
+    pub(crate) fn on_behalf(&self, name: &str, user: &str) -> OnBehalf {
+        let session = format!("{ON_BEHALF}{name}");
+        self.open(
+            &session,
+            Principal {
+                user: user.to_string(),
+                handle: String::new(),
+                name: String::new(),
+                issuer: "payments".to_string(),
+            },
+        );
+        OnBehalf {
+            principals: self.clone(),
+            session,
+        }
     }
 
     fn set_accounts(&self, on: bool) {

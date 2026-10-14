@@ -23,6 +23,27 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0332, 2026-10-13: a payment is the provider's word, held to its
+signature** (the integrator's; NEXT 6c; track `payments`, merged from
+`9a7a094f`).
+- A webhook is the provider's word only as it signed it (HMAC-SHA256 held
+  to RFC 4231, five minutes either way, every `v1` tried, compared whole),
+  and is read again from the provider before the host acts; a development
+  provider charges nothing and behaves as Stripe's API does.
+- A command `invoked_by Payments` settles a payment on the reader's behalf,
+  once the provider's word says so, and no reader presses it (PW6401 to
+  PW6405). The key is the host's, never a value a program holds.
+- Where the deployment takes payments, an order awaits its payment on the
+  provider's page, which the order page frames; the provider's word places
+  it; its reader, or the provider, takes it back, its lines back in the cart
+  and its code released. A deployment that takes none places as before.
+- Found on the way: a cookie naming the session a payment is settled in
+  was the reader's; an outcome the host could not settle was remembered
+  and never settled; a provider that never answered held the host's layer;
+  the host read a provider's answer to the connection's close; and
+  `secrets.payments()` does not build (not claimed, the reason recorded).
+Verify TRAIN_RUN green, with train-5.
+
 **ADR-0281 amended (5), 2026-10-13: a shell script a recipe runs plans
 it, and master's verify runs no browser suite again on the same code**
 (the integrator's; track `plan-shell`, merged from `f289fc9`).

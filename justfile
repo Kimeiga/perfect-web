@@ -23,6 +23,7 @@ import 'just/store-accounts.just'
 import 'just/store-search.just'
 import 'just/store-hours.just'
 import 'just/order-total.just'
+import 'just/payments.just'
 
 default:
     @just --list

@@ -23,6 +23,7 @@
     { "id": "48", "name": "Harbor Coffee", "cuisine": "Café, Bakery", "open": true, "said": "Open 24 hours", "description": "A neighborhood cafe by the water, pouring drip coffee brewed to order and matcha whisked by hand." }
   ],
   "order": { "$case": "none" },
+  "#store.page.OrderPage~6": { "$case": "none" },
   "menu": [
     { "category": { "id": "coffee", "name": "Coffee" }, "items": [
       { "id": "espresso", "store_id": "47", "name": "Espresso", "description": "A double shot, pulled short.", "price": 350, "price.display": "$3.50", "available": true, "category": { "id": "coffee", "name": "Coffee" } },

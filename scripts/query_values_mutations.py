@@ -76,9 +76,9 @@ MUTANTS = [
         # Re-anchored by track store-pg: the store's operations, built once
         # over either layer's rows.
         # Re-anchored by track store-accounts: an owner's, a session's or a user's.
-        "                        .map(|o| Box::new(Val::Variant(o.status, None)));\n",
-        "                        .map(|o| Box::new(Val::Variant(o.status, None)))\n"
-        "                        .filter(|_| false);\n",
+        # Re-anchored by NEXT 6c: an awaiting order's status carries its page.
+        "                        Some(o) => Some(Box::new(order_status(r, owner, o.status)?)),\n",
+        "                        Some(_) => None,\n",
     ),
     (
         "a no-session block is rendered",

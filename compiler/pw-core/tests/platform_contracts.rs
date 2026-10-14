@@ -468,7 +468,19 @@ fn the_trusted_platform_contract_is_hashed() {
     // `OrderError.TotalChanged(Money<USD>)`, and the checkout's `Tip`,
     // `PromoError`, `TipError`, `FundedBy`, `PartCharged`, `OrderCharged` and
     // `Charges` (track `order-total`, NEXT 6b).
-    const EXPECTED: u64 = 0x3da6_468c_8f20_7209;
+    // 2026-10-13: `payments` joins the platform (NEXT 6c, step six): a
+    // `Payment`, its `PaymentStatus`, a `Settled` outcome and `begin`,
+    // effect `payments.begin`, at the origin alone as the deployment's key.
+    // 2026-10-13: `payments.begin` takes no key, which is the host's (step
+    // seven); a `Payment` carries the provider's `page` for it, and
+    // `BeginError` gains `NotTaken`. `domain.pw`'s `OrderStatus` gains
+    // `AwaitingPayment(PaymentPage)`, its `OrderError` `AwaitingPayment` and
+    // `PaymentUnavailable`, and it begins a payment (`begin_payment`).
+    // 2026-10-13: step eight. `payments` gains `cancel`, effect
+    // `payments.cancel`, and its `CancelError`; `domain.pw`'s `OrderStatus`
+    // gains `Canceled`, and it declares `CancelOrderError` and
+    // `AwaitedPayment`.
+    const EXPECTED: u64 = 0x7ec9_a8b1_5d51_bc1c;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

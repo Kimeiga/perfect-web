@@ -93,6 +93,11 @@ fn the_store_builds_every_artifact_from_source() {
             "store.page.MenuSize",
             // A session's order (ADR-0193).
             "store.page.Order",
+            // The order page's two values computed from it (NEXT 6c): the
+            // provider's page an awaiting order is paid on, for its total's
+            // words and for the frame.
+            "store.page.OrderPage.derived_3",
+            "store.page.OrderPage.derived_6",
             // What the order was charged (track `order-total`).
             "store.page.OrderTotal",
             // The places an address may name, and whether the store reaches
@@ -109,6 +114,8 @@ fn the_store_builds_every_artifact_from_source() {
             "store.page.add_to_cart",
             // The cart's code applied (track `order-total`).
             "store.page.apply_promo",
+            // An order awaiting its payment, taken back (NEXT 6c, step eight).
+            "store.page.cancel_order",
             "store.page.choose_address",
             // Its tip, by percent and by amount (track `order-total`).
             "store.page.choose_tip",
@@ -124,6 +131,8 @@ fn the_store_builds_every_artifact_from_source() {
             // The cart's code taken off (track `order-total`).
             "store.page.remove_promo",
             "store.page.rename_address",
+            // A payment's outcome, settled (NEXT 6c).
+            "store.page.settle_payment",
             // The search (track `store-search`).
             "store.search.Search",
         ],
@@ -170,13 +179,14 @@ fn the_store_builds_every_artifact_from_source() {
     );
     assert_eq!(
         b.handlers.len(),
-        24,
+        25,
         "add_to_cart, clear_cart, and a line's three (ADR-0172); the cart \
          page's clear and a line's three (ADR-0190), its place_order, and \
          its checkout's seven: a code applied and taken off, four tips by \
          percent and one by amount (track `order-total`) \
          (ADR-0193); the address page's label and its four (track \
-         `store-accounts`)"
+         `store-accounts`); the order page's cancel_order (NEXT 6c, step \
+         eight)"
     );
     assert_eq!(
         b.contracts.len(),

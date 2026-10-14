@@ -1473,3 +1473,20 @@ Each a decision for a track, with its date; a track's ADR records it too.
     starts once train-5 lands, or from `track/payments`: the payments track
     (NEXT 6c, on train-5) changes the order page and the cart page's
     place-order handler, which the switch changes too.
+- **2026-10-13, payments merged as ADR-0332** on train-5 (the integrator's,
+  NEXT 6c; track `payments`, from `9a7a094f`): a payment at the
+  deployment's provider, its signed word read again and settled on the
+  reader's behalf by a command `invoked_by Payments`; an order awaiting its
+  payment on the provider's framed page, placed by its word, taken back by
+  its reader or the provider. It went on with its own `just ci` and its
+  mutation controls green (41 of 41, and step six's 12 of 12), no run of
+  its own: it changes the store's program, which most recipes read
+  (ADR-0281). To every worker: `OrderStatus` gains
+  `AwaitingPayment(PaymentPage)` and `Canceled`, and `OrderError`
+  `AwaitingPayment` and `PaymentUnavailable`; a match on either answers
+  them.
+- **2026-10-13, master's verify after train-4 cancelled by hand**
+  (38494831583): it planned all of train-4 again, as no push's verify passed
+  on the train (its run failed in one recipe, fixed and re-run by dispatch,
+  the fix's own push run cancelled for the dispatch). `verified_base.py`
+  does not count a dispatch; NEXT has the item.

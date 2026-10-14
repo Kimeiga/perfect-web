@@ -242,6 +242,14 @@ pub(crate) trait Rows {
     /// An owner's order moved along, the lines it was placed with kept;
     /// one set with none placed has none. `None` removes it.
     fn set_status(&mut self, owner: &str, status: Option<&str>) -> Result<(), String>;
+    /// NEXT 6c: the payment an owner's order awaits (`payments.rs`), none
+    /// where it awaits none; `None` sets none.
+    fn awaiting(&mut self, owner: &str) -> Result<Option<crate::payments::Awaiting>, String>;
+    fn set_awaiting(
+        &mut self,
+        owner: &str,
+        awaiting: Option<&crate::payments::Awaiting>,
+    ) -> Result<(), String>;
     fn notice(&mut self, store: &str) -> Result<Option<String>, String>;
     fn set_notice(&mut self, store: &str, text: &str) -> Result<(), String>;
     fn prep(&mut self, store: &str) -> Result<Option<i64>, String>;
@@ -278,6 +286,9 @@ pub(crate) trait Rows {
     fn set_promo(&mut self, promo: &crate::checkout::Promo) -> Result<(), String>;
     /// `owner`'s use of `code` recorded, or `false` where it was already.
     fn use_promo(&mut self, owner: &str, code: &str) -> Result<bool, String>;
+    /// `owner`'s use of `code` released (NEXT 6c, step eight): an order taken
+    /// back before it was paid used none.
+    fn release_promo(&mut self, owner: &str, code: &str) -> Result<(), String>;
     fn chosen(&mut self, owner: &str) -> Result<crate::checkout::Chosen, String>;
     fn set_chosen(&mut self, owner: &str, chosen: &crate::checkout::Chosen) -> Result<(), String>;
     /// `owner`'s latest order, its charges recorded.
@@ -314,6 +325,50 @@ impl Written {
             None => Vec::new(),
         })
     }
+}
+
+/// An order's status as the program reads it (NEXT 6c): its case, and an
+/// awaiting one's provider's page.
+const AWAITING: &str = "awaiting-payment";
+/// An order taken back before it was paid (step eight).
+const CANCELED: &str = "canceled";
+
+fn order_status(r: &mut dyn Rows, owner: &str, status: String) -> Result<Val, String> {
+    if status != AWAITING {
+        return Ok(Val::Variant(status, None));
+    }
+    let page = r.awaiting(owner)?.map(|a| a.page).unwrap_or_default();
+    Ok(Val::Variant(
+        status,
+        Some(Box::new(Val::Record(vec![(
+            "url".into(),
+            Val::String(page),
+        )]))),
+    ))
+}
+
+/// **An awaiting order taken back** (NEXT 6c, step eight): canceled, its
+/// lines back in the reader's cart beside what the cart holds now (a line of
+/// the same item gains its quantity), its code's use released, and the
+/// payment it awaited forgotten. The checkout's choices are the reader's to
+/// make again.
+fn take_back(r: &mut dyn Rows, owner: &str) -> Result<(), String> {
+    let Some(order) = r.order(owner)? else {
+        return Ok(());
+    };
+    let mut cart = r.cart(owner)?;
+    for line in order.lines {
+        match cart.iter_mut().find(|held| held.item == line.item) {
+            Some(held) => held.quantity += line.quantity,
+            None => cart.push(line),
+        }
+    }
+    r.set_cart(owner, &cart)?;
+    if let Some(code) = r.charged(owner)?.and_then(|c| c.promo) {
+        r.release_promo(owner, &code)?;
+    }
+    r.set_status(owner, Some(CANCELED))?;
+    r.set_awaiting(owner, None)
 }
 
 fn ok(v: Val) -> Vec<Val> {
@@ -568,9 +623,10 @@ fn unfaulted(with: With, session: &str, faults: &Faults) -> Ops {
                     this.as_str()
                 };
                 w(&mut |r| {
-                    let status = r
-                        .order(owner)?
-                        .map(|o| Box::new(Val::Variant(o.status, None)));
+                    let status = match r.order(owner)? {
+                        Some(o) => Some(Box::new(order_status(r, owner, o.status)?)),
+                        None => None,
+                    };
                     Ok(ok(Val::Option(status)))
                 })
             }),
@@ -593,6 +649,29 @@ fn unfaulted(with: With, session: &str, faults: &Faults) -> Ops {
             }),
         );
     }
+    // **The payment the reader's order awaits** (NEXT 6c, step eight): the
+    // order's reference and the payment's id, where an order of theirs
+    // awaits one the provider has begun.
+    let w = with.clone();
+    ops.insert(
+        "store:data/user-orders#awaited".to_string(),
+        Arc::new(move |args: &[Val]| {
+            let (owner, _) = reader_of("user-orders#awaited", args)?;
+            w(&mut |r| {
+                let awaits = r.order(owner)?.is_some_and(|o| o.status == AWAITING);
+                let awaited = match r.awaiting(owner)? {
+                    Some(a) if awaits && !a.payment.is_empty() => {
+                        Some(Box::new(Val::Record(vec![
+                            ("order".into(), Val::String(a.reference)),
+                            ("payment".into(), Val::String(a.payment)),
+                        ])))
+                    }
+                    _ => None,
+                };
+                Ok(vec![Val::Option(awaited)])
+            })
+        }),
+    );
     // The session's delivery estimate (E14, T10), after the estimator's
     // delay: a slow source, which a streamed region does not wait for.
     let estimator = faults
@@ -1183,6 +1262,118 @@ pub(crate) fn writes(
             }),
         );
     }
+    // **An order awaiting its payment** (NEXT 6c, step seven): placed as
+    // `user-orders#place` places one, its status `awaiting-payment`, with a
+    // reference of its own, which the payment carries. Refused while an
+    // order of the reader's awaits one.
+    let (w, placed) = (with.clone(), written.clone());
+    ops.insert(
+        "store:data/user-orders#await-payment".to_string(),
+        Arc::new(move |args: &[Val]| {
+            let op = "user-orders#await-payment";
+            let (owner, rest) = reader_of(op, args)?;
+            let charged = crate::checkout::place_args(rest)?;
+            w(&mut |r| {
+                if r.order(owner)?.is_some_and(|o| o.status == AWAITING) {
+                    return Ok(declared("awaiting-payment"));
+                }
+                let lines = r.cart(owner)?;
+                if lines.is_empty() {
+                    return Ok(declared("nothing-to-order"));
+                }
+                if !cart_reaches(r, &lines, owner)? {
+                    return Ok(declared("no-coverage"));
+                }
+                if !crate::checkout::place_charged(r, owner, &lines, &charged)? {
+                    return Ok(crate::checkout::already_used());
+                }
+                r.set_status(owner, Some(AWAITING))?;
+                r.set_cart(owner, &[])?;
+                let reference = format!("o-{}", &crate::identity::token()[..16]);
+                r.set_awaiting(
+                    owner,
+                    Some(&crate::payments::Awaiting {
+                        reference: reference.clone(),
+                        ..Default::default()
+                    }),
+                )?;
+                let mut written = placed.lock().expect("written");
+                written.wrote = true;
+                written.cart_total = Some(0);
+                Ok(ok(Val::String(reference)))
+            })
+        }),
+    );
+    // **The payment the reader's awaiting order awaits**, and the
+    // provider's page for it. Another order's reference changes nothing.
+    let (w, wrote) = (with.clone(), written.clone());
+    ops.insert(
+        "store:data/user-orders#paying".to_string(),
+        Arc::new(move |args: &[Val]| {
+            let op = "user-orders#paying";
+            let (owner, rest) = reader_of(op, args)?;
+            let [Val::String(reference), Val::Record(payment)] = rest else {
+                return Err(format!("{op} received {args:?}"));
+            };
+            let field = |name: &str| match payment.iter().find(|(n, _)| n == name) {
+                Some((_, Val::String(v))) => Ok(v.clone()),
+                other => Err(format!("{op}'s payment has no `{name}`: {other:?}")),
+            };
+            let (id, page) = (field("id")?, field("page")?);
+            w(&mut |r| {
+                if let Some(a) = r.awaiting(owner)?
+                    && a.reference == *reference
+                {
+                    r.set_awaiting(
+                        owner,
+                        Some(&crate::payments::Awaiting {
+                            reference: reference.clone(),
+                            payment: id.clone(),
+                            page: page.clone(),
+                        }),
+                    )?;
+                    wrote.lock().expect("written").wrote = true;
+                }
+                let status = r.order(owner)?.map(|o| o.status).unwrap_or_default();
+                Ok(ok(order_status(r, owner, status)?))
+            })
+        }),
+    );
+    // **The reader's order's payment, settled as the provider says it**:
+    // placed where it succeeded and the order awaits that payment; the
+    // order as it is otherwise, a payment heard twice or for an order the
+    // reader's is no longer changing nothing.
+    let (w, wrote) = (with.clone(), written.clone());
+    ops.insert(
+        "store:data/user-orders#settle".to_string(),
+        Arc::new(move |args: &[Val]| {
+            let op = "user-orders#settle";
+            let (owner, rest) = reader_of(op, args)?;
+            let [Val::String(reference), Val::Variant(status, None)] = rest else {
+                return Err(format!("{op} received {args:?}"));
+            };
+            w(&mut |r| {
+                let awaits = r.order(owner)?.is_some_and(|o| o.status == AWAITING)
+                    && r.awaiting(owner)?
+                        .is_some_and(|a| a.reference == *reference);
+                if awaits && status == "succeeded" {
+                    r.set_status(owner, Some("placed"))?;
+                    r.set_awaiting(owner, None)?;
+                    wrote.lock().expect("written").wrote = true;
+                }
+                // Step eight: taken back where it was canceled, by its reader
+                // or by the provider.
+                if awaits && status == "canceled" {
+                    take_back(r, owner)?;
+                    wrote.lock().expect("written").wrote = true;
+                }
+                match r.order(owner)? {
+                    Some(o) => Ok(ok(order_status(r, owner, o.status)?)),
+                    None => Ok(declared("nothing-to-order")),
+                }
+            })
+        }),
+    );
     // **A reader's addresses, written** (track `store-accounts`, milestone
     // 2): add one (a label and a place from the table, chosen as it is
     // saved), rename one, remove one (the chosen one leaves none chosen), or
@@ -1637,6 +1828,8 @@ pub(crate) struct State {
     promo_uses: std::collections::BTreeSet<(String, String)>,
     choices: BTreeMap<String, crate::checkout::Chosen>,
     charged: BTreeMap<String, crate::checkout::Charged>,
+    /// NEXT 6c: the payment each owner's order awaits.
+    awaiting: BTreeMap<String, crate::payments::Awaiting>,
 }
 
 impl State {
@@ -1686,6 +1879,7 @@ impl State {
             promo_uses: Default::default(),
             choices: BTreeMap::new(),
             charged: BTreeMap::new(),
+            awaiting: BTreeMap::new(),
         }
     }
 }
@@ -1789,6 +1983,26 @@ impl Rows for MemRows {
                 // TRACK SEAM (order-total): its charges with it, as
                 // PostgreSQL's go with the order's row.
                 self.state().charged.remove(session);
+                // NEXT 6c: and the payment it awaited.
+                self.state().awaiting.remove(session);
+            }
+        }
+        Ok(())
+    }
+    fn awaiting(&mut self, owner: &str) -> Result<Option<crate::payments::Awaiting>, String> {
+        Ok(self.state.awaiting.get(owner).cloned())
+    }
+    fn set_awaiting(
+        &mut self,
+        owner: &str,
+        awaiting: Option<&crate::payments::Awaiting>,
+    ) -> Result<(), String> {
+        match awaiting {
+            Some(a) => {
+                self.state().awaiting.insert(owner.to_string(), a.clone());
+            }
+            None => {
+                self.state().awaiting.remove(owner);
             }
         }
         Ok(())
@@ -1865,6 +2079,12 @@ impl Rows for MemRows {
             .state()
             .promo_uses
             .insert((code.to_string(), owner.to_string())))
+    }
+    fn release_promo(&mut self, owner: &str, code: &str) -> Result<(), String> {
+        self.state()
+            .promo_uses
+            .remove(&(code.to_string(), owner.to_string()));
+        Ok(())
     }
     fn chosen(&mut self, owner: &str) -> Result<crate::checkout::Chosen, String> {
         Ok(self.state.choices.get(owner).cloned().unwrap_or_default())

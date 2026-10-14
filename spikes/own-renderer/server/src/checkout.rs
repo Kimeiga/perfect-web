@@ -745,6 +745,17 @@ pub(crate) fn pg_use_promo(c: &mut Counted<'_>, owner: &str, code: &str) -> Resu
     Ok(n == 1)
 }
 
+/// **`owner`'s use of `code` released** (NEXT 6c, step eight): an order
+/// taken back before it was paid used none.
+pub(crate) fn pg_release_promo(c: &mut Counted<'_>, owner: &str, code: &str) -> Result<(), String> {
+    c.execute(
+        "DELETE FROM promo_uses WHERE code = $1 AND owner = $2",
+        &[&code, &owner],
+    )
+    .map_err(pg)?;
+    Ok(())
+}
+
 fn tip_parts(t: &Tip) -> (&'static str, i64) {
     match t {
         Tip::None => ("none", 0),

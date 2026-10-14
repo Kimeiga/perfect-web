@@ -334,7 +334,7 @@
     "path": "store.page.CartPage",
     "name": "CartPage",
     "params": [],
-    "schema": "134d304637a66d2b",
+    "schema": "866b19e7ab8fe89c",
     "chunks": [
       {
         "chunk": "static",
@@ -951,7 +951,7 @@
                 "id": 40,
                 "owner": 14,
                 "event": "press",
-                "handler": "b7567b82874d05d7",
+                "handler": "28c5a41dbe465f7d",
                 "name": "place_order",
                 "captures": [
                   "checkout.charges.total"
@@ -1184,7 +1184,7 @@
     "path": "store.page.OrderPage",
     "name": "OrderPage",
     "params": [],
-    "schema": "a2e8359fe0a92607",
+    "schema": "411f40898a3e8e15",
     "chunks": [
       {
         "chunk": "static",
@@ -1260,26 +1260,99 @@
                             "value": "<p id=\"order-status\">Delivered.</p>\n                    "
                           }
                         ]
+                      },
+                      {
+                        "case": "awaiting-payment",
+                        "binding": "_",
+                        "body": [
+                          {
+                            "chunk": "static",
+                            "value": "<p id=\"order-status\">Awaiting your payment: pay below, on the provider's page.</p>\n                    "
+                          }
+                        ]
+                      },
+                      {
+                        "case": "canceled",
+                        "body": [
+                          {
+                            "chunk": "static",
+                            "value": "<p id=\"order-status\">Canceled: its items are back in your cart.</p>\n                    "
+                          }
+                        ]
                       }
                     ]
                   }
                 },
                 {
                   "chunk": "static",
-                  "value": "\n                    <p id=\"order-total\">Total charged: "
+                  "value": "\n                    \n                    "
                 },
                 {
                   "chunk": "dynamic",
                   "value": {
-                    "part": "text",
+                    "part": "match",
                     "id": 3,
-                    "value": "charged.display",
-                    "context": "text"
+                    "value": "#store.page.OrderPage~3",
+                    "arms": [
+                      {
+                        "case": "to-pay",
+                        "body": [
+                          {
+                            "chunk": "static",
+                            "value": "<p id=\"order-total\">Total to pay: "
+                          },
+                          {
+                            "chunk": "dynamic",
+                            "value": {
+                              "part": "text",
+                              "id": 4,
+                              "value": "charged.display",
+                              "context": "text"
+                            }
+                          },
+                          {
+                            "chunk": "static",
+                            "value": "</p>\n                    "
+                          }
+                        ]
+                      },
+                      {
+                        "case": "charged",
+                        "body": [
+                          {
+                            "chunk": "static",
+                            "value": "<p id=\"order-total\">Total charged: "
+                          },
+                          {
+                            "chunk": "dynamic",
+                            "value": {
+                              "part": "text",
+                              "id": 5,
+                              "value": "charged.display",
+                              "context": "text"
+                            }
+                          },
+                          {
+                            "chunk": "static",
+                            "value": "</p>\n                    "
+                          }
+                        ]
+                      },
+                      {
+                        "case": "not-charged",
+                        "body": [
+                          {
+                            "chunk": "static",
+                            "value": "<p id=\"order-total\">Nothing was charged.</p>\n                    "
+                          }
+                        ]
+                      }
+                    ]
                   }
                 },
                 {
                   "chunk": "static",
-                  "value": "</p>\n                "
+                  "value": "\n                "
                 }
               ]
             },
@@ -1297,13 +1370,108 @@
       },
       {
         "chunk": "static",
-        "value": "\n            </section>\n            <p><a href=\"/\">Order from a store</a></p>\n        </main><!--/pw-slot-->"
+        "value": "\n            </section>\n            \n            "
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "match",
+          "id": 6,
+          "value": "#store.page.OrderPage~6",
+          "arms": [
+            {
+              "case": "some",
+              "binding": "pay",
+              "body": [
+                {
+                  "chunk": "static",
+                  "value": "<section aria-label=\"Payment\">\n                <iframe data-pw=\"0\" id=\"payment\" "
+                },
+                {
+                  "chunk": "dynamic",
+                  "value": {
+                    "part": "attribute",
+                    "id": 7,
+                    "owner": 0,
+                    "name": "src",
+                    "value": "pay.url",
+                    "context": "url"
+                  }
+                },
+                {
+                  "chunk": "static",
+                  "value": " title=\"Pay for your order\"></iframe>\n                \n                "
+                },
+                {
+                  "chunk": "dynamic",
+                  "value": {
+                    "part": "conditional",
+                    "id": 8,
+                    "value": "SignedIn~holds",
+                    "then": [
+                      {
+                        "chunk": "static",
+                        "value": "<button data-pw=\"1\" id=\"cancel-order\" type=\"button\""
+                      },
+                      {
+                        "chunk": "dynamic",
+                        "value": {
+                          "part": "event",
+                          "id": 9,
+                          "owner": 1,
+                          "event": "press",
+                          "handler": "6f4329b46ef92224",
+                          "name": "cancel_order"
+                        }
+                      },
+                      {
+                        "chunk": "static",
+                        "value": ">\n                    Cancel this order\n                </button>"
+                      }
+                    ],
+                    "otherwise": []
+                  }
+                },
+                {
+                  "chunk": "static",
+                  "value": "\n            </section>\n            "
+                }
+              ]
+            },
+            {
+              "case": "none",
+              "body": [
+                {
+                  "chunk": "static",
+                  "value": "\n            "
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "\n            \n            <p id=\"order-notice\" role=\"status\">"
+      },
+      {
+        "chunk": "dynamic",
+        "value": {
+          "part": "text",
+          "id": 10,
+          "value": "notice",
+          "context": "text"
+        }
+      },
+      {
+        "chunk": "static",
+        "value": "</p>\n            <p><a href=\"/\">Order from a store</a></p>\n        </main><!--/pw-slot-->"
       },
       {
         "chunk": "dynamic",
         "value": {
           "part": "title",
-          "id": 4,
+          "id": 11,
           "pieces": [
             {
               "piece": "text",

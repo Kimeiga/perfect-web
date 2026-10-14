@@ -232,6 +232,9 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
             // Track `uploads` (ADR-0260): an upload's clauses, its paths, and
             // the forms that post a file.
             out.extend(crate::uploads::check(&hirs, i));
+            // NEXT 6c: a command the platform invokes, which no reader
+            // presses (PW64xx).
+            out.extend(crate::invoked::check(&hirs, i, &workspace, &sent));
             // ADR-0163: a page says when its address names nothing.
             out.extend(not_found_names_a_case(&u.hir, i, &sigs, &workspace));
             // ADR-0295: and when it is another address of the page.

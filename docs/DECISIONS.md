@@ -2916,3 +2916,9 @@ a case crosses from a browser (the integrator's; W9's finding in NEXT 6b).
 - ADR-0281 amended (5), 2026-10-13: a shell script a recipe runs plans it;
   master's verify skips the browser suites where only records changed since
   the run that passed.
+[ADR-0332](DECISIONS/ADR-0332-a-payment-is-the-providers-word-held-to-its-signature.md):
+a payment is the provider's word, held to its signature (the integrator's;
+NEXT 6c).
+- A signed webhook, read again; a command `invoked_by Payments`, on the
+  reader's behalf; an order awaiting its payment, framed, placed by the
+  provider's word, taken back by its reader or the provider.
