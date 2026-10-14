@@ -24,6 +24,11 @@ pub enum PrivacyQualifier {
 /// outbox with the command's writes, and sent if and only if they commit.
 pub const OUTBOX_WRITE: &str = "outbox.write";
 
+/// **What a `schedule` or an `unschedule` performs** (the scheduled-commands
+/// track): a run of a command the clock invokes, written with its command's
+/// writes.
+pub const CLOCK_SCHEDULE: &str = "clock.schedule";
+
 #[derive(Debug, Clone)]
 pub struct Signature {
     pub path: String,

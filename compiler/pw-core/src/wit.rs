@@ -937,6 +937,62 @@ pub fn package(
             slot.1.push(text);
         }
     }
+    // **The schedules' functions** (the scheduled-commands track): for each
+    // command a body schedules or cancels, `-at` and `-after` taking its
+    // parameters and then the time, an `s64`, and `-cancel` its parameters,
+    // each answering nothing.
+    for (unit, hir) in hirs.iter().enumerate() {
+        for (decl_id, d) in hir.all_decls() {
+            if d.kind != DeclKind::Command {
+                continue;
+            }
+            let Some(sig) = sigs.by_def(DefId {
+                unit,
+                decl: decl_id.0,
+            }) else {
+                continue;
+            };
+            for how in crate::backend::SCHEDULE_HOWS {
+                let id = crate::backend::schedule_binding(&sig.path, how);
+                if !wanted.contains(&format!("{}#{}", id.interface, id.name)) {
+                    continue;
+                }
+                let Some((pkg, iface)) = id.interface.split_once('/') else {
+                    continue;
+                };
+                let mut params = sig.params.clone();
+                if how != "cancel" {
+                    let int = crate::resolved::ResolvedType::inferred(
+                        &crate::resolved::TypeKey::Primitive(crate::resolved::Primitive::Int),
+                        &|_| None,
+                        &d.name_span,
+                    )
+                    .map(crate::resolved::TypeResolution::Resolved)
+                    .ok_or_else(|| WitError::Unmappable {
+                        ty: "a schedule's time".into(),
+                        at: id.qualified(),
+                    })?;
+                    params.push(Some(int));
+                }
+                let taking = Interface {
+                    params,
+                    returns: None,
+                };
+                let (text, used) = wit_func(&id.name, &taking, &types)?;
+                host_uses.extend(used.iter().cloned());
+                let entry = hosts.entry(pkg.to_string()).or_insert_with(|| HostPackage {
+                    name: pkg.to_string(),
+                    interfaces: BTreeMap::new(),
+                });
+                let slot = entry
+                    .interfaces
+                    .entry(iface.to_string())
+                    .or_insert_with(|| (BTreeSet::new(), Vec::new()));
+                slot.0.extend(used);
+                slot.1.push(text);
+            }
+        }
+    }
     for h in hosts.values_mut() {
         for (_, funcs) in h.interfaces.values_mut() {
             funcs.sort();

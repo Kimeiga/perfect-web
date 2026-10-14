@@ -47,9 +47,11 @@ import context.{ current_session, current_user }
 import domain.{ StoreId, Store, StoreError, CartError, MenuItem, MenuSection, InteractionId,
     MenuItemId, PositiveInt, Recommendation, RecommendationError, DeliveryEstimate,
     EstimateError, OrderStatus, OrderError, TrackingError, Tip, TipError, PromoError,
-    Money, USD, is_less, begin_payment, PaymentPage, CancelOrderError }
+    Money, USD, is_less, begin_payment, PaymentPage, CancelOrderError, AwaitedPayment }
 // NEXT 6c: a payment begun, and settled on the provider's word.
 import payments.{ Settled, PaymentStatus, BeginError, CancelError }
+// The scheduled-commands track: an order no one pays is taken back.
+import clock.{ minutes }
 import capability.{ Session, SessionId, User, UserId }
 import Events.{ MenuChanged, InventoryChanged, UserCartChanged, UserOrderChanged, AddressesChanged, StoreChanged }
 // TRACK SEAM (store-hours): each store's hours, and whether it is open.
@@ -448,7 +450,13 @@ command place_order(shown: Money<USD>)
                 match UserOrders.await_payment(current_user(), p.charged, p.promo) {
                     Err(e) => Err(e),
                     Ok(order) => match begin_payment(order, p.charged.total) {
-                        Ok(payment) => UserOrders.paying(current_user(), order, payment),
+                        // Taken back thirty minutes on where no one has paid
+                        // or taken it back since (the scheduled-commands
+                        // track, ADR-0332's sweep).
+                        Ok(payment) => {
+                            schedule expire_order(order) after minutes(30)
+                            UserOrders.paying(current_user(), order, payment)
+                        },
                         Err(BeginError.NotTaken) => UserOrders.settle(current_user(), order, PaymentStatus.Succeeded),
                         Err(BeginError.TransportFailed) => Err(OrderError.PaymentUnavailable),
                     },
@@ -470,7 +478,22 @@ command settle_payment(settled: Settled)
     invalidates   Cart(current_user()), Order(current_user()), Checkout(current_user()), OrderTotal(current_user())
     emits         UserCartChanged(current_user()), UserOrderChanged(current_user())
 {
+    // Paid, or given up: no order is left to take back (the
+    // scheduled-commands track). One waiting still, for a card or the bank,
+    // keeps its sweep.
+    if settled_for_good(settled.status) {
+        unschedule expire_order(settled.order)
+    }
     UserOrders.settle(current_user(), settled.order, settled.status)
+}
+
+// **Whether a payment's status is its last**: paid, or given up.
+fn settled_for_good(status: PaymentStatus) -> Bool !{} {
+    match status {
+        PaymentStatus.Succeeded => true,
+        PaymentStatus.Canceled => true,
+        _ => false,
+    }
 }
 
 // **An order awaiting its payment, taken back by its reader** (NEXT 6c, step
@@ -488,15 +511,50 @@ command cancel_order()
 {
     match UserOrders.awaited(current_user()) {
         None => Err(CancelOrderError.NotAwaitingPayment),
-        Some(awaited) => match payments.cancel(awaited.payment) {
-            Ok(_) => match UserOrders.settle(current_user(), awaited.order, PaymentStatus.Canceled) {
-                Ok(status) => Ok(status),
-                // Its order gone since it was read: none to take back.
-                Err(_) => Err(CancelOrderError.NotAwaitingPayment),
-            },
-            Err(CancelError.Past(_)) => Err(CancelOrderError.Paid),
-            Err(CancelError.TransportFailed) => Err(CancelOrderError.PaymentUnavailable),
+        // Taken back, it is not swept (the scheduled-commands track).
+        Some(awaited) => {
+            unschedule expire_order(awaited.order)
+            take_back(current_user(), awaited)
         },
+    }
+}
+
+// **An order no one paid, taken back** (the scheduled-commands track,
+// ADR-0332's sweep): run by the clock thirty minutes after its reader placed
+// it awaiting its payment, on their behalf, as their cancel takes it back.
+// Paid or taken back since, it is no longer awaiting, and stands as it is.
+command expire_order(order: String)
+    -> Result<OrderStatus, CancelOrderError>
+    invoked_by    Clock
+    idempotent_by InteractionId
+    transaction   serializable
+    invalidates   Cart(current_user()), Order(current_user()), Checkout(current_user()), OrderTotal(current_user())
+    emits         UserCartChanged(current_user()), UserOrderChanged(current_user())
+{
+    match UserOrders.awaited(current_user()) {
+        Some(awaited) => if awaited.order == order {
+            take_back(current_user(), awaited)
+        } else {
+            Err(CancelOrderError.NotAwaitingPayment)
+        },
+        None => Err(CancelOrderError.NotAwaitingPayment),
+    }
+}
+
+// **An order awaiting its payment, taken back for `reader`** (NEXT 6c, step
+// eight): its payment canceled at the provider, then the order canceled, its
+// lines back in the cart and its code's use released. Where the provider
+// says the payment is past canceling, the order stands, and the provider's
+// word places it.
+fn take_back(reader: User<UserId>, awaited: AwaitedPayment) -> Result<OrderStatus, CancelOrderError> {
+    match payments.cancel(awaited.payment) {
+        Ok(_) => match UserOrders.settle(reader, awaited.order, PaymentStatus.Canceled) {
+            Ok(status) => Ok(status),
+            // Its order gone since it was read: none to take back.
+            Err(_) => Err(CancelOrderError.NotAwaitingPayment),
+        },
+        Err(CancelError.Past(_)) => Err(CancelOrderError.Paid),
+        Err(CancelError.TransportFailed) => Err(CancelOrderError.PaymentUnavailable),
     }
 }
 

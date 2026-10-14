@@ -77,10 +77,12 @@ jobs:
               # A track's push (ADR-0253): what the track changed since it left
               # `master`, at every push, in 9 shards, so that `master`'s runs
               # keep most of the plan's 20 jobs; in more where 9 would end past
-              # the planner's ceiling (ADR-0290, amended 2026-10-10).
+              # the planner's ceiling (ADR-0290, amended 2026-10-10). Less each
+              # recipe whose committed evidence is current, here and on
+              # `master` (ADR-0281, amended 2026-10-13 (6)).
               if [ "${GITHUB_REF_NAME#track/}" != "$GITHUB_REF_NAME" ]; then
                 base=$(git merge-base origin/master "$GITHUB_SHA")
-                python3 scripts/ci_plan.py --shards 9 --changed "$base" "$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+                python3 scripts/ci_plan.py --shards 9 --changed "$base" "$GITHUB_SHA" --current >> "$GITHUB_OUTPUT"
               # The chain's choice, from the newest commit pushed that a run
               # passed at: a train verified at its head is not verified again
               # when `master` moves to it (ADR-0281, amended 2026-10-13). A
@@ -88,7 +90,7 @@ jobs:
               elif git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
                 base=$(python3 scripts/verified_base.py "$BEFORE" "$GITHUB_SHA")
                 echo "planned from $base (the push's before: $BEFORE)"
-                python3 scripts/ci_plan.py --shards 17 --changed "$base" "$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+                python3 scripts/ci_plan.py --shards 17 --changed "$base" "$GITHUB_SHA" --current >> "$GITHUB_OUTPUT"
                 # And the browser suites, not again where only records
                 # changed since the run that passed (the same amendment).
                 if [ "$base" != "$BEFORE" ]; then

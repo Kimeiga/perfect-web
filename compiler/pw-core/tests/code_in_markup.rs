@@ -81,7 +81,14 @@ fn a_template_writes_no_script_url() {
     );
     clean("<a href=\"https://example.com/a?b={msg}\">x</a>");
     clean("<a href=\"/stores/{msg}:menu\">x</a>");
-    clean("<img src=\"data:image/png;base64,AAAA\" alt=\"a\" />");
+    clean("<a href=\"mailto:orders@example.com\">x</a>");
+    // A `data:` image runs nothing: PW5023 says nothing of it. It is a load
+    // from no origin of the page's, which its policy refuses, and PW5052 is
+    // what refuses it (ADR-0195's ruling 13).
+    one(
+        "<img src=\"data:image/png;base64,AAAA\" alt=\"a\" />",
+        "PW5052 `<img src=\"data:image/png;base64,AAAA\">` in `Note` loads from `data:`",
+    );
 }
 
 #[test]

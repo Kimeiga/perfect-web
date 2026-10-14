@@ -579,3 +579,84 @@ fn on_postgres_an_entry_written_with_a_wildcard_is_every_entry() {
         "each session's timeline at 20 was dropped"
     );
 }
+
+// --- the scheduled-commands track ---------------------------------------
+
+/// **Two commands a test adds to the feed**: `post_in_five`, which
+/// schedules a post of `text` five minutes on, and `post_later`, which the
+/// clock runs then, on behalf of the reader who scheduled it.
+const SCHEDULING: &str = r#"
+// A test's: a post of `text`, by the clock.
+command post_later(text: PostText) -> Result<Post, FeedError>
+    invoked_by    Clock
+    idempotent_by InteractionId
+    emits         Posted(author(current_session()))
+{
+    publish(current_session(), text)
+}
+
+// A test's: `post_later(text)` scheduled five minutes on.
+command post_in_five(text: PostText) -> Result<Int, FeedError>
+    requires      SignedIn
+    idempotent_by InteractionId
+{
+    schedule post_later(text) after minutes(5)
+    Ok(1)
+}
+"#;
+
+/// The feed's `app.pw`, with [`SCHEDULING`]'s commands and the clock's
+/// `minutes` they read.
+fn with_scheduling(app: &str) -> String {
+    let imported = app.replacen(
+        "\nimport List\n",
+        "\nimport List\nimport clock.{ minutes }\n",
+        1,
+    );
+    format!("{imported}{SCHEDULING}")
+}
+
+/// **On the feed too, a run is kept by its database** (the
+/// scheduled-commands track): written with the scheduling command's writes
+/// in the feed's schema, run by a host started after it once its time has
+/// passed, as the reader who scheduled it, and removed. The control: before
+/// its time, nothing is posted.
+#[test]
+fn on_postgres_a_feeds_run_is_kept_by_its_database() {
+    let Some(url) = database() else { return };
+    let db = Schema::new(&url, "scheduled");
+    let (_dir, out) = built_feed_with(with_scheduling);
+    let host = || {
+        let layer = FeedPg::open(&url, Some(&db.name)).expect("the layer");
+        Server::from_build_with(out.clone(), out.clone(), Some(Arc::new(layer))).expect("served")
+    };
+    let posts = {
+        let s = host();
+        let scheduled = posted(
+            &s,
+            "/command/feed.app.post_in_five",
+            "a",
+            "i-1",
+            "[\"Later\"]",
+        );
+        assert!(scheduled.contains("\"committed\":true"), "{scheduled}");
+        db.count("SELECT count(*) FROM posts")
+    };
+    assert_eq!(db.count("SELECT count(*) FROM schedules"), 1);
+    let due = db.count("SELECT due_ms FROM schedules");
+    let s = host();
+    let ahead = due - s.now();
+    posted(
+        &s,
+        &format!("/bench/clock?advance={}", ahead - 1000),
+        "clock",
+        "c-1",
+        "",
+    );
+    assert_eq!(s.run_due().0, 0, "the control: a second before its time");
+    assert_eq!(db.count("SELECT count(*) FROM posts"), posts);
+    posted(&s, "/bench/clock?advance=1000", "clock", "c-2", "");
+    assert_eq!(s.run_due().0, 1);
+    assert_eq!(db.count("SELECT count(*) FROM posts"), posts + 1);
+    assert_eq!(db.count("SELECT count(*) FROM schedules"), 0, "removed");
+}

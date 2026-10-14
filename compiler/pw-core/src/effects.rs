@@ -596,6 +596,24 @@ impl<'a> Inference<'a> {
             // what is legal inside it — `contexts::elsewhere` and
             // `forbidden_in_phase` — but those read the EXECUTION CONTEXT and
             // the body's real effects, which they already did.
+            //
+            // **A schedule performs `clock.schedule`** (the scheduled-commands
+            // track): a statement, not a call, charged where it is written, as
+            // a call to the host is, so a command that schedules declares it.
+            if let Expr::Keyword { keyword, .. } = body.expr(id)
+                && matches!(keyword.as_str(), "schedule" | "unschedule")
+            {
+                let effect = crate::signatures::CLOCK_SCHEDULE.to_string();
+                out.effects.insert(effect.clone());
+                out.sources.push(Source {
+                    effect,
+                    span: body.expr_span(id),
+                    via: Via::Direct {
+                        callee: keyword.clone(),
+                    },
+                });
+                continue;
+            }
             let Expr::Call { callee, .. } = body.expr(id) else {
                 continue;
             };

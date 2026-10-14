@@ -474,6 +474,14 @@
       ]
     },
     {
+      "path": "store.page.expire_order",
+      "name": "expire_order",
+      "node": "command",
+      "params": [
+        "order"
+      ]
+    },
+    {
       "path": "store.page.increase_in_cart",
       "name": "increase_in_cart",
       "node": "command",
@@ -1068,6 +1076,54 @@
     {
       "from": "store.page.decrease_in_cart",
       "to": "store.page.Cart",
+      "kind": "invalidates",
+      "key": [
+        "current_user()"
+      ]
+    },
+    {
+      "from": "store.page.expire_order",
+      "to": "Events.UserCartChanged",
+      "kind": "emits",
+      "key": [
+        "current_user()"
+      ]
+    },
+    {
+      "from": "store.page.expire_order",
+      "to": "Events.UserOrderChanged",
+      "kind": "emits",
+      "key": [
+        "current_user()"
+      ]
+    },
+    {
+      "from": "store.page.expire_order",
+      "to": "store.page.Cart",
+      "kind": "invalidates",
+      "key": [
+        "current_user()"
+      ]
+    },
+    {
+      "from": "store.page.expire_order",
+      "to": "store.page.Checkout",
+      "kind": "invalidates",
+      "key": [
+        "current_user()"
+      ]
+    },
+    {
+      "from": "store.page.expire_order",
+      "to": "store.page.Order",
+      "kind": "invalidates",
+      "key": [
+        "current_user()"
+      ]
+    },
+    {
+      "from": "store.page.expire_order",
+      "to": "store.page.OrderTotal",
       "kind": "invalidates",
       "key": [
         "current_user()"

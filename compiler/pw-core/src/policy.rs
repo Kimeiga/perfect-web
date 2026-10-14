@@ -316,7 +316,7 @@ pub fn domain_of(head: &str) -> Option<Domain> {
         "requires" => Domain::PredicateRef,
         // NEXT 6c: who invokes a command that no reader presses, a word of
         // the platform's: `Payments`, the host on its provider's word.
-        "invoked_by" => Domain::Word(&["Payments"]),
+        "invoked_by" => Domain::Word(crate::invoked::INVOKERS),
         "placement" => Domain::Worlds,
         "privacy" => Domain::LabelCtor,
         "capability" => Domain::EffectRef,

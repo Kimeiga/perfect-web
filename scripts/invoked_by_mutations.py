@@ -83,9 +83,11 @@ MUTANTS = [
     ),
     (
         "a word the platform does not invoke by is taken",
-        POLICY,
-        '        "invoked_by" => Domain::Word(&["Payments"]),\n',
-        '        "invoked_by" => Domain::Word(&["Payments", "Stripe"]),\n',
+        # Re-anchored by the scheduled-commands track: the clause's words
+        # are `invoked.rs`'s, which `policy.rs` reads, and the clock is one.
+        INVOKED,
+        'pub const INVOKERS: &[&str] = &["Payments", "Clock"];\n',
+        'pub const INVOKERS: &[&str] = &["Payments", "Clock", "Stripe"];\n',
     ),
     (
         "the clause is taken on a query",

@@ -227,7 +227,7 @@ MUTANTS = [
         "a second announcer is added beside the served one",
         "browser",
         RUNTIME,
-        '  announcer ??= document.querySelector(".pw-announcer[role=status]");\n',
+        '  announcer = document.querySelector(".pw-announcer[role=status]");\n',
         "",
     ),
     (

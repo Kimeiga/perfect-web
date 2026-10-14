@@ -11,8 +11,11 @@ The recipes are `just`'s own list, kept where they record evidence
   whose tests the range changed, a Rust test or a browser spec (ADR-0281);
   each recipe that runs a browser spec the range changed; each recipe whose
   own script changed or reads a program or a benchmark the range changed
-  (`data_inputs`), or runs a shell script the range changed; and each
-  recipe whose own lines changed;
+  (`data_inputs`), whose own lines name one the range changed
+  (`body_inputs`), or that runs a shell script the range changed; and each
+  recipe whose own lines changed; and with `--current`, as a push plans,
+  less each recipe whose committed evidence is current at HEAD (`current`,
+  ADR-0281, amended 2026-10-13 (6));
 - or those named.
 
 Each is dealt, the longest first, to the shard where it ends soonest
@@ -29,12 +32,14 @@ Prints, for `$GITHUB_OUTPUT`, `shards=<json>`, a list of `{"index": i,
 nothing is to run.
 
     python3 scripts/ci_plan.py --shards 17 --all
-    python3 scripts/ci_plan.py --shards 17 --changed BASE HEAD
+    python3 scripts/ci_plan.py --shards 17 --changed BASE HEAD [--current]
     python3 scripts/ci_plan.py --shards 17 e14-feed e14-read-whole
 """
 
 import argparse
+import fnmatch
 import importlib.util
+from collections.abc import Callable
 import json
 import pathlib
 import re
@@ -127,6 +132,8 @@ NEEDS_DATABASE = {
     "e14-interactions",
     # NEXT 6c: the store's orders awaiting their payments, on PostgreSQL too.
     "e14-payments",
+    # The scheduled-commands track: a run kept in each layer's database.
+    "e14-scheduled",
 }
 
 EVIDENCE_RECIPE = re.compile(r"^e[0-9]+-[a-z0-9-]+$")
@@ -263,7 +270,9 @@ def changed_specs(changed: dict[str, list[tuple[int, int]]]) -> set[str]:
 def touched_scripts(changed: dict[str, list[tuple[int, int]]], near: int) -> set[str]:
     """The mutation scripts a change reaches: the script itself, a mutant
     within `near` lines of a changed line, or a test file it runs, a Rust
-    test or a browser spec (ADR-0281)."""
+    test or a browser spec (ADR-0281): a test target by `--test`, or one of
+    the server's test modules by its filter, `tests::store_scheduled::`,
+    which planned nothing until train-6's fix to one."""
     tests = {pathlib.Path(p).stem for p in changed if "/tests/" in p and p.endswith(".rs")}
     specs = changed_specs(changed)
     out = set()
@@ -273,7 +282,10 @@ def touched_scripts(changed: dict[str, list[tuple[int, int]]], near: int) -> set
             out.add(path.name)
             continue
         text = path.read_text()
-        if any(f'"--test", "{t}"' in text or f"--test {t}" in text for t in tests):
+        if any(
+            f'"--test", "{t}"' in text or f"--test {t}" in text or f"tests::{t}::" in text
+            for t in tests
+        ):
             out.add(path.name)
             continue
         # A browser spec it runs: the mutants it plants are killed there.
@@ -321,6 +333,25 @@ def data_inputs(script: pathlib.Path) -> list[str]:
     return [p.rstrip("/") for p in named if p.startswith(DATA_ROOTS)]
 
 
+def body_inputs(body: str) -> list[str]:
+    """The programs and benchmarks a recipe's own lines name under
+    `DATA_ROOTS`, a path or a glob: `e10-build`'s `examples/store/*.pw`."""
+    return sorted(set(re.findall(r"(?<![\w./-])((?:examples|benchmarks)/[\w.*?/-]+)", body)))
+
+
+def names_path(pattern: str, path: str) -> bool:
+    """Whether a recipe's `pattern` names `path`: a glob, segment by
+    segment, as a shell expands one (a `*` never crosses a `/`); a path, it
+    or anything under it."""
+    pattern = pattern.rstrip("/")
+    if not any(ch in pattern for ch in "*?["):
+        return path == pattern or path.startswith(pattern + "/")
+    parts, names = pattern.split("/"), path.split("/")
+    return len(parts) == len(names) and all(
+        fnmatch.fnmatchcase(n, p) for p, n in zip(parts, names)
+    )
+
+
 def reads_what_changed(body: str, changed: dict[str, list[tuple[int, int]]]) -> bool:
     """Whether a recipe's own script, one that plants no mutant, changed or
     reads what changed. Until 2026-10-12 neither planned it: holds' merge
@@ -328,10 +359,16 @@ def reads_what_changed(body: str, changed: dict[str, list[tuple[int, int]]]) -> 
     to it, and no verify planned `e14-diffs`, which applies them (W8's
     finding). And a shell script it runs, by its path: until 2026-10-13 a
     change to `spikes/wasmtime-component/audit.sh` planned no `e8-host`,
-    whose script it is (train-3's run planned none)."""
+    whose script it is (train-3's run planned none). And a program its own
+    lines name: until 2026-10-14 `e10-build`, which builds
+    `examples/store/*.pw`, was planned by no push since 2026-10-12, and its
+    evidence said `place_order` imports `user-orders#place` after ADR-0332
+    moved it (train-5's finding)."""
     for rel in re.findall(r"(?<![\w./-])((?:[\w-]+/)+[\w.-]+\.sh)\b", body):
         if rel in changed:
             return True
+    if any(names_path(p, c) for p in body_inputs(body) for c in changed):
+        return True
     for name in re.findall(r"scripts/(\w+\.py)", body):
         if name.endswith("_mutations.py"):
             continue
@@ -358,12 +395,16 @@ def recipes_for(changed: dict[str, list[tuple[int, int]]], near: int, names: lis
     scripts = touched_scripts(changed, near)
     body = bodies()
     specs = changed_specs(changed)
+    tests = {pathlib.Path(p).stem for p in changed if "/tests/" in p and p.endswith(".rs")}
     out = {
         name
         for name in names
         if any(f"scripts/{s}" in body.get(name, "") for s in scripts)
         # A recipe that runs a browser spec the range changed (ADR-0281).
         or any(s in body.get(name, "") for s in specs)
+        # And one that runs a server test module the range changed, by its
+        # filter (train-6's finding).
+        or any(f"tests::{t}::" in body.get(name, "") for t in tests)
         # A recipe whose own script changed, or reads what changed.
         or reads_what_changed(body.get(name, ""), changed)
     }
@@ -374,6 +415,80 @@ def recipes_for(changed: dict[str, list[tuple[int, int]]], near: int, names: lis
             text = (ROOT / part).read_text().splitlines()
             out |= recipes_at(text, changed[part], names)
     return sorted(out)
+
+
+# **The commit an evidence file says it was recorded at** (ADR-0281,
+# amended 2026-10-13 (6)): `commit: <sha>`, a run's whole commit. A file
+# written from a tree with changes says `+ uncommitted changes` after it,
+# and records no commit.
+RECORDED_AT = re.compile(r"^commit: ([0-9a-f]{40})[ \t]*$", re.M)
+
+# The evidence files a recipe's lines write: `} > docs/evidence/E14/x.txt`.
+WRITES = re.compile(r">[ \t]*(docs/evidence/[\w./-]+\.txt)")
+
+
+def evidence_files(body: str) -> list[str]:
+    """The evidence files a recipe's lines write."""
+    return sorted(set(WRITES.findall(body)))
+
+
+def recorded_at(head: str, path: str, root: pathlib.Path = ROOT) -> str | None:
+    """The commit `path`, as `head` holds it, was recorded at, or none."""
+    out = subprocess.run(["git", "show", f"{head}:{path}"], cwd=root, capture_output=True)
+    if out.returncode != 0:
+        return None
+    m = RECORDED_AT.search(out.stdout.decode("utf-8", errors="replace"))
+    return m.group(1) if m else None
+
+
+def descends(sha: str, head: str, root: pathlib.Path = ROOT) -> bool:
+    """Whether `head` is `sha` or descends from it."""
+    out = subprocess.run(["git", "merge-base", "--is-ancestor", sha, head], cwd=root, capture_output=True)
+    return out.returncode == 0
+
+
+def current(
+    names: list[str],
+    head: str,
+    near: int = NEAR,
+    body: dict[str, str] | None = None,
+    read: Callable[[str, str], str | None] | None = None,
+    descends_from: Callable[[str, str], bool] | None = None,
+    reach: Callable[[str, str], set[str]] | None = None,
+) -> dict[str, str]:
+    """**The recipes of `names` whose committed evidence is current at
+    `head`**, each with the commit it was recorded at (ADR-0281, amended
+    2026-10-13 (6)): every file the recipe writes recorded at one whole
+    commit that `head` descends from, and nothing the recipe reads changed
+    since, by this planner's own rule (`reach`). A run passed it there: the
+    fetch copies no file of a recipe that failed (`evidence_fetch.py`). A
+    push does not run it again; the nightly runs it whatever its evidence
+    says.
+    Until then master's push after a train fixed by a dispatch planned the
+    whole train again (verify 38494831583, cancelled by hand). Any error
+    leaves a recipe planned."""
+    body = bodies() if body is None else body
+    read = read or recorded_at
+    descends_from = descends_from or descends
+    reach = reach or (lambda sha, h: set(recipes_for(hunks(sha, h), near, names)))
+    out: dict[str, str] = {}
+    reached: dict[str, set[str]] = {}
+    for name in names:
+        try:
+            shas = {read(head, f) for f in evidence_files(body.get(name, ""))}
+            # One commit for every file it writes, each file recorded.
+            sha = next(iter(shas)) if len(shas) == 1 else None
+            if sha is None:
+                continue
+            if not descends_from(sha, head):
+                continue
+            if sha not in reached:
+                reached[sha] = reach(sha, head)
+            if name not in reached[sha]:
+                out[name] = sha
+        except Exception as error:  # noqa: BLE001 - any failure plans it
+            print(f"ci_plan: {name}'s evidence not read, so it is planned: {error}", file=sys.stderr)
+    return out
 
 
 def joined(a: tuple[bool, bool], b: tuple[bool, bool]) -> tuple[bool, bool]:
@@ -556,6 +671,9 @@ def main() -> int:
     parser.add_argument("--all", action="store_true")
     parser.add_argument("--changed", nargs=2, metavar=("BASE", "HEAD"))
     parser.add_argument("--near", type=int, default=NEAR)
+    # With `--changed`: less each recipe whose committed evidence is current
+    # at HEAD (`current`), as a push plans.
+    parser.add_argument("--current", action="store_true")
     parser.add_argument("recipes", nargs="*")
     args = parser.parse_args()
     known = recipes()
@@ -568,6 +686,11 @@ def main() -> int:
         names = args.recipes
     elif args.changed:
         names = changed_recipes(args.changed[0], args.changed[1], args.near, evidence)
+        if args.current:
+            kept = current(names, args.changed[1], args.near)
+            for name, sha in sorted(kept.items()):
+                print(f"ci_plan: {name} is current, recorded at {sha[:8]}", file=sys.stderr)
+            names = [n for n in names if n not in kept]
     elif args.all:
         names = evidence
     else:

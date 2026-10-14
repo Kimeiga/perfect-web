@@ -27,6 +27,25 @@ fn now_wall() -> Int !{ clock.wall } { 0 }
 
 fn today() -> String !{ clock.wall } { "" }
 
+// **A span of time** (the scheduled-commands track): milliseconds, as an
+// `Instant` counts them. What `schedule .. after` waits from its command's
+// commit, so no program reads the time to compute when; one not after zero
+// is due at once.
+opaque type Duration = Int
+
+// **`n` seconds, minutes or hours.**
+fn seconds(n: Int) -> Duration !{} {
+    Duration(n * 1000)
+}
+
+fn minutes(n: Int) -> Duration !{} {
+    Duration(n * 60000)
+}
+
+fn hours(n: Int) -> Duration !{} {
+    Duration(n * 3600000)
+}
+
 // --- the clock a kept value reads, and the calendar (ADR-0304) ----------------
 
 // **A time zone**: an IANA name, as the host's tz database names it

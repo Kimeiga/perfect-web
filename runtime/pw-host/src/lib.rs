@@ -134,6 +134,20 @@ pub struct Import {
     /// materialization's read. Mirrored by field name, ADR-0018.
     #[serde(default)]
     pub reads: Option<String>,
+    /// **The run it schedules, or cancels** (the scheduled-commands track):
+    /// the command's component, and how. Mirrored by field name, ADR-0018.
+    #[serde(default)]
+    pub schedules: Option<Schedules>,
+}
+
+/// **What a schedules' import does** (the scheduled-commands track): for the
+/// component `command`, `at` an instant or `after` a duration, each given
+/// after the command's arguments, or `cancel` the run pending for them.
+/// Mirrored by field name, ADR-0018.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct Schedules {
+    pub command: String,
+    pub how: String,
 }
 
 /// **One place a value from outside must hold an invariant** (ADR-0179), as

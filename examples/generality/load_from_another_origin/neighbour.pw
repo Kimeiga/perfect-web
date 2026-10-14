@@ -1,0 +1,18 @@
+// @status: NEIGHBOUR
+// @invariant: load_from_another_origin
+// @dimension: valid neighbour — links to another origin that load nothing, and loads from this one
+//
+// A navigation and an item's property name another origin, and a browser
+// fetches neither; a frame and an image name this one, the image's path
+// built with a value.
+
+module generality.own_origin_neighbour
+
+view Directions(key: String) !{} {
+    <a href="https://maps.example/directions">Directions</a>
+    <div itemscope itemtype="https://schema.org/Place">
+        <link itemprop="hasMap" href="https://maps.example/store" />
+    </div>
+    <iframe src="/maps/embed" title="Map"></iframe>
+    <img src="/images/{key}.png" alt="The store" />
+}

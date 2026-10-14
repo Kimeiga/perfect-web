@@ -223,6 +223,11 @@ interface store-page-decrease-in-cart-api {
     decrease-in-cart: func(arg0: domain-menu-item-id) -> result<user-carts-user-cart, domain-cart-error>;
 }
 
+interface store-page-expire-order-api {
+    use pw:types/types.{domain-cancel-order-error, domain-order-status};
+    expire-order: func(arg0: string) -> result<domain-order-status, domain-cancel-order-error>;
+}
+
 interface store-page-increase-in-cart-api {
     use pw:types/types.{user-carts-user-cart, domain-cart-error, domain-menu-item-id};
     increase-in-cart: func(arg0: domain-menu-item-id) -> result<user-carts-user-cart, domain-cart-error>;
@@ -509,6 +514,7 @@ world store-page-cancel-order {
     import pw:host/outbox;
     import pw:host/payments;
     import pw:host/principal;
+    import pw:host/schedules;
     import store:data/user-orders;
     export store-page-cancel-order-api;
 }
@@ -545,6 +551,15 @@ world store-page-decrease-in-cart {
     export store-page-decrease-in-cart-api;
 }
 
+world store-page-expire-order {
+    import pw:host/invalidations;
+    import pw:host/outbox;
+    import pw:host/payments;
+    import pw:host/principal;
+    import store:data/user-orders;
+    export store-page-expire-order-api;
+}
+
 world store-page-increase-in-cart {
     import pw:host/invalidations;
     import pw:host/outbox;
@@ -560,6 +575,7 @@ world store-page-place-order {
     import pw:host/outbox;
     import pw:host/payments;
     import pw:host/principal;
+    import pw:host/schedules;
     import store:data/checkout;
     import store:data/fees;
     import store:data/hours;
@@ -604,6 +620,7 @@ world store-page-settle-payment {
     import pw:host/invalidations;
     import pw:host/outbox;
     import pw:host/principal;
+    import pw:host/schedules;
     import store:data/user-orders;
     export store-page-settle-payment-api;
 }
@@ -1047,6 +1064,10 @@ package pw:host {
         use pw:types/types.{domain-menu-section, domain-store-id, store-page-menu-count};
         store-page-menu-size: func(arg0: domain-store-id) -> store-page-menu-count;
         store-page-menu: func(arg0: domain-store-id) -> list<domain-menu-section>;
+    }
+    interface schedules {
+        store-page-expire-order-after: func(arg0: string, arg1: s64);
+        store-page-expire-order-cancel: func(arg0: string);
     }
 }
 

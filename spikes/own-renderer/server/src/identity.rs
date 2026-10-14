@@ -346,11 +346,13 @@ impl Principals {
     }
 
     /// **A session the platform opens on a reader's behalf** (NEXT 6c, step
-    /// seven), named [`ON_BEHALF`] and then `name`: a payment settled as the
-    /// reader who began it, its `current_user()` theirs. Never a browser's:
-    /// no cookie is let name it, and it is closed when the guard goes,
-    /// whatever the command answered.
-    pub(crate) fn on_behalf(&self, name: &str, user: &str) -> OnBehalf {
+    /// seven), named [`ON_BEHALF`] and then `name`, its principal issued by
+    /// the `invoker`: a payment settled as the reader who began it, or a run
+    /// as the user whose command scheduled it (the scheduled-commands
+    /// track), its `current_user()` theirs. Never a browser's: no cookie is
+    /// let name it, and it is closed when the guard goes, whatever the
+    /// command answered.
+    pub(crate) fn on_behalf(&self, invoker: &str, name: &str, user: &str) -> OnBehalf {
         let session = format!("{ON_BEHALF}{name}");
         self.open(
             &session,
@@ -358,7 +360,7 @@ impl Principals {
                 user: user.to_string(),
                 handle: String::new(),
                 name: String::new(),
-                issuer: "payments".to_string(),
+                issuer: invoker.to_string(),
             },
         );
         OnBehalf {
@@ -515,6 +517,18 @@ impl Default for Identity {
 }
 
 impl Identity {
+    /// **Where a sign-in sends the browser, where that is not this origin**
+    /// (`csp::Deployment::forms`): a deployment's provider, at its own; none
+    /// in the guest model, or for the development provider, which this
+    /// server serves at a path of its own.
+    pub(crate) fn sign_in_origin(&self) -> Option<String> {
+        let mode = self.mode.read().expect("mode");
+        let Mode::Accounts(accounts) = &*mode else {
+            return None;
+        };
+        crate::csp::origin_of(&accounts.provider.authorization_endpoint())
+    }
+
     /// Each session's principal, which the data layer maps a session to
     /// its user by.
     pub fn principals(&self) -> Principals {
@@ -1126,14 +1140,22 @@ impl Reply {
             _ => "",
         };
         let mut head = format!(
-            "HTTP/1.1 {} {reason}\r\ncontent-type: {}\r\ncontent-length: {}\r\n{}",
+            "HTTP/1.1 {} {reason}\r\ncontent-type: {}\r\ncontent-length: {}\r\n{}{}",
             self.status,
             self.mime,
             self.body.len(),
+            super::NOSNIFF,
             super::PRIVATE
         );
         if let Some(location) = &self.location {
             head.push_str(&format!("location: {location}\r\n"));
+        }
+        // An identity's page runs nothing (`csp::BARE`).
+        if self.mime.starts_with("text/html") {
+            head.push_str(&format!(
+                "content-security-policy: {}\r\n",
+                crate::csp::BARE
+            ));
         }
         let sets_session = self
             .cookies

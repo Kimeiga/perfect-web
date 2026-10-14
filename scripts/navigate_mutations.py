@@ -51,8 +51,10 @@ MUTANTS = [
         "its arguments are related to nothing",
         COMPILER,
         VALUES,
-        '            } if matches!(keyword.as_str(), "query" | "subscription" | "navigate")\n',
-        '            } if matches!(keyword.as_str(), "query" | "subscription")\n',
+        # Re-anchored by the scheduled-commands track: a schedule's arguments
+        # are related there too.
+        '                "query" | "subscription" | "navigate" | "schedule" | "unschedule"\n',
+        '                "query" | "subscription" | "schedule" | "unschedule"\n',
     ),
     (
         "its page is looked for among the terms",

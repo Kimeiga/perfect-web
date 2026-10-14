@@ -725,6 +725,11 @@ mod checkout;
 // signature.
 #[allow(dead_code)]
 mod payments;
+// ADR-0195's ruling 13: what a page this host serves may load and run.
+mod csp;
+// The scheduled-commands track: a command runs when the clock passes its
+// time.
+mod schedules;
 
 struct Server {
     /// **The build this host serves, by its name** (ADR-0300): on each
@@ -733,6 +738,9 @@ struct Server {
     build_id: String,
     /// The templates the compiler emitted, deserialized once.
     templates: Vec<Template>,
+    /// **What the build's markup asks of its pages' policy** (`csp`), read
+    /// from its templates once.
+    needs: csp::Needs,
     /// **The program's data layer** (ADR-0218): what its contracts import,
     /// which the deployment supplies. A query reads through it and a command
     /// stages its writes in it.
@@ -960,6 +968,9 @@ struct Server {
     identity: identity::Identity,
     /// **A request whose body is a file**: the uploads track's (ADR-0253).
     uploads: uploads::Uploads,
+    /// **How the scheduled runs ended** since the host started (the
+    /// scheduled-commands track), which `/metrics` reports.
+    counted_runs: CountedRuns,
     /// **The deployment's public origin** (ADR-0311), `PW_ORIGIN`, as the
     /// identity reads it: what a page's canonical address is written
     /// absolute with, never a request's `Host`, which its client chooses.
@@ -1290,6 +1301,10 @@ fn topology_for(layer: &[&'static str]) -> Topology {
                 "payments.begin",
                 // Step eight: a payment canceled, by its reader alone.
                 "payments.cancel",
+                // The scheduled-commands track: a run scheduled, or
+                // cancelled, with a command's writes, which this host runs
+                // when the clock passes its time.
+                "clock.schedule",
             ]
             .iter()
             .chain(layer)
@@ -1613,6 +1628,7 @@ impl Server {
         Server {
             cart_by_reader,
             build_id,
+            needs: csp::Needs::of(&templates),
             templates,
             data,
             store,
@@ -1676,6 +1692,7 @@ impl Server {
             // TRACK SEAM (identity): built above, its principals the layer's.
             identity,
             uploads: uploads::Uploads::default(),
+            counted_runs: CountedRuns::default(),
         }
     }
 
@@ -1707,10 +1724,11 @@ impl Server {
             })
             .map(|c| c.component_id.clone())
             .ok_or("the program declares no command invoked by Payments")?;
-        let behalf = self
-            .identity
-            .principals()
-            .on_behalf(&format!("payment-{}", settled.intent), &settled.owner);
+        let behalf = self.identity.principals().on_behalf(
+            "payments",
+            &format!("payment-{}", settled.intent),
+            &settled.owner,
+        );
         let session = behalf.session().to_string();
         let status = settled.status.replace('_', "-");
         let sent = serde_json::json!({
@@ -2032,6 +2050,40 @@ impl Server {
         let staged: StagedEvents = Arc::default();
         for import in &contract.imports {
             let into = staged.clone();
+            // **A run it schedules, or cancels** (the scheduled-commands
+            // track): the command's arguments, as a press sends them, and
+            // when, staged with its writes.
+            if let Some(scheduling) = import.schedules.clone() {
+                let f: HostFn = Arc::new(move |values: &[Val]| {
+                    let (given, when) = match (scheduling.how.as_str(), values.split_last()) {
+                        ("at", Some((Val::S64(at), given))) => (given, schedules::When::At(*at)),
+                        ("after", Some((Val::S64(ms), given))) => {
+                            (given, schedules::When::After(*ms))
+                        }
+                        ("cancel", _) => (values, schedules::When::Cancel),
+                        (how, _) => {
+                            return Err(format!(
+                                "a schedule `{how}` of `{}` was given {values:?}",
+                                scheduling.command
+                            ));
+                        }
+                    };
+                    let args = serde_json::Value::Array(given.iter().map(val_to_json).collect())
+                        .to_string();
+                    into.lock()
+                        .expect("staged runs")
+                        .scheduled
+                        .push(schedules::Scheduling {
+                            key: schedules::key(&scheduling.command, &args),
+                            command: scheduling.command.clone(),
+                            args,
+                            when,
+                        });
+                    Ok(Vec::new())
+                });
+                host.insert(import.key(), f);
+                continue;
+            }
             let f: HostFn = match (import.event.clone(), import.invalidates.clone()) {
                 (Some(event), _) => Arc::new(move |values: &[Val]| {
                     into.lock()
@@ -2338,10 +2390,23 @@ impl Server {
                 };
                 return Ok((answered, Vec::new()));
             }
-            let (emitted, invalidated) = {
+            let (emitted, invalidated, scheduling) = {
                 let staged = staged_events.lock().expect("staged");
-                (staged.events.clone(), staged.invalidated.clone())
+                (
+                    staged.events.clone(),
+                    staged.invalidated.clone(),
+                    staged.scheduled.clone(),
+                )
             };
+            // **Its runs, as its commit writes them** (the scheduled-commands
+            // track): a duration counted from now, each on behalf of this
+            // session's user.
+            let scheduler = self.identity.principals().user_of(session);
+            let now_ms = self.now();
+            let scheduled: Vec<schedules::Scheduled> = scheduling
+                .iter()
+                .map(|s| s.at_commit(now_ms, &scheduler))
+                .collect();
             // **Its answer, committed with its writes** (ADR-0325): what a
             // retry of its interaction is answered, here after a restart or on
             // another host, kept a day.
@@ -2369,6 +2434,7 @@ impl Server {
                 &emitted,
                 &invalidated,
                 recorded.as_ref(),
+                &scheduled,
             ) {
                 Ok(committed) => committed,
                 // **Recorded first by another host** (ADR-0325): the same
@@ -2385,6 +2451,11 @@ impl Server {
                     None => return Err(why),
                 },
             };
+            // A run it scheduled may be due before the next the host
+            // waits for: the host looks again.
+            if !scheduled.is_empty() {
+                self.timers.changed.notify_all();
+            }
             let Some(((emitted, invalidated), ids)) = committed else {
                 // Nothing was written, so there is nothing to commit.
                 let answered = Answered {
@@ -2459,15 +2530,21 @@ impl Server {
         emitted: &[data::Handed],
         invalidated: &[data::Dropped],
         interaction: Option<&data::Recorded<'_>>,
+        scheduled: &[schedules::Scheduled],
     ) -> Result<Option<(data::Outboxed, Vec<i64>)>, String> {
-        let Some(rows) = staging.rows() else {
-            return Ok(None);
+        // A command that wrote nothing commits nothing, unless it scheduled
+        // or cancelled a run (the scheduled-commands track), which is
+        // written as its writes are.
+        let rows = match staging.rows() {
+            Some(rows) => rows,
+            None if !scheduled.is_empty() => Vec::new(),
+            None => return Ok(None),
         };
         let events = emitted
             .iter()
             .map(|(event, values)| outboxed(event, values))
             .collect::<Result<Vec<_>, String>>()?;
-        let (delivered, ids) = match staging.commit(emitted, invalidated, interaction)? {
+        let (delivered, ids) = match staging.commit(emitted, invalidated, interaction, scheduled)? {
             Some(committed) => {
                 let mut ids = Vec::new();
                 if self.data.session_entry() {
@@ -2505,6 +2582,9 @@ impl Server {
                         Materializer::prune_interactions(tx, r.forget_before_ms);
                         Materializer::record_interaction(tx, r.key, r.sent, r.answer, r.at_ms)?;
                     }
+                    // And the runs it scheduled, or cancelled (the
+                    // scheduled-commands track).
+                    schedules::write(tx, scheduled)?;
                     Ok::<_, String>(events)
                 })?;
                 ((emitted.to_vec(), invalidated.to_vec()), ids)
@@ -2546,7 +2626,8 @@ impl Server {
             }
             other => return Err(format!("{op} answered {other:?}")),
         };
-        let Some(((delivered, _), ids)) = self.commit_staged(&mut *staging, events, &[], None)?
+        let Some(((delivered, _), ids)) =
+            self.commit_staged(&mut *staging, events, &[], None, &[])?
         else {
             return Ok(answer);
         };
@@ -2979,6 +3060,113 @@ impl Server {
     fn now(&self) -> i64 {
         self.sync_query_clock();
         self.epoch + i64::try_from(self.query_clock.0.now()).unwrap_or(i64::MAX)
+    }
+
+    /// **Where this host's scheduled runs are kept** (the scheduled-commands
+    /// track): the layer's, where it writes them with its commands' writes;
+    /// the materializer's otherwise.
+    fn runs(&self) -> &dyn schedules::Runs {
+        match self.data.runs() {
+            Some(runs) => runs,
+            None => &self.materializer,
+        }
+    }
+
+    /// **Each scheduled run, run once the clock passes its time** (the
+    /// scheduled-commands track), for as long as the host runs: woken when a
+    /// commit schedules one or the clock is moved, and each second at least.
+    fn run_when_due(&self) {
+        loop {
+            let (ran, wait) = self.run_due();
+            if ran == 0 {
+                self.timers.wait(wait);
+            }
+        }
+    }
+
+    /// Each run due now, one at a time, in the order of their instants: how
+    /// many, and how long until the next, a second at most.
+    fn run_due(&self) -> (usize, u64) {
+        let now = self.now();
+        let due = match self.runs().due_runs(now, 16) {
+            Ok(due) => due,
+            Err(why) => {
+                eprintln!("pw dev server: the scheduled runs were not read: {why}");
+                return (0, 1000);
+            }
+        };
+        for run in &due {
+            self.run_scheduled(run);
+        }
+        // What the runs' commits reached, told to each session reading it,
+        // as a connection's command's is once it is answered (ADR-0219):
+        // no connection made these.
+        if !due.is_empty() {
+            self.tell_waiting();
+        }
+        let next = self.runs().next_run().unwrap_or(None);
+        let wait = next.map_or(1000, |at| (at - self.now()).clamp(1, 1000));
+        (due.len(), u64::try_from(wait).unwrap_or(1000))
+    }
+
+    /// **A scheduled run, run** (the scheduled-commands track): its command,
+    /// on behalf of the user whose command scheduled it, in a session of its
+    /// own never a browser's, as a press is run, keyed by its scheduling so
+    /// that it commits once (ADR-0325): run again after a restart, or by a
+    /// second host, it is answered as it was. One that committed, or
+    /// answered a declared error, which is the program's answer, is done.
+    /// One that trapped or was refused runs again, after 2 s doubling to a
+    /// minute; after [`schedules::RETRIES`] runs again it is kept, failed,
+    /// and said in the host's log and its `/metrics`.
+    fn run_scheduled(&self, run: &pw_materialize::ScheduledRun) {
+        let behalf = self.identity.principals().on_behalf(
+            "clock",
+            &format!("schedule-{}", run.id),
+            &run.user,
+        );
+        let session = behalf.session().to_string();
+        let interaction = format!("schedule-{}", run.id);
+        let answered = serde_json::from_str::<Vec<serde_json::Value>>(&run.args)
+            .map_err(|e| format!("its arguments do not read: {e}"))
+            .and_then(|args| {
+                self.command_answer(&run.command, &session, &args, Some(&interaction))
+            });
+        let failed = match answered {
+            Ok(answered) => answered.why,
+            Err(why) => Some(why),
+        };
+        let kept = match failed {
+            None => {
+                self.counted_runs
+                    .ran
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                self.runs().ran(run.id)
+            }
+            Some(why) if run.attempts >= schedules::RETRIES => {
+                self.counted_runs
+                    .failed
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                eprintln!(
+                    "pw dev server: a run of {} due at {} failed for good, run {} times: {why}",
+                    run.command,
+                    run.due_ms,
+                    run.attempts + 1
+                );
+                self.runs()
+                    .retry(run.id, run.attempts + 1, run.due_ms, Some(&why))
+            }
+            Some(_) => {
+                self.counted_runs
+                    .retried
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                let failures = run.attempts + 1;
+                let again = self.now().saturating_add(schedules::backoff_ms(failures));
+                self.runs().retry(run.id, failures, again, None)
+            }
+        };
+        if let Err(why) = kept {
+            eprintln!("pw dev server: a scheduled run was not kept: {why}");
+        }
     }
 
     /// **Each live document read again at the instant what it shows holds
@@ -6003,6 +6191,19 @@ impl Server {
         }
     }
 
+    /// **What a document this host serves may load and run** (`csp`): the
+    /// script that starts the runtime and the data layer's style, by their
+    /// hashes; what the build's markup asks; and the deployment's payment
+    /// provider and identity provider, where it has them at origins of
+    /// their own.
+    fn policy(&self) -> String {
+        let deployment = csp::Deployment {
+            frames: self.payments.get().map(|p| p.provider.clone()),
+            forms: self.identity.sign_in_origin(),
+        };
+        csp::document(RUNTIME_SOURCE, self.data.style(), &self.needs, &deployment)
+    }
+
     /// **A document, and each streamed region's arm as its query settles**
     /// (ADR-0148). With nothing left to settle it is one response of known
     /// length, as every document was. Otherwise all but the document's end is
@@ -6030,19 +6231,21 @@ impl Server {
         // **The build that served it** (ADR-0300), which a page that keeps
         // its parts across a navigation holds the next document to.
         let build = format!("pw-build: {}\r\n", self.build_id);
+        // What it may load and run (`csp`).
+        let policy = format!("content-security-policy: {}\r\n", self.policy());
         if settling.waiting.is_empty() && settling.settled.is_empty() {
             write_response(
                 stream,
                 200,
                 "text/html; charset=utf-8",
-                &format!("{PRIVATE}{cookie}{build}"),
+                &format!("{PRIVATE}{cookie}{build}{policy}"),
                 page.as_bytes(),
             );
             return;
         }
         let head = format!(
-            "HTTP/1.1 200 OK\r\ncontent-type: text/html; charset=utf-8\r\n{PRIVATE}{cookie}{build}\
-             connection: close\r\n\r\n"
+            "HTTP/1.1 200 OK\r\ncontent-type: text/html; charset=utf-8\r\n{NOSNIFF}{PRIVATE}{cookie}\
+             {build}{policy}connection: close\r\n\r\n"
         );
         let shell = page.strip_suffix(DOCUMENT_END).unwrap_or(page);
         if stream
@@ -6473,14 +6676,25 @@ impl Server {
 
 /// **What a command handed the platform** (ADR-0208, ADR-0209): its events
 /// and the entries it invalidates, each by its declaration's path with the
-/// values it computed, staged until its writes commit.
+/// values it computed, and the runs it scheduled or cancelled (the
+/// scheduled-commands track), staged until its writes commit.
 #[derive(Default)]
 struct Staged {
     events: Vec<(String, Vec<Val>)>,
     invalidated: Vec<crate::data::Dropped>,
+    scheduled: Vec<schedules::Scheduling>,
 }
 
 type StagedEvents = Arc<Mutex<Staged>>;
+
+/// **How a host's scheduled runs ended** (the scheduled-commands track):
+/// done, to run again, or kept, failed for good.
+#[derive(Default)]
+struct CountedRuns {
+    ran: std::sync::atomic::AtomicU64,
+    retried: std::sync::atomic::AtomicU64,
+    failed: std::sync::atomic::AtomicU64,
+}
 
 /// **A region a document leaves for its query to fill** (ADR-0148): which
 /// part, the plan's entry for it (its query's component and policies), and
@@ -7636,6 +7850,12 @@ fn main() {
     {
         let server = server.clone();
         std::thread::spawn(move || server.tell_when_time_passes());
+    }
+    // **Each scheduled run, run once the clock passes its time** (the
+    // scheduled-commands track).
+    {
+        let server = server.clone();
+        std::thread::spawn(move || server.run_when_due());
     }
 
     for stream in listener.incoming() {
@@ -8823,9 +9043,16 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
         // data-layer operation ran, and how many query values are kept.
         ("GET", "/metrics") => {
             let calls = server.calls.lock().expect("calls").clone();
+            let runs = &server.counted_runs;
             let body = serde_json::json!({
                 "calls": calls,
                 "kept": server.queries.stored(),
+                // The scheduled-commands track: how its runs ended.
+                "runs": {
+                    "ran": runs.ran.load(std::sync::atomic::Ordering::SeqCst),
+                    "retried": runs.retried.load(std::sync::atomic::Ordering::SeqCst),
+                    "failed": runs.failed.load(std::sync::atomic::Ordering::SeqCst),
+                },
             });
             respond_json(&mut stream, 200, &session, fresh, &body.to_string());
         }
@@ -9359,7 +9586,10 @@ fn moved(
         stream,
         if permanent { 308 } else { 307 },
         "text/html; charset=utf-8",
-        &format!("{PRIVATE}{cookie}location: {location}\r\n"),
+        &format!(
+            "{PRIVATE}{cookie}location: {location}\r\n{}",
+            runs_nothing("text/html")
+        ),
         body.as_bytes(),
     );
 }
@@ -9551,6 +9781,9 @@ fn serve_file(server: &Server, stream: &mut TcpStream, route: &str) {
         Some("mjs") | Some("js") => "text/javascript; charset=utf-8",
         Some("json") => "application/json; charset=utf-8",
         Some("wasm") => "application/wasm",
+        // A stylesheet the build ships, which a page's policy allows from
+        // this origin, and which a browser applies only as `text/css`.
+        Some("css") => "text/css; charset=utf-8",
         _ => "application/octet-stream",
     };
     match std::fs::read(&path) {
@@ -9976,6 +10209,10 @@ fn document(
 /// one does in WebKit.
 const RUNTIME: &str = "<script>import(\"/pw-runtime.mjs\")</script>";
 
+/// **Its text**, which a document's policy allows by its hash (`csp`).
+/// `RUNTIME`'s, as a test holds it.
+const RUNTIME_SOURCE: &str = "import(\"/pw-runtime.mjs\")";
+
 /// The store page's speculation manifest, if the build wrote one (ADR-0122).
 /// **Every page's speculation manifest** (ADR-0191), by the page it names.
 fn speculation_manifests(dist: &std::path::Path) -> BTreeMap<String, serde_json::Value> {
@@ -10068,7 +10305,24 @@ fn respond(stream: &mut TcpStream, code: u16, mime: &str, session: &str, fresh: 
     } else {
         String::new()
     };
-    write_response(stream, code, mime, &format!("{PRIVATE}{cookie}"), body);
+    write_response(
+        stream,
+        code,
+        mime,
+        &format!("{PRIVATE}{cookie}{}", runs_nothing(mime)),
+        body,
+    );
+}
+
+/// **The policy of an HTML answer that is no document the runtime starts
+/// in** (`csp::BARE`): a page not found, a page moved, a page the build
+/// rendered with no runtime. None for any other type.
+fn runs_nothing(mime: &str) -> String {
+    if mime.starts_with("text/html") {
+        format!("content-security-policy: {}\r\n", csp::BARE)
+    } else {
+        String::new()
+    }
 }
 
 /// **A file of the build** (ADR-0184): the runtime, the renderer, a
@@ -10078,12 +10332,19 @@ fn respond(stream: &mut TcpStream, code: u16, mime: &str, session: &str, fresh: 
 /// that kept that file would have given the session to everyone it served
 /// the file to, who would then all share one cart.
 fn respond_build(stream: &mut TcpStream, code: u16, mime: &str, body: &[u8]) {
-    write_response(stream, code, mime, "", body);
+    write_response(stream, code, mime, &runs_nothing(mime), body);
 }
+
+/// **Every answer's type is its type** (`csp`): `nosniff`, so a browser
+/// runs as a script only what is served as one, and applies as a
+/// stylesheet only what is served as one (Fetch, "Should response to
+/// request be blocked due to nosniff?"). A page's policy allows this
+/// origin's scripts (`'self'`): this is what makes that its JavaScript.
+const NOSNIFF: &str = "x-content-type-options: nosniff\r\n";
 
 fn write_response(stream: &mut TcpStream, code: u16, mime: &str, headers: &str, body: &[u8]) {
     let head = format!(
-        "HTTP/1.1 {code} {}\r\ncontent-type: {mime}\r\ncontent-length: {}\r\n{headers}connection: close\r\n\r\n",
+        "HTTP/1.1 {code} {}\r\ncontent-type: {mime}\r\ncontent-length: {}\r\n{NOSNIFF}{headers}connection: close\r\n\r\n",
         reason(code),
         body.len()
     );
@@ -13600,8 +13861,13 @@ public query Store(",
     mod store_hours;
     // TRACK SEAM (order-total): an order's total.
     mod order_total;
+    /// What a page this host serves may load and run (`csp`).
+    mod page_policy;
     // TRACK SEAM (payments): an order awaiting its payment, and settled.
     mod store_payments;
+    // The scheduled-commands track: a command run when the clock passes its
+    // time, and the store's sweep.
+    mod store_scheduled;
 
     /// **A second program is served by the same host** (ADR-0218): the
     /// feed's timeline from its data layer, and a post committed and sent

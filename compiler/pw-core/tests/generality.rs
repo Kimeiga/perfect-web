@@ -553,10 +553,14 @@ fn generality_is_reported_separately_from_conformance() {
     // `derived_not_pure`, a value a template computes. 44 / 44 the same day:
     // ADR-0230's `operand_type`, a condition that tests a number. 45 / 45
     // on 2026-10-12: ADR-0311's `canonical_address`, a page's canonical
-    // address.
+    // address. 46 / 46 on 2026-10-14: ADR-0195's ruling 13's
+    // `load_from_another_origin`, a page loading from another origin. 49 /
+    // 49 the same day: the scheduled-commands track's
+    // `schedule_names_no_clocked_command`, `scheduled_outside_a_command`
+    // and `schedule_time`.
     assert_eq!(
         (general.len(), narrow.len(), untested.len()),
-        (45, 0, 0),
+        (49, 0, 0),
         "the published figure moved. If that is intended, update
          docs/STATUS.md and docs/NEXT.md in the same commit — a number in a
          status report that no test holds is a number that drifts."

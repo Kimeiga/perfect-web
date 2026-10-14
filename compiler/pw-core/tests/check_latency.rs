@@ -20,12 +20,24 @@
 //!
 //! A test that asserts "under 50 ms" on a shared CI machine fails for reasons
 //! that have nothing to do with the compiler, and a flaky gate teaches people
-//! to re-run it. The ceiling here is an order of magnitude above the measured
-//! value: it catches a change that makes checking pathological and says nothing
-//! about a 20% regression. The RAW NUMBER is the evidence, and
-//! `docs/evidence/E9/check-latency.txt` is where it lives.
+//! to re-run it. The ceiling here catches a change that makes checking
+//! pathological and says nothing about a 20% regression. The RAW NUMBER is the
+//! evidence, and `docs/evidence/E9/check-latency.txt` is where it lives.
+//!
+//! **And so the number grew unremarked** (found 2026-10-13). The ceiling was
+//! fifty times the 37 ms measured for 36 files on 2026-08-08; the measurement
+//! reached about 850 ms for 52 files, within two and a half times it, as every
+//! analysis added since resolves and types on its own and nothing is shared.
+//! Nothing read the number again: the recipe that records it runs on the
+//! development machine alone. The two tests here measure one at a time, as
+//! measuring both at once measured their contention, which failed train-5's
+//! local `just ci` at 3.4 s.
 
 use std::time::{Duration, Instant};
+
+/// One measurement at a time: this file's two tests ran at once, each timing
+/// its checks while the other's ran.
+static MEASURING: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 /// The store demo as one program: the platform packages, the shared library and
 /// the app. 36 files, the same set `just ci` checks.
@@ -84,6 +96,7 @@ fn time_check(files: &[(String, String)], runs: usize) -> Duration {
 
 #[test]
 fn the_whole_program_and_one_edit_are_both_measured() {
+    let _alone = MEASURING.lock().unwrap_or_else(|held| held.into_inner());
     let files = program();
     assert!(files.len() >= 30, "only {} files", files.len());
 
@@ -113,8 +126,9 @@ fn the_whole_program_and_one_edit_are_both_measured() {
         files.len()
     );
 
-    // The loose ceiling. An order of magnitude above the measured value, so it
-    // catches pathological work and stays quiet about noise.
+    // The loose ceiling, for pathological work: two and a half times the
+    // 2026-10-13 measurement, where it was fifty times the 2026-08-08 one
+    // (the module's comment says how that happened).
     assert!(
         cold < Duration::from_millis(2000),
         "a full check of {} files took {:?}, which is not editor-feedback \
@@ -137,6 +151,7 @@ fn a_rejected_program_is_not_measurably_slower_than_a_clean_one() {
     // The shape a latency claim usually hides: fast on the happy path, and slow
     // exactly when a developer is iterating on a broken file. Editor feedback
     // is worth most when the program does not compile.
+    let _alone = MEASURING.lock().unwrap_or_else(|held| held.into_inner());
     let files = program();
     let mut broken = files.clone();
     let app = broken

@@ -281,6 +281,10 @@ pub struct Workspace {
     /// `Nominal(Box, [])` against `Nominal(Box, [Int])` would have had to
     /// guess which one was malformed.
     type_arity: BTreeMap<DefId, usize>,
+    /// **Each unit's module, by its unit** (the checker's latency,
+    /// 2026-10-13): `module_of` searched every module for each name it
+    /// resolved.
+    by_unit: BTreeMap<UnitId, usize>,
     pub errors: Vec<ResolveError>,
 }
 
@@ -379,6 +383,7 @@ impl Workspace {
                 ws.preludes.entry(ns).or_default().push(ws.modules.len());
             }
             ws.by_name.insert(name.clone(), ws.modules.len());
+            ws.by_unit.entry(unit).or_insert(ws.modules.len());
             ws.modules.push(Module {
                 name,
                 unit,
@@ -517,7 +522,12 @@ impl Workspace {
     }
 
     pub fn module_of(&self, unit: UnitId) -> Option<&Module> {
-        self.modules.iter().find(|m| m.unit == unit)
+        match self.by_unit.get(&unit) {
+            Some(&i) => self.modules.get(i),
+            // A unit with no module of its own, or one added since the
+            // workspace was built.
+            None => self.modules.iter().find(|m| m.unit == unit),
+        }
     }
 
     /// Resolve in one namespace. The precise form; [`Workspace::resolve`]
@@ -526,7 +536,10 @@ impl Workspace {
         let Some(m) = self.module_of(unit) else {
             return Resolution::Unresolved;
         };
-        if let Some(def) = m.defines.get(&(ns, name.to_string())) {
+        // The key, made once: once a module looked in, it was a string made
+        // for each import and each prelude (the checker's latency).
+        let key = (ns, name.to_string());
+        if let Some(def) = m.defines.get(&key) {
             return Resolution::Local(*def);
         }
         // **A name the file imports by name, before a whole module's**
@@ -544,7 +557,7 @@ impl Workspace {
                 if by_name != named || (!by_name && !imp.names.is_empty()) {
                     continue;
                 }
-                if let Some(def) = self.modules[t].defines.get(&(ns, name.to_string())) {
+                if let Some(def) = self.modules[t].defines.get(&key) {
                     hits.push((imp.module.clone(), *def));
                 }
             }
@@ -570,7 +583,7 @@ impl Workspace {
         {
             for &i in exporters {
                 let m = &self.modules[i];
-                if let Some(def) = m.defines.get(&(ns, name.to_string())) {
+                if let Some(def) = m.defines.get(&key) {
                     hits.push((m.name.clone(), *def));
                 }
             }

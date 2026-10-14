@@ -1,8 +1,8 @@
 ADR-0326 - a name imported by name is the file's, before a whole module's
 
 produced by: just e14-explicit-imports
-commit: c3a596048c572c8592ce336ede4fcb417847e5ed
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38451028940 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 92fdd6e34743e33a80914939976125a9eb307842
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38559878637 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the order, and the refusal (compiler/pw-core/tests/explicit_imports.rs)

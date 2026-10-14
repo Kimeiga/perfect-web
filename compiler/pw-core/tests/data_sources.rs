@@ -384,9 +384,11 @@ fn the_store_states_its_source_and_asks_only_what_it_gives() {
             "increase_in_cart",
             "place_order",
             // A payment's outcome, settled (NEXT 6c), and an order awaiting
-            // its payment taken back (step eight).
+            // its payment taken back (step eight), by its reader or by the
+            // clock (the scheduled-commands track).
             "settle_payment",
             "cancel_order",
+            "expire_order",
             // The checkout's choices (track `order-total`).
             "choose_tip",
             "apply_promo",
@@ -404,9 +406,11 @@ fn the_store_states_its_source_and_asks_only_what_it_gives() {
         "clear_cart",
         "place_order",
         // A payment's outcome, settled (NEXT 6c), and an order awaiting its
-        // payment taken back (step eight).
+        // payment taken back (step eight), by its reader or by the clock
+        // (the scheduled-commands track).
         "settle_payment",
         "cancel_order",
+        "expire_order",
         // The checkout's choices (track `order-total`).
         "choose_tip",
         "apply_promo",
@@ -421,6 +425,7 @@ fn the_store_states_its_source_and_asks_only_what_it_gives() {
     assert_eq!(named("PW0348"), commands);
     // Track `order-total`: the checkout's three, three times, and its
     // query's four reads. NEXT 6c: the settling command, and the one that
-    // takes an order back, three times each.
-    assert_eq!(found.len(), 60, "{found:#?}");
+    // takes an order back, three times each; and the clock's sweep (the
+    // scheduled-commands track), three times.
+    assert_eq!(found.len(), 63, "{found:#?}");
 }

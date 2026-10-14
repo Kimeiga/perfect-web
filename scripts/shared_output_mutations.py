@@ -41,16 +41,17 @@ MUTANTS = [
         "a streamed page may be kept by any cache",
         "server",
         SERVER,
-        # Re-anchored by ADR-0300, which names the build after it.
-        '            "HTTP/1.1 200 OK\\r\\ncontent-type: text/html; charset=utf-8\\r\\n{PRIVATE}{cookie}{build}\\\n',
-        '            "HTTP/1.1 200 OK\\r\\ncontent-type: text/html; charset=utf-8\\r\\n{cookie}{build}\\\n',
+        # Re-anchored by ADR-0300, which names the build after it, and by
+        # the page-csp track, which says its type before it.
+        '            "HTTP/1.1 200 OK\\r\\ncontent-type: text/html; charset=utf-8\\r\\n{NOSNIFF}{PRIVATE}{cookie}\\\n',
+        '            "HTTP/1.1 200 OK\\r\\ncontent-type: text/html; charset=utf-8\\r\\n{NOSNIFF}{cookie}\\\n',
     ),
     (
         "a file of the build names a session",
         "server",
         SERVER,
-        '    write_response(stream, code, mime, "", body);\n',
-        '    write_response(stream, code, mime, "set-cookie: pw-session=leaked; Path=/\\r\\n", body);\n',
+        '    write_response(stream, code, mime, &runs_nothing(mime), body);\n',
+        '    write_response(stream, code, mime, &format!("set-cookie: pw-session=leaked; Path=/\\r\\n{}", runs_nothing(mime)), body);\n',
     ),
     (
         "a private query's value is kept for every reader",
