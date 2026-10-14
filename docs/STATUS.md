@@ -23,6 +23,18 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0329 amended, 2026-10-13: the store switches to what ADR-0330 and
+ADR-0331 allow** (W9's; track `store-switch`, merged from `1d217edc`, on
+the payments track).
+- The tip is one command, `choose_tip(Tip)`: a case sent from the browser
+  (ADR-0331), and a typed amount refused by name where it is negative
+  (`NegativeTip`). `choose_tip_amount`, `tip_of_percent` and
+  `TipError.NotOffered` are gone, so no percent is refused at run time.
+- `OrderTotal` answers an `Option<Money<USD>>`, read through its arm
+  (ADR-0330) inside the order page's own wording of its total (ADR-0332's:
+  to pay, charged); `cents(0)` where no order is placed is gone.
+Verify TRAIN_RUN green, with train-5.
+
 **ADR-0332, 2026-10-13: a payment is the provider's word, held to its
 signature** (the integrator's; NEXT 6c; track `payments`, merged from
 `9a7a094f`).

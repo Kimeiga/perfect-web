@@ -389,7 +389,6 @@ fn the_store_states_its_source_and_asks_only_what_it_gives() {
             "cancel_order",
             // The checkout's choices (track `order-total`).
             "choose_tip",
-            "choose_tip_amount",
             "apply_promo",
             "remove_promo",
             "add_address"
@@ -410,7 +409,6 @@ fn the_store_states_its_source_and_asks_only_what_it_gives() {
         "cancel_order",
         // The checkout's choices (track `order-total`).
         "choose_tip",
-        "choose_tip_amount",
         "apply_promo",
         "remove_promo",
         // A reader's addresses (track `store-accounts`).
@@ -421,8 +419,8 @@ fn the_store_states_its_source_and_asks_only_what_it_gives() {
     ];
     assert_eq!(named("PW0347"), commands);
     assert_eq!(named("PW0348"), commands);
-    // Track `order-total`: the checkout's four, three times, and its
+    // Track `order-total`: the checkout's three, three times, and its
     // query's four reads. NEXT 6c: the settling command, and the one that
     // takes an order back, three times each.
-    assert_eq!(found.len(), 63, "{found:#?}");
+    assert_eq!(found.len(), 60, "{found:#?}");
 }

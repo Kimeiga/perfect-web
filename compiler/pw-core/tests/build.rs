@@ -95,9 +95,10 @@ fn the_store_builds_every_artifact_from_source() {
             "store.page.Order",
             // The order page's two values computed from it (NEXT 6c): the
             // provider's page an awaiting order is paid on, for its total's
-            // words and for the frame.
+            // words and for the frame. The second numbered after the total's
+            // arms read their binding (track `store-switch`, ADR-0330).
             "store.page.OrderPage.derived_3",
-            "store.page.OrderPage.derived_6",
+            "store.page.OrderPage.derived_8",
             // What the order was charged (track `order-total`).
             "store.page.OrderTotal",
             // The places an address may name, and whether the store reaches
@@ -117,9 +118,9 @@ fn the_store_builds_every_artifact_from_source() {
             // An order awaiting its payment, taken back (NEXT 6c, step eight).
             "store.page.cancel_order",
             "store.page.choose_address",
-            // Its tip, by percent and by amount (track `order-total`).
+            // Its tip, a case a browser sends (track `order-total`;
+            // ADR-0331, track `store-switch`).
             "store.page.choose_tip",
-            "store.page.choose_tip_amount",
             "store.page.clear_cart",
             // A line's controls (ADR-0172).
             "store.page.decrease_in_cart",

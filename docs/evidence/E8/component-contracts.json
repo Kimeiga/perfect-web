@@ -1226,12 +1226,6 @@
         "kind": "component"
       },
       {
-        "interface": "pw:app/store.page.choose_tip_amount",
-        "name": "choose_tip_amount",
-        "owner": "external",
-        "kind": "component"
-      },
-      {
         "interface": "pw:app/store.page.clear_cart",
         "name": "clear_cart",
         "owner": "external",
@@ -2251,9 +2245,9 @@
     ]
   },
   {
-    "component_id": "store.page.OrderPage.derived_6",
+    "component_id": "store.page.OrderPage.derived_8",
     "capability_mapping": 1,
-    "abi_schema": "90abafb9a9249b63",
+    "abi_schema": "1eb10587a8b0b5db",
     "required_capabilities": [],
     "allowed_placements": [
       "origin"
@@ -2261,7 +2255,7 @@
     "imports": [],
     "exports": [
       {
-        "name": "derived$6",
+        "name": "derived$8",
         "kind": "derived",
         "binding": {
           "local": "direct",
@@ -2278,8 +2272,8 @@
           }
         },
         "component": {
-          "interface": "pw:app/store-page-order-page-derived-6-api@0.1.0",
-          "function": "derived6"
+          "interface": "pw:app/store-page-order-page-derived-8-api@0.1.0",
+          "function": "derived8"
         }
       }
     ]
@@ -2375,7 +2369,7 @@
                 "kind": "preserve_principal",
                 "principal": "User<UserId>",
                 "position": "result",
-                "ty": "Money<USD>"
+                "ty": "Option<Money<USD>>"
               }
             ]
           }
@@ -4747,190 +4741,6 @@
         "component": {
           "interface": "pw:app/store-page-choose-tip-api@0.1.0",
           "function": "choose-tip",
-          "idempotent_by": "InteractionId"
-        }
-      }
-    ]
-  },
-  {
-    "component_id": "store.page.choose_tip_amount",
-    "capability_mapping": 1,
-    "abi_schema": "412b648412daec74",
-    "required_capabilities": [
-      {
-        "family": "database",
-        "operation": "write",
-        "argument": "Carts"
-      },
-      {
-        "family": "outbox",
-        "operation": "write"
-      },
-      {
-        "family": "session",
-        "operation": "read"
-      }
-    ],
-    "allowed_placements": [
-      "origin"
-    ],
-    "imports": [
-      {
-        "interface": "pw:host/invalidations",
-        "name": "store-page-checkout",
-        "capability": "outbox.write",
-        "capabilities": [
-          {
-            "family": "outbox",
-            "operation": "write"
-          }
-        ],
-        "signature": {
-          "params": [
-            {
-              "declared": {
-                "path": "capability.User",
-                "args": [
-                  {
-                    "declared": {
-                      "path": "capability.UserId"
-                    }
-                  }
-                ]
-              }
-            }
-          ],
-          "result": {
-            "primitive": "Unit"
-          }
-        },
-        "owner": "platform",
-        "kind": "host_capability",
-        "invalidates": "store.page.Checkout"
-      },
-      {
-        "interface": "pw:host/outbox",
-        "name": "user-cart-changed",
-        "capability": "outbox.write",
-        "capabilities": [
-          {
-            "family": "outbox",
-            "operation": "write"
-          }
-        ],
-        "signature": {
-          "params": [
-            {
-              "declared": {
-                "path": "capability.User",
-                "args": [
-                  {
-                    "declared": {
-                      "path": "capability.UserId"
-                    }
-                  }
-                ]
-              }
-            }
-          ],
-          "result": {
-            "primitive": "Unit"
-          }
-        },
-        "owner": "platform",
-        "kind": "host_capability",
-        "event": "Events.UserCartChanged"
-      },
-      {
-        "interface": "pw:host/principal",
-        "name": "read",
-        "capability": "session.read",
-        "capabilities": [
-          {
-            "family": "session",
-            "operation": "read"
-          }
-        ],
-        "signature": {
-          "params": [],
-          "result": {
-            "declared": {
-              "path": "capability.User",
-              "args": [
-                {
-                  "declared": {
-                    "path": "capability.UserId"
-                  }
-                }
-              ]
-            }
-          }
-        },
-        "owner": "platform",
-        "kind": "host_capability"
-      },
-      {
-        "interface": "store:data/checkout",
-        "name": "set-tip",
-        "capability": "database.write<Carts>",
-        "capabilities": [
-          {
-            "family": "database",
-            "operation": "write",
-            "argument": "Carts"
-          }
-        ],
-        "signature": {
-          "params": [
-            {
-              "declared": {
-                "path": "capability.User",
-                "args": [
-                  {
-                    "declared": {
-                      "path": "capability.UserId"
-                    }
-                  }
-                ]
-              }
-            },
-            {
-              "declared": {
-                "path": "domain.Tip"
-              }
-            }
-          ],
-          "result": {
-            "declared": {
-              "path": "store.checkout.Chosen"
-            }
-          }
-        },
-        "owner": "external",
-        "kind": "host_capability"
-      }
-    ],
-    "exports": [
-      {
-        "name": "choose_tip_amount",
-        "kind": "command",
-        "binding": {
-          "local": "direct",
-          "remote": {
-            "kind": "conditional",
-            "obligations": [
-              {
-                "kind": "preserve_principal",
-                "principal": "User<UserId>",
-                "position": "argument 0",
-                "ty": "Money<USD>"
-              }
-            ]
-          }
-        },
-        "component": {
-          "interface": "pw:app/store-page-choose-tip-amount-api@0.1.0",
-          "function": "choose-tip-amount",
           "idempotent_by": "InteractionId"
         }
       }

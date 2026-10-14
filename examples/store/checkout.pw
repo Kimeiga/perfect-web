@@ -303,28 +303,12 @@ fn priced(parts: List<CartPart>, fees: List<FeesOf>, promo: Option<Promo>, code:
     }
 }
 
-// **The tip a percent names**: none, or one the page offers.
-fn tip_of_percent(p: Int) -> Option<Tip> !{} {
-    if p == 0 {
-        Some(Tip.NoTip)
-    } else if p == 15 {
-        Some(Tip.Fifteen)
-    } else if p == 18 {
-        Some(Tip.Eighteen)
-    } else if p == 20 {
-        Some(Tip.Twenty)
-    } else {
-        None
-    }
-}
-
-// **What the reader's latest order was charged**, or nothing where none
-// was placed: the integrator's ruling of 2026-10-13, until a member read of
-// a match arm's binding is computed, when this is `Option<Money<USD>>`.
-fn total_charged(charged: Option<OrderCharged>) -> Money<USD> !{} {
+// **What the reader's latest order was charged**, or none where none was
+// placed (track `store-switch`: read through the order's arm, ADR-0330).
+fn total_charged(charged: Option<OrderCharged>) -> Option<Money<USD>> !{} {
     match charged {
-        Some(c) => c.total,
-        None => nothing(),
+        Some(c) => Some(c.total),
+        None => None,
     }
 }
 
