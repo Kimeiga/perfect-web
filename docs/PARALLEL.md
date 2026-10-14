@@ -1453,3 +1453,23 @@ Each a decision for a track, with its date; a track's ADR records it too.
   train now plans from the train's head, nothing for its evidence: the
   integrator no longer cancels it by hand (the rulings of train-2's entry
   stand otherwise).
+- **2026-10-13, train-4 landed** (`track/train-4`, verify 38451028940): ADR-0329
+  (W9's order total), ADR-0330 (an arm's binding read through a member),
+  ADR-0331 (a case crosses from a browser), the flight test's trace (NEXT
+  3d), and ADR-0281 amended (5) (a shell script a recipe runs plans it;
+  master's verify runs no browser suite again on the same code).
+  - **Ruling (the integrator's), ADR-0281's train amendment**: the
+    integrator's own small tracks ride a train with no run of their own,
+    each with its local `just ci` and its mutation controls green. The
+    correction: `variant-args` went on without its own `just ci`, and the
+    train's failed on a test its change superseded; the whole `just ci`,
+    never a track's own tests alone.
+  - **Found by the train's run**: `cart_lines_mutations.py`'s "a record
+    holding what cannot be sent is sent" survived (40 of 41). ADR-0331's
+    change to `handlers.rs` left no test of a record a browser cannot send;
+    a `Grove { tree: Tree }` is refused by its name (`e9e6a49f`, on the
+    train), and the seven recipes it plans ran by dispatch (38483504682).
+  - To W9: the store's switch (`OrderTotal` an `Option`, `choose_tip(Tip)`)
+    starts once train-5 lands, or from `track/payments`: the payments track
+    (NEXT 6c, on train-5) changes the order page and the cart page's
+    place-order handler, which the switch changes too.

@@ -1,28 +1,28 @@
 ADR-0170 - a loop over a list inside a query's value
 
 produced by: just e14-nested-lists
-commit: 64cc7da190695fa62cadf247d14fd9ebdc24f6e9
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38348107940 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: c3a596048c572c8592ce336ede4fcb417847e5ed
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38451028940 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the plan, and what a speculation would not reach (compiler/pw-core/tests/nested_lists.rs)
 
-test a_list_inside_a_querys_value_is_iterated_by_its_path ... ok
 test a_region_whose_handler_captures_what_the_browser_does_not_hold_is_refused ... ok
+test a_list_inside_a_querys_value_is_iterated_by_its_path ... ok
 test the_count_alone_is_speculated_as_before ... ok
-test a_speculated_value_read_in_a_block_no_region_renders_is_refused ... ok
 test a_region_that_reads_what_the_browser_does_not_hold_is_refused ... ok
+test a_speculated_value_read_in_a_block_no_region_renders_is_refused ... ok
 test a_part_that_reads_a_speculated_value_is_rendered_again ... ok
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.51s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.05s
 
 == a value computed for a row, read whole (runtime/pw-render/tests/paths.rs)
 
 test a_path_set_whole_is_read_before_the_name_it_begins_with ... ok
 test a_field_the_value_does_not_have_is_missing_not_empty ... ok
 test a_row_reads_a_value_two_fields_deep_in_its_item ... ok
-test a_row_whose_computed_value_changed_sets_its_text_where_it_is ... ok
-test a_value_computed_for_a_row_is_read_whole_where_a_field_has_none ... ok
 test a_value_computed_for_a_row_that_changed_is_set_where_it_is ... ok
+test a_value_computed_for_a_row_is_read_whole_where_a_field_has_none ... ok
+test a_row_whose_computed_value_changed_sets_its_text_where_it_is ... ok
 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 == the development server (pw-dev-server)
@@ -32,11 +32,11 @@ test tests::a_block_a_speculation_renders_is_rendered_again_whole ... ok
 test tests::a_block_that_shows_the_arm_it_showed_is_told_part_by_part ... ok
 test tests::a_block_whose_rendering_changed_is_rendered_again ... ok
 test tests::a_list_inside_a_querys_value_is_rendered_and_patched_where_it_is ... ok
-test result: ok. 486 passed; 0 failed; 9 ignored; 0 measured; 0 filtered out; finished in 834.48s
+test result: ok. 498 passed; 0 failed; 9 ignored; 0 measured; 0 filtered out; finished in 824.43s
 
 == the store checks
 
-pw check: 50 file(s), no diagnostics
+pw check: 51 file(s), no diagnostics
 
 == mutation controls (scripts/nested_lists_mutations.py)
 
