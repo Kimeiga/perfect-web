@@ -321,6 +321,56 @@ after 4b.
 
 ## Measurements (4b)
 
-To be folded in from 4b before the integrator rules: each store read's
-statements per call on memory and PostgreSQL, at two data sizes, per
-source operation and per page and command.
+NEXT 4b (track `bounded-statements`, its ADR) counted every operation of
+the store's data layer, and every page and command, on PostgreSQL 18.6 at
+the seed and with fifty stores more, each count equal at both and pinned
+(`tests/bounded_statements.rs`). These are the numbers the budget composes
+from, and the first conformance suite's (decision 2): "operation X makes k
+statements per call, at both sizes". Memory runs no statement; its count
+is not a cost.
+
+- **Per operation**, statements per call, 63 operations: `stores#get` 1,
+  `stores#list` 1, `menus#for-store` 2, `search#find` 2, `search#find-for`
+  4, `coverage#for-store` 2, `hours#for-store` 3, `hours#for-stores` 3 for
+  every store at once, `hours#for-cart` 6, `fees#for-stores` 1 for every
+  store at once, `checkout#parts` 2, `user-orders#await-payment` 14. A
+  write's count grows with what it writes (the cart's lines, a week's
+  periods, a menu's items), never with the stores. So `StoreData` states
+  `sets one_call`, measured.
+- **Per page and command**: `add_to_cart` 7 and 8, `add_address` 3,
+  `choose_tip` 3, the home page 5, the store's page 16, the cart 13, a
+  search 8, the address page 2, `place_order` 54, the order's page 5.
+
+### The first case: one command's repeated reads (the integrator's)
+
+`place_order`'s 54, by operation (the layer's tally per operation):
+
+| Where | Reads | Statements |
+| --- | --- | --- |
+| its transaction: `closed_in(hours_of_cart(..))` | hours#for-cart: the cart, its items' stores, their names, their hours (3) | 6 |
+| its transaction: `priced_for` | checkout#parts (the cart, its items' stores), fees#for-stores, checkout#chosen | 4 |
+| its transaction: `UserOrders.await_payment` | user-orders#await-payment: the cart again, its reach (the addresses, the items' stores, the stores), the order, its lines and parts, the code, the choices cleared | 16 |
+| the provider's `settle_payment`, its own transaction | user-orders#settle | 7 |
+| after the commit: the session's invalidated queries read again | `Cart` six times (user-carts#current), `CartHours`, `Checkout`, `Order`, the estimate | 21 |
+
+In one transaction the cart's lines are read three times and their items'
+stores three times, each by a composite that reads them for itself.
+**Settled: read once above the seam, not coalesced by the host per
+transaction.** The composites move (decision 3): `place_order` reads the
+cart's parts once (`carts#stores`, the lines with their stores), and
+computes the hours from them (`hours_of_stores(parts' stores)`, the three
+statements of the hours alone) and the reach (`coverage_of_stores(parts'
+stores)`, the addresses and the stores' rows), and `await_payment` takes the
+parts it was given rather than reading the cart again for its reach. A
+per-transaction cache in the host would need to know which writes of the
+transaction invalidate which keyed read, a second model of the data beside
+the program's, and would hide the repeated read the program wrote.
+
+- **The number**: the transaction's 26 becomes 21: `hours#for-cart`'s 6
+  becomes the hours' 3 (−3); the reach inside `await-payment` no longer
+  looks up the items' stores (−1); and `await-payment` writes the lines it
+  was given instead of reading the cart again (−1). Estimated from the
+  measured breakdown, confirmed when the composites move.
+- **After the commit**, the six reads of `Cart` are one per document and
+  binding that reads it: the host's merging of one render's reads (decision
+  1) makes them one, 21 becoming 16. `place_order`'s 54 becomes 44.
