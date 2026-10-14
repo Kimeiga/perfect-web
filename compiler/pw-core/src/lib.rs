@@ -79,6 +79,8 @@ pub mod uploads;
 pub mod invoked;
 // ADR-0195's ruling 13, the build's half: a page loads from its own origin.
 pub mod origins;
+// The scheduled-commands track: a command runs when the clock passes its time.
+pub mod scheduled;
 pub mod values;
 pub mod wit;
 

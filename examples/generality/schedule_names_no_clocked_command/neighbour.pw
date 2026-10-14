@@ -1,0 +1,18 @@
+// @status: NEIGHBOUR
+// @invariant: schedule_names_no_clocked_command
+// @dimension: valid neighbour — a clocked command of another module, scheduled and taken back
+//
+// A command the clock invokes, declared in another module and imported, is
+// one a schedule may name, by `schedule` and by `unschedule`.
+
+module generality.schedule_imported
+
+import clock.{ minutes }
+import orders.reminders.{ remind }
+
+command later(order: String) -> Result<Int, String> !{ clock.schedule }
+{
+    schedule remind(order) after minutes(5)
+    unschedule remind(order)
+    Ok(1)
+}

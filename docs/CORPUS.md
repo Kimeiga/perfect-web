@@ -981,3 +981,32 @@ Generality at open:        46/46 invariants generality-tested
 | A-035 | added: an image, its candidates and a stylesheet at paths, and a link to another origin | new category, `a page loads from its own origin` |
 | R-066 | added: an image from another origin (`PW5052`) | new category |
 | `load_from_another_origin` | a GENERAL witness, a `//` address a view's `<link>` preloads, and a NEIGHBOUR one, a navigation and an item's property to another origin, and a frame and an image built with a value at paths | new invariant |
+
+## C23: a command runs when the clock passes its time, 2026-10-14
+
+Opened because the specification changed. A command `invoked_by Clock` is
+run by the host when the clock passes the time a command scheduled it for:
+`schedule cmd(args) at when` (an `Instant`) or `after duration` (a
+`Duration` from the scheduling command's commit), and `unschedule
+cmd(args)` (the scheduled-commands track). A schedule names such a command,
+written as a call (`PW6501`); it is a command's statement (`PW6502`); its
+time is an instant or a duration (`PW6503`). No invariant is retired; no
+fixture changed.
+
+```text
+Corpus version:            C23
+Accepted programs:         36
+Rejected programs:         69
+Charter categories:        36/36 accepted, 69/69 rejected
+Generality at open:        49/49 invariants generality-tested
+```
+
+| Fixture | Change | Kind |
+|---|---|---|
+| A-036 | added: a command schedules one the clock invokes, after thirty minutes, and another takes it back | new category, `a command schedules one the clock invokes` |
+| R-067 | added: a schedule that names a command the clock does not invoke (`PW6501`) | new category |
+| R-068 | added: a schedule written in a function (`PW6502`) | new category |
+| R-069 | added: a run scheduled `at` a duration (`PW6503`) | new category |
+| `schedule_names_no_clocked_command` | a GENERAL witness, an `unschedule` of a command a payment's outcome invokes, and a NEIGHBOUR one, a clocked command of another module | new invariant |
+| `scheduled_outside_a_command` | a GENERAL witness, an `unschedule` in a query, and a NEIGHBOUR one, a schedule inside a command's `if` | new invariant |
+| `schedule_time` | a GENERAL witness, `after` given an instant, and a NEIGHBOUR one, `at` an instant `clock.at` computes | new invariant |

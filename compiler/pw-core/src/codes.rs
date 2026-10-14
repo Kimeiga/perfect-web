@@ -121,6 +121,9 @@ pub enum Owner {
     /// command the platform invokes on its provider's word, and no reader
     /// presses.
     Payments,
+    /// The scheduled-commands track's codes, PW65xx (the integrator's): a
+    /// command the platform runs when the clock passes its time.
+    Schedules,
 }
 
 impl fmt::Display for Code {
@@ -874,6 +877,19 @@ codes! {
         "no page presses a command the platform invokes";
     INVOKED_COMMAND_NOT_IDEMPOTENT = "PW6405" / invoked_command_not_idempotent / 1, Payments,
         "a command the platform invokes is idempotent: the provider's word arrives more than once";
+
+    // --- the scheduled-commands track (PW65xx; the integrator's) ----------
+    //
+    // `schedule cmd(args) at when` and `unschedule cmd(args)`: a command
+    // `invoked_by Clock`, run when the clock passes its time, written with
+    // the scheduling command's writes (Convex's scheduled functions; Oban's
+    // jobs unique by their arguments).
+    SCHEDULE_NAMES_NO_CLOCKED_COMMAND = "PW6501" / schedule_names_no_clocked_command / 1, Schedules,
+        "a `schedule` names a command `invoked_by Clock`, written as a call";
+    SCHEDULED_OUTSIDE_A_COMMAND = "PW6502" / scheduled_outside_a_command / 1, Schedules,
+        "a `schedule` or an `unschedule` is a command's statement: what a page shows schedules nothing";
+    SCHEDULE_TIME = "PW6503" / schedule_time / 1, Schedules,
+        "a scheduled run's time is `at` an `Instant` or `after` a `Duration`";
 }
 
 /// Codes that were registered, are no longer emitted, and whose numbers must
@@ -964,6 +980,7 @@ impl Owner {
             Owner::StoreAccounts => "PW62",
             Owner::StoreSearch => "PW63",
             Owner::Payments => "PW64",
+            Owner::Schedules => "PW65",
             Owner::Syntax | Owner::Resolution => "PW00",
             Owner::Placement | Owner::Privacy | Owner::Markup => "PW50",
             Owner::Types => "PW06",
@@ -1030,6 +1047,7 @@ mod tests {
                 (Owner::StoreAccounts, "PW62"),
                 (Owner::StoreSearch, "PW63"),
                 (Owner::Payments, "PW64"),
+                (Owner::Schedules, "PW65"),
             ] {
                 assert!(
                     !c.id.starts_with(block) || c.owner == owner,

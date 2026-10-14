@@ -237,6 +237,9 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
             // NEXT 6c: a command the platform invokes, which no reader
             // presses (PW64xx).
             out.extend(crate::invoked::check(&hirs, i, &workspace, &sent));
+            // The scheduled-commands track: a schedule names a command the
+            // clock invokes, in a command, at its time (PW65xx).
+            out.extend(crate::scheduled::check(&hirs, i, &workspace, &sigs));
             // ADR-0163: a page says when its address names nothing.
             out.extend(not_found_names_a_case(&u.hir, i, &sigs, &workspace));
             // ADR-0295: and when it is another address of the page.

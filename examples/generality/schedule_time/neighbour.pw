@@ -1,0 +1,24 @@
+// @status: NEIGHBOUR
+// @invariant: schedule_time
+// @dimension: valid neighbour — an instant the clock computes from a date, a time and a zone
+//
+// `at` an instant the program computes with `clock.at` is one, though no
+// value of it is written.
+
+module generality.at_a_computed_instant
+
+import domain.{ InteractionId }
+import clock.{ LocalDate, LocalTime, TimeZone, at }
+
+command remind(order: String) -> Result<Int, String>
+    invoked_by    Clock
+    idempotent_by InteractionId
+{
+    Ok(1)
+}
+
+command remind_on(order: String, day: LocalDate, time: LocalTime, zone: TimeZone) -> Result<Int, String> !{ clock.schedule, clock.zone }
+{
+    schedule remind(order) at at(day, time, zone)
+    Ok(1)
+}

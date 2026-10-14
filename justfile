@@ -25,6 +25,7 @@ import 'just/store-hours.just'
 import 'just/order-total.just'
 import 'just/payments.just'
 import 'just/page-policy.just'
+import 'just/scheduled.just'
 
 default:
     @just --list
