@@ -144,6 +144,28 @@ reads it) and ADR-0193 (an order placed from the cart).
   computed (the integrator's track), it becomes `Option<Money<USD>>` read
   through the arm.
 
+## Amended: the store switches (track `store-switch`, W9)
+
+What ADR-0330 and ADR-0331 allow, the store now uses; the interim two
+commands and `cents(0)` go.
+
+- **One `choose_tip(tip: Tip)`**, a case a browser sends (ADR-0331). The
+  buttons press `choose_tip(Tip.Fifteen)` and so on, and Add tip
+  `choose_tip(Tip.TipAmount(amount))`. A negative amount is refused
+  `NegativeTip`. `choose_tip_amount`, `tip_of_percent` and
+  `TipError.NotOffered` are removed. The server's test presses it as a
+  browser does: `[{ "$case": "twenty" }]`, `[{ "$case": "tip-amount",
+  "value": 300 }]`.
+- **`OrderTotal(reader) -> Option<Money<USD>>`**, none where no order is
+  placed, read through the arm that binds it (ADR-0330), inside the order's
+  arm and payments' own wording of the total (ADR-0332): `{:ToPay}{#match
+  charged}{:Some(to_pay)}Total to pay: {to_pay.display}{:None}{/match}`, and
+  likewise `Total charged:` once charged. The two bindings are named apart,
+  as ADR-0330 asks of arms that read one path.
+- The mutant "a percent the page does not offer is taken" goes with
+  `tip_of_percent`; `scripts/order_total_mutations.py` is 21 mutants.
+- The KNOWN_LIMITATIONS line "The store has not yet switched" is removed.
+
 ## Alternatives
 
 - **One schedule for an order of several stores.** Which store's? Each
