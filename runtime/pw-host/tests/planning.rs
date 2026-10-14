@@ -69,6 +69,10 @@ fn full() -> Topology {
                     "payments.begin".to_string(),
                     // And canceled, by its reader alone (step eight).
                     "payments.cancel".to_string(),
+                    // A run scheduled with a command's writes, which the
+                    // host runs when the clock passes its time (the
+                    // scheduled-commands track).
+                    "clock.schedule".to_string(),
                 ]),
             },
         ],

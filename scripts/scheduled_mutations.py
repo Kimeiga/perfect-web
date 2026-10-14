@@ -29,7 +29,7 @@ the store in memory:
   again; a run scheduled again a second run; a cancel cancelling nothing;
 - running: a run made as no reader; a run answered kept; a refused run
   taken as answered, run again at once, or never kept failed; the host
-  granting no scheduling;
+  granting no scheduling; a run's commit told to no one reading it;
 - the store: a payment declined cancelling its sweep; one paid keeping
   it; an order taken back swept still; a sweep taking back an order it
   was not scheduled for.
@@ -259,6 +259,13 @@ MUTANTS = [
         SERVER,
         "            Some(why) if run.attempts >= schedules::RETRIES => {\n",
         "            Some(why) if run.attempts >= i64::MAX => {\n",
+    ),
+    (
+        "a run's commit is told to no one reading it",
+        MEMORY,
+        SERVER,
+        "        if !due.is_empty() {\n            self.tell_waiting();\n        }\n",
+        "",
     ),
     (
         "the host grants no scheduling",

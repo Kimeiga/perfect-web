@@ -150,7 +150,8 @@ checks its arguments as a call's).
   corpus (A-036, R-067 to R-069, three generality pairs);
 - the host's runs and the store's sweep (`tests/store_scheduled.rs`), the
   store in memory and on PostgreSQL: the sweep at thirty minutes and not a
-  minute before, on its reader's behalf; a payment paid cancelling it and
+  minute before, on its reader's behalf, and told to the reader's open
+  order page, though no connection made it; a payment paid cancelling it and
   one declined keeping it; the reader's cancel cancelling it; a press of
   the sweep refused; a sweep of another order taking nothing back; a
   command that answers an error scheduling nothing, and one that writes
@@ -161,5 +162,6 @@ checks its arguments as a call's).
   its command's record written by one transaction; a run outliving the
   host that scheduled it; a run committed and not removed committing once;
   two hosts committing a run once; the feed's layer keeping its runs;
-- mutation controls (`scripts/scheduled_mutations.py`): the language's,
-  the host's in memory and on PostgreSQL.
+- mutation controls (`scripts/scheduled_mutations.py`, 37): the language's
+  12, the host's 20 in memory and 5 on PostgreSQL, each run by the suite
+  that must kill it.

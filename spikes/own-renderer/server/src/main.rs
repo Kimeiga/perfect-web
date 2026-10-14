@@ -3098,6 +3098,12 @@ impl Server {
         for run in &due {
             self.run_scheduled(run);
         }
+        // What the runs' commits reached, told to each session reading it,
+        // as a connection's command's is once it is answered (ADR-0219):
+        // no connection made these.
+        if !due.is_empty() {
+            self.tell_waiting();
+        }
         let next = self.runs().next_run().unwrap_or(None);
         let wait = next.map_or(1000, |at| (at - self.now()).clamp(1, 1000));
         (due.len(), u64::try_from(wait).unwrap_or(1000))

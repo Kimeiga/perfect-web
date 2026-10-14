@@ -179,15 +179,6 @@ pub fn schedule_binding(path: &str, how: &str) -> ir::ImportId {
     }
 }
 
-/// What a schedules' function `name` does for the command at `path`: `None`
-/// for one of another command's.
-pub fn schedule_shape(path: &str, name: &str) -> Option<&'static str> {
-    let how = name
-        .strip_prefix(&crate::wit::ident(path))?
-        .strip_prefix('-')?;
-    SCHEDULE_HOWS.into_iter().find(|h| *h == how)
-}
-
 /// **The platform's reads** (ADR-0277): each resource a materialization's
 /// body reads, `query R(..)`, is a function of it, taking R's parameters and
 /// answering R's value, its `Ok` where R answers a `Result`, by R's whole

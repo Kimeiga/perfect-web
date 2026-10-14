@@ -130,6 +130,28 @@ fn an_order_no_one_pays_is_taken_back_thirty_minutes_on() {
     });
 }
 
+/// **An order swept is told to its reader's open page**: the run is the
+/// host's own, made by no connection, and the page open on the order is
+/// told it was taken back as it is told of the reader's own cancel.
+#[test]
+fn an_order_swept_is_told_to_its_readers_open_page() {
+    paying(|s, _| {
+        placed_awaiting(s);
+        s.serve_document_settled("a", "store.page.OrderPage", &Params::new(), &[])
+            .expect("served");
+        let doc = latest(&s.pending.lock().expect("pending"), "a");
+        later(s, THIRTY_MINUTES);
+        assert_eq!(s.run_due().0, 1);
+        assert!(
+            sets_of(s, &doc)
+                .iter()
+                .any(|set| { written(set).contains("Canceled: its items are back in your cart.") }),
+            "{:?}",
+            sets_of(s, &doc)
+        );
+    });
+}
+
 /// **A payment settled for good cancels its order's sweep; one declined
 /// keeps it**: a decline is no outcome for the order, which still awaits a
 /// card, and is still taken back if none comes. Paid, the order stands past
