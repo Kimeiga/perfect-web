@@ -175,6 +175,12 @@ const REJECTED_CATEGORIES: &[&str] = &[
     "a schedule that names a command the clock does not invoke",
     "a schedule written outside a command",
     "a run scheduled at what is no instant",
+    // NEXT 6c's `invoked_by Payments`, corpus C24: PW6401 to PW6405.
+    "a command the platform invokes that requires a reader",
+    "a payment's command given what is no settled payment",
+    "two commands a payment's outcome invokes",
+    "a page that presses a command the platform invokes",
+    "a command the platform invokes with no key",
 ];
 
 /// Milestone 0 gate (charter §14 M0): ">= 10 accepted and 20 rejected".

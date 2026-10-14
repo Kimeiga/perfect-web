@@ -1,0 +1,12 @@
+// @status: NEIGHBOUR
+// @invariant: invoked_command_not_idempotent
+//
+// A command a reader presses may declare no key: no platform's word is sent
+// to it again.
+
+module generality.unkeyed_press
+
+command remind(order: String) -> Result<Int, String>
+{
+    Ok(1)
+}

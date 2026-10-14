@@ -876,7 +876,7 @@ codes! {
     INVOKED_COMMAND_PRESSED = "PW6404" / invoked_command_pressed / 1, Payments,
         "no page presses a command the platform invokes";
     INVOKED_COMMAND_NOT_IDEMPOTENT = "PW6405" / invoked_command_not_idempotent / 1, Payments,
-        "a command the platform invokes is idempotent: the provider's word arrives more than once";
+        "a command the platform invokes is idempotent: its word, a provider's or the clock's, may come more than once";
 
     // --- the scheduled-commands track (PW65xx; the integrator's) ----------
     //
