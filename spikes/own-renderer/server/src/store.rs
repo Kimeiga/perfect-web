@@ -272,6 +272,30 @@ pub(crate) trait Rows {
     fn hours(&mut self, store: &str) -> Result<Option<crate::hours::Hours>, String>;
     fn set_hours(&mut self, store: &str, hours: &crate::hours::Hours) -> Result<(), String>;
 
+    // TRACK SEAM (bounded-statements): rows read by set (NEXT 4b), each one
+    // statement on PostgreSQL whatever the number of keys (`= ANY($1)`), and
+    // a scan in memory, which these defaults are.
+    /// The stores among `ids`, in the stores' order.
+    fn stores_by_ids(&mut self, ids: &[String]) -> Result<Vec<StoreRow>, String> {
+        Ok(self
+            .stores()?
+            .into_iter()
+            .filter(|s| ids.contains(&s.id))
+            .collect())
+    }
+    /// The store that lists each of `items`: the first, in the stores'
+    /// order, whose menu has it.
+    fn stores_of_items(&mut self, items: &[String]) -> Result<BTreeMap<String, String>, String> {
+        scanned_stores_of_items(self, items)
+    }
+    /// The hours of each of `stores` the layer holds, in `stores`' order.
+    fn hours_of(
+        &mut self,
+        stores: &[String],
+    ) -> Result<Vec<(String, crate::hours::Hours)>, String> {
+        hours_one_by_one(self, stores)
+    }
+
     // TRACK SEAM (order-total): the checkout's rows (`checkout.rs`).
     /// The fees of a list of stores, in its order, a store without a
     /// schedule left out: one statement on PostgreSQL.
@@ -830,10 +854,11 @@ pub(crate) fn coverage(
     };
     let place = crate::places::place(&chosen.place)
         .ok_or_else(|| format!("address `{}` names no place `{}`", chosen.id, chosen.place))?;
+    // The one store's row (NEXT 4b), not every store's.
     let zone = r
-        .stores()?
+        .stores_by_ids(&[store.to_string()])?
         .into_iter()
-        .find(|s| s.id == store)
+        .next()
         .map(|s| s.zone);
     Ok(Some(match zone {
         Some(zone) => Reach {
@@ -849,29 +874,95 @@ pub(crate) fn coverage(
     }))
 }
 
+/// **The store that lists each of `items`, by scanning every store's
+/// menu**: memory's way, free; on PostgreSQL a statement per store, which
+/// its own `stores_of_items` is not (NEXT 4b).
+pub(crate) fn scanned_stores_of_items<R: Rows + ?Sized>(
+    r: &mut R,
+    items: &[String],
+) -> Result<BTreeMap<String, String>, String> {
+    let mut out = BTreeMap::new();
+    for s in r.stores()? {
+        for i in r.menu(&s.id)? {
+            if items.contains(&i.id) {
+                out.entry(i.id).or_insert_with(|| s.id.clone());
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// **The hours of each of `stores`, a store at a time**: memory's way; on
+/// PostgreSQL three statements a store, which its own `hours_of` is not.
+pub(crate) fn hours_one_by_one<R: Rows + ?Sized>(
+    r: &mut R,
+    stores: &[String],
+) -> Result<Vec<(String, crate::hours::Hours)>, String> {
+    let mut out = Vec::new();
+    for s in stores {
+        if let Some(h) = r.hours(s)? {
+            out.push((s.clone(), h));
+        }
+    }
+    Ok(out)
+}
+
+/// **Whether each of `stores` reaches the owner's chosen address**, by set
+/// (NEXT 4b): the owner's addresses once and the stores' rows at once,
+/// whatever their number. None for a store where no address is chosen.
+pub(crate) fn coverage_of(
+    r: &mut dyn Rows,
+    stores: &[String],
+    owner: &str,
+) -> Result<BTreeMap<String, Option<Reach>>, String> {
+    let Some(chosen) = r.addresses(owner)?.into_iter().find(|a| a.chosen) else {
+        return Ok(stores.iter().map(|s| (s.clone(), None)).collect());
+    };
+    let place = crate::places::place(&chosen.place)
+        .ok_or_else(|| format!("address `{}` names no place `{}`", chosen.id, chosen.place))?;
+    let zones: BTreeMap<String, crate::places::Zone> = r
+        .stores_by_ids(stores)?
+        .into_iter()
+        .map(|s| (s.id, s.zone))
+        .collect();
+    Ok(stores
+        .iter()
+        .map(|s| {
+            let reach = match zones.get(s) {
+                Some(zone) => Reach {
+                    delivers: crate::places::delivers_to(zone, place),
+                    minutes: crate::places::travel_minutes(zone, place),
+                    label: chosen.label.clone(),
+                },
+                None => Reach {
+                    delivers: false,
+                    minutes: 0,
+                    label: chosen.label.clone(),
+                },
+            };
+            (s.clone(), Some(reach))
+        })
+        .collect())
+}
+
 /// **Whether every line of a cart is delivered to the owner's chosen
-/// address** (track `store-accounts`): a line's item from some store that
-/// lists it and reaches the address. True where no address is chosen.
+/// address** (track `store-accounts`): a line's item from the store that
+/// lists it, which reaches the address. True where no address is chosen. By
+/// set (NEXT 4b): the lines' stores in one read, their reach in two.
 fn cart_reaches(r: &mut dyn Rows, lines: &[Line], owner: &str) -> Result<bool, String> {
     if !r.addresses(owner)?.iter().any(|a| a.chosen) {
         return Ok(true);
     }
-    let stores = r.stores()?;
-    for line in lines {
-        let mut reached = false;
-        for store in &stores {
-            if r.menu(&store.id)?.iter().any(|i| i.id == line.item)
-                && coverage(r, &store.id, owner)?.is_some_and(|c| c.delivers)
-            {
-                reached = true;
-                break;
-            }
-        }
-        if !reached {
-            return Ok(false);
-        }
-    }
-    Ok(true)
+    let items: Vec<String> = lines.iter().map(|l| l.item.clone()).collect();
+    let of_item = r.stores_of_items(&items)?;
+    let stores: Vec<String> = of_item.values().cloned().collect();
+    let reach = coverage_of(r, &stores, owner)?;
+    Ok(lines.iter().all(|line| {
+        of_item
+            .get(&line.item)
+            .and_then(|s| reach.get(s))
+            .is_some_and(|c| c.as_ref().is_some_and(|c| c.delivers))
+    }))
 }
 
 /// A reader's addresses as the program's `List<Address>` is.
@@ -919,12 +1010,11 @@ fn catalog(with: With, faults: &Faults, stopped: Option<Stopped>) -> Ops {
         "store:data/stores#get".to_string(),
         Arc::new(move |args: &[Val]| match args {
             [Val::String(id)] => {
+                // The one store's row (NEXT 4b), not every store's.
                 let found = w(&mut |r| {
-                    Ok(r.stores()?
+                    Ok(r.stores_by_ids(std::slice::from_ref(id))?
                         .iter()
-                        .find(|s| s.id == *id)
                         .map(store_val)
-                        .into_iter()
                         .collect())
                 })?;
                 let Some(store) = found.into_iter().next() else {
@@ -954,7 +1044,7 @@ fn catalog(with: With, faults: &Faults, stopped: Option<Stopped>) -> Ops {
     );
     // A store's menu, `None` where the layer holds no such store.
     fn menu_of(r: &mut dyn Rows, id: &str) -> Result<Option<Vec<Item>>, String> {
-        if !r.stores()?.iter().any(|s| s.id == id) {
+        if r.stores_by_ids(&[id.to_string()])?.is_empty() {
             return Ok(None);
         }
         r.menu(id).map(Some)

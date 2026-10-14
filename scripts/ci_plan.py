@@ -124,6 +124,7 @@ NEEDS_DATABASE = {
     "e14-store-search",
     "e14-store-hours",
     "e14-order-total",
+    "e14-bounded-statements",
     "e14-interactions",
     # NEXT 6c: the store's orders awaiting their payments, on PostgreSQL too.
     "e14-payments",

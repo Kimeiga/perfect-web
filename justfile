@@ -23,6 +23,7 @@ import 'just/store-accounts.just'
 import 'just/store-search.just'
 import 'just/store-hours.just'
 import 'just/order-total.just'
+import 'just/bounded-statements.just'
 import 'just/payments.just'
 
 default:
