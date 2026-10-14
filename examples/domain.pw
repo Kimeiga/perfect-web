@@ -382,11 +382,9 @@ type PromoError =
     // Its store has no line in the cart: a code is one store's.
     | NotInCart
 
-// **Why a tip is refused**: an amount below nothing, or a percent the page
-// does not offer.
+// **Why a tip is refused**: an amount below nothing.
 type TipError =
     | NegativeTip
-    | NotOffered
 
 // **Who pays for a discount.** A store's own lowers what is taxed; one the
 // platform reimburses does not (California's Regulation 1671.1, New York's

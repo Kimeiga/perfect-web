@@ -1490,3 +1490,9 @@ Each a decision for a track, with its date; a track's ADR records it too.
   on the train (its run failed in one recipe, fixed and re-run by dispatch,
   the fix's own push run cancelled for the dispatch). `verified_base.py`
   does not count a dispatch; NEXT has the item.
+\n- **2026-10-13, W9's store switch merged** on train-5 (track
+  `store-switch`, from `1d217edc`, on the payments track): ADR-0329 amended,
+  one `choose_tip(Tip)` and `OrderTotal` an `Option`. It went on with its
+  own local checks green and no run of its own (its push's verify cancelled
+  by the coordinator, the integrator's ruling for small tracks); train-5's
+  run verifies it. W9 takes NEXT 4b from master once train-5 lands.

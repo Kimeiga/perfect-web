@@ -12,8 +12,7 @@ Each mutant undoes one rule:
   most; no small-order fee; a percent off rounded toward zero; a platform's
   discount lowering the tax, or a store's not; the tip left out of the
   total; an expired code, a used code, a code of a store not in the cart,
-  or one under its least subtotal, taken; a negative tip, or a percent the
-  page does not offer, taken;
+  or one under its least subtotal, taken; a negative tip taken;
 - the command (`examples/store/app.pw`): the order placed whatever total
   the page showed;
 - the layers: memory's uses of a code not read; memory's charges not
@@ -162,13 +161,6 @@ MUTANTS = [
         CHECKOUT,
         "        TipAmount(amount) => is_less(amount, nothing()),\n",
         "        TipAmount(amount) => false,\n",
-    ),
-    (
-        "a percent the page does not offer is taken",
-        "server",
-        CHECKOUT,
-        "        Some(Tip.Twenty)\n    } else {\n        None\n",
-        "        Some(Tip.Twenty)\n    } else {\n        Some(Tip.NoTip)\n",
     ),
     (
         "the order is placed whatever total the page showed",
