@@ -344,8 +344,11 @@ is not a cost.
 - **`place_order`, by scenario** (the integrator's ruling of 2026-10-14,
   both pinned): (a) a deployment taking no payments, placed at once, its
   operations 33, its commit 7, its queries read again 21; (b) a deployment
-  taking payments, awaiting, its transaction 35, then `settle_payment` on
-  the provider's word in its own, 16. (b) is the production path, (a) the
+  taking payments, awaiting, its transaction 37 (its sweep scheduled, 2,
+  since ADR-0334), then `settle_payment` on the provider's word in its own,
+  17 (the sweep cancelled, 1); `cancel_order` 25 and the provider's word of
+  its cancel 14; the sweep run thirty minutes on, `expire_order` 26 and the
+  word of its cancel 12. (b) is the production path, (a) the
   development store's. "The development provider settles inside
   `place_order`" was wrong: the one transaction 4b measured first is
   ADR-0332's path for a deployment that takes no payments, where
@@ -367,9 +370,9 @@ of 2026-10-14):
 | its commit | the outbox's inserts, the interaction's record, the outbox read back | 7 |
 | after the commit: the session's invalidated queries read again | `Cart` six times (user-carts#current), `CartHours`, `Checkout`, `Order`, the estimate | 21 |
 
-In scenario (b), the production path, `place_order`'s transaction (35)
+In scenario (b), the production path, `place_order`'s transaction (37)
 has no settle among its operations; `settle_payment` runs later, on the
-provider's word, in its own (16).
+provider's word, in its own (17).
 
 In one transaction the cart's lines are read three times and their items'
 stores three times, each by a composite that reads them for itself.
@@ -414,4 +417,4 @@ straddle a commit.
 
 With both, `place_order`'s 61 in scenario (a) (33 + 7 + 21) becomes 51
 (28 + 7 + 16). In scenario (b) the first case's savings are the same reads,
-in `place_order`'s 35.
+in `place_order`'s 37.
