@@ -42,6 +42,17 @@ fields, as the browser holds them).
 3. **A case of a type that contains itself is not sent**: a host reads none
    from a browser, so the handler is refused where it is compiled, by name.
 
+## Correction, 2026-10-13 (found by train-4's run)
+
+Its change to `compiler/pw-core/tests/handlers.rs` replaced the test's one
+refused record, which held a case and is now sent, with one refused for a
+field's name, and left no test of a record holding what a browser cannot
+send: `cart_lines_mutations.py`'s "a record holding what cannot be sent is
+sent" survived (verify 38451028940, 40 of 41 killed). A `Grove { tree: Tree }`,
+its field's type one that contains itself, is refused by its name
+(`e9e6a49f`); the recipes that read the test ran again by dispatch
+(38483504682).
+
 ## Alternatives
 
 - **A case's index, or its name as a bare string.** The browser already

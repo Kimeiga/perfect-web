@@ -125,6 +125,16 @@ hold.
      run would plan most of what the train's will (a program most recipes
      read changed) goes on with its local `just ci` and its mutation
      controls green.
+   - **The integrator's own small tracks ride a train** (the integrator's,
+     2026-10-13, train-4): `arm-members`, `variant-args`, `flight-wait` and
+     `plan-shell` went on with no run of their own, each with its local
+     `just ci` and its mutation controls green; the train's run verifies
+     them with the rest. **Correction, the same day**: `variant-args` went
+     on with its own tests and mutants green and no `just ci` of its own,
+     and the train's `just ci` failed on another crate's test its change
+     superseded (`handlers.rs`'s refusal of a case a browser could not
+     send). The rule is the whole `just ci`, never the track's own tests
+     alone.
    - **A shell script a recipe runs plans it** (the integrator's finding,
      2026-10-13). The planner read only the `scripts/*.py` a recipe's lines
      name: train-3's run, and the audit track's own, planned no `e8-host`

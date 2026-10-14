@@ -1,8 +1,8 @@
 ADR-0181 - a menu is grouped by its category, and a list inside a row is changed where it is
 
 produced by: just e14-menu-categories
-commit: 64cc7da190695fa62cadf247d14fd9ebdc24f6e9
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38348107940 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: c3a596048c572c8592ce336ede4fcb417847e5ed
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38451028940 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
@@ -16,17 +16,17 @@ test fields_are_the_renderer_s_and_a_query_s_member_in_text_at_the_top_is_a_part
 test what_a_row_decides_by_and_a_list_it_iterates_are_computed_for_it ... ok
 test a_signal_s_member_is_refused_since_the_browser_reads_a_signal_by_field ... ok
 test a_query_s_member_read_outside_a_row_is_computed_by_a_host ... ok
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.91s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.70s
 
 == the renderer (runtime/pw-render/tests/nested_lists.rs, instance_changes.rs)
 
 test a_block_that_changed_renders_the_instance_again ... ok
 test a_match_that_shows_the_arm_it_showed_is_set_where_it_is ... ok
 test a_block_that_decides_as_it_did_is_set_where_it_is ... ok
-test nothing_changed_is_no_change ... ok
 test a_renamed_item_sets_its_text_and_every_attribute_that_reads_the_name ... ok
-test an_attribute_is_set_as_the_document_writes_it_and_a_boolean_one_comes_and_goes ... ok
 test an_unkeyed_list_inside_the_row_that_changed_renders_the_row_again ... ok
+test an_attribute_is_set_as_the_document_writes_it_and_a_boolean_one_comes_and_goes ... ok
+test nothing_changed_is_no_change ... ok
 test what_a_handler_captures_is_set_where_it_is ... ok
 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 test an_item_renamed_inside_a_section_is_set_where_it_is ... ok
@@ -41,11 +41,11 @@ test tests::a_menu_is_grouped_by_its_category ... ok
 test tests::a_rename_sets_every_part_that_reads_the_name ... ok
 test tests::a_stock_change_told_renders_its_row_again_where_it_is ... ok
 test tests::an_insert_and_what_changed_with_it_are_derived_from_the_menu ... ok
-test result: ok. 486 passed; 0 failed; 9 ignored; 0 measured; 0 filtered out; finished in 447.65s
+test result: ok. 498 passed; 0 failed; 9 ignored; 0 measured; 0 filtered out; finished in 1067.39s
 
 == the pages, in three engines (e2e/stores.spec.mjs, e2e/keyed-list.spec.mjs)
 
-  72 passed (4.1m)
+  72 passed (6.6m)
 
 == mutation controls (scripts/menu_categories_mutations.py)
 

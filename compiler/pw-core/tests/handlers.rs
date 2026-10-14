@@ -492,6 +492,7 @@ type Size = Small | Large
 type Crate = Crate { size: Size }
 type Hours = Hours { opensMinute: Int }
 type Tree = Leaf | Branch(Int, List<Tree>)
+type Grove = Grove { tree: Tree }
 
 command Buy(id: Sku, qty: Qty) -> Int { 0 }
 command Rename(id: Sku, name: String) -> Int { 0 }
@@ -508,6 +509,7 @@ command Choose(s: Size) -> Int { 0 }
 command Stack(c: Crate) -> Int { 0 }
 command Open(h: Hours) -> Int { 0 }
 command Plant(t: Tree) -> Int { 0 }
+command Replant(g: Grove) -> Int { 0 }
 query Look(id: Sku) -> Int { 0 }
 fn helper(x: Int) -> Int { x }
 
@@ -789,6 +791,14 @@ fn a_command_parameter_a_browser_cannot_send_is_refused() {
         "Plant(Tree.Leaf)",
         "a command parameter a browser cannot send",
         "`Tree`",
+    );
+    // A record holding what a browser cannot send, the record refused by its
+    // own name. Until 2026-10-13 no test held one once ADR-0331 sent cases,
+    // and its mutant survived train-4's run.
+    refused(
+        "Replant(Grove { tree: Tree.Leaf })",
+        "a command parameter a browser cannot send",
+        "`Grove`",
     );
     // A record whose field's name would not come back from its WIT name:
     // `opens-minute` is found as `opens_minute`.

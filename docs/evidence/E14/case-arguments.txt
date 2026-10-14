@@ -1,0 +1,32 @@
+ADR-0331 - a case crosses from a browser
+
+produced by: just e14-case-arguments
+commit: c3a596048c572c8592ce336ede4fcb417847e5ed
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38451028940 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== a case sent and read (compiler/pw-conformance/tests/case_arguments.rs)
+
+test a_declared_case_is_read_by_its_name_and_payload ... ok
+test a_case_of_a_type_whose_cases_carry_nothing_is_read_by_its_name ... ok
+test options_and_results_are_read_by_their_cases ... ok
+test a_pages_handler_sends_a_command_a_case ... ok
+test what_is_not_a_case_of_the_type_is_refused_by_the_host ... ok
+test a_case_of_a_type_that_contains_itself_is_not_sent ... ok
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.18s
+
+== mutation controls (scripts/case_arguments_mutations.py)
+
+baseline: 6 passed, 0 failed
+the handler's compiler refuses an `Option` sent: KILLED (1 of 6 tests fail)
+the handler's compiler refuses a `Result` sent: KILLED (1 of 6 tests fail)
+the handler's compiler refuses a declared case sent: KILLED (1 of 6 tests fail)
+a case of a type that contains itself is sent: KILLED (1 of 6 tests fail)
+the browser's wire refuses an `Option` and a `Result`: KILLED (1 of 6 tests fail)
+the browser's wire refuses a declared case: KILLED (1 of 6 tests fail)
+the host reads `some` as `none`: KILLED (1 of 6 tests fail)
+the host takes a declared case's payload it has none of, or lacks: KILLED (1 of 6 tests fail)
+the host takes a key a case does not carry: KILLED (1 of 6 tests fail)
+the host takes too few of a case's several fields: KILLED (1 of 6 tests fail)
+10 of 10 mutants killed
+memory bound: no process was stopped

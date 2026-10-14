@@ -33,7 +33,7 @@ it, and master's verify runs no browser suite again on the same code**
   (verify 38440251297), and still ran its three browser suites on the same
   code: where only records changed since the run that passed, they are
   skipped. 33 of 33 planner mutants killed.
-Verify TRAIN_RUN green, with train-4.
+Verify 38451028940 (seven recipes again after `e9e6a49f`, by dispatch 38483504682) green, with train-4.
 
 **2026-10-13: a flight test that fails says the query runtime's trace**
 (the integrator's finding; NEXT 3d; track `flight-wait`, merged from
@@ -42,7 +42,7 @@ Verify TRAIN_RUN green, with train-4.
   train-3's first `just ci`, at a load of 20, and not since (20 of 20 alone,
   40 of 40 eight at once); neither cause tried explains it. Held open as a
   race until shown otherwise; its assertion prints the runtime's trace.
-Verify TRAIN_RUN green, with train-4.
+Verify 38451028940 (seven recipes again after `e9e6a49f`, by dispatch 38483504682) green, with train-4.
 
 **ADR-0331, 2026-10-13: a case crosses from a browser** (the integrator's;
 W9's finding in NEXT 6b; track `variant-args`, merged from `6054be9`).
@@ -52,7 +52,7 @@ W9's finding in NEXT 6b; track `variant-args`, merged from `6054be9`).
   a type that contains itself is refused where the handler is compiled.
 - Found on the way: the host's enum arm was unreachable (a Pleris sum type
   is always a WIT variant), and is gone.
-Verify TRAIN_RUN green, with train-4.
+Verify 38451028940 (seven recipes again after `e9e6a49f`, by dispatch 38483504682) green, with train-4.
 
 **ADR-0330, 2026-10-13: an arm's binding is read through a member, as a
 block's value is** (the integrator's; W9's finding in NEXT 6b; track
@@ -64,7 +64,7 @@ block's value is** (the integrator's; W9's finding in NEXT 6b; track
 - Refused by name: two arms reading one path from different values, an arm
   of a match on a loop's item, and one in a region the browser renders
   again from a speculation.
-Verify TRAIN_RUN green, with train-4.
+Verify 38451028940 (seven recipes again after `e9e6a49f`, by dispatch 38483504682) green, with train-4.
 
 **ADR-0329, 2026-10-13: an order is priced by the program from the
 store's data** (W9's; NEXT 6b; track `order-total`, merged from `1a64318`,
@@ -85,7 +85,7 @@ with the integrator's rulings of 2026-10-13).
 - Found on the way: ADR-0327 named `is_less`, which nothing declared (W9);
   the promo field sat inside the disclosure's target size (now its own
   paragraph).
-Verify TRAIN_RUN green, with train-4.
+Verify 38451028940 (seven recipes again after `e9e6a49f`, by dispatch 38483504682) green, with train-4.
 
 **ADR-0281 amended (4), 2026-10-13: a push to master plans from what a
 run passed at** (the integrator's; track `verified-base`, merged from
