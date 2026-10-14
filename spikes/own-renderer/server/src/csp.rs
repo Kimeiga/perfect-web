@@ -289,6 +289,19 @@ mod tests {
         assert_eq!(needs, Needs::default());
     }
 
+    /// **A comment's text is no markup, whatever it says**: a `>` in it
+    /// does not end it, and a tag after one is not the page's. Train-6's run
+    /// found the mutant that reads a comment's text as markup surviving:
+    /// each comment the tests wrote held its tag first, which the mutant
+    /// took as the comment's own attributes.
+    #[test]
+    fn a_comment_holds_no_markup_whatever_it_says() {
+        let needs = Needs::of(&[template(vec![stat(
+            "<main><!-- when a > b, show <iframe src=\"/x\"> and <p style=\"x\"> --><p>a</p></main>",
+        )])]);
+        assert_eq!(needs, Needs::default());
+    }
+
     /// **A style attribute, written or a value's, in any case and at any
     /// depth**; a frame; and a `<style>` element's text, to its end tag.
     #[test]
