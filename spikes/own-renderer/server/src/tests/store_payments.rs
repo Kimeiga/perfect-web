@@ -18,7 +18,7 @@ const APPLY: &str = "store.page.apply_promo";
 /// webhook served by the server's own [`handle`] while `test` runs: the
 /// provider tells the host what a card did as it would in a deployment. The
 /// test is given the provider too, to hold its word back (step eight).
-fn paying(test: impl FnOnce(&Served, &payments::Origin)) {
+pub(super) fn paying(test: impl FnOnce(&Served, &payments::Origin)) {
     let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
     let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
     let port = listener.local_addr().expect("address").port();
@@ -54,7 +54,7 @@ fn paying(test: impl FnOnce(&Served, &payments::Origin)) {
 
 /// The reader's order's status as the layer reads it: its case, and the
 /// provider's page an awaiting one is paid on.
-fn status_of(s: &Server, session: &str) -> Option<(String, Option<String>)> {
+pub(super) fn status_of(s: &Server, session: &str) -> Option<(String, Option<String>)> {
     let owner = s.owner(session);
     match s.layer_read(session, "store:data/user-orders#current", &owner) {
         Val::Result(Ok(Some(v))) => match *v {
@@ -80,7 +80,7 @@ fn status_of(s: &Server, session: &str) -> Option<(String, Option<String>)> {
 
 /// **A card paid in the provider's page**, as the reader's browser posts
 /// its form there: the page the provider answers with.
-fn pay(page: &str, card: &str) -> String {
+pub(super) fn pay(page: &str, card: &str) -> String {
     sent(
         page,
         "application/x-www-form-urlencoded",

@@ -69,8 +69,18 @@ ADR's counts.
    and the outbox read back (one), each bounded by what the command hands
    the platform, never by the data's size. The control: `choose_tip`
    emitting one event more makes one statement more.
-7. **A command is pinned apart**: its transaction's operations, its commit,
-   and the session's queries read again after it (`place_order`'s three).
+7. **A command is pinned apart**, and **its scenario named** (the
+   integrator's ruling of 2026-10-14), both pinned:
+   - (a) **a deployment taking no payments: placed at once** (ADR-0332, the
+     development store's): `begin_payment` answers `BeginError.NotTaken`,
+     and `place_order` settles its order inline, in its own transaction;
+     its operations, its commit and the session's queries read again after
+     it, apart;
+   - (b) **a deployment taking payments: awaiting** (the production path):
+     the development provider configured as `tests/store_payments.rs`'
+     `paying` does; `place_order`'s transaction leaves the order awaiting,
+     no settle among its operations, and `settle_payment`, on the
+     provider's word (a card paid on its page), runs in its own.
 
 ## Measurements
 
@@ -98,18 +108,22 @@ with the number of stores.
 
 Per page and command, each command with its commit: `add_to_cart` 10 and
 11, `add_address` 6, `choose_tip` 6, the home page 5, the store's page 16,
-the cart 13, a search 8, the address page 2, the order's page 5; and
-`place_order` apart, its operations 33, its commit 7, its queries read
-again 21.
+the cart 13, a search 8, the address page 2, the order's page 5.
 
-`place_order`, by operation (the layer's tally per operation):
+`place_order`, by scenario:
+- (a) taking no payments, placed at once: its operations 33, its commit 7,
+  its queries read again 21;
+- (b) taking payments, awaiting: its transaction 35; then `settle_payment`
+  on the provider's word, its own transaction, 16.
+
+`place_order` in (a), by operation (the layer's tally per operation):
 
 | Where | Operation | Calls | Statements |
 | --- | --- | --- | --- |
 | its transaction | hours#for-cart (`closed_in`) | 1 | 6 |
 | its transaction | checkout#parts, fees#for-stores, checkout#chosen (`priced_for`) | 3 | 4 |
 | its transaction | user-orders#await-payment | 1 | 16 |
-| its transaction: the development provider settles as the payment begins | user-orders#settle | 1 | 7 |
+| its transaction: no payments taken, so the order is settled at once (ADR-0332) | user-orders#settle | 1 | 7 |
 | its commit | the outbox's inserts, the interaction's record, the outbox read back | | 7 |
 | after the commit, the session's invalidated queries read again | user-carts#current (`Cart`) | 6 | 6 |
 | after the commit | hours#for-cart (`CartHours`) | 1 | 6 |

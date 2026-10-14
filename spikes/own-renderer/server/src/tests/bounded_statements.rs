@@ -382,8 +382,8 @@ fn steps(more: bool) -> Vec<(String, u64)> {
     .expect("answered");
     let ran = s.data.statements_by_transaction()[txns..].to_vec();
     let after = s.data.statements().expect("counted") - all;
-    // One transaction: the development provider settles the payment as it
-    // is begun, so `user-orders#settle` runs in `place_order`'s own.
+    // One transaction: this server takes no payments, so `place_order`
+    // places the order at once, `user-orders#settle` in its own (ADR-0332).
     let [own] = ran[..] else {
         panic!("place_order's one transaction: {ran:?}")
     };
@@ -403,10 +403,16 @@ fn steps(more: bool) -> Vec<(String, u64)> {
             }
         }
     }
-    out.push(("place_order: its operations".to_string(), in_ops));
-    out.push(("place_order: its commit".to_string(), own - in_ops));
     out.push((
-        "place_order: its queries read again".to_string(),
+        "place_order, taking no payments: its operations".to_string(),
+        in_ops,
+    ));
+    out.push((
+        "place_order, taking no payments: its commit".to_string(),
+        own - in_ops,
+    ));
+    out.push((
+        "place_order, taking no payments: its queries read again".to_string(),
         after - own,
     ));
     let mut step = |name: &str, run: &dyn Fn()| {
@@ -491,8 +497,9 @@ fn a_commands_commit_is_counted_with_it() {
 /// [`steps`] runs them.
 // A command's count is its transaction's, its commit's statements with it
 // (what it hands the outbox, its interaction's record, the outbox read
-// back). `place_order`'s three apart: `user-orders#settle` (7) is among its
-// operations, the development provider settling as the payment begins.
+// back). `place_order`'s three apart, where the deployment takes no
+// payments: `user-orders#settle` (7) is among its operations, the order
+// placed at once (ADR-0332).
 const PAGES: &[(&str, u64)] = &[
     ("add_to_cart (47)", 10),
     ("add_to_cart (48)", 11),
@@ -503,8 +510,89 @@ const PAGES: &[(&str, u64)] = &[
     ("/cart", 13),
     ("/search?q=coffee", 8),
     ("/stores/47/address", 2),
-    ("place_order: its operations", 33),
-    ("place_order: its commit", 7),
-    ("place_order: its queries read again", 21),
+    ("place_order, taking no payments: its operations", 33),
+    ("place_order, taking no payments: its commit", 7),
+    (
+        "place_order, taking no payments: its queries read again",
+        21,
+    ),
     ("/order", 5),
+];
+
+/// **Scenario (b), a deployment that takes payments** (ADR-0332, the
+/// production path): `place_order` leaves the order awaiting its payment,
+/// no settle among its operations; the provider's word, a card paid on its
+/// page, runs `settle_payment` in a transaction of its own. Each
+/// transaction's statements, with fifty stores more where `more` says.
+fn awaiting(more: bool) -> Vec<(String, u64)> {
+    let mut out = Vec::new();
+    super::store_payments::paying(|s, _| {
+        if more {
+            s.data
+                .execute_for_test(FIFTY_MORE)
+                .expect("fifty stores more");
+        }
+        s.command(
+            "store.page.add_to_cart",
+            "a",
+            &add_shown("espresso", 1),
+            false,
+        )
+        .expect("added");
+        s.command("store.page.add_to_cart", "a", &add_shown("drip", 1), false)
+            .expect("added");
+        let total = s.shown_total("a");
+        let before = s.data.statements_by_transaction().len();
+        s.command_answered(
+            "store.page.place_order",
+            "a",
+            std::slice::from_ref(&total),
+            // A payment is begun by an interaction (ADR-0332).
+            Some("place-1"),
+        )
+        .expect("answered");
+        let Some((status, Some(page))) = super::store_payments::status_of(s, "a") else {
+            panic!("an order awaiting its payment")
+        };
+        assert_eq!(status, "awaiting-payment");
+        let placed = s.data.statements_by_transaction()[before..].to_vec();
+        let paid = super::store_payments::pay(&page, "4242424242424242");
+        assert!(paid.contains("Paid."), "{paid}");
+        let settled = s.data.statements_by_transaction()[before + placed.len()..].to_vec();
+        let ([own], [settle]) = (&placed[..], &settled[..]) else {
+            panic!("place_order's transaction, then settle_payment's: {placed:?} {settled:?}")
+        };
+        out.push((
+            "place_order, taking payments: its transaction".to_string(),
+            *own,
+        ));
+        out.push((
+            "settle_payment, on the provider's word: its transaction".to_string(),
+            *settle,
+        ));
+    });
+    out
+}
+
+/// **Where the deployment takes payments, `place_order` and the
+/// `settle_payment` the provider's word runs are each a bounded number of
+/// statements**, equal at the seed and with fifty stores more, and pinned.
+#[test]
+fn placing_and_settling_where_payments_are_taken_is_bounded() {
+    if std::env::var("PW_STORE_TEST_LAYER").as_deref() != Ok("postgres") {
+        eprintln!("skipped: the store is not served on PostgreSQL");
+        return;
+    }
+    let seed = awaiting(false);
+    let more = awaiting(true);
+    eprintln!("statements where payments are taken:\n  {seed:?}\n  {more:?}");
+    assert_eq!(seed, more, "equal at both sizes");
+    let pinned: Vec<(String, u64)> = AWAITING.iter().map(|(k, v)| (k.to_string(), *v)).collect();
+    assert_eq!(seed, pinned, "as pinned");
+}
+
+/// Scenario (b)'s transactions, each with its commit.
+const AWAITING: &[(&str, u64)] = &[
+    ("place_order, taking payments: its transaction", 35),
+    ("settle_payment, on the provider's word: its transaction", 16),
 ];
