@@ -23,6 +23,96 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0334, 2026-10-14: a command runs when the clock passes its time**
+(the integrator's; ADR-0332's not-claimed sweep and NEXT 4's third step;
+track `scheduled-commands`, merged from `9bd44dec`).
+- `invoked_by Clock`: a command no reader presses, run by the host on behalf
+  of the user whose command scheduled it. `schedule cmd(args) at when`, `…
+  after duration` and `unschedule cmd(args)` are a command's statements
+  (PW6501 to PW6503): the clock's `Instant` or `Duration`, by declaration;
+  one run pending for each command and its arguments.
+- Written with the scheduling command's writes, in its transaction (each
+  PostgreSQL layer's `schedules`, or the materializer's): a command that
+  answers an error schedules nothing. Each due run is made as a press is,
+  keyed by its scheduling so two hosts, or a restart, commit it once; a
+  refused or trapping run runs again after 2 s doubling, then is kept
+  failed, logged and counted in `/metrics`.
+- The store's first use: an order no one pays is taken back thirty minutes
+  on, as its reader's cancel takes it back; paid, or taken back, its sweep
+  is cancelled; declined, it is kept.
+- `just e14-scheduled`: the checker's tests and corpus, the host's on each
+  layer and the database's own, and 36 mutation controls.
+Verify 38559878637 green, with train-6.
+
+**ADR-0333, 2026-10-14: what a page may run is generated from its build**
+(the integrator's; ADR-0195's ruling 13; tracks `page-csp` and
+`page-origins`, merged from `859c6503`).
+- Every HTML answer the host writes carries a Content-Security-Policy. A
+  document's allows the one inline script that starts the runtime and the
+  data layer's style, each by its hash; the runtime's modules and its
+  WebAssembly from this origin (`'wasm-unsafe-eval'`); a `style` attribute
+  only where the build writes one; the payment provider's page as a frame
+  where the deployment takes payments; a sign-in at the identity provider's
+  origin where it is another; and no frame of the page. Every other HTML
+  answer runs nothing.
+- Generated from the build's templates and the deployment, never written by
+  hand: one policy for a build's every page, as a navigation that keeps its
+  layout keeps its first document. Every answer says its type is its type
+  (`nosniff`), so `'self'` allows this origin's JavaScript alone.
+- What the policy would refuse, the build refuses where it is written
+  (PW5052): an address a page fetches, written as text, is a path, and a
+  `<link>`'s address is written as text. Corpus C22; generality 46 / 46.
+- Each page the suite serves runs under it with nothing refused, in three
+  engines, with its controls: an inline script and a `style` attribute
+  refused; without `'wasm-unsafe-eval'` the runtime does not start; a policy
+  naming no provider frames nothing.
+- Found on the way: the host's announcer carried the only inline style
+  (served unstyled now, the runtime hiding it through the CSSOM); the
+  performance suite's control read layout through `eval`; no answer but an
+  upload's said its type was its type; a stylesheet the build ships was
+  served as bytes; train-5's docs wrote a literal `\n` into PARALLEL.md.
+Verify 38559878637 green, with train-6.
+
+**2026-10-14: the checker's latency, found 24 times E9's** (the integrator's
+finding; track `check-latency`, merged from `ed53d44b`).
+- A check of the store program's 52 files takes about 850 ms, where E9's
+  gate item 4 passed on 37 ms for 36 files (2026-08-08), and an edit costs
+  a full check. The ceiling, fifty times the 2026-08 measurement, was never
+  read again: its recipe runs on the development machine alone.
+- A profile (macOS `sample`): every analysis added since resolves names and
+  types bodies on its own. Fixed here, each check saying what it said: one
+  typer a body for the session analysis, which built one per value a page
+  prints (`values::BodyTypes`), and a module found by its unit, where every
+  module was searched for each name resolved. About 10 to 15% faster.
+- The latency test runs its two measurements one at a time, as running
+  both at once measured their contention, and says what it measures. NEXT
+  holds the work: each declaration's typer and resolution computed once a
+  check and shared, then an edit that redoes only what it reaches.
+Verify 38559878637 green, with train-6.
+
+**ADR-0281 amended (6), 2026-10-14: a push runs no recipe whose committed
+evidence is current** (the integrator's; track `current-evidence`, merged
+from `22afb624`).
+- `ci_plan.py --current`, passed at every push, a track's and master's,
+  drops a planned recipe whose every evidence file, as the head holds it,
+  was recorded at one whole commit the head descends from, where nothing the
+  recipe reads changed since, by the planner's own rule. Evidence written
+  from a tree with changes records no commit and never counts; the nightly
+  runs every recipe whatever its evidence says.
+- Found at train-4's landing: master's push planned the whole train again
+  (verify 38494831583, cancelled by hand), as the train's run had failed in
+  one recipe, fixed and run by dispatch, and a dispatch does not count
+  (`verified_base.py`). Replayed on that push: 52 recipes without, none
+  with. A train whose run failed takes the run's evidence with its fix.
+- Found at train-5's landing: a recipe whose own lines name a program
+  (`e10-build`'s `examples/store/*.pw`, 50 in all) was planned by no change
+  to it, so `e10-build`'s evidence still named an import ADR-0332 removed,
+  and `--current` would have called it current. The program a recipe's own
+  lines name plans it now.
+- `scripts/tests/test_ci_scripts.py`'s `CurrentEvidence` (9 tests) and the
+  program a recipe names; `dealt_by_time_mutations.py`, 43 of 43.
+Verify 38559878637 green, with train-6.
+
 **ADR-0329 amended, 2026-10-13: the store switches to what ADR-0330 and
 ADR-0331 allow** (W9's; track `store-switch`, merged from `1d217edc`, on
 the payments track).

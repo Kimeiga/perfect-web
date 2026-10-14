@@ -5,8 +5,9 @@
   way every time; leaves out the measurements of a machine; gives the
   recipes run against a database shards and a PostgreSQL of their own, as
   many as end the run soonest; takes more shards than it is asked for where
-  its number would end a shard past the ceiling under a shard's limit; and
-  reaches from a change to the mutation scripts it touches;
+  its number would end a shard past the ceiling under a shard's limit;
+  reaches from a change to the mutation scripts it touches; and, as a push
+  plans, runs no recipe whose committed evidence is current;
 - `ci_recipes.py` takes what a recipe wrote to be the files whose bytes
   changed while it ran, and frees what its builds leave;
 - `ci_summary.py` fails a run where a recipe failed, a mutant survived, or a
@@ -136,6 +137,29 @@ class Plan(unittest.TestCase):
             plan.touched_scripts({grammar: [(1, 1)]}, 30),
         )
 
+    def test_a_changed_server_test_module_reaches_what_runs_it_by_its_filter(self) -> None:
+        # Train-6's finding, 2026-10-14: the server's test modules run by a
+        # filter, `tests::store_scheduled::`, never by `--test`, and a change
+        # to one planned nothing: the push of a fix to two of its tests would
+        # have run no recipe of them, and the fetch would have taken their
+        # old evidence as current.
+        module = "spikes/own-renderer/server/src/tests/store_scheduled.rs"
+        self.assertIn("scheduled_mutations.py", plan.touched_scripts({module: [(1, 1)]}, 30))
+        planned = plan.recipes_for({module: [(1, 1)]}, 30, plan.recipes())
+        self.assertIn("e14-scheduled", planned)
+        # And a recipe that runs it by its filter with no script of its own:
+        # today every such recipe runs a script that names the filter too.
+        saved = plan.bodies
+        try:
+            plan.bodies = lambda: {"e14-direct": "cargo test -- tests::store_scheduled::"}
+            self.assertEqual(plan.recipes_for({module: [(1, 1)]}, 30, ["e14-direct"]), ["e14-direct"])
+        finally:
+            plan.bodies = saved
+        # The control: a module nothing runs plans nothing by it.
+        nothing = "spikes/own-renderer/server/src/tests/nothing_runs_this.rs"
+        self.assertNotIn("scheduled_mutations.py", plan.touched_scripts({nothing: [(1, 1)]}, 30))
+        self.assertNotIn("e14-scheduled", plan.recipes_for({nothing: [(1, 1)]}, 30, plan.recipes()))
+
     def test_a_changed_browser_spec_reaches_the_scripts_and_recipes_that_run_it(self) -> None:
         # ADR-0281: a spec a script runs is its test, as a Rust test file is;
         # a change to `accessibility.spec.mjs` planned nothing before.
@@ -172,6 +196,30 @@ class Plan(unittest.TestCase):
         self.assertNotIn(
             "e14-diffs",
             plan.recipes_for({"benchmarks/baselines/sveltekit/README.md": [(1, 1)]}, 30, names),
+        )
+
+    def test_a_recipe_is_planned_where_its_own_lines_name_a_program_that_changed(self) -> None:
+        # Train-5's finding (2026-10-14): `e10-build` builds
+        # `examples/store/*.pw` in its own lines, and no push planned it
+        # since 2026-10-12; its evidence named an import ADR-0332 removed.
+        names = plan.recipes()
+        planned = plan.recipes_for({"examples/store/app.pw": [(1, 1)]}, 30, names)
+        self.assertIn("e10-build", planned)
+        self.assertIn("e8-wit", planned)
+        self.assertIn("examples/store/*.pw", plan.body_inputs(plan.bodies()["e10-build"]))
+        # A glob's star stays in its segment, as a shell's does; a path
+        # names what is under it.
+        self.assertTrue(plan.names_path("examples/*.pw", "examples/domain.pw"))
+        self.assertFalse(plan.names_path("examples/*.pw", "examples/store/app.pw"))
+        self.assertTrue(plan.names_path("examples/store/*.pw", "examples/store/app.pw"))
+        self.assertTrue(
+            plan.names_path("examples/kiokun/data/han-1char-3", "examples/kiokun/data/han-1char-3/a.json")
+        )
+        self.assertFalse(plan.names_path("examples/kiokun/data/han", "examples/kiokun/data/han-1char-3"))
+        # The control: a program no recipe's lines name plans none of them.
+        self.assertNotIn(
+            "e10-build",
+            plan.recipes_for({"examples/feed/app.pw": [(1, 1)]}, 30, names),
         )
 
     def test_a_recipe_is_planned_where_a_shell_script_it_runs_changed(self) -> None:
@@ -732,6 +780,122 @@ class Summary(unittest.TestCase):
 
         self.assertEqual(one([self.result(wrote=["a.txt"])], {"a.txt": "3 of 3 mutants killed\n"}), 0)
         self.assertEqual(one([self.result(wrote=["a.txt"])], {"a.txt": "x: SURVIVED\n"}), 1)
+
+
+class CurrentEvidence(unittest.TestCase):
+    """ADR-0281, amended 2026-10-13 (6): a push does not run a recipe whose
+    committed evidence is current at its head."""
+
+    HEAD, OLD, ELSE = "h" * 40, "a" * 40, "e" * 40
+    BODY = {
+        "e14-one": "@{ echo; } > docs/evidence/E14/one.txt\n",
+        "e14-two": "@{ echo; } > docs/evidence/E14/two.txt\n    @{ echo; } >docs/evidence/E14/two-more.txt\n",
+        "e14-none": "@cargo test --locked\n",
+    }
+
+    def current(self, files: dict, reached: set = frozenset(), descends: bool = True) -> dict:
+        return plan.current(
+            sorted(self.BODY),
+            self.HEAD,
+            body=self.BODY,
+            read=lambda head, path: files.get(path),
+            descends_from=lambda sha, head: descends,
+            reach=lambda sha, head: set(reached),
+        )
+
+    def test_a_recipe_whose_evidence_is_current_is_not_run_again(self) -> None:
+        files = {"docs/evidence/E14/one.txt": self.OLD}
+        self.assertEqual(self.current(files), {"e14-one": self.OLD})
+        # The control: what it reads changed since its evidence was recorded.
+        self.assertEqual(self.current(files, reached={"e14-one"}), {})
+
+    def test_evidence_of_a_commit_the_head_does_not_descend_from_is_not_current(self) -> None:
+        files = {"docs/evidence/E14/one.txt": self.OLD}
+        self.assertEqual(self.current(files, descends=False), {})
+
+    def test_a_recipe_is_current_only_where_every_file_it_writes_is_at_one_commit(self) -> None:
+        both = {"docs/evidence/E14/two.txt": self.OLD, "docs/evidence/E14/two-more.txt": self.OLD}
+        self.assertEqual(self.current(both), {"e14-two": self.OLD})
+        apart = {"docs/evidence/E14/two.txt": self.OLD, "docs/evidence/E14/two-more.txt": self.ELSE}
+        self.assertEqual(self.current(apart), {})
+        one = {"docs/evidence/E14/two.txt": self.OLD}
+        self.assertEqual(self.current(one), {})
+
+    def test_a_recipe_that_writes_no_evidence_is_never_current(self) -> None:
+        self.assertNotIn("e14-none", self.current({"docs/evidence/E14/one.txt": self.OLD}))
+        self.assertEqual(plan.evidence_files(self.BODY["e14-two"]), [
+            "docs/evidence/E14/two-more.txt", "docs/evidence/E14/two.txt",
+        ])
+
+    def test_any_error_leaves_a_recipe_planned(self) -> None:
+        def broken(head: str, path: str) -> str:
+            raise OSError("no git")
+
+        found = plan.current(
+            ["e14-one"], self.HEAD, body=self.BODY, read=broken,
+            descends_from=lambda sha, head: True, reach=lambda sha, head: set(),
+        )
+        self.assertEqual(found, {})
+
+    def test_a_tree_with_changes_records_no_commit(self) -> None:
+        sha = "0123456789abcdef0123456789abcdef01234567"
+        self.assertEqual(plan.RECORDED_AT.search(f"x\ncommit: {sha}\nrust: 1\n").group(1), sha)
+        self.assertIsNone(plan.RECORDED_AT.search(f"commit: {sha} + uncommitted changes\n"))
+        self.assertIsNone(plan.RECORDED_AT.search("commit: 0123456\n"))
+
+    def test_the_evidence_is_read_as_the_head_holds_it(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            root = pathlib.Path(d)
+
+            def git(*args: str) -> str:
+                return subprocess.run(
+                    ["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", *args],
+                    cwd=root, check=True, capture_output=True, text=True,
+                ).stdout.strip()
+
+            git("init", "-q")
+            (root / "a.txt").write_text("a\n")
+            git("add", "a.txt")
+            git("commit", "-q", "-m", "a")
+            run = git("rev-parse", "HEAD")
+            evidence = root / "docs/evidence/E14/one.txt"
+            evidence.parent.mkdir(parents=True)
+            evidence.write_text(f"one\n\ncommit: {run}\n")
+            git("add", "docs")
+            git("commit", "-q", "-m", "evidence")
+            head = git("rev-parse", "HEAD")
+            # Changed in the tree since, and not committed: not what the head holds.
+            evidence.write_text("one\n\ncommit: " + "f" * 40 + "\n")
+            self.assertEqual(plan.recorded_at(head, "docs/evidence/E14/one.txt", root), run)
+            self.assertIsNone(plan.recorded_at(head, "docs/evidence/E14/none.txt", root))
+            self.assertTrue(plan.descends(run, head, root))
+            self.assertFalse(plan.descends(head, run, root))
+
+    def test_main_runs_no_current_recipe_only_where_asked(self) -> None:
+        import contextlib
+        import io
+
+        def planned(argv: list[str]) -> list[str]:
+            out = io.StringIO()
+            with mock.patch.object(sys, "argv", ["ci_plan.py", *argv]), contextlib.redirect_stdout(out):
+                self.assertEqual(plan.main(), 0)
+            shards = json.loads(out.getvalue().strip()[len("shards="):])
+            return sorted(r for s in shards for r in s["recipes"])
+
+        names = ["e10-affine-bindings", "e10-attribute-case"]
+        with mock.patch.object(plan, "changed_recipes", lambda *a: list(names)), \
+                mock.patch.object(plan, "current", lambda n, head, near: {"e10-attribute-case": self.OLD}):
+            self.assertEqual(planned(["--changed", "b", "h"]), names)
+            self.assertEqual(planned(["--changed", "b", "h", "--current"]), ["e10-affine-bindings"])
+
+    def test_the_workflow_plans_each_push_with_the_evidence(self) -> None:
+        workflow = (SCRIPTS.parent / ".github/workflows/verify.yml").read_text()
+        pushes = [
+            line for line in workflow.splitlines()
+            if line.lstrip().startswith("python3 scripts/ci_plan.py") and "--changed" in line
+        ]
+        self.assertEqual(len(pushes), 2, pushes)
+        self.assertTrue(all("--current" in line for line in pushes), pushes)
 
 
 class VerifiedBase(unittest.TestCase):

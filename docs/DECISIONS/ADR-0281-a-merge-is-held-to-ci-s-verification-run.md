@@ -143,6 +143,32 @@ hold.
      lines that the range changed plans the recipe, as a changed browser
      spec does (`ci_plan.py`'s `reads_what_changed`; a test in
      `test_ci_scripts.py`, a mutant in `dealt_by_time_mutations.py`).
+   - **A push runs no recipe whose committed evidence is current** (the
+     integrator's, 2026-10-13 (6)). Master's push after train-4 planned the
+     whole train again (verify 38494831583, cancelled by hand): the train's
+     run had failed in one recipe, fixed and run again by dispatch, so no
+     push's run passed on its line, and a dispatch does not count. The
+     record was in the tree already: each evidence file names the commit a
+     run passed its recipe at. A push now plans as before, less each recipe
+     whose every evidence file, as the head holds it, was recorded at one
+     whole commit the head descends from, where nothing the recipe reads
+     changed since, by the planner's own rule (`ci_plan.py --current`).
+     Replayed on that push: 52 recipes without, none with. So a train whose
+     run failed takes the run's evidence with its fix, and its push runs
+     what the evidence does not cover, the failed recipe and what the fix
+     reaches: no dispatch and no cancel. Evidence written from a tree with
+     changes records no commit and never counts; the nightly runs every
+     recipe, whatever its evidence says, for what the toolchain or the
+     runners moved.
+     **Found at train-5's landing (2026-10-14)**: a recipe whose own lines
+     name a program (`e10-build`'s `examples/store/*.pw`, 50 recipes in
+     all) was planned by no change to it, only by its own lines', its
+     script's or its tests', so its evidence went stale unsaid:
+     `e10-build`'s, recorded at `3fdcf929`, still said `place_order`
+     imports `user-orders#place` after ADR-0332. And `--current` would
+     have called it current. A program a recipe's own lines name, a glob
+     read segment by segment as a shell expands one, or a path and what is
+     under it, plans the recipe now (`body_inputs`).
    - That is a file a recorded command produced, as CLAUDE.md asks.
    - The fetch is a download, so it waits for the owner's yes in the
      integrator's session. Approval relayed through another session does

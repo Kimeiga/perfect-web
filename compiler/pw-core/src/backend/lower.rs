@@ -315,6 +315,61 @@ fn host_imports(cx: &Context<'_>, p: &Program) -> Vec<CallableImport> {
             });
         }
     }
+    // **And the schedules' functions** (the scheduled-commands track): for
+    // each command a body schedules or cancels, `-at` and `-after` take its
+    // parameters and then the time, as the `Int` it is, and `-cancel` its
+    // parameters; each answers nothing, under `clock.schedule`.
+    let scheduling = cx
+        .contracts
+        .iter()
+        .flat_map(|c| c.imports.iter())
+        .flat_map(|i| i.capabilities.iter())
+        .find(|c| c.name() == crate::signatures::CLOCK_SCHEDULE)
+        .cloned();
+    for (unit, hir) in cx.hirs.iter().enumerate() {
+        for (id, decl) in hir.all_decls() {
+            if decl.kind != crate::hir::DeclKind::Command {
+                continue;
+            }
+            let def = crate::resolve::DefId { unit, decl: id.0 };
+            let Some(signature) = cx.sigs.by_def(def) else {
+                continue;
+            };
+            let params: Option<Vec<Type>> = signature
+                .params
+                .iter()
+                .map(
+                    |p| match ty_resolved(cx.sigs, p.as_ref()?.resolved()?, &decl.name_span) {
+                        Lowering::Lowered(t) => Some(t),
+                        _ => None,
+                    },
+                )
+                .collect();
+            let Some(params) = params else {
+                continue;
+            };
+            for how in crate::backend::SCHEDULE_HOWS {
+                let import = crate::backend::schedule_binding(&signature.path, how);
+                if !wanted.contains(&import) {
+                    continue;
+                }
+                let mut params = params.clone();
+                if how != "cancel" {
+                    params.push(Type::Int);
+                }
+                out.push(CallableImport {
+                    id: import,
+                    callee: def,
+                    binding: crate::backend::ir::ImportBinding::PlatformHost,
+                    signature: crate::backend::ir::BackendSignature {
+                        params,
+                        result: Type::Unit,
+                    },
+                    required_capabilities: scheduling.iter().cloned().map(CapabilityId).collect(),
+                });
+            }
+        }
+    }
     out.sort_by(|a, b| a.id.cmp(&b.id));
     out.dedup_by(|a, b| a.id == b.id);
     out
@@ -1754,6 +1809,107 @@ impl<'a> Lower<'a> {
         Lowering::Lowered(())
     }
 
+    /// Whether the function being lowered is a command's export, whose body
+    /// may schedule (PW6502).
+    fn lowering_a_command(&self) -> bool {
+        self.inlining
+            .first()
+            .and_then(|d| crate::resolve::declaration(self.cx.hirs, *d))
+            .is_some_and(|d| d.kind == DeclKind::Command)
+    }
+
+    /// **A run a command schedules, or cancels** (the scheduled-commands
+    /// track): `schedule cmd(args) at when`, a call of the platform's
+    /// schedules' function for `cmd` and how, given `cmd`'s parameters, as a
+    /// call gives them, and then the time as the `Int` it is; `unschedule
+    /// cmd(args)`, its cancel, given the parameters. The host writes each with
+    /// the command's writes, or not at all.
+    fn scheduled(
+        &mut self,
+        body: &Body,
+        keyword: &str,
+        modifiers: &[String],
+        args: &[ExprId],
+        span: Span,
+    ) -> Lowering<ValueId> {
+        let blocked = |why: String| Lowering::Blocked {
+            why,
+            span: span.clone(),
+        };
+        let (how, given, time) = match (keyword, modifiers.get(1).map(String::as_str)) {
+            ("schedule", Some(how @ ("at" | "after"))) if !args.is_empty() => {
+                (how, &args[..args.len() - 1], args.last().copied())
+            }
+            ("unschedule", None) => ("cancel", args, None),
+            _ => return blocked(format!("`{keyword}` is written `{keyword} cmd(..)`")),
+        };
+        let Some(name) = modifiers.first() else {
+            return blocked(format!("`{keyword}` names no command"));
+        };
+        let (crate::resolve::Resolution::Local(def)
+        | crate::resolve::Resolution::Imported { def, .. }) =
+            self.cx
+                .ws
+                .resolve_in(self.unit, crate::resolve::Namespace::Term, name)
+        else {
+            return blocked(format!("`{name}` names no command"));
+        };
+        let Some(sig) = self.cx.sigs.by_def(def) else {
+            return blocked(format!("`{name}` has no resolved signature"));
+        };
+        if given.len() != sig.params.len() {
+            return blocked(format!(
+                "`{name}` is given {} values for its {} parameters",
+                given.len(),
+                sig.params.len()
+            ));
+        }
+        let mut values = Vec::new();
+        for (expr, declared) in given.iter().zip(&sig.params) {
+            let Some(declared) = declared.as_ref() else {
+                return blocked(format!("`{name}` has a parameter of no declared type"));
+            };
+            let ty = match self.ty(declared, &span) {
+                Lowering::Lowered(t) => t,
+                other => return other.map(|_| unreachable!()),
+            };
+            match self.expr(body, *expr, Some(&ty)) {
+                Lowering::Lowered(v) => values.push(v),
+                other => return other,
+            }
+        }
+        // The time, an `Instant` or a `Duration`, crosses as the `Int` it is
+        // (ADR-0054): its value retyped to its representation.
+        if let Some(time) = time {
+            let at = match self.expr(body, time, None) {
+                Lowering::Lowered(v) => v,
+                other => return other,
+            };
+            let value = match self.types.get(&at).cloned() {
+                Some(Type::Int) => at,
+                Some(Type::Nominal(d, instance))
+                    if self.representation(d, &instance, &span) == Some(Type::Int) =>
+                {
+                    let result = self.fresh();
+                    self.push(Instr::Retype {
+                        result,
+                        value: at,
+                        ty: Type::Int,
+                    })
+                }
+                _ => return blocked(format!("`{keyword} {name}`'s time is no `Int`")),
+            };
+            values.push(value);
+        }
+        let result = self.fresh();
+        Lowering::Lowered(self.push(Instr::ImportCall {
+            result,
+            import: crate::backend::schedule_binding(&sig.path, how),
+            args: values,
+            ty: Type::Unit,
+        }))
+    }
+
     /// **A read in a materialization's body** (ADR-0277): `query R(args)`, a
     /// call of the platform's read of R, given R's parameters and answering
     /// R's value, its `Ok` where R answers a `Result`. The host answers it from
@@ -2202,6 +2358,19 @@ impl<'a> Lower<'a> {
                 ..
             } if self.handler && keyword == "navigate" => {
                 self.navigate(body, modifiers, args, span)
+            }
+            // **A run a command schedules, or cancels** (the
+            // scheduled-commands track): only in a command's own body, which
+            // PW6502 keeps it to.
+            Expr::Keyword {
+                keyword,
+                modifiers,
+                args,
+                ..
+            } if matches!(keyword.as_str(), "schedule" | "unschedule")
+                && self.lowering_a_command() =>
+            {
+                self.scheduled(body, keyword, modifiers, args, span)
             }
             other => Lowering::Unsupported {
                 construct: construct_name(other),

@@ -1,0 +1,30 @@
+// @corpus: rejected
+// @id: R-068
+// @category: a schedule written outside a command
+// @rule: PW6502
+// @invariant: scheduled_outside_a_command
+// @charter: §7.5
+// @milestone: 14
+// @expect-error: `schedule` in `plan`, which is no command: what a page shows schedules nothing
+// @expect-error: a `schedule` or an `unschedule` is a command's statement: what a page shows schedules nothing
+//
+// A run is written with the writes of the command that decides it, in its
+// transaction. A function writes nothing, so a run it scheduled would have no
+// commit to be written with.
+
+module orders.planned
+
+import domain.{ InteractionId }
+import clock.{ Instant }
+
+command remind(order: String) -> Result<Int, String>
+    invoked_by    Clock
+    idempotent_by InteractionId
+{
+    Ok(1)
+}
+
+fn plan(order: String, when: Instant) -> Int !{ clock.schedule } {
+    schedule remind(order) at when
+    1
+}

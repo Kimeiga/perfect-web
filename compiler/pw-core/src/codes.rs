@@ -121,6 +121,9 @@ pub enum Owner {
     /// command the platform invokes on its provider's word, and no reader
     /// presses.
     Payments,
+    /// The scheduled-commands track's codes, PW65xx (the integrator's): a
+    /// command the platform runs when the clock passes its time.
+    Schedules,
 }
 
 impl fmt::Display for Code {
@@ -669,6 +672,11 @@ codes! {
     // address written as text could name no page, or one served elsewhere.
     CANONICAL_ADDRESS = "PW5051" / canonical_address / 1, Markup,
         "a page's canonical address is a page's, `href={Page(args)}`, served at a route without a query part, each argument a value the page reads or text";
+    // ADR-0195's ruling 13, the build's half: the host's policy allows a
+    // page its own origin alone, so a load written from another built, and
+    // the browser refused it.
+    LOAD_FROM_ANOTHER_ORIGIN = "PW5052" / load_from_another_origin / 1, Markup,
+        "a page loads from its own origin: an address its markup fetches, written as text, is a path, and a `<link>`'s address is written as text";
     // ADR-0221: `<textarea bind:value={draft}>` was written as an attribute
     // a textarea does not have, and a first value showed nothing until the
     // runtime set it; a `<select>`'s likewise. Found by the feed (ADR-0220).
@@ -869,6 +877,19 @@ codes! {
         "no page presses a command the platform invokes";
     INVOKED_COMMAND_NOT_IDEMPOTENT = "PW6405" / invoked_command_not_idempotent / 1, Payments,
         "a command the platform invokes is idempotent: the provider's word arrives more than once";
+
+    // --- the scheduled-commands track (PW65xx; the integrator's) ----------
+    //
+    // `schedule cmd(args) at when` and `unschedule cmd(args)`: a command
+    // `invoked_by Clock`, run when the clock passes its time, written with
+    // the scheduling command's writes (Convex's scheduled functions; Oban's
+    // jobs unique by their arguments).
+    SCHEDULE_NAMES_NO_CLOCKED_COMMAND = "PW6501" / schedule_names_no_clocked_command / 1, Schedules,
+        "a `schedule` names a command `invoked_by Clock`, written as a call";
+    SCHEDULED_OUTSIDE_A_COMMAND = "PW6502" / scheduled_outside_a_command / 1, Schedules,
+        "a `schedule` or an `unschedule` is a command's statement: what a page shows schedules nothing";
+    SCHEDULE_TIME = "PW6503" / schedule_time / 1, Schedules,
+        "a scheduled run's time is `at` an `Instant` or `after` a `Duration`";
 }
 
 /// Codes that were registered, are no longer emitted, and whose numbers must
@@ -959,6 +980,7 @@ impl Owner {
             Owner::StoreAccounts => "PW62",
             Owner::StoreSearch => "PW63",
             Owner::Payments => "PW64",
+            Owner::Schedules => "PW65",
             Owner::Syntax | Owner::Resolution => "PW00",
             Owner::Placement | Owner::Privacy | Owner::Markup => "PW50",
             Owner::Types => "PW06",
@@ -1025,6 +1047,7 @@ mod tests {
                 (Owner::StoreAccounts, "PW62"),
                 (Owner::StoreSearch, "PW63"),
                 (Owner::Payments, "PW64"),
+                (Owner::Schedules, "PW65"),
             ] {
                 assert!(
                     !c.id.starts_with(block) || c.owner == owner,

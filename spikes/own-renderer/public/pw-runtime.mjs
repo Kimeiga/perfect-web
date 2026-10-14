@@ -1773,17 +1773,20 @@ let announcer = null;
  * the same node from the first byte, or, from a host that served none, one
  * added once, before anything is said. */
 function announcerOf() {
-  announcer ??= document.querySelector(".pw-announcer[role=status]");
+  if (announcer) return announcer;
+  announcer = document.querySelector(".pw-announcer[role=status]");
   if (!announcer) {
     announcer = document.createElement("div");
     announcer.setAttribute("role", "status");
     announcer.className = "pw-announcer";
-    // Seen by no one, said to whoever reads the page by ear.
-    announcer.style.cssText =
-      "position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;" +
-      "overflow:hidden;clip-path:inset(50%);white-space:nowrap";
     document.body.append(announcer);
   }
+  // Seen by no one, said to whoever reads the page by ear. Through the
+  // CSSOM, which the page's policy allows where it allows no `style`
+  // attribute: the host serves the announcer empty and unstyled.
+  announcer.style.cssText =
+    "position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;" +
+    "overflow:hidden;clip-path:inset(50%);white-space:nowrap";
   return announcer;
 }
 

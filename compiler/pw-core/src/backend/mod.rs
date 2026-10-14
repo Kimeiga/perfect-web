@@ -161,6 +161,24 @@ pub fn invalidated_query(
 /// query's whole path, since two modules' queries may share a name.
 pub const INVALIDATIONS_INTERFACE: &str = "pw:host/invalidations";
 
+/// **The platform's schedules** (the scheduled-commands track): for each
+/// command a body schedules, a function by the command's whole path and what
+/// it does, `-at` an instant or `-after` a duration, taking the command's
+/// parameters and then the time, and `-cancel`, taking its parameters. The
+/// host writes each with the scheduling command's writes, or not at all.
+pub const SCHEDULES_INTERFACE: &str = "pw:host/schedules";
+
+/// What a schedules' function does: `at`, `after` or `cancel`.
+pub const SCHEDULE_HOWS: [&str; 3] = ["at", "after", "cancel"];
+
+/// The schedules' function that does `how` for the command at `path`.
+pub fn schedule_binding(path: &str, how: &str) -> ir::ImportId {
+    ir::ImportId {
+        interface: SCHEDULES_INTERFACE.to_string(),
+        name: format!("{}-{how}", crate::wit::ident(path)),
+    }
+}
+
 /// **The platform's reads** (ADR-0277): each resource a materialization's
 /// body reads, `query R(..)`, is a function of it, taking R's parameters and
 /// answering R's value, its `Ok` where R answers a `Result`, by R's whole

@@ -69,6 +69,10 @@ fn full() -> Topology {
                     "payments.begin".to_string(),
                     // And canceled, by its reader alone (step eight).
                     "payments.cancel".to_string(),
+                    // A run scheduled with a command's writes, which the
+                    // host runs when the clock passes its time (the
+                    // scheduled-commands track).
+                    "clock.schedule".to_string(),
                 ]),
             },
         ],
@@ -243,6 +247,7 @@ fn an_edge_whose_ends_share_no_node_is_necessarily_remote() {
             invalidates: None,
             every: Vec::new(),
             reads: None,
+            schedules: None,
             interface: "pw:app/app.Store".into(),
             name: "Store".into(),
             capability: String::new(),
@@ -324,6 +329,7 @@ fn placement_and_transferability_are_independent_and_only_one_pair_fails() {
             invalidates: None,
             every: Vec::new(),
             reads: None,
+            schedules: None,
             interface: format!("pw:app/{target}"),
             name: "Store".into(),
             capability: String::new(),
@@ -455,6 +461,7 @@ fn an_undetermined_signature_does_not_refuse_a_deployment() {
             invalidates: None,
             every: Vec::new(),
             reads: None,
+            schedules: None,
             interface: "pw:app/app.Store".into(),
             name: "Store".into(),
             capability: String::new(),
@@ -567,6 +574,7 @@ fn a_necessarily_remote_edge_that_owes_a_principal_is_not_a_finished_plan() {
             invalidates: None,
             every: Vec::new(),
             reads: None,
+            schedules: None,
             interface: "pw:app/app.Basket".into(),
             name: "Basket".into(),
             capability: String::new(),
@@ -644,6 +652,7 @@ fn widget_for() -> ComponentContract {
             invalidates: None,
             every: Vec::new(),
             reads: None,
+            schedules: None,
             interface: "pw:app/app.Basket".into(),
             name: "Basket".into(),
             capability: String::new(),

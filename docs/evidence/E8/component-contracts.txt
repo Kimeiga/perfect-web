@@ -306,8 +306,9 @@ store.page.apply_promo  abi 5ec827dd0f4f958c
   host      store:data/promos#find  (database.read<Stores>)
   exports   command apply_promo
 
-store.page.cancel_order  abi 18b3c1b8eab814e8
+store.page.cancel_order  abi 997dea91592137f5
   runs at   origin
+  needs     clock.schedule
   needs     database.read<Orders>
   needs     database.write<Carts>
   needs     database.write<Orders>
@@ -322,6 +323,7 @@ store.page.cancel_order  abi 18b3c1b8eab814e8
   host      pw:host/outbox#user-order-changed  (outbox.write)
   host      pw:host/payments#cancel  (payments.cancel)
   host      pw:host/principal#read  (session.read)
+  host      pw:host/schedules#store-page-expire-order-cancel  (clock.schedule)
   host      store:data/user-orders#awaited  (database.read<Orders>)
   host      store:data/user-orders#settle  (database.write<Orders>)
   exports   command cancel_order
@@ -371,6 +373,26 @@ store.page.decrease_in_cart  abi 610e5e7433cc7a04
   host      store:data/user-carts#decrease  (database.write<Carts>)
   exports   command decrease_in_cart
 
+store.page.expire_order  abi 773978126174b1e0
+  runs at   origin
+  needs     database.read<Orders>
+  needs     database.write<Carts>
+  needs     database.write<Orders>
+  needs     outbox.write
+  needs     payments.cancel
+  needs     session.read
+  host      pw:host/invalidations#store-page-cart  (outbox.write)
+  host      pw:host/invalidations#store-page-checkout  (outbox.write)
+  host      pw:host/invalidations#store-page-order  (outbox.write)
+  host      pw:host/invalidations#store-page-order-total  (outbox.write)
+  host      pw:host/outbox#user-cart-changed  (outbox.write)
+  host      pw:host/outbox#user-order-changed  (outbox.write)
+  host      pw:host/payments#cancel  (payments.cancel)
+  host      pw:host/principal#read  (session.read)
+  host      store:data/user-orders#awaited  (database.read<Orders>)
+  host      store:data/user-orders#settle  (database.write<Orders>)
+  exports   command expire_order
+
 store.page.increase_in_cart  abi ea834328e33999c3
   runs at   origin
   needs     database.read<Menus>
@@ -384,9 +406,10 @@ store.page.increase_in_cart  abi ea834328e33999c3
   host      store:data/user-carts#add  (database.write<Carts>)
   exports   command increase_in_cart
 
-store.page.place_order  abi 336265f353707f23
+store.page.place_order  abi e428270e6485b6f2
   runs at   origin
   needs     clock.compare
+  needs     clock.schedule
   needs     clock.zone
   needs     database.read<Carts>
   needs     database.read<Orders>
@@ -407,6 +430,7 @@ store.page.place_order  abi 336265f353707f23
   host      pw:host/outbox#user-order-changed  (outbox.write)
   host      pw:host/payments#begin  (payments.begin)
   host      pw:host/principal#read  (session.read)
+  host      pw:host/schedules#store-page-expire-order-after  (clock.schedule)
   host      store:data/checkout#chosen  (database.read<Carts>)
   host      store:data/checkout#parts  (database.read<Carts>)
   host      store:data/fees#for-stores  (database.read<Stores>)
@@ -462,8 +486,9 @@ store.page.rename_address  abi 7e1a5f55cd7ee9c6
   host      store:data/addresses#rename  (database.write<Addresses>)
   exports   command rename_address
 
-store.page.settle_payment  abi 39bcda995b964ea4
+store.page.settle_payment  abi 8ac6e1f4e1759bef
   runs at   origin
+  needs     clock.schedule
   needs     database.write<Carts>
   needs     database.write<Orders>
   needs     outbox.write
@@ -475,6 +500,7 @@ store.page.settle_payment  abi 39bcda995b964ea4
   host      pw:host/outbox#user-cart-changed  (outbox.write)
   host      pw:host/outbox#user-order-changed  (outbox.write)
   host      pw:host/principal#read  (session.read)
+  host      pw:host/schedules#store-page-expire-order-cancel  (clock.schedule)
   host      store:data/user-orders#settle  (database.write<Orders>)
   exports   command settle_payment
 

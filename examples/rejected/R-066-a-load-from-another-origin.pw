@@ -1,0 +1,30 @@
+// @corpus: rejected
+// @id: R-066
+// @category: a load from another origin
+// @rule: PW5052
+// @invariant: load_from_another_origin
+// @charter: §8.2
+// @milestone: 14
+// @expect-error: `<img src="https://images.example/logo.png">` in `StoreLogo` loads from `https://images.example`, another origin: a page loads from its own
+// @expect-error: a page loads from its own origin: an address its markup fetches, written as text, is a path, and a `<link>`'s address is written as text
+//
+// The host sends each page a Content-Security-Policy generated from its
+// build and its deployment: a page loads from its own origin, and from the
+// providers its deployment names. An image written from another origin
+// would build, and the browser would refuse it; the build refuses it where
+// it is written (ADR-0195, ruling 13).
+
+module store.foreign_logo
+
+import domain.{ StoreId }
+
+page StoreLogo(id: StoreId) !{} {
+    route "/stores/{id}/logo"
+    view {
+        <title>The store's logo</title>
+        <main>
+            <h1>Logo</h1>
+            <img src="https://images.example/logo.png" alt="The store's logo" />
+        </main>
+    }
+}

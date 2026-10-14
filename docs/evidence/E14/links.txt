@@ -1,37 +1,36 @@
 ADR-0189 - a <link> is written where HTML allows it
 
 produced by: just e14-links
-commit: 5d147285f6e2957e5a5c0a5ac159c7269d1721b7
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38277655867 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 92fdd6e34743e33a80914939976125a9eb307842
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38559878637 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the rule (compiler/pw-core/tests/links.rs)
 
 test a_link_the_head_holds_is_refused_in_markup ... ok
 test a_link_html_allows_in_the_body_is_written_where_it_is ... ok
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
 
 == the corpus at C12 (corpus-check, generality.rs, checking_source.rs)
 
-accepted: 34 files
-accepted: 34/34 charter §16 categories covered
-rejected: 65 files
-rejected: 65/65 charter §16 categories covered
+accepted: 36 files
+accepted: 36/36 charter §16 categories covered
+rejected: 69 files
+rejected: 69/69 charter §16 categories covered
 corpus-check: OK
 test a_caught_file_conveys_every_fact_its_expect_error_lines_declare ... ok
 test every_rejected_fixture_emits_only_its_own_defect ... ok
-test every_diagnostic_carries_what_charter_16_3_requires has been running for over 60 seconds
 test every_diagnostic_carries_what_charter_16_3_requires ... ok
-test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 91.08s
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 81.22s
 test generality_is_reported_separately_from_conformance ... ok
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 87.24s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 82.17s
 
 == every program the repository checks
 
-pw check: 80 file(s), no diagnostics
-pw check: 60 file(s), no diagnostics
-pw check: 26 file(s), no diagnostics
-pw check: 42 file(s), no diagnostics
+pw check: 83 file(s), no diagnostics
+pw check: 63 file(s), no diagnostics
+pw check: 27 file(s), no diagnostics
+pw check: 43 file(s), no diagnostics
 
 == mutation controls (scripts/links_mutations.py)
 

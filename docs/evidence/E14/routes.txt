@@ -1,28 +1,28 @@
 ADR-0160 - a page's route
 
 produced by: just e14-routes
-commit: 5d147285f6e2957e5a5c0a5ac159c7269d1721b7
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38277655867 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 92fdd6e34743e33a80914939976125a9eb307842
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38559878637 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the tests (compiler/pw-core/tests/routes.rs)
 
 test a_query_part_ends_the_route_and_names_each_parameter_once ... ok
 test a_route_names_each_parameter_once_and_nothing_else ... ok
-test a_route_is_slash_and_segments ... ok
 test a_query_parameter_is_an_option_of_text ... ok
-test a_route_that_names_its_parameters_is_the_control ... ok
-test the_plan_carries_the_route ... ok
+test a_route_is_slash_and_segments ... ok
 test a_routes_parameter_is_text ... ok
+test the_plan_carries_the_route ... ok
+test a_route_that_names_its_parameters_is_the_control ... ok
 test two_pages_of_one_name_are_told_apart_by_their_modules ... ok
 test one_route_is_one_pages ... ok
 test two_routes_that_differ_in_their_query_are_one ... ok
 test an_address_gives_only_what_its_route_names ... ok
-test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
 
 == the store declares its route, and checks
 
-pw check: 60 file(s), no diagnostics
+pw check: 63 file(s), no diagnostics
 
 == mutation controls (scripts/routes_mutations.py)
 

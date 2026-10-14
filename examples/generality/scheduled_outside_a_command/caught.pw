@@ -1,0 +1,21 @@
+// @status: GENERAL
+// @invariant: scheduled_outside_a_command
+//
+// Structurally different from R-068: an `unschedule`, in a query, which
+// reads and writes nothing for a run to be taken back with.
+
+module generality.unschedule_in_query
+
+import domain.{ InteractionId }
+
+command remind(order: String) -> Result<Int, String>
+    invoked_by    Clock
+    idempotent_by InteractionId
+{
+    Ok(1)
+}
+
+query Reminded(order: String) -> Bool !{ clock.schedule } {
+    unschedule remind(order)
+    true
+}

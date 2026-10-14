@@ -119,6 +119,11 @@ const STMT_KEYWORDS: &[&str] = &[
     // `Ok(_) => navigate OrderPage()`: a handler goes to a page once its
     // command commits (ADR-0280). One expression, as `query` is.
     "navigate",
+    // `schedule expire_payment(order) after minutes(30)`: a command the
+    // platform runs when the clock passes its time, and `unschedule` the
+    // same command and arguments (the scheduled-commands track).
+    "schedule",
+    "unschedule",
     "use",
     "observe",
     "animate",
@@ -2061,6 +2066,17 @@ impl<'a> P<'a> {
             }
             self.expect(Kind::RParen, "to close a statement argument list");
             self.finish();
+        }
+        // **When a scheduled command runs**: `at` an instant, or `after` a
+        // duration from the commit, an expression of its own, which a
+        // trailing modifier word could not hold (`at order.deadline` ended the
+        // statement at its `.`).
+        if keyword == "schedule"
+            && matches!(self.cur_text(), "at" | "after")
+            && self.at(Kind::Ident)
+        {
+            self.bump();
+            self.expr(0);
         }
         if self.eat(Kind::Colon) {
             self.type_ref();

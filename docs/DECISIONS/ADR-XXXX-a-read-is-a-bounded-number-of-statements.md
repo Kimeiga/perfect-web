@@ -65,9 +65,10 @@ ADR's counts.
    each operation's, and each command's transaction's, apart.
 6. **A command's commit is counted with it** (the integrator's ruling of
    2026-10-14): what it hands the outbox (an insert per event and per
-   invalidated entry), its interaction's record (two statements, ADR-0325)
-   and the outbox read back (one), each bounded by what the command hands
-   the platform, never by the data's size. The control: `choose_tip`
+   invalidated entry), its interaction's record (two statements, ADR-0325),
+   its scheduled runs (ADR-0334: a delete for each, and an insert for each
+   run due) and the outbox read back (one), each bounded by what the command
+   hands the platform, never by the data's size. The control: `choose_tip`
    emitting one event more makes one statement more.
 7. **A command is pinned apart**, and **its scenario named** (the
    integrator's ruling of 2026-10-14), both pinned:
@@ -113,8 +114,12 @@ the cart 13, a search 8, the address page 2, the order's page 5.
 `place_order`, by scenario:
 - (a) taking no payments, placed at once: its operations 33, its commit 7,
   its queries read again 21;
-- (b) taking payments, awaiting: its transaction 35; then `settle_payment`
-  on the provider's word, its own transaction, 16.
+- (b) taking payments, awaiting: its transaction 37 (its sweep scheduled,
+  2); then `settle_payment` on the provider's word, its own transaction, 17
+  (the sweep cancelled, 1). And the order taken back: `cancel_order` 25,
+  then `settle_payment` on the provider's word of the cancel 14; the sweep
+  run thirty minutes on (the clock moved, then `run_due`): `expire_order`
+  26, then the provider's word of its cancel 12.
 
 `place_order` in (a), by operation (the layer's tally per operation):
 

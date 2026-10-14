@@ -1,0 +1,28 @@
+// @corpus: accepted
+// @id: A-035
+// @category: a page loads from its own origin
+// @charter: §8.2
+// @milestone: 14
+//
+// What a page loads, written as text, is a path, which a browser resolves
+// against the page's own address: an image and its larger candidates, and a
+// stylesheet. A link to another origin is a navigation, which goes
+// anywhere, and an image whose address a value chooses is held by the
+// page's policy in the browser (ADR-0195, ruling 13).
+
+module store.own_origin
+
+import domain.{ StoreId }
+
+page StoreVisit(id: StoreId) !{} {
+    route "/stores/{id}/visit"
+    view {
+        <title>Visit the store</title>
+        <link rel="stylesheet" href="/stores/{id}/visit.css" />
+        <main>
+            <h1>Visit</h1>
+            <img src="/images/logo.png" srcset="/images/logo.png 1x, /images/logo@2x.png 2x" alt="The store's logo" />
+            <p><a href="https://example.com/directions">Directions</a></p>
+        </main>
+    }
+}

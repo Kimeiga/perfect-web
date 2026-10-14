@@ -1,0 +1,36 @@
+// @corpus: accepted
+// @id: A-036
+// @category: a command schedules one the clock invokes
+// @charter: §7.5
+// @milestone: 14
+//
+// A reader's command schedules a run of a command the clock invokes, thirty
+// minutes after it commits, and another takes it back, each with its writes
+// (the scheduled-commands track). No reader presses the run, and no program
+// reads the time to say when.
+
+module orders.reminders
+
+import domain.{ InteractionId }
+import clock.{ minutes }
+
+// Runs thirty minutes after `remind_later` commits, on behalf of the reader
+// whose command scheduled it.
+command remind(order: String) -> Result<Int, String>
+    invoked_by    Clock
+    idempotent_by InteractionId
+{
+    Ok(1)
+}
+
+command remind_later(order: String) -> Result<Int, String> !{ clock.schedule }
+{
+    schedule remind(order) after minutes(30)
+    Ok(1)
+}
+
+command never_mind(order: String) -> Result<Int, String> !{ clock.schedule }
+{
+    unschedule remind(order)
+    Ok(1)
+}

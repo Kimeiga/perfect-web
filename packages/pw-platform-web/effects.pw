@@ -314,6 +314,14 @@ effect clock.compare {
     capability clock.compare
 }
 
+// **A command run when the clock passes its time** (the scheduled-commands
+// track): `schedule cmd(args) at when` and `unschedule cmd(args)`, written
+// with the scheduling command's writes, at the origin that holds them.
+effect clock.schedule {
+    placement  origin
+    capability clock.schedule
+}
+
 // **The host's time zone database**: a zone's rules, which a deployment's
 // tz data says and which change only with it. A capability, as a host
 // supplies the database: a host without one refuses what reads it.

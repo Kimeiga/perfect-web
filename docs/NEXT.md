@@ -737,7 +737,9 @@ E14 comes before E11-E13. Its plan, controls and task list are
              effect, ordering refused while closed, and orders scheduled.
              In three steps: ~~the clock~~ (ADR-0304, merged 2026-10-10);
              ~~the store's hours~~ (ADR-0328, merged 2026-10-13, W9's);
-             orders scheduled;
+             orders scheduled: ~~a command the clock runs~~ (ADR-0334, merged
+             2026-10-14, its first use ADR-0332's sweep); an order placed
+             for a time its reader chooses, sent to its store then;
           4a. ~~**typed page query parameters**~~ (ADR-0309, merged
              2026-10-12): a route's query part, `route "/search{?q}"`,
              RFC 6570's form-style expansion; each name an `Option` of
@@ -793,6 +795,10 @@ E14 comes before E11-E13. Its plan, controls and task list are
              without paying, said why; until then no mutant guards them;
 
           Then the language's, found on the way:
+          - **a program's declaration of another origin** (ADR-0195's
+            ruling 13, its last clause; ADR-0333 built the rest): an origin a
+            program declares, which its pages' policy allows and PW5052 lets
+            its markup load from; built when a program needs one;
           - ~~**a template's bindings shadow module members**~~ (ADR-0310,
             merged 2026-10-12): a name means its binding in every analysis,
             the template's bindings, a call through a local and a loop's
@@ -844,14 +850,31 @@ E14 comes before E11-E13. Its plan, controls and task list are
             and over ADR-0292's 3.9 GiB bound. Still to measure: an
             opt-level for `cranelift-codegen` and `regalloc2` in the dev
             profile, against what it adds to a cold build and to `target/`;
-          - **a train fixed by a dispatch is verified** (the integrator's
-            finding at train-4's landing, 2026-10-13): `verified_base.py`
-            counts a commit only where a push's or the nightly's verify
-            passed at it, so a train whose run failed in one recipe, fixed
-            and re-run by dispatch, had its master push plan the whole train
-            again (verify 38494831583, cancelled by hand). Count a dispatch
-            at a commit that ran every recipe its train's run failed in and
-            every recipe the fix plans, with a test and its mutants;
+          - ~~**a train fixed by a dispatch is verified**~~ (the
+            integrator's finding at train-4's landing, 2026-10-13; ADR-0281
+            amended (6), track `current-evidence`): master's push after
+            train-4 planned the whole train again (verify 38494831583,
+            cancelled by hand). Not by counting a dispatch: a push runs no
+            recipe whose committed evidence is current, and a train whose
+            run failed takes the run's evidence with its fix;
+          - **the checker's latency** (the integrator's finding,
+            2026-10-13): a full check of the store program takes about
+            800 ms for 52 files, where E9's gate item 4 passed on 37 ms for
+            36 files (2026-08-08), and an edit costs a full check, so
+            editor feedback is near a second. Every analysis added since
+            resolves names and types bodies on its own, and none shares
+            what another computed. A profile (macOS `sample`, the latency
+            test): the value relations about 10%, a session-handle analysis
+            that built a typer for each printed value about 16% (one typer
+            a body since, track `check-latency`), the effect inference and
+            the summaries about 8% each, and name resolution through every
+            import throughout (each unit's module indexed, one key a lookup,
+            the same track). Nothing read the number again in two months:
+            its recipe is the development machine's (`just e9-latency`).
+            The work: each declaration's typer and resolution computed once
+            a check and shared by every analysis that reads them, then an
+            edit that redoes only what it reaches (E9's query system), the
+            number recorded again at each step;
           - **a recipe not yet measured is planned at its kind's upper
             quartile** (done, ADR-0290's amendment of 2026-10-09).
           - **a shard dealt within a ceiling under its limit** (done,

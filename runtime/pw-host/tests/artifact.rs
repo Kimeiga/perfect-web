@@ -136,6 +136,7 @@ fn the_declared_component_imports_exactly_what_its_world_says() {
                 invalidates: None,
                 every: Vec::new(),
                 reads: None,
+                schedules: None,
             }
         })
         .collect();
@@ -182,6 +183,7 @@ fn the_std_component_is_refused_for_authority_nobody_asked_for() {
                     invalidates: None,
                     every: Vec::new(),
                     reads: None,
+                    schedules: None,
                 }
             })
             .collect(),
@@ -251,6 +253,7 @@ fn a_granted_component_instantiates_and_an_ungranted_one_does_not() {
                 invalidates: None,
                 every: Vec::new(),
                 reads: None,
+                schedules: None,
             }
         })
         .collect();
@@ -306,6 +309,7 @@ fn a_refused_admission_yields_no_granted_to_link_from() {
                 invalidates: None,
                 every: Vec::new(),
                 reads: None,
+                schedules: None,
             }
         })
         .collect();
@@ -357,6 +361,7 @@ fn an_instance_runs_within_the_budget_its_deployment_declares() {
                 invalidates: None,
                 every: Vec::new(),
                 reads: None,
+                schedules: None,
             }
         })
         .collect();
@@ -432,6 +437,7 @@ fn a_memory_ceiling_denies_growth_rather_than_aborting() {
                 invalidates: None,
                 every: Vec::new(),
                 reads: None,
+                schedules: None,
             }
         })
         .collect();
@@ -502,6 +508,7 @@ fn a_granted_guest_calls_the_host_and_receives_its_answer() {
                 invalidates: None,
                 every: Vec::new(),
                 reads: None,
+                schedules: None,
             }
         })
         .collect();

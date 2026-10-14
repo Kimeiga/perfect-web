@@ -123,6 +123,8 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         per_unit.extend(metadata(&u.hir));
         // ADR-0189: a `<link>` is one HTML allows where it is written.
         per_unit.extend(links(&u.hir));
+        // ADR-0195's ruling 13: and a page loads from its own origin.
+        per_unit.extend(crate::origins::check(&u.hir));
         // ADR-0185: an id names one element, a reference names one shown
         // with it, and ARIA is what WAI-ARIA defines.
         per_unit.extend(ids_and_aria(&u.hir));
@@ -235,6 +237,9 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
             // NEXT 6c: a command the platform invokes, which no reader
             // presses (PW64xx).
             out.extend(crate::invoked::check(&hirs, i, &workspace, &sent));
+            // The scheduled-commands track: a schedule names a command the
+            // clock invokes, in a command, at its time (PW65xx).
+            out.extend(crate::scheduled::check(&hirs, i, &workspace, &sigs));
             // ADR-0163: a page says when its address names nothing.
             out.extend(not_found_names_a_case(&u.hir, i, &sigs, &workspace));
             // ADR-0295: and when it is another address of the page.
@@ -2998,6 +3003,10 @@ fn sessions_stay_on_the_server(
         .map(|m| m.name.as_str());
     for (_, body, _) in hir.bodies.iter() {
         let decl = hir.decl(body.owner);
+        // One typer for the body, built for its first printed value: one for
+        // each value solved the whole body once a hole (the checker's
+        // latency, 2026-10-13).
+        let mut types: Option<crate::values::BodyTypes> = None;
         for (_, node, _) in body.nodes.iter() {
             let mut printed: Vec<ExprId> = match node {
                 Node::Interpolation(e) => vec![*e],
@@ -3020,7 +3029,10 @@ fn sessions_stay_on_the_server(
                 })
                 .collect();
             for e in printed {
-                let (ty, _) = crate::values::type_of(sigs, workspace, unit, module, decl, body, e);
+                let types = types.get_or_insert_with(|| {
+                    crate::values::BodyTypes::new(sigs, workspace, unit, module, decl, body)
+                });
+                let (ty, _) = types.of(e);
                 if session_in_ty(sigs, &ty, &mut BTreeSet::new()) {
                     out.push(refused(
                         "this prints a session's handle, which would reach the browser".to_string(),

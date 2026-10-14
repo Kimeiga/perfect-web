@@ -1,0 +1,23 @@
+// @status: GENERAL
+// @invariant: schedule_names_no_clocked_command
+//
+// Structurally different from R-067: an `unschedule`, not a `schedule`, of a
+// command another of the platform's invokers runs, a payment's outcome.
+
+module generality.unschedule_settled
+
+import domain.{ InteractionId }
+import payments.{ Settled }
+
+command settle(settled: Settled) -> Result<Int, String>
+    invoked_by    Payments
+    idempotent_by InteractionId
+{
+    Ok(1)
+}
+
+command forget(settled: Settled) -> Result<Int, String> !{ clock.schedule }
+{
+    unschedule settle(settled)
+    Ok(1)
+}

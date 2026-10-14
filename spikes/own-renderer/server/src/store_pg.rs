@@ -79,6 +79,11 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "0014_order_payments",
         include_str!("../migrations/store/0014_order_payments.sql"),
     ),
+    // The scheduled-commands track: the runs a command schedules.
+    (
+        "0015_schedules",
+        include_str!("../migrations/store/0015_schedules.sql"),
+    ),
 ];
 
 /// **The schema a deployment's store is in**, unless it names another.
@@ -1017,14 +1022,16 @@ impl crate::data::Staged for Staging<'_> {
         events: &[Handed],
         invalidated: &[Dropped],
         interaction: Option<&crate::data::Recorded<'_>>,
+        scheduled: &[crate::schedules::Scheduled],
     ) -> Result<Option<Outboxed>, String> {
         // The commit's statements are the command's (the integrator's ruling
         // on NEXT 4b): what it handed the outbox, its interaction's record,
-        // and the outbox read back, each bounded by what the command hands
-        // the platform, never by the data's size.
+        // the runs it scheduled or cancelled, and the outbox read back, each
+        // bounded by what the command hands the platform, never by the
+        // data's size.
         let (tally, txn) = (self.tally.clone(), self.txn);
         tally.around_in(txn, || {
-            self.committed_with(events, invalidated, interaction)
+            self.committed_with(events, invalidated, interaction, scheduled)
         })
     }
 }
@@ -1035,6 +1042,7 @@ impl Staging<'_> {
         events: &[Handed],
         invalidated: &[Dropped],
         interaction: Option<&crate::data::Recorded<'_>>,
+        scheduled: &[crate::schedules::Scheduled],
     ) -> Result<Option<Outboxed>, String> {
         let mut conn = self.conn.lock().expect("the command's connection");
         let c = conn
@@ -1075,6 +1083,16 @@ impl Staging<'_> {
             // Its two: the expired records deleted, the answer inserted.
             Counted::ran(2);
         }
+        // **And the runs it scheduled, or cancelled** (the
+        // scheduled-commands track).
+        crate::schedules::pg::write(c, scheduled).map_err(pg)?;
+        // Its statements: a delete for each, and an insert for each run due.
+        Counted::ran(
+            scheduled
+                .iter()
+                .map(|s| 1 + u64::from(s.due_ms.is_some()))
+                .sum(),
+        );
         // The writes and the outbox's rows, at once or not at all. A commit
         // the database refuses (a serialization failure, a deferred
         // constraint) has rolled back, and nothing is delivered.
@@ -1107,6 +1125,46 @@ impl Drop for Staging<'_> {
     }
 }
 
+/// **Its runs, outside a command** (the scheduled-commands track): those
+/// its `schedules` keeps, each statement on a connection of its own.
+impl crate::schedules::Runs for StorePg {
+    fn due_runs(
+        &self,
+        now_ms: i64,
+        limit: usize,
+    ) -> Result<Vec<pw_materialize::ScheduledRun>, String> {
+        let mut conn = self.pool.take()?;
+        crate::schedules::pg::due_runs(conn.client(), now_ms, limit).map_err(pg)
+    }
+
+    fn next_run(&self) -> Result<Option<i64>, String> {
+        let mut conn = self.pool.take()?;
+        crate::schedules::pg::next_run(conn.client()).map_err(pg)
+    }
+
+    fn ran(&self, id: i64) -> Result<(), String> {
+        let mut conn = self.pool.take()?;
+        crate::schedules::pg::ran(conn.client(), id).map_err(pg)
+    }
+
+    fn retry(
+        &self,
+        id: i64,
+        attempts: i64,
+        due_ms: i64,
+        failed: Option<&str>,
+    ) -> Result<(), String> {
+        let mut conn = self.pool.take()?;
+        crate::schedules::pg::retry(conn.client(), id, attempts, due_ms, failed).map_err(pg)
+    }
+
+    #[cfg(test)]
+    fn all_runs(&self) -> Result<Vec<pw_materialize::ScheduledRun>, String> {
+        let mut conn = self.pool.take()?;
+        crate::schedules::pg::all_runs(conn.client()).map_err(pg)
+    }
+}
+
 impl crate::data::DataLayer for StorePg {
     fn keeps_interactions(&self) -> bool {
         true
@@ -1135,6 +1193,10 @@ impl crate::data::DataLayer for StorePg {
     #[cfg(test)]
     fn execute_for_test(&self, sql: &str) -> Result<(), String> {
         self.sql().batch_execute(sql).map_err(pg)
+    }
+
+    fn runs(&self) -> Option<&dyn crate::schedules::Runs> {
+        Some(self)
     }
 
     fn reads(&self, session: &str, stopped: Option<Stopped>) -> Ops {

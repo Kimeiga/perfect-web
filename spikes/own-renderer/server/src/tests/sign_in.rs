@@ -1073,6 +1073,18 @@ fn the_development_provider_signs_up_and_in_through_the_flow() {
         let form = get(&s, &to, "");
         assert!(form.starts_with("HTTP/1.1 200"), "{form}");
         assert!(form.contains("not for production"), "{form}");
+        // A page that runs nothing (`csp::BARE`), its type its type.
+        assert!(
+            form.contains(&format!(
+                "content-security-policy: {}\r\n",
+                crate::csp::BARE
+            )),
+            "{form}"
+        );
+        assert!(
+            form.contains("x-content-type-options: nosniff\r\n"),
+            "{form}"
+        );
         let body = format!("{}&{fields}", to.split_once('?').expect("query").1);
         let answer = exchanged(
             &s,

@@ -350,8 +350,16 @@ fn on_postgres_a_retried_interaction_runs_its_command_once() {
 /// each built as a host is when it starts, with nothing of the others in its
 /// memory.
 fn hosts(url: &str) -> (Arc<StorePg>, impl Fn() -> Server, tempfile::TempDir) {
+    hosts_with(url, |app| app.to_string())
+}
+
+/// [`hosts`], the store's `app.pw` changed by `change`.
+fn hosts_with(
+    url: &str,
+    change: fn(&str) -> String,
+) -> (Arc<StorePg>, impl Fn() -> Server, tempfile::TempDir) {
     let layer = Arc::new(StorePg::for_test(url).expect("the layer"));
-    let (dir, out) = built_from_patches_in("examples", |app| app.to_string(), &[]);
+    let (dir, out) = built_from_patches_in("examples", change, &[]);
     let kept = layer.clone();
     let host = move || {
         Server::from_build_layers(out.clone(), out.clone(), None, Some(kept.clone()))
@@ -792,4 +800,160 @@ fn on_postgres_serializable_against_a_read_committed_default_is_refused() {
     })
     .expect("a serializable default gives serializable");
     served_with(as_is, &[], || StorePg::for_test(&url)).expect("serializable on each transaction");
+}
+
+// --- the scheduled-commands track ---------------------------------------
+
+/// The store with the track's test commands (`store_scheduled::SCHEDULING`),
+/// served by hosts over one database.
+fn scheduling_hosts(url: &str) -> (Arc<StorePg>, impl Fn() -> Server, tempfile::TempDir) {
+    hosts_with(url, super::store_scheduled::with_scheduling)
+}
+
+/// How many runs the database keeps.
+fn runs_kept(layer: &StorePg) -> i64 {
+    layer
+        .sql()
+        .query_one("SELECT count(*) FROM schedules", &[])
+        .expect("counted")
+        .get(0)
+}
+
+/// **A run is written by its command's own transaction** (the
+/// scheduled-commands track): the run's row and the command's interaction
+/// record, inserted by one transaction. The control: a command that answers
+/// an error writes neither.
+#[test]
+fn on_postgres_a_run_is_written_by_its_commands_transaction() {
+    let Some(url) = database() else { return };
+    let (layer, host, _dir) = scheduling_hosts(&url);
+    let s = host();
+    let press = |refuse: bool, interaction: &str| {
+        s.command_answer(
+            "store.page.add_in_five",
+            "a",
+            &[serde_json::json!("espresso"), serde_json::json!(refuse)],
+            Some(interaction),
+        )
+        .expect("a well-formed request")
+    };
+    assert!(!press(true, "i-1").committed);
+    assert_eq!(runs_kept(&layer), 0, "the control");
+    assert!(press(false, "i-2").committed);
+    let same: bool = layer
+        .sql()
+        .query_one(
+            "SELECT s.xmin::text = i.xmin::text FROM schedules s, interactions i \
+             WHERE i.key LIKE '%add_in_five%'",
+            &[],
+        )
+        .expect("one run, one record")
+        .get(0);
+    assert!(same, "written by one transaction");
+}
+
+/// **A run outlives the host that scheduled it**: a host started after it
+/// over the same database runs it once its time has passed, on behalf of
+/// the scheduler, and removes it.
+#[test]
+fn on_postgres_a_run_outlives_the_host_that_scheduled_it() {
+    let Some(url) = database() else { return };
+    let (layer, host, _dir) = scheduling_hosts(&url);
+    {
+        let s = host();
+        assert!(super::store_scheduled::in_five(&s, "espresso", false, "i-1").committed);
+    }
+    let s = host();
+    assert!(s.cart_lines("a").is_empty());
+    posted(&s, "/bench/clock?advance=300000", "clock", "c-1", "");
+    assert_eq!(s.run_due().0, 1);
+    assert_eq!(s.cart_lines("a"), [("espresso".to_string(), 1)]);
+    assert_eq!(runs_kept(&layer), 0);
+}
+
+/// **A run committed and not removed commits once** (ADR-0325): its host
+/// stopped after the run's commit and before removing it, the next host
+/// runs it again, keyed by its scheduling, meets the first run's record,
+/// and is answered as it was. The line is added once, and the run removed.
+#[test]
+fn on_postgres_a_run_committed_and_not_removed_commits_once() {
+    let Some(url) = database() else { return };
+    let (layer, host, _dir) = scheduling_hosts(&url);
+    let s = host();
+    assert!(super::store_scheduled::in_five(&s, "espresso", false, "i-1").committed);
+    let row = layer
+        .sql()
+        .query_one(
+            "SELECT id, key, command, args, user_id, due_ms FROM schedules",
+            &[],
+        )
+        .expect("one run");
+    let (id, key, command, args, user, due): (i64, String, String, String, String, i64) = (
+        row.get(0),
+        row.get(1),
+        row.get(2),
+        row.get(3),
+        row.get(4),
+        row.get(5),
+    );
+    posted(&s, "/bench/clock?advance=300000", "clock", "c-1", "");
+    assert_eq!(s.run_due().0, 1);
+    assert_eq!(s.cart_lines("a"), [("espresso".to_string(), 1)]);
+    // As though the host stopped after the run's commit, before removing it.
+    layer
+        .sql()
+        .execute(
+            "INSERT INTO schedules (id, key, command, args, user_id, due_ms) \
+             VALUES ($1, $2, $3, $4, $5, $6)",
+            &[&id, &key, &command, &args, &user, &due],
+        )
+        .expect("kept");
+    let next = host();
+    posted(&next, "/bench/clock?advance=300000", "clock", "c-1", "");
+    assert_eq!(next.run_due().0, 1, "run again");
+    assert_eq!(
+        next.cart_lines("a"),
+        [("espresso".to_string(), 1)],
+        "and committed once"
+    );
+    assert_eq!(runs_kept(&layer), 0);
+}
+
+/// **Two hosts, one run** (ADR-0325): while one host runs a due run,
+/// another's run of the same scheduling commits first, played by its record
+/// alone. The first's commit meets it by the run's key, rolls back and
+/// writes nothing, and the run is removed, answered.
+#[test]
+fn on_postgres_two_hosts_commit_a_run_once() {
+    let Some(url) = database() else { return };
+    let (layer, host, _dir) = scheduling_hosts(&url);
+    let s = host();
+    assert!(super::store_scheduled::in_five(&s, "espresso", false, "i-1").committed);
+    let id: i64 = layer
+        .sql()
+        .query_one("SELECT id FROM schedules", &[])
+        .expect("one run")
+        .get(0);
+    let key = format!("on-behalf:schedule-{id}\u{1f}store.page.add_later\u{1f}schedule-{id}");
+    {
+        let layer = layer.clone();
+        *s.before_commit.lock().expect("hook") = Some(Box::new(move |_: &Server| {
+            layer
+                .sql()
+                .execute(
+                    "INSERT INTO interactions (key, sent, answer, at_ms) VALUES ($1, $2, $3, $4)",
+                    &[
+                        &key,
+                        &r#"["espresso"]"#,
+                        &r#"{"committed":true,"why":null,"refused":null,"result":{"first":true}}"#,
+                        &i64::MAX,
+                    ],
+                )
+                .expect("the other host's record");
+        }));
+    }
+    posted(&s, "/bench/clock?advance=300000", "clock", "c-1", "");
+    assert_eq!(s.run_due().0, 1);
+    assert!(s.cart_lines("a").is_empty(), "nothing written");
+    assert_eq!(runs_kept(&layer), 0, "answered, and removed");
 }

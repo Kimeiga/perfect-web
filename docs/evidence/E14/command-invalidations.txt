@@ -1,8 +1,8 @@
 ADR-0209 - a command computes the entries it invalidates
 
 produced by: just e14-command-invalidations
-commit: 64cc7da190695fa62cadf247d14fd9ebdc24f6e9
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38348107940 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 92fdd6e34743e33a80914939976125a9eb307842
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38559878637 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the command's component (compiler/pw-conformance/tests/invalidations.rs)
@@ -10,7 +10,7 @@ rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 test a_command_leaves_a_position_to_every_value ... ok
 test its_contract_imports_the_invalidations_under_the_outbox ... ok
 test a_command_computes_the_entries_it_invalidates ... ok
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
 
 == the store's commands, against their references
 
@@ -20,16 +20,16 @@ test the_kiokun_search_agrees_with_its_reference ... ok
 test the_oracle_notices_a_reference_that_is_wrong ... ok
 test the_stores_queries_agree_with_their_reference ... ok
 test the_stores_commands_agree_with_their_reference ... ok
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.73s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.76s
 
 == the server's drops
 
 test tests::an_invalidated_entry_is_dropped_by_the_key_the_command_computed ... ok
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 494 filtered out; finished in 11.53s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 568 filtered out; finished in 19.14s
 
 == the store's artifacts, as the compiler emits them
 
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 18.87s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 31.35s
 
 == mutation controls (scripts/command_invalidations_mutations.py)
 

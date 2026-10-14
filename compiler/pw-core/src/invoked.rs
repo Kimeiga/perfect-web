@@ -25,8 +25,28 @@ use crate::diagnostics::{Detector, Diagnostic, Related, Repair, Severity};
 use crate::hir::{DeclId, DeclKind, Hir, Span};
 use crate::resolve::{DefId, Namespace, Resolution, Workspace};
 
-/// The platform's invokers, by the word a command names them with.
-pub const INVOKERS: &[&str] = &["Payments"];
+/// The platform's invokers, by the word a command names them with: a
+/// payment's outcome (ADR-0332), and the clock passing a scheduled time (the
+/// scheduled-commands track, `scheduled.rs`).
+pub const INVOKERS: &[&str] = &["Payments", "Clock"];
+
+/// Why no reader's predicate holds a command `invoker` invokes.
+fn on_whose_word(invoker: &str) -> &'static str {
+    match invoker {
+        "Clock" => {
+            "A command the clock invokes runs when the time a command scheduled it for \
+             passes, on behalf of the reader whose command scheduled it. No reader presses \
+             it, so a predicate over the reader has nobody to hold; what a reader may do is \
+             held where the reader acts, on the command that scheduled it."
+        }
+        _ => {
+            "A command the platform invokes runs on the platform's word, the provider's \
+             for a payment, which the host has checked before it calls it. No reader \
+             presses it, so a predicate over the reader has nobody to hold; what a reader \
+             may do is held where the reader acts, on the command that began the payment."
+        }
+    }
+}
 
 /// **The command each invoker invokes**, in source order across the program:
 /// `(unit, declaration)` of each command that names it.
@@ -77,14 +97,13 @@ pub fn check(
                 ),
                 requires.span.clone(),
                 vec![Related::new(at.clone(), format!("`invoked_by {invoker}`"))],
-                "A command the platform invokes runs on the platform's word, the provider's \
-                 for a payment, which the host has checked before it calls it. No reader \
-                 presses it, so a predicate over the reader has nobody to hold; what a reader \
-                 may do is held where the reader acts, on the command that began the payment.",
+                on_whose_word(invoker),
                 format!("remove `requires` from `{}`", decl.name),
             ));
         }
-        if !given_settled(unit, ws, decl) {
+        // A payment's outcome is given as the provider has it; a scheduled
+        // run, as its scheduler gave it (`scheduled.rs` relates them).
+        if invoker == "Payments" && !given_settled(unit, ws, decl) {
             let written: Vec<String> = decl
                 .params
                 .iter()
@@ -114,8 +133,10 @@ pub fn check(
             ));
         }
         // The first, in source order across the program, is the one; every
-        // other is refused where it is written, naming it.
-        if let Some(each) = all.get(invoker)
+        // other is refused where it is written, naming it. A payment's
+        // outcome has one answer; the clock runs as many as are scheduled.
+        if invoker == "Payments"
+            && let Some(each) = all.get(invoker)
             && let Some(&(first_unit, first)) = each.first()
             && (first_unit, first) != (unit, id)
         {
@@ -152,10 +173,20 @@ pub fn check(
                 ),
                 at.clone(),
                 Vec::new(),
-                "A provider sends its word again until it is answered, and may send it twice \
-                 at once. The host keys each outcome, the payment and where it stands, as a \
-                 press's interaction (ADR-0325), so it commits once; a command that declares \
-                 no key would run again for each.",
+                match invoker {
+                    "Clock" => {
+                        "A scheduled run is run again where it did not commit: a host stopped \
+                         before its commit, a run that trapped. The host keys each run by its \
+                         schedule, as a press's interaction (ADR-0325), so it commits once; a \
+                         command that declares no key would run again for each."
+                    }
+                    _ => {
+                        "A provider sends its word again until it is answered, and may send it \
+                         twice at once. The host keys each outcome, the payment and where it \
+                         stands, as a press's interaction (ADR-0325), so it commits once; a \
+                         command that declares no key would run again for each."
+                    }
+                },
                 format!("declare `idempotent_by InteractionId` on `{}`", decl.name),
             ));
         }
@@ -179,14 +210,30 @@ pub fn check(
                         )
                     })
                     .collect(),
-                "A command the platform invokes is answered on the platform's word: a \
-                 payment's outcome on the provider's, read again from the provider. A press \
-                 is a reader's word, and would settle a payment the provider never took; the \
-                 host answers one as a command that is not there.",
-                format!(
-                    "send the command that begins the payment, not `{}`",
-                    decl.name
-                ),
+                match invoker {
+                    "Clock" => {
+                        "A command the clock invokes runs when its time passes, on the \
+                         platform's word. A press is a reader's word, and would run it before \
+                         its time, or twice; the host answers one as a command that is not \
+                         there."
+                    }
+                    _ => {
+                        "A command the platform invokes is answered on the platform's word: a \
+                         payment's outcome on the provider's, read again from the provider. A \
+                         press is a reader's word, and would settle a payment the provider \
+                         never took; the host answers one as a command that is not there."
+                    }
+                },
+                match invoker {
+                    "Clock" => format!(
+                        "schedule it from a command a reader presses: `schedule {}(..) at ..`",
+                        decl.name
+                    ),
+                    _ => format!(
+                        "send the command that begins the payment, not `{}`",
+                        decl.name
+                    ),
+                },
             ));
         }
     }

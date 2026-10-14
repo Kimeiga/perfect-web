@@ -873,11 +873,39 @@ pub(crate) fn type_of(
     body: &Body,
     e: ExprId,
 ) -> (Ty, String) {
-    let lexical = Lexical::build(decl, body);
-    let typer = Typer::new(sigs, ws, at, module, decl, body, lexical, Vec::new());
-    let t = typer.of(e);
-    let name = typer.display(&t);
-    (t, name)
+    BodyTypes::new(sigs, ws, at, module, decl, body).of(e)
+}
+
+/// **One body's expressions, typed by one typer** (the checker's latency,
+/// 2026-10-13). A typer solves its whole body as it is built, and `type_of`
+/// builds one for the one expression it is asked about: an analysis that
+/// asked about every value a page prints built one for each, and a page of
+/// a few hundred holes solved itself a few hundred times.
+pub(crate) struct BodyTypes<'a> {
+    typer: Typer<'a>,
+}
+
+impl<'a> BodyTypes<'a> {
+    pub(crate) fn new(
+        sigs: &'a Signatures,
+        ws: &'a Workspace,
+        at: UnitId,
+        module: Option<&'a str>,
+        decl: &'a Decl,
+        body: &'a Body,
+    ) -> BodyTypes<'a> {
+        let lexical = Lexical::build(decl, body);
+        BodyTypes {
+            typer: Typer::new(sigs, ws, at, module, decl, body, lexical, Vec::new()),
+        }
+    }
+
+    /// The type the value relations give `e`, and its name.
+    pub(crate) fn of(&self, e: ExprId) -> (Ty, String) {
+        let t = self.typer.of(e);
+        let name = self.typer.display(&t);
+        (t, name)
+    }
 }
 
 /// What a call's written path names.
@@ -1389,8 +1417,11 @@ impl<'a> Typer<'a> {
                     other => other,
                 }
             }
-            // A navigation produces nothing (ADR-0280): the page goes.
-            Expr::Keyword { keyword, .. } if keyword == "navigate" => {
+            // A navigation produces nothing (ADR-0280): the page goes. Nor does
+            // a schedule: the run comes later (the scheduled-commands track).
+            Expr::Keyword { keyword, .. }
+                if matches!(keyword.as_str(), "navigate" | "schedule" | "unschedule") =>
+            {
                 Ty::Primitive(Primitive::Unit)
             }
             Expr::Binary { op, lhs, rhs } => match op {
@@ -2299,7 +2330,14 @@ impl<'a> Typer<'a> {
                         }
                         _ => None,
                     };
-                    (target, args.iter().map(|a| (None, *a)).collect())
+                    // `schedule cmd(args) at when`: the command's arguments,
+                    // and its time after them, which is the schedule's
+                    // (`scheduled.rs` checks it), not the command's.
+                    let given = match (keyword.as_str(), modifiers.get(1).map(String::as_str)) {
+                        ("schedule", Some("at" | "after")) => &args[..args.len().saturating_sub(1)],
+                        _ => &args[..],
+                    };
+                    (target, given.iter().map(|a| (None, *a)).collect())
                 }
                 _ => return unknown,
             };
@@ -4070,8 +4108,10 @@ impl<'a> Typer<'a> {
             // each argument related as a call's is.
             Expr::Keyword {
                 keyword, modifiers, ..
-            } if matches!(keyword.as_str(), "query" | "subscription" | "navigate")
-                && !modifiers.is_empty() =>
+            } if matches!(
+                keyword.as_str(),
+                "query" | "subscription" | "navigate" | "schedule" | "unschedule"
+            ) && !modifiers.is_empty() =>
             {
                 out.extend(self.call(id).relations)
             }

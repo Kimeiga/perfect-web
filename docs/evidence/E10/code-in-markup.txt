@@ -1,8 +1,8 @@
 ADR-0094 - a template writes no code
 
 produced by: just e10-code-in-markup
-commit: 5d147285f6e2957e5a5c0a5ac159c7269d1721b7
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38277655867 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 92fdd6e34743e33a80914939976125a9eb307842
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38559878637 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == code in markup (compiler/pw-core/tests/code_in_markup.rs)

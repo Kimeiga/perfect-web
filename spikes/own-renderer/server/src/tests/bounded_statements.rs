@@ -519,6 +519,21 @@ const PAGES: &[(&str, u64)] = &[
     ("/order", 5),
 ];
 
+/// **The transactions so far, once none is still running**: the provider
+/// tells the host of a cancel as it answers it, on a connection of its own,
+/// so a `settle_payment` may still be counting when the command returns.
+fn quiet(s: &Server) -> Vec<u64> {
+    let mut last = s.data.statements_by_transaction();
+    loop {
+        std::thread::sleep(std::time::Duration::from_millis(300));
+        let now = s.data.statements_by_transaction();
+        if now == last {
+            return now;
+        }
+        last = now;
+    }
+}
+
 /// **Scenario (b), a deployment that takes payments** (ADR-0332, the
 /// production path): `place_order` leaves the order awaiting its payment,
 /// no settle among its operations; the provider's word, a card paid on its
@@ -570,6 +585,68 @@ fn awaiting(more: bool) -> Vec<(String, u64)> {
             "settle_payment, on the provider's word: its transaction".to_string(),
             *settle,
         ));
+        // An order awaiting, taken back by its reader: `cancel_order`'s
+        // transaction (ADR-0332's step eight).
+        s.command(
+            "store.page.add_to_cart",
+            "a",
+            &add_shown("espresso", 1),
+            false,
+        )
+        .expect("added");
+        let total = s.shown_total("a");
+        s.command_answered(
+            "store.page.place_order",
+            "a",
+            std::slice::from_ref(&total),
+            Some("place-2"),
+        )
+        .expect("answered");
+        let before = quiet(s).len();
+        let canceled = s
+            .command_answered("store.page.cancel_order", "a", &[], Some("cancel-1"))
+            .expect("answered");
+        assert!(canceled.committed, "{:?}", canceled.result);
+        let ran = quiet(s)[before..].to_vec();
+        // Its own, and `settle_payment` on the provider's word of the
+        // cancel, which the provider tells the host as it answers the
+        // cancel (ADR-0332's step eight).
+        let [cancel, told] = ran[..] else {
+            panic!("cancel_order's transaction, then settle_payment's: {ran:?}")
+        };
+        out.push(("cancel_order: its transaction".to_string(), cancel));
+        out.push((
+            "settle_payment, on the provider's word of the cancel: its transaction".to_string(),
+            told,
+        ));
+        // An order no one pays, swept thirty minutes on (ADR-0334): the clock
+        // moved, then the run that is due, `expire_order`'s transaction.
+        let total = s.shown_total("a");
+        s.command_answered(
+            "store.page.place_order",
+            "a",
+            std::slice::from_ref(&total),
+            Some("place-3"),
+        )
+        .expect("answered");
+        let before = quiet(s).len();
+        s.query_clock.0.advance(30 * 60 * 1000);
+        assert_eq!(s.run_due().0, 1, "the sweep, run");
+        let ran = quiet(s)[before..].to_vec();
+        // Its own, and `settle_payment` on the provider's word of the cancel
+        // the sweep asks of it.
+        let [expire, told] = ran[..] else {
+            panic!("expire_order's transaction, then settle_payment's: {ran:?}")
+        };
+        out.push((
+            "expire_order, run thirty minutes on: its transaction".to_string(),
+            expire,
+        ));
+        out.push((
+            "settle_payment, on the provider's word of the sweep's cancel: its transaction"
+                .to_string(),
+            told,
+        ));
     });
     out
 }
@@ -592,7 +669,23 @@ fn placing_and_settling_where_payments_are_taken_is_bounded() {
 }
 
 /// Scenario (b)'s transactions, each with its commit.
+// Since ADR-0334 a command's commit writes its scheduled runs too: a delete
+// for each, and an insert for each run due. `place_order` schedules its
+// sweep (2), `settle_payment` and `cancel_order` cancel it (1).
 const AWAITING: &[(&str, u64)] = &[
-    ("place_order, taking payments: its transaction", 35),
-    ("settle_payment, on the provider's word: its transaction", 16),
+    ("place_order, taking payments: its transaction", 37),
+    (
+        "settle_payment, on the provider's word: its transaction",
+        17,
+    ),
+    ("cancel_order: its transaction", 25),
+    (
+        "settle_payment, on the provider's word of the cancel: its transaction",
+        14,
+    ),
+    ("expire_order, run thirty minutes on: its transaction", 26),
+    (
+        "settle_payment, on the provider's word of the sweep's cancel: its transaction",
+        12,
+    ),
 ];
