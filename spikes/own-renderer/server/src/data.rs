@@ -61,6 +61,13 @@ pub(crate) trait DataLayer: Send + Sync {
         BTreeMap::new()
     }
 
+    /// **Each command's transaction's statements**, in the order the
+    /// commands began, on a layer that counts them (NEXT 4b).
+    #[cfg(test)]
+    fn statements_by_transaction(&self) -> Vec<u64> {
+        Vec::new()
+    }
+
     /// **SQL a test runs on the layer's database**, where it has one: fifty
     /// stores more (NEXT 4b).
     #[cfg(test)]

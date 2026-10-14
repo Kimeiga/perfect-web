@@ -61,7 +61,16 @@ ADR's counts.
 5. **The layer's own tally.** A statement is counted on the thread that runs
    it (`STATEMENTS`, ADR-0308 amended); `store_pg.rs`' `Tally` adds each
    call's to the layer's total, whatever thread ran it, which a page's or a
-   command's count is read from (`DataLayer::statements`, a test's).
+   command's count is read from (`DataLayer::statements`, a test's); and
+   each operation's, and each command's transaction's, apart.
+6. **A command's commit is counted with it** (the integrator's ruling of
+   2026-10-14): what it hands the outbox (an insert per event and per
+   invalidated entry), its interaction's record (two statements, ADR-0325)
+   and the outbox read back (one), each bounded by what the command hands
+   the platform, never by the data's size. The control: `choose_tip`
+   emitting one event more makes one statement more.
+7. **A command is pinned apart**: its transaction's operations, its commit,
+   and the session's queries read again after it (`place_order`'s three).
 
 ## Measurements
 
@@ -87,19 +96,21 @@ what it writes, a line, a period or an item (`user-orders#await-payment`
 writes the cart's two lines, `hours#set` a week's seven periods), never
 with the number of stores.
 
-Per page and command: `add_to_cart` 7 and 8, `add_address` 3, `choose_tip`
-3, the home page 5, the store's page 16, the cart 13, a search 8, the
-address page 2, `place_order` 54, the order's page 5.
+Per page and command, each command with its commit: `add_to_cart` 10 and
+11, `add_address` 6, `choose_tip` 6, the home page 5, the store's page 16,
+the cart 13, a search 8, the address page 2, the order's page 5; and
+`place_order` apart, its operations 33, its commit 7, its queries read
+again 21.
 
-`place_order`'s 54, by operation (the layer's tally per operation, `Tally`'s
-`by_op`):
+`place_order`, by operation (the layer's tally per operation):
 
 | Where | Operation | Calls | Statements |
 | --- | --- | --- | --- |
 | its transaction | hours#for-cart (`closed_in`) | 1 | 6 |
 | its transaction | checkout#parts, fees#for-stores, checkout#chosen (`priced_for`) | 3 | 4 |
 | its transaction | user-orders#await-payment | 1 | 16 |
-| the provider's `settle_payment`, its own transaction | user-orders#settle | 1 | 7 |
+| its transaction: the development provider settles as the payment begins | user-orders#settle | 1 | 7 |
+| its commit | the outbox's inserts, the interaction's record, the outbox read back | | 7 |
 | after the commit, the session's invalidated queries read again | user-carts#current (`Cart`) | 6 | 6 |
 | after the commit | hours#for-cart (`CartHours`) | 1 | 6 |
 | after the commit | checkout#parts, fees#for-stores, checkout#chosen (`Checkout`) | 3 | 4 |
@@ -121,7 +132,8 @@ NEXT 4c's note takes this as its measured baseline.
 
 - `tests/bounded_statements.rs`, on PostgreSQL: every operation per call,
   and every page and command, at the seed and with fifty stores more,
-  pinned and equal at both.
+  pinned and equal at both; a command's commit counted with it, and its
+  control.
 - `scripts/bounded_statements_mutations.py`, 7 mutants, each restoring one
   loop, narrowed to `tests::bounded_statements::`: `just
   e14-bounded-statements`.

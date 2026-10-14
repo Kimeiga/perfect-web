@@ -363,30 +363,60 @@ fn steps(more: bool) -> Vec<(String, u64)> {
             fetched_as(&s, path, Some("a"));
         });
     }
+    // `place_order`, pinned apart (the integrator's ruling on NEXT 4b): its
+    // transaction's operations, its commit (what it hands the outbox, its
+    // interaction's record, the outbox read back), and the session's
+    // queries read again after its commit.
     let total = s.shown_total("a");
-    let before = s.data.statements_by_op();
-    step("place_order", &|| {
-        s.command_answered(
-            "store.page.place_order",
-            "a",
-            std::slice::from_ref(&total),
-            None,
-        )
-        .expect("answered");
-    });
-    // What `place_order`'s statements are made of, by operation (NEXT 4c's
-    // measured baseline): each operation's calls and statements in it.
-    let after = s.data.statements_by_op();
-    for (op, (calls, ran)) in &after {
-        let (c0, r0) = before.get(op).copied().unwrap_or_default();
-        if *calls > c0 {
+    let (txns, all, by_op) = (
+        s.data.statements_by_transaction().len(),
+        s.data.statements().expect("counted"),
+        s.data.statements_by_op(),
+    );
+    s.command_answered(
+        "store.page.place_order",
+        "a",
+        std::slice::from_ref(&total),
+        None,
+    )
+    .expect("answered");
+    let ran = s.data.statements_by_transaction()[txns..].to_vec();
+    let after = s.data.statements().expect("counted") - all;
+    // One transaction: the development provider settles the payment as it
+    // is begun, so `user-orders#settle` runs in `place_order`'s own.
+    let [own] = ran[..] else {
+        panic!("place_order's one transaction: {ran:?}")
+    };
+    let mut in_ops = 0;
+    for (op, (calls, statements)) in s.data.statements_by_op() {
+        let (c0, r0) = by_op.get(&op).copied().unwrap_or_default();
+        if calls > c0 {
+            // What its statements are made of, by operation (NEXT 4c's
+            // baseline).
             eprintln!(
                 "place_order: {op}: {} calls, {} statements",
                 calls - c0,
-                ran - r0
+                statements - r0
             );
+            if op.starts_with("command ") {
+                in_ops += statements - r0;
+            }
         }
     }
+    out.push(("place_order: its operations".to_string(), in_ops));
+    out.push(("place_order: its commit".to_string(), own - in_ops));
+    out.push((
+        "place_order: its queries read again".to_string(),
+        after - own,
+    ));
+    let mut step = |name: &str, run: &dyn Fn()| {
+        let before = s.data.statements().expect("a layer that counts");
+        run();
+        out.push((
+            name.to_string(),
+            s.data.statements().expect("counted") - before,
+        ));
+    };
     step("/order", &|| {
         fetched_as(&s, "/order", Some("a"));
     });
@@ -414,18 +444,67 @@ fn each_page_and_command_is_a_bounded_number_of_statements() {
     assert_eq!(seed, pinned, "as pinned");
 }
 
+/// `choose_tip` emitting one event more (`UserOrderChanged`), for the
+/// control below.
+fn one_more_event(app: &str) -> String {
+    let at = app.find("command choose_tip(").expect("choose_tip");
+    let emits = "    emits         UserCartChanged(current_user())\n";
+    let found = at + app[at..].find(emits).expect("its emits");
+    format!(
+        "{}    emits         UserCartChanged(current_user()), UserOrderChanged(current_user())\n{}",
+        &app[..found],
+        &app[found + emits.len()..]
+    )
+}
+
+/// `choose_tip`'s transaction's statements, on a store built with `change`.
+fn choose_tip_counted(change: fn(&str) -> String) -> u64 {
+    let s = served_from_patches_in("examples", change, &[]);
+    s.command(
+        "store.page.choose_tip",
+        "a",
+        &[Val::Variant("fifteen".into(), None)],
+        false,
+    )
+    .expect("chosen");
+    *s.data
+        .statements_by_transaction()
+        .last()
+        .expect("its transaction")
+}
+
+/// **A command's commit is counted with it** (the integrator's ruling on
+/// NEXT 4b): what it hands the outbox is a statement each, so the same
+/// command emitting one event more makes one statement more.
+#[test]
+fn a_commands_commit_is_counted_with_it() {
+    if std::env::var("PW_STORE_TEST_LAYER").as_deref() != Ok("postgres") {
+        eprintln!("skipped: the store is not served on PostgreSQL");
+        return;
+    }
+    let plain = choose_tip_counted(|app| app.to_string());
+    let more = choose_tip_counted(one_more_event);
+    assert_eq!(more, plain + 1, "one event more, one statement more");
+}
+
 /// **What each page and command runs**, on PostgreSQL, in the order
 /// [`steps`] runs them.
+// A command's count is its transaction's, its commit's statements with it
+// (what it hands the outbox, its interaction's record, the outbox read
+// back). `place_order`'s three apart: `user-orders#settle` (7) is among its
+// operations, the development provider settling as the payment begins.
 const PAGES: &[(&str, u64)] = &[
-    ("add_to_cart (47)", 7),
-    ("add_to_cart (48)", 8),
-    ("add_address", 3),
-    ("choose_tip", 3),
+    ("add_to_cart (47)", 10),
+    ("add_to_cart (48)", 11),
+    ("add_address", 6),
+    ("choose_tip", 6),
     ("/", 5),
     ("/stores/47", 16),
     ("/cart", 13),
     ("/search?q=coffee", 8),
     ("/stores/47/address", 2),
-    ("place_order", 54),
+    ("place_order: its operations", 33),
+    ("place_order: its commit", 7),
+    ("place_order: its queries read again", 21),
     ("/order", 5),
 ];

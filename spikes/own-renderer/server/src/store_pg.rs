@@ -262,19 +262,52 @@ pub(crate) struct Tally {
     /// a command's count is made of (NEXT 4c's measured baseline).
     #[cfg(test)]
     by_op: Arc<Mutex<BTreeMap<String, (u64, u64)>>>,
+    /// Each command's transaction's statements, its operations' and its
+    /// commit's, in the order the commands began.
+    #[cfg(test)]
+    transactions: Arc<Mutex<Vec<u64>>>,
 }
 
 impl Tally {
     fn around<T>(&self, f: impl FnOnce() -> T) -> T {
+        self.around_in(None, f)
+    }
+
+    /// [`around`](Tally::around), the statements also the command's
+    /// transaction `txn`'s, where it is one.
+    fn around_in<T>(&self, txn: Option<usize>, f: impl FnOnce() -> T) -> T {
+        #[cfg(not(test))]
+        let _ = txn;
         #[cfg(test)]
         let before = STATEMENTS.with(|n| n.get());
         let out = f();
         #[cfg(test)]
-        self.total.fetch_add(
-            STATEMENTS.with(|n| n.get()) - before,
-            std::sync::atomic::Ordering::SeqCst,
-        );
+        {
+            let ran = STATEMENTS.with(|n| n.get()) - before;
+            self.total
+                .fetch_add(ran, std::sync::atomic::Ordering::SeqCst);
+            if let Some(t) = txn {
+                self.transactions.lock().expect("transactions")[t] += ran;
+            }
+        }
         out
+    }
+
+    /// A command's transaction begun: its place among the tally's.
+    fn begin(&self) -> Option<usize> {
+        #[cfg(test)]
+        {
+            let mut t = self.transactions.lock().expect("transactions");
+            t.push(0);
+            Some(t.len() - 1)
+        }
+        #[cfg(not(test))]
+        None
+    }
+
+    #[cfg(test)]
+    pub(crate) fn transactions(&self) -> Vec<u64> {
+        self.transactions.lock().expect("transactions").clone()
     }
 
     /// `ops`, each call's statements recorded by the operation's name: a
@@ -320,8 +353,17 @@ pub(crate) struct Counted<'c>(pub(crate) &'c mut Client);
 
 impl Counted<'_> {
     fn counted() {
+        Self::ran(1);
+    }
+
+    /// **`n` statements run on a connection that is not counted's**, by code
+    /// another layer shares (`feed_pg::record`, `feed_pg::delivered`),
+    /// counted where they are run.
+    pub(crate) fn ran(n: u64) {
+        #[cfg(not(test))]
+        let _ = n;
         #[cfg(test)]
-        STATEMENTS.with(|n| n.set(n.get() + 1));
+        STATEMENTS.with(|c| c.set(c.get() + n));
     }
 
     pub(crate) fn query<T: ?Sized + postgres::ToStatement>(
@@ -950,6 +992,9 @@ pub(crate) struct Staging<'a> {
     /// Whether its transaction committed; dropped otherwise, it rolls back.
     committed: bool,
     ops: Ops,
+    /// The layer's tally, and this command's place in it (NEXT 4b).
+    tally: Tally,
+    txn: Option<usize>,
 }
 
 impl crate::data::Staged for Staging<'_> {
@@ -968,6 +1013,24 @@ impl crate::data::Staged for Staging<'_> {
     }
 
     fn commit(
+        &mut self,
+        events: &[Handed],
+        invalidated: &[Dropped],
+        interaction: Option<&crate::data::Recorded<'_>>,
+    ) -> Result<Option<Outboxed>, String> {
+        // The commit's statements are the command's (the integrator's ruling
+        // on NEXT 4b): what it handed the outbox, its interaction's record,
+        // and the outbox read back, each bounded by what the command hands
+        // the platform, never by the data's size.
+        let (tally, txn) = (self.tally.clone(), self.txn);
+        tally.around_in(txn, || {
+            self.committed_with(events, invalidated, interaction)
+        })
+    }
+}
+
+impl Staging<'_> {
+    fn committed_with(
         &mut self,
         events: &[Handed],
         invalidated: &[Dropped],
@@ -997,7 +1060,7 @@ impl crate::data::Staged for Staging<'_> {
         let mut ids: Vec<i64> = Vec::new();
         for (kind, name, values) in handed {
             let args = json_of(name, &values)?;
-            let row = c
+            let row = Counted(c)
                 .query_one(
                     "INSERT INTO outbox (kind, name, args) VALUES ($1, $2, $3::text::jsonb) \
                      RETURNING id",
@@ -1009,12 +1072,16 @@ impl crate::data::Staged for Staging<'_> {
         // **The interaction's answer, with the writes** (ADR-0325).
         if let Some(r) = interaction {
             crate::feed_pg::record(c, r)?;
+            // Its two: the expired records deleted, the answer inserted.
+            Counted::ran(2);
         }
         // The writes and the outbox's rows, at once or not at all. A commit
         // the database refuses (a serialization failure, a deferred
         // constraint) has rolled back, and nothing is delivered.
         c.batch_execute("COMMIT").map_err(pg)?;
         self.committed = true;
+        // The outbox's rows read back, one statement.
+        Counted::ran(1);
         match delivered(c, &ids) {
             Ok(read) => Ok(Some(read)),
             // Committed, and not read back: what it handed is what
@@ -1061,6 +1128,11 @@ impl crate::data::DataLayer for StorePg {
     }
 
     #[cfg(test)]
+    fn statements_by_transaction(&self) -> Vec<u64> {
+        self.tally.transactions()
+    }
+
+    #[cfg(test)]
     fn execute_for_test(&self, sql: &str) -> Result<(), String> {
         self.sql().batch_execute(sql).map_err(pg)
     }
@@ -1101,11 +1173,12 @@ impl crate::data::DataLayer for StorePg {
             Err(why) => (None, why),
         };
         let conn = Arc::new(Mutex::new(conn));
+        let txn = self.tally.begin();
         let with: With = {
             let (conn, tally) = (conn.clone(), self.tally.clone());
             Arc::new(
                 move |f| match conn.lock().expect("the command's connection").as_mut() {
-                    Some(c) => tally.around(|| f(&mut PgRows(Counted(c.client())))),
+                    Some(c) => tally.around_in(txn, || f(&mut PgRows(Counted(c.client())))),
                     None => Err(why.clone()),
                 },
             )
@@ -1122,6 +1195,8 @@ impl crate::data::DataLayer for StorePg {
             written,
             committed: false,
             ops,
+            tally: self.tally.clone(),
+            txn,
         })
     }
 
