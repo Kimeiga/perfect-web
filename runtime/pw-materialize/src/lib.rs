@@ -88,6 +88,23 @@ pub struct Committed {
     pub event: Event,
 }
 
+/// **A run a command scheduled** (the scheduled-commands track): the
+/// command's component, its arguments as a press sends them (a JSON array),
+/// the user on whose behalf it runs, when it is due on the host's clock, and
+/// how many times it has run and failed. Its `id` is this scheduling's: one
+/// scheduled again is another.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScheduledRun {
+    pub id: i64,
+    pub command: String,
+    pub args: String,
+    pub user: String,
+    pub due_ms: i64,
+    pub attempts: i64,
+    /// Why it failed for good, where it did: kept, and never run again.
+    pub failed: Option<String>,
+}
+
 /// What one entry of a materialized fragment is keyed by.
 ///
 /// The fragment, the argument that identifies the instance, and every dimension
@@ -334,7 +351,18 @@ impl Materializer {
                  answer TEXT NOT NULL,
                  at_ms  INTEGER NOT NULL
              );
-             CREATE INDEX interactions_at ON interactions (at_ms);",
+             CREATE INDEX interactions_at ON interactions (at_ms);
+             CREATE TABLE schedules (
+                 id       INTEGER PRIMARY KEY AUTOINCREMENT,
+                 key      TEXT NOT NULL UNIQUE,
+                 command  TEXT NOT NULL,
+                 args     TEXT NOT NULL,
+                 user_id  TEXT NOT NULL,
+                 due_ms   INTEGER NOT NULL,
+                 attempts INTEGER NOT NULL DEFAULT 0,
+                 failed   TEXT
+             );
+             CREATE INDEX schedules_due ON schedules (due_ms);",
         )
         .expect("schema");
         Materializer {
@@ -506,6 +534,103 @@ impl Materializer {
             |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)),
         )
         .ok()
+    }
+
+    /// **A run scheduled in a command's transaction** (the
+    /// scheduled-commands track): the one pending for `key`, a command and
+    /// its arguments, replaced by a new scheduling, so one scheduled again
+    /// moves. Committed with the command's state and events, or with none of
+    /// them.
+    pub fn schedule(
+        tx: &rusqlite::Transaction<'_>,
+        key: &str,
+        command: &str,
+        args: &str,
+        user: &str,
+        due_ms: i64,
+    ) -> Result<(), String> {
+        Materializer::unschedule(tx, key)?;
+        tx.execute(
+            "INSERT INTO schedules (key, command, args, user_id, due_ms) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![key, command, args, user, due_ms],
+        )
+        .map(|_| ())
+        .map_err(|e| format!("a run of `{command}` not scheduled: {e}"))
+    }
+
+    /// **The run pending for `key` cancelled**, in a command's transaction:
+    /// nothing where none is.
+    pub fn unschedule(tx: &rusqlite::Transaction<'_>, key: &str) -> Result<(), String> {
+        tx.execute("DELETE FROM schedules WHERE key = ?1", params![key])
+            .map(|_| ())
+            .map_err(|e| format!("a run not cancelled: {e}"))
+    }
+
+    /// **The runs due at `now_ms`**, at most `limit`, earliest first; those
+    /// failed for good aside.
+    pub fn due_runs(&self, now_ms: i64, limit: usize) -> Vec<ScheduledRun> {
+        self.runs(
+            "WHERE failed IS NULL AND due_ms <= ?1 ORDER BY due_ms, id LIMIT ?2",
+            params![now_ms, limit as i64],
+        )
+    }
+
+    /// **Every run scheduled**, pending or failed for good, earliest first.
+    pub fn scheduled_runs(&self) -> Vec<ScheduledRun> {
+        self.runs("ORDER BY due_ms, id", params![])
+    }
+
+    fn runs(&self, filter: &str, values: &[&dyn rusqlite::ToSql]) -> Vec<ScheduledRun> {
+        let db = self.db();
+        let mut stmt = db
+            .prepare(&format!(
+                "SELECT id, command, args, user_id, due_ms, attempts, failed FROM schedules {filter}"
+            ))
+            .expect("prepare");
+        let rows = stmt
+            .query_map(values, |r| {
+                Ok(ScheduledRun {
+                    id: r.get(0)?,
+                    command: r.get(1)?,
+                    args: r.get(2)?,
+                    user: r.get(3)?,
+                    due_ms: r.get(4)?,
+                    attempts: r.get(5)?,
+                    failed: r.get(6)?,
+                })
+            })
+            .expect("query");
+        rows.map(|r| r.expect("row")).collect()
+    }
+
+    /// **When the next pending run is due**, where one is.
+    pub fn next_run(&self) -> Option<i64> {
+        let db = self.db();
+        db.query_row(
+            "SELECT MIN(due_ms) FROM schedules WHERE failed IS NULL",
+            [],
+            |r| r.get::<_, Option<i64>>(0),
+        )
+        .expect("next run")
+    }
+
+    /// **A run answered**: its scheduling removed. One scheduled again since
+    /// is another scheduling, and stays.
+    pub fn ran(&self, id: i64) {
+        let db = self.db();
+        db.execute("DELETE FROM schedules WHERE id = ?1", params![id])
+            .expect("a run removed");
+    }
+
+    /// **A run that failed**: to run again at `due_ms`, its `attempts` so
+    /// far; or, `failed` with why, kept and never run again.
+    pub fn retry(&self, id: i64, attempts: i64, due_ms: i64, failed: Option<&str>) {
+        let db = self.db();
+        db.execute(
+            "UPDATE schedules SET attempts = ?2, due_ms = ?3, failed = ?4 WHERE id = ?1",
+            params![id, attempts, due_ms, failed],
+        )
+        .expect("a run kept");
     }
 
     /// Read a state value, for tests that check the state and the outbox agree.

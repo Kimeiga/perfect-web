@@ -85,6 +85,15 @@ pub(crate) trait DataLayer: Send + Sync {
         Ok(None)
     }
 
+    /// **The runs its commands schedule, where it keeps them** (the
+    /// scheduled-commands track): written in its own transactions with the
+    /// commands' writes ([`Staged::commit`]), by a layer whose writes outlive
+    /// the host, as its interactions are. By default the host's materializer
+    /// keeps them, with the rows it commits.
+    fn runs(&self) -> Option<&dyn crate::schedules::Runs> {
+        None
+    }
+
     /// **Every operation it supplies**, read from the functions it builds,
     /// not from a list kept beside them.
     fn operations(&self) -> BTreeSet<String> {
@@ -120,12 +129,15 @@ pub(crate) trait Staged {
     /// **An interaction's record** (ADR-0325), where the command has one, is
     /// committed in the same transaction by a layer that keeps its own
     /// ([`DataLayer::keeps_interactions`]), and by the host's materializer
-    /// with [`rows`] otherwise.
+    /// with [`rows`] otherwise; and so are **the runs it scheduled, or
+    /// cancelled** (the scheduled-commands track), by a layer that keeps its
+    /// own ([`DataLayer::runs`]).
     fn commit(
         &mut self,
         _events: &[Handed],
         _invalidated: &[Dropped],
         _interaction: Option<&Recorded<'_>>,
+        _scheduled: &[crate::schedules::Scheduled],
     ) -> Result<Option<Outboxed>, String> {
         Ok(None)
     }

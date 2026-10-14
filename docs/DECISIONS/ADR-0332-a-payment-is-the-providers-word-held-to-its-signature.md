@@ -179,7 +179,9 @@ origin-only secret operation, `capture_payment`) and the charter's
 - **An awaiting order no one pays or takes back** stays awaiting: an intent
   does not expire on its own (a Checkout Session does, in a day), and a
   deployment's sweep of stale ones (`cancellation_reason: abandoned`) is
-  not built. A taken-back order's checkout choices, its tip and its code,
+  not built. (Built by ADR-0334, 2026-10-14: an order still awaiting its
+  payment thirty minutes after it was placed is taken back, as its reader's
+  cancel takes it back.) A taken-back order's checkout choices, its tip and its code,
   are the reader's to choose again.
 - **The provider is asked inside the command's transaction**: a host's
   commands are serialized by its layer, so the host waits while the

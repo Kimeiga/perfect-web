@@ -1,0 +1,23 @@
+// @status: GENERAL
+// @invariant: schedule_time
+//
+// Structurally different from R-069: `after` given an instant, the other
+// word with the other type, from a parameter rather than a call.
+
+module generality.after_an_instant
+
+import domain.{ InteractionId }
+import clock.{ Instant }
+
+command remind(order: String) -> Result<Int, String>
+    invoked_by    Clock
+    idempotent_by InteractionId
+{
+    Ok(1)
+}
+
+command remind_then(order: String, when: Instant) -> Result<Int, String> !{ clock.schedule }
+{
+    schedule remind(order) after when
+    Ok(1)
+}

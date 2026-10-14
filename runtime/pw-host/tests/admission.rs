@@ -50,6 +50,7 @@ fn contract(id: &str, placements: &[&str], capabilities: &[&str]) -> ComponentCo
                 invalidates: None,
                 every: Vec::new(),
                 reads: None,
+                schedules: None,
                 interface: format!("pw:host/{}", c.family),
                 name: if c.operation.is_empty() {
                     "use".to_string()
@@ -477,6 +478,7 @@ fn with_component_dep(mut c: ComponentContract) -> ComponentContract {
         invalidates: None,
         every: Vec::new(),
         reads: None,
+        schedules: None,
         interface: "pw:app/shop.Store".into(),
         name: "Store".into(),
         capability: String::new(),
@@ -519,6 +521,7 @@ fn an_import_is_classified_before_it_is_compared() {
         invalidates: None,
         every: Vec::new(),
         reads: None,
+        schedules: None,
         interface: "perfect-web:store/stores@0.1.0".into(),
         name: "read".into(),
         capability: "store.read".into(),
@@ -618,6 +621,7 @@ fn a_runtime_import_can_never_be_authorised() {
         invalidates: None,
         every: Vec::new(),
         reads: None,
+        schedules: None,
         interface: "wasi:cli/exit@0.2.9".into(),
         name: "exit".into(),
         capability: "database.read<Stores>".into(),

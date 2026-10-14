@@ -737,7 +737,9 @@ E14 comes before E11-E13. Its plan, controls and task list are
              effect, ordering refused while closed, and orders scheduled.
              In three steps: ~~the clock~~ (ADR-0304, merged 2026-10-10);
              ~~the store's hours~~ (ADR-0328, merged 2026-10-13, W9's);
-             orders scheduled;
+             orders scheduled: ~~a command the clock runs~~ (ADR-0334, merged
+             2026-10-14, its first use ADR-0332's sweep); an order placed
+             for a time its reader chooses, sent to its store then;
           4a. ~~**typed page query parameters**~~ (ADR-0309, merged
              2026-10-12): a route's query part, `route "/search{?q}"`,
              RFC 6570's form-style expansion; each name an `Option` of

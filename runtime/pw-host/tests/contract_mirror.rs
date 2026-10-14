@@ -70,6 +70,30 @@ fn the_compilers_contracts_deserialize_with_every_field_populated() {
                     );
                 }
                 ImportKind::HostCapability => {
+                    // A run scheduled, or cancelled (the scheduled-commands
+                    // track), names the command it schedules, one of the
+                    // program's components the clock invokes, and how.
+                    if let Some(s) = &i.schedules {
+                        assert!(
+                            all.iter().any(|d| d.component_id == s.command
+                                && d.exports.iter().any(|e| e
+                                    .component
+                                    .as_ref()
+                                    .and_then(|x| x.invoked_by.as_deref())
+                                    == Some("Clock"))),
+                            "{}: {} schedules {}, which is no command the clock invokes",
+                            c.component_id,
+                            i.key(),
+                            s.command
+                        );
+                        assert!(
+                            ["at", "after", "cancel"].contains(&s.how.as_str()),
+                            "{}: {} schedules {:?}",
+                            c.component_id,
+                            i.key(),
+                            s.how
+                        );
+                    }
                     assert!(
                         !i.capability.is_empty(),
                         "{}: host import {} names no capability",

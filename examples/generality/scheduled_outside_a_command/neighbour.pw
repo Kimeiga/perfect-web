@@ -1,0 +1,26 @@
+// @status: NEIGHBOUR
+// @invariant: scheduled_outside_a_command
+// @dimension: valid neighbour — a schedule inside an `if` of a command's body
+//
+// A schedule decided by a condition is still the command's statement,
+// written with its writes.
+
+module generality.schedule_conditional
+
+import domain.{ InteractionId }
+import clock.{ minutes }
+
+command remind(order: String) -> Result<Int, String>
+    invoked_by    Clock
+    idempotent_by InteractionId
+{
+    Ok(1)
+}
+
+command maybe_remind(order: String, wanted: Bool) -> Result<Int, String> !{ clock.schedule }
+{
+    if wanted {
+        schedule remind(order) after minutes(10)
+    }
+    Ok(1)
+}

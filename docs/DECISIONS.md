@@ -2929,3 +2929,11 @@ ADR-0195's ruling 13).
   templates and the deployment; a document's script and style by their
   hashes; every answer `nosniff`; the build refuses a load from another
   origin (PW5052).
+[ADR-0334](DECISIONS/ADR-0334-a-command-runs-when-the-clock-passes-its-time.md):
+a command runs when the clock passes its time (the integrator's; ADR-0332's
+sweep, NEXT 4).
+- `invoked_by Clock`; `schedule cmd(args) at|after t` and `unschedule
+  cmd(args)`, a command's statements (PW6501 to PW6503), written with its
+  writes; each run made as a press is, on its scheduler's behalf, keyed so
+  it commits once; the store's abandoned orders taken back at thirty
+  minutes.

@@ -56,6 +56,11 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "0008_interactions",
         include_str!("../migrations/feed/0008_interactions.sql"),
     ),
+    // The scheduled-commands track: the runs a command schedules.
+    (
+        "0009_schedules",
+        include_str!("../migrations/feed/0009_schedules.sql"),
+    ),
 ];
 
 /// **How a command's transaction is opened.** The layer sets serializable on
@@ -735,6 +740,7 @@ impl crate::data::Staged for Staging<'_> {
         events: &[Handed],
         invalidated: &[Dropped],
         interaction: Option<&crate::data::Recorded<'_>>,
+        scheduled: &[crate::schedules::Scheduled],
     ) -> Result<Option<Outboxed>, String> {
         let mut conn = self.conn.lock().expect("the command's connection");
         let c = conn
@@ -779,6 +785,9 @@ impl crate::data::Staged for Staging<'_> {
         if let Some(r) = interaction {
             record(c, r)?;
         }
+        // **And the runs it scheduled, or cancelled** (the
+        // scheduled-commands track).
+        crate::schedules::pg::write(c, scheduled).map_err(pg)?;
         c.batch_execute("COMMIT").map_err(pg)?;
         self.committed = true;
         // Track `uploads`: each lease the command committed or discarded
@@ -910,6 +919,43 @@ impl Drop for Staging<'_> {
 type InTransaction =
     dyn Fn(&mut Client, &[Val]) -> Result<(Val, bool), String> + Send + Sync + 'static;
 
+/// **Its runs, outside a command** (the scheduled-commands track): those
+/// its `schedules` keeps, each statement on a connection of its own.
+impl crate::schedules::Runs for FeedPg {
+    fn due_runs(
+        &self,
+        now_ms: i64,
+        limit: usize,
+    ) -> Result<Vec<pw_materialize::ScheduledRun>, String> {
+        self.pool
+            .with(|c| crate::schedules::pg::due_runs(c, now_ms, limit))
+    }
+
+    fn next_run(&self) -> Result<Option<i64>, String> {
+        self.pool.with(crate::schedules::pg::next_run)
+    }
+
+    fn ran(&self, id: i64) -> Result<(), String> {
+        self.pool.with(|c| crate::schedules::pg::ran(c, id))
+    }
+
+    fn retry(
+        &self,
+        id: i64,
+        attempts: i64,
+        due_ms: i64,
+        failed: Option<&str>,
+    ) -> Result<(), String> {
+        self.pool
+            .with(|c| crate::schedules::pg::retry(c, id, attempts, due_ms, failed))
+    }
+
+    #[cfg(test)]
+    fn all_runs(&self) -> Result<Vec<pw_materialize::ScheduledRun>, String> {
+        self.pool.with(crate::schedules::pg::all_runs)
+    }
+}
+
 impl crate::data::DataLayer for FeedPg {
     fn reads(&self, _session: &str, _stopped: Option<Stopped>) -> crate::data::Ops {
         let pool = self.pool.clone();
@@ -934,6 +980,10 @@ impl crate::data::DataLayer for FeedPg {
 
     fn recalled(&self, key: &str, since_ms: u64) -> Result<Option<(String, String)>, String> {
         self.pool.with(|c| recalled(c, key, since_ms))
+    }
+
+    fn runs(&self) -> Option<&dyn crate::schedules::Runs> {
+        Some(self)
     }
 
     fn identified_by(&self, principals: Principals) {

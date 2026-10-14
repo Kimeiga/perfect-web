@@ -1,0 +1,31 @@
+// @corpus: rejected
+// @id: R-069
+// @category: a run scheduled at what is no instant
+// @rule: PW6503
+// @invariant: schedule_time
+// @charter: §7.5
+// @milestone: 14
+// @expect-error: `schedule remind(..) at` in `remind_later` is given a `clock.Duration`, where it takes a `clock.Instant`
+// @expect-error: a scheduled run's time is `at` an `Instant` or `after` a `Duration`
+//
+// `at` names an instant; thirty minutes is a duration, which `after` waits
+// from the command's commit. Read as an instant it would be thirty minutes
+// past 1970.
+
+module orders.misdated
+
+import domain.{ InteractionId }
+import clock.{ minutes }
+
+command remind(order: String) -> Result<Int, String>
+    invoked_by    Clock
+    idempotent_by InteractionId
+{
+    Ok(1)
+}
+
+command remind_later(order: String) -> Result<Int, String> !{ clock.schedule }
+{
+    schedule remind(order) at minutes(30)
+    Ok(1)
+}

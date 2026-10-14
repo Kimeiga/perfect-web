@@ -23,6 +23,27 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0334, 2026-10-14: a command runs when the clock passes its time**
+(the integrator's; ADR-0332's not-claimed sweep and NEXT 4's third step;
+track `scheduled-commands`, merged from `9bd44dec`).
+- `invoked_by Clock`: a command no reader presses, run by the host on behalf
+  of the user whose command scheduled it. `schedule cmd(args) at when`, `…
+  after duration` and `unschedule cmd(args)` are a command's statements
+  (PW6501 to PW6503): the clock's `Instant` or `Duration`, by declaration;
+  one run pending for each command and its arguments.
+- Written with the scheduling command's writes, in its transaction (each
+  PostgreSQL layer's `schedules`, or the materializer's): a command that
+  answers an error schedules nothing. Each due run is made as a press is,
+  keyed by its scheduling so two hosts, or a restart, commit it once; a
+  refused or trapping run runs again after 2 s doubling, then is kept
+  failed, logged and counted in `/metrics`.
+- The store's first use: an order no one pays is taken back thirty minutes
+  on, as its reader's cancel takes it back; paid, or taken back, its sweep
+  is cancelled; declined, it is kept.
+- `just e14-scheduled`: the checker's tests and corpus, the host's on each
+  layer and the database's own, and 36 mutation controls.
+Verify TRAIN_RUN green, with train-6.
+
 **ADR-0333, 2026-10-14: what a page may run is generated from its build**
 (the integrator's; ADR-0195's ruling 13; tracks `page-csp` and
 `page-origins`, merged from `859c6503`).

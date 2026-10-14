@@ -227,6 +227,7 @@ fn a_hand_written_rust_guest_through_the_host() {
                     invalidates: None,
                     every: Vec::new(),
                     reads: None,
+                    schedules: None,
                     interface: interface.into(),
                     name: name.into(),
                     capability: "store.read".into(),

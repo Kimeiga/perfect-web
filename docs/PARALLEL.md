@@ -1559,3 +1559,23 @@ Each a decision for a track, with its date; a track's ADR records it too.
     by the page's policy; read layout through a module of this origin, as
     the performance suite's control does now;
   - the announcer is served unstyled; the runtime hides it.
+- **2026-10-14, scheduled-commands merged as ADR-0334** on train-6 (the
+  integrator's; ADR-0332's sweep, NEXT 4's third step; from `9bd44dec`): a
+  command runs when the clock passes its time. To every worker:
+  - `invoked_by Clock` is a second platform invoker beside `Payments`: no
+    reader presses it, it requires nothing and is idempotent; any number of
+    them, with any parameters;
+  - `schedule cmd(args) at when`, `schedule cmd(args) after duration` and
+    `unschedule cmd(args)` are statements of a command's body alone
+    (PW6501 to PW6503), performing `clock.schedule`, which the origin
+    grants; `clock.Duration` and `seconds`, `minutes`, `hours` are the
+    platform's;
+  - a contract's import may say what it schedules (`schedules: { command,
+    how }`, mirrored in pw-host); a layer's `Staged::commit` is handed the
+    runs its command scheduled, and a layer whose writes outlive the host
+    writes them in its transaction and says so (`DataLayer::runs`): store
+    0015, feed 0009;
+  - `identity::on_behalf` names the invoker that issues its principal;
+  - the store: `expire_order` is the clock's; `cancel_order` and the sweep
+    share `take_back`; `place_order` schedules, `settle_payment` and
+    `cancel_order` cancel.

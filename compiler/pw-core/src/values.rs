@@ -1417,8 +1417,11 @@ impl<'a> Typer<'a> {
                     other => other,
                 }
             }
-            // A navigation produces nothing (ADR-0280): the page goes.
-            Expr::Keyword { keyword, .. } if keyword == "navigate" => {
+            // A navigation produces nothing (ADR-0280): the page goes. Nor does
+            // a schedule: the run comes later (the scheduled-commands track).
+            Expr::Keyword { keyword, .. }
+                if matches!(keyword.as_str(), "navigate" | "schedule" | "unschedule") =>
+            {
                 Ty::Primitive(Primitive::Unit)
             }
             Expr::Binary { op, lhs, rhs } => match op {
@@ -2327,7 +2330,14 @@ impl<'a> Typer<'a> {
                         }
                         _ => None,
                     };
-                    (target, args.iter().map(|a| (None, *a)).collect())
+                    // `schedule cmd(args) at when`: the command's arguments,
+                    // and its time after them, which is the schedule's
+                    // (`scheduled.rs` checks it), not the command's.
+                    let given = match (keyword.as_str(), modifiers.get(1).map(String::as_str)) {
+                        ("schedule", Some("at" | "after")) => &args[..args.len().saturating_sub(1)],
+                        _ => &args[..],
+                    };
+                    (target, given.iter().map(|a| (None, *a)).collect())
                 }
                 _ => return unknown,
             };
@@ -4098,8 +4108,10 @@ impl<'a> Typer<'a> {
             // each argument related as a call's is.
             Expr::Keyword {
                 keyword, modifiers, ..
-            } if matches!(keyword.as_str(), "query" | "subscription" | "navigate")
-                && !modifiers.is_empty() =>
+            } if matches!(
+                keyword.as_str(),
+                "query" | "subscription" | "navigate" | "schedule" | "unschedule"
+            ) && !modifiers.is_empty() =>
             {
                 out.extend(self.call(id).relations)
             }

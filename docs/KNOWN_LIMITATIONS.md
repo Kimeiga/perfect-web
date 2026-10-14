@@ -1118,8 +1118,9 @@ preserved, not replaced with invented results.
   change.
 - **A cart's lines are mapped to their stores by a read per store**
   (`checkout#parts`, as `hours#for-cart`), until NEXT 4b bounds every read.
-- **Payments** (ADR-0332): an order no one pays or takes back awaits for
-  good (no sweep of abandoned ones); the provider is asked inside the
+- **Payments** (ADR-0332): an order no one pays is taken back thirty
+  minutes on (ADR-0334), at a time no deployment chooses; the provider is
+  asked inside the
   command's transaction, so the host's commands wait while it answers (ten
   seconds at most); the reader's return is no second trigger; a
   taken-back order's tip and code are chosen again; and a secret does not
@@ -1131,3 +1132,10 @@ preserved, not replaced with invented results.
   runtime writes its renderer's markup through `innerHTML`; one policy for a
   build's every page, so a page that frames nothing, in a build that frames
   the payment provider, may frame it too.
+- **Scheduled commands** (ADR-0334): no recurring schedule; a run starts
+  within a second of its time on a host that is running, and one past due
+  when a host starts; the in-memory layers keep runs as long as the host
+  runs, as they keep their data; an effect outside a run's transaction (the
+  provider's cancel) may be asked twice by two hosts, as a press sent twice
+  asks it; a run failed for good is kept and said, and runs again only when
+  it is scheduled again.

@@ -483,7 +483,10 @@ fn the_trusted_platform_contract_is_hashed() {
     // 2026-10-13: `domain.pw`'s `TipError` loses `NotOffered`: the tip is
     // one `choose_tip(Tip)`, a case a browser sends (ADR-0331, track
     // `store-switch`).
-    const EXPECTED: u64 = 0xef49_0b16_51db_51d8;
+    // 2026-10-14: `clock.pw` declares `Duration` and `seconds`, `minutes`
+    // and `hours`; `effects.pw` declares `clock.schedule` (the
+    // scheduled-commands track).
+    const EXPECTED: u64 = 0xd948_f12f_5148_1319;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

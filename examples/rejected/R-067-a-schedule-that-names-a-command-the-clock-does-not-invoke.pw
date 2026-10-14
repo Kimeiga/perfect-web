@@ -1,0 +1,28 @@
+// @corpus: rejected
+// @id: R-067
+// @category: a schedule that names a command the clock does not invoke
+// @rule: PW6501
+// @invariant: schedule_names_no_clocked_command
+// @charter: §7.5
+// @milestone: 14
+// @expect-error: `schedule remind` in `remind_later` names a command the clock does not invoke: it declares no `invoked_by Clock`
+// @expect-error: a `schedule` names a command `invoked_by Clock`, written as a call
+//
+// The clock runs a command declared `invoked_by Clock`, which no reader
+// presses, on behalf of the reader whose command scheduled it. `remind` is a
+// command a reader presses: run by the clock, it would run as no one asked.
+
+module orders.unclocked
+
+import clock.{ minutes }
+
+command remind(order: String) -> Result<Int, String>
+{
+    Ok(1)
+}
+
+command remind_later(order: String) -> Result<Int, String> !{ clock.schedule }
+{
+    schedule remind(order) after minutes(30)
+    Ok(1)
+}
