@@ -42,7 +42,7 @@ track `scheduled-commands`, merged from `9bd44dec`).
   is cancelled; declined, it is kept.
 - `just e14-scheduled`: the checker's tests and corpus, the host's on each
   layer and the database's own, and 36 mutation controls.
-Verify TRAIN_RUN green, with train-6.
+Verify 38559878637 green, with train-6.
 
 **ADR-0333, 2026-10-14: what a page may run is generated from its build**
 (the integrator's; ADR-0195's ruling 13; tracks `page-csp` and
@@ -71,7 +71,7 @@ Verify TRAIN_RUN green, with train-6.
   performance suite's control read layout through `eval`; no answer but an
   upload's said its type was its type; a stylesheet the build ships was
   served as bytes; train-5's docs wrote a literal `\n` into PARALLEL.md.
-Verify TRAIN_RUN green, with train-6.
+Verify 38559878637 green, with train-6.
 
 **2026-10-14: the checker's latency, found 24 times E9's** (the integrator's
 finding; track `check-latency`, merged from `ed53d44b`).
@@ -88,7 +88,7 @@ finding; track `check-latency`, merged from `ed53d44b`).
   both at once measured their contention, and says what it measures. NEXT
   holds the work: each declaration's typer and resolution computed once a
   check and shared, then an edit that redoes only what it reaches.
-Verify TRAIN_RUN green, with train-6.
+Verify 38559878637 green, with train-6.
 
 **ADR-0281 amended (6), 2026-10-14: a push runs no recipe whose committed
 evidence is current** (the integrator's; track `current-evidence`, merged
@@ -111,7 +111,7 @@ from `22afb624`).
   lines name plans it now.
 - `scripts/tests/test_ci_scripts.py`'s `CurrentEvidence` (9 tests) and the
   program a recipe names; `dealt_by_time_mutations.py`, 43 of 43.
-Verify TRAIN_RUN green, with train-6.
+Verify 38559878637 green, with train-6.
 
 **ADR-0329 amended, 2026-10-13: the store switches to what ADR-0330 and
 ADR-0331 allow** (W9's; track `store-switch`, merged from `1d217edc`, on

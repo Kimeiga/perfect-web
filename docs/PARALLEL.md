@@ -1579,3 +1579,31 @@ Each a decision for a track, with its date; a track's ADR records it too.
   - the store: `expire_order` is the clock's; `cancel_order` and the sweep
     share `take_back`; `place_order` schedules, `settle_payment` and
     `cancel_order` cancel.
+- **2026-10-14, train-6 landed** (`track/train-6`, verify 38559878637, and
+  38608064959 for the four recipes its three fixes reach): ADR-0281 amended
+  (6) (current-evidence), check-latency, ADR-0333 (page-csp and
+  page-origins), the planner's program-names fix, and ADR-0334
+  (scheduled-commands).
+  - **Its run: 95 recipes, 3 failed.** `e14-scheduled` and
+    `e14-descriptions` (the whole server suite) on one test,
+    `an_order_swept_is_told_to_its_readers_open_page`: the provider's word,
+    heard on its own connection between the sweep's commit and the run's
+    telling, took the telling the host keeps for every session and told
+    the page on its own thread, after the test looked. A whole mutation run
+    of the train's head had found the same race in another test as a
+    survivor ("an order taken back is swept still"); both tests hold the
+    provider's word back now. `e14-page-policy`, 43 of 44: "a comment's
+    text is read as markup" survived, as every comment the tests wrote
+    held its tag first; a comment with a `>` before its tags kills it.
+  - **Found by the fixes' plans** (the integrator's): the planner knew a
+    test file only by `--test`, so a change to one of the server's test
+    modules (run by a filter, `tests::store_scheduled::`) planned nothing,
+    and the landing's fetch would have taken the old tests' evidence. It
+    plans by the filter now. A source's own `mod tests` (csp.rs's) is the
+    next planner track's.
+  - **And a stale survivor**: `docs/evidence/E10/names.txt` had said "19 of
+    20 mutants killed" since 2026-10-07, a week in which no push planned
+    its recipe and the nightly, which ran it green, keeps no evidence. This
+    run recorded it again; `just ci` refuses committed evidence that
+    records a survivor now (`scripts/evidence_survivors.py`, in
+    `evidence-gates`).

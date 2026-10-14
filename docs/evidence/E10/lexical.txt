@@ -1,137 +1,149 @@
 ADR-0063 - every name means one binding
 
 produced by: just e10-lexical
-commit: d569e18f6379bd9be400ded19e1f4aca1ef26350
+commit: 92fdd6e34743e33a80914939976125a9eb307842
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38559878637 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the scopes, and what each reader makes of them (compiler/pw-core/tests/lexical_scope.rs)
 
 test a_capture_is_typed_by_the_binding_its_name_means ... ok
-test a_record_shorthand_names_the_binding_in_scope ... ok
-test a_name_bound_twice_carries_each_bindings_label ... ok
-test a_secret_logged_through_a_for_loops_name_is_refused ... ok
 test a_for_loops_name_is_an_element_of_its_list ... ok
 test a_lambda_parameter_is_not_the_let_it_shadows ... ok
-test two_arms_binding_one_name_are_typed_apart ... ok
-test a_secret_rendered_through_an_each_blocks_name_is_refused ... ok
-test an_each_blocks_name_is_an_element_of_its_collection ... ok
-test two_arms_binding_one_name_in_a_template_are_typed_apart ... ok
-test two_branches_binding_one_name_are_typed_apart ... ok
-test a_secret_logged_through_a_lambdas_parameter_is_refused ... ok
+test a_name_bound_twice_carries_each_bindings_label ... ok
 test a_let_binds_from_the_next_statement ... ok
+test a_record_shorthand_names_the_binding_in_scope ... ok
+test a_secret_logged_through_a_for_loops_name_is_refused ... ok
+test a_secret_logged_through_a_lambdas_parameter_is_refused ... ok
+test a_secret_rendered_through_an_each_blocks_name_is_refused ... ok
+test a_secret_string_logged_through_a_for_loops_name_is_refused ... ok
+test a_secret_string_logged_through_a_lambdas_parameter_is_refused ... ok
+test an_each_blocks_name_is_an_element_of_its_collection ... ok
+test two_arms_binding_one_name_are_typed_apart ... ok
+test two_branches_binding_one_name_are_typed_apart ... ok
+test two_arms_binding_one_name_in_a_template_are_typed_apart ... ok
 test two_lambdas_binding_one_name_are_typed_apart ... ok
-test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.22s
 
 == a match over a name an arm binds again (compiler/pw-core/tests/match_exhaustiveness.rs)
 
-test a_result_match_without_err_is_refused ... ok
-test a_call_returning_a_declared_sum_type_is_checked ... ok
-test an_option_match_without_none_is_refused ... ok
 test a_declared_option_parameter_is_checked_too ... ok
-test a_return_in_an_arm_is_not_a_phantom_arm ... ok
+test a_call_returning_a_declared_sum_type_is_checked ... ok
 test a_field_count_is_checked_at_any_depth_and_in_every_arm ... ok
 test a_name_an_arm_binds_again_is_not_read_as_the_parameter ... ok
-test the_kiokun_slices_matches_are_proven_now ... ok
-test a_pattern_nested_under_some_is_analysed ... ok
-test a_type_no_pattern_takes_apart_is_matched_by_a_name_only ... ok
-test a_nested_pattern_is_read_against_its_fields_type ... ok
-test what_the_analysis_cannot_read_is_blocked_not_proven ... ok
 test a_literal_is_one_value_of_its_type ... ok
-test exhaustive_matches_pass ... ok
+test a_result_match_without_err_is_refused ... ok
+test a_nested_pattern_is_read_against_its_fields_type ... ok
+test a_pattern_nested_under_some_is_analysed ... ok
 test a_constructor_its_type_lacks_is_refused_not_read_as_a_wildcard ... ok
-test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+test an_option_match_without_none_is_refused ... ok
+test a_return_in_an_arm_is_not_a_phantom_arm ... ok
+test the_kiokun_slices_matches_are_proven_now ... ok
+test a_type_no_pattern_takes_apart_is_matched_by_a_name_only ... ok
+test what_the_analysis_cannot_read_is_blocked_not_proven ... ok
+test exhaustive_matches_pass ... ok
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.36s
 
 == what the value relations decide: the store program
 
-42 file(s)
-  Arity       agree                            24
-  Argument    agree                            28
-  Field       agree                            11
-  Return      agree                            63
+52 file(s)
+  Arity       agree                            492
+  Argument    agree                            731
+  Field       agree                            167
+  Return      agree                            315
   Return      undecided: Unknown               1
-  Binding     agree                            1
-  Annotation  agree                            422
-  Operand     agree                            11
-  Assignment  agree                            1
-  Member      agree                            8
-  Case        agree                            5
-  Fields      agree                            1
-  Branches    agree                            2
-  Literal     agree                            5
-  Handler     agree                            2
-  Text        agree                            4
+  Binding     agree                            14
+  Annotation  agree                            1059
+  Operand     agree                            388
+  Assignment  agree                            57
+  Member      agree                            430
+  Case        agree                            50
+  Fields      agree                            40
+  Branches    agree                            38
+  Items       agree                            10
+  Literal     agree                            169
+  Handler     agree                            25
+  Truth       agree                            14
+  Text        agree                            140
+  Invariant   agree                            10
+  Transition  agree                            4
 
 == what the value relations decide: kiokun
 
-26 file(s)
-  Arity       agree                            76
+27 file(s)
+  Arity       agree                            82
   Argument    agree                            131
-  Field       agree                            32
-  Return      agree                            81
+  Field       agree                            38
+  Return      agree                            97
   Return      undecided: Unknown               1
   Binding     agree                            1
-  Annotation  agree                            396
-  Operand     agree                            163
+  Annotation  agree                            452
+  Operand     agree                            216
   Assignment  agree                            1
-  Member      agree                            105
+  Member      agree                            109
   Case        agree                            4
   Fields      agree                            6
-  Branches    agree                            5
+  Branches    agree                            6
   Items       agree                            1
-  Literal     agree                            79
+  Literal     agree                            99
   Truth       agree                            8
-  Text        agree                            35
+  Text        agree                            39
+  Invariant   agree                            2
 
 == what the value relations decide: the accepted corpus as one program
 
-64 file(s)
-  Arity       agree                            62
-  Argument    agree                            87
-  Argument    undecided: Unknown               5
-  Field       agree                            18
-  Return      agree                            75
+83 file(s)
+  Arity       agree                            154
+  Argument    agree                            217
+  Argument    undecided: Unknown               4
+  Field       agree                            74
+  Return      agree                            160
   Return      undecided: Unknown               1
-  Binding     agree                            1
+  Binding     agree                            3
   Binding     undecided: Unknown               3
-  Annotation  agree                            462
-  Operand     agree                            49
+  Annotation  agree                            783
+  Operand     agree                            233
   Operand     undecided: Unknown               3
-  Assignment  agree                            2
-  Member      agree                            47
-  Member      undecided: Unknown               2
+  Assignment  agree                            3
+  Member      agree                            142
+  Member      undecided: Unknown               1
   Case        agree                            7
-  Fields      agree                            3
-  Branches    agree                            4
+  Fields      agree                            22
+  Branches    agree                            12
   Branches    undecided: Unknown               1
-  Literal     agree                            16
-  Handler     agree                            1
-  Truth       agree                            1
-  Text        agree                            14
+  Items       agree                            4
+  Literal     agree                            91
+  Handler     agree                            3
+  Truth       agree                            4
+  Text        agree                            45
   Text        undecided: Unknown               2
+  Invariant   agree                            9
+  Transition  agree                            1
 
 == mutation controls (scripts/lexical_mutations.py)
 
-baseline: 29 passed, 0 failed
-a block's names outlive it: KILLED (1 of 29 tests fail)
-a lambda's parameters outlive it: KILLED (1 of 29 tests fail)
-a `let` is in scope in its own initialiser: KILLED (1 of 29 tests fail)
-a lambda's parameters bind nothing: KILLED (3 of 29 tests fail)
-a match arm's names bind nothing: KILLED (3 of 29 tests fail)
-a `for` loop's names bind nothing: KILLED (2 of 29 tests fail)
-an `{#each}` block binds nothing: KILLED (3 of 29 tests fail)
-a `{#match}` arm binds nothing: KILLED (2 of 29 tests fail)
-a record's shorthand field names no binding: KILLED (1 of 29 tests fail)
-a `for` loop's name is not its list's element: KILLED (1 of 29 tests fail)
-an `{#each}` collection's fields are not read: KILLED (1 of 29 tests fail)
-a `{#match}` arm's names are not typed: KILLED (2 of 29 tests fail)
-a record's shorthand is read by its name: KILLED (1 of 29 tests fail)
-the declared-type environment reads no local's binding: KILLED (1 of 29 tests fail)
-a handler's capture is typed by no binding: KILLED (1 of 29 tests fail)
-a `for` loop's name carries no label: KILLED (1 of 29 tests fail)
-a lambda's parameters carry no label: KILLED (1 of 29 tests fail)
-an `{#each}` block's name carries no label: KILLED (1 of 29 tests fail)
-a name's label is not read through its binding: KILLED (4 of 29 tests fail)
+baseline: 31 passed, 0 failed
+a block's names outlive it: KILLED (1 of 31 tests fail)
+a lambda's parameters outlive it: KILLED (1 of 31 tests fail)
+a `let` is in scope in its own initialiser: KILLED (1 of 31 tests fail)
+a lambda's parameters bind nothing: KILLED (3 of 31 tests fail)
+a match arm's names bind nothing: KILLED (3 of 31 tests fail)
+a `for` loop's names bind nothing: KILLED (2 of 31 tests fail)
+an `{#each}` block binds nothing: KILLED (3 of 31 tests fail)
+a `{#match}` arm binds nothing: KILLED (2 of 31 tests fail)
+a record's shorthand field names no binding: KILLED (1 of 31 tests fail)
+a `for` loop's name is not its list's element: KILLED (1 of 31 tests fail)
+an `{#each}` collection's fields are not read: KILLED (1 of 31 tests fail)
+a `{#match}` arm's names are not typed: KILLED (2 of 31 tests fail)
+a record's shorthand is read by its name: KILLED (1 of 31 tests fail)
+the declared-type environment reads no local's binding: KILLED (1 of 31 tests fail)
+a handler's capture is typed by no binding: KILLED (1 of 31 tests fail)
+a `for` loop's name carries no label: KILLED (1 of 31 tests fail)
+a lambda's parameters carry no label: KILLED (1 of 31 tests fail)
+an `{#each}` block's name carries no label: KILLED (1 of 31 tests fail)
+a name's label is not read through its binding: KILLED (6 of 31 tests fail)
 19 of 19 mutants killed
+memory bound: no process was stopped
 
 NOT CLAIMED: a label carried through a declared function, such as
 List.get over a list of secrets (next: ADR-0064). NOT CLAIMED: a record

@@ -1,8 +1,8 @@
 ADR-0230 - a condition is a Bool, or a List or String tested non-empty
 
 produced by: just e14-condition-truth
-commit: d65f2785ad21bf9bd599e639aec2c156d25c0a51
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38203954490 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 92fdd6e34743e33a80914939976125a9eb307842
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38559878637 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the checker (compiler/pw-core/tests/template_truth.rs, template_operands.rs)
@@ -11,21 +11,21 @@ test an_option_condition_is_reported_once ... ok
 test an_each_runs_over_a_list ... ok
 test an_event_attribute_is_given_a_function ... ok
 test an_if_tests_a_value_with_a_truth ... ok
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.64s
 test a_number_and_a_record_have_no_truth ... ok
 test a_bool_and_a_list_or_string_tested_non_empty_have ... ok
 test the_repair_builds ... ok
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.58s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.89s
 
 == the corpus at C17 (corpus-check, checking_source.rs, generality.rs)
 
-accepted: 33 files
-accepted: 33/33 charter §16 categories covered
-rejected: 63 files
-rejected: 63/63 charter §16 categories covered
+accepted: 36 files
+accepted: 36/36 charter §16 categories covered
+rejected: 69 files
+rejected: 69/69 charter §16 categories covered
 corpus-check: OK
-test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 48.92s
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 53.11s
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 114.68s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 107.26s
 
 == mutation controls (scripts/condition_truth_mutations.py)
 

@@ -1,8 +1,8 @@
 ADR-0107 - a cache key names each parameter its entry depends on
 
 produced by: just e10-keys-cover-reads
-commit: 5d147285f6e2957e5a5c0a5ac159c7269d1721b7
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38277655867 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 92fdd6e34743e33a80914939976125a9eb307842
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38559878637 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == keys cover reads (compiler/pw-core/tests/keys_cover_reads.rs)
@@ -11,7 +11,7 @@ test the_key_is_underlined_and_the_read_shown ... ok
 test a_read_on_one_branch_is_a_read ... ok
 test a_subscription_dedupes_by_what_it_reads ... ok
 test a_key_names_each_parameter_its_body_reads ... ok
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.66s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.24s
 
 == mutation controls (scripts/key_read_mutations.py)
 
