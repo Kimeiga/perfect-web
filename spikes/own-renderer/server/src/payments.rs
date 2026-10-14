@@ -250,7 +250,7 @@ pub(crate) struct Intent {
     /// Who began it: the reader whose command did, as the host names its
     /// principal. The host settles the payment on their behalf (step seven).
     pub(crate) owner: String,
-    /// In cents: an amount's minor units (ADR-XXXX).
+    /// In cents: an amount's minor units (ADR-0327).
     pub(crate) amount: i64,
     /// The amount it was begun with. An intent's amount can be changed at a
     /// provider before it is paid; the host holds a payment to what it began.
