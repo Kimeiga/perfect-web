@@ -1,0 +1,321 @@
+# ADR-XXXX: a read is bounded by construction
+
+Status: design note, proposed by W9 for NEXT 4c (track `bounded-reads`),
+for the integrator's ruling. Docs only: nothing here is built yet. Date:
+2026-10-14. Builds on ADR-0207 (a data source states what it guarantees),
+ADR-0101 (a declaration's inferred row), ADR-0125 (a page shows what its
+queries return), ADR-0218 (a host serves any program; its data is the
+deployment's), and NEXT 4b (the store's set-oriented `Rows` methods and
+their statement counts), whose measurements this note will carry before it
+is ruled on.
+
+## Context
+
+- **The owner asked that N+1 be impossible by construction, whatever the
+  database.** Today it is only measured. The integrator's N+1 finding of
+  2026-10-12 found it in the store's host operations, not in its programs:
+  `hours#for-stores` and `hours#for-cart` run a statement per store, the
+  search's reach runs a coverage read per store, and `checkout#parts` maps
+  a cart's lines to their stores by reading every store's menu. The
+  KNOWN_LIMITATIONS lines (ADR-0328, ADR-0329) say so.
+- **Above the seam, the programs are already set-shaped, but nothing makes
+  them be.** `StoresOpen` reads every store's hours with one call:
+
+  ```
+  let stores = Stores.list()
+  let hours = hours_of_stores(List.map(stores, s => s.id))
+  List.map(stores, s => listed(s, hours))
+  ```
+
+  and the checkout reads a cart's stores' fees with one
+  (`fees_of_stores(List.map(parts, p => p.store))`). The integrator found no
+  program in the store or the feed that reads per element today. But
+  `List.map(stores, s => listed(s, hours_of(s.id)))` checks as well as the
+  set read does, and runs one host call per store.
+- **Below the seam, what a call costs is unstated.** A host operation is a
+  name and a signature (ADR-0218). Nothing says whether `fees#for-stores`
+  is one statement or one per store; 4b measured it, per layer, by hand.
+- **What others do.**
+  - Rails' `strict_loading` "will raise an error if the record tries to
+    lazily load an association" (`ActiveRecord::StrictLoadingViolationError`;
+    Rails API, `QueryMethods#strict_loading`, read 2026-10-14). A refusal
+    whose repair is the set read (`includes`).
+  - DataLoader coalesces "all individual loads which occur within a single
+    frame of execution" (a tick of the event loop) and calls the batch
+    function "with all requested keys" (graphql/dataloader README, read
+    2026-10-14). Merging at run time, per tick.
+  - Haxl (Marlow, Brandy, Coens, Purdy, "There is no Fork: an Abstraction
+    for Efficient, Concurrent, and Concise Data Access", ICFP 2014, pp.
+    325-337) batches the fetches an applicative computation makes in one
+    round, so the rounds are the data-dependency levels, not the fetches.
+- **What each database gives for a set read**, read in each vendor's own
+  documentation on 2026-10-14:
+  - **PostgreSQL**: `expression operator ANY (array expression)`: "The
+    left-hand expression is evaluated and compared to each element of the
+    array" (Functions and Operators, 9.25.3). One statement for any number
+    of keys.
+  - **DynamoDB** `BatchGetItem`: "A single operation can retrieve up to 16
+    MB of data, which can contain as many as 100 items"; more than 100 is a
+    `ValidationException`; a partial result returns `UnprocessedKeys`, to
+    retry "starting with the next item", and DynamoDB "strongly recommend[s]
+    that you use an exponential backoff algorithm" (API Reference,
+    BatchGetItem). So at least ⌈n/100⌉ calls, more when a response passes 16
+    MB or is throttled.
+  - **Firestore** `documents.batchGet` "Gets multiple documents", taking a
+    list of names, its response "The streamed response for
+    `Firestore.BatchGetDocuments`"; the page states no maximum (REST
+    reference, projects.databases.documents.batchGet). A query's `in`
+    combines "up to 30 equality (`==`) clauses on the same field" (Query
+    data, Simple and compound queries). So by name, one call; by a field,
+    ⌈n/30⌉ queries.
+  - **Cassandra**: "The `IN` relationship is only allowed on the last column
+    of the partition key or on the last column of the full primary key"
+    (Apache Cassandra, CQL, DML, SELECT's WHERE clause); DataStax's guide
+    says "The IN operator can impact performance on medium-large datasets"
+    and that "There are cases in which the IN operator should not be used"
+    (DataStax CQL for DSE 6.9, Querying). Neither states the coordinator's
+    work per partition. So a source on Cassandra states one client call per
+    key, issued concurrently, until a measurement says otherwise.
+  - So a set read's cost is the source's to state. It is one statement on
+    PostgreSQL, a function of n on DynamoDB, and per key on Cassandra.
+
+## Decision
+
+### 1. Above the seam: a read whose key comes from a loop's element is refused
+
+- **The rule (PW0354).** A call that performs a source read, a `database.read<R>`
+  in its inferred row (ADR-0101) reached through a function bound by a
+  `host` policy, is refused where both hold:
+  1. **it is inside a loop over data**: inside a lambda handed to a `List`
+     combinator (`List.map`, `List.fold`, `List.filter`, `List.find`,
+     `List.any`, `List.all`, `List.sort_by`, or any function whose
+     parameter is a function and which the call graph shows applying it to
+     a list's elements), inside a `for x in xs` body, or in a function on a
+     cycle of the call graph whose recursive call is passed part of its own
+     argument (a recursion over data); and
+  2. **its key comes from the loop's element**: an argument that names the
+     lambda's parameter, the `for` pattern's binding, or the recursive
+     parameter, directly or through a `let`, a field, or a call of a pure
+     function on it.
+  A read inside a loop whose key does not depend on the element (the same
+  store's hours, read in a loop over its periods) is not refused: it is one
+  key, and the host's cache answers the repeats.
+- **The repair is the set read.** The diagnostic names the set-shaped
+  operation where the source declares one (decision 2), and shows it, here
+  on `StoresOpen` as it would be were it written per store:
+
+  ```
+  error[PW0354]: `hours_of` reads `Stores` once for each element of `stores`
+    --> examples/store/hours.pw:392:41
+     |
+  392 |     List.map(stores, s => listed(s, hours_of(s.id)))
+     |                                     ^^^^^^^^^^^^^^ one read per store
+     |
+     = note: its key `s.id` comes from `s`, the element `List.map` passes
+     = help: read them together, before the loop:
+             let hours = hours_of_stores(List.map(stores, s => s.id))
+             List.map(stores, s => listed(s, hours))
+  ```
+
+  Where the source declares no set read for the operation, the help says so
+  ("`hours_of` has no set read; its source can declare one") and the
+  refusal stands: a read per element is the thing refused.
+- **How the checker finds it, in Pleris's HIR.** Two analyses that already
+  exist answer each half; the rule joins them and recomputes neither
+  (ADR-0022: record, never recompute):
+  - **"a source read"**: `effects.rs`' inferred row, with the span of each
+    effect's source (`Inferred.sources`), already says which call performs
+    `database.read<R>`, through every call it makes.
+  - **"inside a loop"**: `effects.rs`' `enclosing_callback` already finds the
+    lambda handed to another function that contains a call (by span, as HIR
+    has no parent links). `Expr::For` is the loop syntax; `recursion.rs`
+    finds recursive types, and the call graph `effects.rs` walks for rows
+    gives a function's cycle.
+  - **"its key comes from the element"**: new, and small. The lambda's
+    `params` and the `For`'s `pat` are `PatternId`s; `lexical.rs` says which
+    binding each local name means (ADR-0063), a lambda's parameters and a
+    `for` loop's among them. The rule walks the
+    read's arguments to the names they mention, following a `let` to its
+    initializer, and asks whether any resolves to a loop's binding.
+- **Later, the compiler rewrites instead of refusing** (Haxl's batching, by
+  the compiler): a `List.map` whose lambda's only read is keyed by the
+  element becomes the set read before the loop and a lookup inside it, as
+  the help above shows, and the rounds are the data-dependency levels. On
+  the checkout's real code (`checkout.pw`'s `charged_of`), with a keyed
+  `fees_of` declared `set fees_of_stores`, the program as written:
+
+  ```
+  List.map(parts, part => part_charged(part.store, subtotal_of(part.lines), fees_of(part.store), promo_of(promo, part.store)))
+  ```
+
+  is rewritten into the store's own text today, one read before the loop
+  and the lookup it already has (`fees_for`) inside it:
+
+  ```
+  let fees = fees_of_stores(List.map(parts, p => p.store))
+  List.map(parts, part => part_charged(part.store, subtotal_of(part.lines), fees_for(part.store, fees), promo_of(promo, part.store)))
+  ```
+
+  The lookup is the pair's to supply: `set` names the set read, and a
+  generated lookup by the key finds each element's result in its answer.
+  Not in 4c: refusal first, so every program states its set reads, and the
+  rewrite is a step whose output the refusal already accepts.
+- **The host merges what it loops over itself.** A page's sibling bindings
+  and its instances (ADR-0125) are the host's loop, not the program's: the
+  host gathers the reads one render asks for, keyed alike, into one set
+  read, as DataLoader does per tick. **Not inside a component**: a
+  component that awaits each read before the next issues them one round
+  trip apart whatever the runtime's async support (Wasmtime's
+  component-model async ABI is opt-in and its builtins "very incomplete",
+  Config docs, read 2026-10-14), since the next key may depend on the last
+  answer. The program states the set read; the host does not guess it.
+
+### 2. Below the seam: an operation states what one call costs
+
+- **A source states each keyed read's set-shaped form and its cost**, as
+  ADR-0207's guarantees are stated:
+
+  ```
+  source StoreData
+      holds        Stores, Menus, Carts, Orders, Addresses
+      transactions serializable
+      reads        strong, snapshot, read_your_writes, eventual
+      changes      none
+      sets         one_call
+  ```
+
+  `sets` is `one_call` (PostgreSQL's `= ANY($1)`, Firestore's `batchGet`
+  by name), `chunked(k)` (DynamoDB's `BatchGetItem`, k = 100: at least
+  ⌈n/k⌉ calls; Firestore's `in`, k = 30), or `per_key` (Cassandra, a source
+  that cannot batch). A clause left out guarantees nothing: `per_key`.
+- **A host function pairs its keyed read with its set read**, so the
+  checker and the rewrite know them:
+
+  ```
+  fn hours_of(store: StoreId) -> Result<OpeningHours, StoreError> !{ database.read<Stores> }
+      host "store:data/hours#for-store"
+      set  hours_of_stores
+  ```
+
+  `set` names a function of the same source whose parameter is a list of
+  the keyed read's key and whose result is a list of the keyed result with
+  its key. The checker holds the pair to that shape.
+- **The seam stays one call per named operation.** Only keyed reads become
+  set-shaped; there is no universal `read(keys) -> map`. An operation is
+  what the host links a component to (ADR-0218), and its name is what a
+  contract, a grant and a test say.
+- **A conformance suite measures each layer.** 4b's method, generalized:
+  for each set read a layer provides, the suite runs it through the layer's
+  counted connection (`store_pg.rs`' `Counted`, ADR-0308 amended) at two
+  data sizes, and asserts the calls the source's `sets` states: the same
+  count at both for `one_call`, ⌈n/k⌉ for `chunked(k)`. A layer whose
+  measured count grows where it states `one_call` fails the suite. Every
+  layer runs it: memory, PostgreSQL, and any a deployment adds.
+- **The budget.** ADR-0207's declared guarantees gain the set-read cost. A
+  page's or a command's budget is its calls, each times its source's cost:
+  a set read on a `one_call` source is 1; on `chunked(100)`, ⌈n/100⌉; a
+  `per_key` source's set read is n.
+- **PW0355**: the checker reports a page or a command whose budget grows
+  with the data on a source that cannot batch (`per_key`), naming the read:
+
+  ```
+  warning[PW0355]: `StoresOpen` reads `Stores` once per store on `Ledger`, which cannot batch
+    --> examples/store/hours.pw:391:17
+     = note: `Ledger` states `sets per_key`: a set read is a call per key
+     = help: hold `Stores` in a source that batches, or bound the list
+  ```
+
+  A warning, not a refusal: a source that cannot batch is the deployment's
+  choice, and the program is right as written.
+- **Evidence.** The compiler emits each page's and each command's bound
+  (its calls by source, and each one's cost) beside its plan, and the
+  server's tests check it against `Counted`'s count of what the page
+  actually ran, per source operation as 4b counts them.
+
+### 3. The store's composites move above the seam
+
+The architect's ruling of 2026-08-20 expects the store's operations "to
+become compiled Pleris over narrower platform primitives" (as the integrator
+cites it; `docs/EVIDENCE_LEDGER.md`'s E10-S10, "Replace the host's
+`store:data/carts` with compiled Pleris over narrower primitives"). These
+composites move, each to the primitives named, each primitive a keyed or
+set read the conformance suite measures:
+
+| Composite (host today) | What it does in Rust | Moves to (Pleris) over primitives |
+| --- | --- | --- |
+| `search#find`, `#find-for`: the scan | `search::scan`, every store's menu matched on the host (memory) | the match in Pleris over `menus#matching(patterns)`, a set read (PostgreSQL's two statements, ADR-0308) |
+| `search#find-for`: the reach | `store::coverage` per store found, a read per store | `coverage_of_stores(stores, reader)`, a set read: the reader's chosen place once, the stores' zones by set |
+| `hours#for-cart` | each line's store by `store_of`, every store's menu read, then hours per store | `carts#stores(reader)`, one statement (cart lines joined to their items' stores), then `hours_of_stores` |
+| `checkout#parts` | the same `store_of` per line | `carts#stores(reader)`, and the grouping in Pleris |
+| `carts#add`: the price | `catalog_item(item)`, the item's name and price read on the host for the line | `menus#items(ids)`, a set read, and the line made in Pleris (E10-S10) |
+| `user-orders#place`: the reach | `cart_reaches`, a coverage read per store of the cart | `coverage_of_stores`, as the search's reach, checked in `place_order` as its hours are |
+| `coverage#for-store`, `#reaches` | the rule `places::delivers_to` on the host | the rule a pure Pleris function over `addresses#chosen(reader)` and `stores#zones(stores)` |
+
+What stays below the seam: a single keyed read or write of one resource,
+and its set form. `hours#for-stores` stays, as a set read, one statement
+after 4b.
+
+### 4. Migration
+
+- **No program changes.** The integrator found no read keyed by a loop's
+  element in the store's or the feed's programs; PW0354 is added with the
+  corpus checked against it (`corpus-check`, the accepted fixtures), and a
+  rejected fixture for each loop form (a `List` combinator's lambda, a
+  `for`, a recursion over data) with its repaired control.
+- **Sources state `sets`.** `StoreData` states `one_call`. A source that
+  states nothing is `per_key`, so PW0355 tells the programs on it where
+  their budget grows; none does today.
+- **The pairs.** Each keyed host read with a set form names it (`set`):
+  `hours_of` / `hours_of_stores` today; the rest as the composites move.
+- **The composites move one at a time**, each its own track, each measured
+  before and after by `Counted`.
+
+## Alternatives
+
+- **Merge reads at run time inside a component** (DataLoader per tick). A
+  loop that awaits each answer before its next key issues the reads apart;
+  merging needs the program to state the keys together, which is the set
+  read.
+- **The rewrite first** (Haxl by the compiler). It hides the read a reader
+  of the program would want to see, and a rewrite that cannot apply (a key
+  computed from the last answer) would leave a loop of reads unflagged.
+  Refusal first makes the set read the program's own text.
+- **A universal `read(keys) -> map`.** Every operation would become a
+  key-value read, losing what an operation's name and signature say (a
+  search, a cart's hours), and what a contract grants by name.
+- **Count only, refuse nothing** (today). A count catches a regression a
+  test exercises; it cannot make one impossible.
+- **Refuse any read inside a loop.** A read whose key does not depend on the
+  element is one key; refusing it would refuse correct programs.
+
+## Acceptance (when built)
+
+- `compiler/pw-core/tests/bounded_reads.rs`: PW0354 for each loop form, a
+  key through a `let` and a field, and its control (a key not from the
+  element; the set read); PW0355 on a `per_key` source and its control on
+  `one_call`; the pair's shape refused where it does not fit.
+- The conformance suite over memory and PostgreSQL, each set read at two
+  data sizes.
+- The emitted bound of each store page and command, checked against
+  `Counted` in the server's tests.
+- A mutation script, each rule's mutant killed.
+
+## Not claimed
+
+- **The rewrite** into one set read: a later step.
+- **A recursion over data whose reads are keyed by computed values** the
+  checker cannot trace to the element: refused only where the trace is
+  syntactic (a name, a `let`, a field, a pure call).
+- **Writes**: a write per element (`for x in xs { insert(x) }`) is the next
+  question; this note bounds reads.
+- **A source's cost under throttling**: DynamoDB's `UnprocessedKeys` and
+  backoff make ⌈n/100⌉ a floor, not a bound.
+- **Cassandra's internal fan-out**: a `per_key` source is charged its client
+  calls; what a coordinator does per partition is the source's to measure.
+- **The host's merging across pages or sessions**: one render's reads only.
+
+## Measurements (4b)
+
+To be folded in from 4b before the integrator rules: each store read's
+statements per call on memory and PostgreSQL, at two data sizes, per
+source operation and per page and command.
