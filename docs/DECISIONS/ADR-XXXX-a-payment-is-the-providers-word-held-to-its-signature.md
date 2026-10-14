@@ -189,6 +189,15 @@ A-010 (an origin-only secret operation, `capture_payment`) and the charter's
   Content-Security-Policy on the store's pages (`frame-src` the provider
   alone; SAQ A's 2025 criterion for the page that frames the hosted
   fields).
+- **A secret in a built program.** The backend and the WIT lay a privacy
+  qualifier out as its argument (the 2026-08-20 ruling; ADR-0031, ADR-0270),
+  which is right for `User<UserId>`, whose argument is the identity, and
+  wrong for `Secret<C>`, whose argument tags what the secret is for and
+  whose value is its material (`opaque type Secret<C> = String`). So
+  `secrets.payments()` checks and does not build ("a type parameter no use
+  instantiates", found in step seven). No program holds the key (decision
+  5); how a secret crosses a component's boundary, as a handle the host
+  resolves or not at all, is ruled with the first program that needs one.
 - A real provider: a Stripe adapter in test mode waits for the owner's
   approval of each crate it needs (NEXT 6d).
 - Refunds, captures held for later (`requires_capture`), disputes.
