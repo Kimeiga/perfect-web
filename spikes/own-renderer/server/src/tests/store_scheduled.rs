@@ -132,14 +132,17 @@ fn an_order_no_one_pays_is_taken_back_thirty_minutes_on() {
 
 /// **An order swept is told to its reader's open page**: the run is the
 /// host's own, made by no connection, and the page open on the order is
-/// told it was taken back as it is told of the reader's own cancel.
+/// told it was taken back as it is told of the reader's own cancel. The
+/// provider's word that the payment is canceled is held back: heard, its
+/// own connection would tell the page.
 #[test]
 fn an_order_swept_is_told_to_its_readers_open_page() {
-    paying(|s, _| {
+    paying(|s, origin| {
         placed_awaiting(s);
         s.serve_document_settled("a", "store.page.OrderPage", &Params::new(), &[])
             .expect("served");
         let doc = latest(&s.pending.lock().expect("pending"), "a");
+        origin.hold();
         later(s, THIRTY_MINUTES);
         assert_eq!(s.run_due().0, 1);
         assert!(
@@ -173,12 +176,18 @@ fn a_paid_order_is_not_swept_and_a_declined_card_keeps_its_sweep() {
 }
 
 /// **An order its reader takes back is not swept**: the cancel cancels its
-/// sweep, in the same commit. The control: before it, the sweep is pending.
+/// sweep, in the same commit. The provider's word that the payment is
+/// canceled would cancel it too, by `settle_payment`, once heard; it is held
+/// back here, so what is seen is the cancel's own. Until 2026-10-14 it was
+/// not, and the test held whichever came first: a mutant that took the
+/// cancel's away survived one run of two. The control: before it, the
+/// sweep is pending.
 #[test]
 fn an_order_taken_back_by_its_reader_is_not_swept() {
-    paying(|s, _| {
+    paying(|s, origin| {
         placed_awaiting(s);
         assert_eq!(runs(s).len(), 1, "the control: its sweep");
+        origin.hold();
         let taken = s
             .command_answered(CANCEL, "a", &[], Some("cancel-1"))
             .expect("answered");
