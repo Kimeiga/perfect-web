@@ -93,8 +93,14 @@ fn a_command_the_platform_invokes_says_so_in_its_contract() {
     let export = export_of(&settle, "t.settle");
     assert_eq!(export.invoked_by.as_deref(), Some("Payments"));
     // Control: the same command no platform invokes says nobody, and is
-    // another interface.
-    let plain = command("settle", "settled: Settled", "");
+    // another interface. Its other clauses the same: a control that also
+    // lacked `idempotent_by` was another interface for that too, and held
+    // nothing of `invoked_by` (train-5's run found the mutant surviving).
+    let plain = command(
+        "settle",
+        "settled: Settled",
+        "    idempotent_by InteractionId\n",
+    );
     assert_eq!(export_of(&plain, "t.settle").invoked_by, None);
     assert_ne!(
         contract_of(&settle, "t.settle").abi_schema,

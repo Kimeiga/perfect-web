@@ -265,8 +265,11 @@ MUTANTS = [
         "an order a store out of reach is in is placed",
         "server",
         STORE,
-        "                    if by_reader && !cart_reaches(r, &lines, owner)? {\n",
-        "                    if by_reader && !cart_reaches(r, &lines, owner)? && false {\n",
+        # Re-anchored by ADR-0332: the store places an order through
+        # `#await-payment`, and no program reaches `#place` since (train-5's
+        # run found this surviving there).
+        "                if !cart_reaches(r, &lines, owner)? {\n",
+        "                if !cart_reaches(r, &lines, owner)? && false {\n",
     ),
     (
         "a saved address is not chosen",
