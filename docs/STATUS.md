@@ -23,6 +23,35 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0333, 2026-10-14: what a page may run is generated from its build**
+(the integrator's; ADR-0195's ruling 13; tracks `page-csp` and
+`page-origins`, merged from `859c6503`).
+- Every HTML answer the host writes carries a Content-Security-Policy. A
+  document's allows the one inline script that starts the runtime and the
+  data layer's style, each by its hash; the runtime's modules and its
+  WebAssembly from this origin (`'wasm-unsafe-eval'`); a `style` attribute
+  only where the build writes one; the payment provider's page as a frame
+  where the deployment takes payments; a sign-in at the identity provider's
+  origin where it is another; and no frame of the page. Every other HTML
+  answer runs nothing.
+- Generated from the build's templates and the deployment, never written by
+  hand: one policy for a build's every page, as a navigation that keeps its
+  layout keeps its first document. Every answer says its type is its type
+  (`nosniff`), so `'self'` allows this origin's JavaScript alone.
+- What the policy would refuse, the build refuses where it is written
+  (PW5052): an address a page fetches, written as text, is a path, and a
+  `<link>`'s address is written as text. Corpus C22; generality 46 / 46.
+- Each page the suite serves runs under it with nothing refused, in three
+  engines, with its controls: an inline script and a `style` attribute
+  refused; without `'wasm-unsafe-eval'` the runtime does not start; a policy
+  naming no provider frames nothing.
+- Found on the way: the host's announcer carried the only inline style
+  (served unstyled now, the runtime hiding it through the CSSOM); the
+  performance suite's control read layout through `eval`; no answer but an
+  upload's said its type was its type; a stylesheet the build ships was
+  served as bytes; train-5's docs wrote a literal `\n` into PARALLEL.md.
+Verify TRAIN_RUN green, with train-6.
+
 **2026-10-14: the checker's latency, found 24 times E9's** (the integrator's
 finding; track `check-latency`, merged from `ed53d44b`).
 - A check of the store program's 52 files takes about 850 ms, where E9's

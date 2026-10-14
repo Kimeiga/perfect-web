@@ -950,3 +950,34 @@ Generality at open:        45/45 invariants generality-tested
 | Fixture | Change | Kind |
 |---|---|---|
 | R-064 | changed: its query says `user` (`PW5007`) | its category kept |
+
+## C22: a page loads from its own origin, 2026-10-14
+
+Opened because the specification changed. The host sends each page a
+Content-Security-Policy generated from its build and its deployment
+(ADR-0195's ruling 13, the host's half), so an address a page's markup
+fetches that names another origin built and was refused in the browser. An
+address a page's markup fetches, written as text, is a path, and a
+`<link>`'s address is written as text (`PW5052`). No invariant is retired.
+Two fixtures changed:
+
+- **A-028**: its `preconnect` to another origin is a `preload` of an image
+  of its own; its item's property, a value no browser fetches, still names
+  schema.org.
+- **`link_not_in_body`'s NEIGHBOUR witness**: its `preconnect` names this
+  origin.
+
+```text
+Corpus version:            C22
+Accepted programs:         35
+Rejected programs:         66
+Charter categories:        35/35 accepted, 66/66 rejected
+Generality at open:        46/46 invariants generality-tested
+```
+
+| Fixture | Change | Kind |
+|---|---|---|
+| A-028 | changed: its preload is this origin's (`PW5052`) | its category kept |
+| A-035 | added: an image, its candidates and a stylesheet at paths, and a link to another origin | new category, `a page loads from its own origin` |
+| R-066 | added: an image from another origin (`PW5052`) | new category |
+| `load_from_another_origin` | a GENERAL witness, a `//` address a view's `<link>` preloads, and a NEIGHBOUR one, a navigation and an item's property to another origin, and a frame and an image built with a value at paths | new invariant |

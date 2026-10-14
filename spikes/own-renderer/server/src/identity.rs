@@ -515,6 +515,18 @@ impl Default for Identity {
 }
 
 impl Identity {
+    /// **Where a sign-in sends the browser, where that is not this origin**
+    /// (`csp::Deployment::forms`): a deployment's provider, at its own; none
+    /// in the guest model, or for the development provider, which this
+    /// server serves at a path of its own.
+    pub(crate) fn sign_in_origin(&self) -> Option<String> {
+        let mode = self.mode.read().expect("mode");
+        let Mode::Accounts(accounts) = &*mode else {
+            return None;
+        };
+        crate::csp::origin_of(&accounts.provider.authorization_endpoint())
+    }
+
     /// Each session's principal, which the data layer maps a session to
     /// its user by.
     pub fn principals(&self) -> Principals {
@@ -1126,14 +1138,22 @@ impl Reply {
             _ => "",
         };
         let mut head = format!(
-            "HTTP/1.1 {} {reason}\r\ncontent-type: {}\r\ncontent-length: {}\r\n{}",
+            "HTTP/1.1 {} {reason}\r\ncontent-type: {}\r\ncontent-length: {}\r\n{}{}",
             self.status,
             self.mime,
             self.body.len(),
+            super::NOSNIFF,
             super::PRIVATE
         );
         if let Some(location) = &self.location {
             head.push_str(&format!("location: {location}\r\n"));
+        }
+        // An identity's page runs nothing (`csp::BARE`).
+        if self.mime.starts_with("text/html") {
+            head.push_str(&format!(
+                "content-security-policy: {}\r\n",
+                crate::csp::BARE
+            ));
         }
         let sets_session = self
             .cookies

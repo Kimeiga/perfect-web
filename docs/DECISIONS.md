@@ -2922,3 +2922,10 @@ NEXT 6c).
 - A signed webhook, read again; a command `invoked_by Payments`, on the
   reader's behalf; an order awaiting its payment, framed, placed by the
   provider's word, taken back by its reader or the provider.
+[ADR-0333](DECISIONS/ADR-0333-what-a-page-may-run-is-generated-from-its-build.md):
+what a page may run is generated from its build (the integrator's;
+ADR-0195's ruling 13).
+- Every HTML answer carries a Content-Security-Policy, from the build's
+  templates and the deployment; a document's script and style by their
+  hashes; every answer `nosniff`; the build refuses a load from another
+  origin (PW5052).

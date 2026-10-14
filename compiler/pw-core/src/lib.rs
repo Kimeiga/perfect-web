@@ -77,6 +77,8 @@ pub mod types;
 pub mod uploads;
 // NEXT 6c: a command the platform invokes, which no reader presses.
 pub mod invoked;
+// ADR-0195's ruling 13, the build's half: a page loads from its own origin.
+pub mod origins;
 pub mod values;
 pub mod wit;
 

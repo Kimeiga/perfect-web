@@ -725,6 +725,8 @@ mod checkout;
 // signature.
 #[allow(dead_code)]
 mod payments;
+// ADR-0195's ruling 13: what a page this host serves may load and run.
+mod csp;
 
 struct Server {
     /// **The build this host serves, by its name** (ADR-0300): on each
@@ -733,6 +735,9 @@ struct Server {
     build_id: String,
     /// The templates the compiler emitted, deserialized once.
     templates: Vec<Template>,
+    /// **What the build's markup asks of its pages' policy** (`csp`), read
+    /// from its templates once.
+    needs: csp::Needs,
     /// **The program's data layer** (ADR-0218): what its contracts import,
     /// which the deployment supplies. A query reads through it and a command
     /// stages its writes in it.
@@ -1613,6 +1618,7 @@ impl Server {
         Server {
             cart_by_reader,
             build_id,
+            needs: csp::Needs::of(&templates),
             templates,
             data,
             store,
@@ -6003,6 +6009,19 @@ impl Server {
         }
     }
 
+    /// **What a document this host serves may load and run** (`csp`): the
+    /// script that starts the runtime and the data layer's style, by their
+    /// hashes; what the build's markup asks; and the deployment's payment
+    /// provider and identity provider, where it has them at origins of
+    /// their own.
+    fn policy(&self) -> String {
+        let deployment = csp::Deployment {
+            frames: self.payments.get().map(|p| p.provider.clone()),
+            forms: self.identity.sign_in_origin(),
+        };
+        csp::document(RUNTIME_SOURCE, self.data.style(), &self.needs, &deployment)
+    }
+
     /// **A document, and each streamed region's arm as its query settles**
     /// (ADR-0148). With nothing left to settle it is one response of known
     /// length, as every document was. Otherwise all but the document's end is
@@ -6030,19 +6049,21 @@ impl Server {
         // **The build that served it** (ADR-0300), which a page that keeps
         // its parts across a navigation holds the next document to.
         let build = format!("pw-build: {}\r\n", self.build_id);
+        // What it may load and run (`csp`).
+        let policy = format!("content-security-policy: {}\r\n", self.policy());
         if settling.waiting.is_empty() && settling.settled.is_empty() {
             write_response(
                 stream,
                 200,
                 "text/html; charset=utf-8",
-                &format!("{PRIVATE}{cookie}{build}"),
+                &format!("{PRIVATE}{cookie}{build}{policy}"),
                 page.as_bytes(),
             );
             return;
         }
         let head = format!(
-            "HTTP/1.1 200 OK\r\ncontent-type: text/html; charset=utf-8\r\n{PRIVATE}{cookie}{build}\
-             connection: close\r\n\r\n"
+            "HTTP/1.1 200 OK\r\ncontent-type: text/html; charset=utf-8\r\n{NOSNIFF}{PRIVATE}{cookie}\
+             {build}{policy}connection: close\r\n\r\n"
         );
         let shell = page.strip_suffix(DOCUMENT_END).unwrap_or(page);
         if stream
@@ -9359,7 +9380,10 @@ fn moved(
         stream,
         if permanent { 308 } else { 307 },
         "text/html; charset=utf-8",
-        &format!("{PRIVATE}{cookie}location: {location}\r\n"),
+        &format!(
+            "{PRIVATE}{cookie}location: {location}\r\n{}",
+            runs_nothing("text/html")
+        ),
         body.as_bytes(),
     );
 }
@@ -9551,6 +9575,9 @@ fn serve_file(server: &Server, stream: &mut TcpStream, route: &str) {
         Some("mjs") | Some("js") => "text/javascript; charset=utf-8",
         Some("json") => "application/json; charset=utf-8",
         Some("wasm") => "application/wasm",
+        // A stylesheet the build ships, which a page's policy allows from
+        // this origin, and which a browser applies only as `text/css`.
+        Some("css") => "text/css; charset=utf-8",
         _ => "application/octet-stream",
     };
     match std::fs::read(&path) {
@@ -9976,6 +10003,10 @@ fn document(
 /// one does in WebKit.
 const RUNTIME: &str = "<script>import(\"/pw-runtime.mjs\")</script>";
 
+/// **Its text**, which a document's policy allows by its hash (`csp`).
+/// `RUNTIME`'s, as a test holds it.
+const RUNTIME_SOURCE: &str = "import(\"/pw-runtime.mjs\")";
+
 /// The store page's speculation manifest, if the build wrote one (ADR-0122).
 /// **Every page's speculation manifest** (ADR-0191), by the page it names.
 fn speculation_manifests(dist: &std::path::Path) -> BTreeMap<String, serde_json::Value> {
@@ -10068,7 +10099,24 @@ fn respond(stream: &mut TcpStream, code: u16, mime: &str, session: &str, fresh: 
     } else {
         String::new()
     };
-    write_response(stream, code, mime, &format!("{PRIVATE}{cookie}"), body);
+    write_response(
+        stream,
+        code,
+        mime,
+        &format!("{PRIVATE}{cookie}{}", runs_nothing(mime)),
+        body,
+    );
+}
+
+/// **The policy of an HTML answer that is no document the runtime starts
+/// in** (`csp::BARE`): a page not found, a page moved, a page the build
+/// rendered with no runtime. None for any other type.
+fn runs_nothing(mime: &str) -> String {
+    if mime.starts_with("text/html") {
+        format!("content-security-policy: {}\r\n", csp::BARE)
+    } else {
+        String::new()
+    }
 }
 
 /// **A file of the build** (ADR-0184): the runtime, the renderer, a
@@ -10078,12 +10126,19 @@ fn respond(stream: &mut TcpStream, code: u16, mime: &str, session: &str, fresh: 
 /// that kept that file would have given the session to everyone it served
 /// the file to, who would then all share one cart.
 fn respond_build(stream: &mut TcpStream, code: u16, mime: &str, body: &[u8]) {
-    write_response(stream, code, mime, "", body);
+    write_response(stream, code, mime, &runs_nothing(mime), body);
 }
+
+/// **Every answer's type is its type** (`csp`): `nosniff`, so a browser
+/// runs as a script only what is served as one, and applies as a
+/// stylesheet only what is served as one (Fetch, "Should response to
+/// request be blocked due to nosniff?"). A page's policy allows this
+/// origin's scripts (`'self'`): this is what makes that its JavaScript.
+const NOSNIFF: &str = "x-content-type-options: nosniff\r\n";
 
 fn write_response(stream: &mut TcpStream, code: u16, mime: &str, headers: &str, body: &[u8]) {
     let head = format!(
-        "HTTP/1.1 {code} {}\r\ncontent-type: {mime}\r\ncontent-length: {}\r\n{headers}connection: close\r\n\r\n",
+        "HTTP/1.1 {code} {}\r\ncontent-type: {mime}\r\ncontent-length: {}\r\n{NOSNIFF}{headers}connection: close\r\n\r\n",
         reason(code),
         body.len()
     );
@@ -13601,6 +13656,8 @@ public query Store(",
     // TRACK SEAM (order-total): an order's total.
     mod order_total;
     // TRACK SEAM (payments): an order awaiting its payment, and settled.
+    /// What a page this host serves may load and run (`csp`).
+    mod page_policy;
     mod store_payments;
 
     /// **A second program is served by the same host** (ADR-0218): the

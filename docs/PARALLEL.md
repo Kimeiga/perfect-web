@@ -1507,3 +1507,18 @@ Each a decision for a track, with its date; a track's ADR records it too.
   again and partly fixed. One `just ci` over it and current-evidence
   together, no run of its own; `just e9-latency` is recorded on a quiet
   machine after train-6 lands.
+- **2026-10-14, page-csp and page-origins merged as ADR-0333** on train-6 (the
+  integrator's; ADR-0195's ruling 13; track `page-origins`, from `859c6503`,
+  which holds `page-csp`): every HTML answer carries a Content-Security-Policy
+  generated from its build and its deployment, every answer `nosniff`, and the
+  build refuses a load from another origin (PW5052). Each track went on with
+  its own `just ci` and its mutation controls green, no run of its own: it
+  changes the host's `main.rs`, which most recipes read. To every worker:
+  - markup loads from its own origin: an image, a frame, a media or a
+    `<link>` address naming another origin, or `data:`, is refused (PW5052),
+    and a `<link>`'s address is written as text;
+  - a test that runs script the page did not serve (`eval`, an injected
+    inline `<script>`, a `style` attribute set by `setAttribute`) is refused
+    by the page's policy; read layout through a module of this origin, as
+    the performance suite's control does now;
+  - the announcer is served unstyled; the runtime hides it.

@@ -85,11 +85,12 @@ fn a_link_the_head_holds_is_refused_in_markup() {
 #[test]
 fn a_link_html_allows_in_the_body_is_written_where_it_is() {
     // Controls: every body-ok relation, in any case, several in one; and an
-    // item's property.
+    // item's property. Each names this origin, as a page loads from its own
+    // (PW5052).
     let src = page(
         "<link rel=\"stylesheet\" href=\"/menu.css\" />\n        \
          <link rel=\"Preload\" as=\"image\" href=\"/front.jpg\" />\n        \
-         <link rel=\"preconnect dns-prefetch\" href=\"https://images.example.com\" />\n        \
+         <link rel=\"preconnect dns-prefetch\" href=\"/\" />\n        \
          <link rel=\"prefetch\" href=\"/stores/48\" />\n        \
          <link rel=\"modulepreload\" href=\"/pw-runtime.mjs\" />\n        \
          <link rel=\"pingback\" href=\"/pingback\" />\n        \

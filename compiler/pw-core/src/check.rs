@@ -123,6 +123,8 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         per_unit.extend(metadata(&u.hir));
         // ADR-0189: a `<link>` is one HTML allows where it is written.
         per_unit.extend(links(&u.hir));
+        // ADR-0195's ruling 13: and a page loads from its own origin.
+        per_unit.extend(crate::origins::check(&u.hir));
         // ADR-0185: an id names one element, a reference names one shown
         // with it, and ARIA is what WAI-ARIA defines.
         per_unit.extend(ids_and_aria(&u.hir));

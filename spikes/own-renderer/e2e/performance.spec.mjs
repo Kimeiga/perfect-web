@@ -242,16 +242,20 @@ test("gate 9: the runtime never reads layout at all", async ({ page }) => {
   expect(reads, "the runtime measures nothing, so it cannot interleave").toEqual([]);
 
   // The control: the counter works. Attributed to `pw-runtime` by stack, so
-  // this synthesizes a frame that claims to be one.
-  const seen = await page.evaluate(() => {
+  // this reads layout from a module whose address claims to be one. A module
+  // of this origin, as the page's policy allows, where it refuses `eval` and
+  // `new Function`, which this control used until the policy (ADR-0195's
+  // ruling 13).
+  await page.route("**/pw-runtime-probe.mjs", (route) =>
+    route.fulfill({
+      contentType: "text/javascript",
+      body: "export const read = () => document.body.getBoundingClientRect().width;",
+    }),
+  );
+  const seen = await page.evaluate(async () => {
     const before = window.__layoutReads.length;
-    const fn = new Function(
-      "return document.body.getBoundingClientRect().width",
-    );
-    Object.defineProperty(fn, "name", { value: "pw-runtime-probe" });
-    // Force a matching stack frame by evaluating from a named source.
-    // eslint-disable-next-line no-eval
-    (0, eval)("//# sourceURL=pw-runtime-probe.js\ndocument.body.getBoundingClientRect()");
+    const { read } = await import("/pw-runtime-probe.mjs");
+    read();
     return window.__layoutReads.length - before;
   });
   expect(seen, "the read counter can go up").toBeGreaterThan(0);

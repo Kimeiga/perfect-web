@@ -775,6 +775,10 @@ E14 comes before E11-E13. Its plan, controls and task list are
              crate, and with test keys only.
 
           Then the language's, found on the way:
+          - **a program's declaration of another origin** (ADR-0195's
+            ruling 13, its last clause; ADR-0333 built the rest): an origin a
+            program declares, which its pages' policy allows and PW5052 lets
+            its markup load from; built when a program needs one;
           - ~~**a template's bindings shadow module members**~~ (ADR-0310,
             merged 2026-10-12): a name means its binding in every analysis,
             the template's bindings, a call through a local and a loop's
