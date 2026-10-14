@@ -83,7 +83,12 @@ is ruled on.
 
 ### 1. Above the seam: a read whose key comes from a loop's element is refused
 
-- **The rule (PW0354).** A call that performs a source read, a `database.read<R>`
+Both diagnostics come from the inferred effect row, so they are Effects'
+(PW04xx, beside PW0400 an undeclared effect, PW0401 a forbidden one and
+PW0402 a wrong frame phase): PW0405 and PW0406 (the integrator's
+assignment, 2026-10-14).
+
+- **The rule (PW0405).** A call that performs a source read, a `database.read<R>`
   in its inferred row (ADR-0101) reached through a function bound by a
   `host` policy, is refused where both hold:
   1. **it is inside a loop over data**: inside a lambda handed to a `List`
@@ -105,7 +110,7 @@ is ruled on.
   on `StoresOpen` as it would be were it written per store:
 
   ```
-  error[PW0354]: `hours_of` reads `Stores` once for each element of `stores`
+  error[PW0405]: `hours_of` reads `Stores` once for each element of `stores`
     --> examples/store/hours.pw:392:41
      |
   392 |     List.map(stores, s => listed(s, hours_of(s.id)))
@@ -215,11 +220,11 @@ is ruled on.
   page's or a command's budget is its calls, each times its source's cost:
   a set read on a `one_call` source is 1; on `chunked(100)`, ⌈n/100⌉; a
   `per_key` source's set read is n.
-- **PW0355**: the checker reports a page or a command whose budget grows
+- **PW0406**: the checker reports a page or a command whose budget grows
   with the data on a source that cannot batch (`per_key`), naming the read:
 
   ```
-  warning[PW0355]: `StoresOpen` reads `Stores` once per store on `Ledger`, which cannot batch
+  warning[PW0406]: `StoresOpen` reads `Stores` once per store on `Ledger`, which cannot batch
     --> examples/store/hours.pw:391:17
      = note: `Ledger` states `sets per_key`: a set read is a call per key
      = help: hold `Stores` in a source that batches, or bound the list
@@ -258,12 +263,12 @@ after 4b.
 ### 4. Migration
 
 - **No program changes.** The integrator found no read keyed by a loop's
-  element in the store's or the feed's programs; PW0354 is added with the
+  element in the store's or the feed's programs; PW0405 is added with the
   corpus checked against it (`corpus-check`, the accepted fixtures), and a
   rejected fixture for each loop form (a `List` combinator's lambda, a
   `for`, a recursion over data) with its repaired control.
 - **Sources state `sets`.** `StoreData` states `one_call`. A source that
-  states nothing is `per_key`, so PW0355 tells the programs on it where
+  states nothing is `per_key`, so PW0406 tells the programs on it where
   their budget grows; none does today.
 - **The pairs.** Each keyed host read with a set form names it (`set`):
   `hours_of` / `hours_of_stores` today; the rest as the composites move.
@@ -290,9 +295,9 @@ after 4b.
 
 ## Acceptance (when built)
 
-- `compiler/pw-core/tests/bounded_reads.rs`: PW0354 for each loop form, a
+- `compiler/pw-core/tests/bounded_reads.rs`: PW0405 for each loop form, a
   key through a `let` and a field, and its control (a key not from the
-  element; the set read); PW0355 on a `per_key` source and its control on
+  element; the set read); PW0406 on a `per_key` source and its control on
   `one_call`; the pair's shape refused where it does not fit.
 - The conformance suite over memory and PostgreSQL, each set read at two
   data sizes.
