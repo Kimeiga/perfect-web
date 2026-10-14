@@ -826,14 +826,13 @@ E14 comes before E11-E13. Its plan, controls and task list are
             and over ADR-0292's 3.9 GiB bound. Still to measure: an
             opt-level for `cranelift-codegen` and `regalloc2` in the dev
             profile, against what it adds to a cold build and to `target/`;
-          - **a train fixed by a dispatch is verified** (the integrator's
-            finding at train-4's landing, 2026-10-13): `verified_base.py`
-            counts a commit only where a push's or the nightly's verify
-            passed at it, so a train whose run failed in one recipe, fixed
-            and re-run by dispatch, had its master push plan the whole train
-            again (verify 38494831583, cancelled by hand). Count a dispatch
-            at a commit that ran every recipe its train's run failed in and
-            every recipe the fix plans, with a test and its mutants;
+          - ~~**a train fixed by a dispatch is verified**~~ (the
+            integrator's finding at train-4's landing, 2026-10-13; ADR-0281
+            amended (6), track `current-evidence`): master's push after
+            train-4 planned the whole train again (verify 38494831583,
+            cancelled by hand). Not by counting a dispatch: a push runs no
+            recipe whose committed evidence is current, and a train whose
+            run failed takes the run's evidence with its fix;
           - **a recipe not yet measured is planned at its kind's upper
             quartile** (done, ADR-0290's amendment of 2026-10-09).
           - **a shard dealt within a ceiling under its limit** (done,

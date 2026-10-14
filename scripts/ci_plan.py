@@ -12,7 +12,9 @@ The recipes are `just`'s own list, kept where they record evidence
   each recipe that runs a browser spec the range changed; each recipe whose
   own script changed or reads a program or a benchmark the range changed
   (`data_inputs`), or runs a shell script the range changed; and each
-  recipe whose own lines changed;
+  recipe whose own lines changed; and with `--current`, as a push plans,
+  less each recipe whose committed evidence is current at HEAD (`current`,
+  ADR-0281, amended 2026-10-13 (6));
 - or those named.
 
 Each is dealt, the longest first, to the shard where it ends soonest
@@ -29,12 +31,13 @@ Prints, for `$GITHUB_OUTPUT`, `shards=<json>`, a list of `{"index": i,
 nothing is to run.
 
     python3 scripts/ci_plan.py --shards 17 --all
-    python3 scripts/ci_plan.py --shards 17 --changed BASE HEAD
+    python3 scripts/ci_plan.py --shards 17 --changed BASE HEAD [--current]
     python3 scripts/ci_plan.py --shards 17 e14-feed e14-read-whole
 """
 
 import argparse
 import importlib.util
+from collections.abc import Callable
 import json
 import pathlib
 import re
@@ -376,6 +379,80 @@ def recipes_for(changed: dict[str, list[tuple[int, int]]], near: int, names: lis
     return sorted(out)
 
 
+# **The commit an evidence file says it was recorded at** (ADR-0281,
+# amended 2026-10-13 (6)): `commit: <sha>`, a run's whole commit. A file
+# written from a tree with changes says `+ uncommitted changes` after it,
+# and records no commit.
+RECORDED_AT = re.compile(r"^commit: ([0-9a-f]{40})[ \t]*$", re.M)
+
+# The evidence files a recipe's lines write: `} > docs/evidence/E14/x.txt`.
+WRITES = re.compile(r">[ \t]*(docs/evidence/[\w./-]+\.txt)")
+
+
+def evidence_files(body: str) -> list[str]:
+    """The evidence files a recipe's lines write."""
+    return sorted(set(WRITES.findall(body)))
+
+
+def recorded_at(head: str, path: str, root: pathlib.Path = ROOT) -> str | None:
+    """The commit `path`, as `head` holds it, was recorded at, or none."""
+    out = subprocess.run(["git", "show", f"{head}:{path}"], cwd=root, capture_output=True)
+    if out.returncode != 0:
+        return None
+    m = RECORDED_AT.search(out.stdout.decode("utf-8", errors="replace"))
+    return m.group(1) if m else None
+
+
+def descends(sha: str, head: str, root: pathlib.Path = ROOT) -> bool:
+    """Whether `head` is `sha` or descends from it."""
+    out = subprocess.run(["git", "merge-base", "--is-ancestor", sha, head], cwd=root, capture_output=True)
+    return out.returncode == 0
+
+
+def current(
+    names: list[str],
+    head: str,
+    near: int = NEAR,
+    body: dict[str, str] | None = None,
+    read: Callable[[str, str], str | None] | None = None,
+    descends_from: Callable[[str, str], bool] | None = None,
+    reach: Callable[[str, str], set[str]] | None = None,
+) -> dict[str, str]:
+    """**The recipes of `names` whose committed evidence is current at
+    `head`**, each with the commit it was recorded at (ADR-0281, amended
+    2026-10-13 (6)): every file the recipe writes recorded at one whole
+    commit that `head` descends from, and nothing the recipe reads changed
+    since, by this planner's own rule (`reach`). A run passed it there: the
+    fetch copies no file of a recipe that failed (`evidence_fetch.py`). A
+    push does not run it again; the nightly runs it whatever its evidence
+    says.
+    Until then master's push after a train fixed by a dispatch planned the
+    whole train again (verify 38494831583, cancelled by hand). Any error
+    leaves a recipe planned."""
+    body = bodies() if body is None else body
+    read = read or recorded_at
+    descends_from = descends_from or descends
+    reach = reach or (lambda sha, h: set(recipes_for(hunks(sha, h), near, names)))
+    out: dict[str, str] = {}
+    reached: dict[str, set[str]] = {}
+    for name in names:
+        try:
+            shas = {read(head, f) for f in evidence_files(body.get(name, ""))}
+            # One commit for every file it writes, each file recorded.
+            sha = next(iter(shas)) if len(shas) == 1 else None
+            if sha is None:
+                continue
+            if not descends_from(sha, head):
+                continue
+            if sha not in reached:
+                reached[sha] = reach(sha, head)
+            if name not in reached[sha]:
+                out[name] = sha
+        except Exception as error:  # noqa: BLE001 - any failure plans it
+            print(f"ci_plan: {name}'s evidence not read, so it is planned: {error}", file=sys.stderr)
+    return out
+
+
 def joined(a: tuple[bool, bool], b: tuple[bool, bool]) -> tuple[bool, bool]:
     """What a shard sets up for two recipes: what either needs."""
     return (a[0] or b[0], a[1] or b[1])
@@ -556,6 +633,9 @@ def main() -> int:
     parser.add_argument("--all", action="store_true")
     parser.add_argument("--changed", nargs=2, metavar=("BASE", "HEAD"))
     parser.add_argument("--near", type=int, default=NEAR)
+    # With `--changed`: less each recipe whose committed evidence is current
+    # at HEAD (`current`), as a push plans.
+    parser.add_argument("--current", action="store_true")
     parser.add_argument("recipes", nargs="*")
     args = parser.parse_args()
     known = recipes()
@@ -568,6 +648,11 @@ def main() -> int:
         names = args.recipes
     elif args.changed:
         names = changed_recipes(args.changed[0], args.changed[1], args.near, evidence)
+        if args.current:
+            kept = current(names, args.changed[1], args.near)
+            for name, sha in sorted(kept.items()):
+                print(f"ci_plan: {name} is current, recorded at {sha[:8]}", file=sys.stderr)
+            names = [n for n in names if n not in kept]
     elif args.all:
         names = evidence
     else:
