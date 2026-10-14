@@ -1502,3 +1502,8 @@ Each a decision for a track, with its date; a track's ADR records it too.
   mutation controls green (40 of 40) and one `just ci` over it and
   check-latency together, each track's code under the whole `just ci`
   (ADR-0281's correction of 2026-10-13), no run of its own.
+- **2026-10-14, check-latency merged** on train-6 (the integrator's finding;
+  track `check-latency`, from `ed53d44b`): the checker's latency, measured
+  again and partly fixed. One `just ci` over it and current-evidence
+  together, no run of its own; `just e9-latency` is recorded on a quiet
+  machine after train-6 lands.

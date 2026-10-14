@@ -2998,6 +2998,10 @@ fn sessions_stay_on_the_server(
         .map(|m| m.name.as_str());
     for (_, body, _) in hir.bodies.iter() {
         let decl = hir.decl(body.owner);
+        // One typer for the body, built for its first printed value: one for
+        // each value solved the whole body once a hole (the checker's
+        // latency, 2026-10-13).
+        let mut types: Option<crate::values::BodyTypes> = None;
         for (_, node, _) in body.nodes.iter() {
             let mut printed: Vec<ExprId> = match node {
                 Node::Interpolation(e) => vec![*e],
@@ -3020,7 +3024,10 @@ fn sessions_stay_on_the_server(
                 })
                 .collect();
             for e in printed {
-                let (ty, _) = crate::values::type_of(sigs, workspace, unit, module, decl, body, e);
+                let types = types.get_or_insert_with(|| {
+                    crate::values::BodyTypes::new(sigs, workspace, unit, module, decl, body)
+                });
+                let (ty, _) = types.of(e);
                 if session_in_ty(sigs, &ty, &mut BTreeSet::new()) {
                     out.push(refused(
                         "this prints a session's handle, which would reach the browser".to_string(),

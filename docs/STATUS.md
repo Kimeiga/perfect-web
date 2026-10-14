@@ -23,6 +23,23 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**2026-10-14: the checker's latency, found 24 times E9's** (the integrator's
+finding; track `check-latency`, merged from `ed53d44b`).
+- A check of the store program's 52 files takes about 850 ms, where E9's
+  gate item 4 passed on 37 ms for 36 files (2026-08-08), and an edit costs
+  a full check. The ceiling, fifty times the 2026-08 measurement, was never
+  read again: its recipe runs on the development machine alone.
+- A profile (macOS `sample`): every analysis added since resolves names and
+  types bodies on its own. Fixed here, each check saying what it said: one
+  typer a body for the session analysis, which built one per value a page
+  prints (`values::BodyTypes`), and a module found by its unit, where every
+  module was searched for each name resolved. About 10 to 15% faster.
+- The latency test runs its two measurements one at a time, as running
+  both at once measured their contention, and says what it measures. NEXT
+  holds the work: each declaration's typer and resolution computed once a
+  check and shared, then an edit that redoes only what it reaches.
+Verify TRAIN_RUN green, with train-6.
+
 **ADR-0281 amended (6), 2026-10-14: a push runs no recipe whose committed
 evidence is current** (the integrator's; track `current-evidence`, merged
 from `22afb624`).

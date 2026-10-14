@@ -833,6 +833,24 @@ E14 comes before E11-E13. Its plan, controls and task list are
             cancelled by hand). Not by counting a dispatch: a push runs no
             recipe whose committed evidence is current, and a train whose
             run failed takes the run's evidence with its fix;
+          - **the checker's latency** (the integrator's finding,
+            2026-10-13): a full check of the store program takes about
+            800 ms for 52 files, where E9's gate item 4 passed on 37 ms for
+            36 files (2026-08-08), and an edit costs a full check, so
+            editor feedback is near a second. Every analysis added since
+            resolves names and types bodies on its own, and none shares
+            what another computed. A profile (macOS `sample`, the latency
+            test): the value relations about 10%, a session-handle analysis
+            that built a typer for each printed value about 16% (one typer
+            a body since, track `check-latency`), the effect inference and
+            the summaries about 8% each, and name resolution through every
+            import throughout (each unit's module indexed, one key a lookup,
+            the same track). Nothing read the number again in two months:
+            its recipe is the development machine's (`just e9-latency`).
+            The work: each declaration's typer and resolution computed once
+            a check and shared by every analysis that reads them, then an
+            edit that redoes only what it reaches (E9's query system), the
+            number recorded again at each step;
           - **a recipe not yet measured is planned at its kind's upper
             quartile** (done, ADR-0290's amendment of 2026-10-09).
           - **a shard dealt within a ceiling under its limit** (done,
