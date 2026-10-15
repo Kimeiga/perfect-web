@@ -1,0 +1,51 @@
+diff --git a/lib/Menus.pw b/lib/Menus.pw
+index 634e976..4d8bff4 100644
+--- a/lib/Menus.pw
++++ b/lib/Menus.pw
+@@ -49,6 +49,10 @@ import browser.{ Element, MapHandle, MapError }
+ fn for_store(store: StoreId) -> Result<List<MenuItem>, StoreError> !{ database.read<Menus> }
+     host "store:data/menus#for-store"
+ 
++// One item's price, in cents: one round trip to the database.
++fn price(item: MenuItemId) -> Result<Int, StoreError> !{ database.read<Menus> }
++    host "store:data/menus#price"
++
+ // Partitioned by user rather than by organization. Declared so a challenge
+ // witness can vary the PARTITION without varying anything else.
+ fn for_user(store: StoreId, limit: Int, user: User<UserId>) -> Result<List<MenuItem>, StoreError>
+diff --git a/store/app.pw b/store/app.pw
+index ee62303..1e6acbe 100644
+--- a/store/app.pw
++++ b/store/app.pw
+@@ -42,6 +42,7 @@ import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItem, Interacti
+     MenuItemId, PositiveInt }
+ import capability.{ Session, SessionId }
+ import Events.{ CartChanged }
++import List
+ 
+ // Public. Same answer for every reader, so a shared cache is correct and the
+ // key is just the store.
+@@ -57,6 +58,23 @@ public query Menu(id: StoreId) -> Result<List<MenuItem>, StoreError>
+     Menus.for_store(id)
+ }
+ 
++// Each item's price, read one item at a time: one round trip per item
++// on the menu, after the one that reads the menu.
++public query MenuPrices(id: StoreId) -> List<Result<Int, StoreError>>
++    freshness     5.minutes
++    consistency   snapshot
++    cache         shared
++    key           id
++    concurrency   one_per_key
++    on_key_change cancel
++    timeout       2.seconds
++{
++    match Menus.for_store(id) {
++        Ok(items) => List.map(items, item => Menus.price(item.id)),
++        Err(_) => [],
++    }
++}
++
+ public query Store(id: StoreId) -> Result<Store, StoreError>
+     freshness     30.seconds
+     consistency   snapshot

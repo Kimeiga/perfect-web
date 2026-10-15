@@ -154,7 +154,11 @@ async function showOnce(ex, app) {
   let specs = null;
   try {
     const base = `http://127.0.0.1:${port}`;
-    if (!(await waitFor(`${base}${s.storePath}`, 60_000))) {
+    // Up when it answers at all: a path no route serves, so that the probe
+    // reads nothing of the store. Reading the store page here would be the
+    // first read of everything it reads, and a store that keeps a read (T09's
+    // notice, five minutes) would then keep the probe's, not the spec's.
+    if (!(await waitFor(`${base}/__pw-museum-ready`, 60_000))) {
       return { stage: "serve", out: tail(serverOut) };
     }
     // The spec and the contract's fixtures, beside the harness so they

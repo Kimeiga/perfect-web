@@ -1,0 +1,26 @@
+{
+  "id": "H07-n-plus-one",
+  "leaf": "H07",
+  "title": "One round trip per row: a page whose work grows with its list",
+  "source": {
+    "ref": "census H07 (model/spec), R1, S33",
+    "kind": "model/spec (no dated primary source yet)",
+    "url": "research/failures/taxonomy/02-security-privacy.md#h-database-invariants-and-query-semantics ; https://sre.google/sre-book/handling-overload/",
+    "date": "2026-09-10, as read for the census",
+    "says": "the census's own model: one remote lookup per list row; logical data demand should not impose unnecessary serial or per-row round trips (H07). S33 is the overload a multiplied demand causes, not an N+1 incident. A dated primary source is still to be found, so this exhibit does not yet qualify under the ADR's rule and is shown as a miss pending its source"
+  },
+  "claim": "none: the census marks H07 'specified but unproven' (batch only with equivalent authorization, consistency, limits and failure semantics; report unbatchable causes)",
+  "repro": {
+    "stack": "next-react",
+    "bug": "next-react.patch",
+    "fixed": "fixed.next-react.patch",
+    "how": "a price per menu item read in the Server Component with `Promise.all(menu.map(..))`, one round trip each, counted at `/bench/queries`; the repair reads every price in one round trip"
+  },
+  "pleris": {
+    "kind": "miss",
+    "patch": "pleris.patch",
+    "why": "a query whose body maps a read over a list, `List.map(items, item => Menus.price(item.id))`, checks clean when its effect row declares the read; nothing batches it or refuses it",
+    "faithful": "The same per-item read on the benchmark's store: `Menus.price` per item, inside a public query over the menu. The generality corpus accepts the same shape as a valid neighbour (examples/generality/undeclared_effect/complete-row.pw). A runtime count of the host's round trips is still to be added."
+  },
+  "expect": "miss"
+}
