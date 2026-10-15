@@ -306,28 +306,33 @@ impl<'a> Types<'a> {
         // type (PW5016).
         // A loop's list is a name, or a path inside its value, `cart.lines`
         // (ADR-0172). Until 2026-10-03 a path was not typed, and a handler
-        // in its row could not be resumed (PW5016).
-        let eaches: Vec<(crate::hir::NodeId, Option<Binder>, Vec<String>)> = types
+        // in its row could not be resumed (PW5016). The list is an
+        // expression (ADR-XXXX): a path is read from it, and a list it
+        // computes is typed by what that returns, where it names no type
+        // parameter this typer does not solve.
+        let eaches: Vec<(crate::hir::NodeId, ExprId, Option<Binder>, Vec<String>)> = types
             .lexical
             .each_blocks()
-            .filter(|(_, collection, _)| !collection.contains('('))
-            .map(|(n, collection, head)| {
-                let fields = collection
-                    .split('.')
-                    .skip(1)
-                    .map(|f| f.trim().to_string())
-                    .collect();
-                (n, head, fields)
-            })
+            .map(|(n, list, head)| (n, list, head, fields_of(body, list)))
             .collect();
         let arms: Vec<(crate::hir::NodeId, ExprId)> = types.lexical.template_arms().collect();
         loop {
             let learned = types.bindings.len();
-            for (n, head, fields) in &eaches {
+            for (n, list, head, fields) in &eaches {
                 if types.bindings.contains_key(&Binder::Each(*n)) {
                     continue;
                 }
-                if let Some(elem) = head.and_then(|b| types.element_at(body, b, fields)) {
+                let elem = match head {
+                    Some(b) => types.element_at(body, *b, fields),
+                    None if crate::lexical::path_root(body, *list).is_none() => types
+                        .of(body, *list)
+                        .as_ref()
+                        .and_then(element_of_type)
+                        .filter(|t| !mentions_parameter(t))
+                        .cloned(),
+                    None => None,
+                };
+                if let Some(elem) = elem {
                     types.bindings.insert(Binder::Each(*n), elem);
                 }
             }
@@ -747,6 +752,19 @@ impl<'a> Types<'a> {
             _ => self.by_path(&path_of(body, callee)),
         }
     }
+}
+
+/// The fields a path reads, in order: `lines` in `cart.lines`; none for a
+/// name, or for anything computed.
+fn fields_of(body: &Body, e: ExprId) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut at = e;
+    while let Expr::Field { base, name } = body.expr(at) {
+        out.push(name.clone());
+        at = *base;
+    }
+    out.reverse();
+    out
 }
 
 /// The element type of a written type, seeing through the carriers.

@@ -9537,13 +9537,18 @@ fn loop_keys(hir: &Hir, id: crate::hir::DeclId, decl: &Decl, out: &mut Vec<Diagn
         else {
             continue;
         };
-        let (binding, Some(key), Some(key_span)) = (&each.binder, &each.key, &each.key_span) else {
+        let (binding, Some(read)) = (&each.binder, each.key) else {
             continue;
         };
-        let head = key.split('.').next().unwrap_or_default().trim();
-        if head == binding {
+        // A path from the row: in the key's scope, the row's name is the
+        // innermost binding of it (ADR-XXXX).
+        let from_row = crate::lexical::path_root(body, read)
+            .is_some_and(|root| matches!(body.expr(root), Expr::Name(n) if n == binding));
+        if from_row {
             continue;
         }
+        let key = each.written.key.clone().unwrap_or_default();
+        let key_span = body.expr_span(read);
         out.push(Diagnostic {
             code: crate::codes::LOOP_KEY.id,
             invariant: crate::codes::LOOP_KEY.invariant,

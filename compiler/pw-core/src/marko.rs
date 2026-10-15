@@ -441,12 +441,13 @@ fn emit_node(
                     marker.trim_matches(|c| c == '{' || c == '}').trim()
                 ));
             }
-            let each = each.as_ref().map(Each::of).ok_or_else(|| {
+            let each = each.as_ref().ok_or_else(|| {
                 format!(
                     "the `{}` directive is not modelled yet",
                     directive.trim_matches(|c| c == '{' || c == '}').trim()
                 )
             })?;
+            let each = Each::of(body, each, ctx)?;
             // `by` keys the loop. Marko takes a property NAME for objects and a
             // FUNCTION for primitives — and the loop parameter is not in scope
             // inside `by=`, so `by=item.id` is an undefined variable. The
@@ -462,8 +463,7 @@ fn emit_node(
             };
             out.push_str(&format!(
                 "{pad}<for|{}| of={}{by}>\n",
-                each.binding,
-                ctx.name(&each.source)
+                each.binding, each.source
             ));
             for c in children {
                 emit_node(body, *c, depth + 1, ctx, out)?;
@@ -537,13 +537,19 @@ struct Each {
 }
 
 impl Each {
-    /// The head the grammar read (ADR-0242).
-    fn of(each: &crate::hir::EachHead) -> Each {
-        Each {
-            source: each.list.clone(),
+    /// The head the grammar read (ADR-0242): the list as Marko source, read
+    /// from the expression it is (ADR-XXXX), so a list read from a
+    /// parameter is read from `input`, as any other use of one is; and the
+    /// key as the path it reads from the row, or as written.
+    fn of(body: &Body, each: &crate::hir::EachHead, ctx: &Ctx<'_>) -> Result<Each, String> {
+        Ok(Each {
+            source: expr_text(body, each.list, ctx)?,
             binding: each.binder.clone(),
-            key: each.key.clone(),
-        }
+            key: each.key.map(|k| {
+                crate::template_ir::value_path_of(body, k)
+                    .unwrap_or_else(|| each.written.key.clone().unwrap_or_default())
+            }),
+        })
     }
 }
 

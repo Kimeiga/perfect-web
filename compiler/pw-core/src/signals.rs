@@ -276,12 +276,11 @@ fn dialogs(
             Node::Block {
                 subject, children, ..
             } => {
+                // A loop's list, read as the subject is (ADR-XXXX).
                 let each = lexical
                     .each_blocks()
                     .find(|(node, ..)| *node == n)
-                    .and_then(|(_, _, head)| head)
-                    .and_then(|b| signals.get(&b))
-                    .map(|(name, _)| name.clone());
+                    .and_then(|(_, list, _)| signal_of(list));
                 let decided = subject.and_then(signal_of).or(each);
                 let shown = shown_by.map(str::to_string).or(decided);
                 for c in children {

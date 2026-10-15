@@ -1215,12 +1215,6 @@ fn mark_used(body: &Body, id: ExprId, used: bool, out: &mut BTreeSet<ExprId>) {
     }
 }
 
-/// Is this one name, as a directive writes one?
-fn is_ident(s: &str) -> bool {
-    s.starts_with(|c: char| c.is_alphabetic() || c == '_')
-        && s.chars().all(|c| c.is_alphanumeric() || c == '_')
-}
-
 /// The rounds the typer's bindings are solved in, at most. Each round adds a
 /// binding or completes one's type, or ends the solving; a chain written in
 /// order is solved in one.
@@ -2231,7 +2225,7 @@ impl<'a> Typer<'a> {
         let lists = self
             .lexical
             .each_blocks()
-            .filter(|(_, collection, head)| self.each_list(collection, *head).1)
+            .filter(|(_, list, _)| self.reads_a_member(*list))
             .map(|(n, ..)| n)
             .collect();
         MemberReads { exprs, lists }
@@ -3441,10 +3435,12 @@ impl<'a> Typer<'a> {
         for (b, t) in self.term_binders() {
             added |= self.bind(b, t);
         }
-        // `{#each xs as x}`: each `x` is an element of `xs`, read from the
-        // directive as written: a name, and the fields read from it.
-        for (node, collection, head) in self.lexical.each_blocks() {
-            if let Ty::Builtin(Builtin::List, args) = self.each_collection(collection, head)
+        // `{#each xs as x}`: each `x` is an element of `xs`, the list typed
+        // as any expression is (ADR-XXXX). Until 2026-10-15 it was read from
+        // the directive's text, a name and the fields read from it, and a
+        // computed list's rows had no type.
+        for (node, list, _) in self.lexical.each_blocks() {
+            if let Ty::Builtin(Builtin::List, args) = self.of(list)
                 && let [element] = args.as_slice()
             {
                 added |= self.bind(Binder::Each(node), element.clone());
@@ -3492,34 +3488,18 @@ impl<'a> Typer<'a> {
         added
     }
 
-    /// **The collection an `{#each}` directive names, typed**: a name, and
-    /// the fields read from it. `Unknown` where the directive writes anything
-    /// else.
-    fn each_collection(&self, collection: &str, head: Option<Binder>) -> Ty {
-        self.each_list(collection, head).0
-    }
-
-    /// [`Typer::each_collection`], and whether a read on the way calls a
-    /// member function (ADR-0169).
-    fn each_list(&self, collection: &str, head: Option<Binder>) -> (Ty, bool) {
-        let mut segments = collection.split('.').map(str::trim);
-        let first = segments.next().unwrap_or_default();
-        if !is_ident(first) {
-            return (Ty::Unknown, false);
-        }
-        let mut t = match head {
-            Some(b) => self.local(b),
-            None => self.global(first),
-        };
-        let mut calls = false;
-        for segment in segments {
-            if !is_ident(segment) {
-                return (Ty::Unknown, calls);
+    /// **Whether a loop's list is read through a member function** on the
+    /// way (ADR-0169): `store.items`, where `items` is declared on `Store`
+    /// rather than a field of it. A path's reads, each as it is typed.
+    fn reads_a_member(&self, list: ExprId) -> bool {
+        let mut at = list;
+        while let Expr::Field { base, name } = self.body.expr(at) {
+            if self.calls_a_member(&self.of(*base), name) {
+                return true;
             }
-            calls |= self.calls_a_member(&t, segment);
-            t = self.member_type(&t, segment);
+            at = *base;
         }
-        (t, calls)
+        false
     }
 
     /// **Record the type a binding holds.** A binding keeps the first type
@@ -3662,8 +3642,8 @@ impl<'a> Typer<'a> {
     /// first two failed only when rendered.
     fn template_relations(&self, out: &mut Vec<ValueRelation>) {
         let unknown = |t: &Ty| matches!(t, Ty::Unknown | Ty::Var(_) | Ty::Parameter { .. });
-        for (node, collection, head) in self.lexical.each_blocks() {
-            let t = self.each_collection(collection, head);
+        for (node, list, _) in self.lexical.each_blocks() {
+            let t = self.of(list);
             let outcome = match &t {
                 Ty::Builtin(Builtin::List, _) | Ty::Any => Outcome::Agree,
                 t if unknown(t) => Outcome::Undecided(Undecided::Unknown),
@@ -3683,37 +3663,28 @@ impl<'a> Typer<'a> {
                 declared_at: None,
                 boundary: (span.clone(), "this block".to_string()),
             });
-            // The fields the list is read through exist (ADR-0074).
-            let mut segments = collection.split('.').map(str::trim);
-            let first = segments.next().unwrap_or_default();
-            if is_ident(first) {
-                let start = match head {
-                    Some(b) => self.local(b),
-                    None => self.global(first),
-                };
-                let rest: Vec<&str> = segments.collect();
-                self.read_through(start, &rest, &span, out);
-            }
-            // The key is read from the element, through fields it has, and is
-            // written as text (ADR-0074). A key read from another name is
-            // PW5021's.
+            // The fields the list and the key are read through are related
+            // where each is read, as any field read is (ADR-0074): the head
+            // is expressions (ADR-XXXX), which the walk reaches. The key is
+            // written as text, where it is read from the row; a key read
+            // from another name is PW5021's.
             let crate::hir::Node::Block {
                 each: Some(each), ..
             } = self.body.node(node)
             else {
                 continue;
             };
-            let (binding, Some(key)) = (&each.binder, &each.key) else {
+            let Some(key) = each.key else {
                 continue;
             };
-            let segments: Vec<&str> = key.split('.').map(str::trim).collect();
-            if segments.first() != Some(&binding.as_str()) {
+            let from_row = crate::lexical::path_root(self.body, key)
+                .and_then(|root| self.lexical.binder(root))
+                == Some(Binder::Each(node));
+            if !from_row {
                 continue;
             }
-            let element = self.local(Binder::Each(node));
-            if let Some(t) = self.read_through(element, &segments[1..], &span, out) {
-                out.extend(self.text(t, format!("({key})"), span.clone()));
-            }
+            let written = each.written.key.clone().unwrap_or_default();
+            out.extend(self.text(self.of(key), format!("({written})"), span.clone()));
         }
         let mut roots = Vec::new();
         for id in self.body.walk() {
@@ -4019,58 +3990,6 @@ impl<'a> Typer<'a> {
             declared_at: None,
             boundary: (span, "read here".to_string()),
         }
-    }
-
-    /// **A path a directive reads, field by field** (ADR-0074): each field
-    /// is one its value has. The type at the end, or `None` where a field is
-    /// missing or a value's type is not known. Until 2026-09-26 a directive's
-    /// fields were typed and not checked, so `{#each s.itemz}` passed.
-    fn read_through(
-        &self,
-        start: Ty,
-        fields: &[&str],
-        span: &crate::hir::Span,
-        out: &mut Vec<ValueRelation>,
-    ) -> Option<Ty> {
-        let mut t = start;
-        for name in fields {
-            if !is_ident(name) {
-                return None;
-            }
-            let r = t.receiver()?;
-            let choices = self.sigs.member_choices(self.module(), r, name);
-            let outcome = if self.sigs.member_by_in(self.module(), r, name).is_some()
-                || self
-                    .representation(&t, name)
-                    .is_some_and(|(def, _)| def.unit == self.at)
-            {
-                None
-            } else if !choices.is_empty() {
-                Some(format!("{AMBIGUOUS_MEMBER}{}", choices.join(", ")))
-            } else if self.contents_have(&t, name) {
-                Some(OPTIONAL_CONTENTS.to_string())
-            } else {
-                Some(format!("a member `{name}`"))
-            };
-            if let Some(expected) = outcome {
-                out.push(ValueRelation {
-                    declaration: self.decl.name.clone(),
-                    kind: RelationKind::Member,
-                    span: span.clone(),
-                    target: name.to_string(),
-                    index: None,
-                    outcome: Outcome::Disagree {
-                        expected,
-                        actual: self.display(&t),
-                    },
-                    declared_at: None,
-                    boundary: (span.clone(), "the value read".to_string()),
-                });
-                return None;
-            }
-            t = self.member_type(&t, name);
-        }
-        Some(t)
     }
 
     /// The same relations, over one tree: the body, or a policy's term root,
