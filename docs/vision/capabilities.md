@@ -18,7 +18,7 @@ in the same commit.
   owner's scope.
 
 Checked against train-9 (`track/train-9`, 2026-10-15): `master` at `22a0508e`
-and the train's merges, ADR-0001 to ADR-0342.
+and the train's merges, ADR-0001 to ADR-0343.
 
 ## Built
 
@@ -63,7 +63,7 @@ and the train's merges, ADR-0001 to ADR-0342.
 | Materializations | 0019, 0103, 0176, 0255, 0273, 0277 | A value its body derives, kept, and made again in order. | Public ones only; made again whole; `regenerate on_read` not run. |
 | Structured concurrency and affine resources | 0016, 0045, 0211, 0250, 0251, 0269 | Checked statically (PW20xx). | The `pw-tasks` runtime is not wired into the host. |
 | Layout and frame phases | 0187; R-034, R-038, R-040, R-043 | Checked at compile time. | No frame scheduler in the runtime: no `requestAnimationFrame` or observers. |
-| Developer experience | 0013, 0149, 0276, 0321 | The compiler's feedback: `pw check` (coded diagnostics with spans, and notes shown in the file they belong to), `pw explain` (types, effects, privacy, placement), `pw fmt` (one canonical layout), `pw diff` (what a change means), `pw build`. | No guide or tutorial on `master` (`track/guide` is writing one, with a tutorial app that already checks and is served in a browser test); no editor support or language server ("none exists yet", 0321; the charter asks for one); no `pw new`; no live reload (a host serves one build, 0317); a small standard library (no `split`, no `range`); no debugging aid beyond `PW_TRACE` lines, `GET /metrics` and the development server's per-document trail (0296). |
+| Developer experience | 0013, 0149, 0276, 0321, 0343 | The compiler's feedback: `pw check` (coded diagnostics with spans, and notes shown in the file they belong to), `pw explain` (types, effects, privacy, placement), `pw fmt` (one canonical layout), `pw diff` (what a change means), `pw build`. A guide and a tutorial, `docs/guide/`, whose every example the real `pw` checks, its tutorial the guestbook a browser test drives, and the codes' reference generated from the registry (0343). | The guide covers what a newcomer needs first, not the language (no streams, materializations, uploads, payments, resources or WIT components yet), and `docs/SEMANTICS.md` still reads as the M0-era status; `pw check` passes programs `pw build` refuses (the guide holds three as examples); no editor support or language server ("none exists yet", 0321; the charter asks for one); no `pw new`; no live reload (a host serves one build, 0317); a small standard library (no `split`, no `range`); no debugging aid beyond `PW_TRACE` lines, `GET /metrics` and the development server's per-document trail (0296). |
 
 ## Missing
 
@@ -138,10 +138,10 @@ and the train's merges, ADR-0001 to ADR-0342.
 - The language has no `test` declaration and the CLI no `pw test`. There are
   no fixtures or fake-data helper, no browser harness shipped to authors, and
   no coverage.
-- In flight: `track/guide` compiles its examples with a test and drives its
-  tutorial's app in browsers, and `track/todomvc` holds TodoMVC to the
-  upstream Cypress suite. Each tests Pleris or one app, not a tool an author
-  runs.
+- The guide compiles its examples with a test and drives its tutorial's
+  app in browsers (0343), and `track/todomvc` (in flight) holds TodoMVC to
+  the upstream Cypress suite. Each tests Pleris or one app, not a tool an
+  author runs.
 
 **A data layer declared in Pleris**
 
@@ -185,7 +185,8 @@ source), and a CRDT or OT library behind `replicated`.
 
 Branches being built now (2026-10-15, about 21:30 UTC, as each track's
 progress file and commits show it). None is on `master`; train-9 lands 4c's
-checker (0340), ratings and reviews (0341) and the bug museum (0342).
+checker (0340), ratings and reviews (0341), the bug museum (0342) and the
+guide (0343).
 A row moves when its branch merges with its ADR and its evidence, and not
 before; what a line says here is the branch's aim, and its state as its
 commits show it at that hour. The branches move; `git log` on each says
@@ -198,7 +199,6 @@ more.
 | `track/tables` | D1 of the three-database note (ADR-0338): the `table` declaration, its checks (PW0354 to PW0366), its generated functions, `tables.json` and a schema's diff. Its design settled on train-8's `master`; the grammar and lowering first. | A data layer declared in Pleris. |
 | `track/todomvc` | TodoMVC in Pleris, held to its spec and to its upstream Cypress suite; D2's first app with no Rust data layer (ADR-0338). A page binds a signal to its address's fragment, the platform declares a double press and a control losing focus, a checkbox's patch sets its state, `autofocus` on insert; the app, its layer, its tests, mutation controls and the ADR; its spec 141 of 141 in three engines, and TodoMVC's own Cypress suite run against it (Cypress 15.21.1). Its recipes and `just ci` are left. Local, not pushed. | Routing (a fragment); forms; testing tools; the head-to-head comparison. |
 | `track/second-host` | Hosts sharing one database: each hears every commit from the outbox, and a session is the database's. The outbox is a log in commit order that every host reads from its cursor; a commit through either layer waits for the outbox's lock and wakes another host, tested. Three review findings are being fixed. Local, not pushed. | Reading and live updates; accounts (sessions); a second host. |
-| `track/guide` | The language guide and tutorial, every example compiled by a test with the real compiler: the example checker, a generated reference of the diagnostic codes, a "Why Pleris" page whose refusals compile, a tutorial guestbook served in three engines. Its recipe ran green locally (74 of 74 mutants, 12 browser tests); pushed, train-8 merged in, its final report pending; for train-10. | Developer experience. |
 | `track/each-head-effects` | A finding: an effectful call, or a secret, in an `{#each}`'s head escapes the effect and privacy checks, as the head is kept as text (ADR-0242's not-claimed). The fix gives the head's list and key to every analysis as expressions: committed with its tests, a 21-mutant script and its ADR, train-8 merged in; the scripts it reaches are being run whole. | Privacy and per-user isolation; capabilities (the checker's soundness). |
 | `track/argument-invariants` | A finding: an opaque type's `where` invariant is not held on a command's arguments a browser sends. Each value entering a program from outside to be read through its type's checked constructor, and refused with words where it fails. The reproduction is committed, failing by design; the boundaries are being audited, then the fix. | Commands; forms. |
 | `track/check-is-build` | A finding: `pw check` passes programs `pw build` refuses. The check to run the build's analyses, writing nothing, held by a test over the build's refusals. Started; no commit yet. | Developer experience. |
@@ -282,4 +282,5 @@ Beside that order:
 analytics; AI token streaming. They decide the app after these. Interop and
 testing tools for app authors are exercised by no reference app either.
 Production is kiokun.com's, when the owner says go; a declared data layer is
-the three-database app's; developer experience is `track/guide`'s.
+the three-database app's; developer experience has its guide (0343), and
+its editor support, `pw new` and live reload wait.

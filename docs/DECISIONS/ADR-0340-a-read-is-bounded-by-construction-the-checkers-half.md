@@ -464,3 +464,11 @@ rulings, and what the merge did:
   holds them, with the test that applies them in memory
   (`the_stores_pair_and_its_sources_cost_are_the_integrators_to_add_together`),
   to land together.
+- **Where this track met ADR-0341 on the train**: ratings and reviews,
+  merged after this, gave `StoresOpen`'s loop each store's ratings
+  (`listed(s, hours, ratings)`), and
+  `the_stores_loop_is_seen_and_refused_where_it_reads_per_element` edits
+  that loop's line by its exact text. The train's first `just ci` failed
+  it; it edits the merged line now, the same refusal word for word, and
+  `bounded_checker_mutations.py` ran whole on the train, 40 of 40
+  (22:42 to 22:51Z).

@@ -1813,19 +1813,23 @@ Each a decision for a track, with its date; a track's ADR records it too.
   - Landed from the PC by the integrator's delegate, across two usage
     cut-offs, from its progress file.
 - **2026-10-15, train-9** (`track/train-9`, from `master` at `22a0508e`;
-  the integrator's delegate, on the PC): three merges, each its own merge
+  the integrator's delegate, on the PC): four merges, each its own merge
   commit with its ADR numbered and its documents, merged, resolved, then
-  numbered (ADR-0281), and three small commits.
+  numbered (ADR-0281), and four small commits.
   - **What it carries.** NEXT 4c's checker (ADR-0340, track
     `bounded-checker`, from `e5b8cdb9`): a read keyed by its loop's element
     refused (PW0405), `set` pairs held to their shape (PW0407), `sets` and
     PW0406; corpus C25. Ratings and reviews (ADR-0341, W9's, from
     `2190221c`), the DoorDash customer side's last piece but scheduled
     orders. The bug museum and the head-to-head's protocol (ADR-0342, track
-    `proof`, from `11531dba`). Then: the store page's two pinned shapes
-    brought to its ratings (`0483e495`); `scripts/doctor.sh` and
-    `scripts/record-environment.sh` executable again (train-8's finding);
-    and `statements_separated.rs`'s stale `ADR-XXXX`, ADR-0303.
+    `proof`, from `11531dba`). The guide whose examples compile (ADR-0343,
+    track `guide`, from `49967631`), taken with the coordinator's leave
+    once it was pushed on green, before this train's `just ci` ran again.
+    And: the store page's two pinned shapes brought to its ratings
+    (`0483e495`); `scripts/doctor.sh` and `scripts/record-environment.sh`
+    executable again (train-8's finding); `statements_separated.rs`'s stale
+    `ADR-XXXX`, ADR-0303; and `bounded_reads`' store test brought to the
+    loop reviews changed (`ed5d0bb2`, below).
   - **The tracks' own runs.** `bounded-checker`'s verify (38780144526)
     green in every job finished when it was merged, its longest shard still
     running; `proof`'s (38734336242) green; each one's `ci` red only in
@@ -1847,6 +1851,12 @@ Each a decision for a track, with its date; a track's ADR records it too.
     - ADR-0342: H07, below. Its question, whether the own renderer's
       Playwright config should start only the hosts a spec needs, is not
       ruled here: open.
+    - ADR-0343: the root README's link to the guide is kept; the
+      guestbook's hosts are PORT + 210 to 212, beside the reviews'; its
+      reference of codes regenerated at the merge for PW0405 to PW0407, as
+      its §3 asks; `mutant_programs.py`'s guestbook entry is open; the
+      checks' gaps go to their tracks, and the two with none (`<img>` with
+      no `alt`, `&&`'s message) to KNOWN_LIMITATIONS.
   - **A finding, the museum working as meant: its first closed miss.**
     Merged after ADR-0340 on the same train, the museum's `--checks-only`
     run failed: H07's unchanged program, an N+1 read (`List.map` over
@@ -1866,6 +1876,16 @@ Each a decision for a track, with its date; a track's ADR records it too.
     the train both files passed in the three engines (92 passed, 1
     skipped). To every worker: a change to a page runs the browser suites
     that pin that page's shape, not only its own spec, before its push.
+  - **A finding: two merges met in one line, which only the train saw.**
+    `bounded_reads`' store test (ADR-0340) edits `StoresOpen`'s loop in
+    `hours.pw` to read each store's hours in it and expects PW0405 there;
+    ADR-0341 had given that loop each store's ratings, so the line was gone
+    and the train's first `just ci` failed the test before it checked
+    anything. Each track was green alone. The test now edits the merged
+    line, the same refusal word for word (`ed5d0bb2`), and
+    `bounded_checker_mutations.py` ran whole again on the train, 40 of 40.
+    A train's `just ci` is where its tracks meet; a test that edits another
+    track's program text by its exact line is where they meet first.
   - **A record's count, unchecked**: `bounded-checker`'s commit `1f0d772f`
     says "41 in all" of a script that has 40 mutants (its ADR and its run
     say 40); `track/evidence-integrity`'s family of findings.

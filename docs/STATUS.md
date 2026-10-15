@@ -122,6 +122,9 @@ and answers of 2026-10-15; corpus C25).
 - The track's own runs: `bounded_checker_mutations.py` whole, 40 of 40, and
   `just ci` green twice, the second at its head; its `verify`
   (38780144526) green in every job that had finished when it was merged.
+  On the train, its store test edits the home page's loop as ADR-0341
+  left it (the train's first `just ci` found the two merges meeting
+  there), and the script ran whole again, 40 of 40.
 Verify TRAIN_RUN green, with train-9.
 
 **ADR-0339, 2026-10-15: a collaborative document is merged by Automerge,
