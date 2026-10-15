@@ -23,6 +23,52 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**2026-10-14: a change to a source's own tests plans what runs them** (the
+integrator's finding at train-6; track `planner-test-modules`, merged from
+`80802a46`).
+- Train-6's survivor in `e14-page-policy` was killed by a test in
+  `csp.rs`'s own `mod tests`, and its push planned no `e14-page-policy`:
+  no test file, far from every mutant, while the script runs those tests by
+  the filter `csp::`. A change after a source's `#[cfg(test)] mod tests {`
+  now reaches the scripts and recipes that name the module's filter, as
+  train-6's fix made a server test module's reach those that name
+  `tests::<name>::`.
+- Held by a test whose change is far from every mutant, and three mutants
+  (`dealt_by_time_mutations.py`, 48 of 48).
+Verify 38629460236 green, with train-7.
+
+**2026-10-14: a mutant of a program's source is still a program** (the
+integrator's finding; track `mutant-programs`, merged from `6a30b2f5`).
+- Of the 237 mutants of a `.pw` source the mutation scripts plant, the
+  checker refused the program 14 left: each "killed" by the build, whatever
+  the tests hold, its verdict reading as a test's. Three were refused for
+  another reason than what they undo: store-hours' "an order is placed
+  whatever the hours" called `UserOrders.place` with one argument since
+  order-total gave it three; command-answers' wrote `&&`, which the
+  language does not have; kiokun's read a list of another type. Each is
+  well-typed now and killed by its own script's tests (3 of 13, 1 of 42, 2
+  of 2). The other eleven take away a protection the checker holds, and
+  their scripts say which rule (`CHECKED`).
+- `just ci` holds it (`mutant-programs`, `scripts/mutant_programs.py`):
+  237 mutants, 11 refused by their named rule, none failing; on the tree
+  before, all 14 fail. Its logic is held with a stand-in checker (4 tests).
+Verify 38629460236 green, with train-7.
+
+**2026-10-14: the corpus specifies `invoked_by`** (the integrator's finding;
+corpus C24; track `corpus-invoked`, merged from `64e5ee4e`).
+- NEXT 6c's five codes (PW6401 to PW6405, a command the platform invokes)
+  had no fixture: the corpus, the executable specification, did not say
+  them. C24 adds a rejected fixture for each (R-070 to R-074) and a
+  generality pair for each, a GENERAL witness on the clock's command and a
+  NEIGHBOUR beside it. Generality 54 / 54.
+- Exercising them found two diagnostics that named no boundary span, which
+  charter §16.3 requires: PW6402 and PW6405 name their `invoked_by` clause
+  now, held by a test and two mutants (`invoked_by_mutations.py`, 14 of
+  14). PW6405's invariant says the clock's word as well as a provider's.
+- Measured: the rejected corpus exercises 54 of the 196 codes. NEXT holds
+  the rest, and the rule for a new code.
+Verify 38629460236 green, with train-7.
+
 **ADR-0334, 2026-10-14: a command runs when the clock passes its time**
 (the integrator's; ADR-0332's not-claimed sweep and NEXT 4's third step;
 track `scheduled-commands`, merged from `9bd44dec`).

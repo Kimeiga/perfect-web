@@ -1,0 +1,17 @@
+// @status: GENERAL
+// @invariant: invoked_command_parameters
+//
+// Structurally different from R-071: the outcome is given, and a second
+// parameter beside it, which the host has nothing to give.
+
+module generality.settled_and_more
+
+import domain.{ InteractionId }
+import payments.{ Settled }
+
+command settle(settled: Settled, times: Int) -> Result<Int, String>
+    invoked_by    Payments
+    idempotent_by InteractionId
+{
+    Ok(times)
+}

@@ -40,6 +40,15 @@ POSTGRES = "postgres"
 BROWSER = "browser"
 
 # (what is undone, which tests, file, anchor, replacement)
+# The mutants the checker refuses, by the rule that is the protection each
+# takes away (`scripts/mutant_programs.py`): every other mutant here
+# leaves a program that checks.
+CHECKED = {
+    "the count is cached shared, every reader's": {'PW5001'},
+    'mark-read reaches no other session: it invalidates nothing': {'PW5106', 'PW5107'},
+    "a like tells the post's author nothing: the count listens for no `Notified`": {'PW5106'},
+}
+
 MUTANTS = [
     (
         "a listener's handle binds no event's id (ADR-0091 unamended)",

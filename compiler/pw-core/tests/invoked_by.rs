@@ -252,3 +252,39 @@ fn no_page_presses_a_command_the_platform_invokes() {
         reported(&begins)
     );
 }
+/// **PW6402 and PW6405 name the clause they hold the command to** (charter
+/// §16.3, corpus C24): the `invoked_by` it declares, which is why it is
+/// given a payment's outcome and keyed. Until C24 exercised them, both named
+/// no boundary span. The control: a command a reader presses, keyed by
+/// nothing, is told nothing.
+#[test]
+fn a_payments_command_is_told_at_its_invoked_by_clause() {
+    let src_of = |decls: &str| files(decls).last().expect("t.pw").1.clone();
+    let boundary = |decls: &str, code: &str| -> Vec<String> {
+        let src = src_of(decls);
+        pw_core::check::check_sources(&files(decls))
+            .into_iter()
+            .filter(|(n, _)| n == "t.pw")
+            .flat_map(|(_, ds)| ds)
+            .filter(|d| d.code == code)
+            .flat_map(|d| d.related)
+            .map(|r| src[r.span.start..r.span.end].trim().to_string())
+            .collect()
+    };
+    let misgiven = command("settle", "order: String", BY);
+    assert_eq!(
+        boundary(&misgiven, "PW6402"),
+        ["invoked_by    Payments"],
+        "{:?}",
+        reported(&misgiven)
+    );
+    let unkeyed = command("settle", "settled: Settled", "    invoked_by Payments\n");
+    assert_eq!(
+        boundary(&unkeyed, "PW6405"),
+        ["invoked_by Payments"],
+        "{:?}",
+        reported(&unkeyed)
+    );
+    let pressed = command("begin", "n: Int", "");
+    assert!(reported(&pressed).is_empty(), "{:?}", reported(&pressed));
+}

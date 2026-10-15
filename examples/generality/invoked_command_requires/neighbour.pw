@@ -1,0 +1,26 @@
+// @status: NEIGHBOUR
+// @invariant: invoked_command_requires
+//
+// The predicate is held where a reader acts: the command a reader presses
+// requires it, and schedules the clock's, which requires nothing.
+
+module generality.requiring_scheduler
+
+import domain.{ InteractionId }
+import clock.{ minutes }
+// The deployment's `SignedIn`, as A-005 declares it.
+import cart.commands.{ SignedIn }
+
+command remind(order: String) -> Result<Int, String>
+    invoked_by    Clock
+    idempotent_by InteractionId
+{
+    Ok(1)
+}
+
+command remind_later(order: String) -> Result<Int, String> !{ clock.schedule }
+    requires SignedIn
+{
+    schedule remind(order) after minutes(30)
+    Ok(1)
+}
