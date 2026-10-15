@@ -757,9 +757,16 @@ fn an_argument_that_breaks_its_invariant_never_reaches_the_component() {
             "argument refused: value 2 is {forged}, and `domain.PositiveInt` holds `value >= 1`"
         );
         // Each way in: the free function and the compiled component's, with
-        // its `requires` evaluated, and the measured call a benchmark makes.
+        // its `requires` evaluated; and the unauthorized call and the
+        // measured one a benchmark makes, which refuse an export that
+        // requires anything, but only after its arguments are decoded.
         let calls: Calls = Arc::default();
-        let why = authorized_call(
+        let asked: Arc<Mutex<Vec<String>>> = Arc::default();
+        let evaluate = |predicate: &str, _: &[&Val]| {
+            asked.lock().unwrap().push(predicate.to_string());
+            Ok(true)
+        };
+        let why = engine::call_authorized_within(
             &bytes,
             &c,
             &granted,
@@ -767,6 +774,7 @@ fn an_argument_that_breaks_its_invariant_never_reaches_the_component() {
             &host(&calls, answered.clone()),
             &at,
             &args,
+            evaluate,
         )
         .expect_err("refused before the component runs");
         assert_eq!(why, said);
@@ -778,37 +786,72 @@ fn an_argument_that_breaks_its_invariant_never_reaches_the_component() {
                 &host(&calls, answered.clone()),
                 &at,
                 &args,
-                approve_store_authorization,
+                evaluate,
             )
             .expect_err("refused before the component runs");
         assert_eq!(why, said);
+        let why = prepared
+            .call_within(
+                &c,
+                &granted,
+                &limits(),
+                &host(&calls, answered.clone()),
+                &at,
+                &args,
+            )
+            .expect_err("refused");
+        assert_eq!(why, said, "decoded before its `requires` is asked for");
+        let why = prepared
+            .call_measured(
+                &c,
+                &granted,
+                &limits(),
+                &host(&calls, answered.clone()),
+                &at,
+                &args,
+            )
+            .expect_err("refused");
+        assert_eq!(why, said, "decoded before its `requires` is asked for");
         assert!(
             calls.lock().unwrap().is_empty(),
             "no operation was called: {:?}",
             calls.lock().unwrap()
         );
+        assert!(
+            asked.lock().unwrap().is_empty(),
+            "no predicate read it: {:?}",
+            asked.lock().unwrap()
+        );
     }
-    // The control: 1 runs, and reaches the data layer.
+    // The control: 1 runs each way, and reaches the data layer each time.
     let calls: Calls = Arc::default();
-    authorized_call(
-        &bytes,
-        &c,
-        &granted,
-        &limits(),
-        &host(&calls, answered.clone()),
-        &at,
-        &[item("cortado"), Val::S64(1)],
-    )
-    .expect("a count runs");
-    assert!(
-        calls
-            .lock()
-            .unwrap()
-            .iter()
-            .any(|(op, _)| op == "store:data/user-carts#add"),
-        "{:?}",
-        calls.lock().unwrap()
-    );
+    let count = [item("cortado"), Val::S64(1)];
+    let ops = host(&calls, answered.clone());
+    authorized_call(&bytes, &c, &granted, &limits(), &ops, &at, &count).expect("a count runs");
+    prepared
+        .call_authorized_within(
+            &c,
+            &granted,
+            &limits(),
+            &ops,
+            &at,
+            &count,
+            approve_store_authorization,
+        )
+        .expect("a count runs");
+    prepared
+        .call_within(&c, &granted, &limits(), &ops, &at, &count)
+        .expect("a count runs");
+    prepared
+        .call_measured(&c, &granted, &limits(), &ops, &at, &count)
+        .expect("a count runs");
+    let added = calls
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|(op, _)| op == "store:data/user-carts#add")
+        .count();
+    assert_eq!(added, 4, "{:?}", calls.lock().unwrap());
 }
 
 /// **A data layer's answer that breaks an invariant is the command's
@@ -901,7 +944,10 @@ fn sustained_calls_leave_memory_flat() {
                 &limits(),
                 &ops,
                 &[&interface, &function],
-                &[item(&format!("item-{n}")), Val::S64(n)],
+                // A count from 1: a `PositiveInt` of 0 is refused before the
+                // component runs (ADR-XXXX, argument invariants), and this
+                // measures the calls that run.
+                &[item(&format!("item-{n}")), Val::S64(n + 1)],
                 approve_store_authorization,
             )
             .expect("runs");
