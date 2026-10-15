@@ -3,11 +3,11 @@
   "leaf": "F01",
   "title": "Text another user wrote runs as script in a customer's page",
   "source": {
-    "ref": "S21, S27",
-    "kind": "security guidance; W3C specification",
-    "url": "https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html ; https://www.w3.org/TR/trusted-types/",
-    "date": "2026-09-10, as read for the census",
-    "says": "the census's reading: output contexts need different treatment, and safe text sinks, validated URLs and audited HTML sanitization are not interchangeable (S21); Trusted Types constrains values entering injection sinks through explicit policies (S27)"
+    "ref": "GHSA-9f4f-jv96-8766 (CVE-2025-46719); S21, S27",
+    "kind": "a CVE, the advisory of the app that had it (Open WebUI, a SvelteKit app); security guidance; W3C specification",
+    "url": "https://github.com/advisories/GHSA-9f4f-jv96-8766 ; https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html ; https://www.w3.org/TR/trusted-types/",
+    "date": "CVE-2025-46719 published by NVD 2025-05-05, reviewed by GitHub 2026-07-07, read 2026-10-15; S21, S27 2026-09-10, as read for the census",
+    "says": "Open WebUI before 0.6.6 (a SvelteKit app: `@sveltejs/kit` in its package.json, read 2026-10-15) rendered an HTML token of a chat message with `{@html `${token.text}`}` (MarkdownTokens.svelte): a stored XSS, rated high, which the advisory takes to account takeover; it calls `{@html}` \"a dangerous Svelte functionality\". the census's reading: output contexts need different treatment, and safe text sinks, validated URLs and audited HTML sanitization are not interchangeable (S21); Trusted Types constrains values entering injection sinks through explicit policies (S27)"
   },
   "claim": "charter §8.2 (escaping is the default); `html.raw_html` performs `unsafe.raw_html`, and reaching it needs an audited capability with a justification (PW5010)",
   "related": [

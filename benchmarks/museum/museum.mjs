@@ -375,7 +375,9 @@ async function main() {
     console.log(`   ${ex.repro.stack}, the bug: ${counts(shown.bug)}${shown.happens ? "" : "  <- the bug did not happen"}`);
     for (const f of shown.bug.failures ?? []) console.log(`     ${f}`);
     if (shown.bug.out) console.log(shown.bug.out.replace(/^/gm, "     "));
-    console.log(`   ${ex.repro.stack}, repaired: ${counts(shown.fixed)}${shown.control ? " (the spec fails: it detects the bug)" : "  <- the repair did not make the spec fail"}`);
+    // A half not run says only that: no claim about a spec that did not run.
+    const controlSaid = shown.skipped ? "" : shown.control ? " (the spec fails: it detects the bug)" : "  <- the repair did not make the spec fail";
+    console.log(`   ${ex.repro.stack}, repaired: ${counts(shown.fixed)}${controlSaid}`);
     if (shown.fixed.out) console.log(shown.fixed.out.replace(/^/gm, "     "));
     const said = answer(ex);
     if (said.program) {

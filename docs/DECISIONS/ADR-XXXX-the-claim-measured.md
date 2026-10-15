@@ -144,9 +144,9 @@ counts.
 |---|---|---|---|---|---|
 | `J08-shared-server-state` | J08, E01 | S54: SvelteKit docs, "state management", its server-global example (framework documentation; read 2026-10-14) | SvelteKit: a module-level variable a `load` sets for one request and another request reads | `R-004`'s rule, `PW0100`: a session-labelled value in a shared materialization; charter §7.8 | refused (diagnostic) |
 | `G01-retried-command-twice` | G01, M04 | S13: AWS Builders' Library, "making retries safe with idempotent APIs"; S14: Stripe, "idempotent requests" (engineering article, provider contract) | Next.js: a Server Action that places an order, its POST delivered twice (a retry), two orders | `R-014`'s rule, `PW0312`; `idempotent_by` (ADR-0024/0025); T08's refusal (ADR-0154) | partial: to establish what the checker refuses and what the runtime performs since ADR-0120's finding |
-| `F01-markup-from-text` | F01 | S21: OWASP XSS prevention cheat sheet; S27: W3C Trusted Types (guidance, specification) | SvelteKit `{@html}` and Next.js `dangerouslySetInnerHTML` on a store description holding `<img onerror>` | `R-024`'s rule, `PW0322`: `raw_html` needs the `unsafe.raw_html` capability and a justification; charter §8.2 | refused (diagnostic), and a runtime test that text is escaped |
-| `J01-stale-page-after-save` | J01 (B06) | ADR-0280: the owner's own Next.js case; Next.js docs, `staleTimes` and the Router Cache (framework documentation, read 2026-10-08) | Next.js: a save, then `router.push` to a page the Router Cache serves as read before the save | ADR-0280: a handler navigates after its command commits | refused (runtime) |
-| `H07-n-plus-one` | H07 | the census has a model/spec only; a primary source is to be found (an incident report naming N+1, or the framework's docs on request waterfalls) | Next.js: a Server Component that reads one row per list item | none found yet: the census marks H07 "specified but unproven" | **miss**, unless a rule is found |
+| `F01-markup-from-text` | F01 | GHSA-9f4f-jv96-8766 (CVE-2025-46719): Open WebUI, a SvelteKit app, rendered a chat message's HTML with `{@html}` (a CVE; NVD 2025-05-05, read 2026-10-15); S21: OWASP XSS prevention cheat sheet; S27: W3C Trusted Types (guidance, specification) | SvelteKit `{@html}` and Next.js `dangerouslySetInnerHTML` on a store description holding `<img onerror>` | `R-024`'s rule, `PW0322`: `raw_html` needs the `unsafe.raw_html` capability and a justification; charter §8.2 | refused (diagnostic), and a runtime test that text is escaped |
+| `J01-stale-page-after-save` | J01 (B06) | vercel/next.js#42991, "next/link is not calling the server for subsequent navigations on dynamic routes" (the framework's tracker; opened 2022-11-16, read 2026-10-15); ADR-0280: the owner's own Next.js case; Next.js docs, `staleTimes` and the Router Cache (framework documentation, read 2026-10-08) | Next.js: a save, then `router.push` to a page the Router Cache serves as read before the save | ADR-0280: a handler navigates after its command commits | refused (runtime) |
+| `H07-n-plus-one` | H07 | Vercel's own Next.js course, "Query performance patterns" (the framework vendor's documentation; updated 2026-08-21, read 2026-10-15); Prisma ORM's "Query optimization" (ORM documentation, read 2026-10-15); the census's model/spec. No incident report yet | Next.js: a Server Component that reads one row per list item | none found yet: the census marks H07 "specified but unproven" | **miss**, unless a rule is found |
 
 The sixth, queued: a race between two tabs (H01, lost update, S16
 PostgreSQL's isolation docs), expected a miss.
@@ -210,16 +210,34 @@ the ADR that reports it.
 
 ## Downloads the owner is asked about
 
-Nothing was downloaded. These would be:
+Nothing was downloaded, and none of these is approved (ruled by the
+integrator, 2026-10-15: the requests stay here, and the coordinator asks the
+owner). Licences and sizes as their own records state them, read 2026-10-15
+(GitHub's API for the repository, the npm registry's metadata for the
+packages; no code fetched):
 
-- **TodoMVC's own React and Svelte implementations**, from the `tastejs/todomvc`
-  repository: name, version (a commit), licence (expected MIT, to verify)
-  and size to be stated when asked, before fetching;
-- **axe-core** for the accessibility audit (licence MPL-2.0 expected, to
-  verify; version and size to state);
-- any framework version a CVE exhibit needs (for example Next.js before
-  15.2.3 for CVE-2025-29927, S10), only if a pattern reproduction is judged
-  not enough.
+- **TodoMVC's own React and Svelte implementations**: `tastejs/todomvc` at
+  `ff43b02e59dfa604386bb382034b2cd07c2bcd8a` (2026-05-03), MIT by its
+  `license.md` ("Everything in this repo is MIT License unless otherwise
+  specified"; neither example's `package.json` names another).
+  `examples/react`: 26 files, 2,011,587 bytes, of which a committed
+  production build (`dist/`, 1.63 MB, 1.36 MB of it a source map) and a
+  368 KB lockfile; `examples/svelte`: 17 files, 123,152 bytes, its build
+  (`dist/`) 57 KB. The committed builds serve as they are; building either
+  from source needs its npm dependencies, a further download not asked for;
+- **axe-core** for the accessibility audit, through Playwright:
+  `@axe-core/playwright` 4.13.0 (MPL-2.0, 47,180 bytes, 7 files), which
+  depends on `axe-core ~4.13.0`, that is 4.13.0 (MPL-2.0, 3,113,323 bytes;
+  the latest, 4.14.0, is 3,430,531), with Playwright, already installed, as
+  its peer;
+- **a vulnerable Next.js**, only if a pattern reproduction is judged not
+  enough for a CVE exhibit: `next@15.2.2`, the last before CVE-2025-29927's
+  fix in 15.2.3 (S10), MIT, 111,018,792 bytes, 7,277 files, and on this host
+  its compiler `@next/swc-linux-x64-gnu@15.2.2`, MIT, 143,989,537 bytes; with
+  its small dependencies (`styled-jsx` 1.0 MB MIT, `@swc/helpers` 234 KB
+  Apache-2.0, and others) about 260 MB, and its optional `sharp@0.33.5`
+  (Apache-2.0) would add `@img/sharp-libvips-linux-x64@1.0.4`, 16 MB,
+  LGPL-3.0-or-later.
 
 ## Consequences
 
@@ -233,9 +251,10 @@ Nothing was downloaded. These would be:
 
 ## Results
 
-`node benchmarks/museum/museum.mjs`, 2026-10-14, the five exhibits run here;
-`just e14-museum` records them with the mutation controls in
-`docs/evidence/E14/museum.txt`. Misses first:
+`node benchmarks/museum/museum.mjs`, 2026-10-14, the five exhibits run here,
+and J01's Pleris half again on 2026-10-15 (finding 2); the mutation controls,
+`scripts/proof_mutations.py`, killed 3 of 3 on 2026-10-15. `just e14-museum`
+records both in `docs/evidence/E14/museum.txt`. Misses first:
 
 | exhibit | the bug, shown | its repair | Pleris |
 |---|---|---|---|
@@ -256,7 +275,16 @@ Corrections first.
    `pw check` reports `PW5001`; R-024 says `PW0322` and it reports
    `PW5010`. The `@invariant` names still match. The brief's "59 `R-*`
    programs" are 69 now.
-2. **`bench.mjs`'s Next.js and SvelteKit sandboxes cannot install on the PC
+2. **(this track's own runner) The museum read J01's passing runtime test as
+   a failure.** The first whole J01 run (2026-10-15, about 02:03Z) printed
+   Playwright's "1 passed (8.5m)" for `navigate.spec.mjs`'s order test, and
+   the museum reported "NOT refused (its runtime test failed)": Playwright's
+   line reporter writes cursor moves (`ESC[1A ESC[2K`) before its summary
+   even into a pipe with `FORCE_COLOR=0`, so the exhibit's `^\s*1 passed`
+   never matched. The runner now reads a test's output without escape
+   sequences. Its `--checks-only` output also said a repair "fails the spec"
+   where no spec had run; it now says "not run" alone.
+3. **`bench.mjs`'s Next.js and SvelteKit sandboxes cannot install on the PC
    this ran on**, two ways: corepack's last known good pnpm there is 12.11.2,
    whose files are missing, so any `pnpm` outside the repository fails, and
    the sandboxes live under `/tmp`; and inside it, the harness's pinned
@@ -265,70 +293,119 @@ Corrections first.
    `ERR_PNPM_NO_OFFLINE_TARBALL`. The E14 harness's runs and the tasks'
    controls on those two stacks need a download on this host (shown by the
    same install run by hand, not by running those recipes). The museum
-   builds in place instead.
-3. **G01's bug is in ADR-0120's own store.** An idiomatic Server Action in a
+   builds in place instead. Ruled by the integrator, 2026-10-15: it stays a
+   finding, and the museum keeps building in place.
+4. **G01's bug is in ADR-0120's own store.** An idiomatic Server Action in a
    `<form action>` adds once per delivery of its request; no change was
    needed to show it.
-4. **J08's faithful program is a stand-in, said so.** Pleris has no
+5. **J08's faithful program is a stand-in, said so.** Pleris has no
    module-level mutable state, so the framework's construct cannot be
    written; the one place a Pleris program keeps a value across requests is
    a resource's cache, and the same intent there is refused. Not shown: data
    a user types, kept in a public resource, carries no private label, and
    whether Pleris would refuse that variant is untested; it is the next
    exhibit's question, and may be a partial.
-5. **H07: Pleris accepts a read per row.** The generality corpus holds the
+6. **H07: Pleris accepts a read per row.** The generality corpus holds the
    same shape as an accepted neighbour
    (`examples/generality/undeclared_effect/complete-row.pw`); nothing
    batches it. The census's "specified but unproven" is accurate. Not yet
-   measured: the round trips the Pleris runtime makes for it. H07 also has
-   no dated primary source yet, so by this ADR's own rule it does not yet
-   qualify; it is kept, labelled, because a miss is better shown than
-   omitted.
-6. **J01 confirms ADR-0280's reading in the pinned version**: next@16.3.8's
+   measured: the round trips the Pleris runtime makes for it. H07's sources
+   are now documentation (read 2026-10-15): Vercel's own Next.js course
+   names queries inside `.map()` as the problem, and Prisma's documentation
+   defines the n+1 problem; so it qualifies by this ADR's fourth kind. No
+   incident report naming N+1 in a Next.js or SvelteKit app was found in the
+   time given to it.
+7. **J01 confirms ADR-0280's reading in the pinned version**: next@16.3.8's
    own defaults are `staleTimes { dynamic: 0, static: 300 }`, and a fully
-   prefetched page is shown after a save until `router.refresh()`.
-7. **A readiness probe that reads the page is the first read of what it
+   prefetched page is shown after a save until `router.refresh()`. The
+   framework's own tracker has carried the behaviour since 2022:
+   vercel/next.js#42991 (opened 2022-11-16, closed 2023-08-16, 297
+   comments).
+8. **A readiness probe that reads the page is the first read of what it
    reads.** The runner's probe asked for the store page, T09's notice was
    kept five minutes from it, and F01's spec never saw its markup. The probe
    asks for a path no route serves.
+9. **J01's repair is itself reported broken on streamed pages.**
+   vercel/next.js#99028 (opened 2026-09-22, open, read 2026-10-15): after a
+   mutation, `router.refresh()` fetches nothing for a streamed page in
+   production builds of 16.1.7, 16.3.5 and 16.4.0-canary.37, and the page
+   keeps the data read before the mutation until a hard reload. The pinned
+   16.3.8 is not in its matrix. J01's cart page does not stream, and the
+   repair works there (the spec fails on it). Not shown: whether 16.3.8 has
+   the defect (Next, 1).
+10. **F01's construct is a real CVE's.** Open WebUI, a SvelteKit app,
+    rendered a chat message's HTML token with `{@html}` and no sanitizer
+    before 0.6.6 (GHSA-9f4f-jv96-8766, CVE-2025-46719, rated high; its
+    advisory takes it to account takeover). The exhibit's reproduction is
+    the same directive on text another user wrote; its source is now a CVE
+    of the app that had it (the second kind), S21 and S27 the guidance.
+11. **J01's Pleris half takes 8.5 minutes for its one test here**: the own
+    renderer's Playwright config starts every host its suite declares (about
+    forty servers, `spikes/own-renderer/playwright.config.mjs`) before the
+    first test, whichever spec is run. Starting only the hosts a spec needs
+    would make the museum's runtime halves, and any one-spec run, fast; it
+    is a shared file, so this is a question (below), not a change.
 
 ## What is claimed, and what is not
 
 - Claimed, for these five: the bug happens in the pinned framework version
   and its idiomatic repair removes it, and Pleris's answer is as the table
   says, each by a recorded command, with mutation controls for the three
-  refusing codes.
+  refusing codes. Each exhibit's source is the one its `exhibit.json` names,
+  with the kind, the date read and the words quoted.
 - Not claimed: that five exhibits sample the census; that a refused class
-  is refused for every program of it (finding 4); that the census's
-  documentation and guidance sources are incidents (each exhibit prints its
-  source's kind); H07's runtime cost in Pleris; any head-to-head number,
-  none of which is measured yet.
+  is refused for every program of it (finding 5); that the documentation
+  and guidance sources are incidents (each exhibit prints its source's
+  kind; H07 has documentation only); H07's runtime cost in Pleris; whether
+  J01's repair fails on a streamed page in the pinned version (finding 9);
+  any head-to-head number, none of which is measured yet.
 
 ## Next
 
-1. Dated primary sources where the census has guidance or a model only:
-   H07 (an incident naming N+1, or a framework's documentation of it), F01
-   (a CVE of this pattern in a Next.js or SvelteKit app), J01 (a Next.js
-   issue of the owner's case).
-2. The sixth exhibit, two tabs (H01, a lost update, S16), and J08's variant
-   (finding 4).
-3. F01's second layer: every Pleris page carries a CSP from its build
+1. J01's variant on a streamed page (finding 9): the same save and push to
+   a cart page that streams (a `Suspense` boundary), repaired by
+   `router.refresh()`, in the pinned 16.3.8. If the repair fails there, the
+   framework's documented fix is itself the bug, and the exhibit's control
+   is a hard reload; if it holds, the exhibit says so.
+2. H07: an incident report or advisory naming N+1 in a Next.js or SvelteKit
+   app (the first two kinds), and the round trips the Pleris runtime makes
+   for the exhibit's program.
+3. The sixth exhibit, two tabs (H01, a lost update, S16), and J08's variant
+   (finding 5).
+4. F01's second layer: every Pleris page carries a CSP from its build
    (ADR-0195's ruling 13), which would refuse an inline handler that
    reached the page; not yet shown by a test.
-4. The census's "missing" and "partially covered" leaves as exhibits that
+5. The census's "missing" and "partially covered" leaves as exhibits that
    say "Pleris does not catch this yet" (NEXT).
-5. The head-to-head, TodoMVC first, once `track/todomvc` lands and the
+6. The head-to-head, TodoMVC first, once `track/todomvc` lands and the
    owner decides the downloads above; then the store slice.
+
+## Rulings
+
+Ruled by the integrator, 2026-10-15, on this ADR's questions:
+
+1. **Downloads**: none approved. The requests stay in "Downloads the owner
+   is asked about", each with its source, licence and size; the coordinator
+   asks the owner.
+2. **Reading public pages** (framework documentation, GitHub issues, CVE
+   records) to date and quote a source is research, and allowed: it
+   downloads no code. Each exhibit's `source` records the URL, the date read
+   and the words quoted; J01's, F01's and H07's were read so (2026-10-15),
+   and the owner list's licences and sizes from the repository's and the
+   registry's own records.
+3. **The census stays untouched**: an exhibit links to its leaf one way,
+   from `exhibit.json`.
+4. **J01 is never bent to pass**: had next@16.3.8's Router Cache not served
+   the stale page, the exhibit would have said so, a finding against
+   ADR-0280's reading. It serves it: the pushed page says "0" while the
+   spec's own reload of the same address says "1" (2026-10-14, twice, and
+   the evidence's run). Misses are reported first, and as plainly as
+   refusals.
+5. **The host's pnpm** (finding 3) stays a finding; the museum keeps
+   building in place.
 
 ## Questions for the integrator
 
-1. The downloads above (TodoMVC's React and Svelte implementations,
-   axe-core, a vulnerable Next.js only if a CVE exhibit needs one), and, for
-   finding 2, whether this host's pnpm store should get `nanoid@3.3.19` or
-   the harness's sandbox lockfiles should follow the workspace's.
-2. May a worker read upstream web pages (framework docs, issues) to date a
-   source? Meanwhile every source here is one the census or an ADR already
-   read, or the installed package's own code.
-3. Should an exhibit be linked from its census leaf (editing
-   `research/failures/taxonomy/*.md`), or only the exhibit to its leaf, as
-   now?
+1. Finding 11: may the own renderer's Playwright config start only the
+   hosts the spec being run needs? It is a shared file that every track's
+   browser runs read, so it is asked, not changed.
