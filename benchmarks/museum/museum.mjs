@@ -2,7 +2,9 @@
 // The bug museum (ADR-XXXX, "the claim, measured").
 //
 //   node museum.mjs                    # every exhibit
-//   node museum.mjs --exhibit J08      # the exhibits whose id starts so
+//   node museum.mjs --exhibit J08,F01  # the exhibits whose id starts so
+//   node museum.mjs --checks-only      # Pleris's `pw check` halves alone, for
+//                                      # the mutation controls (scripts/proof_mutations.py)
 //
 // An exhibit is a failure from the census (research/failures/), with a dated
 // primary source, shown in two halves, each with its control:
@@ -40,6 +42,7 @@ const PW = path.join(REPO, "target/debug/pw");
 // The brief's Playwright ports (8941-9140); each reproduction's server takes
 // the next one from PORT + 10.
 const PORT = Number(process.env.PORT ?? 8941);
+const CHECKS_ONLY = process.argv.includes("--checks-only");
 let nextPort = PORT + 10;
 
 const STACKS = {
@@ -119,7 +122,7 @@ async function waitFor(url, ms) {
 function exhibits(prefix) {
   return fs
     .readdirSync(MUSEUM, { withFileTypes: true })
-    .filter((d) => d.isDirectory() && !d.name.startsWith(".") && (!prefix || d.name.startsWith(prefix)))
+    .filter((d) => d.isDirectory() && !d.name.startsWith(".") && (!prefix || prefix.split(",").some((x) => d.name.startsWith(x))))
     .map((d) => {
       const root = path.join(MUSEUM, d.name);
       const ex = JSON.parse(fs.readFileSync(path.join(root, "exhibit.json"), "utf8"));
@@ -308,7 +311,7 @@ function answer(ex) {
       said.neighbour = plerisCheck(ex, p.fixed ? [...base, p.patch, p.fixed] : base);
     }
   }
-  if (p.test) said.runtime = plerisRuntime(ex);
+  if (p.test && !CHECKS_ONLY) said.runtime = plerisRuntime(ex);
   return said;
 }
 
@@ -339,6 +342,7 @@ function verdict(ex, shown, said) {
 }
 
 function counts(r) {
+  if (r.stage === "not run") return "not run (--checks-only)";
   return r.stage === "spec" ? `${r.passed} passed, ${r.failed} failed` : `stopped at ${r.stage}`;
 }
 
@@ -346,10 +350,15 @@ async function main() {
   const prefix = process.argv.includes("--exhibit") ? process.argv[process.argv.indexOf("--exhibit") + 1] : undefined;
   if (!fs.existsSync(PW)) throw new Error(`no ${PW}: build it first (cargo build -p pw-cli)`);
   const rows = [];
-  for (const ex of exhibits(prefix)) {
+  // With --checks-only, an exhibit whose answer is a runtime test alone has
+  // nothing to check.
+  for (const ex of exhibits(prefix).filter((e) => !CHECKS_ONLY || e.pleris.patch)) {
     console.log(`== ${ex.id}: ${ex.title}`);
     console.log(`   census ${[ex.leaf, ...(ex.also ?? [])].join(", ")}; source ${ex.source.ref ?? ""} ${ex.source.kind}, ${ex.source.date}: ${ex.source.url}`);
-    const shown = await showBug(ex);
+    const notRun = { stage: "not run" };
+    const shown = CHECKS_ONLY
+      ? { skipped: true, happens: true, control: true, bug: notRun, fixed: notRun }
+      : await showBug(ex);
     console.log(`   ${ex.repro.stack}, the bug: ${counts(shown.bug)}${shown.happens ? "" : "  <- the bug did not happen"}`);
     for (const f of shown.bug.failures ?? []) console.log(`     ${f}`);
     if (shown.bug.out) console.log(shown.bug.out.replace(/^/gm, "     "));
@@ -378,8 +387,8 @@ async function main() {
   rows.sort((a, b) => order(a) - order(b) || a.ex.id.localeCompare(b.ex.id));
   console.log("exhibit | census | source | the bug, in | its repair | Pleris");
   for (const r of rows) {
-    const bug = `${r.ex.repro.stack}: ${r.shown.happens ? "shown" : "NOT SHOWN"}`;
-    const repair = r.shown.control ? "fails the spec" : "DOES NOT FAIL THE SPEC";
+    const bug = `${r.ex.repro.stack}: ${r.shown.skipped ? "not run" : r.shown.happens ? "shown" : "NOT SHOWN"}`;
+    const repair = r.shown.skipped ? "not run" : r.shown.control ? "fails the spec" : "DOES NOT FAIL THE SPEC";
     const mark = r.ok ? "" : "  <- NOT AS EXPECTED";
     console.log(`${r.ex.id} | ${r.ex.leaf} | ${r.ex.source.kind}, ${r.ex.source.date} | ${bug} | ${repair} | ${r.status}${mark}`);
   }
