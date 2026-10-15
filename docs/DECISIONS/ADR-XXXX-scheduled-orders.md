@@ -8,7 +8,7 @@ on ADR-0180 (a delivery estimate is a range), ADR-0304 (the clock, read by
 comparison), ADR-0328 (a store's hours), ADR-0329 (an order priced again in
 its transaction), ADR-0332 (a payment is the provider's word), ADR-0334 (a
 command run when the clock passes its time) and NEXT 4b (a read is a bounded
-number of statements, its ADR-XXXX).
+number of statements, ADR-0336).
 
 ## Context
 
