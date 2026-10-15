@@ -546,19 +546,56 @@ fn a_pages_program_is_the_directory_it_names() {
                 on_disk.insert(name, std::fs::read_to_string(&p).expect("read"));
             }
         }
-        assert_eq!(
-            assembled.keys().collect::<Vec<_>>(),
-            on_disk.keys().collect::<Vec<_>>(),
-            "{page}'s program and {dir} hold the same files"
-        );
-        for (name, text) in &assembled {
-            assert!(
-                *text == on_disk[name],
-                "{page}'s `{name}` is not {dir}/{name}: the tutorial and the app differ"
-            );
+        if let Some(why) = differs(&assembled, &on_disk) {
+            panic!("{page} and {dir}: {why}");
         }
     }
     assert!(named >= 1, "the tutorial names the app it builds");
+}
+
+/// **How a page's program differs from a directory's files**, or nothing
+/// where they are the same files, byte for byte.
+fn differs(
+    assembled: &BTreeMap<String, String>,
+    on_disk: &BTreeMap<String, String>,
+) -> Option<String> {
+    let (page, dir): (Vec<_>, Vec<_>) = (assembled.keys().collect(), on_disk.keys().collect());
+    if page != dir {
+        return Some(format!(
+            "the page assembles {page:?}, and the directory holds {dir:?}"
+        ));
+    }
+    assembled
+        .iter()
+        .find(|(name, text)| **text != on_disk[*name])
+        .map(|(name, _)| format!("`{name}` differs: the tutorial and the app differ"))
+}
+
+#[test]
+fn a_program_differs_from_a_directory_by_a_file_or_a_byte() {
+    let files = |pairs: &[(&str, &str)]| -> BTreeMap<String, String> {
+        pairs
+            .iter()
+            .map(|(n, s)| (n.to_string(), s.to_string()))
+            .collect()
+    };
+    let app = files(&[("book.pw", "module a\n"), ("pages.pw", "module b\n")]);
+    assert_eq!(differs(&app, &app), None);
+    assert!(differs(&app, &files(&[("book.pw", "module a\n")])).is_some());
+    assert!(
+        differs(
+            &app,
+            &files(&[("book.pw", "module a\n"), ("pages.pw", "module c\n")])
+        )
+        .is_some()
+    );
+    assert!(
+        differs(
+            &app,
+            &files(&[("book.pw", "module a \n"), ("pages.pw", "module b\n")])
+        )
+        .is_some()
+    );
 }
 
 /// **The diagnostic reference lists every code the compiler has**, each
@@ -597,6 +634,95 @@ fn the_diagnostic_reference_lists_every_registered_code() {
 /// A sentence as a Markdown table cell writes it.
 fn escaped(text: &str) -> String {
     text.replace('|', "\\|")
+}
+
+// --- the verdict, held on its own --------------------------------------------
+
+/// One whole-program example, as a page would give it.
+fn example(src: &str, expect: Expect) -> Example {
+    Example {
+        place: "t.md:1".into(),
+        files: vec![(file_name_of(src), src.to_string())],
+        expect,
+    }
+}
+
+/// **A wrong example is reported, and a right one is not**: each way an
+/// example can be wrong, given to the verdict alone, so a verdict that
+/// stopped looking would be seen even while every page is right.
+#[test]
+fn a_wrong_example_is_reported_and_a_right_one_is_not() {
+    let scratch = std::env::temp_dir().join(format!("pw-guide-verdict-{}", std::process::id()));
+    let fails = |codes: &[&str], shown: Option<&str>| {
+        Expect::Fails(
+            codes.iter().map(|c| c.to_string()).collect(),
+            shown.map(str::to_string),
+        )
+    };
+    let right = "module ok\n\nfn one() -> Int !{} {\n    1\n}\n";
+    let mistyped = "module bad\n\nfn one() -> String !{} {\n    1\n}\n";
+    let unformatted = "module ok\n\nfn one() -> Int !{} {\n  1\n}\n";
+    // Checks clean, and `pw build` refuses it (ADR-0137).
+    let unbuilt = "module titled\n\npage Counter() {\n    route \"/counter\"\n    cache private\n\n    \
+                   signal count: Int = 0\n\n    view {\n        <title>Pressed {count}</title>\n        \
+                   <button type=\"button\" on:press={() => count = count + 1}>Press</button>\n    }\n}\n";
+    let unparsed = "module logic\n\nfn both(a: Bool, b: Bool) -> Bool !{} {\n    a && b\n}\n";
+    let cases: Vec<(&str, Example, bool)> = vec![
+        ("a right example", example(right, Expect::Clean), false),
+        ("a mistyped one", example(mistyped, Expect::Clean), true),
+        (
+            "an unformatted one",
+            example(unformatted, Expect::Clean),
+            true,
+        ),
+        (
+            "one that checks and does not build",
+            example(unbuilt, Expect::Clean),
+            true,
+        ),
+        (
+            "a refusal by its code",
+            example(mistyped, fails(&["PW0606"], None)),
+            false,
+        ),
+        (
+            "a refusal by another code",
+            example(mistyped, fails(&["PW0021"], None)),
+            true,
+        ),
+        (
+            "a refusal of a right program",
+            example(right, fails(&["PW0606"], None)),
+            true,
+        ),
+        (
+            "a refusal shown wrongly",
+            example(
+                mistyped,
+                fails(&["PW0606"], Some("error: [PW0606] not what it says\n")),
+            ),
+            true,
+        ),
+        // A text that does not parse has no tree for `pw fmt` to write.
+        (
+            "a refusal that does not parse",
+            example(unparsed, fails(&["PW0009"], None)),
+            false,
+        ),
+    ];
+    let mut wrong = Vec::new();
+    for (i, (what, e, reported)) in cases.iter().enumerate() {
+        let said = verdict(e, &scratch.join(i.to_string()));
+        if said.is_some() != *reported {
+            wrong.push(format!("{what}: {said:?}"));
+        }
+    }
+    let _ = std::fs::remove_dir_all(&scratch);
+    assert!(
+        wrong.is_empty(),
+        "the verdict is wrong about:\n{}",
+        wrong.join("\n")
+    );
 }
 
 // --- the extractor, held on its own ----------------------------------------
