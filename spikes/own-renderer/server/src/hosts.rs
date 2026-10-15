@@ -155,6 +155,15 @@ impl Tail {
         &self.outbox
     }
 
+    /// The backend of its listening connection, which a test ends.
+    #[cfg(test)]
+    pub(crate) fn backend_pid(&self) -> Result<i32, String> {
+        self.with(|c| {
+            c.query_one("SELECT pg_backend_pid()", &[])
+                .map(|r| r.get(0))
+        })
+    }
+
     /// The last id delivered or passed by.
     pub(crate) fn cursor(&self) -> i64 {
         *self.cursor.lock().expect("cursor")

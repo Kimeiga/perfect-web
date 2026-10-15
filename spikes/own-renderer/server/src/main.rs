@@ -13951,6 +13951,8 @@ public query Store(",
     // The scheduled-commands track: a command run when the clock passes its
     // time, and the store's sweep.
     mod store_scheduled;
+    // Track `second-host` (ADR-XXXX): hosts sharing one database.
+    mod second_host;
 
     /// **A second program is served by the same host** (ADR-0218): the
     /// feed's timeline from its data layer, and a post committed and sent
