@@ -92,6 +92,10 @@ fn a_program_that_checks_builds() {
         // And its checkout, which its cart page and its order read (track
         // `order-total`).
         "examples/store/checkout.pw",
+        // And its ratings, which its store page, its home page, its search
+        // and its order read (track `reviews`).
+        "examples/store/reviews.pw",
+        "examples/store/rate.pw",
     ]);
     if let Err(e) = build(&units(&files)) {
         panic!("the store does not build: {e}");

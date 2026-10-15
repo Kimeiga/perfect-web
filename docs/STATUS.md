@@ -23,6 +23,33 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0341, 2026-10-15: a store is rated through its delivered orders, and
+its reviewers go unnamed** (W9's; NEXT's ratings and reviews, the DoorDash
+customer side's last piece but scheduled orders; track `reviews`, merged
+from `2190221c`, with the integrator's rulings of 2026-10-15).
+- A reader rates each store of their latest order once it is delivered: 1
+  to 5 stars, and a comment if they like, once and final. Held twice: by
+  `requires SignedIn, MayRate(store)`, read in the command's transaction,
+  and by the data's own key, `(order, store)`, on both layers.
+- A store's rating is said alike on its page, the home page and a search:
+  "No ratings yet", the count alone below ten ratings, then "4.6 out of 5 ·
+  12 ratings", the mean to one decimal, half up, by the program. A store's
+  page shows its five newest comments without their reviewer: a `public`
+  query cached `shared`, which the checker keeps the reader's handle out
+  of (PW5001, held by a test of the store itself).
+- Read by set: the ratings of a list of stores are one statement on
+  PostgreSQL, and each new operation, page and command is pinned in
+  `bounded_statements.rs`. The store, its new programs among them, checks
+  clean under PW0405 (ADR-0340).
+- The track's own runs: `tests/reviews.rs`, 14 tests in memory and 14 on
+  PostgreSQL; `reviews.spec.mjs` 6 passed in the three engines;
+  `reviews_mutations.py` 30 of 30; `just ci` green. Its verify
+  (38781487357) failed two of the store page's pinned shapes in every
+  engine, an accessibility tree and a count of identity anchors, which
+  still described the page without its ratings: brought to the page on the
+  train, in a commit of their own. Its browser hosts are PORT + 200 to 202.
+Verify TRAIN_RUN green, with train-9.
+
 **ADR-0340, 2026-10-15: a read keyed by its loop's element is refused**
 (NEXT 4c's second step, the checker's half of ADR-0337; track
 `bounded-checker`, merged from `e5b8cdb9`, with the integrator's rulings

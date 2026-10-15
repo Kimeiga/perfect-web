@@ -84,6 +84,11 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "0015_schedules",
         include_str!("../migrations/store/0015_schedules.sql"),
     ),
+    // TRACK SEAM (reviews): a store's ratings, each through an order.
+    (
+        "0017_ratings",
+        include_str!("../migrations/store/0017_ratings.sql"),
+    ),
 ];
 
 /// **The schema a deployment's store is in**, unless it names another.
@@ -467,6 +472,20 @@ impl Rows for PgRows<'_> {
         crate::checkout::pg_charged(&mut self.0, owner)
     }
 
+    // TRACK SEAM (reviews): a store's ratings (`reviews.rs`).
+    fn ratings_of(&mut self, stores: &[String]) -> Result<Vec<(String, i64, i64)>, String> {
+        crate::reviews::pg_ratings_of(&mut self.0, stores)
+    }
+    fn reviews(&mut self, store: &str, most: usize) -> Result<Vec<(i64, i64, String)>, String> {
+        crate::reviews::pg_reviews(&mut self.0, store, most)
+    }
+    fn to_rate(&mut self, owner: &str) -> Result<Option<crate::reviews::ToRate>, String> {
+        crate::reviews::pg_to_rate(&mut self.0, owner)
+    }
+    fn rate(&mut self, rating: &crate::reviews::Rating) -> Result<bool, String> {
+        crate::reviews::pg_rate(&mut self.0, rating)
+    }
+
     fn stores(&mut self) -> Result<Vec<StoreRow>, String> {
         let rows = self
             .0
@@ -653,6 +672,8 @@ impl Rows for PgRows<'_> {
             )
             .map_err(pg)?;
         Ok(Some(Order {
+            // TRACK SEAM (reviews): its id.
+            id,
             status: order.get(1),
             lines: lines.iter().map(line_of).collect(),
         }))

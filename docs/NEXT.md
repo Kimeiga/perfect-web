@@ -1071,8 +1071,16 @@ E14 comes before E11-E13. Its plan, controls and task list are
             W8's `Reach`. ~~A part inside an arm whose subject did not change
             told when the query it reads changes~~ (ADR-0320, merged
             2026-10-12; the sentence is back inside the arm);
-          - **W9, ratings and reviews** of orders and stores, after
-            accounts.
+          - ~~**W9, ratings and reviews** of orders and stores, after
+            accounts~~ (ADR-0341, merged 2026-10-15 on train-9, `just
+            e14-reviews`): each store of a reader's latest delivered order
+            rated once, 1 to 5 stars and a comment; a store's mean said from
+            ten ratings; its reviews public, unnamed and unmoderated. What
+            it leaves: a list of past orders to rate from, item and courier
+            ratings, a badge, a window or recency weighting with the clock,
+            and moderation, which needs the merchant side (out of scope).
+            The DoorDash customer side's one piece left is scheduled orders
+            (item 4 above).
 
           Not claimed: a live courier map (ADR-0075 refuses a mounted
           resource); the merchant, courier and support apps; subscriptions

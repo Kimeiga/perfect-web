@@ -198,9 +198,12 @@ impl Item {
 }
 
 /// **A session's order** (ADR-0193): the cart's lines it was placed with,
-/// and its status's case.
+/// and its status's case. TRACK SEAM (reviews): and its id, PostgreSQL's
+/// `orders.id`, or in memory the count of orders made when it was, so that a
+/// rating is of this order and not of its owner's next (ADR-0341).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Order {
+    pub(crate) id: i64,
     pub(crate) status: String,
     pub(crate) lines: Lines,
 }
@@ -318,6 +321,19 @@ pub(crate) trait Rows {
     /// `owner`'s latest order, its charges recorded.
     fn charge(&mut self, owner: &str, charged: &crate::checkout::Charged) -> Result<(), String>;
     fn charged(&mut self, owner: &str) -> Result<Option<crate::checkout::Charged>, String>;
+
+    // TRACK SEAM (reviews): a store's ratings (`reviews.rs`).
+    /// Each of `stores`' ratings counted and their stars summed, in
+    /// `stores`' order, a store with none left out: one statement on
+    /// PostgreSQL whatever their number.
+    fn ratings_of(&mut self, stores: &[String]) -> Result<Vec<(String, i64, i64)>, String>;
+    /// A store's newest `most` ratings with a comment, newest first: each
+    /// one's id, stars and comment.
+    fn reviews(&mut self, store: &str, most: usize) -> Result<Vec<(i64, i64, String)>, String>;
+    /// `owner`'s latest order as rating reads it, none before one.
+    fn to_rate(&mut self, owner: &str) -> Result<Option<crate::reviews::ToRate>, String>;
+    /// A rating written, or `false` where its order has one of its store.
+    fn rate(&mut self, rating: &crate::reviews::Rating) -> Result<bool, String>;
 }
 
 /// **Where an operation's rows are**, each layer's: it runs `f` on them, in
@@ -1001,6 +1017,7 @@ fn catalog(with: With, faults: &Faults, stopped: Option<Stopped>) -> Ops {
     ops.extend(crate::search::ops(with.clone())); // TRACK SEAM (store-search)
     ops.extend(crate::hours::ops(with.clone())); // TRACK SEAM (store-hours)
     ops.extend(crate::checkout::ops(with.clone())); // TRACK SEAM (order-total)
+    ops.extend(crate::reviews::ops(with.clone())); // TRACK SEAM (reviews)
     // Charter §15.5's store delay (ADR-0174), and its origin failing once
     // (ADR-0177), as a test set them.
     let store_delay = faults.store_delay_ms.clone();
@@ -1587,6 +1604,8 @@ pub(crate) fn writes(
     // TRACK SEAM (order-total): the checkout's writes, and the host's.
     ops.extend(crate::checkout::writes(with.clone(), written.clone()));
     ops.extend(crate::checkout::host_writes(with.clone(), written.clone()));
+    // TRACK SEAM (reviews): a rating given.
+    ops.extend(crate::reviews::writes(with.clone(), written.clone()));
     ops.extend(host_writes(with, session, written));
     ops
 }
@@ -1890,6 +1909,9 @@ pub(crate) fn grants() -> &'static [&'static str] {
         "database.read<Kitchen>",
         // The menu by category (E14, T07).
         "database.read<Categories>",
+        // TRACK SEAM (reviews): a store's ratings, read and given.
+        "database.read<Ratings>",
+        "database.write<Ratings>",
     ]
 }
 
@@ -1920,6 +1942,10 @@ pub(crate) struct State {
     charged: BTreeMap<String, crate::checkout::Charged>,
     /// NEXT 6c: the payment each owner's order awaits.
     awaiting: BTreeMap<String, crate::payments::Awaiting>,
+    /// TRACK SEAM (reviews): every rating given, oldest first, and how many
+    /// orders were made, the last one's id.
+    ratings: Vec<crate::reviews::Rating>,
+    orders_made: i64,
 }
 
 impl State {
@@ -1970,7 +1996,17 @@ impl State {
             choices: BTreeMap::new(),
             charged: BTreeMap::new(),
             awaiting: BTreeMap::new(),
+            // TRACK SEAM (reviews): none rated, and no order made.
+            ratings: Vec::new(),
+            orders_made: 0,
         }
+    }
+
+    /// TRACK SEAM (reviews): **the next order's id**, one more than the
+    /// last made, as PostgreSQL's serial gives one.
+    fn next_order(&mut self) -> i64 {
+        self.orders_made += 1;
+        self.orders_made
     }
 }
 
@@ -2050,6 +2086,8 @@ impl Rows for MemRows {
     }
     fn place(&mut self, session: &str, lines: &[Line]) -> Result<(), String> {
         let order = Order {
+            // TRACK SEAM (reviews): a new order, a new id.
+            id: self.state().next_order(),
             status: "placed".to_string(),
             lines: lines.to_vec(),
         };
@@ -2057,16 +2095,25 @@ impl Rows for MemRows {
         Ok(())
     }
     fn set_status(&mut self, session: &str, status: Option<&str>) -> Result<(), String> {
+        // TRACK SEAM (reviews): an order the kitchen sets with none placed is
+        // made, with an id of its own.
+        if status.is_some() && !self.state.orders.contains_key(session) {
+            let id = self.state().next_order();
+            self.state().orders.insert(
+                session.to_string(),
+                Order {
+                    id,
+                    status: String::new(),
+                    lines: Lines::new(),
+                },
+            );
+        }
         let orders = &mut self.state().orders;
         match status {
             Some(status) => {
-                orders
-                    .entry(session.to_string())
-                    .or_insert_with(|| Order {
-                        status: String::new(),
-                        lines: Lines::new(),
-                    })
-                    .status = status.to_string()
+                if let Some(order) = orders.get_mut(session) {
+                    order.status = status.to_string();
+                }
             }
             None => {
                 orders.remove(session);
@@ -2193,6 +2240,28 @@ impl Rows for MemRows {
     }
     fn charged(&mut self, owner: &str) -> Result<Option<crate::checkout::Charged>, String> {
         Ok(self.state.charged.get(owner).cloned())
+    }
+    // TRACK SEAM (reviews): a store's ratings, in memory.
+    fn ratings_of(&mut self, stores: &[String]) -> Result<Vec<(String, i64, i64)>, String> {
+        Ok(crate::reviews::mem_ratings_of(&self.state.ratings, stores))
+    }
+    fn reviews(&mut self, store: &str, most: usize) -> Result<Vec<(i64, i64, String)>, String> {
+        Ok(crate::reviews::mem_reviews(
+            &self.state.ratings,
+            store,
+            most,
+        ))
+    }
+    fn to_rate(&mut self, owner: &str) -> Result<Option<crate::reviews::ToRate>, String> {
+        Ok(crate::reviews::mem_to_rate(
+            self.state.orders.get(owner),
+            self.state.charged.get(owner),
+            &self.state.stores,
+            &self.state.ratings,
+        ))
+    }
+    fn rate(&mut self, rating: &crate::reviews::Rating) -> Result<bool, String> {
+        Ok(crate::reviews::mem_rate(&mut self.state().ratings, rating))
     }
 }
 

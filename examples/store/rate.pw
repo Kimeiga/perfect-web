@@ -1,0 +1,113 @@
+// @corpus: fixture
+// @id: E14-store-rate
+// @category: a reader rating a store of their delivered order, once
+// @charter: §15.1, §15.4
+// @milestone: E14
+//
+// Track `reviews` (NEXT, W9; ADR-0341): the command that rates, and the page
+// it is pressed on. Apart from `store.reviews` because the page is shown in
+// `store.page`'s layout, and `store.page` reads `store.reviews`.
+
+module store.rate
+
+import domain.{ StoreId, InteractionId }
+import capability.{ User, UserId }
+import context.{ current_user }
+import store.page.{ StoreLayout }
+import Ratings
+import Ratings.{ Stars, Comment, RatingError }
+import Events.{ UserCartChanged }
+import store.reviews.{ OrderRatings, StoreToRate, StoreRated, stars_of, comment_of, chosen_said }
+
+// **Who may rate a store** (ADR-0341, decision 3): the deployment's
+// predicate, evaluated over the reader before the command runs, in its
+// transaction: the reader's latest order is delivered, is from `store`, and
+// has no rating of it yet. Only the order's owner: it is read by the
+// reader's own handle.
+predicate MayRate(store: StoreId)
+    says "You can rate each store of your latest order once, after it's delivered."
+
+// **A store of the reader's latest order rated**, once (ADR-0341, decisions
+// 1 to 3): signed in, and `MayRate(store)`; the order read again and the
+// rating written in one transaction, a second refused by the data's own key.
+// What the store's page and lists say of it is read again for every reader
+// (`StoreRated`); and the reader's own pages are, as the store's other
+// commands' are, by the reader's cart's event: the store's session's
+// documents are versioned by its cart's entry (ADR-0218), so a command that
+// changes no cart tells its reader's pages through it, as `choose_tip` does.
+command rate_order(store: StoreId, stars: Stars, comment: Comment)
+    -> Result<Int, RatingError>
+    requires      SignedIn, MayRate(store)
+    idempotent_by InteractionId
+    retry         transport_only(max = 2, jitter = true)
+    transaction   serializable
+    invalidates   OrderRatings(current_user()), StoreToRate(store, current_user())
+    emits         UserCartChanged(current_user()), StoreRated(store)
+{
+    Ratings.give(current_user(), store, stars, comment)
+}
+
+// **The page a reader rates a store of their order on** (ADR-0341,
+// decision 7): from 1 to 5, a comment if they like, and Send; or, where the
+// store cannot be rated now, why, or what they gave it. The reader's own.
+user page RatePage(id: StoreId) {
+    route     "/order/rate/{id}"
+    layout    StoreLayout
+    placement origin
+    cache     private
+
+    let rate = query StoreToRate(id, current_user())
+    // The stars chosen, none at first; the comment as typed; what the page
+    // last had to say.
+    signal stars: Int = 0
+    signal comment: String = ""
+    signal said: String = ""
+
+    view {
+        <title>Rate your order</title>
+        <main>
+            <h1>Rate your order</h1>
+            <!-- Why the store cannot be rated now, or what the reader gave
+                 it. -->
+            <p id="rate-state">{rate.said}</p>
+            {#if rate.comment}<p id="rate-comment">{rate.comment}</p>{/if}
+            <!-- The form, while the store may be rated: hidden otherwise,
+                 not a block, since it reads the page's signals, which a
+                 block a server value decides is not rendered again by
+                 (ADR-0137). -->
+            <section id="rate-form" aria-label="Your rating" hidden={rate.closed}>
+                <p id="rate-store">How was your order from {rate.name}?</p>
+                <fieldset id="stars">
+                    <legend>Your rating, out of 5</legend>
+                    <button type="button" id="stars-1" aria-label="1 out of 5" aria-pressed={stars == 1} on:press={resumable() => stars = 1}>1</button>
+                    <button type="button" id="stars-2" aria-label="2 out of 5" aria-pressed={stars == 2} on:press={resumable() => stars = 2}>2</button>
+                    <button type="button" id="stars-3" aria-label="3 out of 5" aria-pressed={stars == 3} on:press={resumable() => stars = 3}>3</button>
+                    <button type="button" id="stars-4" aria-label="4 out of 5" aria-pressed={stars == 4} on:press={resumable() => stars = 4}>4</button>
+                    <button type="button" id="stars-5" aria-label="5 out of 5" aria-pressed={stars == 5} on:press={resumable() => stars = 5}>5</button>
+                </fieldset>
+                <p id="stars-chosen" aria-live="polite">{chosen_said(stars)}</p>
+                <label>A comment, if you like. It is shown on the store's page, without your name. <textarea id="comment" bind:value={comment}></textarea></label>
+                <button
+                    id="send-rating"
+                    type="button"
+                    on:press|refusable={resumable(captures = { id }) => match stars_of(stars) {
+                        Some(chosen) => match comment_of(comment) {
+                            Some(words) => match rate_order(id, chosen, words) {
+                                Ok(_) => said = "Thanks: your rating is sent.",
+                                Err(RatingError.NotDelivered) => said = "Your latest order isn't delivered yet.",
+                                Err(RatingError.NotInOrder) => said = "Your latest order isn't from this store.",
+                                Err(RatingError.AlreadyRated) => said = "You've rated this store for this order already.",
+                            },
+                            None => said = "A comment is 500 characters at most.",
+                        },
+                        None => said = "Choose from 1 to 5 first.",
+                    }}
+                >
+                    Send rating
+                </button>
+            </section>
+            <p id="rate-said" role="status">{said}</p>
+            <p><a href="/order">Back to your order</a></p>
+        </main>
+    }
+}

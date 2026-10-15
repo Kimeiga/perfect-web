@@ -2983,3 +2983,11 @@ ADR-0337's checker; corpus C25).
   set read, and PW0406 warns of one that cannot batch. kiokun-site's four
   reads per element are warnings until its layer has set forms and key
   records.
+[ADR-0341](DECISIONS/ADR-0341-ratings-and-reviews.md):
+a store is rated through its delivered orders, and its reviewers go
+unnamed (W9's; the DoorDash customer side's ratings and reviews).
+- Each store of a reader's latest delivered order rated once, 1 to 5 stars
+  and a comment, final; a store's mean said from ten ratings; its reviews
+  shown without their reviewer, public and unmoderated, the shared cache
+  holding no reader's value (PW5001); read by set, one statement for a
+  list of stores.

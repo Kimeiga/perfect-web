@@ -693,6 +693,15 @@ awaited in order. What remains:
   until kiokun's layer has set forms and the pair takes a list of key
   records. A set form pairs with its keyed read by a field of the key's
   type, any such field, until track `pair-key-by-name` names it.
+- **A store's reviews are public and unmoderated, with no merchant side**
+  (ADR-0341): a comment is shown as written (escaped, as all text is), with
+  no review, flagging, removal or reply, since the merchant and support
+  apps are out of scope. A reader rates only the stores of their latest
+  order, once and for good; items and couriers are not rated; a store's
+  mean is every rating it has, with no window, recency weighting or badge.
+  The checker holds what is read through a reader's handle out of the
+  shared reviews; a user's id a data layer answered as plain data would
+  not be seen, and the store's layer answers none (a test and a mutant).
 - **A store's hours look a week ahead** (ADR-0328): a store that next opens
   later says "Closed". A special date replaces its day's hours, never only
   extends them; item-level hours are not kept. On a day a transition skips

@@ -773,7 +773,7 @@
   {
     "component_id": "store.hours.StoresOpen",
     "capability_mapping": 1,
-    "abi_schema": "83705ac29176622a",
+    "abi_schema": "70a5dd9e12a7307f",
     "required_capabilities": [
       {
         "family": "clock",
@@ -782,6 +782,11 @@
       {
         "family": "clock",
         "operation": "zone"
+      },
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Ratings"
       },
       {
         "family": "database",
@@ -915,6 +920,48 @@
                 {
                   "declared": {
                     "path": "store.hours.OpeningHoursOf"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/ratings",
+        "name": "for-stores",
+        "capability": "database.read<Ratings>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Ratings"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "builtin": {
+                "ctor": "List",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "domain.StoreId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "List",
+              "args": [
+                {
+                  "declared": {
+                    "path": "Ratings.RatingsOf"
                   }
                 }
               ]
@@ -2165,6 +2212,12 @@
         "kind": "component"
       },
       {
+        "interface": "pw:app/store.reviews.OrderRatings",
+        "name": "OrderRatings",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
         "interface": "pw:host/principal",
         "name": "read",
         "capability": "session.read",
@@ -2991,6 +3044,12 @@
       {
         "interface": "pw:app/store.page.remove_from_cart",
         "name": "remove_from_cart",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:app/store.reviews.StoreRatings",
+        "name": "StoreRatings",
         "owner": "external",
         "kind": "component"
       },
@@ -8115,9 +8174,856 @@
     ]
   },
   {
+    "component_id": "store.rate.RatePage",
+    "capability_mapping": 1,
+    "abi_schema": "1404bdc0d0d7164e",
+    "required_capabilities": [
+      {
+        "family": "session",
+        "operation": "read"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "pw:app/store.rate.rate_order",
+        "name": "rate_order",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:app/store.reviews.StoreToRate",
+        "name": "StoreToRate",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:host/principal",
+        "name": "read",
+        "capability": "session.read",
+        "capabilities": [
+          {
+            "family": "session",
+            "operation": "read"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": {
+            "declared": {
+              "path": "capability.User",
+              "args": [
+                {
+                  "declared": {
+                    "path": "capability.UserId"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "RatePage",
+        "kind": "page",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-rate-rate-page-api@0.1.0",
+          "function": "rate-page"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.rate.RatePage.derived_10",
+    "capability_mapping": 1,
+    "abi_schema": "2ae23ec8232e911e",
+    "required_capabilities": [],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [],
+    "exports": [
+      {
+        "name": "derived$10",
+        "kind": "derived",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-rate-rate-page-derived-10-api@0.1.0",
+          "function": "derived10"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.rate.RatePage.derived_12",
+    "capability_mapping": 1,
+    "abi_schema": "cb9ddb0f6c696f16",
+    "required_capabilities": [],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [],
+    "exports": [
+      {
+        "name": "derived$12",
+        "kind": "derived",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-rate-rate-page-derived-12-api@0.1.0",
+          "function": "derived12"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.rate.RatePage.derived_14",
+    "capability_mapping": 1,
+    "abi_schema": "f63d360709db7cae",
+    "required_capabilities": [],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [],
+    "exports": [
+      {
+        "name": "derived$14",
+        "kind": "derived",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-rate-rate-page-derived-14-api@0.1.0",
+          "function": "derived14"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.rate.RatePage.derived_16",
+    "capability_mapping": 1,
+    "abi_schema": "ae6bb979e0128dd6",
+    "required_capabilities": [],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [],
+    "exports": [
+      {
+        "name": "derived$16",
+        "kind": "derived",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "result",
+                "ty": "String"
+              }
+            ]
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-rate-rate-page-derived-16-api@0.1.0",
+          "function": "derived16"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.rate.RatePage.derived_6",
+    "capability_mapping": 1,
+    "abi_schema": "baa963082a1877fc",
+    "required_capabilities": [],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [],
+    "exports": [
+      {
+        "name": "derived$6",
+        "kind": "derived",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-rate-rate-page-derived-6-api@0.1.0",
+          "function": "derived6"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.rate.RatePage.derived_8",
+    "capability_mapping": 1,
+    "abi_schema": "06baa34336c3aee4",
+    "required_capabilities": [],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [],
+    "exports": [
+      {
+        "name": "derived$8",
+        "kind": "derived",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-rate-rate-page-derived-8-api@0.1.0",
+          "function": "derived8"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.rate.rate_order",
+    "capability_mapping": 1,
+    "abi_schema": "b9227be84328b2f8",
+    "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Orders"
+      },
+      {
+        "family": "database",
+        "operation": "write",
+        "argument": "Ratings"
+      },
+      {
+        "family": "outbox",
+        "operation": "write"
+      },
+      {
+        "family": "session",
+        "operation": "read"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "pw:host/invalidations",
+        "name": "store-reviews-order-ratings",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "invalidates": "store.reviews.OrderRatings"
+      },
+      {
+        "interface": "pw:host/invalidations",
+        "name": "store-reviews-store-to-rate",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "domain.StoreId"
+              }
+            },
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "invalidates": "store.reviews.StoreToRate"
+      },
+      {
+        "interface": "pw:host/outbox",
+        "name": "store-rated",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "domain.StoreId"
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "event": "store.reviews.StoreRated"
+      },
+      {
+        "interface": "pw:host/outbox",
+        "name": "user-cart-changed",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "event": "Events.UserCartChanged"
+      },
+      {
+        "interface": "pw:host/principal",
+        "name": "read",
+        "capability": "session.read",
+        "capabilities": [
+          {
+            "family": "session",
+            "operation": "read"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": {
+            "declared": {
+              "path": "capability.User",
+              "args": [
+                {
+                  "declared": {
+                    "path": "capability.UserId"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/ratings",
+        "name": "rate",
+        "capability": "database.write<Ratings>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "write",
+            "argument": "Ratings"
+          },
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Orders"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "declared": {
+                "path": "domain.StoreId"
+              }
+            },
+            {
+              "declared": {
+                "path": "Ratings.Stars"
+              }
+            },
+            {
+              "declared": {
+                "path": "Ratings.Comment"
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "Result",
+              "args": [
+                {
+                  "primitive": "Int"
+                },
+                {
+                  "declared": {
+                    "path": "Ratings.RatingError"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "rate_order",
+        "kind": "command",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-rate-rate-order-api@0.1.0",
+          "function": "rate-order",
+          "authorization": [
+            {
+              "predicate": "SignedIn"
+            },
+            {
+              "predicate": "MayRate",
+              "arguments": [
+                0
+              ]
+            }
+          ],
+          "idempotent_by": "InteractionId",
+          "bounded": [
+            {
+              "argument": 1,
+              "type": "Ratings.Stars",
+              "holds": "value >= 1 & value <= 5",
+              "at_least": 1,
+              "at_most": 5
+            },
+            {
+              "argument": 2,
+              "type": "Ratings.Comment",
+              "holds": "String.length(value) <= 500",
+              "measure": "length",
+              "at_most": 500
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.reviews.OrderRatings",
+    "capability_mapping": 1,
+    "abi_schema": "0780524742d7572c",
+    "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Orders"
+      },
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Ratings"
+      },
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Stores"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "store:data/ratings",
+        "name": "for-order",
+        "capability": "database.read<Ratings>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Ratings"
+          },
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Orders"
+          },
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Stores"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "declared": {
+              "path": "Ratings.OrderToRate"
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "OrderRatings",
+        "kind": "query",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "argument 0",
+                "ty": "User<UserId>"
+              },
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "result",
+                "ty": "List<RateLink>"
+              }
+            ]
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-reviews-order-ratings-api@0.1.0",
+          "function": "order-ratings"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.reviews.StoreRatings",
+    "capability_mapping": 1,
+    "abi_schema": "9930a8b1fcfa484b",
+    "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Ratings"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "store:data/ratings",
+        "name": "for-stores",
+        "capability": "database.read<Ratings>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Ratings"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "builtin": {
+                "ctor": "List",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "domain.StoreId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "List",
+              "args": [
+                {
+                  "declared": {
+                    "path": "Ratings.RatingsOf"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/ratings",
+        "name": "reviews",
+        "capability": "database.read<Ratings>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Ratings"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "domain.StoreId"
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "List",
+              "args": [
+                {
+                  "declared": {
+                    "path": "Ratings.Review"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "StoreRatings",
+        "kind": "query",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-reviews-store-ratings-api@0.1.0",
+          "function": "store-ratings"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.reviews.StoreToRate",
+    "capability_mapping": 1,
+    "abi_schema": "b6d304e4a35e2058",
+    "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Orders"
+      },
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Ratings"
+      },
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Stores"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "store:data/ratings",
+        "name": "for-order",
+        "capability": "database.read<Ratings>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Ratings"
+          },
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Orders"
+          },
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Stores"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "declared": {
+              "path": "Ratings.OrderToRate"
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "StoreToRate",
+        "kind": "query",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "argument 1",
+                "ty": "User<UserId>"
+              },
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "result",
+                "ty": "RateShown"
+              }
+            ]
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-reviews-store-to-rate-api@0.1.0",
+          "function": "store-to-rate"
+        }
+      }
+    ]
+  },
+  {
     "component_id": "store.search.Search",
     "capability_mapping": 1,
-    "abi_schema": "9c8a7f1e53e7f531",
+    "abi_schema": "8db4a980491b7b06",
     "required_capabilities": [
       {
         "family": "clock",
@@ -8136,6 +9042,11 @@
         "family": "database",
         "operation": "read",
         "argument": "Menus"
+      },
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Ratings"
       },
       {
         "family": "database",
@@ -8269,6 +9180,48 @@
                 {
                   "declared": {
                     "path": "store.hours.OpeningHoursOf"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/ratings",
+        "name": "for-stores",
+        "capability": "database.read<Ratings>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Ratings"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "builtin": {
+                "ctor": "List",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "domain.StoreId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "List",
+              "args": [
+                {
+                  "declared": {
+                    "path": "Ratings.RatingsOf"
                   }
                 }
               ]

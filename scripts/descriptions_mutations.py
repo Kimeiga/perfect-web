@@ -40,6 +40,8 @@ BOTH_DESCRIPTIONS = (
     "            <p id=\"store-cuisine\">{store.cuisine}</p>\n"
     # And whether it is open (track store-hours).
     "            <p id=\"store-open\">{open.said}</p>\n"
+    # And what its ratings come to (track reviews).
+    "            <p id=\"store-rating\">{ratings.said}</p>\n"
     "            <p id=\"store-description\">{store.description}</p>\n"
     "            <p id=\"menu-line\">{line}</p>\n"
     "\n"
@@ -164,6 +166,8 @@ MUTANTS = [
         .replace("            <p id=\"store-cuisine\">{store.cuisine}</p>\n", "")
         # And whether it is open (track store-hours), likewise.
         .replace("            <p id=\"store-open\">{open.said}</p>\n", "")
+        # And what its ratings come to (track reviews), likewise.
+        .replace("            <p id=\"store-rating\">{ratings.said}</p>\n", "")
         .replace("            <p id=\"menu-line\">{line}</p>\n", "")
         .replace("                                    <p>{item.description}</p>\n", "")
         # And where deliveries go (track store-accounts), which says more of

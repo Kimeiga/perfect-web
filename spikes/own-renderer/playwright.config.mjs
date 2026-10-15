@@ -143,6 +143,12 @@ export const STORE_SEARCH_PORTS = Object.fromEntries(ENGINES.map((e, i) => [e, P
 export const STORE_PAYMENTS_PORTS = Object.fromEntries(
   ENGINES.map((e, i) => [e, PORT + 180 + i]),
 );
+// TRACK SEAM (reviews): the store's build, its sessions signed in through the
+// development identity provider, one per engine, because a store's ratings
+// are every reader's on a host. Not PORT + 190: each payments host's
+// provider is ten ports above it (PW_PAYMENTS_PORT, below), which is where
+// 190 to 192 are.
+export const REVIEWS_PORTS = Object.fromEntries(ENGINES.map((e, i) => [e, PORT + 200 + i]));
 // A build serves the runtime it was built with. One built before the runtime
 // changed runs the old runtime against the new server, and fails for a reason
 // that is no test's: `dist-keyed` did, once each page's subscription named
@@ -366,6 +372,16 @@ export default defineConfig({
     ...(process.env.PW_PERFORMANCE
       ? []
       : Object.values(STORE_ACCOUNTS_PORTS).map((port) => ({
+          command: `../../target/debug/pw-dev-server dist`,
+          env: { PORT: String(port), PW_IDENTITY: "dev-accounts", ...IN_MEMORY },
+          port,
+          reuseExistingServer: !!process.env.PW_REUSE,
+          timeout: 60_000,
+        }))),
+    // TRACK SEAM (reviews): the store's hosts where readers rate.
+    ...(process.env.PW_PERFORMANCE
+      ? []
+      : Object.values(REVIEWS_PORTS).map((port) => ({
           command: `../../target/debug/pw-dev-server dist`,
           env: { PORT: String(port), PW_IDENTITY: "dev-accounts", ...IN_MEMORY },
           port,

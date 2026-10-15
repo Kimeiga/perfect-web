@@ -366,11 +366,26 @@ fn the_store_states_its_source_and_asks_only_what_it_gives() {
             "Checkout",
             "OrderTotal",
             // A store's hours (track `store-hours`): the stores' rows, and
-            // for the cart's, the cart's too.
+            // for the cart's, the cart's too; the stores' ratings are read
+            // with them (track `reviews`).
             "StoreStatus",
+            "StoresOpen",
             "StoresOpen",
             "CartHours",
             "CartHours",
+            // A store's ratings and reviews (track `reviews`), which read the
+            // ratings alone; and the order's stores to rate and the rate
+            // page's, which read the order beside them, once for each of the
+            // three: the order, its stores' names and their ratings.
+            "StoreRatings",
+            "OrderRatings",
+            "OrderRatings",
+            "OrderRatings",
+            "StoreToRate",
+            "StoreToRate",
+            "StoreToRate",
+            // And the search reads the ratings of the stores it found.
+            "Search",
             "Search",
             "Search",
             "Search"
@@ -393,7 +408,9 @@ fn the_store_states_its_source_and_asks_only_what_it_gives() {
             "choose_tip",
             "apply_promo",
             "remove_promo",
-            "add_address"
+            "add_address",
+            // A rating given (track `reviews`).
+            "rate_order"
         ]
     );
     // And every command emits its changes and is idempotent by its
@@ -420,12 +437,15 @@ fn the_store_states_its_source_and_asks_only_what_it_gives() {
         "rename_address",
         "remove_address",
         "choose_address",
+        // A rating given (track `reviews`).
+        "rate_order",
     ];
     assert_eq!(named("PW0347"), commands);
     assert_eq!(named("PW0348"), commands);
     // Track `order-total`: the checkout's three, three times, and its
     // query's four reads. NEXT 6c: the settling command, and the one that
     // takes an order back, three times each; and the clock's sweep (the
-    // scheduled-commands track), three times.
-    assert_eq!(found.len(), 63, "{found:#?}");
+    // scheduled-commands track), three times. Track `reviews`: the rating
+    // command, three times, and its queries' nine more reads.
+    assert_eq!(found.len(), 75, "{found:#?}");
 }
