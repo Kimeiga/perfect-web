@@ -35,7 +35,7 @@ integrator's finding at train-6; track `planner-test-modules`, merged from
   `tests::<name>::`.
 - Held by a test whose change is far from every mutant, and three mutants
   (`dealt_by_time_mutations.py`, 48 of 48).
-Verify TRAIN_RUN green, with train-7.
+Verify 38629460236 green, with train-7.
 
 **2026-10-14: a mutant of a program's source is still a program** (the
 integrator's finding; track `mutant-programs`, merged from `6a30b2f5`).
@@ -52,7 +52,7 @@ integrator's finding; track `mutant-programs`, merged from `6a30b2f5`).
 - `just ci` holds it (`mutant-programs`, `scripts/mutant_programs.py`):
   237 mutants, 11 refused by their named rule, none failing; on the tree
   before, all 14 fail. Its logic is held with a stand-in checker (4 tests).
-Verify TRAIN_RUN green, with train-7.
+Verify 38629460236 green, with train-7.
 
 **2026-10-14: the corpus specifies `invoked_by`** (the integrator's finding;
 corpus C24; track `corpus-invoked`, merged from `64e5ee4e`).
@@ -67,7 +67,7 @@ corpus C24; track `corpus-invoked`, merged from `64e5ee4e`).
   14). PW6405's invariant says the clock's word as well as a provider's.
 - Measured: the rejected corpus exercises 54 of the 196 codes. NEXT holds
   the rest, and the rule for a new code.
-Verify TRAIN_RUN green, with train-7.
+Verify 38629460236 green, with train-7.
 
 **ADR-0334, 2026-10-14: a command runs when the clock passes its time**
 (the integrator's; ADR-0332's not-claimed sweep and NEXT 4's third step;

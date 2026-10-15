@@ -1702,3 +1702,38 @@ Each a decision for a track, with its date; a track's ADR records it too.
   - **Waiting for a quiet machine**: `just e9-latency`, check-latency's
     number, was measured under a load of about 10 on 2026-10-14 and not
     recorded.
+- **2026-10-14, train-7 landed** (`track/train-7`, verify 38629460236):
+  corpus-invoked, mutant-programs and planner-test-modules, merged above.
+  - **What it carries.** Corpus C24: NEXT 6c's `invoked_by` codes, PW6401
+    to PW6405, specified by the corpus (R-070 to R-074 and five generality
+    pairs). A mutant of a program's source is still a program: `just ci`
+    refuses a mutant whose program the checker refuses, unless its script
+    names the rule the mutant takes away. A source's own test module plans
+    what runs it: a change to a `mod tests` plans the scripts and recipes
+    that run it by its module's filter.
+  - **Its run: 20 recipes on 17 shards and the three engines, all green.**
+    22 jobs, every one a success, and 508 of 508 mutants killed over the 20
+    recipes, whose evidence is fetched at `2fad034d` (20 files, none
+    refused as stale). The longest shard, `recipes 0`, held `e14-refusal`
+    alone and took 318 minutes of the 345-minute limit (`e14-refusal`
+    itself 18930 s; train-6's longest shard took 313).
+  - **The red GitHub `ci` is not train-7's.** Since 2026-10-14, `ci`'s
+    "licenses and advisories" job (`cargo deny`) fails on every branch:
+    eleven advisories, RUSTSEC-2026-0353 to 0364 (the job reports no
+    0360), against Wasmtime 48.0.5, each fixed by 48.0.6. Train-7's own
+    `ci` run (38629460404) was green at 20:07 UTC; the runs from 21:33 UTC
+    on, of every branch, are red in that job. `track/wasmtime-48-0-6`
+    (Wasmtime 48.0.6) fixes it, and leads train-8. This landing's push will
+    be red in the same job for the same reason.
+  - **Its local `just ci` on the PC failed one test, `check_latency`, and
+    not for train-7.** A cold check took longer than its 2,000 ms ceiling
+    while about a dozen workers kept the load average at 60 to 110; every
+    other test passed. Alone, at a load of 7, it passed (2 of 2, 19.5 s),
+    and so did the two gates the failure had stopped (`test-compile`,
+    `mutant-programs`: 237 mutants, 11 refused by their named rule, none
+    failing). A wall-clock ceiling measures the machine's load as well as
+    the compiler: `track/evidence-integrity` bounds it by the checking
+    thread's CPU time.
+  - **Landed from the owner's PC.** The work moved to the owner's PC
+    (WSL2) on 2026-10-14, and that machine's coordinator session landed
+    this train, by the steps of the move entry above.
