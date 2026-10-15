@@ -278,12 +278,11 @@ not the same for every reader.
 
 ## When the build refuses what the check passed
 
-`pw build` has refusals of its own. It prints them as `pw: refused: ..`,
-with no code, because they come from what the browser can do with a page. A
-program can check clean and be refused there, so build before you trust a
-green check. [The last section of part 3](tour-pages.md#where-pw-check-stops)
-shows what `pw check` does not say yet, in programs the guide's test
-compiles.
+`pw build` has refusals of its own. It prints them as lines that begin
+`pw:`, and they carry no code. A program can check clean and be refused
+there, so build before you trust a green check. The last section of
+[part 3](tour-pages.md#where-pw-check-stops) shows what `pw check` passes
+and `pw build` refuses, in programs the guide's test compiles.
 
 ## Every code
 

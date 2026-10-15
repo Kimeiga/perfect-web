@@ -56,4 +56,4 @@ are in the ADRs and the reference apps (`examples/feed`, `examples/store`,
 `examples/kiokun-site`), not here yet.
 
 There is no `pw new` and no editor support yet: you name the standard
-packages on the command line, as the tutorial shows. Both are next.
+packages on the command line, as the tutorial shows.

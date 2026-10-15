@@ -971,6 +971,9 @@ fn a_fence_is_read_as_commonmark_reads_it() {
 fn an_unclosed_or_indented_fence_is_refused() {
     assert!(blocks("```pw\nmodule a\n").is_err());
     assert!(blocks("- a list\n  ```pw\n  module a\n  ```\n").is_err());
+    // Refused for being indented, not only for never closing: this one is
+    // closed, at the line's start.
+    assert!(blocks("  ```pw\nmodule a\n```\n").is_err());
     // A closing fence carries nothing after it.
     assert!(blocks("```pw\nmodule a\n``` pw\n").is_err());
     // A fence of the other character closes nothing.
@@ -1053,6 +1056,14 @@ fn shown_output_belongs_to_the_refused_example_before_it() {
         other => panic!("{other:?}"),
     }
     assert!(examples_of("t.md", "```pw\nmodule a\n```\n```text pw-check\nx\n```\n").is_err());
+    // Nor one that is not just after it, whatever refusal comes earlier.
+    assert!(
+        examples_of(
+            "t.md",
+            "```pw fails=PW0606\nmodule a\n```\n\n```sh\nls\n```\n```text pw-check\nx\n```\n"
+        )
+        .is_err()
+    );
     // Not after a gap: that block's output is the build's.
     assert!(
         examples_of(

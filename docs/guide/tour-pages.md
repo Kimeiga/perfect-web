@@ -190,7 +190,7 @@ data comes through the page's queries.
 
 A signal can be read in a part of the page, but not in a `<title>`, and a
 part cannot compute a value from two signals, as in `{a + b}`: `pw build`
-refuses both, and `pw check` does not yet
+refuses both, and `pw check` passes them
 ([where `pw check` stops](#where-pw-check-stops)).
 
 ## Forms and `bind:value`
@@ -338,7 +338,7 @@ page About() {
 `pw check` runs the compiler's checks. `pw build` goes on to the page's
 templates, and refuses some programs `pw check` passes. So a clean check is
 not yet a program that runs: build it, as the [tutorial](tutorial.md) does.
-`pw build` prints its refusals as `pw: refused: ..`, with no code.
+`pw build` prints its refusals as lines that begin `pw:`, with no code.
 
 Each program below is a gap in the checks today. The test that compiles this
 guide holds each one: when the compiler closes a gap, that test fails on the

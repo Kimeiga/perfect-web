@@ -715,7 +715,7 @@ MUST = {
     "the entries are not told of a signed entry": set(),
 }
 
-CARGO_TEST = ["cargo", "test", "--quiet", "--locked", "-p", "pw-cli", "--test", "guide"]
+CARGO_TEST = ["cargo", "test", "--locked", "-p", "pw-cli", "--test", "guide"]
 PYTHON_TEST = [
     "python3",
     "-m",

@@ -182,13 +182,13 @@ Pleris is a research project, and these are true today (2026-10-15):
   server has three data layers, written in Rust for the reference apps: a
   social feed's, a food-delivery store's and a dictionary's. A new app uses
   one of them, as the [tutorial](tutorial.md)'s guestbook uses the feed's,
-  or someone writes a new one in Rust. A data layer declared in Pleris is
-  being designed.
+  or someone writes a new one in Rust. A program cannot yet declare its own
+  storage.
 - **What a predicate means is the server's.** A command `requires SignedIn`
   or `OwnsPost(post)`, and the development server knows three predicates by
   name (ADR-0302).
-- **Sign-in is a development provider** on this machine (ADR-0258). A real
-  OpenID Connect provider is next.
+- **Sign-in is a development provider** on this machine (ADR-0258). There is
+  no adapter for a real OpenID Connect provider yet.
 - **One server.** A second server on the same database hears nothing of the
   first's writes (ADR-0246).
 - **No project tooling.** There is no `pw new`, no project file and no
