@@ -534,8 +534,12 @@ const PAGES: &[(&str, u64)] = &[
     ("/search?q=coffee", 8),
     ("/stores/47/address", 2),
     // Track `scheduled-orders`: the page of times, its cart's stores' hours
-    // (6), the time chosen (1), and its layout's cart (1).
-    ("/cart/when", 8),
+    // (6), the time chosen (1), and its layout's cart (1); and the windows
+    // wait for the estimate to the reader's address from each of the cart's
+    // two stores (`user-estimates#for-store`, 3 each: the address, its place
+    // and the estimate), 6 more (the integrator's ruling of 2026-10-15). The
+    // cart's own (16) asks none: a cart for as soon as possible has no lead.
+    ("/cart/when", 14),
     // Track `scheduled-orders`: 33 and 2 more, the time chosen
     // (`checkout#chosen`) and, where the order is settled, its time
     // (`user-orders#settle` 8, was 7).
@@ -788,10 +792,12 @@ const AWAITING: &[(&str, u64)] = &[
         12,
     ),
     // Track `scheduled-orders`: an order for a time. Its time chosen, held
-    // to the cart's stores' hours; placed, the estimate read and the time
-    // written with it; paid, its send scheduled in the commit (a delete
-    // and an insert); and sent when its preparation is due.
-    ("choose_time, for a time: its transaction", 11),
+    // to the windows its cart's stores take an order at when they are told:
+    // their hours and the cart's one store's estimate (2: no address is
+    // chosen here, so none to read; 3 where one is); placed, the estimate
+    // read and the time written with it; paid, its send scheduled in the
+    // commit (a delete and an insert); and sent when its preparation is due.
+    ("choose_time, for a time: its transaction", 13),
     (
         "place_order, for a time, taking payments: its transaction",
         40,

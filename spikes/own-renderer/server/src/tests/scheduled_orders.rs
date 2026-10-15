@@ -383,6 +383,39 @@ fn the_estimate_moves_the_windows() {
     assert_eq!(tuesday(&s), (at(2027, 3, 2, 7, 15), at(2027, 3, 2, 18, 30)));
 }
 
+/// **A time is held to the estimate as it is when the order is placed**: a
+/// store open 07:00 to 19:00; 08:00 tomorrow is offered under an estimate of
+/// 20 to 50 (its stores told at 07:05) and chosen; the estimate grows to 60
+/// to 90 (told at 06:25, before the store opens), and the order is refused by
+/// name. The control: the estimate back, the same time is placed, scheduled
+/// to be sent at 07:05.
+#[test]
+fn a_time_is_held_to_the_estimate_as_it_is_when_the_order_is_placed() {
+    let s = served();
+    set_hours(&s, "47", &daily(7 * 60, 19 * 60));
+    clock_to(&s, at(2027, 3, 1, 20, 0));
+    s.command(ADD, "a", &add_shown("espresso", 1), false)
+        .expect("added");
+    estimating(&s, 20, 50);
+    let eight = at(2027, 3, 2, 8, 0);
+    assert!(choose(&s, Some(eight), "eight").committed);
+    estimating(&s, 60, 90);
+    let late = place(&s, "late");
+    assert!(!late.committed);
+    assert_eq!(
+        late.result,
+        refused(serde_json::json!({ "$case": "not-offered", "value": eight })),
+    );
+    assert_eq!(order(&s), None, "nothing placed");
+    estimating(&s, 20, 50);
+    let placed = place(&s, "again");
+    assert!(placed.committed, "{:?}", placed.result);
+    assert_eq!(
+        order(&s),
+        Some(("scheduled".into(), Some((eight, eight - 55 * MINUTE))))
+    );
+}
+
 /// **A cart for as soon as possible asks no estimate**: with the estimator
 /// down (a call that fails, not one that refuses), the checkout is shown and
 /// the order placed. The control: with a time chosen the checkout asks the
