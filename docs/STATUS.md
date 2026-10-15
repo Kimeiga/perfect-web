@@ -23,6 +23,30 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0335, 2026-10-14: Wasmtime 48.0.6, for RUSTSEC-2026-0353 to 0364**
+(the integrator's; track `wasmtime-48-0-6`, merged from `af18141a`; the
+release's 28 crates and its CLI archives approved by the owner 2026-10-14).
+- GitHub's `ci` failed its "licenses and advisories" job on every branch
+  from 2026-10-14 21:33 UTC: eleven RustSec advisories against Wasmtime
+  48.0.5, RUSTSEC-2026-0353 to 0364 (0360 is against 49.0.0 to 49.0.2
+  alone). Every pin is 48.0.6: the workspace and its lockfile, `pw-host`,
+  `pw-conformance`, the standalone spike and its lockfile, and the CLI
+  `just bootstrap` installs, by three digests from GitHub's release. Cargo
+  moved the release's 28 crates in each lockfile and nothing else.
+- Each advisory read against what the host enables and calls: two, 0359 (a
+  long chain of types dropped) and 0363 (component-model handles charged to
+  no limit), are reachable by a hostile component, and the version closes
+  them; the rest need a switch the host's engine has off or an API it never
+  calls. No advisory is ignored in `deny.toml`.
+- The track's `ci` (38668653495) was green in all three jobs, "licenses and
+  advisories" among them; its `verify` (38668653510) ran the three browser
+  suites green and planned no recipe.
+- The integrator's answers (in the ADR): `wasm_function_references(false)`
+  is a hardening track of its own (NEXT); the E0 spike's evidence stays
+  historical (ADR-0116); the macOS digest is checked at the Mac's next
+  `just bootstrap`.
+Verify TRAIN_RUN green, with train-8.
+
 **2026-10-14: a change to a source's own tests plans what runs them** (the
 integrator's finding at train-6; track `planner-test-modules`, merged from
 `80802a46`).

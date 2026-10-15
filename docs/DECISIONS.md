@@ -2937,3 +2937,10 @@ sweep, NEXT 4).
   writes; each run made as a press is, on its scheduler's behalf, keyed so
   it commits once; the store's abandoned orders taken back at thirty
   minutes.
+[ADR-0335](DECISIONS/ADR-0335-wasmtime-48-0-6.md):
+Wasmtime 48.0.6, for RUSTSEC-2026-0353 to 0364 (the integrator's; the
+downloads approved by the owner, 2026-10-14).
+- CI's advisory job failed on every branch from 2026-10-14 on eleven
+  Wasmtime advisories. Every pin is 48.0.6; the engine stays as ADR-0244
+  configured it; no advisory ignored. Two are reachable by a hostile
+  component, and the version closes them.

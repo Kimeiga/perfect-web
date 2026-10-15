@@ -855,6 +855,14 @@ E14 comes before E11-E13. Its plan, controls and task list are
             as the scheduled-commands track and C24 did; the 142 before are
             added a family at a time (Syntax's 22, Resolution's 10, UiState's
             10 and Capability's 5 first, none exercised);
+          - **the host's engine refuses function references** (ADR-0335's
+            answer, 2026-10-15): `wasm_function_references(false)` in
+            `engine::engine_config()` refuses RUSTSEC-2026-0359's types by
+            configuration, where Wasmtime 48.0.6 alone closes it today; the
+            backend's only reference is a `funcref` table behind
+            `call_indirect`. A hardening track of its own: a test that the
+            engine refuses them, and a full run, the development server's
+            suites among them;
           - **a program's declaration of another origin** (ADR-0195's
             ruling 13, its last clause; ADR-0333 built the rest): an origin a
             program declares, which its pages' policy allows and PW5052 lets
