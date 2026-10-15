@@ -2937,3 +2937,40 @@ sweep, NEXT 4).
   writes; each run made as a press is, on its scheduler's behalf, keyed so
   it commits once; the store's abandoned orders taken back at thirty
   minutes.
+[ADR-0335](DECISIONS/ADR-0335-wasmtime-48-0-6.md):
+Wasmtime 48.0.6, for RUSTSEC-2026-0353 to 0364 (the integrator's; the
+downloads approved by the owner, 2026-10-14).
+- CI's advisory job failed on every branch from 2026-10-14 on eleven
+  Wasmtime advisories. Every pin is 48.0.6; the engine stays as ADR-0244
+  configured it; no advisory ignored. Two are reachable by a hostile
+  component, and the version closes them.
+[ADR-0336](DECISIONS/ADR-0336-a-read-is-a-bounded-number-of-statements.md):
+a read is a bounded number of statements on PostgreSQL (W9's; NEXT 4b).
+- The store's rows read by set (`= ANY($1)`): stores by id, the stores of
+  a set of items, the hours and the coverage of a set of stores. Every
+  operation, page and command counted at the seed and with fifty stores
+  more, pinned and equal at both; a command's commit counted with it;
+  `place_order` pinned by scenario.
+[ADR-0337](DECISIONS/ADR-0337-a-read-is-bounded-by-construction.md):
+a read is bounded by construction (W9's design note for NEXT 4c, ruled by
+the integrator 2026-10-14; nothing built yet).
+- A read keyed by a loop's element refused above the seam (PW0405), its
+  set read the repair; each source operation's cost per call stated below
+  it (`sets`, PW0406) and measured by one conformance suite; the store's
+  composites moved above the seam. Built in order: the render merge, the
+  checker's rules, the suite, the composites.
+[ADR-0338](DECISIONS/ADR-0338-three-databases.md):
+one app on three kinds of database, each held to what it gives (a design
+note, ruled by the integrator 2026-10-15; nothing built yet).
+- An app's data declared in Pleris (`table`), one generic adapter per
+  database implementing every app's, no app-specific Rust; one conformance
+  suite, the 4c note's; built as tracks D1 to D5 and T1 to T6, the owner's
+  decisions 1 to 7 before T3, T4 or T5.
+[ADR-0339](DECISIONS/ADR-0339-a-collaborative-document-app.md):
+a collaborative document is merged by Automerge, edited in a mounted
+ProseMirror, and told on the stream (a design note, ruled by the
+integrator 2026-10-15; nothing built yet).
+- NEXT's Google Docs-shaped app: Automerge behind `replicated`'s
+  `rich_text` policy; Pleris renders the document and an editor's page
+  mounts ProseMirror; presence and sync on the stream. Its data declared
+  as tables (ADR-0338); its downloads wait for the owner's approval.

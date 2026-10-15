@@ -1,48 +1,48 @@
 Track store-hours - a store's opening hours, and whether it is open by the platform's clock
 
 produced by: just e14-store-hours
-commit: 92fdd6e34743e33a80914939976125a9eb307842
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38559878637 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64, PostgreSQL 18.6)
+commit: 1824590b8d4c62d9923e4af049c525eecbd24977
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38773359015 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64, PostgreSQL 18.6)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 postgres: 18.6 (Debian 18.6-1.pgdg13+2)
 
 == the hours served, the store in memory (tests/store_hours.rs)
 
 test tests::store_hours::a_cut_off_across_midnight_and_a_store_that_never_closes ... ok
-test tests::store_hours::a_days_periods_are_taken_by_opening_whatever_the_order_listed ... ok
 test tests::store_hours::a_period_past_midnight_overlapping_the_next_days_is_one_span ... ok
+test tests::store_hours::a_days_periods_are_taken_by_opening_whatever_the_order_listed ... ok
 test tests::store_hours::a_day_the_clocks_go_forward ... ok
 test tests::store_hours::a_set_reads_back_ordered_the_last_of_each_kept ... ok
-test tests::store_hours::a_store_page_is_told_at_the_closing_instant ... ok
 test tests::store_hours::an_order_is_refused_past_the_last_order_and_while_closed ... ok
+test tests::store_hours::a_store_page_is_told_at_the_closing_instant ... ok
 test tests::store_hours::a_special_date_closes_the_store ... ok
 test tests::store_hours::hours_a_store_cannot_have_are_refused ... ok
-test tests::store_hours::overlapping_periods_are_open_as_their_union ... ok
 test tests::store_hours::the_home_page_and_a_search_show_each_stores_hours ... ok
 test tests::store_hours::hours_run_past_midnight ... ok
+test tests::store_hours::overlapping_periods_are_open_as_their_union ... ok
 test tests::store_hours::the_hours_read_back_alike_on_this_layer ... ok
-test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 556 filtered out; finished in 64.69s
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 561 filtered out; finished in 92.94s
 
 == the hours served, the store on PostgreSQL (PW_STORE_TEST_LAYER=postgres)
 
 test tests::store_hours::a_cut_off_across_midnight_and_a_store_that_never_closes ... ok
-test tests::store_hours::a_days_periods_are_taken_by_opening_whatever_the_order_listed ... ok
 test tests::store_hours::a_period_past_midnight_overlapping_the_next_days_is_one_span ... ok
+test tests::store_hours::a_days_periods_are_taken_by_opening_whatever_the_order_listed ... ok
 test tests::store_hours::a_day_the_clocks_go_forward ... ok
 test tests::store_hours::a_set_reads_back_ordered_the_last_of_each_kept ... ok
 test tests::store_hours::a_store_page_is_told_at_the_closing_instant ... ok
 test tests::store_hours::an_order_is_refused_past_the_last_order_and_while_closed ... ok
 test tests::store_hours::a_special_date_closes_the_store ... ok
 test tests::store_hours::hours_a_store_cannot_have_are_refused ... ok
-test tests::store_hours::hours_run_past_midnight ... ok
-test tests::store_hours::the_home_page_and_a_search_show_each_stores_hours ... ok
 test tests::store_hours::overlapping_periods_are_open_as_their_union ... ok
+test tests::store_hours::the_home_page_and_a_search_show_each_stores_hours ... ok
+test tests::store_hours::hours_run_past_midnight ... ok
 test tests::store_hours::the_hours_read_back_alike_on_this_layer ... ok
-test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 556 filtered out; finished in 65.66s
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 561 filtered out; finished in 92.85s
 
 == the store's pages in three engines (e2e/store-search.spec.mjs)
 
-  36 passed (4.8m)
+  36 passed (5.9m)
 
 == mutation controls (scripts/store_hours_mutations.py)
 
@@ -59,7 +59,7 @@ an evening is said am [server]: KILLED (4 of 13 tests fail)
 a store open the day round is not said so [server]: KILLED (2 of 13 tests fail)
 the home page's stores are kept past a change to their hours [server]: KILLED (1 of 13 tests fail)
 overlapping periods are joined only where one ends as the next starts [server]: KILLED (2 of 13 tests fail)
-an order is placed whatever the hours [server]: KILLED (13 of 13 tests fail)
+an order is placed whatever the hours [server]: KILLED (3 of 13 tests fail)
 memory's hours are not written [server]: KILLED (12 of 13 tests fail)
 memory holds a set in the order it lists [server]: KILLED (2 of 13 tests fail)
 a weekday past 7 is not refused [server]: KILLED (1 of 13 tests fail)

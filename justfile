@@ -23,6 +23,7 @@ import 'just/store-accounts.just'
 import 'just/store-search.just'
 import 'just/store-hours.just'
 import 'just/order-total.just'
+import 'just/bounded-statements.just'
 import 'just/payments.just'
 import 'just/page-policy.just'
 import 'just/scheduled.just'
@@ -42,7 +43,8 @@ doctor:
 bootstrap:
     @bash scripts/bootstrap.sh
 
-# Record the current machine state into docs/environment/macbook.md. Charter §13.1.
+# Record this host's machine state into docs/environment/: macbook.md on the Mac
+# (and tools/versions.lock), pc-wsl.md or linux.md on Linux. Charter §13.1.
 env-record:
     @bash scripts/record-environment.sh
 
@@ -75,6 +77,14 @@ case-check:
 # here rather than when the control is next run (scripts/mutation_anchors.py).
 mutation-anchors:
     @python3 scripts/mutation_anchors.py
+
+# Every mutant of a program's source leaves a program the checker takes, or
+# one its script says the checker refuses, by the rule that is the
+# protection it takes away (scripts/mutant_programs.py): a mutant the checker
+# refuses for another reason is killed by the build, whatever the tests hold.
+mutant-programs:
+    @cargo build --quiet --locked -p pw-cli
+    @python3 scripts/mutant_programs.py "${CARGO_TARGET_DIR:-target}/debug/pw"
 
 # Charter §3.6 supply-chain scanning. `deny.toml` and
 # `tools/node-audit-allow.txt` both require a written reason per exception.
@@ -4709,7 +4719,7 @@ rq-row-polymorphism:
 # ---------------------------------------------------------------------------
 
 # The one command that must pass for the current milestone's gate.
-ci: evidence-gates fmt-check lint case-check mutation-anchors test-unit test-compile
+ci: evidence-gates fmt-check lint case-check mutation-anchors test-unit test-compile mutant-programs
     @echo ""
     @echo "ci: OK"
 

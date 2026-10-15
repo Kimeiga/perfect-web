@@ -23,6 +23,181 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0339, 2026-10-15: a collaborative document is merged by Automerge,
+edited in a mounted ProseMirror, and told on the stream** (a design note
+for NEXT's Google Docs-shaped app, track `docs-design`, merged from
+`2f5e51fb`; ruled by the integrator 2026-10-15). Docs only: nothing is
+built, and nothing was downloaded.
+- Its three rulings: concurrent edits merge in Automerge, behind
+  `replicated`'s `rich_text` policy (reopened if D0's cases or budgets say
+  so); Pleris renders every reader's document, and an editor's page mounts
+  ProseMirror at the page's authority, audited and said to be unconfined;
+  presence and sync ride the stream down, one sync request up, a WebSocket
+  only if a measurement fails.
+- The ruling amends it: no app-specific Rust, the app's own data declared
+  as tables on the generic adapters (ADR-0338), so phase 3 waits for D3; a
+  predicate on a read, `requires` on a query; the owner decisions that are
+  design (3 to 9) ruled under the delegation; PW6601 upward for its codes.
+- **Its downloads wait for the owner** (owner decision 2): Automerge,
+  ProseMirror and what they bring, 16 npm packages shipped to an editor's
+  page among them; nothing is fetched before that approval.
+Verify 38773359015 green, with train-8.
+
+**ADR-0338, 2026-10-15: one app on three kinds of database, each held to
+what it gives** (a design note, track `threedb-design`, merged from
+`b60a9c71`; ruled by the integrator 2026-10-15). Docs only: nothing is
+built yet.
+- An app's data is declared in Pleris (`table`: its row, key, order,
+  indexes, uniqueness, references and bound), and one generic adapter per
+  database implements every app's, so that no app needs Rust; migrations
+  come from the declarations, and one conformance suite runs on every
+  layer. The store is placed on three sources, each held to what its
+  database gives (ADR-0207), with several layers in one host, a change
+  told to every host, and a command across sources.
+- The ruling amends its names (a set form ends in `_many`), its codes
+  (PW0354 to PW0366, declaration rules) and its suite (one with the 4c
+  note's, ADR-0337); TodoMVC is D2's first app with no Rust data layer.
+- Built as the note's tracks: D1 `tables` (in flight on `track/tables`),
+  then D2 the memory adapter with TodoMVC, D3 the PostgreSQL adapter, D4
+  and D5 the feed and the store declared, T1 several sources, T2 SQLite;
+  none downloads anything. The owner's decisions 1 to 7 (which database of
+  each pair, the downloads, what runs where) come before T3 (MongoDB), T4
+  (Cassandra or ScyllaDB) or T5 (CockroachDB) starts.
+Verify 38773359015 green, with train-8.
+
+**2026-10-15: Pleris is developed on Windows inside WSL2** (the move to the
+owner's PC; track `pc-setup`, merged from `c7f4630b`).
+- A clone is LF on every platform: a root `.gitattributes` (`* text=auto
+  eol=lf`, the tree's binary types named), where Git for Windows would
+  check the tree out CRLF; the tree renormalizes to itself.
+- `just doctor` reads a Linux host, a WSL2 Ubuntu or CI's ubuntu-24.04: its
+  processor and memory, Chrome where Playwright installed it, Linux hints,
+  and a worktree, whose `.git` is a file. A version compares by its first
+  dotted number, so a build's stamp is no difference. The Mac's output is
+  as it was. `just env-record` writes the host's own record
+  (`docs/environment/pc-wsl.md` on WSL2) and leaves `tools/versions.lock`,
+  the Mac's record advanced by ADRs, alone.
+- CI's actions run on Node 24 (`setup-just@v4`, `pnpm/action-setup@v5`;
+  `fallow.yml` on the other workflows' versions), and setup-just installs
+  the pinned just 1.58.0 where it installed the newest. The README says to
+  develop inside WSL2, on WSL's own filesystem.
+- Its verify (38659086865) was green; its `ci` (38659086894) red in
+  "licenses and advisories" alone, Wasmtime 48.0.5's (ADR-0335 above).
+Verify 38773359015 green, with train-8.
+
+**ADR-0337, 2026-10-14: a read is bounded by construction** (W9's design
+note for NEXT 4c; track `bounded-reads`, merged from `8bc1fe68`; ruled by
+the integrator 2026-10-14). Docs only: nothing is built yet.
+- Above the seam, a page's and a command's source calls are bounded by
+  its text: a read keyed by a loop's element is refused (PW0405), its set
+  read the repair. Below it, each source operation states what one call
+  costs (`sets`), measured by a conformance suite at two data sizes, and a
+  budget that grows on a source that does not batch is warned of (PW0406).
+  The store's composites move above the seam.
+- Its measurements are 4b's (ADR-0336), and its two cases are settled: one
+  command's repeated reads are read once above the seam, not coalesced by
+  the host; one render's identical calls are made once, in one snapshot.
+- Built in the ruling's order: the render merge (track `render-merge`);
+  PW0405, `set` pairs, `sets` and PW0406 (track `bounded-checker`); the
+  conformance suite, one with the three-database note's; then the
+  composites, one at a time.
+Verify 38773359015 green, with train-8.
+
+**ADR-0336, 2026-10-14: a read is a bounded number of statements on
+PostgreSQL** (W9's; NEXT 4b; track `bounded-statements`, merged from
+`a59a18a3`, with the integrator's rulings of 2026-10-14).
+- The store's logic read the layer's rows a store's or a menu's at a time,
+  and on PostgreSQL each was a statement: the order's reach one per line
+  and store, a reader's search one per store it found, the hours three per
+  store. The rows gain four set reads, each one statement on PostgreSQL
+  whatever its keys (`= ANY($1)`) and a scan in memory: stores by id, the
+  stores of a set of items, the hours of a set of stores (three statements)
+  and their coverage. The loops go; memory's scans are named, and the
+  mutants put them back.
+- Every one of the store layer's 63 operations, and every page and command,
+  counted on PostgreSQL at the seed and with fifty stores more, each count
+  pinned and equal at both (`tests/bounded_statements.rs`, as Django's
+  `assertNumQueries` pins a block's). A command's commit is counted with it
+  (its outbox, its interaction's record, its scheduled runs), and
+  `place_order` pinned by scenario: taking no payments, its operations 33,
+  its commit 7 and its queries read again 21; taking them, 37, then
+  `settle_payment` on the provider's word 17.
+- Locally on PostgreSQL 18.6 (the PC): `just e14-bounded-statements`, 4
+  passed and 7 of 7 mutants killed; `store_accounts_mutations.py` whole, 37
+  of 37; chromium's suite, 381 passed. Its own verify (38641214685) was
+  cancelled by a concurrency group: the train's run is its record.
+Verify 38773359015 green, with train-8.
+
+**ADR-0335, 2026-10-14: Wasmtime 48.0.6, for RUSTSEC-2026-0353 to 0364**
+(the integrator's; track `wasmtime-48-0-6`, merged from `af18141a`; the
+release's 28 crates and its CLI archives approved by the owner 2026-10-14).
+- GitHub's `ci` failed its "licenses and advisories" job on every branch
+  from 2026-10-14 21:33 UTC: eleven RustSec advisories against Wasmtime
+  48.0.5, RUSTSEC-2026-0353 to 0364 (0360 is against 49.0.0 to 49.0.2
+  alone). Every pin is 48.0.6: the workspace and its lockfile, `pw-host`,
+  `pw-conformance`, the standalone spike and its lockfile, and the CLI
+  `just bootstrap` installs, by three digests from GitHub's release. Cargo
+  moved the release's 28 crates in each lockfile and nothing else.
+- Each advisory read against what the host enables and calls: two, 0359 (a
+  long chain of types dropped) and 0363 (component-model handles charged to
+  no limit), are reachable by a hostile component, and the version closes
+  them; the rest need a switch the host's engine has off or an API it never
+  calls. No advisory is ignored in `deny.toml`.
+- The track's `ci` (38668653495) was green in all three jobs, "licenses and
+  advisories" among them; its `verify` (38668653510) ran the three browser
+  suites green and planned no recipe.
+- The integrator's answers (in the ADR): `wasm_function_references(false)`
+  is a hardening track of its own (NEXT); the E0 spike's evidence stays
+  historical (ADR-0116); the macOS digest is checked at the Mac's next
+  `just bootstrap`.
+Verify 38773359015 green, with train-8.
+
+**2026-10-14: a change to a source's own tests plans what runs them** (the
+integrator's finding at train-6; track `planner-test-modules`, merged from
+`80802a46`).
+- Train-6's survivor in `e14-page-policy` was killed by a test in
+  `csp.rs`'s own `mod tests`, and its push planned no `e14-page-policy`:
+  no test file, far from every mutant, while the script runs those tests by
+  the filter `csp::`. A change after a source's `#[cfg(test)] mod tests {`
+  now reaches the scripts and recipes that name the module's filter, as
+  train-6's fix made a server test module's reach those that name
+  `tests::<name>::`.
+- Held by a test whose change is far from every mutant, and three mutants
+  (`dealt_by_time_mutations.py`, 48 of 48).
+Verify 38629460236 green, with train-7.
+
+**2026-10-14: a mutant of a program's source is still a program** (the
+integrator's finding; track `mutant-programs`, merged from `6a30b2f5`).
+- Of the 237 mutants of a `.pw` source the mutation scripts plant, the
+  checker refused the program 14 left: each "killed" by the build, whatever
+  the tests hold, its verdict reading as a test's. Three were refused for
+  another reason than what they undo: store-hours' "an order is placed
+  whatever the hours" called `UserOrders.place` with one argument since
+  order-total gave it three; command-answers' wrote `&&`, which the
+  language does not have; kiokun's read a list of another type. Each is
+  well-typed now and killed by its own script's tests (3 of 13, 1 of 42, 2
+  of 2). The other eleven take away a protection the checker holds, and
+  their scripts say which rule (`CHECKED`).
+- `just ci` holds it (`mutant-programs`, `scripts/mutant_programs.py`):
+  237 mutants, 11 refused by their named rule, none failing; on the tree
+  before, all 14 fail. Its logic is held with a stand-in checker (4 tests).
+Verify 38629460236 green, with train-7.
+
+**2026-10-14: the corpus specifies `invoked_by`** (the integrator's finding;
+corpus C24; track `corpus-invoked`, merged from `64e5ee4e`).
+- NEXT 6c's five codes (PW6401 to PW6405, a command the platform invokes)
+  had no fixture: the corpus, the executable specification, did not say
+  them. C24 adds a rejected fixture for each (R-070 to R-074) and a
+  generality pair for each, a GENERAL witness on the clock's command and a
+  NEIGHBOUR beside it. Generality 54 / 54.
+- Exercising them found two diagnostics that named no boundary span, which
+  charter §16.3 requires: PW6402 and PW6405 name their `invoked_by` clause
+  now, held by a test and two mutants (`invoked_by_mutations.py`, 14 of
+  14). PW6405's invariant says the clock's word as well as a provider's.
+- Measured: the rejected corpus exercises 54 of the 196 codes. NEXT holds
+  the rest, and the rule for a new code.
+Verify 38629460236 green, with train-7.
+
 **ADR-0334, 2026-10-14: a command runs when the clock passes its time**
 (the integrator's; ADR-0332's not-claimed sweep and NEXT 4's third step;
 track `scheduled-commands`, merged from `9bd44dec`).

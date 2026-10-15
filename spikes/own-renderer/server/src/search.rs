@@ -276,8 +276,11 @@ pub(crate) fn reaching(
 ) -> Result<(Vec<Matched>, Near), String> {
     let mut kept = Vec::new();
     let mut near = Near::default();
+    // By set (NEXT 4b): the reader's address once, the stores found at once.
+    let ids: Vec<String> = matched.iter().map(|m| m.id.clone()).collect();
+    let mut reach = crate::store::coverage_of(r, &ids, reader)?;
     for m in matched {
-        match crate::store::coverage(r, &m.id, reader)? {
+        match reach.remove(&m.id).flatten() {
             None => kept.push(m),
             Some(reach) => {
                 near.chosen = true;

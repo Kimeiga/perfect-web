@@ -47,6 +47,34 @@ pub(crate) trait DataLayer: Send + Sync {
     /// default what the host's own database gives a resource no source holds
     /// (ADR-0207): serializable transactions, reads of the latest commit, and
     /// no feed of its changes. An in-memory layer gives that under its lock.
+    /// **The statements its reads and commands have run** (NEXT 4b): a
+    /// layer that counts none (memory) says nothing.
+    #[cfg(test)]
+    fn statements(&self) -> Option<u64> {
+        None
+    }
+
+    /// **Each operation's calls and statements so far**, by its name, on a
+    /// layer that counts them (NEXT 4c's baseline).
+    #[cfg(test)]
+    fn statements_by_op(&self) -> BTreeMap<String, (u64, u64)> {
+        BTreeMap::new()
+    }
+
+    /// **Each command's transaction's statements**, in the order the
+    /// commands began, on a layer that counts them (NEXT 4b).
+    #[cfg(test)]
+    fn statements_by_transaction(&self) -> Vec<u64> {
+        Vec::new()
+    }
+
+    /// **SQL a test runs on the layer's database**, where it has one: fifty
+    /// stores more (NEXT 4b).
+    #[cfg(test)]
+    fn execute_for_test(&self, sql: &str) -> Result<(), String> {
+        Err(format!("this layer runs no SQL: {sql}"))
+    }
+
     fn provides(&self) -> Result<Provided, String> {
         Ok(Provided::host_database())
     }

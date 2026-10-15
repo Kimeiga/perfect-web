@@ -160,6 +160,31 @@ class Plan(unittest.TestCase):
         self.assertNotIn("scheduled_mutations.py", plan.touched_scripts({nothing: [(1, 1)]}, 30))
         self.assertNotIn("e14-scheduled", plan.recipes_for({nothing: [(1, 1)]}, 30, plan.recipes()))
 
+    def test_a_change_to_a_sources_own_tests_reaches_what_runs_them(self) -> None:
+        # Train-6's finding, 2026-10-14: the test that kills its survivor sits
+        # in `csp.rs`'s own `mod tests`, far from every mutant, and is no test
+        # file: its change planned no `e14-page-policy`, whose script runs
+        # `csp::`.
+        csp = "spikes/own-renderer/server/src/csp.rs"
+        lines = (plan.ROOT / csp).read_text().splitlines()
+        # Its last test's lines, far from every mutant, which the near rule
+        # would plan by itself.
+        inside = len(lines) - 2
+        changed = {csp: [(inside, inside)]}
+        self.assertEqual(plan.test_modules(changed), {"csp"})
+        self.assertIn("page_policy_mutations.py", plan.touched_scripts(changed, 30))
+        saved = plan.bodies
+        try:
+            plan.bodies = lambda: {"e14-direct": "cargo test -- csp::tests"}
+            self.assertEqual(plan.recipes_for(changed, 30, ["e14-direct"]), ["e14-direct"])
+        finally:
+            plan.bodies = saved
+        # The control: the same file's first line is no test's, and a path
+        # that ends in the module's name is another module.
+        self.assertEqual(plan.test_modules({csp: [(1, 1)]}), set())
+        self.assertFalse(plan.names_module("pw_core::csp::Needs", "csp"))
+        self.assertTrue(plan.names_module('"csp::", "tests::page_policy::"', "csp"))
+
     def test_a_changed_browser_spec_reaches_the_scripts_and_recipes_that_run_it(self) -> None:
         # ADR-0281: a spec a script runs is its test, as a Rust test file is;
         # a change to `accessibility.spec.mjs` planned nothing before.
