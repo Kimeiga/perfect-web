@@ -1,0 +1,24 @@
+// @status: NEIGHBOUR
+// @invariant: data_not_declared
+// @dimension: valid neighbour — the program's own function, with a body, over a read the table gives
+//
+// A function whose row reads the table, as a binding by hand's does, and
+// which reaches its rows through `all()`: what the program composes over
+// the generated reads is Pleris, and no binding.
+
+module Seals
+
+import List
+
+opaque type SealId = String
+
+type Seal = Seal { id: SealId, label: String }
+
+table Seals
+    row     Seal
+    key     id
+    bounded 50
+
+fn count() -> Int !{ database.read<Seals> } {
+    List.length(Seals.all())
+}

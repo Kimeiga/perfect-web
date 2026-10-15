@@ -1,0 +1,30 @@
+// @corpus: accepted
+// @id: A-102
+// @category: a reference across sources by a field that may name no row
+// @charter: §9.2
+// @milestone: 14
+//
+// A comment's author is a member, held by another source (A-101's
+// `MemberData`), which may delete the member: the field says the comment may
+// name none, `Option<MemberId>` (track `tables`, PW0365). The control for
+// R-105.
+
+module Comments
+
+import Members.{ MemberId }
+import Members
+
+opaque type CommentId = String
+
+type Comment = Comment { id: CommentId, author: Option<MemberId>, text: String }
+
+table Comments
+    row    Comment
+    key    id
+    refers author to Members
+
+source CommentData
+    holds        Comments
+    transactions serializable
+    reads        strong
+    changes      none

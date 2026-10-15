@@ -6,6 +6,25 @@
 
 use pw_core::check::check_sources;
 
+/// **One rejected fixture, checked as its own program** (`rejected_program`),
+/// held to the schema it names as released, where it names one (track
+/// `tables`, ADR-0338): `// @schema-lock: <file beside it>`. A change from a
+/// release is refused only against the release (PW0366).
+fn check_fixture(path: &std::path::Path) -> Vec<(String, Vec<pw_core::diagnostics::Diagnostic>)> {
+    let src = std::fs::read_to_string(path).expect("read");
+    let released = src
+        .lines()
+        .find_map(|l| l.trim().strip_prefix("// @schema-lock:"))
+        .map(|file| {
+            let lock = path.with_file_name(file.trim());
+            let text = std::fs::read_to_string(&lock)
+                .unwrap_or_else(|e| panic!("{}: {e}", lock.display()));
+            pw_core::tables::Schema::read(&text)
+                .unwrap_or_else(|e| panic!("{}: {e}", lock.display()))
+        });
+    pw_core::check::check_sources_with(&rejected_program(path), released.as_ref())
+}
+
 /// Declaration-level rules over one file, through the one parser.
 ///
 /// E6F: `rules::check` reads the HIR. Before, this went through a second
@@ -87,7 +106,7 @@ fn rejected_results() -> Vec<(String, String, Vec<pw_core::diagnostics::Diagnost
         .map(|p| {
             let name = p.file_name().unwrap().to_string_lossy().to_string();
             let src = std::fs::read_to_string(&p).expect("read");
-            let results = check_sources(&rejected_program(&p));
+            let results = check_fixture(&p);
             let diags = results
                 .into_iter()
                 .find(|(n, _)| *n == name)
@@ -404,7 +423,7 @@ fn a_caught_file_conveys_every_fact_its_expect_error_lines_declare() {
     let mut missing = Vec::new();
 
     for p in corpus_dir("rejected") {
-        let results = check_sources(&rejected_program(&p));
+        let results = check_fixture(&p);
         let path = p.file_name().unwrap().to_string_lossy().to_string();
         let diags = &results
             .iter()

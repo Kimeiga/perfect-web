@@ -1,0 +1,19 @@
+// @status: NEIGHBOUR
+// @invariant: refers_across_sources
+// @dimension: valid neighbour — the same reference across sources, by a field that may name no row
+//
+// The field says what no database holds for it: the member may be gone.
+
+module Answers
+
+import Members.{ MemberId }
+import Members
+
+opaque type AnswerId = String
+
+type Answer = Answer { id: AnswerId, author: Option<MemberId>, text: String }
+
+table Answers
+    row    Answer
+    key    id
+    refers author to Members

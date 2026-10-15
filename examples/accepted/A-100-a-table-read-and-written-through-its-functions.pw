@@ -1,0 +1,70 @@
+// @corpus: accepted
+// @id: A-100
+// @category: a table read and written through the functions its declaration gives
+// @charter: §9.2
+// @milestone: 14
+//
+// An app's data declared in Pleris (track `tables`, ADR-0338): a table in
+// the module of its name, keyed by what every database keys a row by, with
+// an index on a field of its row and a bound, read and written only through
+// the functions its declaration gives this module. The control for R-100
+// (its key), R-101 (its index), R-102 (`all()` of a bounded table), R-103 (a
+// read it gives) and R-104 (no binding of the app's own).
+
+module Chores
+
+opaque type ChoreId = String
+opaque type Room = String
+
+type Chore = Chore { room: Room, id: ChoreId, title: String, done: Bool, added: Int }
+
+table Chores
+    row     Chore
+    key     room, id
+    order   added
+    index   by_done on done
+    bounded 200
+
+source ChoreData
+    holds        Chores
+    transactions serializable
+    reads        strong
+    changes      none
+
+query InRoom(room: Room) -> List<Chore>
+    consistency strong
+{
+    Chores.of_room(room)
+}
+
+query Undone() -> List<Chore>
+    consistency strong
+{
+    Chores.by_done(false)
+}
+
+query EveryChore() -> List<Chore>
+    consistency strong
+{
+    Chores.all()
+}
+
+query OneChore(room: Room, id: ChoreId) -> Option<Chore>
+    consistency strong
+{
+    Chores.get(room, id)
+}
+
+command add_chore(chore: Chore) -> Result<(), Chore>
+    transaction serializable
+    invalidates InRoom(chore.room), Undone(), EveryChore(), OneChore(chore.room, chore.id)
+{
+    Chores.insert(chore)
+}
+
+command finish_room(room: Room) -> ()
+    transaction serializable
+    invalidates InRoom(room), Undone(), EveryChore(), OneChore(room, _)
+{
+    Chores.delete_of_room(room)
+}

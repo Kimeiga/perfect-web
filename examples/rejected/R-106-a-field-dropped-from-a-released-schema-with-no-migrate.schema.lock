@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "hash": "c4e446bd4aedc553",
+  "tables": [
+    {
+      "name": "Notes",
+      "source": null,
+      "fields": [
+        {
+          "name": "id",
+          "type": "NoteId",
+          "stored": {
+            "string": {}
+          }
+        },
+        {
+          "name": "title",
+          "type": "String",
+          "stored": {
+            "string": {}
+          }
+        },
+        {
+          "name": "body",
+          "type": "String",
+          "stored": {
+            "string": {}
+          }
+        }
+      ],
+      "key": [
+        "id"
+      ]
+    }
+  ]
+}

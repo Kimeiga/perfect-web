@@ -1,0 +1,26 @@
+// @corpus: rejected
+// @id: R-107
+// @category: a field renamed from a released schema with no migrate
+// @rule: PW0366
+// @invariant: migration_unstated
+// @charter: §9.2
+// @milestone: 14
+// @schema-lock: R-107-a-field-renamed-from-a-released-schema-with-no-migrate.schema.lock
+// @expect-error: `Memos.body` was released and is no field of `Memos`'s row
+// @expect-error: `Memos.text` is new, of `String`
+//
+// The schema released called the memo's text `body`. A rename and a field
+// dropped beside a new one are the same text in a row's record; only the
+// program knows which it meant, and it says so, `migrate text renamed from
+// body`, or the migration would lose every memo's text (ADR-0338, 1.4).
+// `A-103` states its rename, accepted.
+
+module Memos
+
+opaque type MemoId = String
+
+type Memo = Memo { id: MemoId, text: String }
+
+table Memos
+    row Memo
+    key id

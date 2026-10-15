@@ -1,0 +1,31 @@
+// @corpus: rejected
+// @id: R-103
+// @category: a read a table's declaration does not give
+// @rule: PW0362
+// @invariant: data_not_declared
+// @charter: §9.2
+// @milestone: 14
+// @expect-error: `Tasks.by_owner` is no read or write `Tasks` gives
+//
+// A table's reads are its key's, its key's prefixes', and its indexes': a
+// read by a field none of them leads with does not exist, since no database
+// answers it but by reading every row (ADR-0338, 1.2). The repair is an
+// index, `index by_owner on owner`, as `A-100` declares one; or a filter,
+// the program's own, over a read the table gives.
+
+module Tasks
+
+opaque type TaskId = String
+opaque type Owner = String
+
+type Task = Task { id: TaskId, owner: Owner, title: String }
+
+table Tasks
+    row Task
+    key id
+
+query OwnedBy(owner: Owner) -> List<Task>
+    consistency strong
+{
+    Tasks.by_owner(owner)
+}

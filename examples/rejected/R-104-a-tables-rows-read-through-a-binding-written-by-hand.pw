@@ -1,0 +1,27 @@
+// @corpus: rejected
+// @id: R-104
+// @category: a table's rows read through a binding written by hand
+// @rule: PW0362
+// @invariant: data_not_declared
+// @charter: §9.2, §2
+// @milestone: 14
+// @expect-error: `count` reads `Cards` through `host "store:data/cards#count"`, and `Cards` is a table
+//
+// A table's rows are reached through the functions its declaration gives,
+// each a primitive one adapter per database implements for every table. A
+// binding written by hand is an operation the app's own Rust implements,
+// once for each database (ADR-0338, decision 1): the data layer a declared
+// table exists to remove. `A-100` reads its table through its functions.
+
+module Cards
+
+opaque type CardId = String
+
+type Card = Card { id: CardId, front: String }
+
+table Cards
+    row Card
+    key id
+
+fn count() -> Int !{ database.read<Cards> }
+    host "store:data/cards#count"

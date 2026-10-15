@@ -958,9 +958,24 @@ pub fn check(hirs: &[&Hir], unit: usize, ws: &Workspace, sigs: &Signatures) -> V
         .map(|m| m.name.clone())
         .unwrap_or_default();
     let tables = declared(hir);
+    let module_span = hir.modules.iter().next().map(|(_, _, s)| s.clone());
     for (i, t) in tables.iter().enumerate() {
-        out.extend(shape(hirs, unit, ws, sigs, &module, t, i > 0));
-        out.extend(across_sources(hirs, unit, ws, sigs, t));
+        let mut found = shape(hirs, unit, ws, sigs, &module, t, i > 0);
+        found.extend(across_sources(hirs, unit, ws, sigs, t));
+        // Each told beside the table it is about (charter §16.3's boundary
+        // span), or, for the table itself, its module.
+        for d in &mut found {
+            if d.related.is_empty() {
+                d.related.push(match d.primary_span == t.span {
+                    true => Related::new(
+                        module_span.clone().unwrap_or_else(|| t.span.clone()),
+                        format!("the module `{module}`"),
+                    ),
+                    false => Related::new(t.span.clone(), format!("the table `{}`", t.name)),
+                });
+            }
+        }
+        out.extend(found);
     }
     out.extend(bindings(hirs, unit, ws));
     out
@@ -1369,8 +1384,8 @@ fn across_sources(
     };
     t.references
         .iter()
-        .filter(|r| table_module(ws, hirs, unit, &r.value.table).is_some())
         .filter_map(|r| {
+            let (target_unit, target) = table_module(ws, hirs, unit, &r.value.table)?;
             let theirs = source_of(hirs, &r.value.table);
             let (_, ty) = fields.iter().find(|(n, _)| *n == r.value.field)?;
             let optional = ty.as_builtin() == Some(crate::resolved::Builtin::Option);
@@ -1391,7 +1406,11 @@ fn across_sources(
                         r.value.field,
                     ),
                     r.span.clone(),
-                    Vec::new(),
+                    vec![Related::in_unit(
+                        target_unit,
+                        target.span.clone(),
+                        format!("`{}` is held by {}", target.name, source_named(&theirs)),
+                    )],
                     "Within one database a reference is a foreign key, which the database \
                      holds: a row is not written referring to one that is not there, and a row \
                      referred to is not deleted. Two databases hold nothing of each other, so the \
@@ -1440,7 +1459,10 @@ fn bindings(hirs: &[&Hir], unit: usize, ws: &Workspace) -> Vec<Diagnostic> {
                     d.name
                 ),
                 host.span.clone(),
-                Vec::new(),
+                vec![Related::new(
+                    hir.decl_span(id),
+                    format!("`{}` is bound here", d.name),
+                )],
                 NOT_DECLARED,
                 "declare the read the table gives (a key, a prefix of it, an index) and call \
                  its function"
@@ -2422,6 +2444,23 @@ pub fn held_to(
         to: built.hash.clone(),
         steps,
     };
+    // Each told beside the table it is about, as this build declares it
+    // (charter §16.3's boundary span): one table to a module.
+    for (unit, d) in &mut refused {
+        if d.related.is_empty() {
+            d.related
+                .push(match now.iter().find(|(u, _, _)| u == unit) {
+                    Some((_, t, _)) => Related::new(
+                        t.span.clone(),
+                        format!("`{}`, as this build declares it", t.name),
+                    ),
+                    None => Related::new(
+                        d.primary_span.clone(),
+                        "where the table released was held".to_string(),
+                    ),
+                });
+        }
+    }
     (plan, refused)
 }
 

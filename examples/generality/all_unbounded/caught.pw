@@ -1,0 +1,19 @@
+// @status: GENERAL
+// @invariant: all_unbounded
+//
+// Structurally different from R-102: `all()` called bare, in the table's own
+// module, from a function rather than a query.
+
+module Coins
+
+opaque type CoinId = String
+
+type Coin = Coin { id: CoinId, value: Int }
+
+table Coins
+    row Coin
+    key id
+
+fn every() -> List<Coin> !{ database.read<Coins> } {
+    all()
+}

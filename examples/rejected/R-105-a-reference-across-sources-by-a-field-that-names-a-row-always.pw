@@ -1,0 +1,34 @@
+// @corpus: rejected
+// @id: R-105
+// @category: a reference across sources by a field that names a row always
+// @rule: PW0365
+// @invariant: refers_across_sources
+// @charter: §9.2, §2
+// @milestone: 14
+// @expect-error: `Posts.author` refers to `Members` in `MemberData`, and `Posts` is in `PostData`
+//
+// Within one database a reference is a foreign key the database holds. The
+// members are in another (`A-101`'s `MemberData`), which deletes a member
+// without a word to this one, so a post's author may name no row: a field
+// that refers across two sources says so, as an `Option`. `A-102`'s
+// comments refer to the members so, accepted.
+
+module Posts
+
+import Members.{ MemberId }
+import Members
+
+opaque type PostId = String
+
+type Post = Post { id: PostId, author: MemberId, text: String }
+
+table Posts
+    row    Post
+    key    id
+    refers author to Members
+
+source PostData
+    holds        Posts
+    transactions serializable
+    reads        strong
+    changes      none

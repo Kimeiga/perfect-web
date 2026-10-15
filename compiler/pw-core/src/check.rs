@@ -1063,9 +1063,17 @@ fn unresolved_uses(
     // nothing by its name, as the name check reads it: until ADR-0226 it put
     // its module's name in scope here, so `String.nope(s)` was a local's
     // field and checked clean wherever `String` was imported.
+    // Nor does a table (track `tables`): its name is its module's, and
+    // `Shops.all` in `module Shops` is a call into the module, resolved
+    // below, not a field of a local.
     let declared: std::collections::BTreeSet<String> = hir
         .all_decls()
-        .filter(|(_, d)| d.kind != crate::hir::DeclKind::Import)
+        .filter(|(_, d)| {
+            !matches!(
+                d.kind,
+                crate::hir::DeclKind::Import | crate::hir::DeclKind::Table
+            )
+        })
         .map(|(_, d)| d.name.clone())
         .collect();
     for (decl_id, decl) in hir.all_decls() {

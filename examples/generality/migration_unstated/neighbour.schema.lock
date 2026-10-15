@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "hash": "fbe803618688fac3",
+  "tables": [
+    {
+      "name": "Tallies",
+      "source": null,
+      "fields": [
+        {
+          "name": "id",
+          "type": "TallyId",
+          "stored": {
+            "string": {}
+          }
+        },
+        {
+          "name": "points",
+          "type": "Int",
+          "stored": {
+            "int": {}
+          }
+        }
+      ],
+      "key": [
+        "id"
+      ]
+    }
+  ]
+}

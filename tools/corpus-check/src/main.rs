@@ -72,6 +72,12 @@ const ACCEPTED_CATEGORIES: &[&str] = &[
     "a page loads from its own origin",
     // The scheduled-commands track, corpus C23: a run the clock makes.
     "a command schedules one the clock invokes",
+    // Track `tables` (ADR-0338, D1): an app's data, declared, and the
+    // controls of PW0361, PW0362, PW0364, PW0365 and PW0366.
+    "a table read and written through the functions its declaration gives",
+    "a reference between tables one source holds",
+    "a reference across sources by a field that may name no row",
+    "a table's change from its released schema, stated",
 ];
 
 /// Charter §16.2: "Create at least one minimal file for each".
@@ -181,6 +187,16 @@ const REJECTED_CATEGORIES: &[&str] = &[
     "two commands a payment's outcome invokes",
     "a page that presses a command the platform invokes",
     "a command the platform invokes with no key",
+    // Track `tables` (ADR-0338, D1): PW0361, PW0362, PW0364, PW0365 and
+    // PW0366, each beside its accepted control (A-100 to A-103).
+    "a table keyed by a field no database keys a row by",
+    "an index on a field its row does not have",
+    "a table read whole that states no bound",
+    "a read a table's declaration does not give",
+    "a table's rows read through a binding written by hand",
+    "a reference across sources by a field that names a row always",
+    "a field dropped from a released schema with no migrate",
+    "a field renamed from a released schema with no migrate",
 ];
 
 /// Milestone 0 gate (charter §14 M0): ">= 10 accepted and 20 rejected".

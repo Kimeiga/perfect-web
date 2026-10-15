@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "hash": "c6e579c8af68d900",
+  "tables": [
+    {
+      "name": "Scores",
+      "source": null,
+      "fields": [
+        {
+          "name": "id",
+          "type": "ScoreId",
+          "stored": {
+            "string": {}
+          }
+        },
+        {
+          "name": "points",
+          "type": "Int",
+          "stored": {
+            "int": {}
+          }
+        }
+      ],
+      "key": [
+        "id"
+      ]
+    }
+  ]
+}
