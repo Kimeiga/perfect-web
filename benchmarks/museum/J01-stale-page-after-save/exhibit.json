@@ -10,7 +10,8 @@
     "kind": "the owner's report; framework documentation; standard",
     "url": "https://nextjs.org/docs/app/api-reference/config/next-config-js/staleTimes ; https://nextjs.org/docs/app/guides/redirecting ; https://www.rfc-editor.org/rfc/rfc9111.html",
     "date": "Next.js's guides read 2026-10-08 for ADR-0280; RFC 9111 2026-09-10, as read for the census",
-    "says": "ADR-0280's reading: a `router.push` from an event handler goes through the client's Router Cache, whose `static` stale time keeps a static or fully prefetched page for five minutes; so a page pushed to after a save can be the one read before it, and the usual fixes are `router.refresh()`, a cache-busting parameter or a hard reload. S17: correct reuse depends on every response-varying input, not merely the URL"
+    "says": "ADR-0280's reading: a `router.push` from an event handler goes through the client's Router Cache, whose `static` stale time keeps a static or fully prefetched page for five minutes; so a page pushed to after a save can be the one read before it, and the usual fixes are `router.refresh()`, a cache-busting parameter or a hard reload. S17: correct reuse depends on every response-varying input, not merely the URL",
+    "checked": "the installed next@16.3.8's own defaults, dist/server/config-shared.js: staleTimes { dynamic: 0, static: 300 } (seconds), read 2026-10-14"
   },
   "claim": "ADR-0280: a handler navigates after its command commits, and the page navigated to is read after the commit, by order alone (the server serves it after the session's turn, as `no-store`)",
   "related": [

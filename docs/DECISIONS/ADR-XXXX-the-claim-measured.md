@@ -231,10 +231,104 @@ Nothing was downloaded. These would be:
   Web Vitals number predicts the field; that a refused exhibit means Pleris
   refuses every program of its class.
 
-## What was done, and what is next
+## Results
 
-Written as the track proceeds.
+`node benchmarks/museum/museum.mjs`, 2026-10-14, the five exhibits run here;
+`just e14-museum` records them with the mutation controls in
+`docs/evidence/E14/museum.txt`. Misses first:
 
-- 2026-10-14: this plan; the five exhibits chosen, sources recorded.
-- Next: the runner and the first exhibit end to end (`J08`), then the other
-  four, then `just e14-museum` and its evidence, then the mutation script.
+| exhibit | the bug, shown | its repair | Pleris |
+|---|---|---|---|
+| `H07-n-plus-one` | Next.js: one view of a three-item menu, three round trips | one batched read: the spec fails | **miss**: the same per-item read, `List.map` over a host read in a query, checks clean |
+| `F01-markup-from-text` | SvelteKit: a notice rendered with `{@html}` runs its `onerror` in a customer's page | the notice as text: the spec fails | refused, `PW5010`; neighbour clean |
+| `G01-retried-command-twice` | Next.js, ADR-0120's store unchanged: one press, its POST delivered twice, two adds | T08's reference, an interaction per press: the spec fails | refused, `PW0338`; neighbour clean; and the neighbour's runtime adds once when delivered twice (T08's hidden test, score 1) |
+| `J01-stale-page-after-save` | Next.js: after a save, `router.push` shows the cart page prefetched before it ("0"); a reload of the same address shows "1" | `router.refresh()` before the push: the spec fails | refused at runtime (ADR-0280): `navigate.spec.mjs`'s order placed and read after the commit |
+| `J08-shared-server-state` | SvelteKit: Bob, who added nothing, is shown Alice's count, from a module-level `let` | the session's cart read per request: the spec fails | refused, `PW5001`; neighbour clean |
+
+Each bug is one its stack's own checker accepts (`tsc`, `svelte-check`),
+built and served as the contract serves it.
+
+## Findings
+
+Corrections first.
+
+1. **The `R-*` headers' codes are stale.** R-004 says `@rule: PW0100` and
+   `pw check` reports `PW5001`; R-024 says `PW0322` and it reports
+   `PW5010`. The `@invariant` names still match. The brief's "59 `R-*`
+   programs" are 69 now.
+2. **`bench.mjs`'s Next.js and SvelteKit sandboxes cannot install on the PC
+   this ran on**, two ways: corepack's last known good pnpm there is 12.11.2,
+   whose files are missing, so any `pnpm` outside the repository fails, and
+   the sandboxes live under `/tmp`; and inside it, the harness's pinned
+   sandbox lockfile needs `nanoid@3.3.19`, which the store does not hold
+   (the workspace's lockfile has 3.3.18), so an offline install stops at
+   `ERR_PNPM_NO_OFFLINE_TARBALL`. The E14 harness's runs and the tasks'
+   controls on those two stacks need a download on this host (shown by the
+   same install run by hand, not by running those recipes). The museum
+   builds in place instead.
+3. **G01's bug is in ADR-0120's own store.** An idiomatic Server Action in a
+   `<form action>` adds once per delivery of its request; no change was
+   needed to show it.
+4. **J08's faithful program is a stand-in, said so.** Pleris has no
+   module-level mutable state, so the framework's construct cannot be
+   written; the one place a Pleris program keeps a value across requests is
+   a resource's cache, and the same intent there is refused. Not shown: data
+   a user types, kept in a public resource, carries no private label, and
+   whether Pleris would refuse that variant is untested; it is the next
+   exhibit's question, and may be a partial.
+5. **H07: Pleris accepts a read per row.** The generality corpus holds the
+   same shape as an accepted neighbour
+   (`examples/generality/undeclared_effect/complete-row.pw`); nothing
+   batches it. The census's "specified but unproven" is accurate. Not yet
+   measured: the round trips the Pleris runtime makes for it. H07 also has
+   no dated primary source yet, so by this ADR's own rule it does not yet
+   qualify; it is kept, labelled, because a miss is better shown than
+   omitted.
+6. **J01 confirms ADR-0280's reading in the pinned version**: next@16.3.8's
+   own defaults are `staleTimes { dynamic: 0, static: 300 }`, and a fully
+   prefetched page is shown after a save until `router.refresh()`.
+7. **A readiness probe that reads the page is the first read of what it
+   reads.** The runner's probe asked for the store page, T09's notice was
+   kept five minutes from it, and F01's spec never saw its markup. The probe
+   asks for a path no route serves.
+
+## What is claimed, and what is not
+
+- Claimed, for these five: the bug happens in the pinned framework version
+  and its idiomatic repair removes it, and Pleris's answer is as the table
+  says, each by a recorded command, with mutation controls for the three
+  refusing codes.
+- Not claimed: that five exhibits sample the census; that a refused class
+  is refused for every program of it (finding 4); that the census's
+  documentation and guidance sources are incidents (each exhibit prints its
+  source's kind); H07's runtime cost in Pleris; any head-to-head number,
+  none of which is measured yet.
+
+## Next
+
+1. Dated primary sources where the census has guidance or a model only:
+   H07 (an incident naming N+1, or a framework's documentation of it), F01
+   (a CVE of this pattern in a Next.js or SvelteKit app), J01 (a Next.js
+   issue of the owner's case).
+2. The sixth exhibit, two tabs (H01, a lost update, S16), and J08's variant
+   (finding 4).
+3. F01's second layer: every Pleris page carries a CSP from its build
+   (ADR-0195's ruling 13), which would refuse an inline handler that
+   reached the page; not yet shown by a test.
+4. The census's "missing" and "partially covered" leaves as exhibits that
+   say "Pleris does not catch this yet" (NEXT).
+5. The head-to-head, TodoMVC first, once `track/todomvc` lands and the
+   owner decides the downloads above; then the store slice.
+
+## Questions for the integrator
+
+1. The downloads above (TodoMVC's React and Svelte implementations,
+   axe-core, a vulnerable Next.js only if a CVE exhibit needs one), and, for
+   finding 2, whether this host's pnpm store should get `nanoid@3.3.19` or
+   the harness's sandbox lockfiles should follow the workspace's.
+2. May a worker read upstream web pages (framework docs, issues) to date a
+   source? Meanwhile every source here is one the census or an ADR already
+   read, or the installed package's own code.
+3. Should an exhibit be linked from its census leaf (editing
+   `research/failures/taxonomy/*.md`), or only the exhibit to its leaf, as
+   now?
