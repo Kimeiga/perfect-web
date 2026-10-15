@@ -733,6 +733,84 @@ fn a_quantity_that_is_no_positive_int_is_refused_as_the_arguments_are_decoded() 
     }
 }
 
+/// **An argument that breaks its invariant never reaches the component,
+/// whichever call carries it** (ADR-XXXX, argument invariants): the
+/// contract's checks of an export's arguments are the component's boundary,
+/// not one decoder's. A host that builds its values itself (a page's address,
+/// a stored run, a test) calls the same `call_*` as one that decoded a
+/// browser's JSON, and a quantity of 0 for a `PositiveInt` is refused before
+/// the component runs: no operation is called, so the data layer never sees
+/// it. Until the track, only [`engine::Prepared::arguments_for`] held them,
+/// and a value built otherwise ran the command (track `reviews`' finding).
+#[test]
+fn an_argument_that_breaks_its_invariant_never_reaches_the_component() {
+    let c = contract();
+    let bytes = component();
+    let granted = admitted(&c, &bytes, &ALL).expect("admitted");
+    let prepared = engine::Prepared::compile(&bytes).expect("compiles");
+    let [interface, function] = export(&c);
+    let at = [interface.as_str(), function.as_str()];
+    let answered = Val::Result(Ok(Some(Box::new(cart("cortado", 1)))));
+    for forged in [0, -3, i64::MIN] {
+        let args = [item("cortado"), Val::S64(forged)];
+        let said = format!(
+            "argument refused: value 2 is {forged}, and `domain.PositiveInt` holds `value >= 1`"
+        );
+        // Each way in: the free function and the compiled component's, with
+        // its `requires` evaluated, and the measured call a benchmark makes.
+        let calls: Calls = Arc::default();
+        let why = authorized_call(
+            &bytes,
+            &c,
+            &granted,
+            &limits(),
+            &host(&calls, answered.clone()),
+            &at,
+            &args,
+        )
+        .expect_err("refused before the component runs");
+        assert_eq!(why, said);
+        let why = prepared
+            .call_authorized_within(
+                &c,
+                &granted,
+                &limits(),
+                &host(&calls, answered.clone()),
+                &at,
+                &args,
+                approve_store_authorization,
+            )
+            .expect_err("refused before the component runs");
+        assert_eq!(why, said);
+        assert!(
+            calls.lock().unwrap().is_empty(),
+            "no operation was called: {:?}",
+            calls.lock().unwrap()
+        );
+    }
+    // The control: 1 runs, and reaches the data layer.
+    let calls: Calls = Arc::default();
+    authorized_call(
+        &bytes,
+        &c,
+        &granted,
+        &limits(),
+        &host(&calls, answered.clone()),
+        &at,
+        &[item("cortado"), Val::S64(1)],
+    )
+    .expect("a count runs");
+    assert!(
+        calls
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|(op, _)| op == "store:data/user-carts#add"),
+        "{:?}",
+        calls.lock().unwrap()
+    );
+}
+
 /// **A data layer's answer that breaks an invariant is the command's
 /// failure** (ADR-0179): a cart line of 0, answered by `carts#add`, is never
 /// a value the component reads. The contract states where: `ok.lines.*.
