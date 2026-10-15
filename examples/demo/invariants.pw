@@ -1,0 +1,130 @@
+// @corpus: fixture
+// @id: DEMO-invariants
+// @category: external input — a value from a browser held to its type's invariant
+// @charter: §7.1, §7.10
+// @milestone: E14
+//
+// ADR-XXXX (argument invariants): a value of an opaque type with a `where`
+// invariant exists only if it passed the invariant. A command's arguments and
+// a page's parameters come from a browser, so a host decodes each through the
+// checks its type states, an `Int`'s bounds and a `String`'s length, at the
+// top of a value and inside one (a record's field, a list's item, an
+// `Option`'s inside, a case's payload), and refuses one that breaks them
+// before anything reads it.
+
+module demo.invariants
+
+import List
+import String
+import domain.{ InteractionId }
+
+// **Stars, from 1 to 5.**
+opaque type Stars = Int where value >= 1 & value <= 5
+
+// **A note, at most 20 characters** (code points, as `String.length`
+// counts them).
+opaque type Note = String where String.length(value) <= 20
+
+// **A code, from 2 to 8 characters**: what the page's address names.
+opaque type Code = String where String.length(value) >= 2 & String.length(value) <= 8
+
+// **One rating**: its stars, and a note where one is given.
+type Rating = Rating { stars: Stars, note: Option<Note> }
+
+// **A mark**: stars, or a note.
+type Mark =
+    | Starred(Stars)
+    | Noted(Note)
+
+// Why a rating is refused: never, here; the type is the command's answer.
+type RatingError =
+    | Closed
+
+// The page's own checked constructors: what a press builds each from.
+fn stars_of(n: Int) -> Option<Stars> !{} {
+    if n >= 1 & n <= 5 { Some(Stars(n)) } else { None }
+}
+
+fn note_of(text: String) -> Option<Note> !{} {
+    if String.length(text) <= 20 { Some(Note(text)) } else { None }
+}
+
+// **A rating sent for a code**: its stars, as the command was given them.
+command rate(code: Code, stars: Stars, note: Note) -> Result<Int, RatingError>
+    requires      SignedIn
+    idempotent_by InteractionId
+{
+    Ok(stars.value)
+}
+
+// **Several ratings at once**: how many.
+command rate_all(ratings: List<Rating>) -> Result<Int, RatingError>
+    requires      SignedIn
+    idempotent_by InteractionId
+{
+    Ok(List.length(ratings))
+}
+
+// **A mark sent**: its stars, or none for a note.
+command mark(mark: Mark) -> Result<Int, RatingError>
+    requires      SignedIn
+    idempotent_by InteractionId
+{
+    match mark {
+        Mark.Starred(stars) => Ok(stars.value),
+        Mark.Noted(_) => Ok(0),
+    }
+}
+
+// **A note, or none.**
+command annotate(note: Option<Note>) -> Result<Int, RatingError>
+    requires      SignedIn
+    idempotent_by InteractionId
+{
+    match note {
+        Some(_) => Ok(1),
+        None => Ok(0),
+    }
+}
+
+// **The page a code is rated on**: its address names the code, and may give
+// a note; the press sends the stars chosen and the note typed.
+page InvariantsPage(code: Code, note: Option<Note>) {
+    route "/demo/invariants/{code}{?note}"
+    cache private
+
+    signal stars: Int = 0
+    signal typed: String = ""
+    signal said: String = ""
+
+    view {
+        <title>Rate a code</title>
+        <main>
+            <h1>Rate a code</h1>
+            {#match note}
+            {:Some(_)}<p id="noted">A note was given.</p>
+            {:None}<p id="noted">No note was given.</p>
+            {/match}
+            <button type="button" id="stars-3" aria-pressed={stars == 3} on:press={() => stars = 3}>3</button>
+            <button type="button" id="stars-6" aria-pressed={stars == 6} on:press={() => stars = 6}>6</button>
+            <label>A note <input id="typed" bind:value={typed} /></label>
+            <button
+                type="button"
+                id="send"
+                on:press|refusable={resumable(captures = { code }) => match stars_of(stars) {
+                    Some(chosen) => match note_of(typed) {
+                        Some(words) => match rate(code, chosen, words) {
+                            Ok(_) => said = "Sent.",
+                            Err(RatingError.Closed) => said = "Closed.",
+                        },
+                        None => said = "A note is 20 characters at most.",
+                    },
+                    None => said = "Choose from 1 to 5 first.",
+                }}
+            >
+                Send
+            </button>
+            <p id="said" role="status">{said}</p>
+        </main>
+    }
+}
