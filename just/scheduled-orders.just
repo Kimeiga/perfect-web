@@ -4,8 +4,10 @@
 # and is planned by the verification run like any other.
 
 # Track `scheduled-orders` (ADR-XXXX): the times offered, fifteen-minute
-# windows from an hour to a week ahead that every store of the cart is open
-# at, by its hours in its zone, compared with the clock; a time held to them
+# windows from an hour to a week ahead that every store of the cart would
+# take an order for as soon as possible at when its stores are told (the
+# window less the estimate and five minutes), by its hours in its zone,
+# compared with the clock; a time held to them
 # when chosen and when the order is placed; an order for one paid now and
 # sent to its stores when its preparation is due. The checker
 # (compiler/pw-core/tests/scheduled_orders.rs), the server's tests

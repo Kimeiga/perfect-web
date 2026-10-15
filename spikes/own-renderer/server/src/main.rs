@@ -15676,10 +15676,12 @@ public query Store(",
         // (track `store-accounts`); and the cart page's checkout, a code
         // applied and taken off, four tips by percent, one by amount, and the
         // code's and the typed tip's bindings (track `order-total`); and the
-        // order page's, an order awaiting its payment taken back (NEXT 6c).
+        // order page's, an order awaiting its payment taken back (NEXT 6c);
+        // and the page of times', as soon as possible and a window (track
+        // `scheduled-orders`).
         assert_eq!(
             named.len(),
-            21,
+            23,
             "add_to_cart, clear_cart, a line's three (ADR-0172), place_order and an address's five: {named:?}"
         );
         assert_eq!(

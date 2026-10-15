@@ -36,13 +36,18 @@ fn served() -> Served {
 /// charter 15.5's 400 ms, is a test control, not data: every page of times
 /// asks it once a store), failing as `fail` says.
 fn no_delay(s: &Server, fail: Option<&str>) {
-    s.store.faults().estimators.lock().expect("estimators").insert(
-        "a".to_string(),
-        Estimator {
-            delay_ms: 0,
-            fail: fail.map(str::to_string),
-        },
-    );
+    s.store
+        .faults()
+        .estimators
+        .lock()
+        .expect("estimators")
+        .insert(
+            "a".to_string(),
+            Estimator {
+                delay_ms: 0,
+                fail: fail.map(str::to_string),
+            },
+        );
 }
 
 /// **The estimate session `a`'s reader is given**, as the layer holds it:
@@ -324,7 +329,12 @@ fn a_window_is_offered_where_its_store_takes_an_order_when_it_is_told() {
     ] {
         assert_eq!(starts.contains(&window), taken, "{window}");
         clock_to(&s, window - 15 * MINUTE);
-        assert_eq!(cart_hours(&s).is_empty(), taken, "{window}: {}", cart_hours(&s));
+        assert_eq!(
+            cart_hours(&s).is_empty(),
+            taken,
+            "{window}: {}",
+            cart_hours(&s)
+        );
     }
 }
 
@@ -350,7 +360,12 @@ fn a_window_is_offered_exactly_where_an_order_for_as_soon_as_possible_is_taken_w
         let window = tuesday + quarter * 15 * MINUTE;
         clock_to(&s, window - 40 * MINUTE);
         let would = cart_hours(&s).is_empty();
-        assert_eq!(starts.contains(&window), would, "{window}: {}", cart_hours(&s));
+        assert_eq!(
+            starts.contains(&window),
+            would,
+            "{window}: {}",
+            cart_hours(&s)
+        );
         taken += usize::from(would);
     }
     assert_eq!(taken, 14 + 18);

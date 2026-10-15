@@ -488,7 +488,11 @@ fn the_trusted_platform_contract_is_hashed() {
     // scheduled-commands track).
     // 2026-10-14: `clock.pw` declares `later`, `earlier` and `is_before`,
     // pure: an instant moved along the clock or ordered against another,
-    // never the clock read (track `scheduled-orders`).
+    // never the clock read (track `scheduled-orders`). And `examples/domain.pw`
+    // declares `ScheduledFor`, where and for when an order is scheduled; its
+    // `OrderStatus` gains `Scheduled(ScheduledFor)`, and its `OrderError`
+    // `NotOffered(Instant)` and `Scheduled`. Accepted by the integrator,
+    // 2026-10-15 (the hash did not move for the ruling).
     const EXPECTED: u64 = 0xfc57_c926_be38_b1d5;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
