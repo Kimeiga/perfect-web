@@ -1,10 +1,10 @@
 # ADR-XXXX: TodoMVC in Pleris, held to its own spec and its own tests
 
 Status: accepted under the owner's delegation of 2026-10-02 (a worker's, the
-integrator's to number and index). Date: 2026-10-14. Milestone: E14, track
-`todomvc` (W7), its first milestone. Builds on the integrator's rulings in
-docs/PARALLEL.md, "2026-10-09, W7's plan: TodoMVC", and of 2026-10-14 on the
-fragment (below).
+integrator's to number and index). Date: 2026-10-14, closed 2026-10-15 with
+the integrator's rulings (below). Milestone: E14, track `todomvc` (W7), its
+first milestone. Builds on the integrator's rulings in docs/PARALLEL.md,
+"2026-10-09, W7's plan: TodoMVC", and of 2026-10-14 on the fragment (below).
 
 ## Context
 
@@ -23,6 +23,46 @@ fragment (below).
   2026-10-14: build it as its own commit, with its own checker and runtime
   tests and mutation controls, minimal where the language needs more, and
   write down each choice the ruling did not specify.
+
+## Rulings (the integrator, 2026-10-15)
+
+The worker put nine questions; each was ruled by the integrator, 2026-10-15,
+as below, and the section that built it says so.
+
+1. **Signals in rows**: ruled by the integrator, 2026-10-15: keep the
+   page-signal workaround for the first milestone; its cost is stated under
+   "Not claimed". Per-row signal instances (ADR-0137, PW5307) are a separate
+   language track, not this one.
+2. **`todomvc-app-css` is CC BY 4.0**, not MIT as the plan says: ruled by the
+   integrator, 2026-10-15: acceptable with the attribution kept (the page's
+   footer and the licence file copied beside the sheet); the correction to the
+   plan is recorded here. (No repository licence allow-list covers npm packages:
+   `deny.toml`'s is cargo's, and `tools/node-audit-allow.txt` lists advisories.
+   Nothing was added.)
+3. **The fragment signal as a `String`** with clause-named forms: ruled by the
+   integrator, 2026-10-15: accepted; a sum-typed fragment signal is a later
+   question.
+4. **`dblclick`, `blur` and `BlurEvent { value }`**: ruled by the integrator,
+   2026-10-15: accepted.
+5. **`autofocus` on insertion**: ruled by the integrator, 2026-10-15: a runtime
+   behaviour, accepted; section 4 says how it differs from HTML's and why.
+6. **The checkbox property sync**: ruled by the integrator, 2026-10-15:
+   accepted as built (its own commit, its tests, its mutants).
+7. **Cypress**: ruled by the integrator, 2026-10-15: in the evidence recipe
+   only, not in `just ci`. No vacuous pass: where the recipe runs as evidence
+   it fails if Cypress cannot run (no binary, no Xvfb), and never prints a skip
+   and passes. Passes are recorded out of the spec's total and, for each
+   failure, the spec rule and why; a test that asks `localStorage` fails by
+   design for an app whose data is on the server, and says so per test. The
+   upstream test is never changed. Section 5.
+8. **The 500-todo cap** (`full`): ruled by the integrator, 2026-10-15:
+   accepted, as a stated limit with its own test.
+9. **A title of 1 to 1000 characters after trim**: ruled by the integrator,
+   2026-10-15: accepted.
+
+Downloads, approved by the owner on 2026-10-08 for this track and nothing
+else: the Cypress npm package and its binary, `todomvc-app-css` and
+`todomvc-common`. Their versions and sizes are in section 3 and section 5.
 
 ## Decision
 
@@ -80,8 +120,10 @@ written twice, and one outside a page, are the generic rules'.
 
 ### The choices the ruling did not specify
 
-Each is the integrator's to confirm or reverse; none is built past what the
-ruling says, and each is cheap to change now.
+Each was the integrator's to confirm or reverse; none is built past what the
+ruling says, and each is cheap to change. The first, the signal as a `String`,
+was ruled by the integrator, 2026-10-15: accepted; a sum-typed fragment signal
+is a later question.
 
 - **The forms are named by the clause, and the signal is a `String`, not a sum
   type.** The ruling reads "the signal's type names the forms". Two limits of
@@ -145,7 +187,7 @@ new event is a change to this file rather than to a checker" (`events.pw`), so:
 
 The names are the browser's, `dblclick` and `blur`, not `doublepress`: a double
 press has no other form (no key, no touch), and a reader of the program meets
-the name they know. A choice for the integrator to confirm or reverse.
+the name they know. Ruled by the integrator, 2026-10-15: accepted.
 
 Not built, and not needed: `focus` (the pair of `blur`), `focusin` and
 `focusout`, a refinement of a checkbox's `change` to `checked` (ADR-0131), and a
@@ -166,7 +208,12 @@ to `PORT+142`, the plan's ports).
   does. Every operation names its session, and one that names another than
   the command's or the query's own is refused, so no write or read reaches
   another session's list. A session holds at most 500 todos (`full`), which
-  TodoMVC's spec does not state and a host guests write to needs.
+  TodoMVC's spec does not state and a host guests write to needs: a stated
+  limit with its own test (`a_session_holds_at_most_a_bounded_list`), ruled by the
+  integrator, 2026-10-15: accepted. A todo's title is 1 to 1000 characters after
+  trim (the spec says only "trim"; an empty title does not add, and removes the
+  todo on edit; `the_host_holds_a_title_to_its_invariant`): ruled by the
+  integrator, 2026-10-15: accepted.
 - **Its markup and class names are the template's**, and its stylesheets are
   TodoMVC's own: `todomvc-common`'s `base.css` and `todomvc-app-css`'s
   `index.css`, from the npm packages the owner approved on 2026-10-08, copied
@@ -181,11 +228,13 @@ to `PORT+142`, the plan's ports).
   one-line change at its static route, marked as the track's), which a browser
   asks for under `nosniff`.
 - **The licences.** `todomvc-common` is MIT. `todomvc-app-css` is **CC BY 4.0**,
-  at its source and on npm, not MIT as the plan says: it asks for credit, which
-  the page gives in its footer and the licence file served beside the sheet
-  (`/todomvc-app-css.license.txt`) carries, and nothing in it is changed. The
-  owner approved the package; whether CC BY 4.0 is what they meant is the
-  integrator's to confirm (a question below).
+  at its source and on npm, not MIT as the plan says (a correction to the
+  plan): it asks for credit, which the page gives in its footer and the licence
+  file served beside the sheet (`/todomvc-app-css.license.txt`) carries, and
+  nothing in it is changed. Ruled by the integrator, 2026-10-15: acceptable with
+  this attribution. The two packages, approved by the owner on 2026-10-08, from
+  the npm registry through pnpm: `todomvc-app-css` 2.4.3 (4 files, 26,872 bytes
+  unpacked) and `todomvc-common` 1.0.5 (5 files, 10,641 bytes unpacked).
 - **The filters are the model's.** The page's read, `Board(session, filter,
   editing)`, is keyed by the signals `filter`, which the fragment sets (§1), and
   `editing`; the program's own pure functions filter (`shown`) and count
@@ -202,8 +251,10 @@ to `PORT+142`, the plan's ports).
   each row with `editing: true` for the one: the row is shown again, with its
   field. The cost is a read for each begin and end of an edit, and a row
   re-rendered whole, which a change to its text by another tab of the session
-  would take the field from. A question for the integrator, below: this is
-  what the missing piece costs, and the proper fix is a signal a row can read.
+  would take the field from. Ruled by the integrator, 2026-10-15: keep this
+  workaround for the first milestone; this is what the missing piece costs, and
+  the proper fix, a signal a row can read, is a separate language track. The
+  cost is stated under "Not claimed".
 - **The new todo is cleared at Enter, and given back if it was not added.** The
   spec says Enter "creates the todo, appends it to the todo list, and clears
   the input". Cleared when the command answers, what a person typed while the
@@ -238,21 +289,234 @@ its mutants.
   the tab that had ticked it. A signal's attribute already set the property
   (`setAttributePart`); a patch's now does, for `checked`. `selected` is the same
   and is not done: no page needs it, and none tests it. Three tests in three
-  engines, each failing without the change, and two mutants.
-- **An element that arrives with `autofocus` takes focus.** HTML runs
-  `autofocus` once, when a page loads, and ignores it on an element put in
-  later. TodoMVC's edit field appears when a person asks, and "the edit field
-  should be focused": the field they asked for is the one they type in. The
-  runtime watches what is put into the page from its start (`followAutofocus`,
-  a `MutationObserver` on the body, which sees a block's rendering and a
-  server's patch alike) and gives the first element that asks for focus, if it
-  does not have it. What the page was served with is left alone (the browser
-  focused it), and a modal dialog's `autofocus` element is the one `showModal`
-  focuses. A runtime behaviour, not a language rule: the attribute is HTML's
-  and the page says nothing new. `examples/demo/focus.pw` and
-  `e2e/focus.spec.mjs` show it in three engines (7 of the 12 fail without the
-  change; WebKit focuses the first field by itself, and not the second), and
-  TodoMVC's own test holds it on the edit field a patch inserts.
+  engines, each failing without the change, and two mutants. Ruled by the
+  integrator, 2026-10-15: accepted as built.
+- **An element that arrives with `autofocus` takes focus.** *How it differs
+  from HTML's, and why.* HTML honours `autofocus` once per document, and the
+  page's load is its time: an inserted element that has the attribute is only a
+  *candidate*, queued while the top-level document's "autofocus processed flag"
+  is false; the first focus it gives, or any focus the document already has when
+  the candidates are flushed, sets the flag, and from then an inserted element's
+  `autofocus` is ignored (HTML Standard, 6.6.7, read 2026-10-15). TodoMVC's page
+  opens with its new-todo field focused by the attribute, which sets the flag,
+  so a browser leaves the edit field a double press inserts unfocused
+  (Chromium and Firefox do; WebKit focuses an inserted field the first time and
+  not the second, `e2e/focus.spec.mjs`). The spec asks for the opposite, "the
+  edit field should be focused": the field a person asked for is the one they
+  type in, and the attribute is the only way a page says so. So the runtime
+  honours it for each thing put into the page, not once: it watches what is put
+  in from its start (`followAutofocus`, a `MutationObserver` on the body, which
+  sees a block's rendering and a server's patch alike) and gives the first
+  element in it that asks for focus, if it does not have it. What the page was
+  served with is left alone (the browser focused it), and a modal dialog's
+  `autofocus` element is the one `showModal` focuses. A runtime behaviour, not a
+  language rule: the attribute is HTML's and the page says nothing new. Ruled
+  by the integrator, 2026-10-15: accepted. Its cost, under "Not claimed": a
+  patch that inserts an element with `autofocus` takes the focus from wherever a
+  person is. `examples/demo/focus.pw` and `e2e/focus.spec.mjs` show it in three
+  engines (7 of the 12 fail without the change), and TodoMVC's own test holds
+  it on the edit field a patch inserts.
+
+### 5. TodoMVC's own Cypress suite, unchanged
+
+The plan's acceptance for the first milestone is the official suite, run
+unchanged. `spikes/todomvc-cypress` holds the seven files of
+github.com/tastejs/todomvc, at `ff43b02e59dfa604386bb382034b2cd07c2bcd8a`, that
+the suite needs: the spec (29 tests, named for TodoMVC's own Selenium tests),
+its support files, its `knownIssues.js`, its Cypress config and its licence
+(MIT). Each is held to the git blob upstream has
+(`scripts/todomvc_cypress_vendored.py`), so "unchanged" is a hash. The plan
+names the spec `tests/cypress/e2e/spec.cy.js`; upstream today has
+`cypress/e2e/spec.cy.js` (a correction to the plan). It runs on Cypress 15.21.1,
+headless in Electron 138, under Xvfb.
+
+**Downloads** (approved by the owner, 2026-10-08, for this track): the npm
+package `cypress@15.21.1` (7.6 MB installed) and its binary (a zip of 248,957,235
+bytes, 813 MB unzipped, in Cypress's own cache). Not the 15.14.2 that upstream's
+lockfile pins: its dependency tree carried six advisories (`uuid`, three of
+`qs`, two of `extract-zip`) that `scripts/audit-node.sh` refuses, and 15.21.1's
+carries none (nothing is added to `tools/node-audit-allow.txt`); the suite
+printed the same outcomes on both. It is the last 15.x because the spec reads
+`Cypress.env()`, which Cypress 15 warns a future major will drop. The package is
+a member of the workspace, so `just audit` scans its tree; `pnpm exec cypress
+install` fetches the binary, and `just e14-todomvc` runs it (it does nothing
+where the binary is there).
+
+**Two runs, and a judge.** `spikes/todomvc-cypress/run.sh` serves the build on a
+host of its own and runs the suite twice, and `scripts/todomvc_cypress_result.py`
+reads what Cypress printed and judges it.
+
+- **The acceptance**: `cypress run --env framework=page/todomvc.app.Todos`, the
+  suite as it ships. The suite visits `baseUrl + '/' + framework`, so the name
+  is the page's own path on the host and nothing proxies or rewrites an
+  address. It is in none of the suite's tables, so the suite asks of this app
+  what it asks of an app it knows nothing about, `localStorage` included.
+- **The diagnostic**, labelled in every report as not the acceptance: the same
+  files under `--env framework=puremvc`, a name the suite's own table
+  (`noLocalStorageCheck`) takes as keeping nothing in `localStorage`, reaching
+  the page through an address fragment it ignores. It shows what the rest of
+  each test says of this app.
+- **No skip passes** (ruling 7). `run.sh` exits 1 where Cypress cannot run (no
+  Xvfb, no binary, no build, no host) and where a run printed no results
+  table; its status is the judge's, which holds each test to the outcome the
+  app's design gives it. `just e14-todomvc` records both runs and fails with
+  them. The suite is not part of `just ci`.
+
+**What the suite asks of `localStorage`**, read from the vendored spec: of its
+29 tests, 23 ask it, in their own bodies or in their context's `beforeEach`
+(`checkItemSaved` spies on `localStorage.setItem`; the others poll it for the
+todo's text, for n todos, for n completed todos, for the word `complete`), and
+6 ask it nothing (1, 2, 3, 21, 22, 23). TodoMVC's spec asks an app to persist its
+todos to `localStorage`, and to use the framework's own persistence where it has
+one (read at the pinned commit, 2026-10-15); this app's are kept by the host
+(section 3) and it never writes `localStorage`. So in the acceptance a test
+that asks `localStorage` must fail and one that asks it nothing must pass, and
+the judge refuses a run in which either does otherwise.
+
+**The result**, Cypress 15.21.1 and 15.14.2, each run at least twice
+(`scripts/tests/fixtures/todomvc-cypress/` holds real outputs of both). The
+acceptance column is a run whose hook failed at test 7, as in three of five
+runs, and the diagnostic column is one in which test 11 won its race (below):
+
+| # | spec section | test | asks localStorage | acceptance | diagnostic |
+|--:|---|---|---|---|---|
+| 1 | When page is initially opened | should focus on the todo input field | no | pass | pass |
+| 2 | No Todos | starts with nothing | no | pass | pass |
+| 3 | No Todos | should hide #main and #footer | no | pass | pass |
+| 4 | New Todo | should allow me to add todo items | setItem, n todos | FAIL | pass |
+| 5 | New Todo | should clear text input field when an item is added | n todos | FAIL | pass |
+| 6 | New Todo | should append new items to the bottom of the list | n todos | FAIL | pass |
+| 7 | New Todo | should trim text input | n todos | hook fails | pass |
+| 8 | New Todo | should show #main and #footer when items added | n todos | not run | pass |
+| 9 | Mark all as completed | should allow me to mark all items as completed | setItem, n completed, n todos | not run | pass |
+| 10 | Mark all as completed | should allow me to clear the complete state of all items | setItem, n completed, n todos | not run | pass |
+| 11 | Mark all as completed | complete all checkbox should update state when items are completed / cleared | setItem, n completed, n todos | not run | pass or races |
+| 12 | Item | should allow me to mark items as complete | n completed | not run | pass |
+| 13 | Item | should allow me to un-mark items as complete | n completed | not run | pass |
+| 14 | Item | should allow me to edit an item | text | not run | pass |
+| 15 | Editing | should hide other controls when editing | n todos | not run | pass |
+| 16 | Editing | should save edits on blur | n todos, text | not run | pass |
+| 17 | Editing | should trim entered text | n todos, text | not run | pass |
+| 18 | Editing | should remove the item if an empty text string was entered | n todos | not run | pass |
+| 19 | Editing | should cancel edits on escape | n todos | not run | pass |
+| 20 | Counter | should display the current number of todo items | n todos | not run | pass |
+| 21 | Clear completed button | should display the correct text | no | not run | pass |
+| 22 | Clear completed button | should remove completed items when clicked | no | not run | pass |
+| 23 | Clear completed button | should be hidden when there are no items that are completed | no | not run | pass |
+| 24 | Persistence | should persist its data | keyword, n completed, text | not run | skipped by the suite |
+| 25 | Routing | should allow me to display active items | n completed, text | not run | pass |
+| 26 | Routing | should respect the back button | n completed, text | not run | pass |
+| 27 | Routing | should allow me to display completed items | n completed, text | not run | pass |
+| 28 | Routing | should allow me to display all items | n completed, text | not run | pass |
+| 29 | Routing | should highlight the currently applied filter | text (in the hook) | not run | pass |
+
+- **Acceptance: 3 of 29 pass**, the three that ask nothing of `localStorage` and
+  come first. Where a test asks it and ran, it failed: 4 on `expected setItem
+  to have been called` (this app never calls it), 5 and 6 on `cy.then() timed
+  out` over a poll that never ends. Then a hook fails and Cypress skips the
+  rest. **Per test, why each did not pass**: every row above that asks
+  `localStorage` and is FAIL or not run fails, or would fail where it was
+  not run, at its first `localStorage` check, *by design*: the app keeps its
+  todos on the host. The rows that ask nothing and are not run (21, 22, 23) are
+  not run only because a hook failed before them; the diagnostic runs them,
+  and they pass. The judge prints this per test, with the spec's line, in
+  `docs/evidence/E14/todomvc.txt`.
+- **Diagnostic: 28 of 29 pass, 1 skipped by the suite itself** (24, which the
+  suite skips for a name in `noLocalStorageCheck`: it reloads the page and
+  asks `localStorage`; this app's reload is held by its own test, "persistence").
+  The tests that fail in the acceptance pass here, so what they failed on there
+  was `localStorage`, and what the rest of each says holds. Test 11 passes
+  or loses a race, below.
+
+**Why the acceptance stops early.** For an app that never writes `localStorage`
+the suite's own helpers poll for ever: `checkNumberOfTodosInLocalStorage`
+re-arms `setTimeout(checkItems, 0)` until `localStorage` holds something. The
+test that called it fails at Cypress's 4 s `cy.then()` timeout and the loop goes
+on, reading a `Storage` of the window that Cypress clears away between tests (it
+navigates the page to `about:blank`); the read throws `SecurityError: Failed to
+read the 'length' property from 'Storage': Access is denied for this document`
+in the spec's own window; Cypress charges the throw to the next test's
+`beforeEach`, whose `cy.document()` then finds the blank page ("Cannot
+determine what kind of selectors this app uses"), and, as for any failed hook,
+skips the rest of the suite. Which test that is varies with timing (test 7 in
+three of five runs, test 6 in two), so the judge holds a run to rules and not to
+a list. The throw is on record in Cypress's output (`ELECTRON_ENABLE_LOGGING`,
+which `run.sh` sets), and the judge refuses a failed hook without it. It is
+the suite's doing and not the app's: the diagnostic, where the suite does not
+poll, passes the same hook 28 times.
+
+**Test 11 races the host.** "complete all checkbox should update state when
+items are completed / cleared" presses toggle-all and, at once, unchecks the
+first row's box (`uncheck({force: true})`, which does nothing to a box that is
+not checked). The press checks toggle-all's own box and nothing else; the rows'
+boxes are checked by the host's answer. Where the test's next step comes before
+the answer, the first row's box is not yet checked, `uncheck` does nothing, and
+toggle-all stays checked as every row completes (the screenshot of a failure
+shows all three rows completed, "0 items left", and toggle-all checked). The
+answer reaches the page after a median 24 ms on a debug build (min 20.5, max
+33.9; 80 presses at load 4 to 7) and 24 ms on a release build (min 4.6, max
+28.5; 80 presses), because the stream is not pushed: `stream_open`
+(`spikes/own-renderer/server/src/main.rs`) reads the session's queue every 25
+ms (`std::thread::sleep`). Under load 60 to 70 the median was 50 ms (24 to
+101). In 8 diagnostic runs the test failed 3 times (two when the machine was
+loaded, load 30 to 70, and one at load 12) and passed 5 (load 11 to 36). It is neither a bug of the app nor a
+design choice but a finding about the transport (below). The judge lets the
+test pass or lose this race, and says which it did.
+
+**What this says of the app, and what it does not.** The official suite, run
+unchanged, cannot show that tests 4 to 29 pass for this app, because 23 of the
+29 ask `localStorage`, which this app does not use: it is not claimed that the
+unchanged suite passes. The diagnostic shows that, with that one question
+removed by the suite's own table, each test's other assertions hold (28 of 29,
+the 29th skipped by the suite). Adding this app's name to `noLocalStorageCheck`
+would make the acceptance the diagnostic, and is a change to the upstream spec,
+which is never made here.
+
+## What was found
+
+Corrections first.
+
+1. **The plan says `todomvc-app-css` is MIT**: it is CC BY 4.0 (section 3).
+2. **The plan names the spec `tests/cypress/e2e/spec.cy.js`**: upstream has
+   `cypress/e2e/spec.cy.js` (section 5).
+3. **HTML's `autofocus` is once per document, not "at load"**, as the ruling's
+   text and the first draft of section 4 had it: an element inserted later is a
+   candidate until a focus has set the Standard's "autofocus processed flag"
+   (read 2026-10-15). What the runtime does is the same either way (section 4).
+
+Then what the build and the suite found:
+
+4. **The stream transport is a poll** (framework finding). `stream_open` reads
+   a session's queue every 25 ms, so every server-driven update waits for the
+   next tick: a median 24 ms from press to patch on a debug and a release build
+   alike, 50 ms under load. A queued frame could wake the stream (a `Condvar`
+   beside `pending`, notified where a frame is queued, with 25 ms kept as the
+   bound), about thirty lines that would change every page's delivery
+   timing. Not done here: a question for the integrator, below.
+5. **A server-driven page races a test that acts on the result at once**
+   (Cypress test 11). The same property: a client-state app updates its rows in
+   the press's own turn, and a host-state app after the host's answer.
+6. **The official suite cannot run to its end against an app that writes no
+   `localStorage`**: its polling helpers never end, and the loops they leave
+   behind fail the next hook (section 5).
+7. **Two runtime bugs, found by TodoMVC**: server patches set the `checked`
+   attribute and not the property, and nothing focused an element that arrived
+   with `autofocus` (section 4); each is its own commit with tests and mutants.
+8. **The page's content policy refuses `data:` images** (`img-src 'self'`,
+   ADR-0333), which `todomvc-app-css` draws its checkboxes with; the build
+   writes them to files of the app's own origin (section 3).
+9. **Two races in the page's own program**, found by the browser suite and
+   fixed: WebKit lost fast typing when the field was cleared after the
+   command's answer (the field is cleared at Enter and given back on a
+   refusal), and a blur's save ended a newer edit (a save ends only its own).
+10. **The language's limits met**: a keyed read allows only `String`, `Int`
+    and `Bool` keys (PW5308, ADR-0131); a signal read inside a query-loop row is
+    refused (ADR-0137); a `resumable(captures)` handler must be fully typed
+    lambdas or use signals only (a `row.id.value` capture is refused, hence
+    `Row.id: String` and `TodoId(row.id)`).
+11. **Flakes**: one in the browser suite, mine and fixed (the toggle-all test
+    cleared a row before the host's answer; 2 of 141 under load 60 to 80, now
+    waits for the rows, 54 of 54 in a repeat of six). None other.
 
 ## Acceptance
 
@@ -306,8 +570,8 @@ its mutants.
   changes sent; the key naming the row being edited; the template's classes,
   the new-todo field's `autofocus`, the filters' links and TodoMVC's
   stylesheets.
-- `spikes/own-renderer/e2e/todomvc.spec.mjs`, 43 tests in Chromium, Firefox
-  and WebKit, in the spec's own order: no todos; the new todo (Enter, the
+- `spikes/own-renderer/e2e/todomvc.spec.mjs`, 47 tests in Chromium, Firefox
+  and WebKit (141 runs), in the spec's own order: no todos; the new todo (Enter, the
   field cleared and focused, appended, trimmed, never empty, bounded, markup
   shown as text); mark all as complete; an item (its checkbox, hover for
   `.destroy`); editing (a double press, Enter, blur, clicking away, trimmed,
@@ -317,10 +581,42 @@ its mutants.
   routing (each filter and its `selected` link, the model filtering, an item
   updated under a filter, the back button, a page opened at a route and kept
   on reload, a fragment that is no route); the template's markup; and
-  TodoMVC's stylesheets, served and applied, and the licence beside them.
-- `scripts/todomvc_mutations.py`, 49 mutants: 38 of the program, each
-  checked to be a well-typed program before it runs, 10 of the layer and 1
-  of the host; `just e14-todomvc`.
+  TodoMVC's stylesheets, served and applied, and the licence beside them. Since
+  the first draft: a row's box and toggle-all's following the page after a
+  person pressed them (3 tests), and the edit field focused as the patch
+  inserts it (1).
+- `scripts/todomvc_mutations.py`, 52 mutants: 38 of the program, each
+  checked to be a well-typed program before it runs, 10 of the layer, 1 of the
+  host and 3 of the runtime (the box's state, the edit field's focus);
+  `just e14-todomvc`.
+
+### 4. The Cypress suite
+
+- `scripts/tests/test_todomvc_cypress.py`, 44 tests. The vendored files are
+  upstream's blobs, and a file changed by a byte is not. The spec's 29 tests,
+  and which ask `localStorage`, are read from it (6 ask nothing; a context's
+  `beforeEach` counts). Cypress's output is read: the counts, each test's line,
+  each failure's first error line, the browser's record of the polling loops'
+  throw, colour codes, the same lines from 15.14.2 and from 15.21.1. Each rule
+  of the judgement is broken in a copy of a real output: a test that asks
+  `localStorage` passing, one that asks nothing failing, a test not run with no
+  failed hook before it, a failed hook with no cause on record, the first tests,
+  the table against the lines, the exit status, a test the spec lacks, the
+  diagnostic's persistence test, its racy test failing for another reason or
+  skipped, any other test not passing. A suite that did not run is not a pass
+  (no table, an empty file, a missing file, a missing binary's message). And
+  `run.sh` is run whole, with a stand-in Cypress and a stand-in host: the
+  acceptance and the diagnostic under their names, the browser's console on, the
+  machine's display off; a run with no results, an outcome the design does not
+  give, and an exit status that is not the failing count each exit 1; a missing
+  Xvfb, binary, build and host exit 1 and run nothing.
+- `scripts/todomvc_cypress_mutations.py`, 46 mutants of the vendored check,
+  the judge and `run.sh`, each failing at least one of those tests (run twice:
+  46 of 46 killed each time); `just e14-todomvc`.
+- The runs: `just e14-todomvc` records both in `docs/evidence/E14/todomvc.txt`
+  and fails where either is not the outcome the app's design gives. Locally,
+  2026-10-15, on Cypress 15.21.1: the acceptance 3 of 29 passed, the diagnostic
+  28 of 29 passed and 1 skipped by the suite.
 
 ## Not claimed
 
@@ -331,3 +627,59 @@ its mutants.
   hands the document to the next runtime, whose listener replaces this one's
   (`life.signal`); no test holds a fragment-bound page inside one.
 - **The links of the views a page composes** (PW6106).
+- **That the official suite, unchanged, passes this app.** In the acceptance 3
+  of 29 pass; 23 tests ask `localStorage`, which this app never writes, and each
+  fails or would fail there by design (section 5). The official persistence test
+  (24) is never run for this app: it asks `localStorage`, and the suite skips it
+  for the name the diagnostic uses. What the diagnostic shows is that each
+  test's other assertions hold, for one name's table: not the acceptance.
+- **That Cypress test 11 passes**: it passes or loses a race with the host's
+  answer, by timing (section 5), and the judge lets it do either.
+- **Editing is the page's signal, and its cost.** Another tab's change to the
+  row being edited drops the edit in progress, and each begin and end of an
+  edit is a read the server renders (ruling 1: kept for the first milestone;
+  per-row signal instances, ADR-0137 and PW5307, are a separate language
+  track).
+- **A session's list beyond 500 todos, or a title beyond 1000 characters**
+  (rulings 8 and 9): both are limits, each with its test.
+- **`autofocus` that leaves a person's focus alone.** A patch that inserts an
+  element with `autofocus` takes the focus from wherever a person is, as the edit
+  field must; a page that inserts one for another reason would take it too, and
+  nothing refuses that. The `selected` property of an `option` is not synced as
+  `checked` is.
+- **The device's own storage, and a keyboard way to begin an edit.** The
+  version on `localStorage` waits for charter 9.1's fourth kind of state; the
+  spec's way to begin an edit is a double press, which a keyboard cannot make.
+- **A browser other than Chromium, Firefox and WebKit** for the page, and any
+  engine but Electron's Chromium for Cypress.
+
+## Questions for the integrator
+
+1. **Wake the stream when a frame is queued** (section 5, "What was found" 4).
+   `stream_open` reads a session's queue every 25 ms, so a server-driven update
+   takes a median 24 ms to reach the page, on any build. A `Condvar` beside
+   `pending`, notified where a frame is queued, with the 25 ms kept as a bound,
+   would deliver in a few milliseconds; about thirty lines, and a change to the
+   timing of every page, which the track did not make (no suite other than this
+   track's could be run to check it). Without it, Cypress test 11 passes only
+   when the machine is quiet.
+2. **A verification shard for `e14-todomvc` needs Cypress's binary and Xvfb.**
+   The recipe fetches the binary itself (`pnpm exec cypress install`, a zip of
+   about 249 MB; nothing where it is installed) and fails without Xvfb. The
+   GitHub image `ubuntu-24.04` is believed to carry Xvfb; that is not verified
+   here. Provisioning the binary in `verify.yml` instead is the other choice.
+3. **Cypress 15.21.1, not 15.14.2** (section 5): a deviation from upstream's
+   lockfile, for the six advisories; the owner's approval names the package and
+   its binary, not a version.
+
+## Next
+
+- **TodoMVC's second version**, on the device's own storage (charter 9.1's
+  fourth kind, which starts with the Docs app), where the official suite's
+  `localStorage` tests become questions the app can answer.
+- **Per-row signal instances** (ADR-0137, PW5307), so that editing a row is the
+  row's signal and not a page read; then the workaround here goes.
+- **The tutorial's first lesson and the comparison** the plan names, which this
+  milestone's program and evidence are the ground of.
+- **A keyboard way to begin an edit**, where the spec has none.
+
