@@ -101,17 +101,37 @@ def description(mutant):
     return [str(m) for m in mutant[:-3]]
 
 
-def says(line, mutant):
-    """Whether `line` is `mutant`'s verdict: it begins with the mutant's
-    first element, followed by `:`, ` [` or two spaces, holds the rest, and
-    says a verdict."""
+def begins(line, mutant):
+    """Whether `line` begins with the mutant's first element, followed by
+    `:`, ` [` or two spaces, as each script prints it."""
     words = description(mutant)
     if not words or not line.startswith(words[0]):
         return False
     after = line[len(words[0]) : len(words[0]) + 2]
-    if not (after.startswith(":") or after in (" [", "  ")):
-        return False
-    return all(w in line for w in words[1:]) and VERDICT.search(line) is not None
+    return after.startswith(":") or after in (" [", "  ")
+
+
+def verdict_of(line, pending):
+    """Which of `pending` (a slot's mutants not yet said, `(index, mutant)`
+    in the script's order) `line` is the verdict of: the first whose every
+    element before its file the line holds, beginning with its first; else,
+    where the line holds the first alone (`{what}: NOT RUN ..` names no
+    suite), the next. None where the line is no verdict. A script that
+    chose not to run a mutant (`row_reads_mutations.py` takes a part of a
+    description) says nothing of it, and the next verdict names its own."""
+    if VERDICT.search(line) is None:
+        return None
+    for j, (_, m) in enumerate(pending):
+        if begins(line, m) and all(w in line for w in description(m)[1:]):
+            return j
+    if pending and begins(line, pending[0][1]):
+        return 0
+    return None
+
+
+def says(line, mutant):
+    """Whether `line` is `mutant`'s verdict, the next to be said."""
+    return verdict_of(line, [(0, mutant)]) == 0
 
 
 def suite(mutant):
@@ -139,7 +159,8 @@ def deal(mutants, n):
         k = min(range(n), key=lambda k: (of_suite[k].get(suite(m), 0), len(slots[k]), k))
         slots[k].append(i)
         of_suite[k][suite(m)] = of_suite[k].get(suite(m), 0) + 1
-    return [sorted(s) for s in slots]
+    # A slot dealt nothing is not run.
+    return [sorted(s) for s in slots if s]
 
 
 def narrow(mutants, pick):
@@ -190,7 +211,10 @@ def engage():
     if n <= 1:
         return
     script = pathlib.Path(g["__file__"]).resolve()
-    if script.name in SEQUENTIAL:
+    if script.name in SEQUENTIAL or sys.argv[1:]:
+        # Given arguments, a script chooses its own mutants among those it
+        # holds (`row_reads_mutations.py`), and slot 0's baseline would not
+        # be the run's whole: one slot.
         n = 1
     sys.stdout.flush()
     code = Run(script, list(g["MUTANTS"]), n, sys.argv[1:]).run()
@@ -355,12 +379,12 @@ class Slot:
         """One line it printed."""
         self.all.append(raw)
         line = raw.decode("utf-8", "replace").rstrip("\n")
-        j = next((j for j, (_, m) in enumerate(self.pending) if says(line, m)), None)
+        j = verdict_of(line, self.pending)
         if j is None:
             (self.head if self.baseline is None else self.since).append(raw)
             return
         if self.baseline is None:
-            self.split_head()
+            self.split_head(ended=False)
         for i, _ in self.pending[:j]:
             self.skipped.add(i)
         i = self.pending[j][0]
@@ -368,18 +392,19 @@ class Slot:
         self.since = []
         self.pending = self.pending[j + 1 :]
 
-    def split_head(self):
+    def split_head(self, ended):
         """Its baseline: what it said up to its last `baseline` line. What
-        follows was said in its first mutant's run."""
-        cut = len(self.head)
+        follows was said in its first mutant's run, or, where it said no
+        verdict, after its last. Without a `baseline` line, what it said
+        before a verdict is its baseline, and what it said with none is
+        all after."""
         marks = [n for n, l in enumerate(self.head) if l.startswith(b"baseline")]
-        if marks:
-            cut = marks[-1] + 1
+        cut = marks[-1] + 1 if marks else (0 if ended else len(self.head))
         self.baseline, self.since = self.head[:cut], self.head[cut:]
 
     def end(self, code):
         if self.baseline is None:
-            self.split_head()
+            self.split_head(ended=True)
         self.code = code
         counted = any(COUNT.match(l.rstrip(b"\n")) for l in self.since)
         if counted:
@@ -495,17 +520,20 @@ class Run:
     # -- the run
 
     def run(self):
-        self.dealt = deal(self.mutants, self.n)
-        trees = self.prepare()
+        # Stopped from outside, the slots are stopped too (`merge`).
         previous = {}
         for sig in (signal.SIGTERM, signal.SIGINT):
             previous[sig] = signal.signal(sig, self.stopped_from_outside)
+        self.held = None
         try:
+            self.dealt = deal(self.mutants, self.n)
+            trees = self.prepare()
             return self.merge(trees)
         finally:
             for sig, handler in previous.items():
                 signal.signal(sig, handler)
-            self.held.close()
+            if self.held is not None:
+                self.held.close()
 
     def stopped_from_outside(self, *_):
         raise SystemExit(1)
@@ -537,7 +565,7 @@ class Run:
                 self.stop()
                 self.say(red.all)
                 return red.code
-            self.say(self.slots[0].baseline)
+            self.say(self.baseline())
             for i in range(len(self.mutants)):
                 s = next(s for s in self.slots if i in self.dealt[s.k])
                 with self.lock:
@@ -560,6 +588,20 @@ class Run:
         except BaseException:
             self.stop()
             raise
+
+    def baseline(self):
+        """The run's baseline: slot 0's, which was dealt a mutant of each
+        suite; and, should another slot have said one it did not (no
+        script does), that one after it."""
+        said = list(self.slots[0].baseline)
+        labels = {l.split(b":")[0] for l in said}
+        for s in self.slots[1:]:
+            for raw in s.baseline:
+                label = raw.split(b":")[0]
+                if raw.startswith(b"baseline") and label not in labels:
+                    labels.add(label)
+                    said.append(raw)
+        return said
 
     def close(self):
         """What follows the last verdict: what any slot said there beside
