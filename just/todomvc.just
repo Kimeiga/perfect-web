@@ -24,7 +24,7 @@ e14-address-fragment:
        echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
        echo "== the compiler (tests/address_fragment.rs, the policy table's tests)"; echo; \
        cargo test --locked -p pw-core --test address_fragment 2>&1 | grep -E '^(test |test result)|panicked at'; \
-       cargo test --locked -p pw-core --lib policy:: codes:: 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       cargo test --locked -p pw-core --lib -- policy:: codes:: 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the host (tests::address_fragment)"; echo; \
        cargo test --locked -p pw-dev-server -- tests::address_fragment:: 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the browser in three engines (e2e/fragment.spec.mjs)"; echo; \
