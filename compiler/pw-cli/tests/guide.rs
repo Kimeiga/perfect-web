@@ -29,6 +29,10 @@ use std::process::Command;
 /// output, and other languages' code for comparison. None is compiled.
 const OTHER_LANGUAGES: &[&str] = &["sh", "text", "ts", "tsx", "svelte", "json"];
 
+/// The pages that show no Pleris: the index, and the reference of codes
+/// `scripts/guide_diagnostics.py` writes.
+const UNEXAMPLED: &[&str] = &["README.md", "diagnostics.md"];
+
 fn repo() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
@@ -396,7 +400,15 @@ fn every_example_in_the_guide_compiles_as_it_says() {
     for (page, md) in pages() {
         // A plain count of the opening ```pw lines, read apart from the
         // extractor: a block it skipped would be a block nobody checked.
-        opening += md.lines().filter(|l| l.starts_with("```pw")).count();
+        let here = md.lines().filter(|l| l.starts_with("```pw")).count();
+        opening += here;
+        // A page teaches by example: all but the index and the generated
+        // reference of codes show Pleris.
+        if here == 0 && !UNEXAMPLED.contains(&page.as_str()) {
+            problems.push(format!(
+                "{page}: a page of the guide with no Pleris example"
+            ));
+        }
         match examples_of(&page, &md) {
             Ok(found) => examples.extend(found),
             Err(e) => problems.extend(e),
@@ -413,11 +425,7 @@ fn every_example_in_the_guide_compiles_as_it_says() {
         pieces, opening,
         "every ```pw block is one example, or one piece of its page's program"
     );
-    assert!(
-        examples.len() >= 10,
-        "the guide has examples: found {}",
-        examples.len()
-    );
+    assert!(!examples.is_empty(), "the guide has examples");
 
     let threads = std::thread::available_parallelism()
         .map(|n| n.get().min(8))

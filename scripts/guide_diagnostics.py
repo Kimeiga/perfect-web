@@ -129,8 +129,10 @@ def retired(source):
     """(code, why) for each retired code."""
     block = source.split("pub const RETIRED: &[(&str, &str)] = &[", 1)[1].split("];", 1)[0]
     out = []
-    for m in re.finditer(r'\(\s*"(PW\d{4})",\s*((?:"(?:[^"\\]|\\.)*"\s*)+)\)', block, re.S):
-        parts = re.findall(r'"((?:[^"\\]|\\.)*)"', m.group(2))
+    # A trailing comma after the reason, as `rustfmt` writes a tuple split
+    # across lines, is the tuple's.
+    for m in re.finditer(r'\(\s*"(PW\d{4})",\s*((?:"(?:[^"\\]|\\.)*"\s*)+),?\s*\)', block, re.S):
+        parts = re.findall(r'"((?:[^"\\]|\\.)*)"', m.group(2), re.S)
         text = "".join(parts)
         # A `\` before a line's end continues the literal past the newline
         # and the next line's indentation.

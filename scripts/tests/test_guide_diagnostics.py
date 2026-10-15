@@ -60,6 +60,21 @@ class Reading(unittest.TestCase):
         with self.assertRaises(ValueError):
             guide.entries(broken)
 
+    def test_a_retired_code_with_its_reason_continued_across_lines(self):
+        # As codes.rs writes it: the tuple across lines, a trailing comma,
+        # and the reason continued with `\` at a line's end.
+        source = (
+            'pub const RETIRED: &[(&str, &str)] = &[(\n'
+            '    "PW5102",\n'
+            '    "a key must separate the build. \\\n'
+            '     Retired 2026-08-06: the compiler injects it.",\n'
+            ')];\n'
+        )
+        self.assertEqual(
+            guide.retired(source),
+            [("PW5102", "a key must separate the build. Retired 2026-08-06: the compiler injects it.")],
+        )
+
     def test_a_pipe_in_a_cell_is_escaped(self):
         self.assertEqual(guide.cell("`|` and `&`"), "`\\|` and `&`")
 

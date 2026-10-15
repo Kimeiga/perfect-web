@@ -310,6 +310,7 @@ No longer emitted, and never reused.
 
 | Code | Why |
 |---|---|
+| PW5102 | a shared materialization's cache key must separate the build that produced it. Retired 2026-08-06: the compatibility generation is now injected by the compiler for every materialized entry, so the key cannot omit it. If a generated storage key ever lacks its compatibility namespace that is an internal compiler invariant, not an error an application author can repair. |
 
 ## Old numbers
 
