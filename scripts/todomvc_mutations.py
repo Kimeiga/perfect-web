@@ -14,7 +14,9 @@ Each mutant undoes one thing the spec states, or one thing the layer keeps:
   each operation holds a command to;
 - the host's media type for the checkbox's drawings;
 - the browser's runtime (`spikes/own-renderer/public/pw-runtime.mjs`), where
-  a patch sets a checkbox's state as well as its attribute.
+  a patch sets a checkbox's state as well as its attribute, and the edit
+  field a patch inserts takes focus (the runtime's own `autofocus` is
+  controlled in `scripts/autofocus_mutations.py`).
 
 **A program mutant must still be a well-typed program**: each is checked with
 `pw check` before anything runs, and one that does not check is no mutant,
@@ -404,6 +406,13 @@ MUTANTS = [
         RUNTIME_FILE,
         '  if (op.name === "checked" && "checked" in element) element.checked = true;\n',
         "",
+    ),
+    (
+        "an edit field inside the row a patch inserts is not given focus",
+        RUNTIME,
+        RUNTIME_FILE,
+        'node.matches("[autofocus]") ? [node] : [...node.querySelectorAll("[autofocus]")]',
+        'node.matches("[autofocus]") ? [node] : []',
     ),
 ]
 

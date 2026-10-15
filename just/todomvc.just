@@ -63,6 +63,30 @@ e14-dom-events:
      } > docs/evidence/E14/dom-events.txt
     @grep -E "^test result|passed|mutants killed|^---- |panicked at" docs/evidence/E14/dom-events.txt
 
+# Track `todomvc` (ADR-XXXX): an element a block shows with `autofocus`, after
+# the page has loaded, takes focus as it appears, as TodoMVC's edit field
+# does (HTML runs `autofocus` once, when a page loads). The browser in three
+# engines (e2e/focus.spec.mjs over examples/demo/focus.pw) and the mutation
+# controls (scripts/autofocus_mutations.py); TodoMVC's own edit field is
+# held in e14-todomvc.
+e14-autofocus:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server -p kiokun-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-XXXX - an element a block shows with autofocus takes focus as it appears"; echo; \
+       echo "produced by: just e14-autofocus"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the browser in three engines (e2e/focus.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/focus.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/autofocus_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/autofocus_mutations.py; \
+     } > docs/evidence/E14/autofocus.txt
+    @grep -E "^test result|passed|mutants killed|^---- |panicked at" docs/evidence/E14/autofocus.txt
+
 # Track `todomvc` (ADR-XXXX): TodoMVC in Pleris, held to TodoMVC's own spec
 # (`app-spec.md`): every behaviour it states, each with its test. The program
 # (examples/todomvc) and its data layer's tests on the host (tests::todomvc::),

@@ -1673,6 +1673,39 @@ function bindFragment(binding) {
   addEventListener("hashchange", () => followFragment(binding), { signal: life.signal });
 }
 
+// --- `autofocus` on an element a block shows (track `todomvc`) --------------
+//
+// HTML runs `autofocus` when a page loads, and ignores it on an element put
+// in later. A page shows fields after it has loaded, as TodoMVC shows its
+// edit field when a person asks to edit a todo ("the edit field should be
+// focused"): the field they asked for is the one they type in. So an element
+// that arrives with `autofocus`, in a block a signal renders or in a patch
+// from the server, takes focus as it arrives, each time it arrives. What the
+// page was served with is left alone: the browser focused that. (A modal
+// dialog's `autofocus` element is the one `showModal` focuses (ADR-0141): it
+// is already focused by the time this looks.)
+
+/** The element, among `nodes` and what they hold, that asks for focus. */
+function autofocusIn(nodes) {
+  for (const node of nodes) {
+    if (node.nodeType !== Node.ELEMENT_NODE) continue;
+    const asking = node.matches("[autofocus]") ? [node] : [...node.querySelectorAll("[autofocus]")];
+    const found = asking.find((el) => el.isConnected);
+    if (found) return found;
+  }
+  return null;
+}
+
+/** Whatever is put into the page from now on, one change at a time. */
+function followAutofocus() {
+  const observer = new MutationObserver((records) => {
+    const el = autofocusIn(records.flatMap((r) => [...r.addedNodes]));
+    if (el && document.activeElement !== el) el.focus();
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+  life.signal.addEventListener("abort", () => observer.disconnect(), { once: true });
+}
+
 // --- ADR-0152: a key a page changes ---------------------------------------
 //
 // A page's query given a signal is read again, for the new key, when the
@@ -2367,6 +2400,8 @@ async function attach() {
   if (parts.listens !== false) subscribe();
   // The signal a page binds to its address's fragment follows it from here.
   if (parts.fragment) bindFragment(parts.fragment);
+  // What a block shows from here on, with `autofocus`, takes focus.
+  followAutofocus();
   window.__pw.signals = Object.fromEntries(signals);
   window.__pw.ready = true;
   document.documentElement.dataset.pwReady = "1";

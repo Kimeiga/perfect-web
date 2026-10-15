@@ -199,6 +199,9 @@ test("the toggle-all, pressed, still follows the todos: unchecked when one is cl
   await expect(all).not.toBeChecked();
   await all.check({ force: true });
   await expect(all).toBeChecked();
+  // The press checks the box at once; the todos are completed when the host
+  // has answered, and a todo cleared before then is completed after.
+  for (const n of [0, 1]) await expect(items(page).nth(n)).toHaveClass(/completed/);
   await items(page).nth(0).locator(".toggle").uncheck();
   await expect(items(page).nth(0)).not.toHaveClass(/completed/);
   await expect(all).not.toBeChecked();
@@ -292,6 +295,22 @@ test("a double press on the label begins editing: a field holds the title, and t
   await expect(page.locator(".edit")).toHaveCount(1);
 });
 
+test("the edit field is focused as it appears, and is the one typed in", async ({ page }) => {
+  await open(page);
+  await add(page, ONE, TWO);
+  await items(page).nth(1).locator("label").dblclick();
+  await expect(items(page).nth(1).locator(".edit")).toBeFocused();
+  // Typed in with no click on it: at the end of the title, then Enter.
+  await page.keyboard.press("End");
+  await page.keyboard.type("!");
+  await page.keyboard.press("Enter");
+  await expect(items(page).nth(1).locator("label")).toHaveText(`${TWO}!`);
+  // Each time a todo is edited, and whichever one.
+  await items(page).nth(0).locator("label").dblclick();
+  await expect(items(page).nth(0).locator(".edit")).toBeFocused();
+  await expect(items(page).nth(1).locator(".edit")).toHaveCount(0);
+});
+
 test("Enter saves the edit and leaves editing", async ({ page }) => {
   await open(page);
   await add(page, ONE, TWO, THREE);
@@ -335,7 +354,7 @@ test("Enter or blur with nothing changed keeps the todo as it is", async ({ page
   await expect(items(page).nth(0)).not.toHaveClass(/editing/);
   await expect(items(page)).toHaveText([ONE, TWO]);
   await items(page).nth(1).locator("label").dblclick();
-  await items(page).nth(1).locator(".edit").focus();
+  await expect(items(page).nth(1).locator(".edit")).toBeFocused();
   await items(page).nth(1).locator(".edit").blur();
   await expect(items(page).nth(1)).not.toHaveClass(/editing/);
   await expect(items(page)).toHaveText([ONE, TWO]);

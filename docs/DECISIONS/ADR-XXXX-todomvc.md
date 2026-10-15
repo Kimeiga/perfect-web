@@ -223,6 +223,37 @@ to `PORT+142`, the plan's ports).
   What the official Cypress suite says of an app that does not use
   `localStorage` is the next section's.
 
+### 4. Two things TodoMVC needed of the runtime
+
+Building the page found two things the runtime did not do, which no page had
+asked of it. Each is its own commit in the shared runtime, with its tests and
+its mutants.
+
+- **A patch that checks or unchecks a box sets the box's state.** The runtime's
+  `setAttributeAt` set the `checked` attribute and nothing else, which moves a
+  checkbox only until a person has pressed it: from then the property is the
+  box's own. The toggle-all, pressed, stayed checked when one todo was cleared
+  (the official suite asks it: "complete all checkbox should update state when
+  items are completed / cleared"), and a row another tab cleared stayed ticked in
+  the tab that had ticked it. A signal's attribute already set the property
+  (`setAttributePart`); a patch's now does, for `checked`. `selected` is the same
+  and is not done: no page needs it, and none tests it. Three tests in three
+  engines, each failing without the change, and two mutants.
+- **An element that arrives with `autofocus` takes focus.** HTML runs
+  `autofocus` once, when a page loads, and ignores it on an element put in
+  later. TodoMVC's edit field appears when a person asks, and "the edit field
+  should be focused": the field they asked for is the one they type in. The
+  runtime watches what is put into the page from its start (`followAutofocus`,
+  a `MutationObserver` on the body, which sees a block's rendering and a
+  server's patch alike) and gives the first element that asks for focus, if it
+  does not have it. What the page was served with is left alone (the browser
+  focused it), and a modal dialog's `autofocus` element is the one `showModal`
+  focuses. A runtime behaviour, not a language rule: the attribute is HTML's
+  and the page says nothing new. `examples/demo/focus.pw` and
+  `e2e/focus.spec.mjs` show it in three engines (7 of the 12 fail without the
+  change; WebKit focuses the first field by itself, and not the second), and
+  TodoMVC's own test holds it on the edit field a patch inserts.
+
 ## Acceptance
 
 ### 1. The fragment
