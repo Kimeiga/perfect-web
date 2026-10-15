@@ -14,6 +14,13 @@
 import { expect, test } from "@playwright/test";
 
 const PAGE = "/demo/invariants/ab";
+
+/** The page, its handlers attached (the runtime's `data-pw-ready`). */
+async function ready(page) {
+  await page.goto(PAGE);
+  await page.waitForFunction(() => document.documentElement.dataset.pwReady === "1");
+  await expect(page.locator("h1")).toHaveText("Rate a code");
+}
 const STARS = "`demo.invariants.Stars` holds `value >= 1 & value <= 5`";
 const NOTE = "`demo.invariants.Note` holds `String.length(value) <= 20`";
 const CODE =
@@ -53,8 +60,7 @@ test("a page's parameters are held where its address gives them", async ({ reque
 test("a command's argument that breaks its invariant is refused before it runs", async ({
   page,
 }) => {
-  await page.goto(PAGE);
-  await expect(page.locator("h1")).toHaveText("Rate a code");
+  await ready(page);
   const press = (command, args, interaction) =>
     page.request.post(`/command/demo.invariants.${command}`, {
       data: args,
@@ -113,8 +119,7 @@ test("a press sends only what the page's own constructors build", async ({ page 
   page.on("request", (r) => {
     if (r.url().includes("/command/")) sent.push(r.postData());
   });
-  await page.goto(PAGE);
-  await expect(page.locator("h1")).toHaveText("Rate a code");
+  await ready(page);
   // Six stars are no `Stars`: the page says so, and sends nothing.
   await page.locator("#stars-6").click();
   await page.locator("#send").click();
@@ -133,25 +138,27 @@ test("a press sends only what the page's own constructors build", async ({ page 
 });
 
 test("a press whose request is altered on the way is refused, and says so", async ({ page }) => {
-  await page.goto(PAGE);
-  await expect(page.locator("h1")).toHaveText("Rate a code");
-  // The page sends three stars; the request arrives claiming six.
-  await page.route("**/command/demo.invariants.rate", (route) =>
-    route.continue({ postData: JSON.stringify(["ab", 6, ""]) }),
-  );
-  const answered = page.waitForResponse((r) => r.url().includes("/command/demo.invariants.rate"));
+  await ready(page);
+  // The page sends three stars; the request arrives claiming six. The route
+  // sends it on, keeps what the host answered, and gives the page that.
+  // (Read here, not from the page's response: the runtime reads no body of
+  // a refused command, and Chromium then gives a test none either.)
+  let answered = null;
+  await page.route("**/command/demo.invariants.rate", async (route) => {
+    const response = await route.fetch({ postData: JSON.stringify(["ab", 6, ""]) });
+    answered = { status: response.status(), body: await response.json() };
+    await route.fulfill({ response });
+  });
   await page.locator("#stars-3").click();
   await page.locator("#send").click();
-  const answer = await answered;
-  expect(answer.status()).toBe(400);
-  expect(await answer.json()).toEqual({
-    committed: false,
-    error: `argument refused: value 2 is 6, and ${STARS}`,
-  });
   // Told where the press was, in the platform's words (ADR-0302), and the
   // page's own word is not "Sent.".
   const send = page.locator("#send");
   await expect(send).toHaveAttribute("data-pw-handler-error", "failed");
+  expect(answered).toEqual({
+    status: 400,
+    body: { committed: false, error: `argument refused: value 2 is 6, and ${STARS}` },
+  });
   await expect(page.locator("#send + .pw-refusal")).toHaveText("This did not work. Try again.");
   await expect(page.locator("#said")).toHaveText("");
 });

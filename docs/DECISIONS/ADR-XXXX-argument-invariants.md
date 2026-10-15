@@ -64,6 +64,12 @@ decoded."
    - The browser's path keeps ADR-0179's decode at arrival
      (`arguments_for`): refused there, a request keeps nothing (its
      interaction is free), and is answered 400.
+   - The call's check is the last of them, not the one a reader meets: a
+     value it refuses is one no boundary held, a host's own error. A
+     command so refused fails its press as a command that did not commit
+     (202 and no value, the press told in the platform's words); a query,
+     as a query that failed. No value from outside reaches either today:
+     each enters through a boundary that holds it first (the audit).
 2. **A page's parameters are held where its address gives them.**
    - The build states each parameter's invariants in the page's plan
      (`PageValues.bounded`), by the function an export's contract uses

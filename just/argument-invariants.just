@@ -18,6 +18,7 @@
 # (e2e/argument-invariants.spec.mjs); and the mutation controls
 # (scripts/argument_invariants_mutations.py).
 e14-argument-invariants:
+    @cargo build --quiet --locked -p pw-cli -p pw-dev-server -p kiokun-server
     @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
     @mkdir -p docs/evidence/E14
     @{ echo "The argument-invariants track - a value from outside held to its type's invariant at every boundary"; echo; \
