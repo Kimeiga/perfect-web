@@ -1,0 +1,29 @@
+// @status: GENERAL
+// @invariant: forbidden_effect
+// @dimension: nesting — the read is a loop's key, in a loop inside another
+//
+// Structurally different from R-080: the read is neither a list nor at the
+// top of the view. The inner loop's key, `item.stock`, reads a member of
+// each row that reads the database, while the view renders. Until
+// ADR-XXXX a loop's key was text no walker of a view's expressions read.
+
+module generality.each_key_nested
+
+import domain.{ MenuItem, MenuSection }
+
+fn stock(item: MenuItem) -> String !{ database.read<MenuItem> }
+    host "store:data/menus#stock"
+
+view Menu(sections: List<MenuSection>) !{} {
+    <ul aria-label="Menu">
+        {#each sections as section (section.category.id)}
+            <li>
+                <ul aria-label="Items">
+                    {#each section.items as item (item.stock)}
+                        <li>{item.name}</li>
+                    {/each}
+                </ul>
+            </li>
+        {/each}
+    </ul>
+}

@@ -1048,3 +1048,30 @@ Generality at open:        54/54 invariants generality-tested
 | `invoked_twice` | a GENERAL witness, the second apart from the first, answering another type, and a NEIGHBOUR one, two of the clock's | new invariant |
 | `invoked_command_pressed` | a GENERAL witness, the clock's command pressed before its time, and a NEIGHBOUR one, a page pressing the command that schedules it | new invariant |
 | `invoked_command_not_idempotent` | a GENERAL witness, the clock's command keyed by nothing, and a NEIGHBOUR one, a command a reader presses keyed by nothing | new invariant |
+
+## C25: what a loop's head reads, 2026-10-15
+
+Opened because the corpus did not specify a rule the language holds, and
+the checker did not hold it there. A view's effect row is empty (charter
+§7.4), and an `{#each}`'s list and key are what the view evaluates while
+it renders, as a text hole, an attribute or an `{#if}`'s condition is.
+They were text no walker of a view's expressions read (ADR-0242's "not
+claimed"), so a database read in a loop's list checked clean, where the
+same call anywhere else in the view was `PW0401`; written as a member of
+the store it built too (ADR-XXXX, the each-head-effects track). No
+invariant is retired; no fixture changed.
+
+```text
+Corpus version:            C25
+Accepted programs:         37
+Rejected programs:         75
+Charter categories:        37/37 accepted, 75/75 rejected
+Generality at open:        54/54 invariants generality-tested
+```
+
+| Fixture | Change | Kind |
+|---|---|---|
+| A-037 | added: a page's loop over the value of a query it names, the query reading the database | new category, `a loop over a query's value` |
+| R-080 | added: a view's loop over `Stores.list()`, which reads the database (`PW0401` at the list) | new category |
+| `forbidden_effect` | two GENERAL witnesses, a loop's list read through a member that reads the database and a nested loop's key that does, and a NEIGHBOUR one, the list read through a pure member | new witnesses |
+| `secret_to_browser` | a GENERAL witness, a loop over a list computed from secrets, each rendered | new witness |

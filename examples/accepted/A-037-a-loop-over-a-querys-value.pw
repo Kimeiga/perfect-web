@@ -1,0 +1,37 @@
+// @corpus: accepted
+// @id: A-037
+// @category: a loop over a query's value
+// @charter: §7.4, §9.2
+// @milestone: 14
+//
+// R-080's neighbour. The same list, read by a query the page names: the
+// query reads the database where it is placed, and the view's loop runs
+// over the value it answered, which is what a view renders from (charter
+// §7.4).
+
+module store.directory_page
+
+import Stores
+import domain.{ Store }
+
+public query StoreList() -> List<Store> {
+    Stores.list()
+}
+
+page StoreDirectoryPage() {
+    route "/directory"
+
+    let stores = query StoreList()
+
+    view {
+        <title>Stores</title>
+        <main>
+            <h1>Stores</h1>
+            <ul aria-label="Stores">
+                {#each stores as store (store.id)}
+                    <li>{store.name}</li>
+                {/each}
+            </ul>
+        </main>
+    }
+}

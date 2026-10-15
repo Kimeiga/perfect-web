@@ -1,0 +1,28 @@
+// @corpus: rejected
+// @id: R-080
+// @category: a database read in a loop's list
+// @rule: PW0401
+// @invariant: forbidden_effect
+// @charter: §7.4
+// @milestone: 14
+// @expect-error: `StoreDirectory` performs `database.read<Stores>`, which a view may not do
+// @expect-error: a view renders; it cannot reach the database while doing so
+//
+// Found on 2026-10-15 and refused since ADR-XXXX. An `{#each}`'s list and
+// its key were kept as text, which no walker of a view's expressions read:
+// this checked clean, where the same call in a `let`, a text hole, an
+// `{#if}` or an attribute was refused. A loop's head is what the view
+// evaluates while it renders, as any of those is.
+
+module store.directory
+
+import Stores
+
+view StoreDirectory() !{} {
+    // ERROR: the list the loop runs over is read while the view renders.
+    <ul aria-label="Stores">
+        {#each Stores.list() as store (store.id)}
+            <li>{store.name}</li>
+        {/each}
+    </ul>
+}
