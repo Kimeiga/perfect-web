@@ -219,7 +219,10 @@ fn the_stores_handlers_compile_to_the_calls_their_bodies_make() {
             "remove_address",
             "remove_from_cart",
             // The cart's code taken off (track `order-total`).
-            "remove_promo"
+            "remove_promo",
+            // The rate page's send, named for the call it tests first, as
+            // `address_label` is (track `reviews`).
+            "stars_of"
         ]
     );
 
@@ -399,8 +402,10 @@ fn a_module_and_its_event_part_name_one_handler() {
     // And the cart page's checkout (track `order-total`): the code's and the
     // typed tip's bindings, the code applied and taken off, four tips by
     // percent and one by amount. And the order page's (NEXT 6c, step
-    // eight): an order awaiting its payment taken back.
-    assert_eq!(parts.len(), 25, "{parts:?}");
+    // eight): an order awaiting its payment taken back. And the rate page's
+    // (track `reviews`): the five stars chosen, the comment's binding, and the
+    // rating sent.
+    assert_eq!(parts.len(), 32, "{parts:?}");
     // By identity: two of the address page's handlers have one name (both
     // test the label first, `address_label`), and each is its own module.
     let _ = &modules;

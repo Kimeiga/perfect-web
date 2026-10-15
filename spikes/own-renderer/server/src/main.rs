@@ -1193,6 +1193,9 @@ fn components() -> BTreeMap<String, Loaded> {
         "store.hours.StoreStatus",
         "store.hours.StoresOpen",
         "store.hours.CartHours",
+        // TRACK SEAM (reviews): what a store's ratings come to, and its
+        // reviews, which its page reads.
+        "store.reviews.StoreRatings",
     ] {
         let path = dir.join(format!("{id}.wasm"));
         let bytes = std::fs::read(&path).unwrap_or_else(|e| {
@@ -15675,10 +15678,12 @@ public query Store(",
         // (track `store-accounts`); and the cart page's checkout, a code
         // applied and taken off, four tips by percent, one by amount, and the
         // code's and the typed tip's bindings (track `order-total`); and the
-        // order page's, an order awaiting its payment taken back (NEXT 6c).
+        // order page's, an order awaiting its payment taken back (NEXT 6c);
+        // and the rate page's, five stars chosen, the comment's binding and
+        // the rating sent (track `reviews`).
         assert_eq!(
             named.len(),
-            21,
+            28,
             "add_to_cart, clear_cart, a line's three (ADR-0172), place_order and an address's five: {named:?}"
         );
         assert_eq!(

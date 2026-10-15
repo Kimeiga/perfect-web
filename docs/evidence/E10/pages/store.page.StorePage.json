@@ -147,6 +147,25 @@
         ],
         "on_key_change": "cancel"
       }
+    },
+    {
+      "binding": "ratings",
+      "resource": "store.reviews.StoreRatings",
+      "args": [
+        "id"
+      ],
+      "policy": {
+        "cache": "shared",
+        "privacy": "public",
+        "freshness_ms": 30000,
+        "timeout_ms": 2000,
+        "attempts": 1,
+        "parallel": false,
+        "key": [
+          0
+        ],
+        "on_key_change": "cancel"
+      }
     }
   ],
   "parts": [
@@ -192,6 +211,16 @@
     },
     {
       "part": 4,
+      "path": "ratings.said",
+      "binding": "ratings",
+      "steps": [
+        {
+          "field": "said"
+        }
+      ]
+    },
+    {
+      "part": 5,
       "path": "store.description",
       "binding": "store",
       "steps": [
@@ -201,13 +230,13 @@
       ]
     },
     {
-      "part": 5,
+      "part": 6,
       "path": "line",
       "binding": "line",
       "steps": []
     },
     {
-      "part": 24,
+      "part": 25,
       "path": "cart.line_count",
       "binding": "cart",
       "steps": [
@@ -217,7 +246,7 @@
       ]
     },
     {
-      "part": 36,
+      "part": 37,
       "path": "cart.subtotal.display",
       "binding": "cart",
       "steps": [
@@ -232,7 +261,8 @@
   ],
   "collections": [
     "menu",
-    "cart.lines"
+    "cart.lines",
+    "ratings.reviews"
   ],
   "signals": [
     {
@@ -242,21 +272,22 @@
   ],
   "live": [
     {
-      "part": 38,
+      "part": 39,
       "signal": "notice",
       "path": "notice",
       "kind": "text"
     }
   ],
   "blocks": [
-    6,
-    9,
-    37,
-    40
+    7,
+    10,
+    38,
+    41,
+    46
   ],
   "streams": [
     {
-      "part": 12,
+      "part": 13,
       "resource": "store.page.Estimate",
       "args": [
         "id",
@@ -278,7 +309,7 @@
       "streamed": true
     },
     {
-      "part": 42,
+      "part": 43,
       "resource": "store.page.Recommendations",
       "args": [
         "id"
@@ -340,11 +371,11 @@
     }
   ],
   "attributes": [
-    25
+    26
   ],
   "derived": [
     {
-      "part": 41,
+      "part": 42,
       "path": "cart.subtotal.display",
       "binding": "cart",
       "steps": [
@@ -357,7 +388,7 @@
       ]
     }
   ],
-  "title": 45,
+  "title": 50,
   "scope": "user:",
   "layout": {
     "path": "store.page.StoreLayout",
