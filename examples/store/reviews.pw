@@ -48,10 +48,6 @@ fn comment_of(draft: String) -> Option<Comment> !{} {
 // **A store rated**: every reader's view of its ratings is read again.
 event StoreRated(store: StoreId)
 
-// **A reader's order rated**: what the reader's pages say of it is read
-// again, in each of their sessions.
-event OrderRated(user: User<UserId>)
-
 // **How many ratings a store's mean is said from** (ADR-XXXX, decision 4):
 // Uber Eats' minimum. Below it the count alone is said.
 fn fewest_averaged() -> Int !{} {
@@ -136,13 +132,13 @@ fn links_of(o: OrderToRate) -> List<RateLink> !{} {
 
 // **The reader's order's stores to rate** (ADR-XXXX, decision 7): the
 // reader's own, read by their handle, and read again when the order moves
-// along (it is delivered) or is rated.
+// along (it is delivered), or with the reader's pages when it is rated.
 user query OrderRatings(reader: User<UserId>) -> List<RateLink>
     freshness      0.seconds
     consistency    read_your_writes
     cache          private
     key            reader
-    invalidates_on UserOrderChanged(reader), OrderRated(reader)
+    invalidates_on UserOrderChanged(reader)
     concurrency    one_per_key
     on_key_change  cancel
     timeout        2.seconds
@@ -181,7 +177,7 @@ user query StoreToRate(id: StoreId, reader: User<UserId>) -> RateShown
     consistency    read_your_writes
     cache          private
     key            id, reader
-    invalidates_on UserOrderChanged(reader), OrderRated(reader)
+    invalidates_on UserOrderChanged(reader)
     concurrency    one_per_key
     on_key_change  cancel
     timeout        2.seconds

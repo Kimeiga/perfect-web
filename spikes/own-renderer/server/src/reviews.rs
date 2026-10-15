@@ -292,12 +292,11 @@ pub(crate) fn writes(with: With, written: Arc<Mutex<Written>>) -> Ops {
                 if order.status != DELIVERED {
                     return Ok(refused("not-delivered"));
                 }
-                let Some(of) = order.stores.iter().find(|of| of.store == *store) else {
+                if !order.stores.iter().any(|of| of.store == *store) {
                     return Ok(refused("not-in-order"));
-                };
-                if of.given.is_some() {
-                    return Ok(refused("already-rated"));
                 }
+                // Once: by the data's own key, memory's check and PostgreSQL's
+                // `UNIQUE (order_id, store)`, whatever a concurrent press read.
                 let rating = Rating {
                     order: order.order,
                     store: store.clone(),

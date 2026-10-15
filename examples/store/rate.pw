@@ -16,8 +16,8 @@ import context.{ current_user }
 import store.page.{ StoreLayout }
 import Ratings
 import Ratings.{ Stars, Comment, RatingError }
-import store.reviews.{ StoreRatings, OrderRatings, StoreToRate, StoreRated, OrderRated, stars_of,
-    comment_of, chosen_said }
+import Events.{ UserCartChanged }
+import store.reviews.{ OrderRatings, StoreToRate, StoreRated, stars_of, comment_of, chosen_said }
 
 // **Who may rate a store** (ADR-XXXX, decision 3): the deployment's
 // predicate, evaluated over the reader before the command runs, in its
@@ -30,16 +30,19 @@ predicate MayRate(store: StoreId)
 // **A store of the reader's latest order rated**, once (ADR-XXXX, decisions
 // 1 to 3): signed in, and `MayRate(store)`; the order read again and the
 // rating written in one transaction, a second refused by the data's own key.
-// What the store's page and lists say of it, and what the reader's pages say
-// of their order, are read again.
+// What the store's page and lists say of it is read again for every reader
+// (`StoreRated`); and the reader's own pages are, as the store's other
+// commands' are, by the reader's cart's event: the store's session's
+// documents are versioned by its cart's entry (ADR-0218), so a command that
+// changes no cart tells its reader's pages through it, as `choose_tip` does.
 command rate_order(store: StoreId, stars: Stars, comment: Comment)
     -> Result<Int, RatingError>
     requires      SignedIn, MayRate(store)
     idempotent_by InteractionId
     retry         transport_only(max = 2, jitter = true)
     transaction   serializable
-    invalidates   OrderRatings(current_user()), StoreToRate(store, current_user()), StoreRatings(store)
-    emits         OrderRated(current_user()), StoreRated(store)
+    invalidates   OrderRatings(current_user()), StoreToRate(store, current_user())
+    emits         UserCartChanged(current_user()), StoreRated(store)
 {
     Ratings.give(current_user(), store, stars, comment)
 }

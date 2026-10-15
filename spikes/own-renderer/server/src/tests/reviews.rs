@@ -154,13 +154,19 @@ fn a_delivered_orders_store_is_rated_once_and_shown() {
         "{order}"
     );
     let store = page(&s, "b", "/stores/47");
-    assert!(store.contains("1 rating"), "{store}");
+    assert!(
+        store.contains("Open 24 hours 1 rating Small-batch"),
+        "{store}"
+    );
     assert!(
         store.contains("What customers said 4 out of 5") && store.contains("Great espresso."),
         "the review: {store}"
     );
     let home = page(&s, "b", "/");
-    assert!(home.contains("1 rating"), "{home}");
+    assert!(
+        home.contains("Open 24 hours 1 rating Small-batch"),
+        "{home}"
+    );
     assert!(home.contains("No ratings yet"), "store 48: {home}");
     let found = page(&s, "b", "/search?q=coffee");
     assert!(found.contains("1 rating"), "{found}");
@@ -329,7 +335,7 @@ fn a_stores_mean_is_said_from_ten_ratings() {
 fn reviews_show_without_their_reviewer() {
     let s = served();
     for (n, comment) in [
-        "", "First.", "Second.", "Third.", "Fourth.", "Fifth.", "Sixth.",
+        "First.", "Second.", "", "Third.", "Fourth.", "Fifth.", "Sixth.",
     ]
     .iter()
     .enumerate()
@@ -524,5 +530,33 @@ fn the_checker_keeps_the_reader_out_of_a_stores_shared_ratings() {
     assert!(
         why.contains("`StoreRatings` is User<UserId> and declares a shared cache"),
         "{why}"
+    );
+}
+
+/// **A rating is told to the rater's own open pages**: the order page they
+/// rated from says what was given, and the rate page what was given and
+/// thanks, each told after the commit, by the event its query listens for.
+#[test]
+fn a_rating_is_told_to_the_raters_open_pages() {
+    let s = served();
+    delivered(&s, "a", &["espresso"]);
+    s.serve_document_settled("a", "store.page.OrderPage", &Params::new(), &[])
+        .expect("the order page");
+    let order = latest(&s.pending.lock().expect("pending"), "a");
+    s.serve_document_settled("a", "store.rate.RatePage", &store_params("47"), &[])
+        .expect("the rate page");
+    let rating = latest(&s.pending.lock().expect("pending"), "a");
+    let (o, r) = (sets_of(&s, &order).len(), sets_of(&s, &rating).len());
+    rated(&s, "a", "47", 4, "Fine.");
+    s.tell_waiting();
+    let told = format!("{:?}", &sets_of(&s, &order)[o..]);
+    assert!(
+        told.contains("You rated Blue Bottle 4 out of 5."),
+        "the order page: {told}"
+    );
+    let told = format!("{:?}", &sets_of(&s, &rating)[r..]);
+    assert!(
+        told.contains("You rated Blue Bottle 4 out of 5. Thanks!"),
+        "the rate page: {told}"
     );
 }
