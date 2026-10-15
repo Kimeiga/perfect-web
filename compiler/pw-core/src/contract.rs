@@ -406,6 +406,23 @@ pub(crate) fn bounded_in(
     out
 }
 
+/// **Every invariant a declaration's parameters hold** (ADR-0179), each
+/// parameter's [`bounded_in`] at its position: what a host holds a value
+/// from outside to wherever one is given to the declaration, an export's
+/// arguments and a page's parameters alike (ADR-XXXX, argument invariants).
+pub(crate) fn bounded_params(sigs: &Signatures, def: crate::resolve::DefId) -> Vec<Bounded> {
+    sigs.by_def(def)
+        .map(|s| {
+            s.params
+                .iter()
+                .enumerate()
+                .filter_map(|(i, p)| Some(bounded_in(sigs, p.as_ref()?.resolved()?, i)))
+                .flatten()
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 fn bounds_within(
     sigs: &Signatures,
     key: &crate::resolved::TypeKey,
@@ -1701,17 +1718,7 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
             component.invoked_by = decl
                 .policy("invoked_by")
                 .map(|p| p.value.trim().to_string());
-            component.bounded = sigs
-                .by_def(crate::resolve::DefId { unit, decl: id.0 })
-                .map(|s| {
-                    s.params
-                        .iter()
-                        .enumerate()
-                        .filter_map(|(i, p)| Some(bounded_in(sigs, p.as_ref()?.resolved()?, i)))
-                        .flatten()
-                        .collect()
-                })
-                .unwrap_or_default();
+            component.bounded = bounded_params(sigs, crate::resolve::DefId { unit, decl: id.0 });
             let exports = vec![Export {
                 name: decl.name.clone(),
                 kind: kind.to_string(),

@@ -173,8 +173,10 @@ MUTANTS = [
         "an export states no argument's invariant",
         "core",
         CONTRACT,
-        "            component.bounded = sigs\n",
-        "            let _: Vec<Bounded> = sigs\n",
+        # Re-anchored by the argument-invariants track: a declaration's
+        # parameters' invariants are `bounded_params`, a page's too.
+        "            component.bounded = bounded_params(sigs, crate::resolve::DefId { unit, decl: id.0 });\n",
+        "            let _: Vec<Bounded> = bounded_params(sigs, crate::resolve::DefId { unit, decl: id.0 });\n",
     ),
     (
         "an import states no answer's invariant",

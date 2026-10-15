@@ -693,6 +693,15 @@ pub struct PageValues {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub route: Option<String>,
     pub params: Vec<String>,
+    /// **What each parameter must hold** (ADR-0179; ADR-XXXX, argument
+    /// invariants): an address is a browser's, so a host holds each
+    /// parameter, as the address gives it (a path's text, a query's `Option`
+    /// of it), to the invariants its type states before anything reads it,
+    /// as it holds an export's arguments. `argument` is the parameter's
+    /// position in `params`. Not written where no parameter's type states
+    /// one.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub bounded: Vec<crate::contract::Bounded>,
     pub bindings: Vec<Binding>,
     /// Each text part outside a block.
     pub parts: Vec<Part>,
@@ -2322,6 +2331,7 @@ fn plan(
             page,
             route: crate::routes::declared_route(hir, decl),
             params,
+            bounded: crate::contract::bounded_params(sigs, DefId { unit, decl: id.0 }),
             bindings,
             parts,
             collections,
