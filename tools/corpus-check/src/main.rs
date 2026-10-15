@@ -185,10 +185,12 @@ const REJECTED_CATEGORIES: &[&str] = &[
     "a page that presses a command the platform invokes",
     "a command the platform invokes with no key",
     // 4c (track `bounded-checker`), corpus C25: PW0405, a read keyed by its
-    // loop's element, in each loop form.
+    // loop's element, in each loop form; and PW0407, a `set` that does not fit
+    // its keyed read.
     "a read per element in a combinator's callback",
     "a read per element in a for loop",
     "a read per element in a recursion over data",
+    "a set read that answers no result with its key",
 ];
 
 /// Milestone 0 gate (charter §14 M0): ">= 10 accepted and 20 rejected".

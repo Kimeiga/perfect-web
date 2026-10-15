@@ -443,6 +443,23 @@ fn what_is_no_read_per_element_is_accepted() {
 }
 
 #[test]
+fn a_call_that_reads_and_writes_per_element_is_refused_as_a_read() {
+    // Ruled by the integrator, 2026-10-15 (question 4): a call whose row
+    // reads and writes is a read, and refused per element, where one that
+    // only writes is not (`what_is_no_read_per_element_is_accepted`).
+    let src = with(
+        "fn settle(item: Int) -> Int !{ database.read<Price>, database.write<Price> }\n    host \
+         \"m:data/prices#settle\"\n\nfn per(lines: List<Line>) -> List<Int> !{ \
+         database.read<Price>, database.write<Price> } {\n    List.map(lines, l => \
+         settle(l.item))\n}\n",
+    );
+    assert_eq!(
+        bounded(&src),
+        ["PW0405 `settle` reads `Price` once for each element of `lines`"]
+    );
+}
+
+#[test]
 fn a_key_a_read_computes_ends_the_trace_and_its_read_is_refused_once() {
     // The design note's limit: a key is traced through a name, a `let`, a
     // field and a pure call, not through another read. The inner read is the
@@ -573,7 +590,7 @@ fn a_set_read_on_a_source_that_batches_is_not_warned() {
         assert_eq!(reported(&src), Vec::<String>::new(), "{sets}");
     }
     // A resource no source holds is the host's own database's, which gives
-    // every guarantee (ADR-0207).
+    // every guarantee (ADR-0207; ruled by the integrator, 2026-10-15).
     let hosts = PROGRAM.replace(
         "source Ledger\n    holds        Price\n    transactions serializable\n    reads        \
          strong\n    changes      none\n    sets         one_call\n\n",
@@ -581,6 +598,15 @@ fn a_set_read_on_a_source_that_batches_is_not_warned() {
     );
     assert_ne!(hosts, PROGRAM);
     assert_eq!(reported(&hosts), Vec::<String>::new());
+    // Beside a source that cannot batch, one of another resource: what no
+    // source holds is still the host's own, not that source's.
+    let beside = hosts.replace(
+        "fn price_of(",
+        "type Other = Other { id: Int }\n\nsource Mirror\n    holds        Other\n    transactions \
+         serializable\n    reads        strong\n    changes      none\n\nfn price_of(",
+    );
+    assert_ne!(beside, hosts);
+    assert_eq!(reported(&beside), Vec::<String>::new());
     // And a read no `set` names is no set read, whatever its source.
     let unpaired = PROGRAM
         .replace("    set  prices_of\n", "")
@@ -652,6 +678,64 @@ fn a_set_names_a_function_of_the_same_source_given_and_answering_lists() {
         ),
         Vec::<String>::new()
     );
+}
+
+#[test]
+fn a_set_that_does_not_fit_is_the_pairs_own_rule_and_a_bad_sets_value_is_a_policys() {
+    // The integrator's ruling of 2026-10-15: a `set` that does not fit its
+    // keyed read is refused by a rule of its own, PW0407, and not as a policy's
+    // value (PW0335): one defect, one diagnostic, and it names its rule.
+    let src = PROGRAM
+        .replace("    set  prices_of\n", "    set  cents_of\n")
+        .replace(
+            "fn record(",
+            "fn cents_of(items: List<Int>) -> List<Int> !{ database.read<Price> }\n    host \
+             \"m:data/prices#cents\"\n\nfn record(",
+        );
+    let found = diagnostics(&src);
+    assert_eq!(found.len(), 1, "{:?}", reported(&src));
+    let d = &found[0];
+    assert_eq!(d.code, "PW0407");
+    assert_eq!(d.symbol(), "set_pair_shape");
+    assert_eq!(d.invariant, pw_core::codes::SET_PAIR_SHAPE.invariant);
+    assert_eq!(d.reason, "set_pair_shape");
+    assert_eq!(d.severity, Severity::Error);
+    // At the clause the author wrote, with the set form it names beside it.
+    assert_eq!(&src[d.primary_span.clone()], "set  cents_of");
+    let notes: Vec<(&str, &str)> = d
+        .related
+        .iter()
+        .map(|r| (&src[r.span.clone()], r.label.as_str()))
+        .collect();
+    assert_eq!(notes.len(), 1, "{notes:?}");
+    assert!(
+        notes[0].0.starts_with("fn cents_of(items: List<Int>)"),
+        "{notes:?}"
+    );
+    assert_eq!(notes[0].1, "`cents_of` is declared here");
+    assert!(
+        d.repairs[0]
+            .description
+            .starts_with("name a function of the same source"),
+        "{:?}",
+        d.repairs
+    );
+    // And a fit one reports nothing, so the code is the shape's and nothing
+    // else's; while a `sets` value outside its domain stays a policy's value.
+    assert!(
+        !reported(PROGRAM)
+            .iter()
+            .any(|d| d.starts_with("PW0407") || d.starts_with("PW0335")),
+        "{:?}",
+        reported(PROGRAM)
+    );
+    let bad = PROGRAM.replace("    sets         one_call\n", "    sets         batched\n");
+    let shape_or_value: Vec<&str> = diagnostics(&bad)
+        .iter()
+        .map(|d| d.code)
+        .filter(|c| *c == "PW0335" || *c == "PW0407")
+        .collect();
+    assert_eq!(shape_or_value, ["PW0335"], "{:?}", reported(&bad));
 }
 
 #[test]
@@ -791,9 +875,7 @@ fn bounded_in(program: &[(String, String)]) -> Vec<String> {
             ds.into_iter()
                 .map(move |d| format!("{path}: {} {}", d.code, d.message))
         })
-        .filter(|d| {
-            d.contains(": PW0405 ") || d.contains(": PW0406 ") || d.contains(": PW0407 ")
-        })
+        .filter(|d| d.contains(": PW0405 ") || d.contains(": PW0406 ") || d.contains(": PW0407 "))
         .collect()
 }
 

@@ -73,6 +73,7 @@ ownership, control flow, higher-order functions, or cross-module contracts.
 | `no_feasible_placement` | multi-capability, neighbour | 2 | — |
 | `dead_internal_link` | arity variation, neighbour | 2 | — |
 | `read_per_element` | generic callback with a match arm's key, helper extraction (a function named as the callback), cross-module (another module's read, pair and source), neighbour (a key no element's; a callback applied once) | 3 | — |
+| `set_pair_shape` | a reader passed along (a parameter the set form drops), cross-module (another module's set form, of another source), neighbour (the shapes a set form may take: a reader passed along, an answer that holds its key, another module's set form of the same source) | 3 | — |
 
 **Tier 2 complete.** Filling it found three defects, all of the "reads a name
 rather than follows a value" family plus one parser bug: `privacy_flow` had

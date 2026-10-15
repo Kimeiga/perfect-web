@@ -1,0 +1,18 @@
+// @status: GENERAL
+// @invariant: set_pair_shape
+// @dimension: cross-module movement — the set form is another module's, and reads another module's source
+//
+// A-037's `prices_of`, imported and named by a keyed read of another resource:
+// a set form is of its keyed read's source, and the keyed read here is the
+// host database's, where `prices_of` is `PriceBook`'s.
+
+module generality.prices_of_another_source
+
+import List
+import store.list_prices.{ prices_of }
+
+type Voucher = Voucher { item: Int, cents: Int }
+
+fn voucher_of(item: Int) -> Result<Voucher, String> !{ database.read<Voucher> }
+    host "generality:data/vouchers#for-item"
+    set  prices_of

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Mutation controls for 4c, a read is bounded by construction (track
-`bounded-checker`): PW0405, PW0406, the `set` pair and the `sets` clause.
+`bounded-checker`): PW0405, PW0406, PW0407, the `set` pair and the `sets`
+clause.
 
 Each mutant undoes one piece:
 - the syntax: `set` and `sets` clause heads, and only where a name follows;
@@ -17,7 +18,8 @@ Each mutant undoes one piece:
 - PW0406: a source that states no `sets` is `per_key`, and only `per_key`
   warns;
 - the pair's shape: its parameter, its answer, its source, a keyed read
-  that reads;
+  that reads, and the rule that refuses one that does not fit (PW0407, its
+  own, and no policy's value);
 - the reads per element kiokun-site is known to make, and only those;
 - what a build writes of a source's `sets`, and reads of an older one's;
 - the rule's place in `check_units`.
@@ -175,6 +177,19 @@ MUTANTS = [
         "                if decl.kind != DeclKind::Fn || decl.body.is_some() || decl.policy(\"host\").is_some()\n",
     ),
     (
+        "a host call that also writes is no read",
+        BOUNDED,
+        "                    .find_map(|e| database_domain(&e.written, \"read\"))\n",
+        "                    .find_map(|e| database_domain(&e.written, \"read\"))\n"
+        "                    .filter(|_| {\n"
+        "                        !decl\n"
+        "                            .declared_effects\n"
+        "                            .iter()\n"
+        "                            .flatten()\n"
+        "                            .any(|e| database_domain(&e.written, \"write\").is_some())\n"
+        "                    })\n",
+    ),
+    (
         "a helper's parameter keys nothing",
         BOUNDED,
         "                                out.entry(cx.def).or_default().insert(i, reached.clone());\n",
@@ -197,6 +212,13 @@ MUTANTS = [
         BOUNDED,
         "                if Sets::of(source.sets.as_deref()) != Sets::PerKey {\n",
         "                if Sets::of(source.sets.as_deref()) == Sets::PerKey {\n",
+    ),
+    (
+        "a resource no source holds is the first source's",
+        BOUNDED,
+        "                    .find(|s| s.holds.iter().any(|(h, _)| h == resource))\n",
+        "                    .find(|s| s.holds.iter().any(|(h, _)| h == resource))\n"
+        "                    .or_else(|| self.sources.first())\n",
     ),
     (
         "a chunked set read costs one call per chunk, rounded down",
@@ -227,6 +249,18 @@ MUTANTS = [
         BOUNDED,
         "        if reads.is_empty() {\n",
         "        if reads.is_empty() && reads.len() > 1 {\n",
+    ),
+    (
+        "a set that does not fit is refused as a policy's value",
+        BOUNDED,
+        "                            code: codes::SET_PAIR_SHAPE.id,\n",
+        "                            code: codes::POLICY_VALUE.id,\n",
+    ),
+    (
+        "a set that does not fit states a policy value's invariant",
+        BOUNDED,
+        "                            invariant: codes::SET_PAIR_SHAPE.invariant,\n",
+        "                            invariant: codes::POLICY_VALUE.invariant,\n",
     ),
     (
         "a known read per element is refused",

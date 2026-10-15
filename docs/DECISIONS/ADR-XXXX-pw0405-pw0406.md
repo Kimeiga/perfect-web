@@ -1,4 +1,4 @@
-# ADR-XXXX: a read is bounded by construction, the checker's half (PW0405, PW0406)
+# ADR-XXXX: a read is bounded by construction, the checker's half (PW0405, PW0406, PW0407)
 
 Status: proposed by the worker of track `bounded-checker`, for the
 integrator's merge. It builds step 2 of the design note "a read is bounded
@@ -7,6 +7,10 @@ on `origin/track/bounded-reads`), which the integrator accepted on
 2026-10-14, ruling the order of work: (1) the host's render merge (its own
 track), (2) this, the checker's rules, (3) the per-layer conformance suite,
 (4) the store's composites above the seam. Date: 2026-10-14. Milestone: E14.
+The integrator ruled the four questions the first build raised on
+2026-10-15; each ruling is marked "ruled by the integrator, 2026-10-15"
+where it applies, and the four are together under "The integrator's
+rulings".
 Builds on ADR-0207 (a data source states what it guarantees), ADR-0101 (a
 declaration's inferred row), ADR-0022 (record, never recompute), ADR-0063
 (which binding a name means), ADR-0078 (an effect is performed where its
@@ -73,10 +77,11 @@ over data and its key comes from the loop's element.
   loop is one line, the loop with the read's place taken; where it names
   none, "`hours_of` has no set read; its source can declare one".
 
-### `set`, a keyed read's set form (held by PW0335)
+### `set`, a keyed read's set form (held by PW0407)
 
 `set hours_of_stores` on `fn hours_of(store: StoreId)` (a clause on a
-function, `Domain::SetRead`). Held to the note's shape:
+function, `Domain::SetRead`). Held to the note's shape, by a rule of its own
+(PW0407, below):
 - it names a function visible from the keyed read's module, not itself;
 - the keyed read reads a source, and the set read reads the same one (the
   sources holding what each reads; a resource no source holds is the host's
@@ -87,8 +92,17 @@ function, `Domain::SetRead`). Held to the note's shape:
   `Result`'s or an `Option`'s first argument) with its key: a record with a
   field of the key's type and one of the answer's, or the answer itself
   where it holds a field of the key's type.
-A `set` that does not fit pairs nothing, and is refused with PW0335
-(`policy_value`, reason `set_pair_shape`): see the questions.
+A `set` that does not fit pairs nothing, and is refused with **PW0407**
+(`set_pair_shape`): **ruled by the integrator, 2026-10-15** (question 2),
+that the pair's shape has a code of its own and each refusal names its rule,
+where the first build refused it as PW0335's `policy_value` (reason
+`set_pair_shape`). The message says which shape fails, in the clause's own
+words (`set cents_of`: `cents_of` answers `List<Int>`, and a set read of
+`price_of` answers a list of `Price` with its `Int`), with a note at the set
+read it names where it names a function, and PW0335 stays what it was, a
+`sets` value outside its domain (`chunked(0)`, `batched`). PW0407 is the next code
+free beside PW0405 and PW0406: no code of PW0404 to PW0499 but PW0404's is
+registered on `master` or on any `origin/track/*` branch (2026-10-15).
 
 ### `sets`, what one set read costs a source
 
@@ -108,7 +122,8 @@ it: "`StoresOpen` reads `Stores` once per store on `StoreData`, which cannot
 batch", noting "`StoreData` states no `sets`, so `per_key`: a set read is a
 call per key", help "hold `Stores` in a source that batches, or bound the
 list". A resource no source holds is the host's own database's, which gives
-every guarantee (ADR-0207): one call, no warning (see the questions).
+every guarantee (ADR-0207): one call, no warning (**ruled by the
+integrator, 2026-10-15**, question 3: confirmed).
 
 ### What the effect walk records, and the grammar
 
@@ -123,8 +138,10 @@ every guarantee (ADR-0207): one call, no warning (see the questions).
   head a clause only where a name follows on their line (`NAMED_HEADS`):
   `set.size()` in a block whose clauses come first is a statement.
 - The codes, in the Effects block beside PW0400 to PW0402: PW0405
-  `read_per_element` and PW0406 `set_read_per_key`, `Owner::Effects` (the
-  block has no track owner; the integrator assigned both).
+  `read_per_element`, PW0406 `set_read_per_key` and PW0407
+  `set_pair_shape`, each `Owner::Effects` (the block has no track owner; the
+  integrator assigned the first two on 2026-10-14 and ruled the third on
+  2026-10-15).
 
 ## Found (corrections first)
 
@@ -136,14 +153,15 @@ every guarantee (ADR-0207): one call, no warning (see the questions).
    `kiokun.site.Word` asks `search_reading` once for each reading twice
    (app.pw:3133, :3175) and `read_pitch` once for each word (:3168), and
    `kiokun.site.Search` asks `search_reading` once for each reading
-   (:3945). Interim, conservative and cheap to reverse (see the questions):
-   PW0405 is an error everywhere, and these four, listed with their reasons
-   in `bounded::KNOWN_READS_PER_ELEMENT`, are reported as warnings that say
-   why they wait. A test holds the list to exactly these (a stale entry
-   fails, and the same read in a declaration the list does not name is an
-   error). The list empties when kiokun's layer
+   (:3945). The interim, conservative and cheap to reverse, **ruled to stand
+   by the integrator, 2026-10-15** (question 1): PW0405 is an error
+   everywhere, and these four, listed with their reasons in
+   `bounded::KNOWN_READS_PER_ELEMENT`, are reported as warnings that say why
+   they wait. A test holds the list to exactly these (a stale entry fails,
+   and the same read in a declaration the list does not name is an error).
+   The list empties when kiokun's layer
    (`spikes/own-renderer/server/src/kiokun.rs`) has the set forms and the
-   program reads before its loops.
+   program reads before its loops: see Next, which is not built here.
 2. **Three generality witnesses of `undeclared_effect` read per element**
    (`List.map(ids, id => Stores.get(id))`), incidentally: their subject is
    the row. They read `Stores.get(home)` now, a parameter, keeping their
@@ -175,11 +193,16 @@ every guarantee (ADR-0207): one call, no warning (see the questions).
   with them, and two PW0406 with the pair alone. When they land, the test
   `the_stores_pair_and_its_sources_cost_are_the_integrators_to_add_together`
   should read the store as it is.
-- **The generality figure**: 49 / 49 becomes 50 / 50 (`read_per_element`);
-  `tests/generality.rs` says so, and `docs/STATUS.md` and `docs/NEXT.md`
-  carry the number.
-- **Corpus C25**: R-075, R-076, R-077 and A-037 (the numbers were free at
-  5da9c055).
+- **The generality figure**: master's 54 / 54 (train-7) becomes 56 / 56
+  (`read_per_element` and `set_pair_shape`); `tests/generality.rs` says so,
+  and `docs/STATUS.md` and `docs/NEXT.md` carry the number.
+- **Corpus C25**, for `docs/CORPUS.md` (the corpus version's number is the
+  integrator's to give as trains merge, so this track writes no entry):
+  R-075, R-076, R-077 (PW0405, one per loop form), R-078 (PW0407) and A-037,
+  with the generality witnesses `read_per_element` and `set_pair_shape`.
+  Master's NEXT 6c holds R-070 to R-074 as C24; this track's first build
+  named R-070, R-071 and R-072, which collided, and renumbered at the merge
+  of train-7 (R-075 to R-079 are this track's, R-079 free).
 - **KNOWN_LIMITATIONS**: kiokun-site's four reads per element (Found 1);
   and the Not claimed below.
 - The root `justfile` imports `just/bounded-checker.just` (one line, as each
