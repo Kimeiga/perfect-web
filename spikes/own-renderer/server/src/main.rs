@@ -3177,10 +3177,6 @@ impl Server {
         }
     }
 
-    /// **Each live document read again at the instant what it shows holds
-    /// until** (ADR-0304), for as long as the host runs: woken when an
-    /// instant is set or the clock is moved, and each second at least, as the
-    /// clock moves with time.
     /// **Every other host's commits, heard and told** (ADR-XXXX, track
     /// `second-host`), for as long as the host runs: woken by a commit's
     /// notification, and each [`hosts::WAIT_MS`] without one. A layer in
@@ -3245,6 +3241,10 @@ impl Server {
         heard.more
     }
 
+    /// **Each live document read again at the instant what it shows holds
+    /// until** (ADR-0304), for as long as the host runs: woken when an
+    /// instant is set or the clock is moved, and each second at least, as the
+    /// clock moves with time.
     fn tell_when_time_passes(&self) {
         loop {
             let (told, wait) = self.tell_due();
