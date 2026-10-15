@@ -385,7 +385,8 @@ On train-9, 2026-10-15, to the track's questions, and what the merge did:
   the payments hosts' providers' ports (Findings).
 - **The three mutation scripts the seams re-anchored** (`descriptions`,
   `store_hours`, `store_search`) are run whole by the train's verification
-  run, which plans each of them; that run is their record.
+  run, which plans each of them; that run is their record. The track's own
+  verify (38781487357) ran their recipes green already, with its 55 others.
 - **Reviews are public and unmoderated, with no merchant side**:
   KNOWN_LIMITATIONS says so, with the rest of Not claimed.
 - **The track's own verify (38781487357) failed its three browser jobs**,

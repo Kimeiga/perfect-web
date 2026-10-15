@@ -1830,12 +1830,22 @@ Each a decision for a track, with its date; a track's ADR records it too.
     executable again (train-8's finding); `statements_separated.rs`'s stale
     `ADR-XXXX`, ADR-0303; and `bounded_reads`' store test brought to the
     loop reviews changed (`ed5d0bb2`, below).
-  - **The tracks' own runs.** `bounded-checker`'s verify (38780144526)
-    green in every job finished when it was merged, its longest shard still
-    running; `proof`'s (38734336242) green; each one's `ci` red only in
-    "licenses and advisories", Wasmtime 48.0.5's, fixed on `master` by
-    ADR-0335. `reviews`' verify (38781487357) failed its three browser
-    jobs (the finding below), fixed on the train.
+  - **The tracks' own runs.** `bounded-checker`'s verify (38780144526) and
+    `proof`'s (38734336242) green, each one's `ci` red only in "licenses and
+    advisories", Wasmtime 48.0.5's, fixed on `master` by ADR-0335.
+    `reviews`' verify (38781487357) ran its 58 recipes green, the three
+    scripts its seams re-anchored among them, and failed its three browser
+    jobs (the finding below), fixed on the train. `guide`'s verify and `ci`
+    green at `49967631`, with train-8 merged (38815010191, 38815009873).
+  - **Its local `just ci`, twice.** The first (21:22 to 21:53Z, at a load
+    of 30 to 56) failed two targets: `bounded_reads` (the finding below) and
+    `check_latency`, a wall-clock ceiling under that load. The second, on
+    `a2dc1354` with the fix and the guide merged, passed whole (exit 0,
+    22:58 to 23:21Z, at a load of 12 to 54): 338 test binaries, 2,947 tests
+    and none failing, `check_latency` among them (2 of 2, 18.8 s), and
+    `mutant-programs` (248 mutants, 11 refused by their named rule, none
+    failing). The gates before it: anchors 3,042 mutants in 266 scripts,
+    case-check 2,696 paths, evidence-gates 168 tests.
   - **Rulings and answers (the integrator's, 2026-10-15)**, in each ADR:
     - ADR-0340: kiokun's two-value key is a list of key records, so that no
       layer derives a key in app-specific Rust, built with the kiokun track

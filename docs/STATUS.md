@@ -40,8 +40,10 @@ track `guide`, merged from `49967631`, with the integrator's rulings of
   refuses, an `<img>` with no `alt`, and `&&`'s message.
 - On the train: the reference regenerated for ADR-0340's three codes
   (199), the guide's test 15 of 15 and its generator's 7 of 7. The track's
-  own runs: `guide_mutations.py` 74 of 74 and its recipe green locally, its
-  verify green at `00471782` (`e14-guide` among its jobs).
+  own runs: `guide_mutations.py` 74 of 74 and its recipe green locally;
+  its verify green at `00471782` (`e14-guide` among its jobs) and again
+  at `49967631`, with train-8 merged (38815010191), and its `ci` there
+  (38815009873).
 Verify TRAIN_RUN green, with train-9.
 
 **ADR-0342, 2026-10-15: the claim, measured: the bug museum and the
@@ -91,10 +93,12 @@ from `2190221c`, with the integrator's rulings of 2026-10-15).
 - The track's own runs: `tests/reviews.rs`, 14 tests in memory and 14 on
   PostgreSQL; `reviews.spec.mjs` 6 passed in the three engines;
   `reviews_mutations.py` 30 of 30; `just ci` green. Its verify
-  (38781487357) failed two of the store page's pinned shapes in every
-  engine, an accessibility tree and a count of identity anchors, which
-  still described the page without its ratings: brought to the page on the
-  train, in a commit of their own. Its browser hosts are PORT + 200 to 202.
+  (38781487357) ran its 58 recipes green, the three scripts its seams
+  re-anchored among them, and failed two of the store page's pinned shapes
+  in every engine, an accessibility tree and a count of identity anchors,
+  which still described the page without its ratings: brought to the page
+  on the train, in a commit of their own. Its browser hosts are PORT + 200
+  to 202.
 Verify TRAIN_RUN green, with train-9.
 
 **ADR-0340, 2026-10-15: a read keyed by its loop's element is refused**
@@ -121,7 +125,7 @@ and answers of 2026-10-15; corpus C25).
   it).
 - The track's own runs: `bounded_checker_mutations.py` whole, 40 of 40, and
   `just ci` green twice, the second at its head; its `verify`
-  (38780144526) green in every job that had finished when it was merged.
+  (38780144526) green.
   On the train, its store test edits the home page's loop as ADR-0341
   left it (the train's first `just ci` found the two merges meeting
   there), and the script ran whole again, 40 of 40.
