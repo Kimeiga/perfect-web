@@ -52,7 +52,15 @@ test-compile`, applied to the guide:
 - A clean example reports no diagnostic at all, warnings included: the guide
   teaches nothing the compiler warns about.
 - Every file is canonically formatted (`pw fmt --check`, ADR-0013,
-  ADR-0276), as the corpus is: the guide teaches the canonical layout.
+  ADR-0276), as the corpus is: the guide teaches the canonical layout. A
+  refused example that does not parse is the one exception: `pw fmt`
+  formats a tree, and such a text has none.
+- **A clean example also builds** (`pw build --out`): `pw check` passes
+  programs the backend refuses. Found writing this guide, 2026-10-15: a
+  `<title>` that reads a signal (refused under ADR-0137) and a template
+  value computed from two signals (ruling 0073-a) each check clean and are
+  refused by `pw build`. A guide that taught either would teach a program
+  that does not run. A build costs about a second an example.
 
 ### 2. The tutorial is the app the server runs
 

@@ -348,6 +348,21 @@ fn verdict(example: &Example, scratch: &Path) -> Option<String> {
             if code != Some(0) || !out.contains("no diagnostics") {
                 return Some(format!("expected no diagnostics:\n{said}"));
             }
+            // And it builds: what `pw check` passes the backend can still
+            // refuse (a template value computed from two values, a title
+            // that reads a signal), and the guide teaches nothing that
+            // does not build.
+            let out_dir = scratch.join("build-out");
+            let mut build: Vec<&std::ffi::OsStr> =
+                vec!["build".as_ref(), "--out".as_ref(), out_dir.as_os_str()];
+            build.extend(packages.iter().map(|p| p.as_os_str()));
+            build.extend(names.iter().copied());
+            let (built, build_out, build_err) = pw(&build, scratch);
+            if built != Some(0) {
+                return Some(format!(
+                    "checks clean, and `pw build` refuses it:\n{build_out}{build_err}"
+                ));
+            }
         }
         Expect::Fails(codes, shown) => {
             if code != Some(1) {
