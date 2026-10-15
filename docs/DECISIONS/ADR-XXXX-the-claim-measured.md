@@ -27,10 +27,11 @@ Neither had started. What exists to build on:
   sources (`SOURCES.md`). Several are standards or documentation, not
   incidents; the census says so itself.
 - ADR-0120's baselines: the store in Next.js 16.3.8 / React 19.3.0 and
-  SvelteKit 2.70.3 / Svelte 5.57.1, pinned, in the pnpm workspace, and
-  `benchmarks/harness/bench.mjs`, whose `sandbox()` copies a baseline,
-  installs its pinned lockfile **offline** from the local store, and applies a
-  patch. The museum reuses that path, so it downloads nothing.
+  SvelteKit 2.70.3 / Svelte 5.57.1, pinned, in the pnpm workspace with their
+  dependencies installed, and `benchmarks/harness/` (the contract's fixtures
+  and its grading config). `scripts/bench_contract_mutations.py` already
+  builds a patched baseline in place and restores it; the museum does the
+  same, so it downloads nothing.
 - Tasks T01-T12 already carry an `unsafe` patch per stack: plausible wrong
   code a grader must catch. Some are museum-shaped (T03 private cart lines,
   T08 duplicate submissions, T12 an unsafe cache), but a task's unsafe patch
@@ -65,9 +66,14 @@ Neither had started. What exists to build on:
 **The reproduction** lives in `benchmarks/museum/<leaf>-<slug>/`:
 
 - **minimal**: the smallest patch to ADR-0120's Next.js or SvelteKit store
-  that shows the class (`next-react.patch` or `sveltekit.patch`), applied in a
-  sandbox made by `bench.mjs`'s `sandbox()`. Built artifacts only
-  (`next start`, `node build`), as the contract runs them;
+  that shows the class (`next-react.patch` or `sveltekit.patch`), on top of a
+  task's setup where the class needs one (F01 renders T09's notice), or none
+  at all where the baseline already has the bug (G01). Applied in place to
+  the worktree's baseline, on the dependencies the workspace installed for
+  it, and taken back after; a baseline with uncommitted changes is refused.
+  Checked by the stack's own checker (`tsc`, `svelte-check`): the bug is one
+  its checker accepts. Built artifacts only (`next start`, `node build`), as
+  the contract runs them;
 - **idiomatic**: each construct the patch uses follows the framework's own
   documentation, cited in the patch's comments. The bug must be one a
   competent developer following those docs can write, never a strawman;
@@ -81,10 +87,14 @@ Neither had started. What exists to build on:
 
 **Refused in Pleris** means one of, recorded per exhibit:
 
-- **refused by a diagnostic**: `pw check` on `pleris/` (the faithful
-  program) reports the named code (`PWxxxx`) with the expected message, as
-  the `R-*` corpus asserts them. *Faithful*: the same intent written as
-  directly as Pleris allows, not a program contrived to trip the checker;
+- **refused by a diagnostic**: `pw check` on the faithful program reports
+  the named code (`PWxxxx`). The faithful program is `pleris.patch`, the same
+  change made to the benchmark's Pleris store (`benchmarks/baselines/pleris`,
+  ADR-0156), checked with the platform packages as `bench.mjs` checks it.
+  *Faithful*: the same intent written as directly as Pleris allows, not a
+  program contrived to trip the checker; where Pleris cannot write the
+  framework's construct at all (a module-level mutable variable, J08), the
+  exhibit says which construct stands in for it and why;
 - **refused at runtime**: a test runs the same scenario against the Pleris
   development server and passes (the bug does not happen), naming the
   mechanism (an ADR) that prevents it;
@@ -95,12 +105,14 @@ Neither had started. What exists to build on:
 **Every exhibit carries controls**, so that neither half is vacuous (the
 census's U04, "a false-green rejection uses the wrong reason"):
 
-- **the reproduction's control**: `fixed.patch`, the idiomatic repair per
-  the framework's docs. With it, `bug.spec.mjs` must **fail**: the test
-  detects the bug, not something else;
-- **the Pleris control**: `pleris-neighbor/`, the accepted neighbour (the
-  same program with the repair Pleris asks for), which must check clean: the
-  diagnostic is for this bug, not an unrelated error;
+- **the reproduction's control**: `fixed.<stack>.patch`, the idiomatic
+  repair per the framework's docs, applied on the bug. With it,
+  `bug.spec.mjs` must **fail**: the test detects the bug, not something
+  else;
+- **the Pleris control**: the accepted neighbour, which must check clean:
+  the program without the change, or with the repair the code asks for
+  (`pleris-fixed.patch`, when an exhibit has one). The diagnostic is for
+  this bug, not an unrelated error;
 - **mutation controls**: `scripts/proof_mutations.py` (the pattern of the
   existing mutation scripts and `scripts/mutation_anchors.py`) disables each
   refusing rule or mechanism in turn; the museum's run must then report that
@@ -142,13 +154,20 @@ PostgreSQL's isolation docs), expected a miss.
 ### 3. The recipe
 
 `just e14-museum` (in `just/proof.just`) writes `docs/evidence/E14/museum.txt`:
-for each exhibit, the reproduction built and served from its sandbox, its
-`bug.spec.mjs` run on it (must pass) and on `fixed.patch` (must fail); `pw
-check` on `pleris/` (must report the code) and on `pleris-neighbor/` (must
-pass), or the runtime test; then one table, misses first, with each source's
-kind and date. The runner is `benchmarks/museum/museum.mjs`, beside
-`bench.mjs` and reusing its `sandbox()`. Playwright on the brief's port range
-(`PORT` 8941-9140).
+the versions; for each exhibit, the reproduction checked, built and served
+in place, its `bug.spec.mjs` run on it (must pass) and on its repair (must
+fail); `pw check` on the faithful program (must report the code) and on its
+neighbour (must check clean), and the runtime test where there is one; one
+table, misses first, then whatever is not as its exhibit expects, then the
+refusals, each with its source's kind and date; and the mutation controls.
+The runner is `benchmarks/museum/museum.mjs`; it reuses the contract's
+fixtures and grading config (`benchmarks/harness/`). An exhibit is a
+directory, `benchmarks/museum/<leaf>-<slug>/`: `exhibit.json` (its leaf,
+source, claim, patches and what it expects), its patches, and
+`bug.spec.mjs`. Playwright on the brief's port range (`PORT`, 8941-9140).
+The run fails when any exhibit comes out otherwise than it expects, so a
+refusal that stops being made, or a miss that starts being refused, fails
+the recipe until the exhibit is updated.
 
 ### 4. The head-to-head's protocol
 
