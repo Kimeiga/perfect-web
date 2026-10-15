@@ -325,30 +325,61 @@ fn a_trim_between_a_hosts_two_reads_is_learned() {
     );
 }
 
-/// **A notification wakes a waiting host at the commit**, long before the
-/// wait's end: what a page on B waits for a commit through A is the
+/// **`commit`, run on A while `holder` holds the outbox's lock, waits for
+/// it, and wakes `b`, waiting, at once**: A's rows take their ids only
+/// after the holder's commit, so ids are in commit order; and what B waits
+/// for is the database's notification at A's commit, not its wait's end.
+fn waits_for_the_lock_and_wakes(
+    mut holder: postgres::Client,
+    b: &Server,
+    commit: impl FnOnce() + Send,
+) {
+    let lock = tail(b).outbox().lock.clone();
+    holder.batch_execute("BEGIN").expect("begun");
+    holder
+        .execute("SELECT pg_advisory_xact_lock(hashtext($1))", &[&lock])
+        .expect("the outbox's lock held");
+    tail(b).backend_pid().expect("B listens");
+    std::thread::scope(|scope| {
+        let waiting = scope.spawn(|| {
+            let started = std::time::Instant::now();
+            tail(b).wait(20_000);
+            started.elapsed()
+        });
+        let committing = scope.spawn(move || {
+            commit();
+            std::time::Instant::now()
+        });
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        assert!(
+            !committing.is_finished(),
+            "A's commit waits for the outbox's lock"
+        );
+        let released = std::time::Instant::now();
+        holder.batch_execute("COMMIT").expect("the lock released");
+        let committed = committing.join().expect("A committed");
+        assert!(committed >= released, "A commits after the lock is let go");
+        let waited = waiting.join().expect("B waited");
+        assert!(
+            waited < std::time::Duration::from_secs(10),
+            "B woken by A's commit, not its wait's end: {waited:?}"
+        );
+    });
+}
+
+/// **A commit through the feed waits for the outbox's lock, and wakes a
+/// waiting host at once** (ADR-XXXX): its rows take their ids in commit
+/// order, and what a page on B waits for, of a commit through A, is the
 /// database's delivery, not a poll's period.
 #[test]
-fn a_commit_wakes_a_waiting_host() {
+fn a_feed_commit_waits_for_the_outbox_lock_and_wakes_another_host() {
     let Some(url) = database() else { return };
     let db = Schema::new(&url, "woken");
     let a = feed_host(&url, &db);
     let b = feed_host(&url, &db);
-    tail(&b).backend_pid().expect("B listens");
-    let waited = std::thread::scope(|scope| {
-        let waiting = scope.spawn(|| {
-            let started = std::time::Instant::now();
-            tail(&b).wait(20_000);
-            started.elapsed()
-        });
-        std::thread::sleep(std::time::Duration::from_millis(300));
-        post(&a, "a", "Wakes B", "i-1");
-        waiting.join().expect("waited")
+    waits_for_the_lock_and_wakes(db.sql(), &b, || {
+        assert!(post(&a, "a", "Wakes B", "i-1").committed);
     });
-    assert!(
-        waited < std::time::Duration::from_secs(10),
-        "woken by the commit, not the wait's end: {waited:?}"
-    );
 }
 
 /// **Ids are taken in commit order**: a transaction that takes the
@@ -638,8 +669,8 @@ fn store_database() -> Option<String> {
 struct Stores {
     b: Server,
     a: Server,
-    _b_layer: Arc<StorePg>,
-    _a_layer: Arc<StorePg>,
+    b_layer: Arc<StorePg>,
+    a_layer: Arc<StorePg>,
     _dir: tempfile::TempDir,
 }
 
@@ -658,10 +689,27 @@ fn stores(url: &str, provider: &Arc<TestProvider>) -> Stores {
     Stores {
         a: host(&a_layer),
         b: host(&b_layer),
-        _b_layer: b_layer,
-        _a_layer: a_layer,
+        b_layer,
+        a_layer,
         _dir: dir,
     }
+}
+
+/// **A commit through the store waits for the outbox's lock, and wakes a
+/// waiting host at once**, as the feed's does (ADR-XXXX).
+#[test]
+fn a_store_commit_waits_for_the_outbox_lock_and_wakes_another_host() {
+    let Some(url) = store_database() else { return };
+    let provider = Arc::new(TestProvider::default());
+    let hosts = stores(&url, &provider);
+    let ada = super::sign_in::signed_in(&hosts.a, &provider, "came-ada", "ada");
+    assert_eq!(hosts.b_layer.schema(), hosts.a_layer.schema(), "one schema");
+    waits_for_the_lock_and_wakes(hosts.a_layer.sql(), &hosts.b, || {
+        hosts
+            .a
+            .command(ADD, &ada, &add_shown("espresso", 1), false)
+            .expect("ada adds through A");
+    });
 }
 
 const CART: &str = "store.page.CartPage";
