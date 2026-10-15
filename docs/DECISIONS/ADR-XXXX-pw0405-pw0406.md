@@ -57,9 +57,13 @@ over data and its key comes from the loop's element.
   - a recursion over data: a function on a cycle of the call graph whose
     recursive call is passed a part of one of its parameters (through a
     field, a pure call, a `let`, or a loop's element: `count(r)` for `r` in
-    `c.replies`). A parameter passed whole to its own position of the same
-    function is passed along, not walked, and a read keyed by it is not
-    refused. The recursive call is the recursion's turn, not a read.
+    `c.replies`). A parameter passed whole is passed along, not walked, and
+    a read keyed by it is not refused: to its own position of the same
+    function, or handed on through a cycle of several (`ping` and `pong`
+    giving `name` to each other while a count falls), where it is walked
+    only if the function it lands in walks that position (`pong` stepping
+    `item + 1` before it hands it back). The recursive call is the
+    recursion's turn, not a read.
 - **A key from the element**: a name the loop binds, through a `let`'s
   initializer, a match arm's scrutinee, a field, a record or list built of
   it, an operator, or a pure call on it (one the walk charged no effect, or
@@ -162,19 +166,46 @@ integrator, 2026-10-15**, question 3: confirmed).
    The list empties when kiokun's layer
    (`spikes/own-renderer/server/src/kiokun.rs`) has the set forms and the
    program reads before its loops: see Next, which is not built here.
-2. **Three generality witnesses of `undeclared_effect` read per element**
+2. **A correction to the first build: PW0405 refused a mutual recursion
+   that walks nothing** (CI's finding, 2026-10-15, after green mutation
+   runs of 35 and of 39 mutants). `just ci` failed one test target,
+   `what_a_component_does`, whose `ping` and `pong` hand `name` to each
+   other whole while a count falls, reading by `name` at the bottom: one
+   key, read again at each turn. The rule exempted a parameter passed whole
+   only to its own position of the same declaration, so `ping(name, n)`
+   calling `pong(name, n - 1)` walked `name`, and the read was refused as a
+   recursion over data. A whole parameter makes no new key: it is now an
+   edge between positions, walked only where the declaration it lands in
+   walks that position (a fixed point over the cycle), and a test and two
+   mutants hold it (40 mutants in all). The same run found a true positive
+   in the same file: `a_function_passed_by_name_is_compiled_in_and_
+   performed_where_named` mapped a reader over its list, incidental to its
+   subject (the contract), and reads by a literal key now. The mutation
+   script runs `bounded_reads` alone, so no mutant could show either: a
+   rule that refuses programs meets every program the repository has only
+   in `test-unit`, which is where it was found.
+3. **Three generality witnesses of `undeclared_effect` read per element**
    (`List.map(ids, id => Stores.get(id))`), incidentally: their subject is
    the row. They read `Stores.get(home)` now, a parameter, keeping their
    shapes and verdicts (commit 0dd29f80).
-3. **The note's example is exactly what the store warns** once `set
+4. **The note's example is exactly what the store warns** once `set
    hours_of_stores` is written and `StoreData` states no `sets`: PW0406 on
    `StoresOpen` (hours.pw) and on `Search` (search.pw). The two annotations
    below must land together. The note's position, hours.pw:391:17, is
    392:17 with the `set` line.
-4. **`check_latency`'s 2 s ceiling failed at 2.77 s** on this PC while
+5. **`check_latency`'s 2 s ceiling failed at 2.77 s** on this PC while
    other workers' builds held the load average at 76 to 88. The rules cost
    the store's check (52 files, debug) 9 to 24 ms for the program's facts
    and 6 to 11 ms for every unit's checks, about 2% of it.
+6. **The pair's shape cannot tell which field is the key** (2026-10-15,
+   probing PW0407's neighbours). "A record with a field of the key's type"
+   is satisfied by any field of that type: `fn slot_of(store: Int)` with `set
+   slots_of`, `slots_of(stores: List<Int>) -> List<Slot>` and `Slot { day:
+   Int, open: Bool }` checks clean, though no field of `Slot` is the store.
+   The shape the note states is held as stated, and the ruling concerned the
+   code, so it is not changed; a tighter one names the field (the key
+   parameter's own name) or declares it, and would bring the multi-value key
+   of Next with it.
 
 ## For the integrator at merge
 
@@ -207,6 +238,11 @@ integrator, 2026-10-15**, question 3: confirmed).
   and the Not claimed below.
 - The root `justfile` imports `just/bounded-checker.just` (one line, as each
   track's import was added).
+- **Shared files this track changed**, each in a commit of its own that says
+  why: `compiler/pw-core/tests/what_a_component_does.rs` (ADR-0283's: one
+  test's named function reads by a literal key, Found 2), the three
+  `undeclared_effect` witnesses (Found 3), `tests/generality.rs` (the
+  figure) and `tools/corpus-check/src/main.rs` (the categories).
 
 ## Not claimed
 
@@ -217,12 +253,15 @@ integrator, 2026-10-15**, question 3: confirmed).
   command's contract are where it would be written.
 - **The rewrite** of a loop's reads into its set read: a later step, as the
   note orders.
-- **Writes per element**: a call that only writes is not refused (`for l in
-  lines { record(l.item) }`); one whose row reads and writes is refused as a
-  read.
+- **Writes per element** (**ruled by the integrator, 2026-10-15**, question
+  4: confirmed): a call that only writes is not refused (`for l in lines {
+  record(l.item) }`), and is not claimed bounded either: a write per
+  element is as many round trips as the list is long, and no rule here
+  counts it; one whose row reads and writes is refused as a read. The note
+  leaves writes for a later step.
 - **A key of two values**: the pair takes the keyed read's first parameter
   as its key and the rest as passed along; `read_pitch(shard, word)`, whose
-  key is both, has no set form this shape accepts.
+  key is both, has no set form this shape accepts (Next).
 - **Keys the trace does not follow**: through another read's answer (the
   note's "keyed by computed values"), through a `use`, or through a
   function value's call.
@@ -254,48 +293,134 @@ integrator, 2026-10-15**, question 3: confirmed).
 - **Migrate kiokun-site here**: its layer is another track's, `read_pitch`'s
   key is two values (a design question), and its pages are held byte for
   byte to kiokun.com's.
+- **PW0335 for the pair's shape**, as the first build had it: a policy's
+  value is one its domain has, and the domain of `set` is "a set read of
+  this keyed read", which the policy table cannot state, so the refusal
+  said "a policy's value" of what is a rule about two functions. The
+  integrator ruled it a code of its own on 2026-10-15 (PW0407).
 
 ## Acceptance
 
-Recorded by `just e14-bounded-reads` in `docs/evidence/E14/bounded-reads.txt`:
+Recorded by `just e14-bounded-reads` in `docs/evidence/E14/bounded-reads.txt`
+(the recipe's local run is not committed: evidence of record comes from the
+verify run at the train). This track's own runs, each over the tree it names:
 
-- `compiler/pw-core/tests/bounded_reads.rs`, 27 tests: PW0405 in each loop
+- `compiler/pw-core/tests/bounded_reads.rs`, 30 tests: PW0405 in each loop
   form (seven combinators and a pipe, a `for` through a `let`, a recursion
   over a list and over a count, a function of the program's passing its
   callback on and calling it in a `for`, a `let`-bound callback, a named
   callback, a helper, a nested loop), each key path, and its controls (a key
   no element's, the set read, a callback applied once, a parameter passed
-  along, a helper keyed by no element, a write, a read before the loop);
-  ADR-0022's perturbations (renamed, rebound, a decoy); PW0406 on `per_key`
-  and on no `sets`, none on `one_call`, `chunked(100)`, the host's database
-  or a read no `set` names; the pair's shapes; the clauses' places and
-  values; `Sets` and its budget; `source_clauses`, and an older
+  along, directly or through a mutual recursion, a helper keyed by no
+  element, a write, a read before the loop); a call that reads and writes
+  refused as a read; ADR-0022's perturbations (renamed, rebound, a decoy);
+  PW0406 on `per_key` and on no `sets`, none on `one_call`, `chunked(100)`,
+  the host's database (alone, and beside a source that cannot batch) or a
+  read no `set` names; the pair's shapes, PW0407's own facts (code, symbol,
+  invariant, span, note) and a bad `sets` value still PW0335; the clauses'
+  places and values; `Sets` and its budget; `source_clauses`, and an older
   `sources.json` read as `per_key`; the store (clean, mutated per element
   and refused, with the two annotations); the feed; kiokun-site's known
   four. And `bounded`'s own: the call graph's cycles.
 - The corpus (corpus C25): R-075, R-076, R-077 each emit only PW0405 and
-  convey their `@expect-error`s; A-037 and the whole accepted corpus check
-  clean; the witnesses `examples/generality/read_per_element/` (generic
-  callback with a match arm's key, helper extraction, cross-module, and a
-  neighbour), tier 2 in PROFILES; corpus-check OK (37 accepted, 72
-  rejected); generality 50 / 50.
-- `scripts/bounded_checker_mutations.py`: 35 mutants, each killed by
-  `tests/bounded_reads.rs`.
-- `just test-compile`: the store, the accepted corpus, kiokun's slice and
-  kiokun-site check (kiokun-site with its four warnings).
+  R-078 only PW0407, and convey their `@expect-error`s; A-037 and the whole
+  accepted corpus check clean; the witnesses
+  `examples/generality/read_per_element/` (generic callback with a match
+  arm's key, helper extraction, cross-module, and a neighbour) and
+  `examples/generality/set_pair_shape/` (a reader the set form drops,
+  another module's set form of another source, and a neighbour of the
+  shapes a set form may take), tier 2 in PROFILES; corpus-check OK (37
+  accepted, 78 rejected); generality 56 / 56.
+- `scripts/bounded_checker_mutations.py`, run whole: **40 of 40 mutants
+  killed** by `tests/bounded_reads.rs` alone, none "does not build"
+  (17:03 to 17:11Z, 2026-10-15, at 7da0d2ca; the first build's run of 6b290a8f
+  killed 35 of 35, and a run at 2a186b63 39 of 39, before CI's finding).
+- The reference programs, `pw check`: the store (52 files), the accepted
+  corpus (84), the feed (23) and kiokun's slice (27) with no diagnostics;
+  kiokun-site (25) with its four warnings; `scripts/mutant_programs.py`: 237
+  mutants of a program's source, 0 failing.
+- `just ci` at 7da0d2ca (17:11 to 17:28Z, 2026-10-15), `ci: OK`: 337 test
+  binaries, 2914 tests passed and none failed (`check_latency` among them, at
+  a quiet load; `what_a_component_does` 8 of 8), `test-compile` (the store,
+  the accepted corpus, kiokun's slice and kiokun-site check, kiokun-site
+  with its four warnings) and `mutant-programs` (237 mutants, 0 failing).
+  The first `just ci`, at 2a186b63, failed `what_a_component_does` (Found 2).
+  The push is chained to a second `just ci` over the commit that holds this
+  text.
 
-## Questions for the integrator
+## Next: closing kiokun-site's four reads (not built here)
 
-1. **kiokun-site's four reads per element** (Found 1): schedule its layer's
-   set forms (`search#readings`; a set form of `pitch#of`, whose key is two
-   values) and empty `KNOWN_READS_PER_ELEMENT`? Or rule otherwise on the
-   interim (an error with the list, as built; a warning everywhere; or
-   kiokun-site migrated before this merges)?
-2. **The pair's shape needs a code of its own?** Only PW0405 and PW0406
-   were assigned; interim PW0335 (`policy_value`: "a policy's value is one
-   its domain has"), reason `set_pair_shape`, whose domain is "a set read
-   of this keyed read".
-3. **A resource no source holds**: interim `one_call` for PW0406 (ADR-0207:
-   the host's own database gives every guarantee). Confirm.
-4. **A call that reads and writes, per element**, is refused as a read, a
-   write-only one not (the note leaves writes for later). Confirm.
+Ruled by the integrator, 2026-10-15 (question 1): the four stay warnings
+through `KNOWN_READS_PER_ELEMENT` as the interim, and closing them is this
+list, which waits on kiokun's layer and on one design decision of the pair's
+shape. Nothing below is built by this track.
+
+1. **`search#reading` has a set form that fits the shape as written.**
+   `search_reading(reading: String, limit: Int)` answers `List<ReadingHit>`;
+   a set form `search_readings(readings: List<String>, limit: Int) ->
+   List<ReadingFound>` (`ReadingFound { reading: String, rows:
+   List<ReadingHit> }`, the record the program already builds) is given a
+   list of the key and the same `limit`, and answers each key with its rows.
+   Kiokun's layer (`spikes/own-renderer/server/src/kiokun.rs`, beside
+   `kiokun:data/search#reading`) gains `search#readings`; the program names it
+   with `set search_readings` and reads before its three loops
+   (`kiokun.site.Word` twice, `kiokun.site.Search` once, the repair PW0405
+   prints). The two `search_reading` entries of the list go in the same
+   commit; the test that holds the list exact fails on a stale entry.
+2. **`pitch#of`'s key is two values, which the shape does not accept.**
+   `read_pitch(shard: String, word: String)`: PW0405 keys a host read by
+   every parameter (the element `w` gives both, `pitch_shard(speak_of(w))`
+   and `speak_of(w)`), where the pair takes the first parameter alone, the
+   shard, as its key and the rest as passed along. A set form given the
+   loop's words, `read_pitches(words: List<String>)`, is refused ("takes
+   `(List<String>)`, and a set read of `read_pitch` takes `(List<String>,
+   String)`"); one given the shards and the word reads one word's readings
+   in each shard, which is no read the loop makes. The options, for an ADR
+   with the kiokun track:
+   - **The layer derives the shard from the word**: `read_pitch(word)`, one
+     key. Cheapest, and it moves `pitch_shard`'s hash (a port of
+     `PitchAccent.svelte`, written in the program today) into the host's
+     Rust: app-specific Rust, against the steering of 2026-10-15. Not
+     recommended.
+   - **The pair's shape learns a key of several values**: the set form is
+     given a list of the record the key parameters form
+     (`read_pitches(keys: List<PitchKey>)`, `PitchKey { shard, word }`), and
+     answers each record with its readings. The shape's rule changes from
+     "the first parameter" to "the parameters that key the read", which are
+     all of a host read's (as PW0405 already has it) minus a declared
+     reader passed along: a clause or a convention to decide, and
+     `fits`/`keyed` to change together, with tests and mutants as here.
+     Recommended: it is the general form, and `search_reading`'s `limit`
+     (a bound, not a key) shows a read already has parameters that are not
+     keys.
+3. **Then `KNOWN_READS_PER_ELEMENT` is empty** and the constant, the
+   `known` path and the test `a_known_read_is_known_only_where_the_list_names_it`
+   go with it: PW0405 is an error everywhere already. Until then each entry
+   is a read a person decided to wait on, with its reason in the warning.
+
+## The integrator's rulings, 2026-10-15
+
+The four questions the first build raised, each **ruled by the integrator,
+2026-10-15**, and where each is built or held:
+
+1. **kiokun-site's four reads per element**: they stay warnings through
+   `bounded::KNOWN_READS_PER_ELEMENT`, which a test holds exact, as the
+   interim. Closing them needs kiokun's layer to gain set forms and a
+   two-value key (`read_pitch`'s (shard, word)), which the pair's shape does
+   not accept yet: written as Next above, not built here.
+2. **The pair's shape gets a code of its own**, each refusal naming its rule:
+   PW0407 `set_pair_shape`, the next code free beside PW0405 and PW0406
+   (checked on `master` and on every `origin/track/*` branch), instead of
+   PW0335. Built: the code, `bounded::pair`, the test
+   `a_set_that_does_not_fit_is_the_pairs_own_rule_and_a_bad_sets_value_is_a_policys`,
+   the corpus program R-078, the generality witnesses
+   `examples/generality/set_pair_shape/`, and two mutants.
+3. **A resource no source holds counts as `one_call` for PW0406**
+   (ADR-0207's default): confirmed. Held by
+   `a_set_read_on_a_source_that_batches_is_not_warned`, with a source that
+   cannot batch beside it, and a mutant.
+4. **A call that reads and writes per element is refused as a read; a
+   write-only call per element is not**: confirmed, and a write-only call per
+   element goes under Not claimed. Held by
+   `a_call_that_reads_and_writes_per_element_is_refused_as_a_read` and
+   `what_is_no_read_per_element_is_accepted`, and a mutant.

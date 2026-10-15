@@ -6,14 +6,14 @@
 
 # 4c's checker: a read keyed by its loop's element refused (PW0405), a set
 # read on a source that cannot batch warned (PW0406), a keyed read's `set`
-# held to its shape (PW0335), a source's `sets`. The rules' tests
+# held to its shape (PW0407), a source's `sets`. The rules' tests
 # (tests/bounded_reads.rs, the store, the feed and kiokun-site among them),
-# the corpus's (corpus C25: R-075..R-077, A-037, the generality witnesses),
+# the corpus's (corpus C25: R-075..R-078, A-037, the generality witnesses),
 # the reference programs checked, and the mutation controls
 # (scripts/bounded_checker_mutations.py).
 e14-bounded-reads:
     @mkdir -p docs/evidence/E14
-    @{ echo "4c - a read is bounded by construction (PW0405, PW0406)"; echo; \
+    @{ echo "4c - a read is bounded by construction (PW0405, PW0406, PW0407)"; echo; \
        echo "produced by: just e14-bounded-reads"; \
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
        echo "rust: $(rustc --version)"; echo; \
