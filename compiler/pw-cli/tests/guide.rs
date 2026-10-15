@@ -15,9 +15,11 @@
 //! - ```` ```text pw-check ```` is what `pw check --plain` prints for the
 //!   refused example just before it, less its closing count;
 //! - ```` ```pw gap=build ```` is a program `pw check` passes and `pw build`
-//!   refuses: a gap the page says so about, held so that the page cannot go
-//!   on saying it once the compiler closes the gap. ```` ```text pw-build ````
-//!   after it is what `pw build` prints for it.
+//!   refuses, and ```` ```pw gap=check ```` one `pw check` passes that the
+//!   page says it should refuse: each a gap in the checks that the page says
+//!   so about, held so that the page cannot go on saying it once the
+//!   compiler closes the gap. ```` ```text pw-build ```` after a build gap is
+//!   what `pw build` prints for it.
 //!
 //! And `docs/guide/diagnostics.md`, which `scripts/guide_diagnostics.py`
 //! writes from the registry, lists every code `pw_core::codes::ALL` holds,
@@ -109,6 +111,18 @@ fn fence_of(line: &str) -> Option<(char, usize)> {
     (len >= 3).then_some((c, len))
 }
 
+/// **A gap in the checks a page says so about**: a program the compiler is
+/// held to refuse, or that the build refuses, and the check passes. The
+/// guide holds each so that a page cannot go on saying "not yet" once the
+/// compiler has closed the gap.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Gap {
+    /// `pw check` passes it and `pw build` refuses it.
+    Build,
+    /// `pw check` passes it, though the page says it should not.
+    Check,
+}
+
 /// What a block is, read from its info string.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Kind {
@@ -116,9 +130,8 @@ enum Kind {
     Clean,
     /// A whole program the compiler refuses, with exactly these codes.
     Fails(BTreeSet<String>),
-    /// A whole program `pw check` passes and `pw build` refuses: a gap in
-    /// the checks that the page says so about.
-    Gap,
+    /// A whole program the checks let through, as the page says.
+    Gap(Gap),
     /// Part of the page's program: this file's next piece.
     File(String),
     /// What `pw check --plain` prints for the refused example before it.
@@ -139,12 +152,15 @@ fn kind(info: &str) -> Result<Kind, String> {
     if language == "pw" {
         let mut fails = None;
         let mut file = None;
-        let mut gap = false;
+        let mut gap = None;
         for a in &attributes {
             match a.split_once('=') {
-                Some(("gap", "build")) if !gap => gap = true,
+                Some(("gap", "build")) if gap.is_none() => gap = Some(Gap::Build),
+                Some(("gap", "check")) if gap.is_none() => gap = Some(Gap::Check),
                 Some(("gap", _)) => {
-                    return Err(format!("`{a}`: the one gap a page may show is `gap=build`"));
+                    return Err(format!(
+                        "`{a}`: the gaps a page may show are `gap=build` and `gap=check`"
+                    ));
                 }
                 Some(("fails", codes)) if fails.is_none() => {
                     let codes: BTreeSet<String> = codes.split(',').map(str::to_string).collect();
@@ -163,11 +179,11 @@ fn kind(info: &str) -> Result<Kind, String> {
             }
         }
         return match (fails, file, gap) {
-            (None, None, false) => Ok(Kind::Clean),
-            (Some(codes), None, false) => Ok(Kind::Fails(codes)),
-            (None, Some(file), false) => Ok(Kind::File(file)),
-            (None, None, true) => Ok(Kind::Gap),
-            _ => Err("a block is one of `fails=..`, `file=..` and `gap=build`".into()),
+            (None, None, None) => Ok(Kind::Clean),
+            (Some(codes), None, None) => Ok(Kind::Fails(codes)),
+            (None, Some(file), None) => Ok(Kind::File(file)),
+            (None, None, Some(gap)) => Ok(Kind::Gap(gap)),
+            _ => Err("a block is one of `fails=..`, `file=..` and `gap=..`".into()),
         };
     }
     if language == "text" && attributes == ["pw-check"] {
@@ -207,8 +223,9 @@ enum Expect {
     Clean,
     /// Exactly these codes, and, where the guide shows it, this output.
     Fails(BTreeSet<String>, Option<String>),
-    /// `pw check` passes it, and `pw build` refuses it, printing this.
-    Gap(Option<String>),
+    /// `pw check` passes it. A `Build` gap is one `pw build` refuses,
+    /// printing, where the guide shows it, this.
+    Gap(Gap, Option<String>),
 }
 
 /// **A page's examples, and the program its `file=` blocks make**, or every
@@ -238,12 +255,12 @@ fn examples_of(page: &str, md: &str) -> Result<Vec<Example>, Vec<String>> {
                     expect: Expect::Fails(codes, None),
                 });
             }
-            Ok(Kind::Gap) => {
+            Ok(Kind::Gap(gap)) => {
                 last_refused = Some(out.len());
                 out.push(Example {
                     place,
                     files: vec![(file_name_of(&b.text), b.text.clone())],
-                    expect: Expect::Gap(None),
+                    expect: Expect::Gap(gap, None),
                 });
             }
             Ok(Kind::File(name)) => {
@@ -269,11 +286,12 @@ fn examples_of(page: &str, md: &str) -> Result<Vec<Example>, Vec<String>> {
                 }
             }
             Ok(Kind::BuildOutput) => {
-                // The output of the gap example just before it.
-                let follows = i > 0 && matches!(kind(&found[i - 1].info), Ok(Kind::Gap));
+                // The output of the build gap just before it.
+                let follows =
+                    i > 0 && matches!(kind(&found[i - 1].info), Ok(Kind::Gap(Gap::Build)));
                 match (follows, last_refused) {
                     (true, Some(at)) => {
-                        if let Expect::Gap(shown) = &mut out[at].expect {
+                        if let Expect::Gap(Gap::Build, shown) = &mut out[at].expect {
                             *shown = Some(b.text.clone());
                         }
                     }
@@ -285,10 +303,10 @@ fn examples_of(page: &str, md: &str) -> Result<Vec<Example>, Vec<String>> {
             Ok(Kind::Other) => {}
         }
     }
-    // A gap shows what `pw build` prints, or the page claims nothing but
-    // that the build refuses it, whatever it refuses it for.
+    // A build gap shows what `pw build` prints, or the page claims nothing
+    // but that the build refuses it, whatever it refuses it for.
     for e in &out {
-        if matches!(e.expect, Expect::Gap(None)) {
+        if matches!(e.expect, Expect::Gap(Gap::Build, None)) {
             problems.push(format!(
                 "{}: a `pw gap=build` example shows what `pw build` prints, in a `text pw-build` block after it",
                 e.place
@@ -427,26 +445,33 @@ fn verdict(example: &Example, scratch: &Path) -> Option<String> {
                 ));
             }
         }
-        Expect::Gap(shown) => {
+        Expect::Gap(gap, shown) => {
+            // Either gap is a program the check lets through: when `pw
+            // check` refuses it, the gap is closed.
             if code != Some(0) || !out.contains("no diagnostics") {
                 return Some(format!(
-                    "a gap is a program `pw check` passes, and `pw check` does not:\n{said}"
+                    "a gap is a program `pw check` passes, and `pw check` does not: the gap is \
+                     closed. Show it as a refusal (`pw fails=..`), and take back what the page \
+                     says of it:\n{said}"
                 ));
             }
-            let (built, build_out, build_err) = build(&names, &packages, scratch);
-            if built == Some(0) {
-                return Some(
-                    "`pw build` accepts it: the gap is closed. Show it as a plain `pw` example, \
-                     and take back what the page says of it"
-                        .to_string(),
-                );
-            }
-            if let Some(shown) = shown {
-                let printed = format!("{build_out}{build_err}");
-                if printed.trim_end() != shown.trim_end() {
-                    return Some(format!(
-                        "the page shows output `pw build` no longer prints. It prints:\n{printed}"
-                    ));
+            // A build gap is one the build refuses.
+            if *gap == Gap::Build {
+                let (built, build_out, build_err) = build(&names, &packages, scratch);
+                if built == Some(0) {
+                    return Some(
+                        "`pw build` accepts it: the gap is closed. Show it as a plain `pw` \
+                         example, and take back what the page says of it"
+                            .to_string(),
+                    );
+                }
+                if let Some(shown) = shown {
+                    let printed = format!("{build_out}{build_err}");
+                    if printed.trim_end() != shown.trim_end() {
+                        return Some(format!(
+                            "the page shows output `pw build` no longer prints. It prints:\n{printed}"
+                        ));
+                    }
                 }
             }
         }
@@ -860,29 +885,49 @@ fn a_wrong_example_is_reported_and_a_right_one_is_not() {
             None,
         ),
         (
-            "a gap: checks, and does not build",
-            example(unbuilt, Expect::Gap(None)),
+            "a build gap: checks, and does not build",
+            example(unbuilt, Expect::Gap(Gap::Build, None)),
             None,
         ),
         (
-            "a gap that builds",
-            example(right, Expect::Gap(None)),
-            Some("the gap is closed"),
+            "a build gap that builds",
+            example(right, Expect::Gap(Gap::Build, None)),
+            Some("`pw build` accepts it: the gap is closed"),
         ),
         (
-            "a gap that does not check",
-            example(mistyped, Expect::Gap(None)),
+            "a build gap that does not check",
+            example(mistyped, Expect::Gap(Gap::Build, None)),
             Some("a gap is a program `pw check` passes"),
         ),
         (
-            "a gap not as `pw fmt` writes it",
-            example(&unbuilt_unformatted, Expect::Gap(None)),
+            "a build gap not as `pw fmt` writes it",
+            example(&unbuilt_unformatted, Expect::Gap(Gap::Build, None)),
             Some("not as `pw fmt` writes it"),
         ),
         (
-            "a gap whose build output is shown wrongly",
-            example(unbuilt, Expect::Gap(shown_wrongly)),
+            "a build gap whose build output is shown wrongly",
+            example(unbuilt, Expect::Gap(Gap::Build, shown_wrongly)),
             Some("output `pw build` no longer prints"),
+        ),
+        (
+            "a check gap: checks, whatever the build does",
+            example(right, Expect::Gap(Gap::Check, None)),
+            None,
+        ),
+        (
+            "a check gap that the build refuses says nothing of the build",
+            example(unbuilt, Expect::Gap(Gap::Check, None)),
+            None,
+        ),
+        (
+            "a check gap that the check refuses",
+            example(mistyped, Expect::Gap(Gap::Check, None)),
+            Some("a gap is a program `pw check` passes"),
+        ),
+        (
+            "a check gap not as `pw fmt` writes it",
+            example(unformatted, Expect::Gap(Gap::Check, None)),
+            Some("not as `pw fmt` writes it"),
         ),
     ];
     let mut wrong = Vec::new();
@@ -946,7 +991,8 @@ fn an_info_string_says_what_a_block_is() {
         kind("pw file=guestbook/app.pw"),
         Ok(Kind::File("guestbook/app.pw".into()))
     );
-    assert_eq!(kind("pw gap=build"), Ok(Kind::Gap));
+    assert_eq!(kind("pw gap=build"), Ok(Kind::Gap(Gap::Build)));
+    assert_eq!(kind("pw gap=check"), Ok(Kind::Gap(Gap::Check)));
     assert_eq!(kind("text pw-check"), Ok(Kind::Output));
     assert_eq!(kind("text pw-build"), Ok(Kind::BuildOutput));
     assert_eq!(kind("sh"), Ok(Kind::Other));
@@ -961,10 +1007,13 @@ fn an_info_string_says_what_a_block_is() {
         "pw file=a.pw file=b.pw",
         "pw fails=PW0606 file=a.pw",
         "pw gap=",
-        "pw gap=check",
+        "pw gap=lint",
         "pw gap=build gap=build",
+        "pw gap=build gap=check",
         "pw gap=build fails=PW0606",
+        "pw gap=check fails=PW0606",
         "pw gap=build file=a.pw",
+        "pw gap=check file=a.pw",
         "pw strict",
         "rust",
         "sh strict",
@@ -1019,11 +1068,20 @@ fn a_gaps_build_output_belongs_to_the_gap_before_it() {
     let md = "```pw gap=build\nmodule bad\n```\n```text pw-build\npw: refused\n```\n";
     let found = examples_of("t.md", md).expect("well formed");
     match &found[0].expect {
-        Expect::Gap(Some(shown)) => assert_eq!(shown, "pw: refused\n"),
+        Expect::Gap(Gap::Build, Some(shown)) => assert_eq!(shown, "pw: refused\n"),
         other => panic!("{other:?}"),
     }
-    // A gap shows what the build prints.
+    // A build gap shows what the build prints.
     assert!(examples_of("t.md", "```pw gap=build\nmodule a\n```\n").is_err());
+    // A check gap has no build to show, and a build's output is not its.
+    assert!(examples_of("t.md", "```pw gap=check\nmodule a\n```\n").is_ok());
+    assert!(
+        examples_of(
+            "t.md",
+            "```pw gap=check\nmodule a\n```\n```text pw-build\nx\n```\n"
+        )
+        .is_err()
+    );
     // And only a gap's build prints it: not a clean example's, not a refusal's.
     assert!(examples_of("t.md", "```pw\nmodule a\n```\n```text pw-build\nx\n```\n").is_err());
     assert!(
