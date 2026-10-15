@@ -806,8 +806,8 @@ def main():
     ran, failed, names, out = guide_tests()
     print(f"baseline: the guide's tests, {ran} ran, {failed} failed")
     if ran is None or failed or not ran:
-        print("FAIL: the unmutated baseline is not green; no mutant can mean anything")
         print(out[-2000:])
+        print("FAIL: the unmutated baseline is not green; no mutant can mean anything")
         mutation_baseline.explain()
         return 1
     browser = any(held == "browser" for _, held, *_ in MUTANTS)
@@ -815,8 +815,9 @@ def main():
         built, ran, failed, titles, out = browser_tests()
         print(f"baseline: the guestbook in Chromium, {ran} ran, {failed} failed")
         if not built or failed or not ran:
-            print("FAIL: the unmutated baseline is not green; no mutant can mean anything")
             print(out[-3000:])
+            print("FAIL: the unmutated baseline is not green; no mutant can mean anything")
+            mutation_baseline.explain()
             return 1
 
     survivors = 0
