@@ -34,12 +34,15 @@ e14-reviews:
        echo; echo "== each operation, page and command counted, the ratings' among them (tests/bounded_statements.rs)"; echo; \
        PW_STORE_TEST_LAYER=postgres cargo test --locked -p pw-dev-server -- tests::bounded_statements:: 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the store rated in three engines (e2e/reviews.spec.mjs)"; echo; \
-       BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null 2>&1; \
-       cargo build --quiet --locked -p pw-dev-server -p kiokun-server; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/reviews.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       if BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null 2>&1 \
+          && cargo build --quiet --locked -p pw-dev-server -p kiokun-server; then \
+         (cd spikes/own-renderer && pnpm exec playwright test e2e/reviews.spec.mjs --reporter=line 2>&1) \
+           | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' \
+           | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       else \
+         echo "FAILED: the build (spikes/own-renderer/run.sh, cargo build) did not finish, so the browser suite did not run"; \
+       fi; \
        echo; echo "== mutation controls (scripts/reviews_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/reviews_mutations.py; \
      } > docs/evidence/E14/reviews.txt; \
-     grep -E "^test result|mutants killed|^---- |panicked at|memory bound|^ +[0-9]+ (passed|failed)" docs/evidence/E14/reviews.txt
+     grep -E "^test result|mutants killed|^---- |panicked at|memory bound|^FAILED|^ +[0-9]+ (passed|failed)" docs/evidence/E14/reviews.txt

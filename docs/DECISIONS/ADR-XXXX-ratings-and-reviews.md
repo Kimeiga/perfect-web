@@ -248,3 +248,84 @@ To be filled with the recorded counts at the end of the track:
   handle, so the checker holds what is read *through* a handle, not a user's
   id a data layer might answer. The store's has none to answer; a test and
   a mutant hold that.
+
+## Findings
+
+Found while building; corrections first.
+
+- **Corrected: PW5001's test is the compiler's, not the corpus's.** The first
+  plan named a corpus file for the checker's refusal on the claim that PW5001
+  has one (R-004). R-004 is PW0100 and R-045 is PW5101; the corpus has no
+  PW5001 file, and `compiler/pw-core/tests/shared_cache_holds_no_readers_value.rs`
+  holds the rule, `User<UserId>` among its cases. The store's own test
+  (decision 5) holds the store to it instead.
+- **An opaque type's invariant is not held on a command's arguments**
+  (*taken by the integrator to its own track, 2026-10-15*).
+  `rate_order(store, stars, comment)` takes `Stars` and `Comment`, opaque
+  types with `where` clauses; the component decoded 6, 0 and a 501-character
+  comment without refusing them, and they reached the data layer
+  (`store:data/ratings#rate`), which refused them by its own check (and
+  PostgreSQL's `CHECK`). Whether a value a browser sends for an opaque type is
+  checked at the boundary is ADR-0179's and ADR-0331's question. This layer
+  keeps both checks, their tests (`a_comment_is_at_most_five_hundred_characters`,
+  `the_layer_holds_its_rules_without_the_predicate`) and mutants, so it is
+  right whichever way that is ruled.
+- **A command's own session is told only through its cart's entry.** The store
+  re-sends its author's open documents when the session's cart entry
+  regenerates (`drain_held`, ADR-0218's `session_entry`); events and
+  `invalidates` drop entries, and `others_reading` excludes the author. A
+  command that changes no cart therefore emits `UserCartChanged(current_user())`
+  to have its reader's pages read again, as `choose_tip`, `apply_promo` and
+  `remove_promo` do, and now `rate_order` (a test and a mutant hold it).
+  The program cannot say "and my own open pages"; it names an event that
+  means something else. This bears on NEXT's one telling path for every page
+  a change reaches.
+- **`pw check` accepts what `pw build` refuses** (ADR-0137): a signal read
+  inside `{#if server_value}`. The first build of the rate page failed 131
+  of the server's tests, each serving the store; the form is `hidden={..}`
+  instead of in a block.
+- **The static render needs a value for each new page expression, and the
+  recipes hide its refusal.** `spikes/own-renderer/store-values.json` holds
+  the canonical store's values; `run.sh` stopped at step 3c on the first
+  missing one (`store.rating`), then the next: fourteen keys and a field of
+  each listed store, across the home, store, order and rate pages (the rate
+  page's `aria-pressed` and `chosen_said(stars)` parts among them). The
+  recipes' pattern, `BUILD_ONLY=1 bash spikes/own-renderer/run.sh
+  > /dev/null 2>&1;`, goes on to run a browser suite on the half-built
+  `dist`. `just e14-reviews` says when the build failed.
+- **Two port groups can share a port, and nothing names it.** Each payments
+  host's provider is `port + 10`, set in an env value, so a group at
+  `PORT + 190` (this track's first choice, which the integrator accepted)
+  shared three ports with it. Playwright starts every group's server for any
+  spec, so every run failed at start with "already used", whatever it ran,
+  and with `PW_REUSE` it would have driven the wrong server silently. Moved to
+  `PORT + 200`.
+- **PW5106 shaped the model.** A command that writes a resource must
+  invalidate every query reading it (or emit an event it listens to); ratings
+  written under `database.write<Orders>` would have obliged `Order`,
+  `Checkout` and `OrderTotal` to be dropped. So ratings are a resource of
+  their own, `Ratings`, a module as `Orders` is.
+- A capability argument names a type, an opaque type or a MODULE, and must be
+  imported (`import Orders`).
+- **In memory an order had no id** (one per owner, replaced), where
+  PostgreSQL's `orders.id` is its key. Added (`State.orders_made`), so "this
+  order is rated" is a fact of the order on both layers.
+- **Pre-existing, not fixed**: memory's `place` without charges (the
+  benchmark's `orders#place`) keeps the previous order's `charged` row where
+  PostgreSQL's new order has no parts. No store program reaches it.
+- A command's `Ok` answer reaches the page without its value (ADR-0157); a
+  `requires` refusal returns `Err("authorization predicate `X` denied the
+  invocation")` from `command_answered`, and the route's 403 carries the
+  words.
+
+## Next
+
+- A list of a reader's past orders, from which to rate; item and courier
+  ratings; a store badge reading these numbers; a window or recency
+  weighting with the clock's help; moderation with the merchant and support
+  apps (each in Not claimed).
+- A boundary check of opaque arguments (the integrator's track), after which
+  the layer's own range checks become a second line.
+- One telling path for a command's own session, so that `UserCartChanged` is
+  not named by commands that change no cart.
+- A check, when the Playwright config loads, that no two hosts share a port.
