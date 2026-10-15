@@ -40,10 +40,12 @@ const PLERIS_STORE = path.join(BENCH, "baselines/pleris");
 const PW = path.join(REPO, "target/debug/pw");
 
 // The brief's Playwright ports (8941-9140); each reproduction's server takes
-// the next one from PORT + 10.
+// the next one from PORT + 140, in a gap the own renderer's suite leaves
+// between its hosts' ports (PORT + 120..122 and PORT + 160..182), which a
+// runtime test starts. Two servers an exhibit: twenty ports, ten exhibits.
 const PORT = Number(process.env.PORT ?? 8941);
 const CHECKS_ONLY = process.argv.includes("--checks-only");
-let nextPort = PORT + 10;
+let nextPort = PORT + 140;
 
 const STACKS = {
   "next-react": {

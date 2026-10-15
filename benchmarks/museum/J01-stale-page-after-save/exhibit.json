@@ -30,7 +30,7 @@
     "faithful": "The canonical store's 'Place order': a command, then `navigate OrderPage()` in its `Ok` arm, the save made to reach the server late. The test asserts the order's page as served says the order is placed, at its own address with no parameter, by a soft navigation. Pleris has no client cache of pages that a save could leave stale, so there is no program to refuse: this is a runtime guarantee, not a diagnostic.",
     "test": {
       "name": "e2e/navigate.spec.mjs: an order placed goes to its page, read after the commit (Chromium)",
-      "command": "BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null 2>&1 && cargo build --quiet --locked -p pw-dev-server && cd spikes/own-renderer && FORCE_COLOR=0 pnpm exec playwright test e2e/navigate.spec.mjs -g 'an order placed goes to its page, read after the commit' --project=chromium --reporter=line 2>&1",
+      "command": "BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null 2>&1 && cargo build --quiet --locked -p pw-dev-server -p kiokun-server && cd spikes/own-renderer && FORCE_COLOR=0 pnpm exec playwright test e2e/navigate.spec.mjs -g 'an order placed goes to its page, read after the commit' --project=chromium --reporter=line 2>&1",
       "expect": "^\\s*1 passed"
     }
   },

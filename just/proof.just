@@ -12,7 +12,7 @@
 # first (benchmarks/museum/museum.mjs). Then the mutation controls
 # (scripts/proof_mutations.py). Playwright on PORT, 8941 by default.
 e14-museum:
-    @cargo build --quiet --locked -p pw-cli -p pw-dev-server
+    @cargo build --quiet --locked -p pw-cli -p pw-dev-server -p kiokun-server
     @mkdir -p docs/evidence/E14
     @{ echo "ADR-XXXX - the bug museum: each exhibit's bug shown in Next.js or SvelteKit, and Pleris's answer to it"; echo; \
        echo "produced by: just e14-museum"; \
