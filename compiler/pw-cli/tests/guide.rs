@@ -13,7 +13,11 @@
 //!   `<!-- guide-program: examples/guestbook -->`, those files are, byte for
 //!   byte, the directory's;
 //! - ```` ```text pw-check ```` is what `pw check --plain` prints for the
-//!   refused example just before it, less its closing count.
+//!   refused example just before it, less its closing count;
+//! - ```` ```pw gap=build ```` is a program `pw check` passes and `pw build`
+//!   refuses: a gap the page says so about, held so that the page cannot go
+//!   on saying it once the compiler closes the gap. ```` ```text pw-build ````
+//!   after it is what `pw build` prints for it.
 //!
 //! And `docs/guide/diagnostics.md`, which `scripts/guide_diagnostics.py`
 //! writes from the registry, lists every code `pw_core::codes::ALL` holds,
@@ -112,10 +116,15 @@ enum Kind {
     Clean,
     /// A whole program the compiler refuses, with exactly these codes.
     Fails(BTreeSet<String>),
+    /// A whole program `pw check` passes and `pw build` refuses: a gap in
+    /// the checks that the page says so about.
+    Gap,
     /// Part of the page's program: this file's next piece.
     File(String),
     /// What `pw check --plain` prints for the refused example before it.
     Output,
+    /// What `pw build` prints for the gap example before it.
+    BuildOutput,
     /// Commands, output, or another language: not compiled.
     Other,
 }
@@ -130,8 +139,13 @@ fn kind(info: &str) -> Result<Kind, String> {
     if language == "pw" {
         let mut fails = None;
         let mut file = None;
+        let mut gap = false;
         for a in &attributes {
             match a.split_once('=') {
+                Some(("gap", "build")) if !gap => gap = true,
+                Some(("gap", _)) => {
+                    return Err(format!("`{a}`: the one gap a page may show is `gap=build`"));
+                }
                 Some(("fails", codes)) if fails.is_none() => {
                     let codes: BTreeSet<String> = codes.split(',').map(str::to_string).collect();
                     if codes.is_empty() || codes.iter().any(|c| !is_code(c)) {
@@ -148,15 +162,19 @@ fn kind(info: &str) -> Result<Kind, String> {
                 _ => return Err(format!("`{a}`: not an attribute a `pw` block takes")),
             }
         }
-        return match (fails, file) {
-            (None, None) => Ok(Kind::Clean),
-            (Some(codes), None) => Ok(Kind::Fails(codes)),
-            (None, Some(file)) => Ok(Kind::File(file)),
-            (Some(_), Some(_)) => Err("a page's program is clean: `fails` with `file`".into()),
+        return match (fails, file, gap) {
+            (None, None, false) => Ok(Kind::Clean),
+            (Some(codes), None, false) => Ok(Kind::Fails(codes)),
+            (None, Some(file), false) => Ok(Kind::File(file)),
+            (None, None, true) => Ok(Kind::Gap),
+            _ => Err("a block is one of `fails=..`, `file=..` and `gap=build`".into()),
         };
     }
     if language == "text" && attributes == ["pw-check"] {
         return Ok(Kind::Output);
+    }
+    if language == "text" && attributes == ["pw-build"] {
+        return Ok(Kind::BuildOutput);
     }
     if !OTHER_LANGUAGES.contains(&language) {
         return Err(format!(
@@ -189,6 +207,8 @@ enum Expect {
     Clean,
     /// Exactly these codes, and, where the guide shows it, this output.
     Fails(BTreeSet<String>, Option<String>),
+    /// `pw check` passes it, and `pw build` refuses it, printing this.
+    Gap(Option<String>),
 }
 
 /// **A page's examples, and the program its `file=` blocks make**, or every
@@ -199,7 +219,8 @@ fn examples_of(page: &str, md: &str) -> Result<Vec<Example>, Vec<String>> {
     let mut out: Vec<Example> = Vec::new();
     let mut program: BTreeMap<String, String> = BTreeMap::new();
     let mut first_line = None;
-    let mut last_fails: Option<usize> = None;
+    // The example whose output a `text` block after it may show.
+    let mut last_refused: Option<usize> = None;
     for (i, b) in found.iter().enumerate() {
         let place = format!("{page}:{}", b.line);
         match kind(&b.info) {
@@ -210,11 +231,19 @@ fn examples_of(page: &str, md: &str) -> Result<Vec<Example>, Vec<String>> {
                 expect: Expect::Clean,
             }),
             Ok(Kind::Fails(codes)) => {
-                last_fails = Some(out.len());
+                last_refused = Some(out.len());
                 out.push(Example {
                     place,
                     files: vec![(file_name_of(&b.text), b.text.clone())],
                     expect: Expect::Fails(codes, None),
+                });
+            }
+            Ok(Kind::Gap) => {
+                last_refused = Some(out.len());
+                out.push(Example {
+                    place,
+                    files: vec![(file_name_of(&b.text), b.text.clone())],
+                    expect: Expect::Gap(None),
                 });
             }
             Ok(Kind::File(name)) => {
@@ -228,7 +257,7 @@ fn examples_of(page: &str, md: &str) -> Result<Vec<Example>, Vec<String>> {
             Ok(Kind::Output) => {
                 // The output of the refused example just before it.
                 let follows = i > 0 && matches!(kind(&found[i - 1].info), Ok(Kind::Fails(_)));
-                match (follows, last_fails) {
+                match (follows, last_refused) {
                     (true, Some(at)) => {
                         if let Expect::Fails(_, shown) = &mut out[at].expect {
                             *shown = Some(b.text.clone());
@@ -239,7 +268,31 @@ fn examples_of(page: &str, md: &str) -> Result<Vec<Example>, Vec<String>> {
                     )),
                 }
             }
+            Ok(Kind::BuildOutput) => {
+                // The output of the gap example just before it.
+                let follows = i > 0 && matches!(kind(&found[i - 1].info), Ok(Kind::Gap));
+                match (follows, last_refused) {
+                    (true, Some(at)) => {
+                        if let Expect::Gap(shown) = &mut out[at].expect {
+                            *shown = Some(b.text.clone());
+                        }
+                    }
+                    _ => problems.push(format!(
+                        "{place}: `text pw-build` follows a `pw gap=build` block, and this one does not"
+                    )),
+                }
+            }
             Ok(Kind::Other) => {}
+        }
+    }
+    // A gap shows what `pw build` prints, or the page claims nothing but
+    // that the build refuses it, whatever it refuses it for.
+    for e in &out {
+        if matches!(e.expect, Expect::Gap(None)) {
+            problems.push(format!(
+                "{}: a `pw gap=build` example shows what `pw build` prints, in a `text pw-build` block after it",
+                e.place
+            ));
         }
     }
     if let Some(line) = first_line {
@@ -294,6 +347,21 @@ fn pw(args: &[&std::ffi::OsStr], dir: &Path) -> (Option<i32>, String, String) {
         String::from_utf8_lossy(&out.stdout).to_string(),
         String::from_utf8_lossy(&out.stderr).to_string(),
     )
+}
+
+/// **`pw build` of an example's files**, with the standard packages, into
+/// the example's own directory: its status, and what it printed.
+fn build(
+    names: &[&std::ffi::OsStr],
+    packages: &[PathBuf],
+    scratch: &Path,
+) -> (Option<i32>, String, String) {
+    let out_dir = scratch.join("build-out");
+    let mut args: Vec<&std::ffi::OsStr> =
+        vec!["build".as_ref(), "--out".as_ref(), out_dir.as_os_str()];
+    args.extend(packages.iter().map(|p| p.as_os_str()));
+    args.extend(names.iter().copied());
+    pw(&args, scratch)
 }
 
 /// The codes `pw check --plain` reported, from its `error:` and `warning:`
@@ -351,17 +419,35 @@ fn verdict(example: &Example, scratch: &Path) -> Option<String> {
             // And it builds: what `pw check` passes the backend can still
             // refuse (a template value computed from two values, a title
             // that reads a signal), and the guide teaches nothing that
-            // does not build.
-            let out_dir = scratch.join("build-out");
-            let mut build: Vec<&std::ffi::OsStr> =
-                vec!["build".as_ref(), "--out".as_ref(), out_dir.as_os_str()];
-            build.extend(packages.iter().map(|p| p.as_os_str()));
-            build.extend(names.iter().copied());
-            let (built, build_out, build_err) = pw(&build, scratch);
+            // does not build, but what it says it does not.
+            let (built, build_out, build_err) = build(&names, &packages, scratch);
             if built != Some(0) {
                 return Some(format!(
                     "checks clean, and `pw build` refuses it:\n{build_out}{build_err}"
                 ));
+            }
+        }
+        Expect::Gap(shown) => {
+            if code != Some(0) || !out.contains("no diagnostics") {
+                return Some(format!(
+                    "a gap is a program `pw check` passes, and `pw check` does not:\n{said}"
+                ));
+            }
+            let (built, build_out, build_err) = build(&names, &packages, scratch);
+            if built == Some(0) {
+                return Some(
+                    "`pw build` accepts it: the gap is closed. Show it as a plain `pw` example, \
+                     and take back what the page says of it"
+                        .to_string(),
+                );
+            }
+            if let Some(shown) = shown {
+                let printed = format!("{build_out}{build_err}");
+                if printed.trim_end() != shown.trim_end() {
+                    return Some(format!(
+                        "the page shows output `pw build` no longer prints. It prints:\n{printed}"
+                    ));
+                }
             }
         }
         Expect::Fails(codes, shown) => {
@@ -411,42 +497,56 @@ fn pages() -> Vec<(String, String)> {
     out
 }
 
+/// Whether an example is its page's program, made of its `file=` blocks.
+fn is_program(example: &Example) -> bool {
+    example.place.ends_with("(the page's program)")
+}
+
+/// **Every example of some pages, and all that is wrong with how they are
+/// written**: a page with no Pleris example (the index and the generated
+/// reference of codes aside), a ```` ```pw ```` block the reader of the
+/// pages did not see, and whatever `examples_of` refuses.
+fn survey(pages: &[(String, String)]) -> (Vec<Example>, Vec<String>) {
+    let mut examples = Vec::new();
+    let mut problems = Vec::new();
+    for (page, md) in pages {
+        // A plain count of the opening ```pw lines, read apart from the
+        // extractor: a block it skipped would be a block nobody checked.
+        let opening = md.lines().filter(|l| l.starts_with("```pw")).count();
+        // A page teaches by example: all but the index and the generated
+        // reference of codes show Pleris.
+        if opening == 0 && !UNEXAMPLED.contains(&page.as_str()) {
+            problems.push(format!(
+                "{page}: a page of the guide with no Pleris example"
+            ));
+        }
+        match examples_of(page, md) {
+            Ok(found) => {
+                // Every ```pw block is one example, or one piece of its
+                // page's program.
+                let program = found.iter().any(is_program);
+                let pieces = found.iter().filter(|e| !is_program(e)).count()
+                    + if program { file_blocks(md) } else { 0 };
+                if pieces != opening {
+                    problems.push(format!(
+                        "{page}: {opening} lines open a ```pw block and {pieces} were read: \
+                         every block is one example, or one piece of its page's program"
+                    ));
+                }
+                examples.extend(found);
+            }
+            Err(e) => problems.extend(e),
+        }
+    }
+    (examples, problems)
+}
+
 /// **Every example in the guide compiles as the guide says.** All are run,
 /// on several threads, and every failure is reported, so one run says all
 /// it found.
 #[test]
 fn every_example_in_the_guide_compiles_as_it_says() {
-    let mut examples = Vec::new();
-    let mut problems = Vec::new();
-    let mut opening = 0;
-    for (page, md) in pages() {
-        // A plain count of the opening ```pw lines, read apart from the
-        // extractor: a block it skipped would be a block nobody checked.
-        let here = md.lines().filter(|l| l.starts_with("```pw")).count();
-        opening += here;
-        // A page teaches by example: all but the index and the generated
-        // reference of codes show Pleris.
-        if here == 0 && !UNEXAMPLED.contains(&page.as_str()) {
-            problems.push(format!(
-                "{page}: a page of the guide with no Pleris example"
-            ));
-        }
-        match examples_of(&page, &md) {
-            Ok(found) => examples.extend(found),
-            Err(e) => problems.extend(e),
-        }
-    }
-    let pieces: usize = examples
-        .iter()
-        .map(|e| match e.place.ends_with("(the page's program)") {
-            true => count_pieces(e),
-            false => 1,
-        })
-        .sum();
-    assert_eq!(
-        pieces, opening,
-        "every ```pw block is one example, or one piece of its page's program"
-    );
+    let (examples, mut problems) = survey(&pages());
     assert!(!examples.is_empty(), "the guide has examples");
 
     let threads = std::thread::available_parallelism()
@@ -493,16 +593,49 @@ fn every_example_in_the_guide_compiles_as_it_says() {
     );
 }
 
-/// How many `file=` blocks a page's program was assembled from: the page is
-/// read again for it, so the count is the blocks', not the files'.
-fn count_pieces(program: &Example) -> usize {
-    let page = program.place.split(':').next().unwrap_or_default();
-    let md = std::fs::read_to_string(repo().join("docs/guide").join(page)).expect("the page");
-    blocks(&md)
-        .expect("read once already")
+/// How many `file=` blocks a page's program was assembled from: the blocks',
+/// not the files'.
+fn file_blocks(md: &str) -> usize {
+    blocks(md)
+        .map(|found| {
+            found
+                .iter()
+                .filter(|b| matches!(kind(&b.info), Ok(Kind::File(_))))
+                .count()
+        })
+        .unwrap_or(0)
+}
+
+/// The directory a page says it builds, in `<!-- guide-program: DIR -->`.
+fn named_directory(md: &str) -> Option<String> {
+    md.lines().find_map(|l| {
+        l.trim()
+            .strip_prefix("<!-- guide-program:")
+            .and_then(|r| r.strip_suffix("-->"))
+            .map(|dir| dir.trim().to_string())
+    })
+}
+
+/// **How a page's program differs from the files of the directory it
+/// names**, or nothing: its `file=` blocks assemble to exactly those files,
+/// byte for byte.
+fn program_problem(page: &str, md: &str, on_disk: &BTreeMap<String, String>) -> Option<String> {
+    let examples = match examples_of(page, md) {
+        Ok(found) => found,
+        Err(problems) => return Some(problems.join("; ")),
+    };
+    let Some(program) = examples.iter().find(|e| is_program(e)) else {
+        return Some(format!("{page} names a directory and has no `file=` block"));
+    };
+    let assembled: BTreeMap<String, String> = program
+        .files
         .iter()
-        .filter(|b| matches!(kind(&b.info), Ok(Kind::File(_))))
-        .count()
+        .map(|(name, text)| {
+            let base = Path::new(name).file_name().expect("a file name");
+            (base.to_string_lossy().to_string(), text.clone())
+        })
+        .collect();
+    differs(&assembled, on_disk).map(|why| format!("{page} and its directory: {why}"))
 }
 
 /// **The tutorial is the app the server runs**: a page that names a
@@ -512,42 +645,20 @@ fn count_pieces(program: &Example) -> usize {
 fn a_pages_program_is_the_directory_it_names() {
     let mut named = 0;
     for (page, md) in pages() {
-        let Some(dir) = md.lines().find_map(|l| {
-            l.trim()
-                .strip_prefix("<!-- guide-program:")
-                .and_then(|r| r.strip_suffix("-->"))
-                .map(str::trim)
-        }) else {
+        let Some(dir) = named_directory(&md) else {
             continue;
         };
         named += 1;
-        let examples = examples_of(&page, &md).unwrap_or_else(|e| panic!("{e:?}"));
-        let program = examples
-            .iter()
-            .find(|e| e.place.ends_with("(the page's program)"))
-            .unwrap_or_else(|| panic!("{page} names {dir} and has no `file=` block"));
-        let assembled: BTreeMap<String, String> = program
-            .files
-            .iter()
-            .map(|(n, s)| {
-                let base = Path::new(n)
-                    .file_name()
-                    .unwrap()
-                    .to_string_lossy()
-                    .to_string();
-                (base, s.clone())
-            })
-            .collect();
         let mut on_disk = BTreeMap::new();
-        for e in std::fs::read_dir(repo().join(dir)).unwrap_or_else(|e| panic!("{dir}: {e}")) {
+        for e in std::fs::read_dir(repo().join(&dir)).unwrap_or_else(|e| panic!("{dir}: {e}")) {
             let p = e.expect("entry").path();
             if p.extension().is_some_and(|x| x == "pw") {
                 let name = p.file_name().unwrap().to_string_lossy().to_string();
                 on_disk.insert(name, std::fs::read_to_string(&p).expect("read"));
             }
         }
-        if let Some(why) = differs(&assembled, &on_disk) {
-            panic!("{page} and {dir}: {why}");
+        if let Some(why) = program_problem(&page, &md, &on_disk) {
+            panic!("{why}");
         }
     }
     assert!(named >= 1, "the tutorial names the app it builds");
@@ -605,30 +716,42 @@ fn a_program_differs_from_a_directory_by_a_file_or_a_byte() {
 fn the_diagnostic_reference_lists_every_registered_code() {
     let page = std::fs::read_to_string(repo().join("docs/guide/diagnostics.md"))
         .expect("docs/guide/diagnostics.md");
-    let mut missing = Vec::new();
-    for code in pw_core::codes::ALL {
-        let row = page
-            .lines()
-            .find(|l| l.starts_with(&format!("| {} |", code.id)));
+    let codes: Vec<(&str, &str)> = pw_core::codes::ALL
+        .iter()
+        .map(|code| (code.id, code.invariant))
+        .collect();
+    // One row a code, a retired code and an old number.
+    let rows = codes.len()
+        + pw_core::codes::RETIRED.len()
+        + pw_core::diagnostics::DEPRECATED_ALIASES.len();
+    let problems = reference_problems(&page, &codes, rows);
+    assert!(
+        problems.is_empty(),
+        "docs/guide/diagnostics.md is not the registry; run `python3 scripts/guide_diagnostics.py`:\n{}",
+        problems.join("\n")
+    );
+}
+
+/// **What is wrong with the reference of codes**: a code it has no row for,
+/// a row without the invariant the registry gives, or rows beyond the
+/// `rows` the registry accounts for (a code the compiler lacks).
+fn reference_problems(page: &str, codes: &[(&str, &str)], rows: usize) -> Vec<String> {
+    let mut problems = Vec::new();
+    for (id, invariant) in codes {
+        let row = page.lines().find(|l| l.starts_with(&format!("| {id} |")));
         match row {
-            Some(row) if row.contains(&escaped(code.invariant)) => {}
-            Some(row) => missing.push(format!("{}: its invariant is not in `{row}`", code.id)),
-            None => missing.push(format!("{}: no row", code.id)),
+            Some(row) if row.contains(&escaped(invariant)) => {}
+            Some(row) => problems.push(format!("{id}: its invariant is not in `{row}`")),
+            None => problems.push(format!("{id}: no row")),
         }
     }
-    let rows = page.lines().filter(|l| l.starts_with("| PW")).count();
-    assert!(
-        missing.is_empty(),
-        "docs/guide/diagnostics.md is not the registry; run `python3 scripts/guide_diagnostics.py`:\n{}",
-        missing.join("\n")
-    );
-    assert_eq!(
-        rows,
-        pw_core::codes::ALL.len()
-            + pw_core::codes::RETIRED.len()
-            + pw_core::diagnostics::DEPRECATED_ALIASES.len(),
-        "one row a code, a retired code and an old number: no row for a code the compiler lacks"
-    );
+    let found = page.lines().filter(|l| l.starts_with("| PW")).count();
+    if found != rows {
+        problems.push(format!(
+            "{found} rows, and the registry accounts for {rows}: a row for a code the compiler lacks"
+        ));
+    }
+    problems
 }
 
 /// A sentence as a Markdown table cell writes it.
@@ -667,33 +790,60 @@ fn a_wrong_example_is_reported_and_a_right_one_is_not() {
                    signal count: Int = 0\n\n    view {\n        <title>Pressed {count}</title>\n        \
                    <button type=\"button\" on:press={() => count = count + 1}>Press</button>\n    }\n}\n";
     let unparsed = "module logic\n\nfn both(a: Bool, b: Bool) -> Bool !{} {\n    a && b\n}\n";
-    let cases: Vec<(&str, Example, bool)> = vec![
-        ("a right example", example(right, Expect::Clean), false),
-        ("a mistyped one", example(mistyped, Expect::Clean), true),
+    // Two mistakes, so two codes: PW0606 and PW0021.
+    let twice = "module twice\n\nfn one() -> String !{} {\n    1\n}\n\n\
+                 fn two(names: List<String>) -> Int !{} {\n    List.length(names)\n}\n";
+    // The same page, a line of it not as `pw fmt` writes it.
+    let unbuilt_unformatted = unbuilt.replace("    route", "  route");
+    let shown_wrongly = Some("pw: not what it says\n".to_string());
+    // Each case says what is wrong with it, by a sentence the report holds,
+    // or that nothing is: a report for another reason is a wrong report.
+    let cases: Vec<(&str, Example, Option<&str>)> = vec![
+        ("a right example", example(right, Expect::Clean), None),
+        (
+            "a mistyped one",
+            example(mistyped, Expect::Clean),
+            Some("expected no diagnostics"),
+        ),
         (
             "an unformatted one",
             example(unformatted, Expect::Clean),
-            true,
+            Some("not as `pw fmt` writes it"),
         ),
         (
             "one that checks and does not build",
             example(unbuilt, Expect::Clean),
-            true,
+            Some("`pw build` refuses it"),
         ),
         (
             "a refusal by its code",
             example(mistyped, fails(&["PW0606"], None)),
-            false,
+            None,
         ),
         (
             "a refusal by another code",
             example(mistyped, fails(&["PW0021"], None)),
-            true,
+            Some("expected exactly"),
+        ),
+        (
+            "a refusal that names a code too many",
+            example(mistyped, fails(&["PW0606", "PW0021"], None)),
+            Some("expected exactly"),
+        ),
+        (
+            "a refusal that names a code too few",
+            example(twice, fails(&["PW0606"], None)),
+            Some("expected exactly"),
+        ),
+        (
+            "a refusal of two mistakes, each named",
+            example(twice, fails(&["PW0606", "PW0021"], None)),
+            None,
         ),
         (
             "a refusal of a right program",
             example(right, fails(&["PW0606"], None)),
-            true,
+            Some("expected `pw check` to refuse it"),
         ),
         (
             "a refusal shown wrongly",
@@ -701,19 +851,49 @@ fn a_wrong_example_is_reported_and_a_right_one_is_not() {
                 mistyped,
                 fails(&["PW0606"], Some("error: [PW0606] not what it says\n")),
             ),
-            true,
+            Some("output `pw check` no longer prints"),
         ),
         // A text that does not parse has no tree for `pw fmt` to write.
         (
             "a refusal that does not parse",
             example(unparsed, fails(&["PW0009"], None)),
-            false,
+            None,
+        ),
+        (
+            "a gap: checks, and does not build",
+            example(unbuilt, Expect::Gap(None)),
+            None,
+        ),
+        (
+            "a gap that builds",
+            example(right, Expect::Gap(None)),
+            Some("the gap is closed"),
+        ),
+        (
+            "a gap that does not check",
+            example(mistyped, Expect::Gap(None)),
+            Some("a gap is a program `pw check` passes"),
+        ),
+        (
+            "a gap not as `pw fmt` writes it",
+            example(&unbuilt_unformatted, Expect::Gap(None)),
+            Some("not as `pw fmt` writes it"),
+        ),
+        (
+            "a gap whose build output is shown wrongly",
+            example(unbuilt, Expect::Gap(shown_wrongly)),
+            Some("output `pw build` no longer prints"),
         ),
     ];
     let mut wrong = Vec::new();
-    for (i, (what, e, reported)) in cases.iter().enumerate() {
+    for (i, (what, e, expected)) in cases.iter().enumerate() {
         let said = verdict(e, &scratch.join(i.to_string()));
-        if said.is_some() != *reported {
+        let as_expected = match (&said, expected) {
+            (None, None) => true,
+            (Some(said), Some(sentence)) => said.contains(sentence),
+            _ => false,
+        };
+        if !as_expected {
             wrong.push(format!("{what}: {said:?}"));
         }
     }
@@ -738,6 +918,8 @@ fn a_fence_is_read_as_commonmark_reads_it() {
     // A shorter fence of another character does not close a block.
     assert_eq!(found[1].text, "```\nstill text\n");
     assert_eq!(found[2].info, "sh");
+    // Two backticks are inline code, not a fence.
+    assert_eq!(blocks("``code`` at a line's start\n"), Ok(Vec::new()));
 }
 
 #[test]
@@ -746,6 +928,8 @@ fn an_unclosed_or_indented_fence_is_refused() {
     assert!(blocks("- a list\n  ```pw\n  module a\n  ```\n").is_err());
     // A closing fence carries nothing after it.
     assert!(blocks("```pw\nmodule a\n``` pw\n").is_err());
+    // A fence of the other character closes nothing.
+    assert!(blocks("```pw\nmodule a\n~~~\n").is_err());
 }
 
 #[test]
@@ -762,18 +946,31 @@ fn an_info_string_says_what_a_block_is() {
         kind("pw file=guestbook/app.pw"),
         Ok(Kind::File("guestbook/app.pw".into()))
     );
+    assert_eq!(kind("pw gap=build"), Ok(Kind::Gap));
     assert_eq!(kind("text pw-check"), Ok(Kind::Output));
+    assert_eq!(kind("text pw-build"), Ok(Kind::BuildOutput));
     assert_eq!(kind("sh"), Ok(Kind::Other));
     for refused in [
         "",
         "pw fails=",
         "pw fails=E0606",
+        "pw fails=PW0606 fails=PW0021",
         "pw file=app.rs",
         "pw file=../app.pw",
+        "pw file=/app.pw",
+        "pw file=a.pw file=b.pw",
         "pw fails=PW0606 file=a.pw",
+        "pw gap=",
+        "pw gap=check",
+        "pw gap=build gap=build",
+        "pw gap=build fails=PW0606",
+        "pw gap=build file=a.pw",
         "pw strict",
         "rust",
+        "sh strict",
         "text output",
+        "text pw-check pw-build",
+        "text pw-build strict",
     ] {
         assert!(kind(refused).is_err(), "{refused:?} is refused");
     }
@@ -807,6 +1004,141 @@ fn shown_output_belongs_to_the_refused_example_before_it() {
         other => panic!("{other:?}"),
     }
     assert!(examples_of("t.md", "```pw\nmodule a\n```\n```text pw-check\nx\n```\n").is_err());
+    // Not after a gap: that block's output is the build's.
+    assert!(
+        examples_of(
+            "t.md",
+            "```pw gap=build\nmodule a\n```\n```text pw-check\nx\n```\n"
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn a_gaps_build_output_belongs_to_the_gap_before_it() {
+    let md = "```pw gap=build\nmodule bad\n```\n```text pw-build\npw: refused\n```\n";
+    let found = examples_of("t.md", md).expect("well formed");
+    match &found[0].expect {
+        Expect::Gap(Some(shown)) => assert_eq!(shown, "pw: refused\n"),
+        other => panic!("{other:?}"),
+    }
+    // A gap shows what the build prints.
+    assert!(examples_of("t.md", "```pw gap=build\nmodule a\n```\n").is_err());
+    // And only a gap's build prints it: not a clean example's, not a refusal's.
+    assert!(examples_of("t.md", "```pw\nmodule a\n```\n```text pw-build\nx\n```\n").is_err());
+    assert!(
+        examples_of(
+            "t.md",
+            "```pw fails=PW0606\nmodule a\n```\n```text pw-build\nx\n```\n"
+        )
+        .is_err()
+    );
+    // Nor one that is not just after it.
+    assert!(
+        examples_of(
+            "t.md",
+            "```pw gap=build\nmodule a\n```\n\n```sh\nls\n```\n```text pw-build\nx\n```\n"
+        )
+        .is_err()
+    );
+}
+
+/// A page, as `survey` takes it.
+fn page(name: &str, md: &str) -> (String, String) {
+    (name.to_string(), md.to_string())
+}
+
+#[test]
+fn a_page_with_no_example_or_a_block_unseen_is_reported() {
+    let right = page("a.md", "```pw\nmodule a\n```\n");
+    let (examples, problems) = survey(&[right.clone()]);
+    assert_eq!((examples.len(), problems), (1, Vec::new()));
+    // A page teaches by example: the index and the reference of codes aside.
+    let prose = page("b.md", "No example here.\n");
+    let (_, problems) = survey(&[right.clone(), prose]);
+    assert_eq!(problems.len(), 1, "{problems:?}");
+    assert!(problems[0].contains("no Pleris example"), "{problems:?}");
+    for excused in UNEXAMPLED {
+        let (_, problems) = survey(&[page(excused, "No example here.\n")]);
+        assert!(problems.is_empty(), "{excused}: {problems:?}");
+    }
+    // A ```pw line the reader of pages found inside another block, which
+    // is no block of its own: a plain count sees it, the extractor does not.
+    let hidden = page("c.md", "````text\n```pw\nmodule x\n```\n````\n");
+    let (_, problems) = survey(&[hidden]);
+    assert_eq!(problems.len(), 1, "{problems:?}");
+    assert!(
+        problems[0].contains("lines open a ```pw block"),
+        "{problems:?}"
+    );
+    // A page's `file=` blocks are pieces of one program, and each is counted.
+    let pieces = page(
+        "d.md",
+        "```pw file=g/a.pw\nmodule g.a\n```\n```pw file=g/a.pw\nfn f() {}\n```\n```pw file=g/b.pw\nmodule g.b\n```\n",
+    );
+    let (examples, problems) = survey(&[pieces]);
+    assert_eq!((examples.len(), problems), (1, Vec::new()));
+    // What the extractor refuses is reported, whatever the page.
+    let (_, problems) = survey(&[page("e.md", "```pw\nmodule a\n")]);
+    assert!(!problems.is_empty());
+}
+
+#[test]
+fn a_page_is_held_to_the_directory_it_names() {
+    let md = "<!-- guide-program: app/guestbook -->\n\n```pw file=guestbook/book.pw\nmodule a\n```\n\n\
+              ```pw file=guestbook/pages.pw\nmodule b\n```\n";
+    assert_eq!(named_directory(md).as_deref(), Some("app/guestbook"));
+    assert_eq!(named_directory("No comment.\n"), None);
+    let disk = |pairs: &[(&str, &str)]| -> BTreeMap<String, String> {
+        pairs
+            .iter()
+            .map(|(n, s)| (n.to_string(), s.to_string()))
+            .collect()
+    };
+    let app = disk(&[("book.pw", "module a\n"), ("pages.pw", "module b\n")]);
+    assert_eq!(program_problem("t.md", md, &app), None);
+    // A file the directory has and the page lacks, and a byte apart.
+    let more = disk(&[
+        ("book.pw", "module a\n"),
+        ("pages.pw", "module b\n"),
+        ("extra.pw", "module c\n"),
+    ]);
+    assert!(program_problem("t.md", md, &more).is_some());
+    let apart = disk(&[("book.pw", "module a\n"), ("pages.pw", "module b \n")]);
+    assert!(program_problem("t.md", md, &apart).is_some());
+    // A page that names a directory and builds nothing in it.
+    let none = "<!-- guide-program: app/guestbook -->\n\n```pw\nmodule a\n```\n";
+    assert!(program_problem("t.md", none, &app).is_some());
+    assert!(
+        program_problem("t.md", "<!-- guide-program: x -->\n```pw\nmodule a\n", &app).is_some()
+    );
+}
+
+#[test]
+fn the_reference_is_held_to_the_registry() {
+    let page = "| PW0001 | `a` | one | — |\n| PW0002 | `b` | two \\| three | [1](x) |\n";
+    let codes = [("PW0001", "one"), ("PW0002", "two | three")];
+    assert_eq!(reference_problems(page, &codes, 2), Vec::<String>::new());
+    // A code with no row.
+    let more = [codes[0], codes[1], ("PW0003", "three")];
+    let problems = reference_problems(page, &more, 3);
+    assert!(
+        problems.iter().any(|p| p.contains("PW0003: no row")),
+        "{problems:?}"
+    );
+    // A row whose invariant is not the registry's.
+    let other = [codes[0], ("PW0002", "another")];
+    let problems = reference_problems(page, &other, 2);
+    assert!(
+        problems.iter().any(|p| p.contains("PW0002: its invariant")),
+        "{problems:?}"
+    );
+    // A row for a code the compiler lacks.
+    let problems = reference_problems(page, &codes[..1], 1);
+    assert!(
+        problems.iter().any(|p| p.contains("2 rows")),
+        "{problems:?}"
+    );
 }
 
 #[test]
