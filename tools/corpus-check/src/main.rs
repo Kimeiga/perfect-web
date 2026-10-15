@@ -72,6 +72,9 @@ const ACCEPTED_CATEGORIES: &[&str] = &[
     "a page loads from its own origin",
     // The scheduled-commands track, corpus C23: a run the clock makes.
     "a command schedules one the clock invokes",
+    // 4c (track `bounded-checker`), corpus C24: a list's reads, one set read
+    // before its loop.
+    "a list read together before its loop",
 ];
 
 /// Charter §16.2: "Create at least one minimal file for each".
@@ -175,6 +178,11 @@ const REJECTED_CATEGORIES: &[&str] = &[
     "a schedule that names a command the clock does not invoke",
     "a schedule written outside a command",
     "a run scheduled at what is no instant",
+    // 4c (track `bounded-checker`), corpus C24: PW0405, a read keyed by its
+    // loop's element, in each loop form.
+    "a read per element in a combinator's callback",
+    "a read per element in a for loop",
+    "a read per element in a recursion over data",
 ];
 
 /// Milestone 0 gate (charter §14 M0): ">= 10 accepted and 20 rejected".

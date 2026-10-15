@@ -1,0 +1,18 @@
+// @status: GENERAL
+// @invariant: read_per_element
+// @dimension: cross-module movement — the keyed read, its set read and its source are another module's
+//
+// A-037's `price_of`, imported and read once for each item: the module that
+// declares the read reads its list together, and this one does not.
+
+module generality.prices_elsewhere
+
+import List
+import store.list_prices.{ ListPrice, price_of }
+
+fn each_price(items: List<Int>) -> List<Int> !{ database.read<ListPrice> } {
+    List.map(items, item => match price_of(item) {
+        Ok(p) => p.cents,
+        Err(_) => 0,
+    })
+}

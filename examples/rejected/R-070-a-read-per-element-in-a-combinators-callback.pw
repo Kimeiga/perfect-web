@@ -1,0 +1,35 @@
+// @corpus: rejected
+// @id: R-070
+// @category: a read per element in a combinator's callback
+// @rule: PW0405
+// @invariant: read_per_element
+// @charter: §9.5, §7.2
+// @milestone: 14
+// @expect-error: `price_of` reads `LinePrice` once for each element of `items`
+// @expect-error: its key `item` comes from `item`, the element `List.map` passes
+// @expect-error: `let prices = prices_of(List.map(items, item => item))`
+//
+// 4c, a read is bounded by construction: a list's prices read one at a
+// time, a round trip for each item, as many as the list is long (N+1).
+// `price_of` names its set read, which reads them all in one: A-037 reads
+// them so, before its loop.
+
+module store.line_prices
+
+import List
+
+type LinePrice = LinePrice { item: Int, cents: Int }
+
+type LinePriceOf = LinePriceOf { item: Int, price: LinePrice }
+
+fn price_of(item: Int) -> Result<LinePrice, String> !{ database.read<LinePrice> }
+    host "store:data/line-prices#for-item"
+    set  prices_of
+
+fn prices_of(items: List<Int>) -> List<LinePriceOf> !{ database.read<LinePrice> }
+    host "store:data/line-prices#for-items"
+
+fn priced(items: List<Int>) -> List<Result<LinePrice, String>> !{ database.read<LinePrice> } {
+    // ERROR: the callback reads each item's price, keyed by the item.
+    List.map(items, item => price_of(item))
+}

@@ -1,0 +1,29 @@
+// @status: GENERAL
+// @invariant: read_per_element
+// @dimension: generic callback, and aliasing — a function of the program's applies the callback, and a match arm binds the key
+//
+// Structurally different from R-070: the loop is a function of the
+// program's, which passes its callback on to `List.map`, and the key is the
+// element's field, bound by a match arm on the way.
+
+module generality.stores_by_each
+
+import Stores
+import List
+import domain.{ StoreId }
+
+type Visit = Visit { store: Option<StoreId>, count: Int }
+
+fn each<T>(xs: List<T>, f: fn(T) -> Int) -> List<Int> !{} {
+    List.map(xs, f)
+}
+
+fn seen(visits: List<Visit>) -> List<Int> !{ database.read<Stores> } {
+    each(visits, v => match v.store {
+        Some(id) => match Stores.get(id) {
+            Ok(_) => v.count,
+            Err(_) => 0,
+        },
+        None => 0,
+    })
+}

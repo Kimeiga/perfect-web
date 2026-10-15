@@ -1,0 +1,76 @@
+// @corpus: accepted
+// @id: A-037
+// @category: a list read together before its loop
+// @charter: §9.5, §7.2
+// @milestone: 14
+//
+// 4c, a read is bounded by construction: a list's prices read in one set
+// read before the loop that uses them, in each form R-070, R-071 and R-072
+// read them per element, and a read in a loop whose key is no element's.
+// `price_of` names its set read, and the source states what one costs it.
+
+module store.list_prices
+
+import List
+
+type ListPrice = ListPrice { item: Int, cents: Int }
+
+type ListPriceOf = ListPriceOf { item: Int, price: ListPrice }
+
+source PriceBook
+    holds        ListPrice
+    transactions serializable
+    reads        strong
+    changes      none
+    sets         one_call
+
+fn price_of(item: Int) -> Result<ListPrice, String> !{ database.read<ListPrice> }
+    host "store:data/price-book#for-item"
+    set  prices_of
+
+fn prices_of(items: List<Int>) -> List<ListPriceOf> !{ database.read<ListPrice> }
+    host "store:data/price-book#for-items"
+
+fn cents_in(prices: List<ListPriceOf>, item: Int) -> Int !{} {
+    match List.find(prices, p => p.item == item) {
+        Some(p) => p.price.cents,
+        None => 0,
+    }
+}
+
+// R-070's loop: the prices read before it, each looked up in it.
+fn priced(items: List<Int>) -> List<Int> !{ database.read<ListPrice> } {
+    let prices = prices_of(items)
+    List.map(items, item => cents_in(prices, item))
+}
+
+// R-071's.
+fn total(items: List<Int>) -> Int !{ database.read<ListPrice> } {
+    let prices = prices_of(items)
+    let mut sum = 0
+    for item in items {
+        sum = sum + cents_in(prices, item)
+    }
+    sum
+}
+
+// R-072's: the recursion is given what was read before it.
+fn walked(items: List<Int>, prices: List<ListPriceOf>) -> Int !{} {
+    match List.get(items, 0) {
+        None => 0,
+        Some(item) => cents_in(prices, item) + walked(List.drop(items, 1), prices),
+    }
+}
+
+fn walked_total(items: List<Int>) -> Int !{ database.read<ListPrice> } {
+    walked(items, prices_of(items))
+}
+
+// A read in a loop keyed by no element is one key, which the host's cache
+// answers again.
+fn each_at_one_price(items: List<Int>, item: Int) -> List<Int> !{ database.read<ListPrice> } {
+    List.map(items, count => match price_of(item) {
+        Ok(p) => p.cents * count,
+        Err(_) => 0,
+    })
+}

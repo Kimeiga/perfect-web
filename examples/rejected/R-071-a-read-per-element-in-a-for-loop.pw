@@ -1,0 +1,46 @@
+// @corpus: rejected
+// @id: R-071
+// @category: a read per element in a for loop
+// @rule: PW0405
+// @invariant: read_per_element
+// @charter: §9.5, §7.2
+// @milestone: 14
+// @expect-error: `price_of` reads `TotalPrice` once for each element of `items`
+// @expect-error: its key `key` comes from `item`, the element `for` binds
+// @expect-error: `let prices = prices_of(List.map(items, item => item))`
+//
+// 4c, a read is bounded by construction: a total summed in a loop that reads
+// each item's price, its key bound by a `let` on the way. A-037 reads the
+// prices before the loop.
+
+module store.total_prices
+
+import List
+
+type TotalPrice = TotalPrice { item: Int, cents: Int }
+
+type TotalPriceOf = TotalPriceOf { item: Int, price: TotalPrice }
+
+fn price_of(item: Int) -> Result<TotalPrice, String> !{ database.read<TotalPrice> }
+    host "store:data/total-prices#for-item"
+    set  prices_of
+
+fn prices_of(items: List<Int>) -> List<TotalPriceOf> !{ database.read<TotalPrice> }
+    host "store:data/total-prices#for-items"
+
+fn cents(found: Result<TotalPrice, String>) -> Int !{} {
+    match found {
+        Ok(p) => p.cents,
+        Err(_) => 0,
+    }
+}
+
+fn total(items: List<Int>) -> Int !{ database.read<TotalPrice> } {
+    let mut sum = 0
+    for item in items {
+        let key = item
+        // ERROR: a read for each turn of the loop, keyed by its item.
+        sum = sum + cents(price_of(key))
+    }
+    sum
+}
