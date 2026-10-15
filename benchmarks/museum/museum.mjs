@@ -7,13 +7,13 @@
 // An exhibit is a failure from the census (research/failures/), with a dated
 // primary source, shown in two halves, each with its control:
 //
-//   the bug happening    in Next.js or SvelteKit: ADR-0120's baseline, the
-//                        exhibit's patches applied in a sandbox `bench.mjs`
-//                        makes (its pinned lockfile installed offline: no
-//                        download), checked by the stack's own checker, built,
-//                        served, and `bug.spec.mjs` run on it, which passes
-//                        when the bug happens. Control: the idiomatic repair,
-//                        on which the same spec must fail.
+//   the bug happening    in Next.js or SvelteKit: ADR-0120's baseline with
+//                        the exhibit's patches, in place, on the dependencies
+//                        the workspace installed (no download), checked by the
+//                        stack's own checker, built, served, and
+//                        `bug.spec.mjs` run on it, which passes when the bug
+//                        happens. Control: the idiomatic repair, on which the
+//                        same spec must fail.
 //   Pleris's answer      the same change to the benchmark's Pleris store,
 //                        given to `pw check`: refused by a named code, whose
 //                        neighbour (the repair the code asks for) checks
@@ -29,7 +29,6 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { sandbox } from "../harness/bench.mjs";
 
 const MUSEUM = path.dirname(fileURLToPath(import.meta.url));
 const BENCH = path.resolve(MUSEUM, "..");
@@ -45,10 +44,12 @@ let nextPort = PORT + 10;
 
 const STACKS = {
   "next-react": {
+    baseline: path.join(BENCH, "baselines/next-react"),
     storePath: "/stores/blue-bottle",
     serve: (port) => ["pnpm", ["--silent", "start"], { PORT: String(port) }],
   },
   sveltekit: {
+    baseline: path.join(BENCH, "baselines/sveltekit"),
     storePath: "/stores/blue-bottle",
     serve: (port) => [
       "node",
@@ -84,11 +85,19 @@ function patchPath(ex, name) {
   return name.startsWith("benchmarks/") ? path.join(REPO, name) : path.join(ex.root, name);
 }
 
-function apply(ex, names, cwd) {
-  for (const name of names) {
-    const r = sh("git", ["apply", patchPath(ex, name)], { cwd });
-    if (!r.ok) throw new Error(`${name} does not apply: ${tail(r.out)}`);
-  }
+/**
+ * Apply (or, `reverse`, take back) one patch to the files under `dir`, a
+ * patch whose paths are relative to `dir`. Run from the top of `dir`'s own
+ * repository with `--directory`: `git apply` run inside a repository's
+ * subdirectory ignores, silently, every path outside that subdirectory, and
+ * reads a patch's paths from the repository's top.
+ */
+function apply(ex, name, dir, reverse = false) {
+  const top = sh("git", ["rev-parse", "--show-toplevel"], { cwd: dir }).out.trim();
+  const rel = path.relative(top, dir);
+  const args = ["apply", ...(reverse ? ["-R"] : []), ...(rel ? [`--directory=${rel}`] : []), patchPath(ex, name)];
+  const r = sh("git", args, { cwd: top });
+  if (!r.ok) throw new Error(`${name} does not ${reverse ? "come off" : "apply"}: ${tail(r.out)}`);
 }
 
 async function waitFor(url, ms) {
@@ -110,7 +119,7 @@ async function waitFor(url, ms) {
 function exhibits(prefix) {
   return fs
     .readdirSync(MUSEUM, { withFileTypes: true })
-    .filter((d) => d.isDirectory() && (!prefix || d.name.startsWith(prefix)))
+    .filter((d) => d.isDirectory() && !d.name.startsWith(".") && (!prefix || d.name.startsWith(prefix)))
     .map((d) => {
       const root = path.join(MUSEUM, d.name);
       const ex = JSON.parse(fs.readFileSync(path.join(root, "exhibit.json"), "utf8"));
@@ -122,7 +131,7 @@ function exhibits(prefix) {
 
 // --- the bug, happening ----------------------------------------------------------
 
-/** Check, build and serve the sandbox as it stands, run the spec: its counts. */
+/** Check, build and serve the baseline as it stands, run the spec: its counts. */
 async function showOnce(ex, app) {
   const s = STACKS[ex.repro.stack];
   // The stack's own checker first: the bug is one its checker accepts.
@@ -201,15 +210,32 @@ async function showOnce(ex, app) {
 /**
  * The bug, shown: the spec passes on the bug and fails on its repair. Each a
  * spec that ran: a stage of no tests proves nothing either way.
+ *
+ * In place, in this worktree's baseline, with the dependencies the workspace
+ * installed for it: the brief allows the baselines' existing dependencies and
+ * nothing new, and `bench.mjs`'s sandbox installs its own pinned lockfile,
+ * which on this host needs a package the store does not hold (nanoid 3.3.19;
+ * the workspace's is 3.3.18). `scripts/bench_contract_mutations.py` builds its
+ * mutants in place the same way. A baseline with changes git has not
+ * committed is refused, so nothing of anyone's is overwritten; every patch is
+ * taken back, last first, and the baseline built again as it is.
  */
 async function showBug(ex) {
-  const task = { id: ex.id, root: ex.root, prompt: path.join(ex.root, "exhibit.json") };
-  const box = sandbox(task, ex.repro.stack);
+  const app = STACKS[ex.repro.stack].baseline;
+  const dirty = sh("git", ["status", "--porcelain", "--", "."], { cwd: app }).out.trim();
+  if (dirty) {
+    throw new Error(`${path.relative(REPO, app)} has changes git has not committed; the museum patches it in place:\n${dirty}`);
+  }
+  const applied = [];
   try {
-    apply(ex, [...(ex.repro.base ?? []), ...(ex.repro.bug ? [ex.repro.bug] : [])], box.app);
-    const bug = await showOnce(ex, box.app);
-    apply(ex, [ex.repro.fixed], box.app);
-    const fixed = await showOnce(ex, box.app);
+    for (const name of [...(ex.repro.base ?? []), ...(ex.repro.bug ? [ex.repro.bug] : [])]) {
+      apply(ex, name, app);
+      applied.push(name);
+    }
+    const bug = await showOnce(ex, app);
+    apply(ex, ex.repro.fixed, app);
+    applied.push(ex.repro.fixed);
+    const fixed = await showOnce(ex, app);
     const ran = (r) => r.stage === "spec" && r.passed + r.failed > 0;
     return {
       happens: ran(bug) && bug.failed === 0,
@@ -218,7 +244,8 @@ async function showBug(ex) {
       fixed,
     };
   } finally {
-    if (!process.env.MUSEUM_KEEP) fs.rmSync(box.root, { recursive: true, force: true });
+    for (const name of applied.reverse()) apply(ex, name, app, true);
+    sh("pnpm", ["--silent", "build"], { cwd: app });
   }
 }
 
@@ -232,7 +259,7 @@ function plerisCheck(ex, patches) {
       fs.cpSync(path.join(PLERIS_STORE, part), path.join(root, part), { recursive: true });
     }
     sh("git", ["init", "-q"], { cwd: root });
-    apply(ex, patches, root);
+    for (const name of patches) apply(ex, name, root);
     const sources = [
       ...files(path.join(REPO, "packages/pw-std")),
       ...files(path.join(REPO, "packages/pw-platform-web")),

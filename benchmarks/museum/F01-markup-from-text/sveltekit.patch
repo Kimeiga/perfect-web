@@ -1,0 +1,15 @@
+diff --git a/src/routes/stores/[storeId]/+page.svelte b/src/routes/stores/[storeId]/+page.svelte
+index 483bebd..865781e 100644
+--- a/src/routes/stores/[storeId]/+page.svelte
++++ b/src/routes/stores/[storeId]/+page.svelte
+@@ -7,7 +7,9 @@
+ 
+ <main>
+   <h1 id="store-name">{data.store.name}</h1>
+-  <p id="notice">{data.notice}</p>
++  <!-- The staff format their notice (a link, a bold "closed"), so it is
++       rendered as markup: Svelte's {@html} (svelte.dev/docs/svelte/@html). -->
++  <p id="notice">{@html data.notice}</p>
+ 
+   <section aria-label="Menu">
+     <ul id="menu">
