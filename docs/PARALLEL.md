@@ -1737,3 +1737,57 @@ Each a decision for a track, with its date; a track's ADR records it too.
   - **Landed from the owner's PC.** The work moved to the owner's PC
     (WSL2) on 2026-10-14, and that machine's coordinator session landed
     this train, by the steps of the move entry above.
+- **2026-10-15, train-8** (`track/train-8`, from `master` at `bb2847f6`;
+  the integrator's delegate, on the PC): seven merges, each its own merge
+  commit with its ADR numbered and its documents, merged, resolved, then
+  numbered (ADR-0281).
+  - **What it carries.** Wasmtime 48.0.6 for RUSTSEC-2026-0353 to 0364
+    (ADR-0335; track `wasmtime-48-0-6`, from `af18141a`), first, as every
+    branch's "licenses and advisories" job is red until it lands; NEXT 4b,
+    the store's reads by set and every operation's, page's and command's
+    statements pinned at two data sizes (ADR-0336, W9's; from `a59a18a3`);
+    the 4c design note (ADR-0337; from `8bc1fe68`); development on Windows
+    inside WSL2 (track `pc-setup`, from `c7f4630b`; no ADR); the
+    three-database note (ADR-0338; from `b60a9c71`); the Docs app's note
+    (ADR-0339; from `2f5e51fb`); and the capability matrix
+    (`track/capabilities`, `700d6ee1`, never pushed: its own `just ci`
+    failed `check_latency` alone), refreshed for this train.
+  - **4b's own run** (38641214685) was cancelled by a concurrency group, and
+    its local evidence is the PC's, on PostgreSQL 18.6: `just
+    e14-bounded-statements` 4 passed and 7 of 7 mutants killed,
+    `store_accounts_mutations.py` whole 37 of 37, chromium 381 passed. The
+    train's run is its record. The Wasmtime track's runs were green
+    (`ci` 38668653495, its advisory job among them; `verify` 38668653510);
+    pc-setup's `verify` (38659086865) green and its `ci` red in the
+    advisory job alone.
+  - **Rulings (the integrator's), dated**:
+    - 2026-10-14, ADR-0335's questions: `wasm_function_references(false)`
+      is a hardening track of its own (NEXT), not this bump; the E0 spike's
+      evidence stays historical (ADR-0116); the macOS digest is checked at
+      the Mac's next `just bootstrap`. The owner approved the release's
+      downloads on 2026-10-14; `just bootstrap` installed 48.0.6 in the
+      train's worktree, Koka's archive copied from the main checkout so
+      that nothing else was fetched.
+    - 2026-10-14, the 4c note (ADR-0337) accepted; its build order: (1)
+      the render merge, one snapshot per render and identical calls made
+      once (`track/render-merge`); (2) PW0405, `set` pairs, `sets` and
+      PW0406 (`track/bounded-checker`); (3) the conformance suite; (4) the
+      store's composites moved above the seam, one at a time.
+    - 2026-10-15, the three-database note (ADR-0338) accepted with its
+      amendments: an app's data declared in Pleris, one generic adapter per
+      database, no app-specific Rust. D1 `tables` is in flight on
+      `track/tables`; D2, the memory adapter with TodoMVC, is next; the
+      owner's decisions 1 to 7 come before T3, T4 or T5. Its decision 5.5
+      and the 4c note's suite are one suite: written once against the
+      DataLayer seam, run first against today's hand-written layers, and
+      generated for every declared table later.
+    - 2026-10-15, the Docs app's note (ADR-0339) accepted with its
+      amendments; its downloads wait for the owner's approval.
+  - **Open findings, in KNOWN_LIMITATIONS with their tracks**: an
+    effectful call in an `{#each}`'s head (`track/each-head-effects`); an
+    opaque type's invariant on a command's arguments
+    (`track/argument-invariants`); `pw check` passing what `pw build`
+    refuses (`track/check-is-build`); and the evidence's integrity, stale
+    bytecode, counts unchecked against their scripts, the corpus's
+    `@rule` headers and `check_latency` under load
+    (`track/evidence-integrity`).

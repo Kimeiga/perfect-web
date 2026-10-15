@@ -11,6 +11,24 @@ Those historical statements must not override current source or test results.
 
 ## Value checking and generated execution
 
+**Open findings, each with the track fixing it** (the integrator's,
+2026-10-15):
+
+- **An effectful call in an `{#each}`'s head escapes the effect check**
+  (`track/each-head-effects`): the head's list and key are read as written
+  (ADR-0242, below), so a database read or a secret written there is
+  charged no effect and no label, where the same call in a hole, a
+  condition or an attribute is refused (PW0401). The track's failing test
+  holds it.
+- **An opaque type's `where` invariant is not held on a command's
+  arguments** (`track/argument-invariants`): a value a browser sends is read
+  by its type's shape, not through its checked constructor, so a command
+  can be given a value its program could not have made.
+- **`pw check` passes programs `pw build` refuses**
+  (`track/check-is-build`): the build runs analyses the check does not (an
+  `{#each}` over a computed list is refused by the build alone), so a
+  check is green where the build fails.
+
 **What the parser does not read yet** (found with ADR-0237, which made
 lowering report what it parses):
 
@@ -859,6 +877,24 @@ itself does not prove complete enforcement. Read the per-record status and the
 [research/implementation boundary](../research/failures/IMPLEMENTATION.md).
 
 ## Evidence and test coverage
+
+**Open findings about the evidence itself**, each fixed by
+`track/evidence-integrity` (the integrator's, 2026-10-15):
+
+- **Stale Python bytecode can decide a mutant's verdict**: Python holds a
+  cached `.pyc` to its source by size and modification second, so a
+  mutant of a Python source the same size as it, written and restored
+  within a second, can run the other's bytecode.
+- **An evidence file's counts are not checked against its script**:
+  `docs/evidence/E10/privacy-by-resolution.txt` says 4 of 4 mutants
+  killed, and `scripts/privacy_resolution_mutations.py` holds 3; nothing
+  staled the file when the script changed.
+- **The corpus's `@rule` headers are stale**: nothing holds a rejected
+  program's header to the code its `pw check` reports.
+- **`check_latency` fails under load**: its ceiling is wall-clock time, so
+  a machine shared by a dozen workers fails it whatever the checker does
+  (train-7's local `just ci`, PARALLEL.md); the track bounds the checking
+  thread's CPU time instead.
 
 The new recipe tests replace producers in isolated temporary trees. They prove
 exit-status propagation for the tested recipe shapes, not compiler correctness,
