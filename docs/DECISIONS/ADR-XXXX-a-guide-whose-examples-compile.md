@@ -257,6 +257,41 @@ Found writing the guide, corrections first:
   the next run fails "port already used": kill by the servers' working
   directory.
 
+## Evidence
+
+`just e14-guide` records it (`docs/evidence/E14/guide.txt`, written by the
+verification run). What the track ran itself, on 2026-10-15, before it:
+
+- **The guide's test**, `cargo test -p pw-cli --test guide`: 15 tests, green.
+  It checks 48 programs: 26 clean (no diagnostic, formatted as `pw fmt`
+  writes them, built), 18 refused with exactly the codes they name (6 with
+  the compiler's output shown, compared to what `pw check` prints), and 4
+  gaps (3 build gaps with the build's output shown, 1 check gap); the two
+  programs its `file=` blocks assemble (the tour's and the tutorial's), the
+  tutorial's two files byte for byte `examples/guestbook/*.pw`; and the
+  reference's 234 rows, each registered code with its invariant. The other
+  11 tests are the extractor, the verdict, the page-level guards and the
+  directory comparison, each held on its own.
+- **The generator's test**, `scripts/tests/test_guide_diagnostics.py`: 7
+  tests, green, in `just evidence-gates`.
+- **The tutorial's app in a browser**, `e2e/guestbook.spec.mjs`: four tests
+  (a signed-out reader's page; signing up, signing and removing one's own
+  entry; the entry shown before the server answers, with the command's
+  request held at the network, and no Remove until the server's row stands
+  in its place; another reader's open page told of an entry and of its
+  removal), in Chromium, Firefox and WebKit.
+- **The mutation controls**, `scripts/guide_mutations.py`: **74 of 74
+  mutants killed**, each by a test it names (a kill by another test, or by a
+  build that fails, counts as a survivor). Twenty are ways the guide rots
+  (17 in its pages, 3 in the reference), 39 are in the test's own checks and
+  guards, 7 in the generator, and 8 in the tutorial's app: 5 killed by the
+  browser spec in Chromium and 3 refused by a rule of the checker, named in
+  `CHECKED` (PW5048 twice, PW5107). The first whole run killed 72: the
+  survivors were a test that did not tell an indented fence from one never
+  closed, and one that did not tell an output after the wrong block from one
+  after no refusal at all. Each got the case that does, and the script ran
+  whole again.
+
 ## Questions for the integrator
 
 - `scripts/mutant_programs.py` (train-7) checks the mutants of `.pw` sources
