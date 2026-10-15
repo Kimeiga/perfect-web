@@ -948,7 +948,7 @@ MUTANTS = [
         "deinflection",
         APP,
         "    let first = match List.get(resolutions, 0) {\n        Some(r) => recorded(",
-        "    let first = match List.get(no_words, 0) {\n        Some(r) => recorded(",
+        "    let first = match List.get(List.drop(resolutions, List.length(resolutions)), 0) {\n        Some(r) => recorded(",
     ),
     (
         "the page's own forms are among its homophones",

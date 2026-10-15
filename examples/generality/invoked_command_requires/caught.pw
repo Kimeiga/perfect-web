@@ -1,0 +1,20 @@
+// @status: GENERAL
+// @invariant: invoked_command_requires
+//
+// Structurally different from R-070: the clock's command, not a payment's,
+// held to a predicate over its own parameter.
+
+module generality.requiring_clock
+
+import domain.{ InteractionId }
+
+predicate Owner(order: String)
+    says "Only its owner may do this."
+
+command remind(order: String) -> Result<Int, String>
+    invoked_by    Clock
+    requires      Owner(order)
+    idempotent_by InteractionId
+{
+    Ok(1)
+}

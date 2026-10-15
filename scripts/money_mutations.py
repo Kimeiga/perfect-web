@@ -25,6 +25,13 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 DOMAIN = ROOT / "examples/domain.pw"
 
 # (what, file, anchor, replacement)
+# The mutants the checker refuses, by the rule that is the protection each
+# takes away (`scripts/mutant_programs.py`): every other mutant here
+# leaves a program that checks.
+CHECKED = {
+    'a negative rate is kept': {'PW0622'},
+}
+
 MUTANTS = [
     (
         "half up rounds a half down",

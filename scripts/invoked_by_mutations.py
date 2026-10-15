@@ -4,7 +4,8 @@ which no reader presses (`invoked_by Payments`, PW64xx).
 
 Each mutant undoes one piece: a command the platform invokes may hold a
 reader to a predicate (PW6401); it may take what the host does not give,
-or the program's own `Settled` (PW6402); two may answer a payment's outcome,
+or the program's own `Settled` (PW6402), and is told so at no boundary
+span (charter §16.3, corpus C24), as one keyed by nothing is (PW6405); two may answer a payment's outcome,
 or the first is refused rather than the second (PW6403); a page may press
 it (PW6404); its contract does not say who invokes it, or its interface
 hash does not; a word the platform does not invoke by is taken, or the
@@ -33,6 +34,18 @@ PAYMENTS = ROOT / "spikes/own-renderer/server/src/payments.rs"
 
 # (what, file, anchor, replacement)
 MUTANTS = [
+    (
+        "a payment's command given what is no `Settled` names no boundary",
+        INVOKED,
+        '                vec![Related::new(\n                    by.span.clone(),\n                    format!("`invoked_by {invoker}`: the host gives it a payment\'s outcome"),\n                )],\n',
+        "                Vec::new(),\n",
+    ),
+    (
+        "a command the platform invokes keyed by nothing names no boundary",
+        INVOKED,
+        '                vec![Related::new(\n                    by.span.clone(),\n                    format!("`invoked_by {invoker}`: its word may come more than once"),\n                )],\n',
+        "                Vec::new(),\n",
+    ),
     (
         "a command the platform invokes may hold a reader to a predicate",
         INVOKED,

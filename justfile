@@ -76,6 +76,14 @@ case-check:
 mutation-anchors:
     @python3 scripts/mutation_anchors.py
 
+# Every mutant of a program's source leaves a program the checker takes, or
+# one its script says the checker refuses, by the rule that is the
+# protection it takes away (scripts/mutant_programs.py): a mutant the checker
+# refuses for another reason is killed by the build, whatever the tests hold.
+mutant-programs:
+    @cargo build --quiet --locked -p pw-cli
+    @python3 scripts/mutant_programs.py "${CARGO_TARGET_DIR:-target}/debug/pw"
+
 # Charter §3.6 supply-chain scanning. `deny.toml` and
 # `tools/node-audit-allow.txt` both require a written reason per exception.
 audit:
@@ -4709,7 +4717,7 @@ rq-row-polymorphism:
 # ---------------------------------------------------------------------------
 
 # The one command that must pass for the current milestone's gate.
-ci: evidence-gates fmt-check lint case-check mutation-anchors test-unit test-compile
+ci: evidence-gates fmt-check lint case-check mutation-anchors test-unit test-compile mutant-programs
     @echo ""
     @echo "ci: OK"
 
