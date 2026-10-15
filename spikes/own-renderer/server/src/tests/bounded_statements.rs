@@ -64,7 +64,20 @@ fn readers_state(c: &mut postgres::Client) {
         &[&ADA, &place],
     )
     .expect("an address");
+    // TRACK SEAM (reviews): another reader, whose order from store 47 was
+    // delivered, so a rating is read and written whole.
+    c.batch_execute(&format!(
+        "INSERT INTO orders (owner, status) VALUES ('{BEA}', 'delivered');
+         INSERT INTO order_parts (order_id, position, store, subtotal, discount, funded_by,
+                                  delivery, service, small_order, taxable, tax_rate, tax)
+         SELECT id, 0, '47', 350, 0, NULL, 299, 300, 250, 350, 86250, 30
+         FROM orders WHERE owner = '{BEA}';"
+    ))
+    .expect("a delivered order");
 }
+
+/// TRACK SEAM (reviews): the reader who rates, her order delivered.
+const BEA: &str = "bea";
 
 /// Every store's id, as a list a set read takes.
 fn all_stores(c: &mut postgres::Client) -> Val {
@@ -170,6 +183,12 @@ fn arguments(op: &str, stores: &Val) -> Option<Vec<Val>> {
         "host/promos#set" => vec![crate::checkout::promo_val(
             &crate::checkout::seed_promos()[0],
         )],
+        // TRACK SEAM (reviews): every store's ratings at once, a store's
+        // reviews, and the reader's order rated.
+        "data/ratings#for-stores" => vec![stores.clone()],
+        "data/ratings#reviews" => vec![s("47")],
+        "data/ratings#for-order" => vec![s(BEA)],
+        "data/ratings#rate" => vec![s(BEA), s("47"), Val::S64(4), s("Fine.")],
         _ => return None,
     })
 }
@@ -268,6 +287,12 @@ const PINNED: &[(&str, u64)] = &[
     ("store:data/orders#placed", 1),
     ("store:data/places#list", 0),
     ("store:data/promos#find", 1),
+    // TRACK SEAM (reviews): each one statement, `#rate` its order read again
+    // and its row written.
+    ("store:data/ratings#for-order", 1),
+    ("store:data/ratings#for-stores", 1),
+    ("store:data/ratings#rate", 2),
+    ("store:data/ratings#reviews", 1),
     ("store:data/recommendations#for-store", 3),
     ("store:data/search#find", 2),
     ("store:data/search#find-for", 4),
@@ -426,6 +451,24 @@ fn steps(more: bool) -> Vec<(String, u64)> {
     step("/order", &|| {
         fetched_as(&s, "/order", Some("a"));
     });
+    // TRACK SEAM (reviews): the order delivered by the kitchen's route, no
+    // reader's step; then store 47 rated, and its rate page read.
+    let delivered = posted(&s, "/bench/order?status=delivered", "a", "", "");
+    assert!(delivered.starts_with("HTTP/1.1 200"), "{delivered}");
+    step("rate_order", &|| {
+        let rated = s
+            .command_answered(
+                "store.rate.rate_order",
+                "a",
+                &[s_val("47"), Val::S64(4), s_val("Fine.")],
+                None,
+            )
+            .expect("answered");
+        assert!(rated.committed, "{rated:?}");
+    });
+    step("/order/rate/47", &|| {
+        fetched_as(&s, "/order/rate/47", Some("a"));
+    });
     out
 }
 
@@ -505,10 +548,12 @@ const PAGES: &[(&str, u64)] = &[
     ("add_to_cart (48)", 11),
     ("add_address", 6),
     ("choose_tip", 6),
-    ("/", 5),
-    ("/stores/47", 16),
+    // TRACK SEAM (reviews): each list's ratings one read more, the store's
+    // page two (its ratings and its reviews), the order page one.
+    ("/", 6),
+    ("/stores/47", 18),
     ("/cart", 13),
-    ("/search?q=coffee", 8),
+    ("/search?q=coffee", 9),
     ("/stores/47/address", 2),
     ("place_order, taking no payments: its operations", 33),
     ("place_order, taking no payments: its commit", 7),
@@ -516,7 +561,12 @@ const PAGES: &[(&str, u64)] = &[
         "place_order, taking no payments: its queries read again",
         21,
     ),
-    ("/order", 5),
+    ("/order", 6),
+    // TRACK SEAM (reviews): `rate_order`, its transaction (`MayRate`'s read,
+    // `#rate`'s read and its row), its commit, and the reader's pages read
+    // again; the rate page, its store and the layout's cart.
+    ("rate_order", 9),
+    ("/order/rate/47", 2),
 ];
 
 /// **The transactions so far, once none is still running**: the provider

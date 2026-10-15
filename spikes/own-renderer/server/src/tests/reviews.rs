@@ -453,3 +453,76 @@ fn a_comment_is_at_most_five_hundred_characters() {
         "the comment shown whole"
     );
 }
+
+/// **What the build says of the store**, its `reviews.pw` changed by
+/// `change`: built, or why it was refused.
+fn built_with(change: fn(&str) -> String) -> Result<(), String> {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let pw_files = |dir: &str| -> Vec<std::path::PathBuf> {
+        let mut paths: Vec<std::path::PathBuf> = std::fs::read_dir(root.join(dir))
+            .unwrap_or_else(|e| panic!("{dir}: {e}"))
+            .map(|e| e.expect("entry").path())
+            .filter(|p| p.extension().is_some_and(|x| x == "pw"))
+            .collect();
+        paths.sort();
+        paths
+    };
+    let mut files = pw_files("packages/pw-std");
+    files.extend(pw_files("packages/pw-platform-web"));
+    files.push(root.join("examples/domain.pw"));
+    files.extend(pw_files("examples/lib"));
+    files.extend(pw_files("examples/store"));
+    let units: Vec<pw_core::check::Unit> = files
+        .into_iter()
+        .map(|p| {
+            let read = std::fs::read_to_string(&p).expect("read");
+            let src = if p.ends_with("examples/store/reviews.pw") {
+                change(&read)
+            } else {
+                read
+            };
+            pw_core::check::Unit {
+                hir: pw_core::lower::lower_file(&src, &pw_syntax::parse_tree(&src).green),
+                path: p.display().to_string(),
+                src,
+            }
+        })
+        .collect();
+    pw_core::build::build(&units).map(|_| ())
+}
+
+/// **The checker keeps the reader out of a store's shared ratings**
+/// (ADR-XXXX, decision 5): `StoreRatings`, every reader's and kept shared,
+/// made to say whether the reader may rate the store, reads through the
+/// reader's handle, and the build is refused (PW5001); as it is, the store
+/// builds. So whose a review is cannot reach what every reader is served.
+#[test]
+fn the_checker_keeps_the_reader_out_of_a_stores_shared_ratings() {
+    assert_eq!(
+        built_with(|src| src.to_string()),
+        Ok(()),
+        "the store as it is"
+    );
+    let why = built_with(|src| {
+        let (import, body) = (
+            "import Events.{ UserOrderChanged }\n",
+            "    let all = Ratings.for_stores([id])\n    RatingsShown { said: said_of(id, all), reviews: Ratings.reviews(id) }\n",
+        );
+        assert!(src.contains(import) && src.contains(body), "the anchors");
+        src.replace(
+            import,
+            "import Events.{ UserOrderChanged }\nimport context.{ current_user }\n",
+        )
+        .replace(
+            body,
+            "    let all = Ratings.for_stores([id])\n    let mine = Ratings.for_order(current_user())\n    \
+             let said = if mine.delivered { \"Rate it\" } else { said_of(id, all) }\n    \
+             RatingsShown { said: said, reviews: Ratings.reviews(id) }\n",
+        )
+    })
+    .expect_err("refused");
+    assert!(
+        why.contains("`StoreRatings` is User<UserId> and declares a shared cache"),
+        "{why}"
+    );
+}

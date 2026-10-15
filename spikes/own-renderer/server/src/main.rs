@@ -17876,8 +17876,9 @@ public query Store(",
             // Track `store-accounts`: and where deliveries go, before them.
             // ADR-0323: and the cart's link, a block and the subtotal it
             // says while the cart holds a line. ADR-0308, amended: and the
-            // store's cuisine; track `store-hours`: and whether it is open.
-            whole.ends_with("</template><!--/pw-42--></body>\n</html>\n"),
+            // store's cuisine; track `store-hours`: and whether it is open;
+            // track `reviews`: and what its ratings come to.
+            whole.ends_with("</template><!--/pw-43--></body>\n</html>\n"),
             "{whole}"
         );
         // An estimator that is down fills its slot with the failure, and the
