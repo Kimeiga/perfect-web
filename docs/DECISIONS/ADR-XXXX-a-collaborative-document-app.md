@@ -15,6 +15,55 @@ principal), ADR-0279 (a conversation read from each side), ADR-0297 (a
 commit tells the pages that ask), ADR-0302 (a predicate's words) and
 ADR-0333 (what a page may run).
 
+## Ruling (the integrator, 2026-10-15)
+
+Accepted under the owner's delegation of 2026-10-02, with the amendments
+below; the downloads stay the owner's to approve, and nothing is fetched
+before that approval.
+
+1. **The three rulings stand**: Automerge behind `replicated`'s
+   `rich_text` policy (reopened if D0's cases or budgets say so, before D1
+   lands); Pleris renders every reader's document and an editor's page
+   mounts ProseMirror at the page's authority, audited and said to be
+   unconfined; presence and sync down the stream, one sync request up, a
+   WebSocket only if D6's measurement fails (charter §11.3).
+2. **No app-specific Rust (amends "How it fits" and question 4).** The
+   integrator's ruling on the three-database note (2026-10-15) holds here
+   too: the app's own data (documents' names and owners, roles, shared
+   links, comments) is declared as tables and served by the generic
+   adapters (that note's D1 to D3), not a hand-written layer. The
+   replicated document's log, its snapshots and its sync are the
+   platform's, generic over every program's `replicated` values, as the
+   tables' primitives are. `examples/docs/` is the fourth app, with no
+   `migrations/docs/` of its own: its tables' migrations come from their
+   declarations. Phase 3 waits for D3 (the PostgreSQL adapter); phases 0
+   to 2 do not.
+3. **A predicate on a read** (question 2): `requires` on a query, as on a
+   command (ADR-0258), with its words, so who may read a document is in
+   the program where the checker sees it; an operation answering
+   `NotShared` would hide it below the seam, which the three-database note
+   refuses for the same reason.
+4. **The frames** (question 3): added at protocol version 1, sent only to
+   pages whose build holds the replica runtime; a test holds that a page
+   without it never receives `ReplicaSync` or `Presence`.
+5. **`vendor/`** (question 5): accepted; ADR-0333's tests are extended to
+   it (same origin, each file's hash in the manifest), never loosened.
+6. **A document read from each side** (question 6): confirmed; a derive per
+   reader is measured by D6, not assumed affordable.
+7. **Codes and ports** (question 1): PW6601 upward for this app's tracks
+   (free at 2026-10-15 on master and every pushed branch); each track's
+   Playwright base is given when it starts.
+8. **The owner decisions that are design** (3 to 9), under the delegation:
+   the editor at the page's authority, as stated, with a sandboxed frame
+   only on a measured need (3); history kept on editors' devices, erasure
+   by copy, said in the app (4); a shared link grants viewer, commenter or
+   editor, as its document's owner chooses (viewer by default), and lasts
+   until rotated, with an expiry its owner may set (5); offline edits
+   promised within the browser's eviction rules, said on the page (6);
+   presence as proposed, link guests anonymous (7); no suggestion mode
+   (8); no WebSocket before D6's measurement (9). Decision 1 (the CRDT) is
+   ruled 1 above. Decision 2 (the downloads) is the owner's alone.
+
 ## Context
 
 ### What the owner asked, and what it shares with the next app
