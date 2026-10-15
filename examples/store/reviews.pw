@@ -94,7 +94,7 @@ type RatingsShown = RatingsShown { said: String, reviews: List<Review> }
 // **A store's ratings and reviews** (ADR-XXXX, decisions 4 and 5): every
 // reader's, so `public` and shared, keyed by the store, read again when it
 // is rated. Nothing in it is read through a reader: what is shared is
-// every reader's (PW5001; `examples/rejected/R-070`).
+// every reader's (PW5001; `tests/reviews.rs`, the checker's test).
 public query StoreRatings(id: StoreId) -> RatingsShown
     freshness      30.seconds
     consistency    snapshot
