@@ -126,8 +126,14 @@ MUTANTS = [
     (
         "a parameter passed along whole is walked",
         BOUNDED,
-        "                        if whole && c.callee == def && k == i {\n",
-        "                        if false && whole && c.callee == def && k == i {\n",
+        "                        if whole {\n",
+        "                        if false && whole {\n",
+    ),
+    (
+        "a parameter handed whole to a position another declaration walks is not walked",
+        BOUNDED,
+        "                if lands && !walked {\n",
+        "                if false && lands && !walked {\n",
     ),
     (
         "a recursive call is a read per element",

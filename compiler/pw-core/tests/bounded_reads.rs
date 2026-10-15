@@ -286,6 +286,38 @@ fn a_read_in_a_recursion_over_data_keyed_by_its_part_is_refused() {
 }
 
 #[test]
+fn a_parameter_a_mutual_recursion_hands_on_whole_is_not_walked_unless_it_is_stepped() {
+    // `ping` and `pong` give `item` to each other whole while a count falls:
+    // one key, read again at each turn, which the host's cache answers (CI's
+    // finding, 2026-10-15: `what_a_component_does`'s `ping` and `pong` read by
+    // `name` so, and PW0405 refused them as a recursion over `name`).
+    let along = with(
+        "fn ping(item: Int, n: Int) -> Int !{ database.read<Price> } {\n    if n <= 0 {\n        \
+         cents(price_of(item))\n    } else {\n        pong(item, n - 1)\n    }\n}\n\nfn pong(item: \
+         Int, n: Int) -> Int !{ database.read<Price> } {\n    ping(item, n - 1)\n}\n",
+    );
+    assert_eq!(reported(&along), Vec::<String>::new());
+    // The control: `pong` steps what it is given before it hands it back, so
+    // what lands in `ping` is a new key each turn, and `ping`'s read is a read
+    // per turn, though `ping` itself only ever hands `item` on whole.
+    let stepped = along.replace("    ping(item, n - 1)\n", "    ping(item + 1, n - 1)\n");
+    assert_ne!(stepped, along);
+    assert_eq!(
+        bounded(&stepped),
+        [
+            "PW0405 `price_of` reads `Price` once for each call of `ping`, which recurses over `item`"
+        ]
+    );
+    // And a parameter a cycle only permutes among its positions is the same
+    // two keys at every turn.
+    let swapped = along
+        .replace("pong(item, n - 1)", "pong(n, item)")
+        .replace("ping(item, n - 1)", "ping(n, item)");
+    assert_ne!(swapped, along);
+    assert_eq!(reported(&swapped), Vec::<String>::new());
+}
+
+#[test]
 fn a_key_comes_from_the_element_through_a_field_a_pure_call_and_a_match_arm() {
     for (how, body) in [
         ("a field", "List.map(lines, l => cents(price_of(l.item)))"),

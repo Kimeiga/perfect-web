@@ -770,19 +770,24 @@ impl<'p, 'i> Reads<'p, 'i> {
     /// **Each declaration that recurses over data**: on a cycle of the call
     /// graph the walk recorded, with a recursive call passed a part of one of
     /// its parameters, through a field, a pure call, a `let` or a loop's
-    /// element. A parameter passed whole to the same position of the same
-    /// declaration is passed along, not walked.
+    /// element. A parameter passed whole is passed along, not walked: to the
+    /// same position of the same declaration, or handed on through a cycle of
+    /// several (`ping` and `pong` giving `name` to each other while a count
+    /// falls), where it is walked only if the declaration it is handed to
+    /// walks the position it lands in. A whole parameter makes no new key.
     fn recursion(&self) -> BTreeMap<DefId, (BTreeSet<usize>, ExprId)> {
         let components = &self.cycles;
-        let mut out = BTreeMap::new();
+        // Each declaration's parameters a recursive call is passed a part of,
+        // and the first such call; and each whole hand-over, from a parameter
+        // of one declaration to a position of another on its cycle.
+        let mut out: BTreeMap<DefId, (BTreeSet<usize>, ExprId)> = BTreeMap::new();
+        let mut handed: Vec<(DefId, usize, DefId, usize, ExprId)> = Vec::new();
         for cx in &self.bodies {
             let def = cx.def;
             let Some(own) = components.get(&def) else {
                 continue;
             };
             let elements = Self::elements(&self.regions(cx, false));
-            let mut params = BTreeSet::new();
-            let mut first = None;
             for c in &cx.performed.calls {
                 if components.get(&c.callee) != Some(own) {
                     continue;
@@ -795,7 +800,8 @@ impl<'p, 'i> Reads<'p, 'i> {
                     for i in 0..cx.decl.params.len() {
                         let whole = matches!(cx.body.expr(*arg), Expr::Name(_))
                             && cx.lexical.binder(*arg) == Some(Binder::Param(i));
-                        if whole && c.callee == def && k == i {
+                        if whole {
+                            handed.push((def, i, c.callee, k, c.call));
                             continue;
                         }
                         let wanted = |b: Binder| b == Binder::Param(i);
@@ -803,14 +809,33 @@ impl<'p, 'i> Reads<'p, 'i> {
                             .depends(cx, *arg, &wanted, Some(&elements), &mut BTreeSet::new())
                             .is_some()
                         {
-                            params.insert(i);
-                            first.get_or_insert(c.call);
+                            let walked =
+                                out.entry(def).or_insert_with(|| (BTreeSet::new(), c.call));
+                            walked.0.insert(i);
                         }
                     }
                 }
             }
-            if let Some(at) = first {
-                out.insert(def, (params, at));
+        }
+        // A parameter handed whole to a position another declaration walks is
+        // walked: what lands there is a new key each turn.
+        loop {
+            let mut changed = false;
+            for (def, i, callee, k, call) in &handed {
+                let lands = out
+                    .get(callee)
+                    .is_some_and(|(walked, _)| walked.contains(k));
+                let walked = out.get(def).is_some_and(|(walked, _)| walked.contains(i));
+                if lands && !walked {
+                    out.entry(*def)
+                        .or_insert_with(|| (BTreeSet::new(), *call))
+                        .0
+                        .insert(*i);
+                    changed = true;
+                }
+            }
+            if !changed {
+                break;
             }
         }
         out
