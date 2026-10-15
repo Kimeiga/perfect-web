@@ -104,7 +104,11 @@ Irish "Ratings and Reviews on Uber Eats" terms, and its Top Eats FAQ).
      (ADR-0115, ADR-0302): the session's user's latest order is delivered,
      holds `store`, and has no rating of it, read through the command's own
      operations, so in its transaction, as `OwnsPost(post)` is. A refusal is
-     told in the program's words where the press was.
+     told in the program's words where the press was. `SignedIn`'s words,
+     "Sign in to place an order.", are the store's for a guest, a predicate
+     being declared once per program, so `rate_order` reuses them: a guest can
+     barely reach the rate page, and its press is refused all the same
+     (*ruled by the integrator, 2026-10-15*).
    - **The data's own uniqueness**: `(order, store)` is the key on
      PostgreSQL, and memory refuses a second; the layer's `rate` checks the
      order again, delivered and holding the store, in the transaction.
@@ -132,9 +136,12 @@ Irish "Ratings and Reviews on Uber Eats" terms, and its Top Eats FAQ).
      store rarely rated is not new; the count says what is true).
 5. **Reviews show on the store's page, without their reviewer.** The five
    newest ratings with a comment, each its stars and its words, under "What
-   customers said, each from a delivered order". The rate page tells the
-   reader before they send: "Your comment is shown on the store's page,
-   without your name."
+   customers said"; each is of a delivered order, which decision 3 holds. The
+   rate page tells the reader before they send: "A comment, if you like. It is
+   shown on the store's page, without your name." Public, unnamed and
+   unmoderated comments are accepted for the reference app (*ruled by the
+   integrator, 2026-10-15*): there is no moderation, flagging or removal, and
+   no merchant side (Not claimed).
    - **Why no name.** A user's data is private by default here: their
      identity reaches a program only as a handle the host makes (ADR-0270),
      and what a program reads with it is labelled theirs (ADR-0318,
@@ -154,8 +161,18 @@ Irish "Ratings and Reviews on Uber Eats" terms, and its Top Eats FAQ).
        `shared`. Anything read through the reader's handle is labelled
        `User<UserId>`, and a shared cache refuses it (PW5001). So no program
        can mark "your review" among a store's reviews, or read a store's
-       reviews by who wrote them, into what every reader is served:
-       `examples/rejected/R-070`, refused with PW5001's cause chain.
+       reviews by who wrote them, into what every reader is served. It is
+       held by a test of the store itself, not by a corpus file:
+       `the_checker_keeps_the_reader_out_of_a_stores_shared_ratings`
+       (`tests/reviews.rs`) builds the real store, then the store with
+       `StoreRatings` made to read `current_user()`, and the second is
+       refused with PW5001's cause chain (`StoreRatings` is `User<UserId>`
+       and declares a shared cache). The rule itself is the compiler's, tested
+       in `compiler/pw-core/tests/shared_cache_holds_no_readers_value.rs`
+       (`User<UserId>` among its cases); what this test adds is the store's
+       own program, held to it. A corpus file is for a new invariant, and
+       the ids R-070 to R-074 are train-7's (*ruled by the integrator,
+       2026-10-15*).
    - *Alternatives*: DoorDash's name (personal data published by default);
      Uber's private comments (the store's page could not say what customers
      think, and a comment would go to a merchant app that is out of scope);
@@ -186,7 +203,10 @@ Irish "Ratings and Reviews on Uber Eats" terms, and its Top Eats FAQ).
      shared, dropped by `StoreRated(id)`).
    - The order page, once the order is delivered: for each store of it,
      "Rate Blue Bottle", or what the reader gave, read again when the order
-     moves (`UserOrderChanged`) or is rated (`OrderRated`).
+     moves (`UserOrderChanged`) and when the reader rates (`rate_order`
+     invalidates `OrderRatings` and `StoreToRate`, and emits
+     `UserCartChanged(current_user())`, through which the store tells a
+     command's own session: Findings).
    - **The rate page**, `/order/rate/{store}`: five buttons, "1 out of 5" to
      "5 out of 5", a comment, and "Send rating"; or, where the store cannot
      be rated now, why (not delivered, not of the order, or rated already,

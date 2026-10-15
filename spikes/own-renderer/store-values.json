@@ -17,12 +17,26 @@
   "code": "",
   "tip_typed": "",
   "charged": { "$case": "none" },
+  "ratings.said": "No ratings yet",
+  "ratings.reviews": [],
   "store.description": "Small-batch coffee, served at the bar or carried out. The espresso changes with the season, and the pastries come in every morning.",
   "stores": [
-    { "id": "47", "name": "Blue Bottle", "cuisine": "Coffee", "open": true, "said": "Open 24 hours", "description": "Small-batch coffee, served at the bar or carried out. The espresso changes with the season, and the pastries come in every morning." },
-    { "id": "48", "name": "Harbor Coffee", "cuisine": "Café, Bakery", "open": true, "said": "Open 24 hours", "description": "A neighborhood cafe by the water, pouring drip coffee brewed to order and matcha whisked by hand." }
+    { "id": "47", "name": "Blue Bottle", "cuisine": "Coffee", "open": true, "said": "Open 24 hours", "rating": "No ratings yet", "description": "Small-batch coffee, served at the bar or carried out. The espresso changes with the season, and the pastries come in every morning." },
+    { "id": "48", "name": "Harbor Coffee", "cuisine": "Café, Bakery", "open": true, "said": "Open 24 hours", "rating": "No ratings yet", "description": "A neighborhood cafe by the water, pouring drip coffee brewed to order and matcha whisked by hand." }
   ],
   "order": { "$case": "none" },
+  "rate": [],
+  "rate.said": "",
+  "rate.comment": "",
+  "rate.closed": false,
+  "rate.name": "Blue Bottle",
+  "#store.rate.RatePage~6": false,
+  "#store.rate.RatePage~8": false,
+  "#store.rate.RatePage~10": false,
+  "#store.rate.RatePage~12": false,
+  "#store.rate.RatePage~14": false,
+  "#store.rate.RatePage~16": "Choose from 1 to 5.",
+  "comment": "",
   "#store.page.OrderPage~8": { "$case": "none" },
   "menu": [
     { "category": { "id": "coffee", "name": "Coffee" }, "items": [

@@ -145,8 +145,10 @@ export const STORE_PAYMENTS_PORTS = Object.fromEntries(
 );
 // TRACK SEAM (reviews): the store's build, its sessions signed in through the
 // development identity provider, one per engine, because a store's ratings
-// are every reader's on a host.
-export const REVIEWS_PORTS = Object.fromEntries(ENGINES.map((e, i) => [e, PORT + 190 + i]));
+// are every reader's on a host. Not PORT + 190: each payments host's
+// provider is ten ports above it (PW_PAYMENTS_PORT, below), which is where
+// 190 to 192 are.
+export const REVIEWS_PORTS = Object.fromEntries(ENGINES.map((e, i) => [e, PORT + 200 + i]));
 // A build serves the runtime it was built with. One built before the runtime
 // changed runs the old runtime against the new server, and fails for a reason
 // that is no test's: `dist-keyed` did, once each page's subscription named
