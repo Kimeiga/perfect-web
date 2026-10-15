@@ -387,7 +387,7 @@ fn steps(more: bool) -> Vec<(String, u64)> {
     let [own] = ran[..] else {
         panic!("place_order's one transaction: {ran:?}")
     };
-    let mut in_ops = 0;
+    let (mut in_ops, mut carts_again) = (0, 0);
     for (op, (calls, statements)) in s.data.statements_by_op() {
         let (c0, r0) = by_op.get(&op).copied().unwrap_or_default();
         if calls > c0 {
@@ -400,6 +400,11 @@ fn steps(more: bool) -> Vec<(String, u64)> {
             );
             if op.starts_with("command ") {
                 in_ops += statements - r0;
+            }
+            // The cart every page's layout shows, read again after the
+            // commit (NEXT 4c's render merge).
+            if op == "read store:data/user-carts#current" {
+                carts_again = calls - c0;
             }
         }
     }
@@ -414,6 +419,10 @@ fn steps(more: bool) -> Vec<(String, u64)> {
     out.push((
         "place_order, taking no payments: its queries read again".to_string(),
         after - own,
+    ));
+    out.push((
+        "place_order, taking no payments: user-carts#current called again".to_string(),
+        carts_again,
     ));
     let mut step = |name: &str, run: &dyn Fn()| {
         let before = s.data.statements().expect("a layer that counts");
@@ -500,6 +509,14 @@ fn a_commands_commit_is_counted_with_it() {
 // back). `place_order`'s three apart, where the deployment takes no
 // payments: `user-orders#settle` (7) is among its operations, the order
 // placed at once (ADR-0332).
+//
+// NEXT 4c's render merge (track `render-merge`): the queries read again
+// after `place_order`'s commit are one render, the drain's read of the cart
+// and the session's five documents, so `user-carts#current`, which every
+// page's layout reads, is called once there where it was called six times
+// (its row below), and 21 statements became 16. No other count moved: no
+// other page or command here calls one operation twice with the same
+// arguments in one render.
 const PAGES: &[(&str, u64)] = &[
     ("add_to_cart (47)", 10),
     ("add_to_cart (48)", 11),
@@ -514,7 +531,11 @@ const PAGES: &[(&str, u64)] = &[
     ("place_order, taking no payments: its commit", 7),
     (
         "place_order, taking no payments: its queries read again",
-        21,
+        16,
+    ),
+    (
+        "place_order, taking no payments: user-carts#current called again",
+        1,
     ),
     ("/order", 5),
 ];

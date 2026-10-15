@@ -148,6 +148,83 @@ impl Pool {
     fn gone(&self) {
         self.give(None);
     }
+
+    // TRACK SEAM (render-merge): a render's connection (NEXT 4c).
+    /// **A render's connection, lent without waiting**: an idle one, or one
+    /// opened past the bound. A render holds its connection from its first
+    /// read to its end, and meanwhile may wait for a read another thread is
+    /// making (pw-resource's one flight per key): were it to wait here,
+    /// renders holding every connection the bound allows could be waiting
+    /// on it. The bound is the commands' and the single reads', which wait
+    /// for a connection while holding none.
+    fn lend(&self) -> Result<Client, String> {
+        let idle = self.idle.lock().expect("idle connections").0.pop();
+        match idle {
+            Some(c) if !c.is_closed() => Ok(c),
+            _ => self.connect(),
+        }
+    }
+
+    /// A render's connection given back: kept while fewer than the bound
+    /// are idle, and closed otherwise.
+    fn keep(&self, c: Client) {
+        let mut idle = self.idle.lock().expect("idle connections");
+        if !c.is_closed() && idle.0.len() < CONNECTIONS {
+            idle.0.push(c);
+        }
+        self.given_back.notify_one();
+    }
+}
+
+/// **A render's read transaction** (NEXT 4c): a connection the pool lends,
+/// its transaction opened at the render's first read as the feed's is
+/// (`feed_pg::READ_SNAPSHOT`), and committed when the render ends, whoever
+/// reads in it last. A read that fails ends it, as it may have aborted it,
+/// and the render's next read opens another.
+struct RenderRead {
+    pool: Arc<Pool>,
+    conn: Mutex<Option<Client>>,
+}
+
+impl RenderRead {
+    fn with(
+        &self,
+        tally: &Tally,
+        f: &mut dyn FnMut(&mut dyn Rows) -> Result<Vec<Val>, String>,
+    ) -> Result<Vec<Val>, String> {
+        let mut conn = self.conn.lock().expect("the render's connection");
+        if conn.is_none() {
+            let mut c = self.pool.lend()?;
+            c.batch_execute(crate::feed_pg::READ_SNAPSHOT).map_err(pg)?;
+            *conn = Some(c);
+        }
+        let c = conn.as_mut().expect("opened");
+        let out = tally.around(|| f(&mut PgRows(Counted(c))));
+        if out.is_err() {
+            self.end(conn.take().expect("opened"), "ROLLBACK");
+        }
+        out
+    }
+
+    /// The transaction ended, and its connection given back where it could
+    /// end it.
+    fn end(&self, mut c: Client, how: &str) {
+        if c.batch_execute(how).is_ok() {
+            self.pool.keep(c);
+        }
+    }
+}
+
+impl Drop for RenderRead {
+    fn drop(&mut self) {
+        let conn = match self.conn.get_mut() {
+            Ok(c) => c.take(),
+            Err(poisoned) => poisoned.into_inner().take(),
+        };
+        if let Some(c) = conn {
+            self.end(c, "COMMIT");
+        }
+    }
 }
 
 /// **A connection taken from the pool**, given back when dropped; one that
@@ -1212,6 +1289,33 @@ impl crate::data::DataLayer for StorePg {
             }
             out
         });
+        self.tally.by_name(
+            crate::store::reads(with, session, &self.faults, stopped),
+            "read",
+        )
+    }
+
+    // TRACK SEAM (render-merge): a render's snapshot, its read transaction,
+    // and each of its queries' reads in it, counted as a query's are (NEXT
+    // 4c).
+    fn snapshot(&self) -> Option<crate::data::Snapshot> {
+        Some(Box::new(Arc::new(RenderRead {
+            pool: self.pool.clone(),
+            conn: Mutex::new(None),
+        })))
+    }
+
+    fn reads_in(
+        &self,
+        snapshot: &crate::data::Snapshot,
+        session: &str,
+        stopped: Option<Stopped>,
+    ) -> Ops {
+        let Some(read) = snapshot.downcast_ref::<Arc<RenderRead>>() else {
+            return self.reads(session, stopped);
+        };
+        let (read, tally) = (read.clone(), self.tally.clone());
+        let with: With = Arc::new(move |f| read.with(&tally, f));
         self.tally.by_name(
             crate::store::reads(with, session, &self.faults, stopped),
             "read",

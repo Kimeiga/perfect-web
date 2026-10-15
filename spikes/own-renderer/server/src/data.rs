@@ -12,10 +12,35 @@ use std::collections::BTreeSet;
 /// Operations by their key, `store:data/carts#add`.
 pub(crate) type Ops = BTreeMap<String, HostFn>;
 
+/// **One render's snapshot of a layer** (NEXT 4c, track `render-merge`):
+/// the layer's own value, which the host holds for the render and hands back
+/// with each query's reads ([`DataLayer::reads_in`]), and drops when the
+/// render ends. What it holds is the layer's to say: the store as one moment
+/// left it, or a read transaction.
+pub(crate) type Snapshot = Box<dyn std::any::Any + Send + Sync>;
+
 pub(crate) trait DataLayer: Send + Sync {
     /// **The operations a query reads through, for one session.** Nothing a
     /// query does commits.
     fn reads(&self, session: &str, stopped: Option<Stopped>) -> Ops;
+
+    /// **One render's snapshot** (NEXT 4c, track `render-merge`): what every
+    /// read of one render reads, taken at the render's first read and given
+    /// up when the render ends, so the render sees one state of the data
+    /// whatever commits meanwhile. By default none, and each query of a
+    /// render reads as [`DataLayer::reads`] does: a layer whose data never
+    /// changes (kiokun's files) needs none.
+    fn snapshot(&self) -> Option<Snapshot> {
+        None
+    }
+
+    /// **The operations one query of a render reads through**, as
+    /// [`DataLayer::reads`] makes them for one session, every one reading
+    /// `snapshot`, which this layer's [`DataLayer::snapshot`] took (NEXT 4c).
+    /// By default [`DataLayer::reads`].
+    fn reads_in(&self, _snapshot: &Snapshot, session: &str, stopped: Option<Stopped>) -> Ops {
+        self.reads(session, stopped)
+    }
 
     /// **A command's writes, staged until its transaction commits.** The
     /// staging holds whatever the layer needs held from the call to the

@@ -2320,6 +2320,31 @@ impl crate::data::DataLayer for StoreData {
         )
     }
 
+    // TRACK SEAM (render-merge): a render's snapshot, the store as its last
+    // commit left it when the render first read it, each part behind its
+    // `Arc`, so nothing is copied; and each of the render's queries' reads
+    // over it (NEXT 4c).
+    fn snapshot(&self) -> Option<crate::data::Snapshot> {
+        let rows = MemRows {
+            carts: self.carts.lock().expect("carts").clone(),
+            staged: BTreeMap::new(),
+            state: self.state.lock().expect("state").clone(),
+        };
+        Some(Box::new(Arc::new(Mutex::new(rows))))
+    }
+
+    fn reads_in(
+        &self,
+        snapshot: &crate::data::Snapshot,
+        session: &str,
+        stopped: Option<Stopped>,
+    ) -> Ops {
+        match snapshot.downcast_ref::<Arc<Mutex<MemRows>>>() {
+            Some(rows) => reads(with_mem(rows.clone()), session, &self.faults, stopped),
+            None => self.reads(session, stopped),
+        }
+    }
+
     fn begin<'a>(&'a self, session: &str) -> Box<dyn crate::data::Staged + 'a> {
         let fail = self.faults.fail_next.swap(false, Ordering::SeqCst);
         Box::new(StoreData::begin(self, session, fail))

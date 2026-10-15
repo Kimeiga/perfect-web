@@ -139,6 +139,59 @@ fn begin_command(c: &mut Client, isolation: Isolation) -> Result<(), postgres::E
     }
 }
 
+// TRACK SEAM (render-merge): a render's read transaction (NEXT 4c), the
+// feed's and the store's (`store_pg.rs`).
+/// **How a render's read transaction opens** (NEXT 4c): repeatable read, so
+/// every statement of the render reads the snapshot its first statement took
+/// (PostgreSQL 18, 13.2.2), and read only, so it never meets a serialization
+/// failure and never waits for a safe snapshot, as a deferrable one would.
+pub(crate) const READ_SNAPSHOT: &str = "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY";
+
+/// **A render's read transaction** (NEXT 4c): one connection of the pool's,
+/// its transaction opened at the render's first read and committed when the
+/// render ends, whoever reads in it last. A read that fails ends it, as it
+/// may have aborted it, and the render's next read opens another.
+struct RenderRead {
+    pool: Arc<Pool>,
+    client: Mutex<Option<Client>>,
+}
+
+impl RenderRead {
+    fn run(&self, f: Read<'_>) -> Result<Val, String> {
+        let mut client = self.client.lock().expect("the render's connection");
+        if client.is_none() {
+            let mut c = self.pool.take()?;
+            c.batch_execute(READ_SNAPSHOT).map_err(pg)?;
+            *client = Some(c);
+        }
+        let out = f(client.as_mut().expect("opened"));
+        if out.is_err() {
+            self.end(client.take().expect("opened"), "ROLLBACK");
+        }
+        out
+    }
+
+    /// The transaction ended, and its connection given back where it could
+    /// end it.
+    fn end(&self, mut c: Client, how: &str) {
+        if c.batch_execute(how).is_ok() {
+            self.pool.give(c);
+        }
+    }
+}
+
+impl Drop for RenderRead {
+    fn drop(&mut self) {
+        let client = match self.client.get_mut() {
+            Ok(c) => c.take(),
+            Err(poisoned) => poisoned.into_inner().take(),
+        };
+        if let Some(c) = client {
+            self.end(c, "COMMIT");
+        }
+    }
+}
+
 /// One post as read: its author's handle and name where it has a row, its
 /// likes counted, and what it replies to.
 struct Row {
@@ -961,6 +1014,32 @@ impl crate::data::DataLayer for FeedPg {
         let pool = self.pool.clone();
         reads_through(
             Arc::new(move |f: Read<'_>| pool.with(|c| Ok(f(c))).and_then(|r| r)),
+            self.principals(),
+            self.uploaded.get().cloned(),
+        )
+    }
+
+    // TRACK SEAM (render-merge): a render's snapshot, its read transaction,
+    // and each of its queries' reads in it (NEXT 4c).
+    fn snapshot(&self) -> Option<crate::data::Snapshot> {
+        Some(Box::new(Arc::new(RenderRead {
+            pool: self.pool.clone(),
+            client: Mutex::new(None),
+        })))
+    }
+
+    fn reads_in(
+        &self,
+        snapshot: &crate::data::Snapshot,
+        session: &str,
+        stopped: Option<Stopped>,
+    ) -> crate::data::Ops {
+        let Some(read) = snapshot.downcast_ref::<Arc<RenderRead>>() else {
+            return self.reads(session, stopped);
+        };
+        let read = read.clone();
+        reads_through(
+            Arc::new(move |f: Read<'_>| read.run(f)),
             self.principals(),
             self.uploaded.get().cloned(),
         )

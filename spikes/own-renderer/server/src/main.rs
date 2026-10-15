@@ -730,6 +730,9 @@ mod csp;
 // The scheduled-commands track: a command runs when the clock passes its
 // time.
 mod schedules;
+// TRACK SEAM (render-merge): one render's identical calls made once, in one
+// snapshot (NEXT 4c).
+mod render_merge;
 
 struct Server {
     /// **The build this host serves, by its name** (ADR-0300): on each
@@ -910,6 +913,11 @@ struct Server {
     /// after it, and a panic there must not silence the session.
     #[cfg(test)]
     told_rendered: Mutex<Option<KeyedFetched>>,
+    /// **What a test does after a render reads a binding** (NEXT 4c, track
+    /// `render-merge`), once: a commit there lands between two bindings'
+    /// reads, which the render's one snapshot is held against.
+    #[cfg(test)]
+    between_bindings: Mutex<Option<KeyedFetched>>,
     /// **What each session's connections meet** (charter §15.5's one-shot
     /// network error and forced reconnect, ADR-0175): whether its next
     /// command's connection is dropped, and when its subscriptions are cut
@@ -1665,6 +1673,8 @@ impl Server {
             deriving_hook: Mutex::new(None),
             #[cfg(test)]
             told_rendered: Mutex::new(None),
+            #[cfg(test)]
+            between_bindings: Mutex::new(None),
             connection_faults: Mutex::new(BTreeMap::new()),
             materializer_faults: Mutex::new(std::collections::BTreeSet::new()),
             keyed: Mutex::new(BTreeMap::new()),
@@ -3977,36 +3987,56 @@ impl Server {
         args: &[Val],
         stopped: Option<Stopped>,
     ) -> Result<Val, String> {
-        // The store's reads (ADR-0218), and the platform's session.
-        let mut host = self.data.reads(session, stopped);
-        host.insert(
+        // Each operation counted as it runs (`/metrics`).
+        let counted = |name: &str, f: HostFn| -> HostFn {
+            let (calls, name) = (self.calls.clone(), name.to_string());
+            Arc::new(move |args: &[Val]| {
+                *calls
+                    .lock()
+                    .expect("calls")
+                    .entry(name.clone())
+                    .or_default() += 1;
+                f(args)
+            })
+        };
+        // The store's reads (ADR-0218). TRACK SEAM (render-merge): in the
+        // render this thread reads, where it reads one, every one reads the
+        // render's snapshot, and a call the render made already is answered
+        // as it was, and not run again (NEXT 4c).
+        let render = render_merge::reading(&*self.data);
+        let layer = match &render {
+            Some(render) => render.reads(&*self.data, session, stopped),
+            None => self.data.reads(session, stopped),
+        };
+        let mut host: BTreeMap<String, HostFn> = layer
+            .into_iter()
+            .map(|(name, f)| {
+                let f = counted(&name, f);
+                let f = match &render {
+                    Some(render) => render.once(session, &name, f),
+                    None => f,
+                };
+                (name, f)
+            })
+            .collect();
+        // And the platform's session, each read its own: never merged.
+        let mut platform: BTreeMap<String, HostFn> = BTreeMap::new();
+        platform.insert(
             "pw:host/session#read".to_string(),
             Self::session_operation(session),
         );
         // TRACK SEAM (notifications): the reader's user, `current_user()`.
-        host.insert(
+        platform.insert(
             notifications::PRINCIPAL_READ.to_string(),
             notifications::principal_operation(&self.identity.principals(), session),
         );
         // The platform's clock (ADR-0304): every comparison in one read
         // answers for one instant, and notes what the read holds until.
-        host.extend(clock::operations(self.now(), &self.zones));
-        let host = host
-            .into_iter()
-            .map(|(name, f)| {
-                let calls = self.calls.clone();
-                let counted_name = name.clone();
-                let counted: HostFn = Arc::new(move |args: &[Val]| {
-                    *calls
-                        .lock()
-                        .expect("calls")
-                        .entry(counted_name.clone())
-                        .or_default() += 1;
-                    f(args)
-                });
-                (name, counted)
-            })
-            .collect();
+        platform.extend(clock::operations(self.now(), &self.zones));
+        host.extend(platform.into_iter().map(|(name, f)| {
+            let f = counted(&name, f);
+            (name, f)
+        }));
         let out = self.run(component_id, session, &host, args)?;
         out.into_iter()
             .next()
@@ -4044,6 +4074,10 @@ impl Server {
         wanted: impl Fn(&str) -> bool,
         keys: &Keys,
     ) -> Result<BTreeMap<String, Val>, Unread> {
+        // TRACK SEAM (render-merge): one render, unless this is one already
+        // (NEXT 4c): its bindings read one snapshot, and each identical call
+        // once.
+        let _render = render_merge::begin(&*self.data, session);
         let page = document.map_or_else(
             || self.store_page().to_string(),
             |d| self.page_of(&(session.to_string(), d)),
@@ -4072,6 +4106,10 @@ impl Server {
                     }
                 };
                 out.insert(b["binding"].as_str().unwrap_or_default().to_string(), value);
+                #[cfg(test)]
+                if let Some(between) = self.between_bindings.lock().expect("between").take() {
+                    between(self);
+                }
             }
             Ok::<_, Unread>(out)
         });
@@ -4415,6 +4453,11 @@ impl Server {
         if existing && !stale && invalidated.is_empty() {
             return;
         }
+        // TRACK SEAM (render-merge): one render, the count read here and the
+        // session's documents read again below (NEXT 4c): the entry's value
+        // and what its documents show are of one snapshot, and the cart
+        // every page shows is read once.
+        let _render = render_merge::begin(&*self.data, session);
         // The count the page shows, as the page computes it: the cart query's
         // value, read through `domain.line_count` (ADR-0125).
         let value = match self.part_text(session, "cart.line_count") {
@@ -4543,6 +4586,11 @@ impl Server {
                 })
                 .collect()
         };
+        // TRACK SEAM (render-merge): the documents read in one render, unless
+        // this is one already (NEXT 4c): one snapshot for all of them, and
+        // each identical call once, the cart that every page's layout shows
+        // among them. Ended once they are read.
+        let render = render_merge::begin(&*self.data, session);
         let mut read = Vec::new();
         for doc in documents {
             let params = self.params_of(&doc);
@@ -4557,6 +4605,7 @@ impl Server {
                 Err(why) => self.unshowable(&doc, &why),
             }
         }
+        drop(render);
 
         // Two frames per change: the entry advanced, and every place in the
         // document the server DERIVED from it, as one set (ADR-0145). A
