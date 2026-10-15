@@ -455,17 +455,41 @@ fn steps(more: bool) -> Vec<(String, u64)> {
     // reader's step; then store 47 rated, and its rate page read.
     let delivered = posted(&s, "/bench/order?status=delivered", "a", "", "");
     assert!(delivered.starts_with("HTTP/1.1 200"), "{delivered}");
-    step("rate_order", &|| {
-        let rated = s
-            .command_answered(
-                "store.rate.rate_order",
-                "a",
-                &[s_val("47"), Val::S64(4), s_val("Fine.")],
-                None,
-            )
-            .expect("answered");
-        assert!(rated.committed, "{rated:?}");
-    });
+    // `rate_order` apart, as `place_order` is: its transaction (its
+    // operations and its commit), and the reader's open pages read again
+    // after it, which its cart's event regenerates (ADR-0218's session
+    // entry): every page the scenario left open.
+    let (txns, all) = (
+        s.data.statements_by_transaction().len(),
+        s.data.statements().expect("counted"),
+    );
+    let rated = s
+        .command_answered(
+            "store.rate.rate_order",
+            "a",
+            &[s_val("47"), Val::S64(4), s_val("Fine.")],
+            None,
+        )
+        .expect("answered");
+    assert!(rated.committed, "{rated:?}");
+    let ran = s.data.statements_by_transaction()[txns..].to_vec();
+    let after = s.data.statements().expect("counted") - all;
+    let [own] = ran[..] else {
+        panic!("rate_order's one transaction: {ran:?}")
+    };
+    out.push(("rate_order: its transaction".to_string(), own));
+    out.push((
+        "rate_order: its reader's open pages read again".to_string(),
+        after - own,
+    ));
+    let mut step = |name: &str, run: &dyn Fn()| {
+        let before = s.data.statements().expect("a layer that counts");
+        run();
+        out.push((
+            name.to_string(),
+            s.data.statements().expect("counted") - before,
+        ));
+    };
     step("/order/rate/47", &|| {
         fetched_as(&s, "/order/rate/47", Some("a"));
     });
@@ -562,10 +586,12 @@ const PAGES: &[(&str, u64)] = &[
         21,
     ),
     ("/order", 6),
-    // TRACK SEAM (reviews): `rate_order`, its transaction (`MayRate`'s read,
-    // `#rate`'s read and its row), its commit, and the reader's pages read
-    // again; the rate page, its store and the layout's cart.
-    ("rate_order", 9),
+    // TRACK SEAM (reviews): `rate_order`'s transaction (`MayRate`'s read,
+    // `#rate`'s read and its row, and its commit); the reader's open pages
+    // read again after it, the seven the scenario left open, which its cart's
+    // event regenerates; and the rate page, its store and the layout's cart.
+    ("rate_order: its transaction", 8),
+    ("rate_order: its reader's open pages read again", 42),
     ("/order/rate/47", 2),
 ];
 
