@@ -311,3 +311,129 @@ impl Tail {
         })
     }
 }
+
+/// **Sessions and sign-ins kept in a layer's schema** (ADR-XXXX):
+/// `sessions` and `sign_ins`, each by its secret's SHA-256
+/// ([`crate::identity::kept_hash`]), on connections of their own, so that a
+/// request's read of its session waits on no command.
+pub(crate) struct SessionsPg {
+    url: String,
+    schema: String,
+    idle: Mutex<Vec<Client>>,
+    /// The statements it ran: one per request that reads its session.
+    #[cfg(test)]
+    pub(crate) ran: std::sync::atomic::AtomicU64,
+}
+
+/// How many idle connections it keeps.
+const SESSION_CONNECTIONS: usize = 8;
+
+impl SessionsPg {
+    pub(crate) fn new(url: &str, schema: &str) -> SessionsPg {
+        SessionsPg {
+            url: url.to_string(),
+            schema: schema.to_string(),
+            idle: Mutex::new(Vec::new()),
+            #[cfg(test)]
+            ran: std::sync::atomic::AtomicU64::new(0),
+        }
+    }
+
+    fn with<T>(
+        &self,
+        f: impl FnOnce(&mut Client) -> Result<T, postgres::Error>,
+    ) -> Result<T, String> {
+        let taken = self.idle.lock().expect("idle connections").pop();
+        let mut c = match taken {
+            Some(c) if !c.is_closed() => c,
+            _ => {
+                let mut c = Client::connect(&self.url, NoTls).map_err(pg)?;
+                c.batch_execute(&format!("SET search_path TO {}", ident(&self.schema)))
+                    .map_err(pg)?;
+                c
+            }
+        };
+        #[cfg(test)]
+        self.ran.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let out = f(&mut c);
+        if !c.is_closed() {
+            let mut idle = self.idle.lock().expect("idle connections");
+            if idle.len() < SESSION_CONNECTIONS {
+                idle.push(c);
+            }
+        }
+        out.map_err(pg)
+    }
+}
+
+impl crate::identity::Kept for SessionsPg {
+    fn session(&self, hash: &[u8]) -> Result<Option<crate::identity::Principal>, String> {
+        self.with(|c| {
+            Ok(c.query_opt(
+                "SELECT user_id, handle, name, issuer FROM sessions WHERE hash = $1",
+                &[&hash],
+            )?
+            .map(|r| crate::identity::Principal {
+                user: r.get(0),
+                handle: r.get(1),
+                name: r.get(2),
+                issuer: r.get(3),
+            }))
+        })
+    }
+
+    fn open(&self, hash: &[u8], p: &crate::identity::Principal) -> Result<(), String> {
+        self.with(|c| {
+            c.execute(
+                "INSERT INTO sessions (hash, user_id, handle, name, issuer) \
+                 VALUES ($1, $2, $3, $4, $5) \
+                 ON CONFLICT (hash) DO UPDATE SET user_id = EXCLUDED.user_id, \
+                 handle = EXCLUDED.handle, name = EXCLUDED.name, issuer = EXCLUDED.issuer",
+                &[&hash, &p.user, &p.handle, &p.name, &p.issuer],
+            )
+            .map(|_| ())
+        })
+    }
+
+    fn close(&self, hash: &[u8]) -> Result<(), String> {
+        self.with(|c| {
+            c.execute("DELETE FROM sessions WHERE hash = $1", &[&hash])
+                .map(|_| ())
+        })
+    }
+
+    fn begin_sign_in(&self, hash: &[u8], nonce: &str, verifier: &str) -> Result<(), String> {
+        // And those begun more than their lifetime ago forgotten, in the
+        // same statement.
+        self.with(|c| {
+            c.execute(
+                "WITH gone AS (DELETE FROM sign_ins \
+                 WHERE started < clock_timestamp() - interval '10 minutes') \
+                 INSERT INTO sign_ins (hash, nonce, verifier) VALUES ($1, $2, $3)",
+                &[&hash, &nonce, &verifier],
+            )
+            .map(|_| ())
+        })
+    }
+
+    fn take_sign_in(
+        &self,
+        hash: &[u8],
+    ) -> Result<Option<(String, String, std::time::Duration)>, String> {
+        self.with(|c| {
+            Ok(c.query_opt(
+                "DELETE FROM sign_ins WHERE hash = $1 RETURNING nonce, verifier, \
+                 (extract(epoch FROM clock_timestamp() - started) * 1000)::bigint",
+                &[&hash],
+            )?
+            .map(|r| {
+                let ms: i64 = r.get(2);
+                (
+                    r.get(0),
+                    r.get(1),
+                    std::time::Duration::from_millis(u64::try_from(ms).unwrap_or(0)),
+                )
+            }))
+        })
+    }
+}

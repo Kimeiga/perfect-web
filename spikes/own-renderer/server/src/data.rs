@@ -130,6 +130,14 @@ pub(crate) trait DataLayer: Send + Sync {
         None
     }
 
+    /// **Where its sessions and sign-ins are kept beyond the host's memory**
+    /// (ADR-XXXX, track `second-host`): its database, where the hosts share
+    /// one, so a restarted host or another keeps a reader signed in. A layer
+    /// in memory keeps them in the host's, as long as it runs.
+    fn sessions(&self) -> Option<Arc<dyn crate::identity::Kept>> {
+        None
+    }
+
     /// **Every operation it supplies**, read from the functions it builds,
     /// not from a list kept beside them.
     fn operations(&self) -> BTreeSet<String> {

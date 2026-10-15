@@ -66,6 +66,11 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "0010_outbox_log",
         include_str!("../migrations/feed/0010_outbox_log.sql"),
     ),
+    // Track `second-host` (ADR-XXXX): sessions and sign-ins kept.
+    (
+        "0011_sessions",
+        include_str!("../migrations/feed/0011_sessions.sql"),
+    ),
 ];
 
 /// **How a command's transaction is opened.** The layer sets serializable on
@@ -598,6 +603,9 @@ pub(crate) struct FeedPg {
     /// **This host's reader of the outbox** (ADR-XXXX): every other host's
     /// commits, from its cursor; and its id, which its own rows carry.
     tail: crate::hosts::Tail,
+    /// **Its sessions and sign-ins, kept where the hosts share them**
+    /// (ADR-XXXX).
+    sessions: Arc<crate::hosts::SessionsPg>,
 }
 
 impl FeedPg {
@@ -638,6 +646,7 @@ impl FeedPg {
         let outbox = crate::hosts::Outbox::current(&mut c)?;
         pool.give(c);
         let host = crate::hosts::new_host();
+        let sessions = Arc::new(crate::hosts::SessionsPg::new(url, &outbox.schema));
         let tail = crate::hosts::Tail::open(url, outbox, &host)?;
         Ok(FeedPg {
             pool,
@@ -646,6 +655,7 @@ impl FeedPg {
             uploaded: std::sync::OnceLock::new(),
             principals: std::sync::RwLock::new(Principals::default()),
             tail,
+            sessions,
         })
     }
 }
@@ -1024,6 +1034,10 @@ impl crate::data::DataLayer for FeedPg {
 
     fn tail(&self) -> Option<&crate::hosts::Tail> {
         Some(&self.tail)
+    }
+
+    fn sessions(&self) -> Option<Arc<dyn crate::identity::Kept>> {
+        Some(self.sessions.clone())
     }
 
     fn identified_by(&self, principals: Principals) {

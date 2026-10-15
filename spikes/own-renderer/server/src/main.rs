@@ -1617,6 +1617,11 @@ impl Server {
         // user through the identity's principals.
         let identity = identity::Identity::default();
         data.identified_by(identity.principals());
+        // TRACK SEAM (second-host): its sessions kept where the hosts share
+        // them, where the layer's database is shared (ADR-XXXX).
+        if let Some(kept) = data.sessions() {
+            identity.principals().keep_in(kept);
+        }
         // TRACK SEAM (store-accounts): whom the program's cart is, by the
         // key its pages read it with.
         let cart_by_reader = std::iter::once(&plan)
@@ -7973,6 +7978,12 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
         headers.push_str(&line);
     }
     let (session, fresh) = session_of(&headers);
+    // TRACK SEAM (second-host): the session as the hosts keep it, read once
+    // for the request (ADR-XXXX): signed in or out on another host, it is so
+    // here too.
+    if !fresh {
+        server.identity.principals().refresh(&session);
+    }
 
     // TRACK SEAM (uploads, ADR-0253): an upload reads its own body, within
     // its own limits, before the bound a command's body is held to.

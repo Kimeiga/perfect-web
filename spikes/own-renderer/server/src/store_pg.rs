@@ -89,6 +89,11 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "0018_outbox_log",
         include_str!("../migrations/store/0018_outbox_log.sql"),
     ),
+    // Track `second-host` (ADR-XXXX): sessions and sign-ins kept.
+    (
+        "0019_sessions",
+        include_str!("../migrations/store/0019_sessions.sql"),
+    ),
 ];
 
 /// **The schema a deployment's store is in**, unless it names another.
@@ -899,6 +904,9 @@ pub(crate) struct StorePg {
     /// **This host's reader of the outbox** (ADR-XXXX): every other host's
     /// commits, from its cursor; and its id, which its own rows carry.
     tail: crate::hosts::Tail,
+    /// **Its sessions and sign-ins, kept where the hosts share them**
+    /// (ADR-XXXX).
+    sessions: Arc<crate::hosts::SessionsPg>,
     /// A test's schema, dropped with the layer.
     #[cfg(test)]
     owned: bool,
@@ -932,6 +940,7 @@ impl StorePg {
         drop(c);
         let host = crate::hosts::new_host();
         let tail = crate::hosts::Tail::open(url, crate::hosts::Outbox::of(schema), &host)?;
+        let sessions = Arc::new(crate::hosts::SessionsPg::new(url, schema));
         Ok(StorePg {
             pool,
             isolation,
@@ -939,6 +948,7 @@ impl StorePg {
             faults: Faults::new(),
             tally: Tally::default(),
             tail,
+            sessions,
             #[cfg(test)]
             owned: false,
         })
@@ -1225,6 +1235,10 @@ impl crate::data::DataLayer for StorePg {
 
     fn tail(&self) -> Option<&crate::hosts::Tail> {
         Some(&self.tail)
+    }
+
+    fn sessions(&self) -> Option<Arc<dyn crate::identity::Kept>> {
+        Some(self.sessions.clone())
     }
 
     fn reads(&self, session: &str, stopped: Option<Stopped>) -> Ops {

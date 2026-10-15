@@ -273,12 +273,60 @@ impl Principal {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 struct PrincipalsInner {
     /// The accounts model: a session is signed in only where a sign-in put
     /// it in `sessions`. Otherwise every session is its own guest.
     accounts: AtomicBool,
     sessions: RwLock<HashMap<String, Principal>>,
+    /// TRACK SEAM (second-host): **where sessions are kept beyond this
+    /// host's memory** (ADR-XXXX), the database the hosts share, where the
+    /// data layer has one. `sessions` is then each request's copy of it.
+    kept: OnceLock<Arc<dyn Kept>>,
+}
+
+impl std::fmt::Debug for PrincipalsInner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PrincipalsInner")
+            .field("accounts", &self.accounts)
+            .field("sessions", &self.sessions)
+            .field("kept", &self.kept.get().is_some())
+            .finish()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TRACK SEAM (second-host): sessions kept where the hosts share them
+// ---------------------------------------------------------------------------
+
+/// **A secret as it is kept**: its SHA-256, never the secret (ADR-XXXX). A
+/// session's id (128 bits from the operating system) and a sign-in's state
+/// (256) are past any guess, so a fast hash is enough: a copy of what is
+/// kept opens no session and completes no sign-in. A password, which a
+/// person chose, is the slow hash's (ADR-0258's Argon2id).
+pub(crate) fn kept_hash(secret: &str) -> Vec<u8> {
+    use sha2::Digest;
+    sha2::Sha256::digest(secret.as_bytes()).to_vec()
+}
+
+/// **Where a deployment keeps its sessions and its sign-ins under way**
+/// beyond one host's memory (ADR-XXXX, track `second-host`): the database
+/// its hosts share, so that a host restarted, or another one, knows the
+/// reader a sign-in made, and a sign-in begun on one host completes on
+/// another. Each by its secret's [`kept_hash`].
+pub(crate) trait Kept: Send + Sync {
+    /// The principal of the session whose id hashes to `hash`, or none.
+    fn session(&self, hash: &[u8]) -> Result<Option<Principal>, String>;
+    /// A session opened for `principal`.
+    fn open(&self, hash: &[u8], principal: &Principal) -> Result<(), String>;
+    /// A session closed: no one from now on.
+    fn close(&self, hash: &[u8]) -> Result<(), String>;
+    /// A sign-in begun: its nonce and its PKCE verifier, which the token
+    /// request needs as they are.
+    fn begin_sign_in(&self, hash: &[u8], nonce: &str, verifier: &str) -> Result<(), String>;
+    /// A sign-in's nonce and verifier, and how long ago it began, taken: it
+    /// completes once.
+    fn take_sign_in(&self, hash: &[u8]) -> Result<Option<(String, String, Duration)>, String>;
 }
 
 /// **A session open on a reader's behalf**, closed when it goes.
@@ -343,6 +391,64 @@ impl Principals {
 
     fn close(&self, session: &str) {
         self.0.sessions.write().expect("principals").remove(session);
+    }
+
+    /// TRACK SEAM (second-host): **sessions kept in `kept`** (ADR-XXXX),
+    /// handed once, when the server is built on a layer that has one.
+    pub(crate) fn keep_in(&self, kept: Arc<dyn Kept>) {
+        let _ = self.0.kept.set(kept);
+    }
+
+    /// Where sessions are kept beyond this host's memory, where they are.
+    pub(crate) fn kept(&self) -> Option<Arc<dyn Kept>> {
+        self.0.kept.get().cloned()
+    }
+
+    /// TRACK SEAM (second-host): **`session` as it is kept, read once for a
+    /// request** (ADR-XXXX): signed in on another host, or by this one
+    /// before it restarted, it is signed in here; signed out anywhere, it is
+    /// no one here. One statement, in the accounts model where sessions are
+    /// kept; nothing otherwise. A read that fails signs the request out:
+    /// it is no one rather than someone it may no longer be.
+    pub fn refresh(&self, session: &str) {
+        let Some(kept) = self.0.kept.get() else {
+            return;
+        };
+        if !self.0.accounts.load(Ordering::SeqCst)
+            || session.is_empty()
+            || session.starts_with(ON_BEHALF)
+        {
+            return;
+        }
+        match kept.session(&kept_hash(session)) {
+            Ok(Some(principal)) => self.open(session, principal),
+            Ok(None) => self.close(session),
+            Err(why) => {
+                eprintln!("pw dev server: a session was not read: {why}");
+                self.close(session);
+            }
+        }
+    }
+
+    /// **`session` signed in as `principal`**: kept first where sessions are
+    /// kept, so that no host knows a sign-in the others cannot.
+    fn sign_in(&self, session: &str, principal: Principal) -> Result<(), String> {
+        if let Some(kept) = self.0.kept.get() {
+            kept.open(&kept_hash(session), &principal)?;
+        }
+        self.open(session, principal);
+        Ok(())
+    }
+
+    /// **`session` signed out**: no one wherever it is kept, then here.
+    fn sign_out(&self, session: &str) -> Result<(), String> {
+        if let Some(kept) = self.0.kept.get()
+            && !session.is_empty()
+        {
+            kept.close(&kept_hash(session))?;
+        }
+        self.close(session);
+        Ok(())
     }
 
     /// **A session the platform opens on a reader's behalf** (NEXT 6c, step
@@ -668,7 +774,20 @@ impl Identity {
         };
         let (state, nonce, verifier) = (token(), token(), token());
         let challenge = s256(&verifier);
-        {
+        // TRACK SEAM (second-host): kept where the hosts share it, so that
+        // the callback completes it on whichever host it reaches.
+        if let Some(kept) = self.principals.kept() {
+            if let Err(why) = kept.begin_sign_in(&kept_hash(&state), &nonce, &verifier) {
+                return Some(Reply::page(
+                    503,
+                    "Sign-in not started",
+                    &format!(
+                        "<p role=\"alert\">Sign-in could not start: {}.</p>",
+                        escape(&why)
+                    ),
+                ));
+            }
+        } else {
             let mut pending = accounts.pending.lock().expect("pending");
             pending.retain(|_, p| p.started.elapsed() < SIGN_IN_LIFETIME);
             pending.insert(
@@ -737,10 +856,29 @@ impl Identity {
         if state.is_empty() || !same(&state, &bound) {
             return Some(refused("it was not started by this browser"));
         }
-        let Some(pending) = accounts.pending.lock().expect("pending").remove(&state) else {
+        // TRACK SEAM (second-host): taken from where the hosts keep it,
+        // once, whichever host began it.
+        let taken = match self.principals.kept() {
+            Some(kept) => match kept.take_sign_in(&kept_hash(&state)) {
+                Ok(taken) => taken.map(|(nonce, verifier, age)| (nonce, verifier, age)),
+                Err(why) => return Some(refused(&why)),
+            },
+            None => accounts
+                .pending
+                .lock()
+                .expect("pending")
+                .remove(&state)
+                .map(|p| (p.nonce, p.verifier, p.started.elapsed())),
+        };
+        let Some((nonce, verifier, age)) = taken else {
             return Some(refused("it was already completed or is unknown"));
         };
-        if pending.started.elapsed() > SIGN_IN_LIFETIME {
+        let pending = Pending {
+            nonce,
+            verifier,
+            started: Instant::now(),
+        };
+        if age > SIGN_IN_LIFETIME {
             return Some(refused("it took too long"));
         }
         let code = fields.get("code").cloned().unwrap_or_default();
@@ -770,8 +908,15 @@ impl Identity {
         // signed-in session that signs in again is signed out, and what it
         // held is its user's, never the next one's.
         let was_guest = self.principals.of(session).is_none_or(|p| p.is_guest());
-        self.principals.close(session);
-        self.principals.open(&rotated, principal.clone());
+        // TRACK SEAM (second-host): kept where the hosts share them, before
+        // the browser is answered (ADR-XXXX).
+        if let Err(why) = self
+            .principals
+            .sign_out(session)
+            .and_then(|()| self.principals.sign_in(&rotated, principal.clone()))
+        {
+            return Some(refused(&format!("the session was not kept: {why}")));
+        }
         // TRACK SEAM (store-accounts): the deployment told, before the
         // browser is answered.
         if was_guest && !session.is_empty() {
@@ -795,7 +940,18 @@ impl Identity {
     /// replayed, is no one; and a new session, so the browser is not left
     /// holding the old one.
     fn sign_out(&self, session: &str) -> Reply {
-        self.principals.close(session);
+        // TRACK SEAM (second-host): no one on any host (ADR-XXXX); a
+        // sign-out not kept is said, and the browser keeps its session.
+        if let Err(why) = self.principals.sign_out(session) {
+            return Reply::page(
+                503,
+                "Sign-out not completed",
+                &format!(
+                    "<p role=\"alert\">Sign-out was not completed: {}.</p>",
+                    escape(&why)
+                ),
+            );
+        }
         let rotated = new_session_id();
         Reply::redirect(
             "/",
