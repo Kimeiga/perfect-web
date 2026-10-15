@@ -260,7 +260,14 @@ fn a_name_bound_twice_carries_each_bindings_label() {
 #[test]
 fn a_secret_rendered_through_an_each_blocks_name_is_refused() {
     let wrong = "module t\n\nimport secrets\nimport capability.{ Secret, Payments }\n\npage P() {\n    placement origin\n\n    let keys: List<Secret<Payments>> = [secrets.payments()]\n\n    view {\n        <ul>\n            {#each keys as k (k)}\n                <li>{k}</li>\n            {/each}\n        </ul>\n    }\n}\n";
-    one(wrong, "PW5003");
+    let d = one(wrong, "PW5003");
+    // The row's name carries its list's label: `{k}` is refused as `k`. The
+    // list is a part the template reads since ADR-XXXX, and is refused too,
+    // so a refusal of the list alone would not say the row is labelled.
+    assert!(
+        d.contains("`k` is Secret<Payments> and is rendered into markup"),
+        "{d}"
+    );
     none(
         &wrong
             .replace(
