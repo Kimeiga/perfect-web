@@ -1,0 +1,31 @@
+{
+  "id": "J01-stale-page-after-save",
+  "leaf": "J01",
+  "also": ["B06"],
+  "title": "A page shown after a save is the one read before it",
+  "source": {
+    "ref": "ADR-0280 (the owner's own Next.js case); S17",
+    "kind": "the owner's report; framework documentation; standard",
+    "url": "https://nextjs.org/docs/app/api-reference/config/next-config-js/staleTimes ; https://nextjs.org/docs/app/guides/redirecting ; https://www.rfc-editor.org/rfc/rfc9111.html",
+    "date": "Next.js's guides read 2026-10-08 for ADR-0280; RFC 9111 2026-09-10, as read for the census",
+    "says": "ADR-0280's reading: a `router.push` from an event handler goes through the client's Router Cache, whose `static` stale time keeps a static or fully prefetched page for five minutes; so a page pushed to after a save can be the one read before it, and the usual fixes are `router.refresh()`, a cache-busting parameter or a hard reload. S17: correct reuse depends on every response-varying input, not merely the URL"
+  },
+  "claim": "ADR-0280: a handler navigates after its command commits, and the page navigated to is read after the commit, by order alone (the server serves it after the session's turn, as `no-store`)",
+  "repro": {
+    "stack": "next-react",
+    "bug": "next-react.patch",
+    "fixed": "fixed.next-react.patch",
+    "how": "a cart page, linked from the store page with `<Link prefetch={true}>`; a client button that saves through a Route Handler and then `router.push`es to the cart's page. The repair is ADR-0280's first usual fix, `router.refresh()` before the push"
+  },
+  "pleris": {
+    "kind": "runtime",
+    "mechanism": "ADR-0280, navigate after the commit",
+    "faithful": "The canonical store's 'Place order': a command, then `navigate OrderPage()` in its `Ok` arm, the save made to reach the server late. The test asserts the order's page as served says the order is placed, at its own address with no parameter, by a soft navigation. Pleris has no client cache of pages that a save could leave stale, so there is no program to refuse: this is a runtime guarantee, not a diagnostic.",
+    "test": {
+      "name": "e2e/navigate.spec.mjs: an order placed goes to its page, read after the commit (Chromium)",
+      "command": "BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null 2>&1 && cargo build --quiet --locked -p pw-dev-server && cd spikes/own-renderer && FORCE_COLOR=0 pnpm exec playwright test e2e/navigate.spec.mjs -g 'an order placed goes to its page, read after the commit' --project=chromium --reporter=line 2>&1",
+      "expect": "^\\s*1 passed"
+    }
+  },
+  "expect": "refused"
+}

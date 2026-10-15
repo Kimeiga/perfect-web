@@ -369,15 +369,19 @@ async function main() {
     const v = verdict(ex, shown, said);
     console.log(`   => ${v.status}${v.ok ? "" : "  <- NOT AS THE EXHIBIT EXPECTS"}`);
     console.log("");
-    rows.push({ ex, ...v });
+    rows.push({ ex, shown, ...v });
   }
 
-  // Misses first, then everything else: what Pleris does not catch is read first.
-  const order = (r) => (r.status.startsWith("miss") ? 0 : r.status.startsWith("refused") ? 2 : 1);
+  // Misses first, then whatever is not as its exhibit expects, then refusals:
+  // what Pleris does not catch is read first.
+  const order = (r) => (!r.ok ? 1 : r.status.startsWith("miss") ? 0 : 2);
   rows.sort((a, b) => order(a) - order(b) || a.ex.id.localeCompare(b.ex.id));
-  console.log("exhibit | census | source | shown in | Pleris");
+  console.log("exhibit | census | source | the bug, in | its repair | Pleris");
   for (const r of rows) {
-    console.log(`${r.ex.id} | ${r.ex.leaf} | ${r.ex.source.kind}, ${r.ex.source.date} | ${r.ex.repro.stack} | ${r.status}`);
+    const bug = `${r.ex.repro.stack}: ${r.shown.happens ? "shown" : "NOT SHOWN"}`;
+    const repair = r.shown.control ? "fails the spec" : "DOES NOT FAIL THE SPEC";
+    const mark = r.ok ? "" : "  <- NOT AS EXPECTED";
+    console.log(`${r.ex.id} | ${r.ex.leaf} | ${r.ex.source.kind}, ${r.ex.source.date} | ${bug} | ${repair} | ${r.status}${mark}`);
   }
   const misses = rows.filter((r) => r.status.startsWith("miss")).length;
   const refused = rows.filter((r) => r.status.startsWith("refused")).length;

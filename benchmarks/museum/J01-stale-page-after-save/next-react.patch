@@ -1,0 +1,87 @@
+diff --git a/app/api/cart/route.ts b/app/api/cart/route.ts
+new file mode 100644
+index 0000000..2e95d2a
+--- /dev/null
++++ b/app/api/cart/route.ts
+@@ -0,0 +1,10 @@
++import { addToCart, isMenuItem } from "@/lib/store";
++import { ensureSession } from "@/lib/session";
++
++/** Add one of an item to the session's cart: `{ store, item }`. */
++export async function POST(request: Request) {
++  const { store, item } = (await request.json()) as { store: string; item: string };
++  if (!isMenuItem(store, item)) return new Response("no such item", { status: 400 });
++  addToCart(await ensureSession(), item, 1);
++  return Response.json({ added: item });
++}
+diff --git a/app/stores/[storeId]/AddAndView.tsx b/app/stores/[storeId]/AddAndView.tsx
+new file mode 100644
+index 0000000..3151a11
+--- /dev/null
++++ b/app/stores/[storeId]/AddAndView.tsx
+@@ -0,0 +1,21 @@
++"use client";
++
++import { useRouter } from "next/navigation";
++
++// Saves, then goes to the cart: `router.push` from an event handler, the way
++// to navigate from a handler.
++export function AddAndView({ store, item }: { store: string; item: string }) {
++  const router = useRouter();
++  return (
++    <button
++      id="add-and-view"
++      type="button"
++      onClick={async () => {
++        await fetch("/api/cart", { method: "POST", body: JSON.stringify({ store, item }) });
++        router.push(`/stores/${store}/cart`);
++      }}
++    >
++      Add and view cart
++    </button>
++  );
++}
+diff --git a/app/stores/[storeId]/cart/page.tsx b/app/stores/[storeId]/cart/page.tsx
+new file mode 100644
+index 0000000..cb9ad10
+--- /dev/null
++++ b/app/stores/[storeId]/cart/page.tsx
+@@ -0,0 +1,13 @@
++import { getCart, lineCount } from "@/lib/store";
++import { currentSession } from "@/lib/session";
++
++// The session's cart, on a page of its own.
++export default async function CartPage() {
++  const cart = getCart(await currentSession());
++  return (
++    <main>
++      <h1>Your cart</h1>
++      <p id="cart-page-count">{lineCount(cart)}</p>
++    </main>
++  );
++}
+diff --git a/app/stores/[storeId]/page.tsx b/app/stores/[storeId]/page.tsx
+index 8d4f845..254dce5 100644
+--- a/app/stores/[storeId]/page.tsx
++++ b/app/stores/[storeId]/page.tsx
+@@ -1,7 +1,9 @@
++import Link from "next/link";
+ import { notFound } from "next/navigation";
+ import { getCart, getMenu, getStore, lineCount } from "@/lib/store";
+ import { currentSession } from "@/lib/session";
+ import { addToCartAction, clearCartAction } from "./actions";
++import { AddAndView } from "./AddAndView";
+ 
+ export default async function StorePage({
+   params,
+@@ -35,6 +37,10 @@ export default async function StorePage({
+ 
+       <section aria-label="Cart">
+         <p id="cart-count">{lineCount(cart)}</p>
++        <Link href={`/stores/${store.id}/cart`} prefetch={true}>
++          View cart
++        </Link>
++        <AddAndView store={store.id} item={menu[0].id} />
+         <form action={clearCartAction}>
+           <input type="hidden" name="store" value={store.id} />
+           <button id="clear-cart" type="submit">
