@@ -17,6 +17,58 @@ The coordinator's addition of 2026-10-14 is the central question, and
 decision 1: an app's data declared in Pleris, with one generic adapter
 per database implementing every app's, so that no app needs Rust.
 
+## Ruling (the integrator, 2026-10-15)
+
+Accepted under the owner's delegation of 2026-10-02, with the amendments
+below; every decision stands as written where no amendment names it.
+
+1. **Decision 1 is the direction for every app's data**: declared in
+   Pleris, served by one generic adapter per database, no app-specific
+   Rust (the owner's steering of 2026-10-15, its second item; the
+   architect's E10-S10, generalized from the carts to every operation).
+   Built in decision 6's order, D1 first.
+2. **Names (amends 1.2).** A set form ends in `_many`, as its host
+   primitive does (`get_many(keys)`, `of_owner_many(owners)`,
+   `by_store_many(stores)`), so that no set read is read as `all()`, the
+   bounded table's whole read. A read by a key's prefix is named by the
+   prefix's fields (`CartLines.of_owner(owner)`; a two-field prefix of a
+   three-field key, `of_owner_store(owner, store)`), so a read says what
+   it reads and no name is told apart by its arity. The writes:
+   `insert(row)` (refused where the key exists), `put(row)` (the whole
+   row), `delete(key)`, `delete_of_<fields>(prefix)`.
+3. **The word and its clauses** (question 1): `table`, with `row`, `key`,
+   `order`, `index`, `unique`, `refers` and `bounded`, and the imports'
+   namespace `pw:tables/<table>#<primitive>`: accepted.
+4. **Codes** (question 2): the table refusals are declaration rules,
+   PW0354 to PW0366 in `DeclarationRules` beside ADR-0207's (free on master
+   and on every pushed track branch at 2026-10-15 02:30Z); D1 checks again
+   at its start and takes the next free code for any that is gone.
+   PW0347's and PW0349's revisions come with T1.
+5. **TodoMVC is D2's first app with no Rust data layer** (question 1):
+   track `todomvc`'s milestone-1 layer (`server/src/todomvc.rs`) is the
+   "before" that D2 deletes.
+6. **The 4c note's `set` pairing is generated for declared tables**
+   (question 1); a hand-written layer keeps its written pairing until its
+   app's data is declared (D4, D5).
+7. **One conformance suite** (amends 1.5 and 5.5): the 4c note's suite
+   (per layer, two data sizes) and decision 5.5's are one suite, written
+   once against the `DataLayer` seam, run first against today's
+   hand-written layers (4c's track) and generated for every declared table
+   from D2 on.
+8. **The seam** (question 3), `sources.json`'s `sets` and `tells`, and
+   `tables.json` (question 4): accepted.
+9. **The name** (question 5): `StoreData` stays until the track that
+   splits the store's data (T1 with T3) names the parts it splits; no
+   rename while there is one source.
+10. **The order** (question 6): accepted: D5's composites in the 4c note's
+    order; T3 after the search, a line's price and a cart's stores are
+    Pleris.
+11. **`transactions partition`** (question 7): a word of ADR-0207's
+    `transactions`, as proposed.
+12. **The owner's decisions** (1 to 7) stay the owner's. None blocks D1 to
+    D5, T1 or T2, which download nothing; the coordinator asks them before
+    T3, T4 or T5 starts.
+
 ## Context
 
 - **The owner's ask** (relayed 2026-10-04 and 2026-10-08): apps use
