@@ -235,8 +235,8 @@ every guarantee (ADR-0207): one call, no warning (see the questions).
 
 Recorded by `just e14-bounded-reads` in `docs/evidence/E14/bounded-reads.txt`:
 
-- `compiler/pw-core/tests/bounded_reads.rs`, 25 tests: PW0405 in each loop
-  form (eight combinators and a pipe, a `for` through a `let`, a recursion
+- `compiler/pw-core/tests/bounded_reads.rs`, 27 tests: PW0405 in each loop
+  form (seven combinators and a pipe, a `for` through a `let`, a recursion
   over a list and over a count, a function of the program's passing its
   callback on and calling it in a `for`, a `let`-bound callback, a named
   callback, a helper, a nested loop), each key path, and its controls (a key
@@ -245,16 +245,18 @@ Recorded by `just e14-bounded-reads` in `docs/evidence/E14/bounded-reads.txt`:
   ADR-0022's perturbations (renamed, rebound, a decoy); PW0406 on `per_key`
   and on no `sets`, none on `one_call`, `chunked(100)`, the host's database
   or a read no `set` names; the pair's shapes; the clauses' places and
-  values; `source_clauses`; the store (clean, mutated per element and
-  refused, with the two annotations); the feed; kiokun-site's known four.
-  And `bounded`'s own: `Sets`, and the call graph's cycles.
+  values; `Sets` and its budget; `source_clauses`, and an older
+  `sources.json` read as `per_key`; the store (clean, mutated per element
+  and refused, with the two annotations); the feed; kiokun-site's known
+  four. And `bounded`'s own: the call graph's cycles.
 - The corpus (corpus C24): R-070, R-071, R-072 each emit only PW0405 and
   convey their `@expect-error`s; A-037 and the whole accepted corpus check
   clean; the witnesses `examples/generality/read_per_element/` (generic
   callback with a match arm's key, helper extraction, cross-module, and a
   neighbour), tier 2 in PROFILES; corpus-check OK (37 accepted, 72
   rejected); generality 50 / 50.
-- `scripts/bounded_checker_mutations.py`: 33 mutants.
+- `scripts/bounded_checker_mutations.py`: 35 mutants, each killed by
+  `tests/bounded_reads.rs`.
 - `just test-compile`: the store, the accepted corpus, kiokun's slice and
   kiokun-site check (kiokun-site with its four warnings).
 

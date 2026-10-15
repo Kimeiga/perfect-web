@@ -736,6 +736,35 @@ fn a_build_states_what_each_set_read_costs_its_source() {
     );
 }
 
+#[test]
+fn a_set_reads_cost_is_what_its_source_states() {
+    use pw_core::bounded::Sets;
+    assert_eq!(Sets::of(None), Sets::PerKey);
+    assert_eq!(Sets::of(Some("one_call")), Sets::OneCall);
+    assert_eq!(Sets::of(Some("per_key")), Sets::PerKey);
+    assert_eq!(Sets::of(Some("chunked(100)")), Sets::Chunked(100));
+    // A value the domain lacks guarantees nothing.
+    assert_eq!(Sets::of(Some("chunked(0)")), Sets::PerKey);
+    assert_eq!(Sets::of(Some("batched")), Sets::PerKey);
+    // The design note's budget: one call, at least one per `k` keys, or one
+    // per key.
+    assert_eq!(Sets::OneCall.calls(250), 1);
+    assert_eq!(Sets::Chunked(100).calls(250), 3);
+    assert_eq!(Sets::Chunked(100).calls(200), 2);
+    assert_eq!(Sets::PerKey.calls(250), 250);
+    assert_eq!(Sets::Chunked(30).written(), "chunked(30)");
+}
+
+#[test]
+fn a_build_from_before_sets_reads_as_guaranteeing_nothing() {
+    // A `sources.json` written before 4c states no `sets`: read again, its
+    // sources are `per_key`, as one that states none is.
+    let older = r#"{"name":"Ledger","holds":["Price"],"transactions":"serializable","reads":["strong"],"changes":"none"}"#;
+    let clauses: pw_core::check::SourceClauses =
+        serde_json::from_str(older).expect("an older build's clauses");
+    assert_eq!(clauses.sets, "per_key");
+}
+
 // --- the reference programs -----------------------------------------------------------
 
 /// The store demo, as the one program it is.

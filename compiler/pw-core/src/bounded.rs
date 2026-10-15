@@ -1535,17 +1535,16 @@ impl<'p, 'i> Reads<'p, 'i> {
         if theirs.is_empty() || mine != other {
             let listed = |s: &BTreeSet<String>| s.iter().cloned().collect::<Vec<_>>().join(", ");
             return Err((
-                match theirs.is_empty() {
-                    true => {
-                        format!("`{value}` reads no source, and a set read reads its keyed read's")
-                    }
-                    false => format!(
+                if theirs.is_empty() {
+                    format!("`{value}` reads no source, and a set read reads its keyed read's")
+                } else {
+                    format!(
                         "`{value}` reads from {}, and `{}` from {}: a set read is of its keyed \
                          read's source",
                         listed(&other),
                         keyed.name,
                         listed(&mine)
-                    ),
+                    )
                 },
                 Some(set),
             ));
@@ -1815,22 +1814,6 @@ fn components(edges: &BTreeMap<DefId, BTreeSet<DefId>>) -> BTreeMap<DefId, usize
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn a_set_reads_cost_is_what_its_source_states() {
-        assert_eq!(Sets::of(None), Sets::PerKey);
-        assert_eq!(Sets::of(Some("one_call")), Sets::OneCall);
-        assert_eq!(Sets::of(Some("per_key")), Sets::PerKey);
-        assert_eq!(Sets::of(Some("chunked(100)")), Sets::Chunked(100));
-        // A value the domain lacks guarantees nothing.
-        assert_eq!(Sets::of(Some("chunked(0)")), Sets::PerKey);
-        assert_eq!(Sets::of(Some("batched")), Sets::PerKey);
-        assert_eq!(Sets::OneCall.calls(250), 1);
-        assert_eq!(Sets::Chunked(100).calls(250), 3);
-        assert_eq!(Sets::Chunked(100).calls(200), 2);
-        assert_eq!(Sets::PerKey.calls(250), 250);
-        assert_eq!(Sets::Chunked(30).written(), "chunked(30)");
-    }
 
     #[test]
     fn a_component_is_a_cycle_or_a_call_of_itself() {

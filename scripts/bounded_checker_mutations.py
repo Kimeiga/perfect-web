@@ -19,9 +19,10 @@ Each mutant undoes one piece:
 - the pair's shape: its parameter, its answer, its source, a keyed read
   that reads;
 - the reads per element kiokun-site is known to make, and only those;
+- what a build writes of a source's `sets`, and reads of an older one's;
 - the rule's place in `check_units`.
 
-Every mutant must fail `tests/bounded_reads.rs` or `bounded`'s own tests.
+Every mutant must fail `tests/bounded_reads.rs`.
 
 Run from the repository root; `just e14-bounded-reads` records the output.
 The source is restored after every mutant, whatever happens.
@@ -240,6 +241,18 @@ MUTANTS = [
         "            .find(|(a, r, _)| !a.is_empty() || (at, read) == (*a, *r))\n",
     ),
     (
+        "a build writes no source's cost",
+        CHECK,
+        "            sets: crate::bounded::Sets::of(s.sets.as_deref()).written(),\n",
+        "            sets: crate::bounded::Sets::PerKey.written(),\n",
+    ),
+    (
+        "an older build's clauses are read as no clauses",
+        CHECK,
+        "    #[serde(default = \"per_key\")]\n",
+        "",
+    ),
+    (
         "the rules run on no unit",
         CHECK,
         "            out.extend(bounded.check(i, &u.src));\n",
@@ -249,7 +262,6 @@ MUTANTS = [
 
 TESTS = [
     ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "bounded_reads"],
-    ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--lib", "bounded::"],
 ]
 
 
