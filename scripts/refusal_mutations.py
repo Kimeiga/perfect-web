@@ -45,6 +45,13 @@ RUNTIME = ROOT / "spikes/own-renderer/public/pw-runtime.mjs"
 FEED = ROOT / "examples/feed/app.pw"
 
 # (what, suite, file, anchor, replacement)
+# The mutants the checker refuses, by the rule that is the protection each
+# takes away (`scripts/mutant_programs.py`): every other mutant here
+# leaves a program that checks.
+CHECKED = {
+    "the feed's composer is shown to a reader signed out": {'PW5048'},
+}
+
 MUTANTS = [
     (
         "a predicate that says nothing is accepted",

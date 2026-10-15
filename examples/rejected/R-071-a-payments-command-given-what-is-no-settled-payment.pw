@@ -1,0 +1,24 @@
+// @corpus: rejected
+// @id: R-071
+// @category: a payment's command given what is no settled payment
+// @rule: PW6402
+// @invariant: invoked_command_parameters
+// @charter: §7.8
+// @milestone: 14
+// @expect-error: `settle` is invoked by Payments with a `payments.Settled`, and takes (order: String)
+// @expect-error: a command `invoked_by Payments` is given one `payments.Settled`, and nothing else
+//
+// The host has the provider's word for a payment: which one, the order it
+// was begun for, and where it stands. An order's reference alone is a value
+// it would have to make up.
+
+module payments_corpus.misgiven
+
+import domain.{ InteractionId }
+
+command settle(order: String) -> Result<Int, String>
+    invoked_by    Payments
+    idempotent_by InteractionId
+{
+    Ok(1)
+}

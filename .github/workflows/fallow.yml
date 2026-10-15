@@ -14,7 +14,7 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - uses: fallow-rs/fallow@v3
@@ -28,8 +28,8 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
       - name: Generate full Fallow report
@@ -41,7 +41,7 @@ jobs:
       - name: Summarize health
         run: |
           node -e 'const fs=require("fs"); const j=JSON.parse(fs.readFileSync("fallow-report.json","utf8")); const h=j.health?.health_score ?? {}; const s=j.check?.summary ?? {}; const d=j.dupes?.stats ?? {}; fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `# Fallow weekly report\n\n- Health: **${h.score ?? "n/a"} ${h.grade ?? ""}**\n- Issues: **${s.total_issues ?? 0}**\n- Dead files: **${s.unused_files ?? 0}**\n- Cycles: **${s.circular_dependencies ?? 0}**\n- Duplication: **${Number(d.duplication_percentage ?? 0).toFixed(1)}%**\n`);'
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: fallow-weekly-report
           path: fallow-report.json

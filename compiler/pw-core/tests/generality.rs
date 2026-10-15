@@ -557,10 +557,11 @@ fn generality_is_reported_separately_from_conformance() {
     // `load_from_another_origin`, a page loading from another origin. 49 /
     // 49 the same day: the scheduled-commands track's
     // `schedule_names_no_clocked_command`, `scheduled_outside_a_command`
-    // and `schedule_time`.
+    // and `schedule_time`. 54 / 54 the same day: corpus C24, the five of
+    // NEXT 6c's `invoked_by`, which no fixture exercised until then.
     assert_eq!(
         (general.len(), narrow.len(), untested.len()),
-        (49, 0, 0),
+        (54, 0, 0),
         "the published figure moved. If that is intended, update
          docs/STATUS.md and docs/NEXT.md in the same commit — a number in a
          status report that no test holds is a number that drifts."
