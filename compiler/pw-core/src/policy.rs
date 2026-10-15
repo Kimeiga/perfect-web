@@ -162,6 +162,12 @@ pub enum Domain {
     /// `max_bytes 5_000_000`, `max_width 4096`. A literal, so a limit is
     /// what the program states and nothing computes it.
     Count,
+    /// **A keyed read's set form** (4c, a read is bounded by construction):
+    /// `set hours_of_stores` on `fn hours_of(store: StoreId)`, a function of
+    /// the same source given a list of the keyed read's key and answering a
+    /// list of what it answers, with its key. Resolved, and held to that
+    /// shape, by `bounded::check` (PW0335).
+    SetRead,
 }
 
 /// One policy operator, with the semantic kind of each argument.
@@ -192,6 +198,9 @@ pub enum Arg {
     Dimension(&'static [&'static str]),
     /// **A real executable term.** Receives ordinary resolution.
     Term,
+    /// **One literal, written alone**: `chunked(100)`. Its name is for a
+    /// message; the operator takes it and nothing else.
+    Positional { name: &'static str, kind: Literal },
 }
 
 /// **What a named literal argument is** (ADR-0089).
@@ -268,6 +277,19 @@ const IDENTITY_OPS: &[Op] = &[Op {
     id: "policy.identity.content_address",
     name: "content_address",
     args: &[Arg::Dimension(IDENTITY_DIMENSIONS)],
+}];
+
+/// **What one set read costs a source** (4c): `chunked(k)`, at least ⌈n/k⌉
+/// calls for n keys (DynamoDB's `BatchGetItem`, k = 100; Firestore's `in`,
+/// k = 30). Beside it the words `one_call` (PostgreSQL's `= ANY($1)`) and
+/// `per_key` (a source that cannot batch).
+const SETS_OPS: &[Op] = &[Op {
+    id: "policy.sets.chunked",
+    name: "chunked",
+    args: &[Arg::Positional {
+        name: "size",
+        kind: Literal::Count,
+    }],
 }];
 
 /// **The kinds an upload may be** (track `uploads`): each one a server
@@ -365,6 +387,9 @@ pub fn domain_of(head: &str) -> Option<Domain> {
         "transactions" => Domain::Word(&["serializable", "snapshot", "read_committed", "none"]),
         "reads" => Domain::Words(&["strong", "snapshot", "read_your_writes", "eventual"]),
         "changes" => Domain::Word(&["none", "feed"]),
+        // 4c: what one set read costs it, and a keyed read's set form.
+        "sets" => Domain::Operator(SETS_OPS, &["one_call", "per_key"]),
+        "set" => Domain::SetRead,
         // An upload's (track `uploads`, ADR-0260): where its committed files
         // are served, its limits, and its kinds, a closed set each sniffed
         // from a file's bytes.
@@ -594,8 +619,10 @@ pub fn declared_by(head: &str) -> Option<(&'static [crate::hir::DeclKind], &'sta
         // A function's binding to what supplies it.
         "intrinsic" => (&[K::Fn], "a function"),
         "host" => (&[K::Fn, K::Effect], "a function"),
-        // A data source's (ADR-0207).
-        "holds" | "transactions" | "reads" | "changes" => (&[K::Source], "a data source"),
+        // A data source's (ADR-0207), and what a set read costs it (4c).
+        "holds" | "transactions" | "reads" | "changes" | "sets" => (&[K::Source], "a data source"),
+        // A keyed read's set form (4c): a function's.
+        "set" => (&[K::Fn], "a function"),
         // An upload's (track `uploads`, ADR-0260).
         "serves" | "max_bytes" | "types" | "max_width" | "max_height" => {
             (&[K::Upload], "an upload")
@@ -978,6 +1005,20 @@ fn operator_fault(op: &'static Op, args: &str) -> Option<ValueFault> {
         .map(str::trim)
         .filter(|a| !a.is_empty())
         .collect();
+    // One literal, written alone: `chunked(100)` (4c).
+    if let [Arg::Positional { name, kind }] = op.args {
+        return match written.as_slice() {
+            [] => Some(ValueFault::MissingArgument(op.name, name)),
+            [v] if !kind.fits(v) => Some(ValueFault::ArgumentKind(
+                op.name,
+                name,
+                *kind,
+                v.to_string(),
+            )),
+            [_] => None,
+            [..] => Some(ValueFault::ArgumentTwice(op.name, name.to_string())),
+        };
+    }
     let mut given: Vec<&str> = Vec::new();
     for a in &written {
         match op.args {
@@ -1048,7 +1089,7 @@ pub fn applied(head: &str, value: &str) -> Option<&'static Op> {
 /// Every operator id the registry defines, for the stability test.
 pub fn all_operator_ids() -> BTreeSet<&'static str> {
     let mut out = BTreeSet::new();
-    for ops in [RETRY_OPS, CONFLICT_OPS, IDENTITY_OPS] {
+    for ops in [RETRY_OPS, CONFLICT_OPS, IDENTITY_OPS, SETS_OPS] {
         for o in ops {
             out.insert(o.id);
         }
@@ -1114,6 +1155,8 @@ mod tests {
         "transactions",
         "reads",
         "changes",
+        "sets",
+        "set",
         "captures",
         "on_version_mismatch",
         "load",
@@ -1215,7 +1258,7 @@ mod tests {
     fn operator_ids_are_unique_and_namespaced() {
         let ids = all_operator_ids();
         let mut count = 0;
-        for ops in [RETRY_OPS, CONFLICT_OPS, IDENTITY_OPS] {
+        for ops in [RETRY_OPS, CONFLICT_OPS, IDENTITY_OPS, SETS_OPS] {
             count += ops.len();
         }
         assert_eq!(ids.len(), count, "two operators share one id");

@@ -356,6 +356,15 @@ codes! {
         "some effects are not permitted where a declaration runs, whatever it declares";
     WRONG_FRAME_PHASE = "PW0402" / wrong_frame_phase / 1, Effects,
         "each frame phase permits only the work it exists to do";
+    // 4c, a read is bounded by construction (track `bounded-checker`): both
+    // read off the inferred row, where its source reads are, so Effects'.
+    // The integrator assigned them, 2026-10-14. A read keyed by a loop's
+    // element is a read per element (N+1), refused; and a set read on a source
+    // that cannot batch is a call per key, warned.
+    READ_PER_ELEMENT = "PW0405" / read_per_element / 1, Effects,
+        "a read in a loop over data is not keyed by the loop's element: the list's reads are one set read, before the loop";
+    SET_READ_PER_KEY = "PW0406" / set_read_per_key / 1, Effects,
+        "a page's or a command's calls do not grow with its data: a set read is on a source that batches";
 
     // --- layout relations (PW04xx) ----------------------------------------
     OBSERVATION_FEEDBACK_CYCLE = "PW0403" / observation_feedback_cycle / 1, Layout,
