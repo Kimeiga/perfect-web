@@ -75,6 +75,16 @@ function tail(text, n = 15) {
   return text.trim().split("\n").slice(-n).join("\n");
 }
 
+/**
+ * Text as a reader sees it: a terminal's escape sequences (colours, and the
+ * cursor moves Playwright's line reporter writes even into a pipe, with
+ * FORCE_COLOR=0) taken out. J01's "1 passed" came after `ESC[1A ESC[2K`, and
+ * a `^\s*1 passed` read the passing run as a failure.
+ */
+function plain(text) {
+  return text.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "");
+}
+
 function files(dir) {
   const out = [];
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -192,7 +202,7 @@ async function showOnce(ex, app) {
         for (const t of spec.tests ?? []) {
           if (t.status !== "expected") {
             const last = t.results?.[t.results.length - 1];
-            const why = (last?.error?.message ?? "").replace(/\x1b\[[0-9;]*m/g, "").split("\n")[0];
+            const why = plain(last?.error?.message ?? "").split("\n")[0];
             failures.push(`${spec.title}: ${why}`.slice(0, 300));
           }
         }
@@ -290,7 +300,8 @@ function plerisRuntime(ex) {
     cwd: REPO,
     env: { ...process.env, PORT: String(PORT) },
   });
-  return { ok: r.ok && new RegExp(t.expect, "m").test(r.out), out: tail(r.out, 6) };
+  const out = plain(r.out);
+  return { ok: r.ok && new RegExp(t.expect, "m").test(out), out: tail(out, 6) };
 }
 
 /**
