@@ -165,11 +165,13 @@ impl Pool {
         }
     }
 
-    /// A render's connection given back: kept while fewer than the bound
-    /// are idle, and closed otherwise.
+    /// A render's connection given back: kept idle while the connections
+    /// out and idle are fewer than the bound, and closed otherwise, so a
+    /// taker, which takes an idle one without waiting, never holds more than
+    /// the bound allows.
     fn keep(&self, c: Client) {
         let mut idle = self.idle.lock().expect("idle connections");
-        if !c.is_closed() && idle.0.len() < CONNECTIONS {
+        if !c.is_closed() && idle.0.len() + idle.1 < CONNECTIONS {
             idle.0.push(c);
         }
         self.given_back.notify_one();
@@ -1043,6 +1045,17 @@ impl StorePg {
     #[cfg(test)]
     pub(crate) fn sql(&self) -> Client {
         self.pool.connect().expect("connected")
+    }
+
+    /// **Every connection the pool's bound allows, taken and held** (NEXT
+    /// 4c's tests): what a single read waits on, and a render's must not.
+    #[cfg(test)]
+    pub(crate) fn hold_the_bound(&self) -> Vec<Box<dyn std::any::Any + Send>> {
+        (0..CONNECTIONS)
+            .map(|_| {
+                Box::new(self.pool.take().expect("a connection")) as Box<dyn std::any::Any + Send>
+            })
+            .collect()
     }
 }
 

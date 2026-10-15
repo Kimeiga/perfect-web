@@ -13913,8 +13913,11 @@ public query Store(",
     // TRACK SEAM (bounded-statements): a read is a bounded number of
     // statements on PostgreSQL (NEXT 4b).
     mod bounded_statements;
+    // TRACK SEAM (render-merge): one render's identical calls made once, in
+    // one snapshot (NEXT 4c).
     /// What a page this host serves may load and run (`csp`).
     mod page_policy;
+    mod render_merge;
     // TRACK SEAM (payments): an order awaiting its payment, and settled.
     mod store_payments;
     // The scheduled-commands track: a command run when the clock passes its

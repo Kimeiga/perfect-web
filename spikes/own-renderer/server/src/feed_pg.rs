@@ -1045,6 +1045,12 @@ impl crate::data::DataLayer for FeedPg {
         )
     }
 
+    /// Another writer's commit, between a render's reads (NEXT 4c's tests).
+    #[cfg(test)]
+    fn execute_for_test(&self, sql: &str) -> Result<(), String> {
+        self.pool.with(|c| c.batch_execute(sql))
+    }
+
     fn uploaded_by(&self, leases: crate::uploads::Leases) {
         let _ = self.uploaded.set(leases);
     }
