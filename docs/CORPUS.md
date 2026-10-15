@@ -1010,3 +1010,41 @@ Generality at open:        49/49 invariants generality-tested
 | `schedule_names_no_clocked_command` | a GENERAL witness, an `unschedule` of a command a payment's outcome invokes, and a NEIGHBOUR one, a clocked command of another module | new invariant |
 | `scheduled_outside_a_command` | a GENERAL witness, an `unschedule` in a query, and a NEIGHBOUR one, a schedule inside a command's `if` | new invariant |
 | `schedule_time` | a GENERAL witness, `after` given an instant, and a NEIGHBOUR one, `at` an instant `clock.at` computes | new invariant |
+
+## C24: a command the platform invokes, specified, 2026-10-14
+
+Opened because the corpus did not specify a rule the language holds. NEXT
+6c's `invoked_by` (ADR-0332, the payments track; ADR-0334 for the clock)
+added five codes and no fixture: a command the platform invokes holds no
+reader to a predicate (`PW6401`); a payment's command is given one
+`payments.Settled` (`PW6402`); one command answers a payment's outcome
+(`PW6403`); no page presses a command the platform invokes (`PW6404`); and
+each is idempotent (`PW6405`). Exercising them found that `PW6402` and
+`PW6405` named no boundary span, which charter §16.3 requires: each names
+its `invoked_by` clause now. No invariant is retired; no fixture changed.
+
+No accepted program is added: `PW6403` is the whole program's, and a
+fixture's program is the accepted corpus with it, so an accepted command
+`invoked_by Payments` would be every rejected fixture's second. The store's
+`settle_payment` is the accepted case, checked with the store.
+
+```text
+Corpus version:            C24
+Accepted programs:         36
+Rejected programs:         74
+Charter categories:        36/36 accepted, 74/74 rejected
+Generality at open:        54/54 invariants generality-tested
+```
+
+| Fixture | Change | Kind |
+|---|---|---|
+| R-070 | added: a payment's command that `requires SignedIn` (`PW6401`) | new category |
+| R-071 | added: a payment's command given an order's reference (`PW6402`) | new category |
+| R-072 | added: two commands a payment's outcome invokes (`PW6403`) | new category |
+| R-073 | added: a page's button that sends a payment's command (`PW6404`) | new category |
+| R-074 | added: a payment's command with no `idempotent_by` (`PW6405`) | new category |
+| `invoked_command_requires` | a GENERAL witness, the clock's command held to a predicate over its parameter, and a NEIGHBOUR one, the predicate held by the command that schedules it | new invariant |
+| `invoked_command_parameters` | a GENERAL witness, the outcome and a second parameter, and a NEIGHBOUR one, the clock's command given two | new invariant |
+| `invoked_twice` | a GENERAL witness, the second apart from the first, answering another type, and a NEIGHBOUR one, two of the clock's | new invariant |
+| `invoked_command_pressed` | a GENERAL witness, the clock's command pressed before its time, and a NEIGHBOUR one, a page pressing the command that schedules it | new invariant |
+| `invoked_command_not_idempotent` | a GENERAL witness, the clock's command keyed by nothing, and a NEIGHBOUR one, a command a reader presses keyed by nothing | new invariant |

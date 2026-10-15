@@ -131,8 +131,8 @@ MUTANTS = [
         "an order is placed whatever the hours",
         "server",
         APP,
-        "        Some(closing) => Err(OrderError.Closed(closing)),\n",
-        "        Some(closing) => UserOrders.place(current_user()),\n",
+        "    match closed_in(hours_of_cart(current_user())) {\n",
+        "    match closed_in(List.take(hours_of_cart(current_user()), 0)) {\n",
     ),
     (
         "memory's hours are not written",
