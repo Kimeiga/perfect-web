@@ -25,6 +25,11 @@ Imported, it also bounds in memory every process the script starts from
 then on (`mutation_bound.py`, 2026-10-09): a mutant's test that holds more
 than the bound is stopped, the script's output says so, and its last line
 says what the bound did, a kind of kill apart from a test's.
+
+And first, where `PW_MUTANT_SLOTS` asks for more than one slot, it hands
+the run to `mutation_slots.py`, which runs the script's own copy in each
+slot, its mutants dealt among them, and ends this process with the run's
+code: the script's loop never runs in this tree.
 """
 
 import collections
@@ -33,6 +38,13 @@ import subprocess
 import sys
 
 import mutation_bound
+import mutation_slots
+
+# Where `PW_MUTANT_SLOTS` asks for slots, the run is the slots' from here,
+# and this process ends with its code: the script's loop never runs in this
+# tree. In a slot, the script's `MUTANTS` are narrowed to those dealt to it
+# (`mutation_slots.py`). Asked for none, nothing changes.
+mutation_slots.engage()
 
 # Every process the script starts from here on, bounded in memory.
 mutation_bound.start()
