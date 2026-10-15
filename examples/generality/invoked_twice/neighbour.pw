@@ -1,0 +1,22 @@
+// @status: NEIGHBOUR
+// @invariant: invoked_twice
+//
+// The clock runs as many commands as are scheduled: two, each its own.
+
+module generality.two_clocked
+
+import domain.{ InteractionId }
+
+command remind(order: String) -> Result<Int, String>
+    invoked_by    Clock
+    idempotent_by InteractionId
+{
+    Ok(1)
+}
+
+command expire(order: String) -> Result<Int, String>
+    invoked_by    Clock
+    idempotent_by InteractionId
+{
+    Ok(2)
+}

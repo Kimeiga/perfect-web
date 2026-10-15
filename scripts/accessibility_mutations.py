@@ -45,6 +45,13 @@ def styled(rule):
 
 
 # (what, file, anchor, replacement)
+# The mutants the checker refuses, by the rule that is the protection each
+# takes away (`scripts/mutant_programs.py`): every other mutant here
+# leaves a program that checks.
+CHECKED = {
+    "the cart's section is named by an id nothing has": {'PW5032'},
+}
+
 MUTANTS = [
     (
         "the store's page has no viewport",

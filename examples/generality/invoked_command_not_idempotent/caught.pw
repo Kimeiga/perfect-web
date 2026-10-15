@@ -1,0 +1,13 @@
+// @status: GENERAL
+// @invariant: invoked_command_not_idempotent
+//
+// Structurally different from R-074: the clock's command, whose run a host
+// stopped before its commit runs again.
+
+module generality.unkeyed_clock
+
+command remind(order: String) -> Result<Int, String>
+    invoked_by Clock
+{
+    Ok(1)
+}

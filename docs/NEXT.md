@@ -739,7 +739,58 @@ E14 comes before E11-E13. Its plan, controls and task list are
              ~~the store's hours~~ (ADR-0328, merged 2026-10-13, W9's);
              orders scheduled: ~~a command the clock runs~~ (ADR-0334, merged
              2026-10-14, its first use ADR-0332's sweep); an order placed
-             for a time its reader chooses, sent to its store then;
+             for a time its reader chooses, sent to its store then: W9's,
+             after 4b, on the integrator's design of 2026-10-14, built on
+             ADR-0304, ADR-0328, ADR-0329, ADR-0332 and ADR-0334. The
+             practice it follows, read that day: DoorDash's merchant help
+             ("Manage Orders") keeps a scheduled order in a Scheduled tab
+             until its preparation is due, and makes it active about five
+             minutes before; Uber Eats ("Scheduled Orders") takes one up to
+             about a week ahead and no later than an hour before, and while
+             the restaurant is closed, for a time it is open. The rulings:
+             - **the reader chooses when, at checkout**, as they choose a
+               tip: a checkout choice, `choose_time(when: Option<Instant>)`,
+               none meaning as soon as possible, kept with the cart and
+               shown by `Checkout`; one time for the whole cart (one order);
+             - **the times offered are the cart's stores' open times**:
+               fifteen-minute windows from an hour to seven days ahead (Uber
+               Eats' bounds), each whose start every store of the cart is
+               open at, by ADR-0328's hours in each store's zone, computed
+               by the program (the clock's comparison, as `closed_in` is),
+               never by the page;
+             - **`place_order` holds the time to them again**, in its
+               transaction, as it prices the cart again (ADR-0329): a time
+               no longer offered (a store's hours changed, the hour passed)
+               is refused by name, `OrderError.NotOffered(when)`, and the
+               reader is shown the times now. As soon as possible keeps
+               today's rule, refused while a store is closed (`Closed`); a
+               time is allowed while the stores are closed now;
+             - **paid now, sent then**: the payment is begun and settled as
+               today (ADR-0332). Settled, a scheduled order is
+               `Scheduled(at)`, and the store is told nothing yet:
+               `schedule send_to_store(order) at prep_starts`, the window's
+               start less the upper bound of the store's estimate (ADR-0180)
+               and five minutes more (DoorDash's lead). The run moves it to
+               `Placed` as an order for as soon as possible is placed at
+               once: the store's queue and the reader's page told, once;
+             - **the sweep still applies** to a scheduled order that awaits
+               its payment (ADR-0334's `expire_order`): a time an hour away
+               does not hold a cart unpaid past thirty minutes;
+             - **the order page says when**, "Scheduled for Thu 6:30 PM" in
+               the store's zone, until the order is placed; then as today;
+             - not claimed in v1: cancelling a scheduled order once paid (a
+               refund at the provider, which no adapter has; before payment
+               the reader's cancel and the sweep apply as today); a store
+               declining scheduled orders; a time per store in a cart of
+               several; a window the store sets;
+             - accepted by the checker and the store's tests on each layer
+               (the times offered at the seed's hours: open, closed, across
+               midnight and a zone; a time no longer offered refused; an
+               order scheduled while its store is closed, for a time it is
+               open; paid now and placed at its time and not before, the
+               clock moved; the order page's words), by the store in three
+               engines (choose a time, pay, the page says when, the clock
+               moved, the page says placed), and by mutation controls;
           4a. ~~**typed page query parameters**~~ (ADR-0309, merged
              2026-10-12): a route's query part, `route "/search{?q}"`,
              RFC 6570's form-style expansion; each name an `Option` of
@@ -795,6 +846,15 @@ E14 comes before E11-E13. Its plan, controls and task list are
              without paying, said why; until then no mutant guards them;
 
           Then the language's, found on the way:
+          - **the corpus specifies a quarter of the codes** (the
+            integrator's finding, 2026-10-14, corpus C24): the rejected
+            corpus exercises 54 of the 196 codes; the rest are held by the
+            compiler's own tests where they have them, and the conformance
+            figure and generality score say nothing of them. From C24 on, a track that
+            adds a code adds its rejected fixture and its generality pair,
+            as the scheduled-commands track and C24 did; the 142 before are
+            added a family at a time (Syntax's 22, Resolution's 10, UiState's
+            10 and Capability's 5 first, none exercised);
           - **a program's declaration of another origin** (ADR-0195's
             ruling 13, its last clause; ADR-0333 built the rest): an origin a
             program declares, which its pages' policy allows and PW5052 lets

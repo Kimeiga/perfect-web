@@ -1,0 +1,26 @@
+// @status: GENERAL
+// @invariant: invoked_command_pressed
+//
+// Structurally different from R-073: the clock's command, not a payment's,
+// pressed before its time, given its order rather than an outcome.
+
+module generality.pressing_clock
+
+import domain.{ InteractionId }
+
+command remind(order: String) -> Result<Int, String>
+    invoked_by    Clock
+    idempotent_by InteractionId
+{
+    Ok(1)
+}
+
+page Remind() {
+    cache private
+
+    view {
+        <main>
+            <button type="button" on:press={() => { let _reminded = remind("o-1") }}>Remind me now</button>
+        </main>
+    }
+}
