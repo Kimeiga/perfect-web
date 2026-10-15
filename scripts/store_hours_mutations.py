@@ -71,8 +71,8 @@ MUTANTS = [
         "the cut-off is ignored",
         "server",
         HOURS_PW,
-        "        Open(o) => if clock.passed(o.last_order) {\n",
-        "        Open(o) => if false {\n",
+        "        Some(s) => !passed_as_of(when, s.last_order),\n",
+        "        Some(s) => true,\n",
     ),
     (
         "the cut-off is not borrowed from the day before a midnight closing",
@@ -85,12 +85,8 @@ MUTANTS = [
         "a store is open before it opens",
         "server",
         HOURS_PW,
-        "    let all = spans(h, zone, today)\n"
-        "    match List.find(all, s => clock.passed(s.opens) & !clock.passed(s.closes)) {\n"
-        "        Some(s) => OpenState.Open(",
-        "    let all = spans(h, zone, today)\n"
-        "    match List.find(all, s => !clock.passed(s.closes)) {\n"
-        "        Some(s) => OpenState.Open(",
+        "    List.find(all, s => passed_as_of(when, s.opens) & !passed_as_of(when, s.closes))\n",
+        "    List.find(all, s => !passed_as_of(when, s.closes))\n",
     ),
     (
         "the day after is said tomorrow",

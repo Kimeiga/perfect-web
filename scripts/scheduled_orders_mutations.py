@@ -1,25 +1,30 @@
 #!/usr/bin/env python3
 """Mutation controls for track `scheduled-orders` (W9, NEXT 4's last step,
-the integrator's design of 2026-10-14): an order placed for a time its
-reader chooses.
+the integrator's design of 2026-10-14 and ruling of 2026-10-15): an order
+placed for a time its reader chooses.
 
 Each mutant undoes one rule:
-- the times offered (`examples/store/scheduled.pw`): a window within the
-  hour offered; one more than a week ahead offered; one while a store is
-  closed, or before it opens; one store's hours standing for the cart's; a
-  time between two quarter hours taken as offered; a day's windows running
-  past its midnight;
+- the times offered (`examples/store/scheduled.pw`, and the one rule of
+  `examples/store/hours.pw` a window is held to): a window within the hour
+  offered; one more than a week ahead offered; one held to the hours at its
+  start, not when its stores are told; one whose stores are told before one
+  opens, or past one's last order (each held to as soon as possible alone, or
+  to a window alone); an instant not yet past when it is told as it is; one
+  store's hours standing for the cart's; a time between two quarter hours
+  taken as offered; a day's windows running past its midnight;
 - a time held to them: chosen whatever it is; as soon as possible keeping a
-  time chosen; placed for a time no longer offered; an order for a time
-  held to the hours now, as one for as soon as possible is; the checkout
-  saying a time it no longer offers is scheduled;
-- when its stores are told: with no lead; the lead alone; by the
-  estimate's least; by the last store's estimate, not the longest; at once
-  where paid at the provider, or where paid at once; never;
-- the words: a window said an hour off; a scheduled order said an hour
-  off; noon said AM; an evening said on a 24-hour clock; a week on said
-  this week; the day the page's address names not shown; the order page
-  and the cart not saying when;
+  time chosen; placed for a time no longer offered; an order for a time held
+  to the hours now, as one for as soon as possible is; the checkout saying a
+  time it no longer offers is scheduled;
+- when its stores are told: with no lead; the lead alone; at the window's
+  start; by the estimate's least; by the last store's estimate, not the
+  longest; by no estimate in the page of times, a time chosen, or an order
+  placed; a cart for as soon as possible asking the estimate; at once where
+  paid at the provider, or where paid at once; never;
+- the words: a window said an hour off; a scheduled order said an hour off,
+  or on another day; noon said am; an evening said on a 24-hour clock; a
+  week on said this week; the day the page's address names not shown; the
+  order page and the cart not saying when;
 - the clock (`packages/pw-platform-web/clock.pw`): an instant moved later
   moving back; an instant before itself;
 - the layers: an order paid for a time placed at once, not scheduled; any
@@ -33,7 +38,10 @@ Each mutant undoes one rule:
 A mutant must fail the development server's tests of the track in memory
 (`memory`) or on PostgreSQL (`postgres`, which needs PW_STORE_DATABASE_URL),
 narrowed by name to `tests::scheduled_orders::` and the module's own
-(`scheduled_orders::tests`). Each `.pw` mutant is a well-typed program.
+(`scheduled_orders::tests`). Each `.pw` mutant is a well-typed program, but
+two (`CHECKED`): a query that reads a reader's addresses and is not read
+again when they change is refused by the checker (PW5106), which is the
+protection those two take away.
 
 Run from the repository root; `just e14-scheduled-orders` records the
 output. The source is restored after every mutant, whatever happens.
@@ -48,6 +56,7 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SCHEDULED_PW = ROOT / "examples/store/scheduled.pw"
+HOURS_PW = ROOT / "examples/store/hours.pw"
 APP = ROOT / "examples/store/app.pw"
 CLOCK = ROOT / "packages/pw-platform-web/clock.pw"
 SERVER = ROOT / "spikes/own-renderer/server/src"
@@ -56,10 +65,13 @@ SCHEDULED_RS = SERVER / "scheduled_orders.rs"
 CHECKOUT_RS = SERVER / "checkout.rs"
 
 REACH = "    !clock.passed(clock.earlier(at, hours(1))) & clock.passed(clock.earlier(at, hours(168)))\n"
-OPEN = "    List.any(spans, s => !clock.is_before(at, s.opens) & clock.is_before(at, s.closes))\n"
-LEAD = "                Some(scheduled_for(at, clock.earlier(at, minutes(most + 5)), clock.zone(first.hours.zone)))\n"
-MOST = "                    Ok(e) => if count(e.max_minutes) > m { count(e.max_minutes) } else { m },\n"
+WINDOWS = "            List.filter(candidates(clock.zone(first.hours.zone)), w => in_reach(w) & List.all(each, spans => takes_order(spans, Some(sends_of(w, lead)))))\n"
+LEAD = "    minutes(most + 5)\n"
+MOST = "        Ok(e) => if count(e.max_minutes) > m { count(e.max_minutes) } else { m },\n"
+LAST_ORDER = "        Some(s) => !passed_as_of(when, s.last_order),\n"
 SETTLED_SEND = "            schedule send_to_store(settled.order) at s.sends\n"
+CHECKOUT_LISTENS = "    invalidates_on UserCartChanged(reader), UserOrderChanged(reader), StoreChanged(_), AddressesChanged(reader)\n"
+TIMES_LISTEN = "    invalidates_on UserCartChanged(reader), StoreChanged(_), AddressesChanged(reader)\n"
 
 # (what, suite, file, anchor, replacement)
 MUTANTS = [
@@ -78,32 +90,59 @@ MUTANTS = [
         "    !clock.passed(clock.earlier(at, hours(1))) & clock.passed(clock.earlier(at, hours(192)))\n",
     ),
     (
-        "a window is offered while its store is closed",
+        "a window is held to the hours at its start, not when its stores are told",
         "memory",
         SCHEDULED_PW,
-        OPEN,
-        "    List.any(spans, s => !clock.is_before(at, s.opens))\n",
+        WINDOWS,
+        WINDOWS.replace("Some(sends_of(w, lead))", "Some(w)"),
     ),
     (
-        "a window is offered before its store opens",
+        "a store is open before it opens",
         "memory",
-        SCHEDULED_PW,
-        OPEN,
-        "    List.any(spans, s => clock.is_before(at, s.closes))\n",
+        HOURS_PW,
+        "    List.find(all, s => passed_as_of(when, s.opens) & !passed_as_of(when, s.closes))\n",
+        "    List.find(all, s => !passed_as_of(when, s.closes))\n",
+    ),
+    (
+        "the last order is held to an order for as soon as possible alone",
+        "memory",
+        HOURS_PW,
+        LAST_ORDER,
+        "        Some(s) => match when {\n"
+        "            None => !passed_as_of(when, s.last_order),\n"
+        "            Some(_) => true,\n"
+        "        },\n",
+    ),
+    (
+        "the last order is held to a window alone",
+        "memory",
+        HOURS_PW,
+        LAST_ORDER,
+        "        Some(s) => match when {\n"
+        "            None => true,\n"
+        "            Some(_) => !passed_as_of(when, s.last_order),\n"
+        "        },\n",
+    ),
+    (
+        "an instant is not yet past when it is told",
+        "memory",
+        HOURS_PW,
+        "        Some(t) => !clock.is_before(t, at),\n",
+        "        Some(t) => clock.is_before(at, t),\n",
     ),
     (
         "one store's hours stand for the cart's",
         "memory",
         SCHEDULED_PW,
-        "            List.filter(candidates(clock.zone(first.hours.zone)), w => List.all(each, spans => open_at(spans, w)) & in_reach(w))\n",
-        "            List.filter(candidates(clock.zone(first.hours.zone)), w => List.any(each, spans => open_at(spans, w)) & in_reach(w))\n",
+        WINDOWS,
+        WINDOWS.replace("List.all(each", "List.any(each"),
     ),
     (
         "a time between two quarter hours is held to be offered",
         "memory",
         SCHEDULED_PW,
-        "        Some(first) => List.any(candidates(clock.zone(first.hours.zone)), w => same_instant(w, at)) &",
-        "        Some(first) => List.any(candidates(clock.zone(first.hours.zone)), w => true) &",
+        "    List.any(offered, w => same_instant(w, at))\n",
+        "    List.any(offered, w => true)\n",
     ),
     (
         "a day's windows run past its midnight",
@@ -116,14 +155,14 @@ MUTANTS = [
         "an order is placed for a time no longer offered",
         "memory",
         SCHEDULED_PW,
-        "        Some(at) => if offered_at(stores, at) {\n",
+        "        Some(at) => if offered_at(stores, at, lead) {\n",
         "        Some(at) => if true {\n",
     ),
     (
         "the checkout says a time it no longer offers is scheduled",
         "memory",
         SCHEDULED_PW,
-        "            Some(first) => if offered_at(stores, at) {\n",
+        "            Some(first) => if among(offered, at) {\n",
         "            Some(first) => if true {\n",
     ),
     (
@@ -141,6 +180,13 @@ MUTANTS = [
         LEAD.replace("minutes(most + 5)", "minutes(5)"),
     ),
     (
+        "the store is told at the window's start",
+        "memory",
+        SCHEDULED_PW,
+        "    clock.earlier(at, lead)\n",
+        "    at\n",
+    ),
+    (
         "the estimate's least is counted",
         "memory",
         SCHEDULED_PW,
@@ -152,14 +198,42 @@ MUTANTS = [
         "memory",
         SCHEDULED_PW,
         MOST,
-        "                    Ok(e) => count(e.max_minutes),\n",
+        "        Ok(e) => count(e.max_minutes),\n",
+    ),
+    (
+        "a cart for as soon as possible asks the estimate",
+        "memory",
+        SCHEDULED_PW,
+        "        None => minutes(0),\n",
+        "        None => lead_of(stores, reader),\n",
+    ),
+    (
+        "the page of times ignores the estimate",
+        "memory",
+        APP,
+        "    times_shown(stores, chosen_when(reader), day, lead_of(stores, reader))\n",
+        "    times_shown(stores, chosen_when(reader), day, minutes(5))\n",
+    ),
+    (
+        "a time is chosen without the estimate",
+        "memory",
+        APP,
+        "            if offered_at(hours, at, lead_of(hours, current_user())) {\n",
+        "            if offered_at(hours, at, minutes(5)) {\n",
+    ),
+    (
+        "an order is placed for a time without the estimate",
+        "memory",
+        APP,
+        "    let lead = lead_for(hours, when, current_user())\n",
+        "    let lead = minutes(5)\n",
     ),
     (
         "a window is said an hour off",
         "memory",
         SCHEDULED_PW,
-        "    let said = clock_time_said(clock.minute_of_day(clock.time_of(at, zone)))\n",
-        "    let said = clock_time_said(clock.minute_of_day(clock.time_of(clock.later(at, hours(1)), zone)))\n",
+        "    let said = time_said(clock.minute_of_day(clock.time_of(at, zone)))\n",
+        "    let said = time_said(clock.minute_of_day(clock.time_of(clock.later(at, hours(1)), zone)))\n",
     ),
     (
         "a scheduled order is said an hour off",
@@ -169,16 +243,23 @@ MUTANTS = [
         "day: clock.weekday(clock.date_of(at, zone)), time: clock.time_of(clock.later(at, hours(1)), zone) }\n",
     ),
     (
-        "noon is said AM",
+        "a scheduled order is said on another day",
         "memory",
         SCHEDULED_PW,
-        '    let half = if h < 12 { "AM" } else { "PM" }\n',
-        '    let half = if h < 13 { "AM" } else { "PM" }\n',
+        '    "{weekday_short(s.day)} {time_said(clock.minute_of_day(s.time))}"\n',
+        '    "{weekday_short(clock.weekday(clock.numbered_day(0)))} {time_said(clock.minute_of_day(s.time))}"\n',
+    ),
+    (
+        "noon is said am",
+        "memory",
+        HOURS_PW,
+        '    let half = if h < 12 { "am" } else { "pm" }\n',
+        '    let half = if h < 13 { "am" } else { "pm" }\n',
     ),
     (
         "an evening is said on a 24-hour clock",
         "memory",
-        SCHEDULED_PW,
+        HOURS_PW,
         "    let hour = if h == 0 { 12 } else if h > 12 { h - 12 } else { h }\n",
         "    let hour = if h == 0 { 12 } else { h }\n",
     ),
@@ -200,8 +281,8 @@ MUTANTS = [
         "a time is chosen whatever it is",
         "memory",
         APP,
-        "        Some(at) => if offered_at(hours_of_cart(current_user()), at) {\n",
-        "        Some(at) => if true {\n",
+        "            if offered_at(hours, at, lead_of(hours, current_user())) {\n",
+        "            if true {\n",
     ),
     (
         "as soon as possible keeps the time chosen",
@@ -214,8 +295,8 @@ MUTANTS = [
         "an order for a time is held to the hours now",
         "memory",
         APP,
-        "    match held_to(hours, when) {\n",
-        "    match held_to(hours, None) {\n",
+        "    match held_to(hours, when, lead) {\n",
+        "    match held_to(hours, None, lead) {\n",
     ),
     (
         "an order paid at the provider is sent at once",
@@ -251,6 +332,20 @@ MUTANTS = [
         APP,
         '<p id="cart-when">{checkout.when_said} <a id="choose-when"',
         '<p id="cart-when"><a id="choose-when"',
+    ),
+    (
+        "the checkout is not read again when the reader's address changes",
+        "memory",
+        APP,
+        CHECKOUT_LISTENS,
+        CHECKOUT_LISTENS.replace(", AddressesChanged(reader)", ""),
+    ),
+    (
+        "the page of times is not read again when the reader's address changes",
+        "memory",
+        APP,
+        TIMES_LISTEN,
+        TIMES_LISTEN.replace(", AddressesChanged(reader)", ""),
     ),
     (
         "an instant moved later moves back",
@@ -351,6 +446,16 @@ MUTANTS = [
         "ON CONFLICT (owner) DO UPDATE SET at_ms = $3, sends_ms = $4, \\\n",
     ),
 ]
+
+# The mutants of a `.pw` source whose program the checker refuses, by the
+# rule that is the protection each takes away (`scripts/mutant_programs.py`):
+# a query that reads the reader's addresses and does not listen for them
+# changing leaves the commands that change them invalidating no reader of
+# them (PW5106).
+CHECKED = {
+    "the checkout is not read again when the reader's address changes": {"PW5106"},
+    "the page of times is not read again when the reader's address changes": {"PW5106"},
+}
 
 TESTS = [
     "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--",
