@@ -1171,10 +1171,13 @@ user page TimePage(day: Option<String>) {
             >
                 As soon as possible
             </button>
+            <!-- Each target stands in a paragraph of its own: a link or a button
+                 under 24 pixels tall needs another 24 away (WCAG 2.5.8), and
+                 a list of one-line items sets them 18 to 22 apart. -->
             <nav aria-label="Days">
                 <ul id="when-days">
                     {#each times.days as d (d.key)}
-                        <li><a href="/cart/when?day={d.key}">{d.said}</a></li>
+                        <li><p><a href="/cart/when?day={d.key}">{d.said}</a></p></li>
                     {/each}
                 </ul>
             </nav>
@@ -1182,7 +1185,7 @@ user page TimePage(day: Option<String>) {
             <ul id="when-windows">
                 {#each times.windows as w (w.key)}
                     <li>
-                        <button
+                        <p><button
                             type="button"
                             aria-label="{w.whole}"
                             on:press={resumable(captures = { w }) => match choose_time(Some(w.start)) {
@@ -1192,7 +1195,7 @@ user page TimePage(day: Option<String>) {
                             }}
                         >
                             {w.said}
-                        </button>
+                        </button></p>
                     </li>
                 {/each}
             </ul>

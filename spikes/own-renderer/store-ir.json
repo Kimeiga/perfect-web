@@ -2418,7 +2418,7 @@
     "params": [
       "day"
     ],
-    "schema": "ba52e5115d73ab4b",
+    "schema": "73de895d16d451dd",
     "chunks": [
       {
         "chunk": "static",
@@ -2463,7 +2463,7 @@
       },
       {
         "chunk": "static",
-        "value": ">\n                As soon as possible\n            </button>\n            <nav aria-label=\"Days\">\n                <ul id=\"when-days\">\n                    "
+        "value": ">\n                As soon as possible\n            </button>\n            \n            <nav aria-label=\"Days\">\n                <ul id=\"when-days\">\n                    "
       },
       {
         "chunk": "dynamic",
@@ -2476,7 +2476,7 @@
           "body": [
             {
               "chunk": "static",
-              "value": "\n                        <li><a data-pw=\"1\" "
+              "value": "\n                        <li><p><a data-pw=\"1\" "
             },
             {
               "chunk": "dynamic",
@@ -2513,7 +2513,7 @@
             },
             {
               "chunk": "static",
-              "value": "</a></li>\n                    "
+              "value": "</a></p></li>\n                    "
             }
           ]
         }
@@ -2546,7 +2546,7 @@
           "body": [
             {
               "chunk": "static",
-              "value": "\n                    <li>\n                        <button data-pw=\"2\" type=\"button\" "
+              "value": "\n                    <li>\n                        <p><button data-pw=\"2\" type=\"button\" "
             },
             {
               "chunk": "dynamic",
@@ -2593,7 +2593,7 @@
             },
             {
               "chunk": "static",
-              "value": "\n                        </button>\n                    </li>\n                "
+              "value": "\n                        </button></p>\n                    </li>\n                "
             }
           ]
         }

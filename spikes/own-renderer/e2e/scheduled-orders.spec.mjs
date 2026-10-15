@@ -30,7 +30,8 @@ async function ready(page, path) {
   });
 }
 
-/** "Mon 6:30 PM" and "6:30 PM": an instant as the store's zone says it. */
+/** "Mon 6:30 pm" and "6:30 pm": an instant as the store's zone says it, a time
+ * as the store's hours say one (ADR-0328). */
 function said(at) {
   const parts = Object.fromEntries(
     new Intl.DateTimeFormat("en-US", {
@@ -42,7 +43,7 @@ function said(at) {
       .formatToParts(new Date(at))
       .map(({ type, value }) => [type, value]),
   );
-  const time = `${parts.hour}:${parts.minute} ${parts.dayPeriod}`;
+  const time = `${parts.hour}:${parts.minute} ${parts.dayPeriod.toLowerCase()}`;
   return { whole: `${parts.weekday} ${time}`, time };
 }
 
