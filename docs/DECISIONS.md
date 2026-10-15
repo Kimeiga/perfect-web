@@ -2998,3 +2998,11 @@ the claim, measured: the bug museum and the head-to-head (track `proof`).
   misses first; five exhibits, H07's miss closed by ADR-0340's PW0405 on
   the same train. The head-to-head's protocol, TodoMVC first; its
   downloads wait for the owner.
+[ADR-0343](DECISIONS/ADR-0343-a-guide-whose-examples-compile.md):
+a guide whose examples compile (track `guide`; NEXT's developer
+experience).
+- `docs/guide/`, every Pleris block checked by the real `pw` (clean,
+  formatted and built, or refused with exactly its codes), the tutorial
+  byte for byte the guestbook a browser test drives, the codes' reference
+  generated from the registry, and each gap in the checks an example held
+  open until the compiler closes it.

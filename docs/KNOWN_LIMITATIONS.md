@@ -28,6 +28,10 @@ Those historical statements must not override current source or test results.
   (`track/check-is-build`): the build runs analyses the check does not (an
   `{#each}` over a computed list is refused by the build alone), so a
   check is green where the build fails.
+- **An `<img>` with no `alt` checks clean, and `&&` is refused with no hint
+  that Pleris writes `&`** (no track yet; ADR-0343): the guide holds each as
+  an example that turns red when the compiler closes it, beside its three
+  programs the check passes and the build refuses.
 
 **What the parser does not read yet** (found with ADR-0237, which made
 lowering report what it parses):

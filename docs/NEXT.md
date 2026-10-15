@@ -1110,8 +1110,12 @@ E14 comes before E11-E13. Its plan, controls and task list are
           relayed 2026-10-08), so the tracks after them are W7, TodoMVC,
           W8, search and filters, and W9, ratings and reviews. It decides
           which of these come first, each its own ADR:
-          - **developer experience**: docs and a tutorial for a developer
-            from outside; editor support, a language server (diagnostics as
+          - **developer experience**: ~~docs and a tutorial for a developer
+            from outside~~ (ADR-0343, merged 2026-10-15 on train-9, `just
+            e14-guide`: `docs/guide/`, every example compiled by the real
+            `pw`, the tutorial the guestbook a browser test drives, and the
+            checks' gaps held as examples; `docs/SEMANTICS.md` still reads
+            as the M0-era status, the guide's finding); editor support, a language server (diagnostics as
             one types, completion, go-to-definition) on the check's ~37 ms;
             `pw new`, live reload, and debugging that traces which query or
             command caused what; and error messages read by a fresh reader;

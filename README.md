@@ -11,6 +11,11 @@ browser-native experiments are a separate later research track.
 [`PROJECT_CHARTER.md`](PROJECT_CHARTER.md) is the project constitution.
 [`AGENTS.md`](AGENTS.md) summarizes the operating rules.
 
+New to Pleris? [The guide](docs/guide/README.md) is for a developer who knows
+TypeScript and React, Next.js or Svelte: why Pleris, a tour of the language, a
+tutorial that builds a small app, and every diagnostic code. A test compiles
+its examples.
+
 ## Implementation status
 
 Current milestone state, completed evidence, open gates, and reproduce commands

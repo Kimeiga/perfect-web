@@ -23,6 +23,27 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0343, 2026-10-15: a guide whose examples compile** (NEXT's
+developer experience, its docs and tutorial for a developer from outside;
+track `guide`, merged from `49967631`, with the integrator's rulings of
+2026-10-15).
+- `docs/guide/`: why Pleris, a tour of the language, its server and its
+  pages, its errors, a tutorial, and a reference of the diagnostic codes
+  generated from the compiler's registry. The root README points to it.
+- Every Pleris block is checked by `compiler/pw-cli/tests/guide.rs`
+  through the real `pw`: a clean example reports nothing, is formatted and
+  builds; a refused one reports exactly its codes and, where shown, its
+  output; the tutorial's blocks are byte for byte `examples/guestbook`,
+  which a browser test drives in three engines. Where the checks fall
+  short, a gap is an example the test holds open, and turns red when the
+  compiler closes it: three programs `pw check` passes and `pw build`
+  refuses, an `<img>` with no `alt`, and `&&`'s message.
+- On the train: the reference regenerated for ADR-0340's three codes
+  (199), the guide's test 15 of 15 and its generator's 7 of 7. The track's
+  own runs: `guide_mutations.py` 74 of 74 and its recipe green locally, its
+  verify green at `00471782` (`e14-guide` among its jobs).
+Verify TRAIN_RUN green, with train-9.
+
 **ADR-0342, 2026-10-15: the claim, measured: the bug museum and the
 head-to-head** (NEXT's evidence that answers "is Pleris perfect?"; track
 `proof`, merged from `11531dba`, with the integrator's rulings of

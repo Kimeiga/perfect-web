@@ -30,6 +30,7 @@ import 'just/scheduled.just'
 import 'just/bounded-checker.just'
 import 'just/reviews.just'
 import 'just/proof.just'
+import 'just/guide.just'
 
 default:
     @just --list
