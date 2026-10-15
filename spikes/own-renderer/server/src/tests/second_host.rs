@@ -3,9 +3,11 @@
 //! schema, as two processes on one PostgreSQL are. Each test passes doing
 //! nothing without a database: `just e14-second-host` runs them.
 
+use super::sign_in::{REDIRECT, TestProvider, command, exchanged, get, location, set_cookie};
 use super::*;
-use crate::feed_pg::FeedPg;
+use crate::feed_pg::{FeedPg, Isolation};
 use crate::hosts::Tail;
+use crate::store_pg::StorePg;
 
 /// The database the feed's tests run against, where the environment names
 /// one.
@@ -323,4 +325,260 @@ fn outbox_ids_are_taken_in_commit_order() {
     });
     let _ = second_done;
     assert!(second_id > first_id, "{second_id} after {first_id}");
+}
+
+// ---------------------------------------------------------------------------
+// Sessions kept where the hosts share them
+// ---------------------------------------------------------------------------
+
+/// [`feed_host`], its readers signed in through `provider`.
+fn feed_host_signing_in(url: &str, schema: &Schema, provider: &Arc<TestProvider>) -> Served {
+    let s = feed_host(url, schema);
+    s.identity.use_provider(provider.clone(), REDIRECT);
+    s
+}
+
+/// A post through `s` by `session`, over HTTP, as a browser sends it: the
+/// request reads its session as the hosts keep it.
+fn posted_by(s: &Server, session: &str, interaction: &str, text: &str) -> String {
+    command(
+        s,
+        "feed.app.post",
+        session,
+        interaction,
+        &serde_json::json!([text]).to_string(),
+    )
+}
+
+/// **A sign-in begun on one host completes on another, and its session holds
+/// on both** (ADR-XXXX): the sign-in under way is kept in the database, so
+/// the provider's callback completes it on whichever host it reaches; the
+/// session it opens is kept there by its id's hash, so each host's next
+/// request finds its reader. Until ADR-XXXX both were the first host's
+/// memory: the callback on B was refused, and a session made on A was no one
+/// on B.
+#[test]
+fn a_sign_in_begun_on_one_host_completes_on_another_and_holds_on_both() {
+    let Some(url) = database() else { return };
+    let db = Schema::new(&url, "signed");
+    let provider = Arc::new(TestProvider::default());
+    let a = feed_host_signing_in(&url, &db, &provider);
+    let b = feed_host_signing_in(&url, &db, &provider);
+    let started = get(&a, "/sign-in", "pw-session=s-came");
+    let (state, _) = set_cookie(&started, "pw-sign-in").expect("the sign-in's cookie");
+    let back = provider.authenticate(&location(&started), "ada", "Ada");
+    let answer = get(
+        &b,
+        &format!("/sign-in/callback?{back}"),
+        &format!("pw-session=s-came; pw-sign-in={state}"),
+    );
+    assert!(answer.starts_with("HTTP/1.1 303"), "{answer}");
+    let ada = set_cookie(&answer, "pw-session").expect("a session").0;
+    for (host, text) in [(&a, "Signed in on B, posting on A"), (&b, "And on B")] {
+        let answer = posted_by(host, &ada, &format!("i-{}", text.len()), text);
+        assert!(answer.contains("\"committed\":true"), "{answer}");
+    }
+    assert_eq!(
+        db.count("SELECT count(*) FROM posts WHERE author = 'ada'"),
+        2,
+        "both ada's"
+    );
+    // Kept by its hash alone: no column holds the id itself.
+    let mut c = db.sql();
+    let hashed: i64 = c
+        .query_one(
+            "SELECT count(*) FROM sessions WHERE hash = $1",
+            &[&crate::identity::kept_hash(&ada)],
+        )
+        .expect("counted")
+        .get(0);
+    assert_eq!(hashed, 1, "the session kept by its hash");
+    let plain: i64 = c
+        .query_one(
+            "SELECT count(*) FROM sessions WHERE hash = convert_to($1, 'UTF8') \
+             OR user_id = $1 OR handle = $1 OR name = $1 OR issuer = $1",
+            &[&ada],
+        )
+        .expect("counted")
+        .get(0);
+    assert_eq!(plain, 0, "never the id itself");
+    assert_eq!(
+        db.count("SELECT count(*) FROM sign_ins"),
+        0,
+        "the sign-in taken once"
+    );
+}
+
+/// **A session signed out on one host is no one on another** (ADR-0258's
+/// sign-out, held across hosts): B's next request reads no session, and its
+/// post is refused for `SignedIn`.
+#[test]
+fn a_session_signed_out_on_one_host_is_no_one_on_another() {
+    let Some(url) = database() else { return };
+    let db = Schema::new(&url, "signed_out");
+    let provider = Arc::new(TestProvider::default());
+    let a = feed_host_signing_in(&url, &db, &provider);
+    let b = feed_host_signing_in(&url, &db, &provider);
+    let ada = super::sign_in::signed_in(&a, &provider, "s-came", "ada");
+    let answer = posted_by(&b, &ada, "i-1", "Signed in on A, posting on B");
+    assert!(answer.contains("\"committed\":true"), "{answer}");
+    let out = exchanged(
+        &a,
+        &format!(
+            "POST /sign-out HTTP/1.1\r\nHost: t\r\nCookie: pw-session={ada}\r\n\
+             Sec-Fetch-Site: same-origin\r\ncontent-length: 0\r\n\r\n"
+        ),
+    );
+    assert!(out.starts_with("HTTP/1.1 303"), "{out}");
+    let refused = posted_by(&b, &ada, "i-2", "Signed out on A");
+    assert!(refused.starts_with("HTTP/1.1 403"), "{refused}");
+    assert!(refused.contains("SignedIn"), "{refused}");
+    assert_eq!(db.count("SELECT count(*) FROM sessions"), 0, "none kept");
+}
+
+/// **A restarted host keeps its readers signed in** (ADR-XXXX): a host
+/// started again on the database finds the session a sign-in made before.
+/// Until ADR-XXXX a restart signed everyone out.
+#[test]
+fn a_restarted_host_keeps_its_readers_signed_in() {
+    let Some(url) = database() else { return };
+    let db = Schema::new(&url, "restarted");
+    let provider = Arc::new(TestProvider::default());
+    let ada = {
+        let a = feed_host_signing_in(&url, &db, &provider);
+        super::sign_in::signed_in(&a, &provider, "s-came", "ada")
+    };
+    let again = feed_host_signing_in(&url, &db, &provider);
+    let answer = posted_by(&again, &ada, "i-1", "After a restart");
+    assert!(answer.contains("\"committed\":true"), "{answer}");
+}
+
+/// **A request reads its session once**: one statement, whatever the page
+/// asks of its reader; none for a request with no session yet.
+#[test]
+fn a_request_reads_its_session_once() {
+    let Some(url) = database() else { return };
+    let db = Schema::new(&url, "read_once");
+    let provider = Arc::new(TestProvider::default());
+    let a = feed_host_signing_in(&url, &db, &provider);
+    let ada = super::sign_in::signed_in(&a, &provider, "s-came", "ada");
+    let kept = a.data.sessions().expect("sessions kept");
+    let before = kept.ran();
+    let page = get(&a, "/", &format!("pw-session={ada}"));
+    assert!(page.starts_with("HTTP/1.1 200"), "{page}");
+    assert_eq!(kept.ran() - before, 1, "one read for the request");
+    let before = kept.ran();
+    let fresh = get(&a, "/", "");
+    assert!(fresh.starts_with("HTTP/1.1 200"), "{fresh}");
+    assert_eq!(kept.ran(), before, "none for a request with no session");
+}
+
+// ---------------------------------------------------------------------------
+// The store on two hosts
+// ---------------------------------------------------------------------------
+
+/// The database the store's tests run against.
+fn store_database() -> Option<String> {
+    match std::env::var("PW_STORE_DATABASE_URL") {
+        Ok(url) if !url.is_empty() => Some(url),
+        _ => {
+            eprintln!("skipped: PW_STORE_DATABASE_URL is not set");
+            None
+        }
+    }
+}
+
+/// **Two hosts of the canonical store on one schema**, each its own layer,
+/// their readers signed in through `provider`; dropped B, then A, then
+/// their layers, A's dropping the schema.
+struct Stores {
+    b: Server,
+    a: Server,
+    _b_layer: Arc<StorePg>,
+    _a_layer: Arc<StorePg>,
+    _dir: tempfile::TempDir,
+}
+
+fn stores(url: &str, provider: &Arc<TestProvider>) -> Stores {
+    let a_layer = Arc::new(StorePg::for_test(url).expect("A's layer"));
+    let b_layer = Arc::new(
+        StorePg::open_with(url, a_layer.schema(), Isolation::Serializable).expect("B's layer"),
+    );
+    let (dir, out) = built_from_patches_in("examples", |app| app.to_string(), &[]);
+    let host = |layer: &Arc<StorePg>| {
+        let s = Server::from_build_layers(out.clone(), out.clone(), None, Some(layer.clone()))
+            .expect("served on PostgreSQL");
+        s.identity.use_provider(provider.clone(), REDIRECT);
+        s
+    };
+    Stores {
+        a: host(&a_layer),
+        b: host(&b_layer),
+        _b_layer: b_layer,
+        _a_layer: a_layer,
+        _dir: dir,
+    }
+}
+
+const CART: &str = "store.page.CartPage";
+
+/// **A reader's cart changed through one host is told to their page on
+/// another**: ada, signed in through A, reads her cart on B (her session
+/// found in the database by B's request); her add through A reaches B's page
+/// when B reads the outbox, by principal, as her other session on one host
+/// is told (ADR-0318).
+#[test]
+fn a_readers_cart_changed_through_one_host_is_told_to_their_page_on_another() {
+    let Some(url) = store_database() else { return };
+    let provider = Arc::new(TestProvider::default());
+    let hosts = stores(&url, &provider);
+    let ada = super::sign_in::signed_in(&hosts.a, &provider, "came-ada", "ada");
+    // What B's request for the page does first.
+    hosts.b.identity.principals().refresh(&ada);
+    hosts
+        .b
+        .serve_document_settled(&ada, CART, &Params::new(), &[])
+        .expect("served on B");
+    let doc = latest(&hosts.b.pending.lock().expect("pending"), &ada);
+    let before = sets_of(&hosts.b, &doc).len();
+    hosts
+        .a
+        .command(ADD, &ada, &add_shown("espresso", 1), false)
+        .expect("ada adds through A");
+    assert_eq!(sets_of(&hosts.b, &doc).len(), before, "not before B reads it");
+    hosts.b.hear();
+    let told: Vec<String> = sets_of(&hosts.b, &doc)[before..]
+        .iter()
+        .map(written)
+        .collect();
+    assert!(
+        told.iter().any(|w| w.contains("$3.50")),
+        "her page on B is told: {told:?}"
+    );
+}
+
+/// **A retry through another host of a press one host committed runs once**
+/// (ADR-0325, held across two live hosts): the same interaction sent to B
+/// is answered from A's record, committed with A's writes, and the cart
+/// holds the one line.
+#[test]
+fn a_retry_through_another_host_is_answered_from_the_first_hosts_record() {
+    let Some(url) = store_database() else { return };
+    let provider = Arc::new(TestProvider::default());
+    let hosts = stores(&url, &provider);
+    let ada = super::sign_in::signed_in(&hosts.a, &provider, "came-ada", "ada");
+    let request = [shown("espresso"), serde_json::json!(1)];
+    let first = hosts
+        .a
+        .command_answer(ADD, &ada, &request, Some("press-1"))
+        .expect("a well-formed request");
+    assert!(first.committed, "{first:?}");
+    hosts.b.identity.principals().refresh(&ada);
+    let again = hosts
+        .b
+        .command_answer(ADD, &ada, &request, Some("press-1"))
+        .expect("a well-formed request");
+    assert_eq!(again, first, "A's answer");
+    assert_eq!(hosts.b.cart_lines(&ada), [("espresso".to_string(), 1)]);
+    assert_eq!(hosts.a.cart_lines(&ada), [("espresso".to_string(), 1)]);
 }

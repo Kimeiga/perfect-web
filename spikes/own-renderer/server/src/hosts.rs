@@ -367,6 +367,11 @@ impl SessionsPg {
 }
 
 impl crate::identity::Kept for SessionsPg {
+    #[cfg(test)]
+    fn ran(&self) -> u64 {
+        self.ran.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
     fn session(&self, hash: &[u8]) -> Result<Option<crate::identity::Principal>, String> {
         self.with(|c| {
             Ok(c.query_opt(

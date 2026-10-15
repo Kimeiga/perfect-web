@@ -327,6 +327,11 @@ pub(crate) trait Kept: Send + Sync {
     /// A sign-in's nonce and verifier, and how long ago it began, taken: it
     /// completes once.
     fn take_sign_in(&self, hash: &[u8]) -> Result<Option<(String, String, Duration)>, String>;
+    /// The statements it ran, which a test counts.
+    #[cfg(test)]
+    fn ran(&self) -> u64 {
+        0
+    }
 }
 
 /// **A session open on a reader's behalf**, closed when it goes.
