@@ -317,9 +317,9 @@ session page Book() {
             <form hidden={!SignedIn} on:submit|prevent={() => match words(draft) {
                 Some(text) => match sign(text) {
                     Ok(_) => draft = "",
-                    Err(_) => draft = draft,
+                    Err(_) => (),
                 },
-                None => draft = draft,
+                None => (),
             }}>
                 <label>Your message <textarea bind:value={draft}></textarea></label>
                 <button type="submit" disabled={String.length(draft) == 0}>Sign</button>
@@ -330,9 +330,9 @@ session page Book() {
                     <li>
                         <p>{entry.text}</p>
                         <p class="by">{entry.author.name}</p>
-                        {#if SignedIn}{#if entry.mine}<button type="button" on:press={resumable(captures = { entry }) => match remove(entry.id) {
-                            Ok(_) => draft = draft,
-                            Err(_) => draft = draft,
+                        {#if SignedIn}{#if entry.mine}<button type="button" on:press={() => match remove(entry.id) {
+                            Ok(_) => (),
+                            Err(_) => (),
                         }}>Remove</button>{/if}{/if}
                     </li>
                 {/each}
@@ -361,11 +361,13 @@ Read it from the top:
   given a button that can only be refused.
 - `on:submit|prevent={() => ...}`: the handler, run in the browser. It
   makes `Words` from the draft, calls the command, and matches on the
-  answer. Every arm assigns: `draft = draft` is how an arm does nothing.
+  answer, which says only whether the command committed: the new entry
+  reaches the page through `Entries`. An arm that does nothing is `()`.
 - `bind:value={draft}`: the textarea and the signal are kept equal.
-- `resumable(captures = { entry }) => ...`: a handler inside a list row
-  names what it uses from the row, so the page resumes in the browser
-  without running the list again.
+- `on:press={() => match remove(entry.id) { .. }}` inside a list row: the
+  handler reads `entry` from its row. The compiler writes what a handler
+  uses into the page, so the browser runs it without rendering the list
+  again (ADR-0134).
 - `<form method="get" action="/sign-in">`: plain HTML forms to the
   server's sign-in, sign-up and sign-out routes.
 

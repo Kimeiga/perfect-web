@@ -30,9 +30,9 @@ session page Book() {
             <form hidden={!SignedIn} on:submit|prevent={() => match words(draft) {
                 Some(text) => match sign(text) {
                     Ok(_) => draft = "",
-                    Err(_) => draft = draft,
+                    Err(_) => (),
                 },
-                None => draft = draft,
+                None => (),
             }}>
                 <label>Your message <textarea bind:value={draft}></textarea></label>
                 <button type="submit" disabled={String.length(draft) == 0}>Sign</button>
@@ -43,9 +43,9 @@ session page Book() {
                     <li>
                         <p>{entry.text}</p>
                         <p class="by">{entry.author.name}</p>
-                        {#if SignedIn}{#if entry.mine}<button type="button" on:press={resumable(captures = { entry }) => match remove(entry.id) {
-                            Ok(_) => draft = draft,
-                            Err(_) => draft = draft,
+                        {#if SignedIn}{#if entry.mine}<button type="button" on:press={() => match remove(entry.id) {
+                            Ok(_) => (),
+                            Err(_) => (),
                         }}>Remove</button>{/if}{/if}
                     </li>
                 {/each}
