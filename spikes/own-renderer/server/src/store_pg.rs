@@ -483,7 +483,7 @@ impl Rows for PgRows<'_> {
     fn set_order_time(
         &mut self,
         owner: &str,
-        time: Option<&crate::scheduled_orders::OrderTime>,
+        time: &crate::scheduled_orders::OrderTime,
     ) -> Result<(), String> {
         crate::scheduled_orders::pg_set_order_time(&mut self.0, owner, time)
     }

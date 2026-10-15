@@ -3,10 +3,10 @@
 -- with the reader's other choices; and an owner's order's time: the
 -- reference of the order it is for, the start of its window and when it is
 -- sent to its stores (milliseconds since 1970), and the window's weekday and
--- minute of the day in its first store's zone, which its page words. One for
--- an owner's latest order, as the payment it awaits is (`order_payments`);
--- gone once the order is sent. The in-memory layer keeps the same
--- (`store.rs`' `choices` and `times`).
+-- minute of the day in its first store's zone, which its page words. One an
+-- owner, as the payment their order awaits is (`order_payments`), read only
+-- with its order's reference, and replaced by their next order for a time.
+-- The in-memory layer keeps the same (`store.rs`' `choices` and `times`).
 
 ALTER TABLE checkout_choices ADD COLUMN scheduled_for bigint;
 

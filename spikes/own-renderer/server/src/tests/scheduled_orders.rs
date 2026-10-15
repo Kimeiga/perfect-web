@@ -563,6 +563,78 @@ fn a_second_order_waits_for_a_scheduled_one_to_be_sent() {
     assert_eq!(s.run_due().0, 1);
     let third = place(&s, "third");
     assert!(third.committed, "{:?}", third.result);
+    // For as soon as possible, it is placed: the first order's time, kept
+    // in the layer, is that order's alone.
+    assert_eq!(order(&s), Some(("placed".into(), None)));
+}
+
+/// **A cart of two stores is sent by the longer of their estimates**: the
+/// reader's address at Union Square, where Blue Bottle (47) is and Harbor
+/// Coffee (48) is a courier's minutes away. The cart lists 48's line first,
+/// so the last store's estimate, 47's, is the shorter.
+#[test]
+fn a_cart_of_two_stores_is_sent_by_its_longest_estimate() {
+    let s = served();
+    clock_to(&s, at(2027, 3, 1, 10, 7));
+    let union = crate::places::place("union-square").expect("a place");
+    s.command(
+        "store.page.add_address",
+        "a",
+        &[Val::String("Home".into()), Val::String(union.id.into())],
+        false,
+    )
+    .expect("saved");
+    let travel = |store: &str| crate::places::travel_minutes(&crate::store::zone_of(store), union);
+    assert!(travel("48") > travel("47"), "48 is farther");
+    s.command(ADD, "a", &add_shown("drip", 1), false)
+        .expect("added");
+    s.command(ADD, "a", &add_shown("espresso", 1), false)
+        .expect("added");
+    let noon = at(2027, 3, 1, 12, 0);
+    assert!(choose(&s, Some(noon), "noon").committed);
+    assert!(place(&s, "place").committed);
+    let sends = noon - (35 + travel("48") + 5) * MINUTE;
+    assert_eq!(order(&s), Some(("scheduled".into(), Some((noon, sends)))));
+}
+
+/// **A send run before its order is paid places nothing**: the order for a
+/// time awaits its payment, and a send of it finds it not scheduled, and
+/// leaves it awaiting. The control: paid, its own send places it (above).
+#[test]
+fn a_send_before_its_order_is_paid_places_nothing() {
+    paying_with(
+        |app| format!("{app}{SEND_IN_FIVE}"),
+        |s, _| {
+            clock_to(s, at(2027, 3, 1, 10, 7));
+            s.command(ADD, "a", &add_shown("espresso", 1), false)
+                .expect("added");
+            assert!(choose(s, Some(at(2027, 3, 1, 15, 0)), "three").committed);
+            assert!(place(s, "place").committed);
+            let awaited = s.layer_read("a", "store:data/user-orders#awaited", &s.owner("a"));
+            let reference = match &awaited {
+                Val::Option(Some(a)) => match val_at(a, &["order"]) {
+                    Some(Val::String(order)) => order.clone(),
+                    other => panic!("an awaited order's reference is {other:?}"),
+                },
+                other => panic!("user-orders#awaited answered {other:?}"),
+            };
+            let early = s
+                .command_answered(
+                    "store.page.send_in_five",
+                    "a",
+                    &[Val::String(reference)],
+                    Some("early"),
+                )
+                .expect("answered");
+            assert!(early.committed, "{:?}", early.result);
+            later(s, 5 * MINUTE);
+            assert_eq!(s.run_due().0, 1, "the send, run");
+            assert_eq!(
+                order(s).map(|(case, _)| case),
+                Some("awaiting-payment".into())
+            );
+        },
+    );
 }
 
 /// A test's: the store's send of `order`, scheduled five minutes on.

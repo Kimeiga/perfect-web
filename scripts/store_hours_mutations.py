@@ -12,7 +12,8 @@ Each mutant undoes one piece:
   day after; a time in the evening said "am"; a store open the day round
   not said so; the home page's stores kept past a change to their hours;
   overlapping periods joined only where one ends as the next starts;
-- the command (`examples/store/app.pw`): an order placed whatever the hours;
+- the command (`place_order`, its hold in `examples/store/scheduled.pw` since
+  track `scheduled-orders`): an order placed whatever the hours;
 - the layers: memory's hours not written; memory's hours held in the
   order a set lists them, not as PostgreSQL returns them; a weekday past 7
   not refused; PostgreSQL's special date written a day late; PostgreSQL's
@@ -37,6 +38,9 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 HOURS_PW = ROOT / "examples/store/hours.pw"
 APP = ROOT / "examples/store/app.pw"
+# Track `scheduled-orders`: `place_order` holds an order for as soon as
+# possible to the hours there (`held_to`).
+SCHEDULED_PW = ROOT / "examples/store/scheduled.pw"
 HOURS_RS = ROOT / "spikes/own-renderer/server/src/hours.rs"
 STORE_DATA = ROOT / "spikes/own-renderer/server/src/store.rs"
 
@@ -129,9 +133,9 @@ MUTANTS = [
     (
         "an order is placed whatever the hours",
         "server",
-        APP,
-        "        Some(closing) => Err(OrderError.Closed(closing)),\n",
-        "        Some(closing) => UserOrders.place(current_user()),\n",
+        SCHEDULED_PW,
+        "            Some(closing) => Some(OrderError.Closed(closing)),\n",
+        "            Some(closing) => None,\n",
     ),
     (
         "memory's hours are not written",

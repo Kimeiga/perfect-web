@@ -15623,13 +15623,14 @@ public query Store(",
             |app| {
                 // `add_to_cart`'s, the first command's. And what a cart's
                 // change would drop that it then says nothing of: the cart's
-                // hours (track `store-hours`) and its checkout (track
-                // `order-total`), which read the cart too.
+                // hours (track `store-hours`), its checkout (track
+                // `order-total`) and the times its stores offer (track
+                // `scheduled-orders`), which read the cart too.
                 let emits = "    emits         UserCartChanged(current_user())\n";
                 assert!(app.contains(emits), "the store's add_to_cart emits");
                 app.replacen(emits, "", 1).replacen(
                     "    invalidates   Cart(current_user())\n",
-                    "    invalidates   Cart(current_user()), CartHours(current_user()), Checkout(current_user())\n",
+                    "    invalidates   Cart(current_user()), CartHours(current_user()), Checkout(current_user()), TimesOffered(current_user(), _)\n",
                     1,
                 )
             },

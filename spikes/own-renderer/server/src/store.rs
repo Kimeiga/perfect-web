@@ -320,8 +320,9 @@ pub(crate) trait Rows {
     fn charged(&mut self, owner: &str) -> Result<Option<crate::checkout::Charged>, String>;
 
     // TRACK SEAM (scheduled-orders): an owner's order's time
-    // (`scheduled_orders.rs`), one for their latest order, as the payment it
-    // awaits is; `None` sets none.
+    // (`scheduled_orders.rs`), one for their latest order that was placed for
+    // a time, written as it awaits its payment; read only with the order's
+    // reference, so one kept past its order is another order's to no one.
     fn order_time(
         &mut self,
         owner: &str,
@@ -329,7 +330,7 @@ pub(crate) trait Rows {
     fn set_order_time(
         &mut self,
         owner: &str,
-        time: Option<&crate::scheduled_orders::OrderTime>,
+        time: &crate::scheduled_orders::OrderTime,
     ) -> Result<(), String>;
 }
 
@@ -1423,7 +1424,7 @@ pub(crate) fn writes(
                 )?;
                 // TRACK SEAM (scheduled-orders): for a time, with it.
                 if let Some(t) = crate::scheduled_orders::time_from(time, &reference)? {
-                    r.set_order_time(owner, Some(&t))?;
+                    r.set_order_time(owner, &t)?;
                 }
                 let mut written = placed.lock().expect("written");
                 written.wrote = true;
@@ -2260,16 +2261,9 @@ impl Rows for MemRows {
     fn set_order_time(
         &mut self,
         owner: &str,
-        time: Option<&crate::scheduled_orders::OrderTime>,
+        time: &crate::scheduled_orders::OrderTime,
     ) -> Result<(), String> {
-        match time {
-            Some(t) => {
-                self.state().times.insert(owner.to_string(), t.clone());
-            }
-            None => {
-                self.state().times.remove(owner);
-            }
-        }
+        self.state().times.insert(owner.to_string(), time.clone());
         Ok(())
     }
 }

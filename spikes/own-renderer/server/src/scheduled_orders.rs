@@ -9,12 +9,14 @@
 //!   `choices` in memory, `checkout_choices.scheduled_for` on PostgreSQL.
 //! - **An order's time** ([`OrderTime`]): the reference of the order it is
 //!   for, the start of its window, when it is sent to its stores, and its
-//!   day and time as its page says them. One for an owner's latest order, as
-//!   the payment it awaits is: written with the order where it awaits its
-//!   payment (`user-orders#await-payment`), read where it is settled, which
-//!   makes it `scheduled` rather than `placed`, and gone once it is sent.
-//!   `State`'s `times` in memory, `order_times` on PostgreSQL
-//!   (`migrations/store/0016_scheduled_orders.sql`).
+//!   day and time as its page says them. One an owner, as the payment their
+//!   order awaits is: written with the order where it awaits its payment
+//!   (`user-orders#await-payment`), and read where it is settled, which makes
+//!   it `scheduled` rather than `placed`, and where it is sent. Each read
+//!   matches it to the order by its reference, so one kept past its order (a
+//!   later order is for as soon as possible) is no order's: it is replaced by
+//!   the owner's next, not removed. `State`'s `times` in memory, `order_times`
+//!   on PostgreSQL (`migrations/store/0016_scheduled_orders.sql`).
 //!
 //! The operations, registered beside the checkout's (`store.rs`' seams): the
 //! reader's `store:data/checkout#set-time`, and `store:data/user-orders#send`,
@@ -120,8 +122,8 @@ pub(crate) fn writes(with: With, written: Arc<Mutex<Written>>) -> Ops {
         }),
     );
     // **The reader's scheduled order, sent to its stores**: placed, where
-    // their order is the one `reference` names and is scheduled still, its
-    // time gone with it; as it is otherwise, nothing written.
+    // their order is the one `reference` names and is scheduled still; as it
+    // is otherwise, nothing written.
     ops.insert(
         "store:data/user-orders#send".to_string(),
         Arc::new(move |args: &[Val]| {
@@ -137,7 +139,6 @@ pub(crate) fn writes(with: With, written: Arc<Mutex<Written>>) -> Ops {
                     .is_some_and(|t| t.reference == *reference);
                 if order.status == SCHEDULED && ours {
                     r.set_status(reader, Some("placed"))?;
-                    r.set_order_time(reader, None)?;
                     written.lock().expect("written").wrote = true;
                     return Ok(crate::store::ok(Val::Variant("placed".into(), None)));
                 }
@@ -175,22 +176,20 @@ pub(crate) fn pg_order_time(c: &mut Counted<'_>, owner: &str) -> Result<Option<O
     }))
 }
 
-/// **An owner's order's time written, or none**, in one statement.
+/// **An owner's order's time written**, the one before it replaced, in one
+/// statement.
 pub(crate) fn pg_set_order_time(
     c: &mut Counted<'_>,
     owner: &str,
-    time: Option<&OrderTime>,
+    t: &OrderTime,
 ) -> Result<(), String> {
-    match time {
-        Some(t) => c.execute(
-            "INSERT INTO order_times (owner, reference, at_ms, sends_ms, weekday, minute) \
-             VALUES ($1, $2, $3, $4, $5, $6) \
-             ON CONFLICT (owner) DO UPDATE SET reference = $2, at_ms = $3, sends_ms = $4, \
-                 weekday = $5, minute = $6",
-            &[&owner, &t.reference, &t.at, &t.sends, &t.weekday, &t.minute],
-        ),
-        None => c.execute("DELETE FROM order_times WHERE owner = $1", &[&owner]),
-    }
+    c.execute(
+        "INSERT INTO order_times (owner, reference, at_ms, sends_ms, weekday, minute) \
+         VALUES ($1, $2, $3, $4, $5, $6) \
+         ON CONFLICT (owner) DO UPDATE SET reference = $2, at_ms = $3, sends_ms = $4, \
+             weekday = $5, minute = $6",
+        &[&owner, &t.reference, &t.at, &t.sends, &t.weekday, &t.minute],
+    )
     .map(|_| ())
     .map_err(pg)
 }

@@ -139,9 +139,14 @@ fn arguments(op: &str, stores: &Val) -> Option<Vec<Val>> {
         "data/addresses#remove" | "data/addresses#choose" => vec![s(ADA), s("addr-1")],
         "data/checkout#set-tip" => vec![s(ADA), Val::Variant("fifteen".into(), None)],
         "data/checkout#set-promo" => vec![s(ADA), Val::Option(None)],
-        "data/user-orders#await-payment" | "data/user-orders#place" => {
-            vec![s(ADA), charged, Val::Option(None)]
+        // Track `scheduled-orders`: the time chosen, none; an order sent; and
+        // an order awaiting its payment is given its time, none.
+        "data/checkout#set-time" => vec![s(ADA), Val::Option(None)],
+        "data/user-orders#send" => vec![s(ADA), s("ref-1")],
+        "data/user-orders#await-payment" => {
+            vec![s(ADA), charged, Val::Option(None), Val::Option(None)]
         }
+        "data/user-orders#place" => vec![s(ADA), charged, Val::Option(None)],
         "data/user-orders#paying" => vec![
             s(ADA),
             s("ref-1"),
@@ -352,12 +357,19 @@ fn steps(more: bool) -> Vec<(String, u64)> {
         )
         .expect("chosen")
     });
+    // Track `scheduled-orders`: as soon as possible chosen, which this
+    // scenario's order is for; and the page of times read below.
+    step("choose_time (as soon as possible)", &|| {
+        s.command("store.page.choose_time", "a", &[Val::Option(None)], false)
+            .expect("chosen")
+    });
     for path in [
         "/",
         "/stores/47",
         "/cart",
         "/search?q=coffee",
         "/stores/47/address",
+        "/cart/when",
     ] {
         step(path, &|| {
             fetched_as(&s, path, Some("a"));
@@ -646,6 +658,71 @@ fn awaiting(more: bool) -> Vec<(String, u64)> {
             "settle_payment, on the provider's word of the sweep's cancel: its transaction"
                 .to_string(),
             told,
+        ));
+        // Track `scheduled-orders`: the swept order's lines, back in the
+        // cart, ordered for a time, a quarter hour past the first offered;
+        // paid on the provider's page; and sent to its stores when its
+        // preparation is due, the window less the estimate's most (35
+        // minutes, no address chosen) and five more.
+        let window = ((s.now() + 3_600_000) / 900_000 + 2) * 900_000;
+        let before = quiet(s).len();
+        let chosen = s
+            .command_answered(
+                "store.page.choose_time",
+                "a",
+                &[Val::Option(Some(Box::new(Val::S64(window))))],
+                Some("time-1"),
+            )
+            .expect("answered");
+        assert!(chosen.committed, "{:?}", chosen.result);
+        let total = s.shown_total("a");
+        s.command_answered(
+            "store.page.place_order",
+            "a",
+            std::slice::from_ref(&total),
+            Some("place-4"),
+        )
+        .expect("answered");
+        let ran = quiet(s)[before..].to_vec();
+        let [choose, place] = ran[..] else {
+            panic!("choose_time's transaction, then place_order's: {ran:?}")
+        };
+        out.push((
+            "choose_time, for a time: its transaction".to_string(),
+            choose,
+        ));
+        out.push((
+            "place_order, for a time, taking payments: its transaction".to_string(),
+            place,
+        ));
+        let Some((status, Some(page))) = super::store_payments::status_of(s, "a") else {
+            panic!("an order awaiting its payment")
+        };
+        assert_eq!(status, "awaiting-payment");
+        let before = quiet(s).len();
+        let paid = super::store_payments::pay(&page, "4242424242424242");
+        assert!(paid.contains("Paid."), "{paid}");
+        let ran = quiet(s)[before..].to_vec();
+        let [settle] = ran[..] else {
+            panic!("settle_payment's transaction: {ran:?}")
+        };
+        out.push((
+            "settle_payment, on the provider's word, for a time: its transaction".to_string(),
+            settle,
+        ));
+        let sends = window - 40 * 60_000;
+        s.query_clock
+            .0
+            .advance(u64::try_from(sends - s.now()).expect("ahead") + 1000);
+        let before = quiet(s).len();
+        assert_eq!(s.run_due().0, 1, "the send, run");
+        let ran = quiet(s)[before..].to_vec();
+        let [send] = ran[..] else {
+            panic!("send_to_store's transaction: {ran:?}")
+        };
+        out.push((
+            "send_to_store, run when its preparation is due: its transaction".to_string(),
+            send,
         ));
     });
     out
