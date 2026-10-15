@@ -517,7 +517,9 @@ fn an_order_is_sent_its_estimates_most_and_five_minutes_before() {
 
 /// **An order for a time awaiting its payment is swept as any is**
 /// (ADR-0334): unpaid thirty minutes on, it is taken back, and nothing was
-/// scheduled to send it. The control: one paid is sent (above).
+/// scheduled to send it. The control: one paid is sent (above); and the
+/// reader's next order for a time, paid, is scheduled for its own time, the
+/// one taken back's replaced.
 #[test]
 fn an_order_for_a_time_awaiting_its_payment_is_swept() {
     paying(|s, _| {
@@ -531,6 +533,23 @@ fn an_order_for_a_time_awaiting_its_payment_is_swept() {
         assert_eq!(order(s), Some(("canceled".into(), None)));
         assert!(runs(s).is_empty(), "{:?}", runs(s));
         assert_eq!(s.cart_lines("a"), vec![("espresso".to_string(), 1)]);
+        let four = at(2027, 3, 1, 16, 0);
+        assert!(choose(s, Some(four), "four").committed);
+        assert!(place(s, "again").committed);
+        let (html, _, _, _) = s
+            .serve_document_settled("a", "store.page.OrderPage", &Params::new(), &[])
+            .expect("served");
+        let page_url = html
+            .split("src=\"")
+            .nth(1)
+            .and_then(|rest| rest.split('"').next())
+            .expect("the provider's page")
+            .to_string();
+        assert!(pay(&page_url, "4242424242424242").contains("Paid."));
+        assert_eq!(
+            order(s),
+            Some(("scheduled".into(), Some((four, four - 40 * MINUTE))))
+        );
     });
 }
 
