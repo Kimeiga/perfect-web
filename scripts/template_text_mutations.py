@@ -20,6 +20,8 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 VALUES = ROOT / "compiler/pw-core/src/values.rs"
 NAMES = ROOT / "compiler/pw-core/src/names.rs"
+# Where a loop's list is one of the expressions every walker reads (ADR-XXXX).
+HIR = ROOT / "compiler/pw-core/src/hir.rs"
 
 # (what is undone, file, anchor, replacement)
 MUTANTS = [
@@ -94,32 +96,35 @@ MUTANTS = [
     (
         "a loop's key is not written as text",
         VALUES,
-        '                out.extend(self.text(t, format!("({key})"), span.clone()));',
-        "                let _ = t;",
+        '            out.extend(self.text(self.of(key), format!("({written})"), span.clone()));\n',
+        "            let _ = (written, key);\n",
     ),
     (
         "a loop's list is not read field by field",
-        VALUES,
-        "                self.read_through(start, &rest, &span, out);",
-        "                let _ = (start, rest);",
+        HIR,
+        "                    out.push((Position::List, *list));\n",
+        "                    let _ = list;\n",
     ),
     (
         "a loop's key is its element whatever it names",
         VALUES,
-        "            if let Some(t) = self.read_through(element, &segments[1..], &span, out) {",
-        "            if let Some(t) = Some(element) {",
+        "self.text(self.of(key), format!(",
+        "self.text(self.local(Binder::Each(node)), format!(",
     ),
     (
         "a field a value lacks is read",
         VALUES,
-        '                Some(format!("a member `{name}`"))',
-        "                None",
+        "                None => Outcome::Disagree {\n"
+        '                    expected: format!("a member `{name}`"),\n',
+        "                None => Outcome::Agree,\n"
+        "                _ if false => Outcome::Disagree {\n"
+        '                    expected: format!("a member `{name}`"),\n',
     ),
     (
         "a computed list is read as a name",
         NAMES,
-        "if written && !self.bound(head) && !self.resolves(head) {",
-        "if !head.is_empty() && !self.bound(head) && !self.resolves(head) {",
+        "                    self.expr(each.list);\n",
+        "                    self.name(&each.written.list, self.body.expr_span(each.list));\n",
     ),
     (
         "a stream's query is written as text",
