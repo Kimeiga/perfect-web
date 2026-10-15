@@ -1791,3 +1791,24 @@ Each a decision for a track, with its date; a track's ADR records it too.
     bytecode, counts unchecked against their scripts, the corpus's
     `@rule` headers and `check_latency` under load
     (`track/evidence-integrity`).
+- **2026-10-15, train-8 landed** (`track/train-8`, verify 38773359015):
+  the Wasmtime bump (ADR-0335), NEXT 4b (ADR-0336), the 4c, three-database
+  and Docs notes, each ruled (ADR-0337 to ADR-0339), pc-setup, and the
+  capability matrix, merged above.
+  - **Its run: 10 recipes on 8 shards and the three engines, all green.**
+    13 jobs, every one a success, in 1 h 45 min, and 193 of 193 mutants
+    killed over the 10 recipes, whose evidence is fetched at `1824590b` (10
+    files, none refused as stale). Among them `e14-bounded-statements`'
+    first record: 4 passed and 7 of 7 killed on PostgreSQL 18.6. The
+    longest shard, `recipes 4 on PostgreSQL`, held `e14-store-postgres`
+    alone and took 105 minutes (the recipe itself 6154 s).
+  - **GitHub's `ci` is green again** (38773359011, on `1824590b`): its
+    "licenses and advisories" job passed with Wasmtime 48.0.6, the first
+    green since 2026-10-14 21:33 UTC, and both build-and-test jobs passed
+    on pc-setup's workflows (Node 24 actions, just 1.58.0 pinned).
+  - **Its local `just ci` passed whole** on the PC (exit 0, 32 minutes, at
+    a load of 11 to 46): 336 test binaries and none failing, `check_latency`
+    among them (2 of 2, 40 s), and `mutant-programs` (237 mutants, 11
+    refused by their named rule, none failing).
+  - Landed from the PC by the integrator's delegate, across two usage
+    cut-offs, from its progress file.

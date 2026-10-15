@@ -41,7 +41,7 @@ built, and nothing was downloaded.
 - **Its downloads wait for the owner** (owner decision 2): Automerge,
   ProseMirror and what they bring, 16 npm packages shipped to an editor's
   page among them; nothing is fetched before that approval.
-Verify TRAIN_RUN green, with train-8.
+Verify 38773359015 green, with train-8.
 
 **ADR-0338, 2026-10-15: one app on three kinds of database, each held to
 what it gives** (a design note, track `threedb-design`, merged from
@@ -63,7 +63,7 @@ built yet.
   none downloads anything. The owner's decisions 1 to 7 (which database of
   each pair, the downloads, what runs where) come before T3 (MongoDB), T4
   (Cassandra or ScyllaDB) or T5 (CockroachDB) starts.
-Verify TRAIN_RUN green, with train-8.
+Verify 38773359015 green, with train-8.
 
 **2026-10-15: Pleris is developed on Windows inside WSL2** (the move to the
 owner's PC; track `pc-setup`, merged from `c7f4630b`).
@@ -83,7 +83,7 @@ owner's PC; track `pc-setup`, merged from `c7f4630b`).
   develop inside WSL2, on WSL's own filesystem.
 - Its verify (38659086865) was green; its `ci` (38659086894) red in
   "licenses and advisories" alone, Wasmtime 48.0.5's (ADR-0335 above).
-Verify TRAIN_RUN green, with train-8.
+Verify 38773359015 green, with train-8.
 
 **ADR-0337, 2026-10-14: a read is bounded by construction** (W9's design
 note for NEXT 4c; track `bounded-reads`, merged from `8bc1fe68`; ruled by
@@ -101,7 +101,7 @@ the integrator 2026-10-14). Docs only: nothing is built yet.
   PW0405, `set` pairs, `sets` and PW0406 (track `bounded-checker`); the
   conformance suite, one with the three-database note's; then the
   composites, one at a time.
-Verify TRAIN_RUN green, with train-8.
+Verify 38773359015 green, with train-8.
 
 **ADR-0336, 2026-10-14: a read is a bounded number of statements on
 PostgreSQL** (W9's; NEXT 4b; track `bounded-statements`, merged from
@@ -126,7 +126,7 @@ PostgreSQL** (W9's; NEXT 4b; track `bounded-statements`, merged from
   passed and 7 of 7 mutants killed; `store_accounts_mutations.py` whole, 37
   of 37; chromium's suite, 381 passed. Its own verify (38641214685) was
   cancelled by a concurrency group: the train's run is its record.
-Verify TRAIN_RUN green, with train-8.
+Verify 38773359015 green, with train-8.
 
 **ADR-0335, 2026-10-14: Wasmtime 48.0.6, for RUSTSEC-2026-0353 to 0364**
 (the integrator's; track `wasmtime-48-0-6`, merged from `af18141a`; the
@@ -150,7 +150,7 @@ release's 28 crates and its CLI archives approved by the owner 2026-10-14).
   is a hardening track of its own (NEXT); the E0 spike's evidence stays
   historical (ADR-0116); the macOS digest is checked at the Mac's next
   `just bootstrap`.
-Verify TRAIN_RUN green, with train-8.
+Verify 38773359015 green, with train-8.
 
 **2026-10-14: a change to a source's own tests plans what runs them** (the
 integrator's finding at train-6; track `planner-test-modules`, merged from
