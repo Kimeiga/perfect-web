@@ -1279,6 +1279,11 @@ pub struct Hir {
     /// a clause's value, a string's hole, a block marker's expression — each
     /// span in the file. The checker reports them as it does the file's.
     pub syntax: Vec<pw_syntax::SyntaxError>,
+    /// **The declarations the compiler wrote, and what for** (track
+    /// `tables`, ADR-0338): each function and record a table's declaration
+    /// gives its module (`tables::generate`), by its id. A declaration not
+    /// here is the program's own.
+    pub generated: std::collections::BTreeMap<DeclId, crate::tables::Generated>,
 }
 
 impl Hir {

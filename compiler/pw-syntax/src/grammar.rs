@@ -4337,22 +4337,10 @@ mod tests {
     /// only where their value follows on the line.
     #[test]
     fn a_table_declaration_reads_each_clause() {
-        let src = "module Todos
-
-table Todos
-    row     Todo
-    key     owner, id
-    order   added
-    index   by_list on list
-    unique  by_slug on slug
-    refers  owner to Users
-    bounded 500
-    migrate title renamed from name
-
-fn after() -> Int !{} {
-    1
-}
-";
+        let src = "module Todos\n\ntable Todos\n    row     Todo\n    key     owner, id\n    \
+                   order   added\n    index   by_list on list\n    unique  by_slug on slug\n    \
+                   refers  owner to Users\n    bounded 500\n    \
+                   migrate title renamed from name\n\nfn after() -> Int !{} {\n    1\n}\n";
         let p = parse_ok(src);
         assert_lossless(src, &p);
         let heads: Vec<String> = texts(&p, K::Policy)
@@ -4398,11 +4386,7 @@ fn after() -> Int !{} {
             ("bounded", ".count"),
         ] {
             let src = format!(
-                "materialize M() {{
-    regenerate on_invalidation
-    {head}{rest}
-}}
-"
+                "materialize M() {{\n    regenerate on_invalidation\n    {head}{rest}\n}}\n"
             );
             let p = parse_tree(&src);
             assert_lossless(&src, &p);
@@ -4414,12 +4398,7 @@ fn after() -> Int !{} {
         }
         // And each is a clause where its value follows.
         for clause in ["row Todo", "order added", "bounded 5"] {
-            let src = format!(
-                "materialize M() {{
-    {clause}
-}}
-"
-            );
+            let src = format!("materialize M() {{\n    {clause}\n}}\n");
             let p = parse_tree(&src);
             assert!(
                 texts(&p, K::Policy).iter().any(|t| t.trim() == clause),

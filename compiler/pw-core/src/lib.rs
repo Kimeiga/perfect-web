@@ -81,6 +81,9 @@ pub mod invoked;
 pub mod origins;
 // The scheduled-commands track: a command runs when the clock passes its time.
 pub mod scheduled;
+// Track `tables` (ADR-0338, D1): an app's data, declared, and the functions
+// it gives.
+pub mod tables;
 pub mod values;
 pub mod wit;
 

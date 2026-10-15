@@ -234,6 +234,10 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
             // Track `uploads` (ADR-0260): an upload's clauses, its paths, and
             // the forms that post a file.
             out.extend(crate::uploads::check(&hirs, i));
+            // Track `tables` (ADR-0338): a table's declaration, and its rows
+            // reached only through the functions it gives (PW0361, PW0362,
+            // PW0365).
+            out.extend(crate::tables::check(&hirs, i, &workspace, &sigs));
             // NEXT 6c: a command the platform invokes, which no reader
             // presses (PW64xx).
             out.extend(crate::invoked::check(&hirs, i, &workspace, &sent));
@@ -1264,7 +1268,19 @@ fn unresolved_uses(
                     // Several: the typer's, by the type expected where the
                     // call is written (ADR-0201).
                     if owners.is_empty() {
-                        out.push(unresolved_bare_call(hir, decl, body, id, &path));
+                        // In a table's own module, a read or a write it does
+                        // not give (track `tables`).
+                        match crate::tables::undeclared(
+                            workspace,
+                            hirs,
+                            unit,
+                            None,
+                            &path,
+                            body.expr_span(id),
+                        ) {
+                            Some(d) => out.push(d),
+                            None => out.push(unresolved_bare_call(hir, decl, body, id, &path)),
+                        }
                     }
                 }
                 continue;
@@ -1294,6 +1310,21 @@ fn unresolved_uses(
                 continue;
             }
             if workspace.resolve_path(unit, &path) != Resolution::Unresolved {
+                continue;
+            }
+            // A read or a write a table does not give (track `tables`):
+            // its own refusal, which names what it gives.
+            if let Some((head, member)) = path.rsplit_once('.')
+                && let Some(d) = crate::tables::undeclared(
+                    workspace,
+                    hirs,
+                    unit,
+                    Some(head),
+                    member,
+                    body.expr_span(id),
+                )
+            {
+                out.push(d);
                 continue;
             }
 
@@ -7698,6 +7729,18 @@ fn to_exhaust_pattern(
 /// whatever the parser said, and its syntax errors were not reported: a
 /// test's program with a typo checked clean.
 pub fn check_sources(files: &[(String, String)]) -> Vec<(String, Vec<Diagnostic>)> {
+    check_sources_with(files, None)
+}
+
+/// **[`check_sources`], and the program held to the schema released**
+/// (track `tables`, ADR-0338, PW0366): `released` is the `schema.lock` a
+/// deployment holds it to, and each change from it that loses or
+/// reinterprets data with no `migrate` stating it is refused in the file of
+/// its table.
+pub fn check_sources_with(
+    files: &[(String, String)],
+    released: Option<&crate::tables::Schema>,
+) -> Vec<(String, Vec<Diagnostic>)> {
     let parsed: Vec<pw_syntax::Parse> = files
         .iter()
         .map(|(_, src)| pw_syntax::parse_tree(src))
@@ -7712,7 +7755,19 @@ pub fn check_sources(files: &[(String, String)]) -> Vec<(String, Vec<Diagnostic>
             hir: crate::lower::lower_file(src, &p.green),
         })
         .collect();
-    let mut checked = check_units(&units).into_iter();
+    let mut held = check_units(&units);
+    if released.is_some() {
+        let hirs: Vec<&Hir> = units.iter().map(|u| &u.hir).collect();
+        let ws = crate::resolve::Workspace::build(&hirs);
+        let sigs = Signatures::build(&ws, &hirs);
+        for (unit, d) in crate::tables::held_to(&hirs, &ws, &sigs, released).1 {
+            if let Some((_, found)) = held.get_mut(unit) {
+                found.push(d);
+                found.sort_by_key(|d| d.primary_span.start);
+            }
+        }
+    }
+    let mut checked = held.into_iter();
     files
         .iter()
         .zip(parsed)

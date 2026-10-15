@@ -58,6 +58,13 @@ pub struct Build {
     /// **The words each predicate the program declares is told in**
     /// (ADR-0302), which a host answers a refusal by it with.
     pub predicates: std::collections::BTreeMap<String, String>,
+    /// **Each table the program declares** (track `tables`, ADR-0338): its
+    /// schema, its functions as a host binds their imports, and the
+    /// migration from the schema released.
+    pub tables: crate::tables::TablesJson,
+    /// **The schema the build declares**, which `schema.lock` holds once the
+    /// build is released.
+    pub schema: crate::tables::Schema,
 }
 
 impl Build {
@@ -82,6 +89,12 @@ impl Build {
     /// DIR/predicates.json           the words a refusal by each predicate the
     ///                               program declares is told in (ADR-0302);
     ///                               none where it declares none
+    /// DIR/tables.json               each table: its schema, its functions as a
+    ///                               host binds their imports, and the
+    ///                               migration from the schema released
+    ///                               (ADR-0338); none where it declares none
+    /// DIR/schema.lock               the schema the build declares: committed
+    ///                               beside the program when it is released
     /// DIR/speculations/<page>.*     each page's speculations (ADR-0122)
     /// DIR/computed/<page>.mjs       what each page computes from its
     ///                               signals, in the browser (ADR-0227)
@@ -190,6 +203,24 @@ impl Build {
             let words =
                 serde_json::to_string_pretty(&self.predicates).map_err(|e| e.to_string())?;
             write("predicates.json", format!("{words}\n").as_bytes())?;
+        }
+        // Each table, and the schema the build declares (ADR-0338). A program
+        // that declares none has neither, and its host serves no table.
+        if !self.tables.tables.is_empty() {
+            let tables = serde_json::to_string_pretty(&self.tables).map_err(|e| e.to_string())?;
+            write("tables.json", format!("{tables}\n").as_bytes())?;
+            write("schema.lock", self.schema.written().as_bytes())?;
+            lines.push(format!(
+                "  tables     {} table(s), schema {}, {} migration step(s) from {}",
+                self.tables.tables.len(),
+                self.schema.hash,
+                self.tables.migration.steps.len(),
+                self.tables
+                    .migration
+                    .from
+                    .as_deref()
+                    .map_or("none released".to_string(), |h| format!("schema {h}"))
+            ));
         }
         for s in &self.speculations {
             if let crate::backend::wasm::Encoding::Encoded(m) = &s.module {
@@ -339,6 +370,17 @@ impl Build {
 
 /// **Build a checked program.** A program that does not check builds nothing.
 pub fn build(units: &[Unit]) -> Result<Build, String> {
+    build_with(units, None)
+}
+
+/// **Build a checked program, held to the schema released** (track
+/// `tables`, ADR-0338): `released` is the `schema.lock` its deployment
+/// holds, and a change from it that loses or reinterprets data with no
+/// `migrate` stating it builds nothing (PW0366).
+pub fn build_with(
+    units: &[Unit],
+    released: Option<&crate::tables::Schema>,
+) -> Result<Build, String> {
     // The gate every backend shares: `js::compile` and `compile_all` each
     // refuse an unchecked program, through `lower::Checked`.
     let handlers = js::compile(units)?;
@@ -350,6 +392,20 @@ pub fn build(units: &[Unit]) -> Result<Build, String> {
     let sigs = crate::signatures::Signatures::build(&ws, &hirs);
     let contracts = crate::contract::contracts(&hirs, &sigs, &ws);
     let (wit, _) = crate::wit::package(&hirs, &ws, &contracts).map_err(|e| format!("WIT: {e}"))?;
+    // The tables, and the program held to the schema released (PW0366).
+    let (tables, schema, refused) = crate::tables::tables_json(&hirs, &ws, &sigs, released);
+    let refused: Vec<String> = refused
+        .iter()
+        .filter(|(_, d)| d.is_error())
+        .map(|(unit, d)| format!("{}: [{}] {}", units[*unit].path, d.code, d.message))
+        .collect();
+    if !refused.is_empty() {
+        return Err(format!(
+            "the program is held to the schema released, and {} change(s) are not stated:\n  {}",
+            refused.len(),
+            refused.join("\n  ")
+        ));
+    }
 
     let sources: Vec<&str> = units.iter().map(|u| u.src.as_str()).collect();
     let templates = templates(&hirs, &sources, &sigs);
@@ -409,6 +465,8 @@ pub fn build(units: &[Unit]) -> Result<Build, String> {
         sources: crate::check::source_clauses(&hirs),
         uploads: crate::uploads::upload_clauses(&hirs),
         predicates: crate::predicates::words_of(&hirs),
+        tables,
+        schema,
     })
 }
 
@@ -434,11 +492,11 @@ pub fn templates(
 }
 
 /// FNV-1a's offset basis, where a build's name starts.
-const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
+pub(crate) const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
 
 /// FNV-1a, 64 bits, `bytes` folded into `h`, and then a zero byte, so that
 /// `"ab", "c"` and `"a", "bc"` name two things.
-fn fnv1a(mut h: u64, bytes: &[u8]) -> u64 {
+pub(crate) fn fnv1a(mut h: u64, bytes: &[u8]) -> u64 {
     for b in bytes.iter().chain(std::iter::once(&0u8)) {
         h ^= *b as u64;
         h = h.wrapping_mul(0x0000_0100_0000_01b3);

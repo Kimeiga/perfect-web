@@ -1186,7 +1186,11 @@ fn audit_values_command(paths: &[&String]) -> ExitCode {
 /// All or nothing, like `emit-handlers`: one refusal writes nothing and fails
 /// the build, naming what was refused and why. No Koka and no Marko: neither
 /// backend is called (E10 gate item 1).
-fn build_command(paths: &[&String], out: &str) -> ExitCode {
+fn build_command(
+    paths: &[&String],
+    out: &str,
+    released: Option<&pw_core::tables::Schema>,
+) -> ExitCode {
     let mut units = Vec::new();
     for path in paths {
         let src = match std::fs::read_to_string(path) {
@@ -1208,7 +1212,7 @@ fn build_command(paths: &[&String], out: &str) -> ExitCode {
             hir,
         });
     }
-    let build = match pw_core::build::build(&units) {
+    let build = match pw_core::build::build_with(&units, released) {
         Ok(b) => b,
         Err(e) => {
             eprintln!("pw: {e}");
@@ -1599,7 +1603,7 @@ fn run() -> ExitCode {
             skip_next = false;
             continue;
         }
-        if a == "--out" || a == "--component" {
+        if a == "--out" || a == "--component" || a == "--schema-lock" {
             skip_next = true;
             continue;
         }
@@ -1654,8 +1658,31 @@ fn run() -> ExitCode {
         eprintln!(
             "  build --out DIR          every artifact: templates, handlers, components, contracts, WIT"
         );
+        eprintln!(
+            "  --schema-lock FILE       (check, build) hold the program's tables to the schema released"
+        );
         return ExitCode::from(2);
     }
+
+    // **The schema released** (track `tables`, ADR-0338): the `schema.lock`
+    // a deployment holds the program's tables to, read whole or refused.
+    let released = match args
+        .iter()
+        .position(|a| a == "--schema-lock")
+        .and_then(|i| args.get(i + 1))
+    {
+        Some(path) => match std::fs::read_to_string(path)
+            .map_err(|e| e.to_string())
+            .and_then(|text| pw_core::tables::Schema::read(&text))
+        {
+            Ok(schema) => Some(schema),
+            Err(e) => {
+                eprintln!("pw: {path}: {e}");
+                return ExitCode::from(2);
+            }
+        },
+        None => None,
+    };
 
     if cmd == "build" {
         let out = args
@@ -1664,11 +1691,11 @@ fn run() -> ExitCode {
             .and_then(|i| args.get(i + 1))
             .cloned();
         let Some(out) = out else {
-            eprintln!("usage: pw build --out DIR <path.pw>...");
+            eprintln!("usage: pw build --out DIR [--schema-lock FILE] <path.pw>...");
             return ExitCode::from(2);
         };
         let sources: Vec<&String> = paths.iter().copied().filter(|p| **p != out).collect();
-        return build_command(&sources, &out);
+        return build_command(&sources, &out, released.as_ref());
     }
 
     if cmd == "emit-speculations" {
@@ -1825,7 +1852,7 @@ fn run() -> ExitCode {
     // given them (ADR-0106). A map keyed by name kept the last file's for
     // every file of that name: `pw check a/app.pw b/app.pw` passed with an
     // error in `a/app.pw` until 2026-09-26.
-    let mut checked = pw_core::check::check_sources(&clean).into_iter();
+    let mut checked = pw_core::check::check_sources_with(&clean, released.as_ref()).into_iter();
     let body_diags: Vec<Vec<Diagnostic>> = inputs
         .iter()
         .map(|i| match i.parsed.errors.is_empty() {
