@@ -80,6 +80,36 @@ test("a guest signs up, signs, and the entry is theirs alone to remove", async (
   await context.close();
 });
 
+test("an entry is shown before the server answers, and offers no Remove until it has", async ({ browser }, testInfo) => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  const name = `Joan ${testInfo.project.name}`;
+  await signUp(page, handle(testInfo, "joan"), name);
+  // The command's request is held at the network, so "before the server
+  // answers" is observed, not inferred from timing.
+  let release;
+  const held = new Promise((resolve) => (release = resolve));
+  await page.route("**/command/guestbook.book.sign", async (route) => {
+    await held;
+    await route.continue();
+  });
+  const words = `Shown at once, from ${testInfo.project.name} ${Date.now()}`;
+  await page.getByLabel("Your message").fill(words);
+  await page.getByRole("button", { name: "Sign", exact: true }).click();
+  // The server has not answered, and the page already shows the entry:
+  // first, by "You", with no Remove button, since it is not the server's row.
+  await expect(page.locator("main > ul > li").first()).toContainText(words);
+  await expect(entry(page, words).locator(".by")).toHaveText("You");
+  await expect(entry(page, words).getByRole("button", { name: "Remove" })).toHaveCount(0);
+  release();
+  // The server's row takes its place: its author named as the server names
+  // it, one row, and theirs to remove.
+  await expect(entry(page, words).locator(".by")).toHaveText(name);
+  await expect(entry(page, words)).toHaveCount(1);
+  await expect(entry(page, words).getByRole("button", { name: "Remove" })).toHaveCount(1);
+  await context.close();
+});
+
 test("another reader's open page is told of an entry, and of its removal", async ({ browser }, testInfo) => {
   const [writer, reader] = [await browser.newContext(), await browser.newContext()];
   const [page, other] = [await writer.newPage(), await reader.newPage()];
