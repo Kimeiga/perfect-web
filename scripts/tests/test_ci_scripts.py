@@ -923,6 +923,108 @@ class CurrentEvidence(unittest.TestCase):
         self.assertTrue(all("--current" in line for line in pushes), pushes)
 
 
+class StaleEvidence(unittest.TestCase):
+    """Track evidence-integrity, finding 2: a train's push plans each recipe
+    whose committed evidence is stale at its head, whatever the train
+    changed. A push planned what its range reached, less what was current,
+    so evidence gone stale before the range was planned by none, and the
+    nightly keeps none: `docs/evidence/E10/privacy-by-resolution.txt` said
+    "4 of 4 mutants killed" for a week after its script's fourth mutant was
+    retired."""
+
+    HEAD, OLD = "h" * 40, "a" * 40
+    BODY = {
+        "e14-one": "@{ echo; } > docs/evidence/E14/one.txt\n",
+        "e14-two": "@{ echo; } > docs/evidence/E14/two.txt\n",
+        "e14-none": "@cargo test --locked\n",
+    }
+
+    def stale(self, texts: dict, reached: set = frozenset()) -> list:
+        def read(head: str, path: str) -> str | None:
+            m = plan.RECORDED_AT.search(texts.get(path) or "")
+            return m.group(1) if m else None
+
+        return plan.stale(
+            sorted(self.BODY),
+            self.HEAD,
+            body=self.BODY,
+            show=lambda head, path: texts.get(path),
+            read=read,
+            descends_from=lambda sha, head: True,
+            reach=lambda sha, head: set(reached),
+        )
+
+    def test_evidence_whose_reads_changed_since_its_commit_is_stale(self) -> None:
+        texts = {
+            "docs/evidence/E14/one.txt": f"commit: {self.OLD}\n",
+            "docs/evidence/E14/two.txt": f"commit: {self.OLD}\n",
+        }
+        self.assertEqual(self.stale(texts, reached={"e14-one"}), ["e14-one"])
+        # The control: nothing either reads changed since; current, both.
+        self.assertEqual(self.stale(texts), [])
+
+    def test_evidence_from_a_tree_with_changes_or_none_at_all_is_stale(self) -> None:
+        texts = {
+            "docs/evidence/E14/one.txt": f"commit: {self.OLD} + uncommitted changes\n",
+            "docs/evidence/E14/two.txt": f"commit: {self.OLD}\n",
+        }
+        self.assertEqual(self.stale(texts), ["e14-one"])
+        # The head holds none of its evidence: it records nothing.
+        del texts["docs/evidence/E14/one.txt"]
+        self.assertEqual(self.stale(texts), ["e14-one"])
+
+    def test_evidence_that_names_no_commit_is_not_judged(self) -> None:
+        # An artifact, or an older recipe's text: planned as before, by what
+        # changed, and never as stale; nor a recipe that writes none.
+        texts = {
+            "docs/evidence/E14/one.txt": "an artifact\n",
+            "docs/evidence/E14/two.txt": f"commit: {self.OLD}\n",
+        }
+        self.assertEqual(self.stale(texts, reached={"e14-one", "e14-two", "e14-none"}), ["e14-two"])
+
+    def test_main_plans_stale_evidence_only_where_asked(self) -> None:
+        import contextlib
+        import io
+
+        def planned(argv: list[str]) -> list[str]:
+            out = io.StringIO()
+            with mock.patch.object(sys, "argv", ["ci_plan.py", *argv]), contextlib.redirect_stdout(out):
+                self.assertEqual(plan.main(), 0)
+            shards = json.loads(out.getvalue().strip()[len("shards="):])
+            return sorted(r for s in shards for r in s["recipes"])
+
+        with mock.patch.object(plan, "changed_recipes", lambda *a: ["e10-affine-bindings"]), \
+                mock.patch.object(plan, "current", lambda n, head, near: {}), \
+                mock.patch.object(plan, "stale", lambda n, head, near: ["e10-attribute-case"]):
+            self.assertEqual(planned(["--changed", "b", "h", "--current"]), ["e10-affine-bindings"])
+            self.assertEqual(
+                planned(["--changed", "b", "h", "--current", "--stale"]),
+                ["e10-affine-bindings", "e10-attribute-case"],
+            )
+
+    def test_a_trains_push_plans_the_stale_evidence_and_another_tracks_does_not(self) -> None:
+        # The track's branch of the plan step, run as the workflow runs it,
+        # with `git` and `python3` answering for themselves.
+        workflow = (SCRIPTS.parent / ".github/workflows/verify.yml").read_text().splitlines()
+        start = next(i for i, l in enumerate(workflow) if 'if [ "${GITHUB_REF_NAME#track/}"' in l)
+        end = next(i for i in range(start, len(workflow)) if workflow[i].lstrip().startswith("elif "))
+        branch = "\n".join(l.strip() for l in workflow[start + 1 : end])
+
+        def plans(ref: str) -> str:
+            with tempfile.TemporaryDirectory() as d:
+                output = pathlib.Path(d) / "output"
+                script = (
+                    'git() { echo base; }\npython3() { echo "python3 $*"; }\n'
+                    f"GITHUB_REF_NAME={ref}\nGITHUB_SHA=head\nGITHUB_OUTPUT={output}\n{branch}\n"
+                )
+                subprocess.run(["bash", "-c", script], check=True, capture_output=True)
+                return output.read_text()
+
+        self.assertIn("--current --stale", plans("track/train-9"))
+        self.assertNotIn("--stale", plans("track/evidence-integrity"))
+        self.assertIn("--changed base head --current", plans("track/evidence-integrity"))
+
+
 class VerifiedBase(unittest.TestCase):
     """ADR-0281, amended 2026-10-13: a train verified at its head is not
     verified again when `master` moves to it."""
