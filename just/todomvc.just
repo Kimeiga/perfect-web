@@ -94,10 +94,21 @@ e14-autofocus:
 # spikes/own-renderer/todomvc.sh and served on a host per engine
 # (e2e/todomvc.spec.mjs), and the mutation controls
 # (scripts/todomvc_mutations.py), each program mutant checked to be a
-# well-typed program.
+# well-typed program. And TodoMVC's own Cypress suite, vendored unchanged
+# (spikes/todomvc-cypress), run against the app twice: as the suite ships (the
+# acceptance: every test that asks localStorage fails by design, and Cypress
+# skips the rest of a suite after a failed hook) and, labelled as not the
+# acceptance, under a name its own tables take as keeping nothing in
+# localStorage. Each run is judged by scripts/todomvc_cypress_result.py from
+# what Cypress printed. THIS RECIPE FAILS where Cypress cannot run (no Xvfb, no
+# binary, no results) and where an outcome is not the one the app's design
+# gives: it never records a skip as a pass. It fetches Cypress's binary into
+# Cypress's own cache (`cypress install` does nothing where it is there). The
+# Cypress suite is not part of `just ci`.
 e14-todomvc:
     @bash spikes/own-renderer/todomvc.sh > /dev/null
     @cargo build --quiet --locked -p pw-dev-server -p kiokun-server
+    @cd spikes/todomvc-cypress && pnpm exec cypress install > /dev/null
     @mkdir -p docs/evidence/E14
     @{ echo "ADR-XXXX - TodoMVC in Pleris, held to its own spec and its own tests"; echo; \
        echo "produced by: just e14-todomvc"; \
@@ -105,13 +116,20 @@ e14-todomvc:
        echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
        echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; \
        echo "todomvc-app-css: $(node -p "require('./spikes/own-renderer/node_modules/todomvc-app-css/package.json').version") ($(node -p "require('./spikes/own-renderer/node_modules/todomvc-app-css/package.json').license"))"; \
-       echo "todomvc-common: $(node -p "require('./spikes/own-renderer/node_modules/todomvc-common/package.json').version") ($(node -p "require('./spikes/own-renderer/node_modules/todomvc-common/package.json').license"))"; echo; \
+       echo "todomvc-common: $(node -p "require('./spikes/own-renderer/node_modules/todomvc-common/package.json').version") ($(node -p "require('./spikes/own-renderer/node_modules/todomvc-common/package.json').license"))"; \
+       echo "cypress: $(cd spikes/todomvc-cypress && pnpm exec cypress --version | tr '\n' ' ')"; echo; \
        echo "== the host: a session's todos, the commands over them, and the page (tests::todomvc::)"; echo; \
        cargo test --locked -p pw-dev-server -- tests::todomvc:: 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the browser in three engines (e2e/todomvc.spec.mjs)"; echo; \
        (cd spikes/own-renderer && pnpm exec playwright test e2e/todomvc.spec.mjs --reporter=line 2>&1) \
          | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' \
          | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== TodoMVC's own Cypress suite, unchanged: the acceptance (spikes/todomvc-cypress/run.sh)"; echo; \
+       bash spikes/todomvc-cypress/run.sh; \
+       echo; echo "== TodoMVC's own Cypress suite, unchanged: the diagnostic, not the acceptance (DIAGNOSTIC=1)"; echo; \
+       DIAGNOSTIC=1 bash spikes/todomvc-cypress/run.sh; \
+       echo; echo "== mutation controls: the Cypress acceptance's checks (scripts/todomvc_cypress_mutations.py)"; echo; \
+       python3 scripts/todomvc_cypress_mutations.py; \
        echo; echo "== mutation controls (scripts/todomvc_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/todomvc_mutations.py; \
      } > docs/evidence/E14/todomvc.txt

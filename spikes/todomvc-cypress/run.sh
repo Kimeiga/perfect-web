@@ -13,11 +13,16 @@
 # path on the host. (The root, `.`, was tried: Cypress asks for `/.`, which no
 # host here serves as `/`.) The name is in none of the suite's tables.
 #
-# Cypress's binary is not in the repository. Where it is not installed, this
-# says so and runs nothing (exit 0): `pnpm exec cypress install` fetches it,
-# into Cypress's own cache. Cypress needs a display: it starts Xvfb itself
-# where none is set, so the one WSLg or a desktop gives is left out of its
-# environment, and the run is the same on a machine with none.
+# **It does not skip.** Where Cypress cannot run (no Xvfb, no binary, a build
+# that is missing, a host that does not start) this exits 1 and says why, and
+# so does a run that printed no results: the evidence recipe (`just
+# e14-todomvc`) must never record a pass for a suite that did not run. The
+# verdict is `scripts/todomvc_cypress_result.py`'s, read from what Cypress
+# printed: this exits with it. (`pnpm exec cypress install`, in this
+# directory, fetches Cypress's binary into its own cache; `UPSTREAM.md` says
+# what.) Cypress starts Xvfb itself where no display is set, and the one WSLg
+# or a desktop gives is left out of its environment, so the run is the same on
+# a machine with none.
 #
 # **The diagnostic** (`DIAGNOSTIC=1`, not the acceptance): the same unchanged
 # files, run as an app the suite's own tables treat as keeping nothing in
@@ -27,69 +32,87 @@
 #     cypress run --env framework=puremvc --config baseUrl=http://127.0.0.1:<port>/page/todomvc.app.Todos#
 #
 # The acceptance's own name is in none of the tables, so each test that asks
-# `localStorage` for the todos fails, and the first test after a failed one
-# fails in its hook (the failed tests' polling of a storage that is gone
-# throws), which skips every test after it. The diagnostic shows what the rest
-# of the suite says of this app.
+# `localStorage` for the todos fails by design, and a failed test's polling
+# loop makes a later hook fail, which skips the rest of the suite. The
+# diagnostic shows what the rest of each test says of this app.
 #
-# The suite's output goes to $OUT (default /tmp/pw-todomvc-cypress.txt, or
-# /tmp/pw-todomvc-cypress-diagnostic.txt), and its summary is printed.
+# Cypress's output goes to $OUT (default /tmp/pw-todomvc-cypress.txt, or
+# /tmp/pw-todomvc-cypress-diagnostic.txt), with the browser's own console
+# (ELECTRON_ENABLE_LOGGING), which is where the failed tests' polling loops
+# record why a hook fails; the report goes to the standard output.
+#
+# Environment: PORT (the base, default 3141), DIAGNOSTIC, OUT, PW_DEV_SERVER
+# (the host's binary, default target/debug/pw-dev-server), TODOMVC_DIST (the
+# built app: a name in spikes/own-renderer or a path, default dist-todomvc),
+# XVFB_BIN (default Xvfb). The last three are for the tests of this script
+# (scripts/tests/test_todomvc_cypress.py), which run it with a Cypress that
+# prints what the test says.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$HERE/../.." && pwd)"
 SPIKE="$REPO_ROOT/spikes/own-renderer"
-DIST="$SPIKE/dist-todomvc"
+DIST_NAME="${TODOMVC_DIST:-dist-todomvc}"
+case "$DIST_NAME" in
+  /*) DIST="$DIST_NAME" ;;
+  *) DIST="$SPIKE/$DIST_NAME" ;;
+esac
+SERVER="${PW_DEV_SERVER:-$REPO_ROOT/target/debug/pw-dev-server}"
+XVFB="${XVFB_BIN:-Xvfb}"
 PORT="$(( ${PORT:-3141} + 143 ))"
 if [ "${DIAGNOSTIC:-}" = 1 ]; then
+  MODE=diagnostic
   FRAMEWORK="puremvc"
   BASE="http://127.0.0.1:$PORT/page/todomvc.app.Todos#"
   OUT="${OUT:-/tmp/pw-todomvc-cypress-diagnostic.txt}"
   echo "cypress: the DIAGNOSTIC run (framework $FRAMEWORK, which the suite takes to keep nothing in localStorage): not the acceptance"
 else
+  MODE=acceptance
   FRAMEWORK="page/todomvc.app.Todos"
   BASE="http://127.0.0.1:$PORT"
   OUT="${OUT:-/tmp/pw-todomvc-cypress.txt}"
 fi
+
+# A suite that cannot run is a failure, never a skip.
+cannot() {
+  echo "run.sh: Cypress cannot run: $*"
+  exit 1
+}
 
 cd "$HERE"
 
 # Each vendored file is the upstream's, byte for byte (UPSTREAM.md).
 python3 "$REPO_ROOT/scripts/todomvc_cypress_vendored.py"
 
-if ! pnpm exec cypress verify > /dev/null 2>&1; then
-  echo "cypress: the binary is not installed on this machine, so the official suite was not run"
-  echo "         (pnpm exec cypress install, in spikes/todomvc-cypress; UPSTREAM.md says what it fetches)"
-  exit 0
-fi
+command -v "$XVFB" > /dev/null 2>&1 \
+  || cannot "Xvfb is not installed (Cypress needs a display and starts Xvfb itself; apt: xvfb)"
+pnpm exec cypress verify > /dev/null 2>&1 \
+  || cannot "its binary is not installed, or does not start (pnpm exec cypress install, in spikes/todomvc-cypress; UPSTREAM.md says what it fetches)"
 echo "cypress: $(pnpm exec cypress --version | tr '\n' ' ')"
-
-if [ ! -d "$DIST/build" ]; then
-  echo "run.sh: $DIST is not built; run spikes/own-renderer/todomvc.sh" >&2
-  exit 1
-fi
+[ -d "$DIST/build" ] || cannot "$DIST is not built (bash spikes/own-renderer/todomvc.sh)"
+[ -x "$SERVER" ] || cannot "the host $SERVER is not built (cargo build -p pw-dev-server)"
 
 # The host: TodoMVC's build, in memory, on a port of its own.
 (cd "$SPIKE" && PORT="$PORT" PW_FEED_DATABASE_URL= PW_STORE_DATABASE_URL= \
-  "$REPO_ROOT/target/debug/pw-dev-server" dist-todomvc > /tmp/pw-todomvc-cypress-host.log 2>&1) &
+  "$SERVER" "$DIST" > /tmp/pw-todomvc-cypress-host.log 2>&1) &
 HOST=$!
 trap 'kill "$HOST" 2>/dev/null || true' EXIT
 for _ in $(seq 1 100); do
-  if curl -fsS -o /dev/null "http://127.0.0.1:$PORT/"; then break; fi
+  if curl -fs -o /dev/null "http://127.0.0.1:$PORT/"; then break; fi
   sleep 0.2
 done
-curl -fsS -o /dev/null "http://127.0.0.1:$PORT/" || { echo "run.sh: the host did not start" >&2; exit 1; }
+curl -fs -o /dev/null "http://127.0.0.1:$PORT/" \
+  || cannot "the host did not start (/tmp/pw-todomvc-cypress-host.log)"
 
 set +e
-env -u DISPLAY -u WAYLAND_DISPLAY pnpm exec cypress run \
+env -u DISPLAY -u WAYLAND_DISPLAY ELECTRON_ENABLE_LOGGING=1 \
+  pnpm exec cypress run \
   --env framework="$FRAMEWORK" \
   --config "baseUrl=$BASE" \
   --reporter spec > "$OUT" 2>&1
 CODE=$?
 set -e
 
-# Each test's line, why each failed (the first line of its error), and
-# Cypress's own table of the counts.
-sed 's/\x1b\[[0-9;]*[A-Za-z]//g' "$OUT" | grep -E "^ +(✓|✔|[0-9]+\)|-) |^ +(AssertionError|CypressError|Error|SecurityError)|│ (Tests|Passing|Failing|Pending|Skipped):" || true
-echo "cypress exit status: $CODE"
-exit 0
+# The verdict: this exits with it. A run with no results table, or with an
+# outcome the app's design does not give, fails here.
+python3 "$REPO_ROOT/scripts/todomvc_cypress_result.py" "$MODE" "$OUT" "$CODE"

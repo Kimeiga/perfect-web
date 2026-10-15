@@ -47,11 +47,38 @@ address. (The root, `.`, was tried first: Cypress asks for `/.`, which no host
 here serves as `/`.) The name is in none of the suite's tables
 (`noLocalStorageCheck` and the rest), so every check the suite makes of an app
 it knows nothing about is made of this one: including `localStorage`, which this
-app does not use (see the ADR's section on the suite's result).
+app does not use (see the ADR's section on the suite's result). That is **the
+acceptance**.
+
+`DIAGNOSTIC=1 run.sh` runs the same files a second time, **not as the
+acceptance**, under a name the suite's own tables take as keeping nothing in
+`localStorage` (`--env framework=puremvc`, reaching the page through an address
+fragment the page ignores). It shows what the rest of each test says of this
+app.
+
+`run.sh` does not skip. It exits 1 where Cypress cannot run (no Xvfb, no
+binary, no build of the app, no host) and where a run printed no results, and
+its status is the verdict of `scripts/todomvc_cypress_result.py`, which reads
+what Cypress printed: the table must count the spec's 29 tests, and each test
+must come out as the app's design gives it (an app that never writes
+`localStorage` fails every test that asks it, and a test that asks nothing
+passes). `scripts/tests/test_todomvc_cypress.py` holds all of this to real
+outputs and runs `run.sh` whole with a stand-in Cypress;
+`scripts/todomvc_cypress_mutations.py` breaks each rule. `just e14-todomvc`
+records both runs; the suite is not part of `just ci`.
 
 # The binary
 
-Cypress 15.14.2's binary is not in the repository: pnpm 10 does not run its
-install script, and `pnpm exec cypress install` fetches it from
-`download.cypress.io` into Cypress's own cache (`~/.cache/Cypress/15.14.2`).
-`run.sh` says so where it is missing, and does nothing else.
+Cypress 15.14.2 (the version that repository's own lockfile pins) is two
+downloads, approved by the owner on 2026-10-08 for this track:
+
+- the npm package `cypress@15.14.2` from the npm registry (7.4 MB installed;
+  162 packages with its dependency tree, held by `pnpm-lock.yaml`), and
+- its binary, which pnpm 10 does not fetch (it runs no install scripts):
+  `pnpm exec cypress install` fetches it from `download.cypress.io` into
+  Cypress's own cache (`~/.cache/Cypress/15.14.2`, 805 MB unzipped; the size
+  of the zip was not recorded). `just e14-todomvc` runs that command, which
+  does nothing where the binary is already there.
+
+Cypress needs a display and starts Xvfb itself (`apt: xvfb`); `run.sh` fails
+where it is missing.
