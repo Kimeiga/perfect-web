@@ -27,6 +27,7 @@ import 'just/bounded-statements.just'
 import 'just/payments.just'
 import 'just/page-policy.just'
 import 'just/scheduled.just'
+import 'just/evidence-integrity.just'
 
 default:
     @just --list
@@ -1578,9 +1579,9 @@ e14-value-labels:
      } > docs/evidence/E14/value-labels.txt
     @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/value-labels.txt
 
-# ADR-0132: the browser's resume decision knows what the build compiled.
 # Its suite runs on the build it makes first, as every recipe's does (track
 # evidence-integrity: it ran on whatever a worktree or a shard had built).
+# ADR-0132: the browser's resume decision knows what the build compiled.
 e14-resume-gate:
     @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
     @cargo build --quiet --locked -p pw-dev-server
@@ -1600,10 +1601,11 @@ e14-resume-gate:
      } > docs/evidence/E14/resume-gate.txt
     @grep -E "^test result|passed|failed|mutants killed|^---- |panicked at" docs/evidence/E14/resume-gate.txt
 
+# Its suite runs on the build it makes first (track evidence-integrity: it
+# ran on whatever a worktree or a shard had built).
 # ADR-0133: a page holds its own UI state, the first slice of signals. The
 # compiler's tests, the browser's renderer, the page in each engine, and a
-# mutant per piece. Its suite runs on the build it makes first (track
-# evidence-integrity: it ran on whatever a worktree or a shard had built).
+# mutant per piece.
 e14-signals:
     @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
     @cargo build --quiet --locked -p pw-dev-server
@@ -1708,11 +1710,12 @@ e14-events:
      } > docs/evidence/E14/events.txt
     @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/events.txt
 
+# The keyed-list suite below needs the build `spikes/own-renderer/run.sh`
+# stages, which it makes first (track evidence-integrity: it ran on whatever
+# a worktree or a shard had built).
 # ADR-0139: a frame is forgotten when the page says it applied it. The
 # server's tests, the mutation controls, and the keyed-list suite twenty
-# times in a row, which failed intermittently before. The last needs the
-# build `spikes/own-renderer/run.sh` stages, which it makes first (track
-# evidence-integrity: it ran on whatever a worktree or a shard had built).
+# times in a row, which failed intermittently before.
 e14-stream-ack:
     @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
     @{ echo "ADR-0139 - a frame is forgotten when the page says it applied it"; echo; \
