@@ -2966,3 +2966,11 @@ note, ruled by the integrator 2026-10-15; nothing built yet).
   database implementing every app's, no app-specific Rust; one conformance
   suite, the 4c note's; built as tracks D1 to D5 and T1 to T6, the owner's
   decisions 1 to 7 before T3, T4 or T5.
+[ADR-0339](DECISIONS/ADR-0339-a-collaborative-document-app.md):
+a collaborative document is merged by Automerge, edited in a mounted
+ProseMirror, and told on the stream (a design note, ruled by the
+integrator 2026-10-15; nothing built yet).
+- NEXT's Google Docs-shaped app: Automerge behind `replicated`'s
+  `rich_text` policy; Pleris renders the document and an editor's page
+  mounts ProseMirror; presence and sync on the stream. Its data declared
+  as tables (ADR-0338); its downloads wait for the owner's approval.

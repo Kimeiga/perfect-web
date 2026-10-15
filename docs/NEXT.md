@@ -1214,7 +1214,18 @@ E14 comes before E11-E13. Its plan, controls and task list are
 
              Any npm or crates.io download it needs (Yjs, yrs, Automerge,
              ProseMirror, ...) waits for the owner's approval, asked when
-             it is reached;
+             it is reached.
+
+             **Ruled** (ADR-0339, the integrator, 2026-10-15): concurrent
+             edits merge in Automerge, behind `replicated`'s `rich_text`
+             policy; Pleris renders every reader's document, and an
+             editor's page mounts ProseMirror at the page's authority; presence
+             and sync ride the stream down, one sync request up. No
+             app-specific Rust: the app's own data is declared as tables on
+             the generic adapters (ADR-0338), so its phase 3 waits for D3.
+             **Its downloads wait for the owner** (the note's "Downloads for
+             the owner's approval", owner decision 2): no track that needs
+             one starts before the owner approves it;
           2. **end-to-end-encrypted direct messages**, ADR-0279's upgraded
              (the owner, relayed 2026-10-08), after the Docs app because both
              need the same foundation, data and computation that live in the

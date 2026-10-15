@@ -23,6 +23,26 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0339, 2026-10-15: a collaborative document is merged by Automerge,
+edited in a mounted ProseMirror, and told on the stream** (a design note
+for NEXT's Google Docs-shaped app, track `docs-design`, merged from
+`2f5e51fb`; ruled by the integrator 2026-10-15). Docs only: nothing is
+built, and nothing was downloaded.
+- Its three rulings: concurrent edits merge in Automerge, behind
+  `replicated`'s `rich_text` policy (reopened if D0's cases or budgets say
+  so); Pleris renders every reader's document, and an editor's page mounts
+  ProseMirror at the page's authority, audited and said to be unconfined;
+  presence and sync ride the stream down, one sync request up, a WebSocket
+  only if a measurement fails.
+- The ruling amends it: no app-specific Rust, the app's own data declared
+  as tables on the generic adapters (ADR-0338), so phase 3 waits for D3; a
+  predicate on a read, `requires` on a query; the owner decisions that are
+  design (3 to 9) ruled under the delegation; PW6601 upward for its codes.
+- **Its downloads wait for the owner** (owner decision 2): Automerge,
+  ProseMirror and what they bring, 16 npm packages shipped to an editor's
+  page among them; nothing is fetched before that approval.
+Verify TRAIN_RUN green, with train-8.
+
 **ADR-0338, 2026-10-15: one app on three kinds of database, each held to
 what it gives** (a design note, track `threedb-design`, merged from
 `b60a9c71`; ruled by the integrator 2026-10-15). Docs only: nothing is
