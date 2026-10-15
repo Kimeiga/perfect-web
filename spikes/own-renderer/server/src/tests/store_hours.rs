@@ -394,7 +394,7 @@ fn weekly(periods: &[(i64, i64, i64)]) -> Hours {
 }
 
 /// Every day's `periods`, in the order given.
-fn every_day(periods: &[(i64, i64)]) -> Hours {
+pub(super) fn every_day(periods: &[(i64, i64)]) -> Hours {
     let each: Vec<(i64, i64, i64)> = (1..=7)
         .flat_map(|d| periods.iter().map(move |&(o, c)| (d, o, c)))
         .collect();

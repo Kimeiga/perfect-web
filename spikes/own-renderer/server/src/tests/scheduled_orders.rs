@@ -3,13 +3,18 @@
 //! offered by the cart's stores' hours, compared with the platform's clock
 //! (ADR-0304), in each store's zone (ADR-0328); a time held to them when it is
 //! chosen and again when the order is placed; and an order for one paid now
-//! and sent to its stores when its preparation is due (ADR-0334). On the
-//! layer the server's tests run on: memory, or PostgreSQL under
+//! and sent to its stores when its preparation is due (ADR-0334). To a store
+//! an order for a time is an order for as soon as possible placed when it is
+//! told, so a window is offered only where every store takes an order then,
+//! by the rule that holds one now (the integrator's ruling of 2026-10-15). On
+//! the layer the server's tests run on: memory, or PostgreSQL under
 //! `PW_STORE_TEST_LAYER=postgres`. Each rule's test has its control. The
 //! stores' zone is San Francisco's; 2027-03-01 is a Monday, before the clocks
-//! go forward on the 14th.
+//! go forward on the 14th. The estimate is 25 to 35 minutes where a test sets
+//! none, so its stores are told 40 minutes before a window, and a store open
+//! 07:00 to 19:00 with a 20-minute cut-off takes an order from 07:00 to 18:40.
 
-use super::store_hours::{at, clock_to, daily, page, set_hours};
+use super::store_hours::{at, clock_to, daily, every_day, page, set_hours};
 use super::store_payments::{pay, paying, paying_with};
 use super::*;
 
@@ -22,7 +27,48 @@ const SWEEP: &str = "store.page.expire_order";
 const MINUTE: i64 = 60_000;
 
 fn served() -> Served {
-    served_from_patches_in("examples", |app| app.to_string(), &[])
+    let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+    no_delay(&s, None);
+    s
+}
+
+/// The estimator session `a`'s reader reaches, answering at once (its delay,
+/// charter 15.5's 400 ms, is a test control, not data: every page of times
+/// asks it once a store), failing as `fail` says.
+fn no_delay(s: &Server, fail: Option<&str>) {
+    s.store.faults().estimators.lock().expect("estimators").insert(
+        "a".to_string(),
+        Estimator {
+            delay_ms: 0,
+            fail: fail.map(str::to_string),
+        },
+    );
+}
+
+/// **The estimate session `a`'s reader is given**, as the layer holds it:
+/// its least and most minutes.
+fn estimating(s: &Server, least: i64, most: i64) {
+    s.untold(
+        "a",
+        "store:host/estimates#set",
+        &[
+            Val::String("a".into()),
+            Val::S64(least),
+            Val::Option(Some(Box::new(Val::S64(most)))),
+        ],
+    );
+}
+
+/// **Why an order for as soon as possible would be refused now**, as the
+/// cart says it, or nothing: the rule `place_order` holds the hours to.
+fn cart_hours(s: &Server) -> String {
+    match s
+        .query("store.page.CartHours", "a", &[Val::String(s.owner("a"))])
+        .expect("the cart's hours")
+    {
+        Val::String(said) => said,
+        other => panic!("the cart's hours are {other:?}"),
+    }
 }
 
 /// **A time chosen** by session `a`'s reader, as the page of times presses
@@ -144,14 +190,14 @@ fn the_seeds_hours_offer_every_quarter_hour_from_an_hour_to_a_week_ahead() {
     assert_eq!(times.len(), 668, "{:?}", &times[..3]);
     assert_eq!(
         times[0],
-        (at(2027, 3, 1, 11, 15), "Today, 11:15 AM".to_string())
+        (at(2027, 3, 1, 11, 15), "Today, 11:15 am".to_string())
     );
     assert!(times.windows(2).all(|w| w[1].0 - w[0].0 == 15 * MINUTE));
-    assert!(times.contains(&(at(2027, 3, 2, 0, 0), "Tomorrow, 12:00 AM".to_string())));
-    assert!(times.contains(&(at(2027, 3, 4, 12, 0), "Thursday, 12:00 PM".to_string())));
+    assert!(times.contains(&(at(2027, 3, 2, 0, 0), "Tomorrow, 12:00 am".to_string())));
+    assert!(times.contains(&(at(2027, 3, 4, 12, 0), "Thursday, 12:00 pm".to_string())));
     assert_eq!(
         times.last().cloned(),
-        Some((at(2027, 3, 8, 10, 0), "Next Monday, 10:00 AM".to_string()))
+        Some((at(2027, 3, 8, 10, 0), "Next Monday, 10:00 am".to_string()))
     );
     clock_to(&s, at(2027, 3, 1, 10, 15));
     let later = offered(&s);
@@ -171,14 +217,18 @@ fn the_page_of_times_is_held_until_the_first_windows_hour() {
     let (html, _, _, _) = s
         .serve_document_settled("a", "store.page.TimePage", &Params::new(), &[])
         .expect("served");
-    assert!(visible(&html).contains("11:15 AM"), "{html}");
+    assert!(visible(&html).contains("11:15 am"), "{html}");
     let doc = latest(&s.pending.lock().expect("pending"), "a");
     assert_eq!(s.timers.at(&doc), Some(at(2027, 3, 1, 10, 15)));
 }
 
-/// **A store open 07:00 to 19:00 offers the windows starting while it is
-/// open**: from 07:00 to 18:45 each day, none at 19:00 or before 07:00; at
-/// 18:00 today none is left, its 19:15 closed.
+/// **A store open 07:00 to 19:00 is offered the windows its stores are told
+/// at while it takes an order**, 40 minutes before each: from 07:00 to 18:40,
+/// its last order (a 20-minute cut-off), so the windows from 07:45 to 19:15
+/// each day: 07:30, whose preparation begins before it opens, is not offered,
+/// nor 19:30, whose preparation begins past its last order; and 19:15, after
+/// it closes, is, as an order for as soon as possible at 18:35 is taken. At
+/// 18:00 today the one window left is 19:15.
 #[test]
 fn a_stores_hours_offer_the_windows_it_is_open_at() {
     let s = served();
@@ -190,26 +240,32 @@ fn a_stores_hours_offer_the_windows_it_is_open_at() {
     let starts: Vec<i64> = times.iter().map(|t| t.0).collect();
     assert_eq!(
         times[0],
-        (at(2027, 3, 2, 7, 0), "Tomorrow, 7:00 AM".to_string())
+        (at(2027, 3, 1, 19, 15), "Today, 7:15 pm".to_string()),
+        "after it closes, a window its store is told for while it is open"
     );
-    assert!(starts.contains(&at(2027, 3, 2, 18, 45)));
-    for closed in [
-        at(2027, 3, 2, 19, 0),
-        at(2027, 3, 3, 6, 45),
-        at(2027, 3, 1, 19, 15),
+    assert_eq!(
+        times[1],
+        (at(2027, 3, 2, 7, 45), "Tomorrow, 7:45 am".to_string())
+    );
+    assert!(starts.contains(&at(2027, 3, 2, 19, 15)));
+    for not in [
+        at(2027, 3, 1, 19, 30),
+        at(2027, 3, 2, 7, 30),
+        at(2027, 3, 2, 19, 30),
+        at(2027, 3, 3, 7, 0),
     ] {
-        assert!(!starts.contains(&closed), "{closed}");
+        assert!(!starts.contains(&not), "{not}");
     }
     assert_eq!(
         times.last().cloned(),
-        Some((at(2027, 3, 8, 18, 0), "Next Monday, 6:00 PM".to_string()))
+        Some((at(2027, 3, 8, 18, 0), "Next Monday, 6:00 pm".to_string()))
     );
-    assert_eq!(times.len(), 6 * 48 + 45);
+    assert_eq!(times.len(), 1 + 6 * 47 + 42);
 }
 
-/// **Hours past midnight offer the windows across it**: open 22:00 to 02:00,
-/// 23:45 and 01:45 are offered, the second the next day's; 02:00 and 21:45
-/// are not.
+/// **Hours past midnight offer the windows across it**: open 22:00 to 02:00
+/// with its last order at 01:40, a night's windows are 22:45 to 02:15, the
+/// second half the next day's; 22:30 and 02:30 are not.
 #[test]
 fn hours_past_midnight_offer_windows_across_it() {
     let s = served();
@@ -219,17 +275,143 @@ fn hours_past_midnight_offer_windows_across_it() {
         .expect("added");
     let times = offered(&s);
     for (open, said) in [
-        (at(2027, 3, 1, 22, 0), "Today, 10:00 PM"),
-        (at(2027, 3, 1, 23, 45), "Today, 11:45 PM"),
-        (at(2027, 3, 2, 1, 45), "Tomorrow, 1:45 AM"),
+        (at(2027, 3, 1, 22, 45), "Today, 10:45 pm"),
+        (at(2027, 3, 1, 23, 45), "Today, 11:45 pm"),
+        (at(2027, 3, 2, 1, 45), "Tomorrow, 1:45 am"),
+        (at(2027, 3, 2, 2, 15), "Tomorrow, 2:15 am"),
     ] {
         assert!(times.contains(&(open, said.to_string())), "{said}");
     }
     let starts: Vec<i64> = times.iter().map(|t| t.0).collect();
-    for closed in [at(2027, 3, 2, 2, 0), at(2027, 3, 1, 21, 45)] {
+    for closed in [at(2027, 3, 2, 2, 30), at(2027, 3, 1, 22, 30)] {
         assert!(!starts.contains(&closed), "{closed}");
     }
-    assert_eq!(times.len(), 7 * 16, "sixteen a night, a week of nights");
+    assert_eq!(times.len(), 7 * 15, "fifteen a night, a week of nights");
+}
+
+/// **A window is offered where its store takes an order when it is told, on
+/// the instant** (the integrator's ruling of 2026-10-15): open 07:00 to 19:00
+/// with its last order at 18:30, told 15 minutes before a window (the
+/// estimate's most, 10, and five). 07:15 is told as the store opens and is
+/// offered; 07:00, told before, is not. 18:30 is told at 18:15 and is offered;
+/// 18:45 is told as the last order passes, and is not. And the cart says, at
+/// each of those instants, what it says of an order for as soon as possible:
+/// taken at 07:00 and 18:15, refused at 06:45 and at 18:30.
+#[test]
+fn a_window_is_offered_where_its_store_takes_an_order_when_it_is_told() {
+    let s = served();
+    estimating(&s, 10, 10);
+    let mut hours = daily(7 * 60, 19 * 60);
+    hours.last_order_minutes = 30;
+    set_hours(&s, "47", &hours);
+    clock_to(&s, at(2027, 3, 1, 20, 0));
+    s.command(ADD, "a", &add_shown("espresso", 1), false)
+        .expect("added");
+    let starts: Vec<i64> = offered(&s).iter().map(|t| t.0).collect();
+    let tuesday: Vec<i64> = starts
+        .iter()
+        .copied()
+        .filter(|t| (at(2027, 3, 2, 0, 0)..at(2027, 3, 3, 0, 0)).contains(t))
+        .collect();
+    assert_eq!(tuesday.first(), Some(&at(2027, 3, 2, 7, 15)));
+    assert_eq!(tuesday.last(), Some(&at(2027, 3, 2, 18, 30)));
+    assert_eq!(tuesday.len(), 46);
+    for (window, taken) in [
+        (at(2027, 3, 2, 7, 0), false),
+        (at(2027, 3, 2, 7, 15), true),
+        (at(2027, 3, 2, 18, 30), true),
+        (at(2027, 3, 2, 18, 45), false),
+    ] {
+        assert_eq!(starts.contains(&window), taken, "{window}");
+        clock_to(&s, window - 15 * MINUTE);
+        assert_eq!(cart_hours(&s).is_empty(), taken, "{window}: {}", cart_hours(&s));
+    }
+}
+
+/// **One rule for both**: a store open 07:00 to 11:00 and 14:00 to 19:00 with
+/// a cut-off of 25 minutes, its last orders between two quarter hours (10:35,
+/// 18:35). Of each quarter hour of a day, a window is offered exactly where
+/// the cart says an order for as soon as possible is taken when its stores
+/// are told, 40 minutes before: the windows 07:45 to 11:00 and 14:45 to
+/// 19:00.
+#[test]
+fn a_window_is_offered_exactly_where_an_order_for_as_soon_as_possible_is_taken_when_told() {
+    let s = served();
+    let mut hours = every_day(&[(7 * 60, 11 * 60), (14 * 60, 19 * 60)]);
+    hours.last_order_minutes = 25;
+    set_hours(&s, "47", &hours);
+    clock_to(&s, at(2027, 3, 1, 20, 0));
+    s.command(ADD, "a", &add_shown("espresso", 1), false)
+        .expect("added");
+    let starts: Vec<i64> = offered(&s).iter().map(|t| t.0).collect();
+    let tuesday = at(2027, 3, 2, 0, 0);
+    let mut taken = 0;
+    for quarter in 0..96 {
+        let window = tuesday + quarter * 15 * MINUTE;
+        clock_to(&s, window - 40 * MINUTE);
+        let would = cart_hours(&s).is_empty();
+        assert_eq!(starts.contains(&window), would, "{window}: {}", cart_hours(&s));
+        taken += usize::from(would);
+    }
+    assert_eq!(taken, 14 + 18);
+}
+
+/// **The windows wait for the estimate**: a store open 07:00 to 19:00 (its
+/// last order at 18:40) is told the estimate's most and five minutes before a
+/// window. No estimate set, 40 minutes: the windows 07:45 to 19:15. An
+/// estimate of 20 to 50, 55 minutes: 08:00 to 19:30. An estimator that
+/// cannot answer counts for nothing beyond the five: 07:15 to 18:30.
+#[test]
+fn the_estimate_moves_the_windows() {
+    let s = served();
+    set_hours(&s, "47", &daily(7 * 60, 19 * 60));
+    clock_to(&s, at(2027, 3, 1, 20, 0));
+    s.command(ADD, "a", &add_shown("espresso", 1), false)
+        .expect("added");
+    let tuesday = |s: &Server| {
+        let day: Vec<i64> = offered(s)
+            .iter()
+            .map(|w| w.0)
+            .filter(|w| (at(2027, 3, 2, 0, 0)..at(2027, 3, 3, 0, 0)).contains(w))
+            .collect();
+        (day[0], day[day.len() - 1])
+    };
+    assert_eq!(tuesday(&s), (at(2027, 3, 2, 7, 45), at(2027, 3, 2, 19, 15)));
+    estimating(&s, 20, 50);
+    assert_eq!(tuesday(&s), (at(2027, 3, 2, 8, 0), at(2027, 3, 2, 19, 30)));
+    no_delay(&s, Some("declared"));
+    assert_eq!(tuesday(&s), (at(2027, 3, 2, 7, 15), at(2027, 3, 2, 18, 30)));
+}
+
+/// **A cart for as soon as possible asks no estimate**: with the estimator
+/// down (a call that fails, not one that refuses), the checkout is shown and
+/// the order placed. The control: with a time chosen the checkout asks the
+/// estimate its windows wait for, and is unavailable while it is down.
+#[test]
+fn a_cart_for_as_soon_as_possible_asks_no_estimate() {
+    let s = served();
+    clock_to(&s, at(2027, 3, 1, 10, 7));
+    s.command(ADD, "a", &add_shown("espresso", 1), false)
+        .expect("added");
+    no_delay(&s, Some("down"));
+    assert_eq!(when_said(&s), "As soon as possible");
+    let soon = place(&s, "soon");
+    assert!(soon.committed, "{:?}", soon.result);
+
+    let s = served();
+    clock_to(&s, at(2027, 3, 1, 10, 7));
+    s.command(ADD, "a", &add_shown("espresso", 1), false)
+        .expect("added");
+    assert!(choose(&s, Some(at(2027, 3, 1, 12, 0)), "noon").committed);
+    no_delay(&s, Some("down"));
+    let owner = s.owner("a");
+    assert!(
+        s.query("store.page.Checkout", "a", &[Val::String(owner)])
+            .is_err(),
+        "a time chosen asks the estimate"
+    );
+    no_delay(&s, None);
+    assert_eq!(when_said(&s), "Scheduled for Mon 12:00 pm");
 }
 
 /// The cart's two stores: Blue Bottle (47) open 07:00 to 19:00 in San
@@ -243,10 +425,12 @@ fn two_zones(s: &Server) {
     clock_to(s, at(2027, 3, 1, 20, 0));
 }
 
-/// **A cart of two stores in two zones is offered the windows both are open
-/// at**, each by its hours in its own zone: 07:00 to 13:45 in San Francisco,
-/// said in the zone of the store the cart lists first. The control: the
-/// other store listed first says the same windows in New York's.
+/// **A cart of two stores in two zones is offered the windows both take an
+/// order for when they are told**, each by its hours in its own zone: from
+/// 07:00 to 13:40 in San Francisco (Harbor Coffee's last order, 16:40 in New
+/// York), so the windows 07:45 to 14:15, said in the zone of the store the
+/// cart lists first. The control: the other store listed first says the same
+/// windows in New York's.
 #[test]
 fn a_cart_across_two_zones_is_offered_the_windows_both_are_open_at() {
     let s = served();
@@ -258,14 +442,14 @@ fn a_cart_across_two_zones_is_offered_the_windows_both_are_open_at() {
     let times = offered(&s);
     assert_eq!(
         times[0],
-        (at(2027, 3, 2, 7, 0), "Tomorrow, 7:00 AM".to_string())
+        (at(2027, 3, 2, 7, 45), "Tomorrow, 7:45 am".to_string())
     );
-    assert!(times.contains(&(at(2027, 3, 2, 13, 45), "Tomorrow, 1:45 PM".to_string())));
+    assert!(times.contains(&(at(2027, 3, 2, 14, 15), "Tomorrow, 2:15 pm".to_string())));
     let starts: Vec<i64> = times.iter().map(|t| t.0).collect();
-    for closed in [at(2027, 3, 2, 14, 0), at(2027, 3, 2, 6, 45)] {
+    for closed in [at(2027, 3, 2, 14, 30), at(2027, 3, 2, 7, 30)] {
         assert!(!starts.contains(&closed), "{closed}");
     }
-    assert_eq!(times.len(), 7 * 28);
+    assert_eq!(times.len(), 7 * 27);
     s.command("store.page.clear_cart", "a", &[], false)
         .expect("cleared");
     s.command(ADD, "a", &add_shown("drip", 1), false)
@@ -275,16 +459,16 @@ fn a_cart_across_two_zones_is_offered_the_windows_both_are_open_at() {
     let said_in_new_york = offered(&s);
     assert_eq!(
         said_in_new_york[0],
-        (at(2027, 3, 2, 7, 0), "Tomorrow, 10:00 AM".to_string())
+        (at(2027, 3, 2, 7, 45), "Tomorrow, 10:45 am".to_string())
     );
     assert_eq!(said_in_new_york.len(), times.len());
 }
 
 /// **A time is held to the times offered when it is chosen**: one within the
-/// hour, one between two quarter hours, one more than a week ahead and one
-/// the store is closed at are each refused by name, and nothing is chosen.
-/// The control: an offered one is chosen, said at checkout, and as soon as
-/// possible chosen again after.
+/// hour, one between two quarter hours, one more than a week ahead, one whose
+/// store is told before it opens and one past its last order are each refused
+/// by name, and nothing is chosen. The control: an offered one is chosen, said
+/// at checkout, and as soon as possible chosen again after.
 #[test]
 fn a_time_not_offered_is_refused_when_chosen() {
     let s = served();
@@ -297,7 +481,8 @@ fn a_time_not_offered_is_refused_when_chosen() {
         at(2027, 3, 1, 11, 0),
         at(2027, 3, 1, 12, 7),
         at(2027, 3, 8, 10, 15),
-        at(2027, 3, 1, 19, 0),
+        at(2027, 3, 2, 7, 30),
+        at(2027, 3, 1, 19, 30),
     ]
     .into_iter()
     .enumerate()
@@ -312,9 +497,9 @@ fn a_time_not_offered_is_refused_when_chosen() {
     assert_eq!(when_said(&s), "As soon as possible", "nothing chosen");
     let chosen = choose(&s, Some(at(2027, 3, 1, 12, 0)), "offered");
     assert!(chosen.committed, "{:?}", chosen.result);
-    assert_eq!(when_said(&s), "Scheduled for Mon 12:00 PM");
+    assert_eq!(when_said(&s), "Scheduled for Mon 12:00 pm");
     assert!(
-        page(&s, "a", "/cart").contains("Scheduled for Mon 12:00 PM Choose a time"),
+        page(&s, "a", "/cart").contains("Scheduled for Mon 12:00 pm Choose a time"),
         "the cart says it"
     );
     let soon = choose(&s, None, "soon");
@@ -343,7 +528,7 @@ fn a_time_no_longer_offered_is_refused_when_the_order_is_placed() {
     );
     assert_eq!(
         when_said(&s),
-        "Mon 12:00 PM is no longer offered: choose another time."
+        "Mon 12:00 pm is no longer offered: choose another time."
     );
     assert_eq!(offered(&s)[0].0, at(2027, 3, 1, 12, 15));
     assert_eq!(order(&s), None, "nothing placed");
@@ -360,8 +545,8 @@ fn a_time_no_longer_offered_is_refused_when_the_order_is_placed() {
 }
 
 /// **A time a store's hours no longer cover is refused**: chosen for 18:00,
-/// the store's hours then end at 17:00. The control: the same time placed
-/// while the hours covered it (above).
+/// the store's hours then end at 17:00, its stores told at 17:20. The control:
+/// the same time placed while the hours covered it (above).
 #[test]
 fn a_time_the_hours_no_longer_cover_is_refused() {
     let s = served();
@@ -459,7 +644,7 @@ fn an_order_is_sent_to_its_stores_when_its_preparation_is_due() {
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
         while !sets_of(s, &doc)
             .iter()
-            .any(|set| visible(&written(set)).contains("Scheduled for Mon 12:00 PM."))
+            .any(|set| visible(&written(set)).contains("Scheduled for Mon 12:00 pm."))
         {
             assert!(
                 std::time::Instant::now() < deadline,
@@ -575,7 +760,7 @@ fn a_second_order_waits_for_a_scheduled_one_to_be_sent() {
     );
     assert_eq!(s.cart_lines("a"), vec![("cortado".to_string(), 1)]);
     assert!(
-        page(&s, "a", "/order").contains("Scheduled for Mon 12:00 PM."),
+        page(&s, "a", "/order").contains("Scheduled for Mon 12:00 pm."),
         "the first stands"
     );
     clock_to(&s, noon - 40 * MINUTE);
@@ -773,21 +958,21 @@ fn the_page_of_times_lists_a_days_windows_and_its_days() {
         shown.contains("Tomorrow Wednesday Thursday Friday Saturday Sunday Next Monday"),
         "{shown}"
     );
-    assert!(shown.contains("Tomorrow 7:00 AM 7:15 AM"), "{shown}");
+    assert!(shown.contains("Tomorrow 7:45 am 8:00 am"), "{shown}");
     let friday = (pw_time::days(2027, 3, 5)).to_string();
     let shown = page(&s, "a", &format!("/cart/when?day={friday}"));
-    assert!(shown.contains("Friday 7:00 AM"), "{shown}");
-    assert!(!shown.contains("Tomorrow 7:00 AM"), "{shown}");
+    assert!(shown.contains("Friday 7:45 am"), "{shown}");
+    assert!(!shown.contains("Tomorrow 7:45 am"), "{shown}");
     let pressed = posted(
         &s,
         "/command/store.page.choose_time",
         "a",
         "pressed-1",
-        &format!(r#"[{{"$case":"some","value":{}}}]"#, at(2027, 3, 5, 7, 0)),
+        &format!(r#"[{{"$case":"some","value":{}}}]"#, at(2027, 3, 5, 7, 45)),
     );
     assert!(pressed.contains("\"committed\":true"), "{pressed}");
     assert!(
-        page(&s, "a", "/cart").contains("Scheduled for Fri 7:00 AM"),
+        page(&s, "a", "/cart").contains("Scheduled for Fri 7:45 am"),
         "the cart says it"
     );
 }
@@ -819,7 +1004,7 @@ fn an_order_for_a_time_is_paid_now_and_its_page_says_when() {
                 .to_string();
             assert!(pay(&page_url, "4242424242424242").contains("Paid."));
             let shown = page(s, "a", "/order");
-            assert!(shown.contains("Scheduled for Tue 6:30 PM."), "{shown}");
+            assert!(shown.contains("Scheduled for Tue 6:30 pm."), "{shown}");
             assert!(shown.contains("Total charged: $"), "{shown}");
         },
     );

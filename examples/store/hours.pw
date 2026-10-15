@@ -136,10 +136,12 @@ fn joined(spans: List<DaySpan>, next: DaySpan) -> List<DaySpan> !{} {
     }
 }
 
-// **The store's spans from yesterday to a week ahead**, joined, by number.
+// **The store's spans from yesterday to eight days ahead**, joined, by number:
+// a window a week ahead, on a day the clocks go forward, is on the eighth
+// (track `scheduled-orders`).
 fn day_spans(h: OpeningHours, today: Int) -> List<DaySpan> !{} {
     let none: List<DaySpan> = []
-    let days = List.map([0, 1, 2, 3, 4, 5, 6, 7, 8], d => today - 1 + d)
+    let days = List.map([0, 1, 2, 3, 4, 5, 6, 7, 8, 9], d => today - 1 + d)
     let each = List.fold(days, none, (out, n) => List.concat(out, spans_on(h, n)))
     List.fold(each, none, (out, s) => joined(out, s))
 }
@@ -171,13 +173,47 @@ fn spans(h: OpeningHours, zone: clock.TimeZone, today: Int) -> List<Span> !{ clo
     })
 }
 
+// **A store's spans as instants**, from yesterday, in its own zone.
+fn spans_of(h: OpeningHours) -> List<Span> !{ clock.compare, clock.zone } {
+    let zone = clock.zone(h.zone)
+    spans(h, zone, clock.day_number(clock.today_in(zone)))
+}
+
+// **Whether `at` has passed, as of `when`** (track `scheduled-orders`): by
+// the platform's clock where `when` is none, as the hours hold an order for
+// as soon as possible; by the instant `when` where it is one, as they hold
+// an order for a time at the instant its stores are told, which to a store
+// is an order for as soon as possible then. `takes_order` is the one rule
+// for both.
+fn passed_as_of(when: Option<Instant>, at: Instant) -> Bool !{ clock.compare } {
+    match when {
+        None => clock.passed(at),
+        Some(t) => !clock.is_before(t, at),
+    }
+}
+
+// **The span a store is open in, as of `when`**: opened by then, and not yet
+// closed.
+fn open_span(all: List<Span>, when: Option<Instant>) -> Option<Span> !{ clock.compare } {
+    List.find(all, s => passed_as_of(when, s.opens) & !passed_as_of(when, s.closes))
+}
+
+// **Whether a store takes an order, as of `when`**: it is open then, and the
+// last order of its span is not past. An order for as soon as possible is
+// held to it as of the clock (`closing_now`); a window is offered only where
+// every store of the cart takes an order as of the instant they are told.
+fn takes_order(all: List<Span>, when: Option<Instant>) -> Bool !{ clock.compare } {
+    match open_span(all, when) {
+        Some(s) => !passed_as_of(when, s.last_order),
+        None => false,
+    }
+}
+
 // **Whether the store is open now, and until when; or when it next opens**,
 // by comparing the clock with each span's opening and closing.
 fn status_of(h: OpeningHours) -> OpenState !{ clock.compare, clock.zone } {
-    let zone = clock.zone(h.zone)
-    let today = clock.day_number(clock.today_in(zone))
-    let all = spans(h, zone, today)
-    match List.find(all, s => clock.passed(s.opens) & !clock.passed(s.closes)) {
+    let all = spans_of(h)
+    match open_span(all, None) {
         Some(s) => OpenState.Open(OpenUntil { until: s.closes, last_order: s.last_order }),
         None => match List.find(all, s => !clock.passed(s.opens)) {
             Some(s) => OpenState.Closed(Some(s.opens)),
@@ -188,10 +224,8 @@ fn status_of(h: OpeningHours) -> OpenState !{ clock.compare, clock.zone } {
 
 // The span the status names, for what the page says of it.
 fn named_span(h: OpeningHours) -> Option<Span> !{ clock.compare, clock.zone } {
-    let zone = clock.zone(h.zone)
-    let today = clock.day_number(clock.today_in(zone))
-    let all = spans(h, zone, today)
-    match List.find(all, s => clock.passed(s.opens) & !clock.passed(s.closes)) {
+    let all = spans_of(h)
+    match open_span(all, None) {
         Some(s) => Some(s),
         None => List.find(all, s => !clock.passed(s.opens)),
     }
@@ -327,22 +361,22 @@ fn closed_in(stores: List<OpeningHoursOf>) -> Option<Closing> !{ clock.compare, 
     })
 }
 
-// **Why a store takes no order now, or nothing.**
+// **Why a store takes no order now, or nothing**: by `takes_order`, as of the
+// clock, and its words only where it says no.
 fn closing_now(h: OpeningHours) -> Option<Closing> !{ clock.compare, clock.zone } {
-    let today = clock.day_number(clock.today_in(clock.zone(h.zone)))
-    match status_of(h) {
-        Open(o) => if clock.passed(o.last_order) {
-            match named_span(h) {
-                Some(span) => Some(Closing.PastLastOrder(local_time((span.days.to - h.last_order_minutes + 1440) % 1440))),
+    let zone = clock.zone(h.zone)
+    let today = clock.day_number(clock.today_in(zone))
+    let all = spans(h, zone, today)
+    if takes_order(all, None) {
+        None
+    } else {
+        match open_span(all, None) {
+            Some(span) => Some(Closing.PastLastOrder(local_time((span.days.to - h.last_order_minutes + 1440) % 1440))),
+            None => Some(Closing.ClosedNow(match List.find(all, s => !clock.passed(s.opens)) {
+                Some(span) => Some(opening_of(span.days.from_day, span.days.from, today)),
                 None => None,
-            }
-        } else {
-            None
-        },
-        Closed(_) => Some(Closing.ClosedNow(match named_span(h) {
-            Some(span) => Some(opening_of(span.days.from_day, span.days.from, today)),
-            None => None,
-        })),
+            })),
+        }
     }
 }
 

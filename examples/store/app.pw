@@ -63,7 +63,7 @@ import store.checkout.{ Priced, Chosen, priced_for, shown_for, promo_for, promo_
 // TRACK SEAM (scheduled-orders): an order placed for a time its reader
 // chooses, offered by its stores' hours and sent to them when it is due.
 import store.scheduled.{ TimesShown, times_shown, checkout_shown, chosen_when, held_to, offered_at,
-    timed_for, set_time, when_scheduled }
+    timed_for, set_time, when_scheduled, lead_of, lead_for }
 
 // Public. Same answer for every reader, so a shared cache is correct and the
 // key is just the store. A change to one store's menu drops that store's kept
@@ -291,13 +291,15 @@ user query Order(reader: User<UserId>) -> Result<Option<OrderStatus>, TrackingEr
 // chosen, and what the page says of the code. Read again when the cart, a
 // choice or a store's data changes, or the clock passes a code's expiry. And
 // (track `scheduled-orders`) when the order is for, read again when the time
-// chosen is an hour away.
+// chosen is an hour away, or the reader's address changes: a time chosen is
+// held to the windows, which wait for the estimates to it. A cart for as soon
+// as possible asks no estimate.
 user query Checkout(reader: User<UserId>) -> Priced
     freshness      0.seconds
     consistency    read_your_writes
     cache          private
     key            reader
-    invalidates_on UserCartChanged(reader), UserOrderChanged(reader), StoreChanged(_)
+    invalidates_on UserCartChanged(reader), UserOrderChanged(reader), StoreChanged(_), AddressesChanged(reader)
     concurrency    one_per_key
     on_key_change  cancel
     timeout        2.seconds
@@ -306,20 +308,23 @@ user query Checkout(reader: User<UserId>) -> Priced
 }
 
 // **The times the reader may choose** (track `scheduled-orders`): the cart's
-// stores' fifteen-minute windows from an hour to a week ahead, by their
-// hours, one day's shown; the reader's, read again when the cart or a
-// store's hours change, or the first window's hour comes.
+// stores' fifteen-minute windows from an hour to a week ahead, those every
+// store takes an order for as soon as possible at when they are told, by
+// their hours; one day's shown. The reader's, read again when the cart, a
+// store's hours or the reader's address change (the estimates the lead
+// is), or the first window's hour comes.
 user query TimesOffered(reader: User<UserId>, day: Option<String>) -> TimesShown
     freshness      0.seconds
     consistency    read_your_writes
     cache          private
     key            reader, day
-    invalidates_on UserCartChanged(reader), StoreChanged(_)
+    invalidates_on UserCartChanged(reader), StoreChanged(_), AddressesChanged(reader)
     concurrency    one_per_key
     on_key_change  cancel
     timeout        2.seconds
 {
-    times_shown(hours_of_cart(reader), chosen_when(reader), day)
+    let stores = hours_of_cart(reader)
+    times_shown(stores, chosen_when(reader), day, lead_of(stores, reader))
 }
 
 // **What the reader's order was charged** (track `order-total`): its total,
@@ -461,11 +466,14 @@ command place_order(shown: Money<USD>)
     // transaction.
     let when = chosen_when(current_user())
     let hours = hours_of_cart(current_user())
+    // The stores are told `lead` before a time (none for as soon as possible,
+    // which asks no estimate).
+    let lead = lead_for(hours, when, current_user())
     // TRACK SEAM (store-hours): refused while a store of the cart is closed
     // or past its last order. TRACK SEAM (scheduled-orders): an order for a
     // time is held to the times offered now instead, so a store closed now
-    // takes one for a time it is open.
-    match held_to(hours, when) {
+    // takes one for a time it would take one.
+    match held_to(hours, when, lead) {
         Some(refused) => Err(refused),
         // TRACK SEAM (order-total): priced again from the data, in this
         // transaction, never from the page's numbers; refused where the code
@@ -480,7 +488,7 @@ command place_order(shown: Money<USD>)
                 // the deployment takes payments; at once where it takes none.
                 // TRACK SEAM (scheduled-orders): with its time, where it is
                 // for one, and when its stores are to be told.
-                match UserOrders.await_payment(current_user(), p.charged, p.promo, timed_for(hours, when, current_user())) {
+                match UserOrders.await_payment(current_user(), p.charged, p.promo, timed_for(hours, when, lead)) {
                     Err(e) => Err(e),
                     Ok(order) => match begin_payment(order, p.charged.total) {
                         // Taken back thirty minutes on where no one has paid
@@ -669,10 +677,13 @@ command choose_time(when: Option<Instant>)
     emits         UserCartChanged(current_user())
 {
     match when {
-        Some(at) => if offered_at(hours_of_cart(current_user()), at) {
-            Ok(set_time(current_user(), when).when)
-        } else {
-            Err(OrderError.NotOffered(at))
+        Some(at) => {
+            let hours = hours_of_cart(current_user())
+            if offered_at(hours, at, lead_of(hours, current_user())) {
+                Ok(set_time(current_user(), when).when)
+            } else {
+                Err(OrderError.NotOffered(at))
+            }
         },
         None => Ok(set_time(current_user(), None).when),
     }
