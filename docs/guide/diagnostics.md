@@ -294,7 +294,7 @@ number or its symbol.
 | PW6402 | `invoked_command_parameters` | a command `invoked_by Payments` is given one `payments.Settled`, and nothing else | — |
 | PW6403 | `invoked_twice` | one command answers a payment's outcome: a second would leave the host two answers | — |
 | PW6404 | `invoked_command_pressed` | no page presses a command the platform invokes | — |
-| PW6405 | `invoked_command_not_idempotent` | a command the platform invokes is idempotent: the provider's word arrives more than once | — |
+| PW6405 | `invoked_command_not_idempotent` | a command the platform invokes is idempotent: its word, a provider's or the clock's, may come more than once | — |
 
 ## Scheduled commands
 
