@@ -99,7 +99,7 @@ command sign(text: Words) -> Result<Post, BookError>
 
 fn pending(shown: List<Entry>, text: Words) -> List<Entry> !{} {
     let you = User { id: UserId("you"), name: "You" }
-    let entry = Entry { id: PostId("pending-{List.length(shown)}"), author: you, text: text.value, mine: true }
+    let entry = Entry { id: PostId("pending-{List.length(shown)}"), author: you, text: text.value, mine: false }
     List.concat([entry], shown)
 }
 

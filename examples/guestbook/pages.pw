@@ -1,5 +1,6 @@
 module guestbook.pages
 
+import List
 import String
 import context.{ current_session }
 import guestbook.book.{ Me, Entries, SignedIn, words, sign, remove }
@@ -22,7 +23,9 @@ session page Book() {
                 <p id="me">Signed in as {me.name}</p>
                 <form method="post" action="/sign-out"><button type="submit">Sign out</button></form>
             {:else}
+                <p id="signed-out">Sign in to sign the guestbook.</p>
                 <form method="get" action="/sign-in"><button type="submit">Sign in</button></form>
+                <form method="get" action="/sign-up"><button type="submit">Sign up</button></form>
             {/if}
             <form hidden={!SignedIn} on:submit|prevent={() => match words(draft) {
                 Some(text) => match sign(text) {
@@ -34,6 +37,7 @@ session page Book() {
                 <label>Your message <textarea bind:value={draft}></textarea></label>
                 <button type="submit" disabled={String.length(draft) == 0}>Sign</button>
             </form>
+            {#if List.length(entries) == 0}<p id="empty">No one has signed yet.</p>{/if}
             <ul>
                 {#each entries as entry (entry.id)}
                     <li>
