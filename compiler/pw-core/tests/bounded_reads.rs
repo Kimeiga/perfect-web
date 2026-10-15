@@ -937,12 +937,14 @@ fn the_store_reads_nothing_per_element() {
 fn the_stores_loop_is_seen_and_refused_where_it_reads_per_element() {
     // ADR-0022's accepted neighbour: the store is clean because the rule ran
     // and its keys are no element's, not because it saw nothing. Its home
-    // page's loop, reading each store's hours in it, is refused.
+    // page's loop, reading each store's hours in it, is refused. (The loop
+    // passes each store's ratings too since ADR-0341, read together before
+    // it as the hours are; the edit takes back the hours' set read alone.)
     let per_store = edited(
         &store(),
         "hours.pw",
-        "    List.map(stores, s => listed(s, hours))\n",
-        "    List.map(stores, s => listed(s, hours_of_stores([s.id])))\n",
+        "    List.map(stores, s => listed(s, hours, ratings))\n",
+        "    List.map(stores, s => listed(s, hours_of_stores([s.id]), ratings))\n",
     );
     assert_eq!(
         bounded_in(&per_store),
