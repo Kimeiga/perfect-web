@@ -163,8 +163,9 @@ every guarantee (ADR-0207): one call, no warning (see the questions).
 - **The store's annotations**, which this track does not write
   (`examples/store` is other workers' now), each as `pw fmt` writes it:
   - `examples/lib/StoreData.pw`, after `    changes      none`:
-    `    sets         one_call` (4b measured it: every set read one
-    statement at both sizes, `hours#for-stores` 3, `fees#for-stores` 1).
+    `    sets         one_call` (4b measured it: each set read's statements
+    the same at both data sizes, for every store at once, `hours#for-stores`
+    3 and `fees#for-stores` 1).
   - `examples/store/hours.pw`, after `    host "store:data/hours#for-store"`:
     `    set  hours_of_stores`.
   - No other pair fits yet: `fees_of_stores` has no keyed read beside it,
