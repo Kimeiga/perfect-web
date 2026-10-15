@@ -371,6 +371,17 @@ fn a_callback_bound_by_a_let_or_passed_on_by_a_function_is_in_the_loop() {
         bounded(&passed),
         ["PW0405 `price_of` reads `Price` once for each element of `lines`"]
     );
+    // And one that calls its callback in a loop of its own.
+    let called = with(
+        "fn each_line(lines: List<Line>, f: fn(Line) -> Int) -> Int !{} {\n    let mut n = 0\n    \
+         for l in lines {\n        n = n + f(l)\n    }\n    n\n}\n\n\
+         fn per(lines: List<Line>) -> Int !{ database.read<Price> } {\n    each_line(lines, l => \
+         cents(price_of(l.item)))\n}\n",
+    );
+    assert_eq!(
+        bounded(&called),
+        ["PW0405 `price_of` reads `Price` once for each element of `lines`"]
+    );
 }
 
 #[test]
