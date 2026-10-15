@@ -272,7 +272,10 @@ ADR-0281, ADR-0292).
 - The other scripts this change reaches: `dealt_by_time_mutations.py` (one
   anchor moved to `$stale`; its suite gained `StaleEvidence`),
   `derived_outside_mutations.py` and `mutation_bound_mutations.py` (their
-  suite gained `Bytecode`), each run whole here (DEALT-RESULT); and
+  suite gained `Bytecode`), each run whole here on 2026-10-15: 48 of 48,
+  10 of 10 and 16 of 16 killed, the moved mutant among them ("a push plans
+  with no regard to the evidence", 2 of 72 tests fail), the bound stopping
+  nothing; and
   `kiokun_inventory_mutations.py` (a mutant in `ci_plan.py`), on the
   development machine only, as its recipe is.
 - `just e14-evidence-integrity` records them; its evidence of record is the
