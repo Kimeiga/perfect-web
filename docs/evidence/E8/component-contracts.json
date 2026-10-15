@@ -1310,11 +1310,15 @@
   {
     "component_id": "store.page.Checkout",
     "capability_mapping": 1,
-    "abi_schema": "2a4f5e5512ea925a",
+    "abi_schema": "0bf6aebc79003f96",
     "required_capabilities": [
       {
         "family": "clock",
         "operation": "compare"
+      },
+      {
+        "family": "clock",
+        "operation": "zone"
       },
       {
         "family": "database",
@@ -1338,6 +1342,75 @@
     "imports": [
       {
         "interface": "pw:host/clock",
+        "name": "at",
+        "capability": "clock.zone",
+        "capabilities": [
+          {
+            "family": "clock",
+            "operation": "zone"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "clock.LocalDate"
+              }
+            },
+            {
+              "declared": {
+                "path": "clock.LocalTime"
+              }
+            },
+            {
+              "declared": {
+                "path": "clock.TimeZone"
+              }
+            }
+          ],
+          "result": {
+            "declared": {
+              "path": "clock.Instant"
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "pw:host/clock",
+        "name": "date",
+        "capability": "clock.zone",
+        "capabilities": [
+          {
+            "family": "clock",
+            "operation": "zone"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "clock.Instant"
+              }
+            },
+            {
+              "declared": {
+                "path": "clock.TimeZone"
+              }
+            }
+          ],
+          "result": {
+            "declared": {
+              "path": "clock.LocalDate"
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "pw:host/clock",
         "name": "passed",
         "capability": "clock.compare",
         "capabilities": [
@@ -1356,6 +1429,74 @@
           ],
           "result": {
             "primitive": "Bool"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "pw:host/clock",
+        "name": "time",
+        "capability": "clock.zone",
+        "capabilities": [
+          {
+            "family": "clock",
+            "operation": "zone"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "clock.Instant"
+              }
+            },
+            {
+              "declared": {
+                "path": "clock.TimeZone"
+              }
+            }
+          ],
+          "result": {
+            "declared": {
+              "path": "clock.LocalTime"
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "bounded": [
+          {
+            "argument": 0,
+            "type": "clock.LocalTime",
+            "holds": "value >= 0 & value <= 1439",
+            "at_least": 0,
+            "at_most": 1439
+          }
+        ]
+      },
+      {
+        "interface": "pw:host/clock",
+        "name": "today",
+        "capability": "clock.compare",
+        "capabilities": [
+          {
+            "family": "clock",
+            "operation": "compare"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "clock.TimeZone"
+              }
+            }
+          ],
+          "result": {
+            "declared": {
+              "path": "clock.LocalDate"
+            }
           }
         },
         "owner": "platform",
@@ -1522,6 +1663,48 @@
             "at_least": 0
           }
         ]
+      },
+      {
+        "interface": "store:data/hours",
+        "name": "for-stores",
+        "capability": "database.read<Stores>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Stores"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "builtin": {
+                "ctor": "List",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "domain.StoreId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "List",
+              "args": [
+                {
+                  "declared": {
+                    "path": "store.hours.OpeningHoursOf"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
       },
       {
         "interface": "store:data/promos",
@@ -2098,7 +2281,22 @@
           }
         },
         "owner": "external",
-        "kind": "host_capability"
+        "kind": "host_capability",
+        "bounded": [
+          {
+            "argument": 0,
+            "path": [
+              "ok",
+              "some",
+              "scheduled",
+              "time"
+            ],
+            "type": "clock.LocalTime",
+            "holds": "value >= 0 & value <= 1439",
+            "at_least": 0,
+            "at_most": 1439
+          }
+        ]
       }
     ],
     "exports": [
@@ -2233,6 +2431,12 @@
                 "principal": "User<UserId>",
                 "position": "argument 0",
                 "ty": "Option<OrderStatus>"
+              },
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "result",
+                "ty": "String"
               }
             ]
           }
@@ -2245,9 +2449,9 @@
     ]
   },
   {
-    "component_id": "store.page.OrderPage.derived_8",
+    "component_id": "store.page.OrderPage.derived_4",
     "capability_mapping": 1,
-    "abi_schema": "1eb10587a8b0b5db",
+    "abi_schema": "d0f2f87eff133f23",
     "required_capabilities": [],
     "allowed_placements": [
       "origin"
@@ -2255,7 +2459,7 @@
     "imports": [],
     "exports": [
       {
-        "name": "derived$8",
+        "name": "derived$4",
         "kind": "derived",
         "binding": {
           "local": "direct",
@@ -2272,8 +2476,42 @@
           }
         },
         "component": {
-          "interface": "pw:app/store-page-order-page-derived-8-api@0.1.0",
-          "function": "derived8"
+          "interface": "pw:app/store-page-order-page-derived-4-api@0.1.0",
+          "function": "derived4"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.page.OrderPage.derived_9",
+    "capability_mapping": 1,
+    "abi_schema": "e58a44b06458557f",
+    "required_capabilities": [],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [],
+    "exports": [
+      {
+        "name": "derived$9",
+        "kind": "derived",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "argument 0",
+                "ty": "Option<OrderStatus>"
+              }
+            ]
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-order-page-derived-9-api@0.1.0",
+          "function": "derived9"
         }
       }
     ]
@@ -3036,6 +3274,396 @@
         "component": {
           "interface": "pw:app/store-page-store-page-api@0.1.0",
           "function": "store-page"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.page.TimePage",
+    "capability_mapping": 1,
+    "abi_schema": "881bdfdcf009c063",
+    "required_capabilities": [
+      {
+        "family": "session",
+        "operation": "read"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "pw:app/store.page.TimesOffered",
+        "name": "TimesOffered",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:app/store.page.choose_time",
+        "name": "choose_time",
+        "owner": "external",
+        "kind": "component"
+      },
+      {
+        "interface": "pw:host/principal",
+        "name": "read",
+        "capability": "session.read",
+        "capabilities": [
+          {
+            "family": "session",
+            "operation": "read"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": {
+            "declared": {
+              "path": "capability.User",
+              "args": [
+                {
+                  "declared": {
+                    "path": "capability.UserId"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "TimePage",
+        "kind": "page",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "argument 0",
+                "ty": "Option<String>"
+              }
+            ]
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-time-page-api@0.1.0",
+          "function": "time-page"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.page.TimesOffered",
+    "capability_mapping": 1,
+    "abi_schema": "204794d4a761e63a",
+    "required_capabilities": [
+      {
+        "family": "clock",
+        "operation": "compare"
+      },
+      {
+        "family": "clock",
+        "operation": "zone"
+      },
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Carts"
+      },
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Stores"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "pw:host/clock",
+        "name": "at",
+        "capability": "clock.zone",
+        "capabilities": [
+          {
+            "family": "clock",
+            "operation": "zone"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "clock.LocalDate"
+              }
+            },
+            {
+              "declared": {
+                "path": "clock.LocalTime"
+              }
+            },
+            {
+              "declared": {
+                "path": "clock.TimeZone"
+              }
+            }
+          ],
+          "result": {
+            "declared": {
+              "path": "clock.Instant"
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "pw:host/clock",
+        "name": "date",
+        "capability": "clock.zone",
+        "capabilities": [
+          {
+            "family": "clock",
+            "operation": "zone"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "clock.Instant"
+              }
+            },
+            {
+              "declared": {
+                "path": "clock.TimeZone"
+              }
+            }
+          ],
+          "result": {
+            "declared": {
+              "path": "clock.LocalDate"
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "pw:host/clock",
+        "name": "passed",
+        "capability": "clock.compare",
+        "capabilities": [
+          {
+            "family": "clock",
+            "operation": "compare"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "clock.Instant"
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Bool"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "pw:host/clock",
+        "name": "time",
+        "capability": "clock.zone",
+        "capabilities": [
+          {
+            "family": "clock",
+            "operation": "zone"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "clock.Instant"
+              }
+            },
+            {
+              "declared": {
+                "path": "clock.TimeZone"
+              }
+            }
+          ],
+          "result": {
+            "declared": {
+              "path": "clock.LocalTime"
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "bounded": [
+          {
+            "argument": 0,
+            "type": "clock.LocalTime",
+            "holds": "value >= 0 & value <= 1439",
+            "at_least": 0,
+            "at_most": 1439
+          }
+        ]
+      },
+      {
+        "interface": "pw:host/clock",
+        "name": "today",
+        "capability": "clock.compare",
+        "capabilities": [
+          {
+            "family": "clock",
+            "operation": "compare"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "clock.TimeZone"
+              }
+            }
+          ],
+          "result": {
+            "declared": {
+              "path": "clock.LocalDate"
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/checkout",
+        "name": "chosen",
+        "capability": "database.read<Carts>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Carts"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "declared": {
+              "path": "store.checkout.Chosen"
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/hours",
+        "name": "for-cart",
+        "capability": "database.read<Stores>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Stores"
+          },
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Carts"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "List",
+              "args": [
+                {
+                  "declared": {
+                    "path": "store.hours.OpeningHoursOf"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "TimesOffered",
+        "kind": "query",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "argument 0",
+                "ty": "User<UserId>"
+              },
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "argument 1",
+                "ty": "Option<String>"
+              },
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "result",
+                "ty": "TimesShown"
+              }
+            ]
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-times-offered-api@0.1.0",
+          "function": "times-offered"
         }
       }
     ]
@@ -4349,6 +4977,18 @@
           {
             "argument": 0,
             "path": [
+              "ok",
+              "scheduled",
+              "time"
+            ],
+            "type": "clock.LocalTime",
+            "holds": "value >= 0 & value <= 1439",
+            "at_least": 0,
+            "at_most": 1439
+          },
+          {
+            "argument": 0,
+            "path": [
               "err",
               "closed",
               "closed-now",
@@ -4596,6 +5236,343 @@
         "component": {
           "interface": "pw:app/store-page-choose-address-api@0.1.0",
           "function": "choose-address",
+          "idempotent_by": "InteractionId"
+        }
+      }
+    ]
+  },
+  {
+    "component_id": "store.page.choose_time",
+    "capability_mapping": 1,
+    "abi_schema": "366ad9c895e82b38",
+    "required_capabilities": [
+      {
+        "family": "clock",
+        "operation": "compare"
+      },
+      {
+        "family": "clock",
+        "operation": "zone"
+      },
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Carts"
+      },
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Stores"
+      },
+      {
+        "family": "database",
+        "operation": "write",
+        "argument": "Carts"
+      },
+      {
+        "family": "outbox",
+        "operation": "write"
+      },
+      {
+        "family": "session",
+        "operation": "read"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "pw:host/clock",
+        "name": "at",
+        "capability": "clock.zone",
+        "capabilities": [
+          {
+            "family": "clock",
+            "operation": "zone"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "clock.LocalDate"
+              }
+            },
+            {
+              "declared": {
+                "path": "clock.LocalTime"
+              }
+            },
+            {
+              "declared": {
+                "path": "clock.TimeZone"
+              }
+            }
+          ],
+          "result": {
+            "declared": {
+              "path": "clock.Instant"
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "pw:host/clock",
+        "name": "passed",
+        "capability": "clock.compare",
+        "capabilities": [
+          {
+            "family": "clock",
+            "operation": "compare"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "clock.Instant"
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Bool"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "pw:host/clock",
+        "name": "today",
+        "capability": "clock.compare",
+        "capabilities": [
+          {
+            "family": "clock",
+            "operation": "compare"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "clock.TimeZone"
+              }
+            }
+          ],
+          "result": {
+            "declared": {
+              "path": "clock.LocalDate"
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "pw:host/invalidations",
+        "name": "store-page-checkout",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "invalidates": "store.page.Checkout"
+      },
+      {
+        "interface": "pw:host/outbox",
+        "name": "user-cart-changed",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "event": "Events.UserCartChanged"
+      },
+      {
+        "interface": "pw:host/principal",
+        "name": "read",
+        "capability": "session.read",
+        "capabilities": [
+          {
+            "family": "session",
+            "operation": "read"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": {
+            "declared": {
+              "path": "capability.User",
+              "args": [
+                {
+                  "declared": {
+                    "path": "capability.UserId"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/checkout",
+        "name": "set-time",
+        "capability": "database.write<Carts>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "write",
+            "argument": "Carts"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "builtin": {
+                "ctor": "Option",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "clock.Instant"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "declared": {
+              "path": "store.checkout.Chosen"
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/hours",
+        "name": "for-cart",
+        "capability": "database.read<Stores>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Stores"
+          },
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Carts"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "List",
+              "args": [
+                {
+                  "declared": {
+                    "path": "store.hours.OpeningHoursOf"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability"
+      }
+    ],
+    "exports": [
+      {
+        "name": "choose_time",
+        "kind": "command",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "transferable"
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-choose-time-api@0.1.0",
+          "function": "choose-time",
           "idempotent_by": "InteractionId"
         }
       }
@@ -5597,6 +6574,18 @@
           {
             "argument": 0,
             "path": [
+              "ok",
+              "scheduled",
+              "time"
+            ],
+            "type": "clock.LocalTime",
+            "holds": "value >= 0 & value <= 1439",
+            "at_least": 0,
+            "at_most": 1439
+          },
+          {
+            "argument": 0,
+            "path": [
               "err",
               "closed",
               "closed-now",
@@ -5899,7 +6888,7 @@
   {
     "component_id": "store.page.place_order",
     "capability_mapping": 1,
-    "abi_schema": "e428270e6485b6f2",
+    "abi_schema": "3e27a7aadfefbcbb",
     "required_capabilities": [
       {
         "family": "clock",
@@ -5916,7 +6905,17 @@
       {
         "family": "database",
         "operation": "read",
+        "argument": "Addresses"
+      },
+      {
+        "family": "database",
+        "operation": "read",
         "argument": "Carts"
+      },
+      {
+        "family": "database",
+        "operation": "read",
+        "argument": "Estimates"
       },
       {
         "family": "database",
@@ -5994,6 +6993,38 @@
       },
       {
         "interface": "pw:host/clock",
+        "name": "date",
+        "capability": "clock.zone",
+        "capabilities": [
+          {
+            "family": "clock",
+            "operation": "zone"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "clock.Instant"
+              }
+            },
+            {
+              "declared": {
+                "path": "clock.TimeZone"
+              }
+            }
+          ],
+          "result": {
+            "declared": {
+              "path": "clock.LocalDate"
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "pw:host/clock",
         "name": "passed",
         "capability": "clock.compare",
         "capabilities": [
@@ -6016,6 +7047,47 @@
         },
         "owner": "platform",
         "kind": "host_capability"
+      },
+      {
+        "interface": "pw:host/clock",
+        "name": "time",
+        "capability": "clock.zone",
+        "capabilities": [
+          {
+            "family": "clock",
+            "operation": "zone"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "clock.Instant"
+              }
+            },
+            {
+              "declared": {
+                "path": "clock.TimeZone"
+              }
+            }
+          ],
+          "result": {
+            "declared": {
+              "path": "clock.LocalTime"
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "bounded": [
+          {
+            "argument": 0,
+            "type": "clock.LocalTime",
+            "holds": "value >= 0 & value <= 1439",
+            "at_least": 0,
+            "at_most": 1439
+          }
+        ]
       },
       {
         "interface": "pw:host/clock",
@@ -6341,6 +7413,36 @@
         }
       },
       {
+        "interface": "pw:host/schedules",
+        "name": "store-page-send-to-store-at",
+        "capability": "clock.schedule",
+        "capabilities": [
+          {
+            "family": "clock",
+            "operation": "schedule"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "primitive": "String"
+            },
+            {
+              "primitive": "Int"
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "schedules": {
+          "command": "store.page.send_to_store",
+          "how": "at"
+        }
+      },
+      {
         "interface": "store:data/checkout",
         "name": "chosen",
         "capability": "database.read<Carts>",
@@ -6614,6 +7716,85 @@
         ]
       },
       {
+        "interface": "store:data/user-estimates",
+        "name": "for-store",
+        "capability": "database.read<Estimates>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Estimates"
+          },
+          {
+            "family": "database",
+            "operation": "read",
+            "argument": "Addresses"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "domain.StoreId"
+              }
+            },
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "Result",
+              "args": [
+                {
+                  "declared": {
+                    "path": "domain.DeliveryEstimate"
+                  }
+                },
+                {
+                  "declared": {
+                    "path": "domain.EstimateError"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability",
+        "bounded": [
+          {
+            "argument": 0,
+            "path": [
+              "ok",
+              "min-minutes"
+            ],
+            "type": "domain.PositiveInt",
+            "holds": "value >= 1",
+            "at_least": 1
+          },
+          {
+            "argument": 0,
+            "path": [
+              "ok",
+              "max-minutes"
+            ],
+            "type": "domain.PositiveInt",
+            "holds": "value >= 1",
+            "at_least": 1
+          }
+        ]
+      },
+      {
         "interface": "store:data/user-orders",
         "name": "await-payment",
         "capability": "database.write<Orders>",
@@ -6654,6 +7835,18 @@
                 "args": [
                   {
                     "primitive": "String"
+                  }
+                ]
+              }
+            },
+            {
+              "builtin": {
+                "ctor": "Option",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "domain.ScheduledFor"
+                    }
                   }
                 ]
               }
@@ -6764,6 +7957,18 @@
           {
             "argument": 0,
             "path": [
+              "ok",
+              "scheduled",
+              "time"
+            ],
+            "type": "clock.LocalTime",
+            "holds": "value >= 0 & value <= 1439",
+            "at_least": 0,
+            "at_most": 1439
+          },
+          {
+            "argument": 0,
+            "path": [
               "err",
               "closed",
               "closed-now",
@@ -6849,6 +8054,18 @@
         "owner": "external",
         "kind": "host_capability",
         "bounded": [
+          {
+            "argument": 0,
+            "path": [
+              "ok",
+              "scheduled",
+              "time"
+            ],
+            "type": "clock.LocalTime",
+            "holds": "value >= 0 & value <= 1439",
+            "at_least": 0,
+            "at_most": 1439
+          },
           {
             "argument": 0,
             "path": [
@@ -7722,6 +8939,241 @@
     ]
   },
   {
+    "component_id": "store.page.send_to_store",
+    "capability_mapping": 1,
+    "abi_schema": "3e017e0550a4f7ce",
+    "required_capabilities": [
+      {
+        "family": "database",
+        "operation": "write",
+        "argument": "Orders"
+      },
+      {
+        "family": "outbox",
+        "operation": "write"
+      },
+      {
+        "family": "session",
+        "operation": "read"
+      }
+    ],
+    "allowed_placements": [
+      "origin"
+    ],
+    "imports": [
+      {
+        "interface": "pw:host/invalidations",
+        "name": "store-page-order",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "invalidates": "store.page.Order"
+      },
+      {
+        "interface": "pw:host/outbox",
+        "name": "user-order-changed",
+        "capability": "outbox.write",
+        "capabilities": [
+          {
+            "family": "outbox",
+            "operation": "write"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "event": "Events.UserOrderChanged"
+      },
+      {
+        "interface": "pw:host/principal",
+        "name": "read",
+        "capability": "session.read",
+        "capabilities": [
+          {
+            "family": "session",
+            "operation": "read"
+          }
+        ],
+        "signature": {
+          "params": [],
+          "result": {
+            "declared": {
+              "path": "capability.User",
+              "args": [
+                {
+                  "declared": {
+                    "path": "capability.UserId"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability"
+      },
+      {
+        "interface": "store:data/user-orders",
+        "name": "send",
+        "capability": "database.write<Orders>",
+        "capabilities": [
+          {
+            "family": "database",
+            "operation": "write",
+            "argument": "Orders"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "declared": {
+                "path": "capability.User",
+                "args": [
+                  {
+                    "declared": {
+                      "path": "capability.UserId"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "primitive": "String"
+            }
+          ],
+          "result": {
+            "builtin": {
+              "ctor": "Result",
+              "args": [
+                {
+                  "declared": {
+                    "path": "domain.OrderStatus"
+                  }
+                },
+                {
+                  "declared": {
+                    "path": "domain.OrderError"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "owner": "external",
+        "kind": "host_capability",
+        "bounded": [
+          {
+            "argument": 0,
+            "path": [
+              "ok",
+              "scheduled",
+              "time"
+            ],
+            "type": "clock.LocalTime",
+            "holds": "value >= 0 & value <= 1439",
+            "at_least": 0,
+            "at_most": 1439
+          },
+          {
+            "argument": 0,
+            "path": [
+              "err",
+              "closed",
+              "closed-now",
+              "some",
+              "at"
+            ],
+            "type": "clock.LocalTime",
+            "holds": "value >= 0 & value <= 1439",
+            "at_least": 0,
+            "at_most": 1439
+          },
+          {
+            "argument": 0,
+            "path": [
+              "err",
+              "closed",
+              "past-last-order"
+            ],
+            "type": "clock.LocalTime",
+            "holds": "value >= 0 & value <= 1439",
+            "at_least": 0,
+            "at_most": 1439
+          }
+        ]
+      }
+    ],
+    "exports": [
+      {
+        "name": "send_to_store",
+        "kind": "command",
+        "binding": {
+          "local": "direct",
+          "remote": {
+            "kind": "conditional",
+            "obligations": [
+              {
+                "kind": "preserve_principal",
+                "principal": "User<UserId>",
+                "position": "argument 0",
+                "ty": "String"
+              }
+            ]
+          }
+        },
+        "component": {
+          "interface": "pw:app/store-page-send-to-store-api@0.1.0",
+          "function": "send-to-store",
+          "idempotent_by": "InteractionId",
+          "invoked_by": "Clock"
+        }
+      }
+    ]
+  },
+  {
     "component_id": "store.page.settle_payment",
     "capability_mapping": 1,
     "abi_schema": "8ac6e1f4e1759bef",
@@ -8007,6 +9459,36 @@
         }
       },
       {
+        "interface": "pw:host/schedules",
+        "name": "store-page-send-to-store-at",
+        "capability": "clock.schedule",
+        "capabilities": [
+          {
+            "family": "clock",
+            "operation": "schedule"
+          }
+        ],
+        "signature": {
+          "params": [
+            {
+              "primitive": "String"
+            },
+            {
+              "primitive": "Int"
+            }
+          ],
+          "result": {
+            "primitive": "Unit"
+          }
+        },
+        "owner": "platform",
+        "kind": "host_capability",
+        "schedules": {
+          "command": "store.page.send_to_store",
+          "how": "at"
+        }
+      },
+      {
         "interface": "store:data/user-orders",
         "name": "settle",
         "capability": "database.write<Orders>",
@@ -8066,6 +9548,18 @@
         "owner": "external",
         "kind": "host_capability",
         "bounded": [
+          {
+            "argument": 0,
+            "path": [
+              "ok",
+              "scheduled",
+              "time"
+            ],
+            "type": "clock.LocalTime",
+            "holds": "value >= 0 & value <= 1439",
+            "at_least": 0,
+            "at_most": 1439
+          },
           {
             "argument": 0,
             "path": [

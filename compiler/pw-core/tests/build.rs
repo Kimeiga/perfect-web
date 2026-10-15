@@ -93,12 +93,15 @@ fn the_store_builds_every_artifact_from_source() {
             "store.page.MenuSize",
             // A session's order (ADR-0193).
             "store.page.Order",
-            // The order page's two values computed from it (NEXT 6c): the
+            // The order page's values computed from it (NEXT 6c): the
             // provider's page an awaiting order is paid on, for its total's
-            // words and for the frame. The second numbered after the total's
-            // arms read their binding (track `store-switch`, ADR-0330).
+            // words and for the frame; and (track `scheduled-orders`) when
+            // a scheduled order is for, in words, between them. The frame's
+            // numbered after the total's arms read their binding (track
+            // `store-switch`, ADR-0330).
             "store.page.OrderPage.derived_3",
-            "store.page.OrderPage.derived_8",
+            "store.page.OrderPage.derived_4",
+            "store.page.OrderPage.derived_9",
             // What the order was charged (track `order-total`).
             "store.page.OrderTotal",
             // The places an address may name, and whether the store reaches
@@ -111,6 +114,8 @@ fn the_store_builds_every_artifact_from_source() {
             "store.page.Store",
             // The stores the home page lists (ADR-0192).
             "store.page.StoreList",
+            // The times the reader may choose (track `scheduled-orders`).
+            "store.page.TimesOffered",
             "store.page.add_address",
             "store.page.add_to_cart",
             // The cart's code applied (track `order-total`).
@@ -118,6 +123,8 @@ fn the_store_builds_every_artifact_from_source() {
             // An order awaiting its payment, taken back (NEXT 6c, step eight).
             "store.page.cancel_order",
             "store.page.choose_address",
+            // When the order is for (track `scheduled-orders`).
+            "store.page.choose_time",
             // Its tip, a case a browser sends (track `order-total`;
             // ADR-0331, track `store-switch`).
             "store.page.choose_tip",
@@ -135,6 +142,9 @@ fn the_store_builds_every_artifact_from_source() {
             // The cart's code taken off (track `order-total`).
             "store.page.remove_promo",
             "store.page.rename_address",
+            // An order for a time, sent to its stores by the clock (track
+            // `scheduled-orders`).
+            "store.page.send_to_store",
             // A payment's outcome, settled (NEXT 6c).
             "store.page.settle_payment",
             // The search (track `store-search`).

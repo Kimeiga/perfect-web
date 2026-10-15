@@ -130,13 +130,18 @@ interface store-page-order-page-api {
 }
 
 interface store-page-order-page-derived-3-api {
-    use pw:types/types.{domain-order-status, store-page-order-charge};
-    derived3: func(arg0: option<domain-order-status>) -> store-page-order-charge;
+    use pw:types/types.{domain-order-status};
+    derived3: func(arg0: option<domain-order-status>) -> string;
 }
 
-interface store-page-order-page-derived-8-api {
+interface store-page-order-page-derived-4-api {
+    use pw:types/types.{domain-order-status, store-page-order-charge};
+    derived4: func(arg0: option<domain-order-status>) -> store-page-order-charge;
+}
+
+interface store-page-order-page-derived-9-api {
     use pw:types/types.{domain-order-status, domain-payment-page};
-    derived8: func(arg0: option<domain-order-status>) -> option<domain-payment-page>;
+    derived9: func(arg0: option<domain-order-status>) -> option<domain-payment-page>;
 }
 
 interface store-page-order-total-api {
@@ -183,6 +188,15 @@ interface store-page-store-page-api {
     store-page: func(arg0: domain-store-id);
 }
 
+interface store-page-time-page-api {
+    time-page: func(arg0: option<string>);
+}
+
+interface store-page-times-offered-api {
+    use pw:types/types.{capability-user-id, store-scheduled-times-shown};
+    times-offered: func(arg0: capability-user-id, arg1: option<string>) -> store-scheduled-times-shown;
+}
+
 interface store-page-add-address-api {
     use pw:types/types.{addresses-address, addresses-address-error, addresses-address-label, addresses-place-id};
     add-address: func(arg0: addresses-address-label, arg1: addresses-place-id) -> result<list<addresses-address>, addresses-address-error>;
@@ -206,6 +220,11 @@ interface store-page-cancel-order-api {
 interface store-page-choose-address-api {
     use pw:types/types.{addresses-address, addresses-address-error, addresses-address-id};
     choose-address: func(arg0: addresses-address-id) -> result<list<addresses-address>, addresses-address-error>;
+}
+
+interface store-page-choose-time-api {
+    use pw:types/types.{clock-instant, domain-order-error};
+    choose-time: func(arg0: option<clock-instant>) -> result<option<clock-instant>, domain-order-error>;
 }
 
 interface store-page-choose-tip-api {
@@ -256,6 +275,11 @@ interface store-page-remove-promo-api {
 interface store-page-rename-address-api {
     use pw:types/types.{addresses-address, addresses-address-error, addresses-address-id, addresses-address-label};
     rename-address: func(arg0: addresses-address-id, arg1: addresses-address-label) -> result<list<addresses-address>, addresses-address-error>;
+}
+
+interface store-page-send-to-store-api {
+    use pw:types/types.{domain-order-error, domain-order-status};
+    send-to-store: func(arg0: string) -> result<domain-order-status, domain-order-error>;
 }
 
 interface store-page-settle-payment-api {
@@ -368,6 +392,7 @@ world store-page-checkout {
     import pw:host/clock;
     import store:data/checkout;
     import store:data/fees;
+    import store:data/hours;
     import store:data/promos;
     export store-page-checkout-api;
 }
@@ -418,8 +443,12 @@ world store-page-order-page-derived-3 {
     export store-page-order-page-derived-3-api;
 }
 
-world store-page-order-page-derived-8 {
-    export store-page-order-page-derived-8-api;
+world store-page-order-page-derived-4 {
+    export store-page-order-page-derived-4-api;
+}
+
+world store-page-order-page-derived-9 {
+    export store-page-order-page-derived-9-api;
 }
 
 world store-page-order-total {
@@ -481,6 +510,20 @@ world store-page-store-page {
     export store-page-store-page-api;
 }
 
+world store-page-time-page {
+    import pw:host/principal;
+    import store-page-choose-time-api;
+    import store-page-times-offered-api;
+    export store-page-time-page-api;
+}
+
+world store-page-times-offered {
+    import pw:host/clock;
+    import store:data/checkout;
+    import store:data/hours;
+    export store-page-times-offered-api;
+}
+
 world store-page-add-address {
     import pw:host/invalidations;
     import pw:host/outbox;
@@ -525,6 +568,16 @@ world store-page-choose-address {
     import pw:host/principal;
     import store:data/addresses;
     export store-page-choose-address-api;
+}
+
+world store-page-choose-time {
+    import pw:host/clock;
+    import pw:host/invalidations;
+    import pw:host/outbox;
+    import pw:host/principal;
+    import store:data/checkout;
+    import store:data/hours;
+    export store-page-choose-time-api;
 }
 
 world store-page-choose-tip {
@@ -580,6 +633,7 @@ world store-page-place-order {
     import store:data/fees;
     import store:data/hours;
     import store:data/promos;
+    import store:data/user-estimates;
     import store:data/user-orders;
     export store-page-place-order-api;
 }
@@ -614,6 +668,14 @@ world store-page-rename-address {
     import pw:host/principal;
     import store:data/addresses;
     export store-page-rename-address-api;
+}
+
+world store-page-send-to-store {
+    import pw:host/invalidations;
+    import pw:host/outbox;
+    import pw:host/principal;
+    import store:data/user-orders;
+    export store-page-send-to-store-api;
 }
 
 world store-page-settle-payment {
@@ -743,6 +805,13 @@ package pw:types {
             delivered,
             awaiting-payment(domain-payment-page),
             canceled,
+            scheduled(domain-scheduled-for),
+        }
+        record domain-scheduled-for {
+            at: clock-instant,
+            sends: clock-instant,
+            day: clock-weekday,
+            time: clock-local-time,
         }
         record domain-payment-page {
             url: string,
@@ -759,6 +828,8 @@ package pw:types {
             total-changed(domain-money),
             awaiting-payment,
             payment-unavailable,
+            not-offered(clock-instant),
+            scheduled,
         }
         variant domain-cancel-order-error {
             not-awaiting-payment,
@@ -931,6 +1002,7 @@ package pw:types {
         record store-checkout-chosen {
             tip: domain-tip,
             promo: option<string>,
+            when: option<clock-instant>,
         }
         record store-checkout-priced {
             charged: domain-order-charged,
@@ -940,6 +1012,8 @@ package pw:types {
             said: string,
             any: bool,
             discount-said: string,
+            when: option<clock-instant>,
+            when-said: string,
         }
         record store-hours-weekly-period {
             weekday: s64,
@@ -983,6 +1057,22 @@ package pw:types {
             cuisine: string,
             open: bool,
             said: string,
+        }
+        record store-scheduled-window {
+            start: clock-instant,
+            key: s64,
+            said: string,
+            whole: string,
+        }
+        record store-scheduled-day-shown {
+            key: string,
+            said: string,
+        }
+        record store-scheduled-times-shown {
+            said: string,
+            days: list<store-scheduled-day-shown>,
+            day: string,
+            windows: list<store-scheduled-window>,
         }
         record store-search-dish-hit {
             id: domain-menu-item-id,
@@ -1034,7 +1124,9 @@ package pw:host {
     interface clock {
         use pw:types/types.{clock-instant, clock-local-date, clock-local-time, clock-time-zone};
         at: func(arg0: clock-local-date, arg1: clock-local-time, arg2: clock-time-zone) -> clock-instant;
+        date: func(arg0: clock-instant, arg1: clock-time-zone) -> clock-local-date;
         passed: func(arg0: clock-instant) -> bool;
+        time: func(arg0: clock-instant, arg1: clock-time-zone) -> clock-local-time;
         today: func(arg0: clock-time-zone) -> clock-local-date;
     }
     interface invalidations {
@@ -1068,6 +1160,7 @@ package pw:host {
     interface schedules {
         store-page-expire-order-after: func(arg0: string, arg1: s64);
         store-page-expire-order-cancel: func(arg0: string);
+        store-page-send-to-store-at: func(arg0: string, arg1: s64);
     }
 }
 
@@ -1081,10 +1174,11 @@ package store:data {
         rename: func(arg0: capability-user-id, arg1: addresses-address-id, arg2: addresses-address-label) -> result<list<addresses-address>, addresses-address-error>;
     }
     interface checkout {
-        use pw:types/types.{capability-user-id, domain-tip, store-checkout-cart-part, store-checkout-chosen};
+        use pw:types/types.{capability-user-id, clock-instant, domain-tip, store-checkout-cart-part, store-checkout-chosen};
         chosen: func(arg0: capability-user-id) -> store-checkout-chosen;
         parts: func(arg0: capability-user-id) -> list<store-checkout-cart-part>;
         set-promo: func(arg0: capability-user-id, arg1: option<string>) -> store-checkout-chosen;
+        set-time: func(arg0: capability-user-id, arg1: option<clock-instant>) -> store-checkout-chosen;
         set-tip: func(arg0: capability-user-id, arg1: domain-tip) -> store-checkout-chosen;
     }
     interface coverage {
@@ -1141,12 +1235,13 @@ package store:data {
         for-store: func(arg0: domain-store-id, arg1: capability-user-id) -> result<domain-delivery-estimate, domain-estimate-error>;
     }
     interface user-orders {
-        use pw:types/types.{capability-user-id, domain-awaited-payment, domain-order-charged, domain-order-error, domain-order-status, domain-tracking-error, payments-payment, payments-payment-status};
-        await-payment: func(arg0: capability-user-id, arg1: domain-order-charged, arg2: option<string>) -> result<string, domain-order-error>;
+        use pw:types/types.{capability-user-id, domain-awaited-payment, domain-order-charged, domain-order-error, domain-order-status, domain-scheduled-for, domain-tracking-error, payments-payment, payments-payment-status};
+        await-payment: func(arg0: capability-user-id, arg1: domain-order-charged, arg2: option<string>, arg3: option<domain-scheduled-for>) -> result<string, domain-order-error>;
         awaited: func(arg0: capability-user-id) -> option<domain-awaited-payment>;
         charged: func(arg0: capability-user-id) -> option<domain-order-charged>;
         current: func(arg0: capability-user-id) -> result<option<domain-order-status>, domain-tracking-error>;
         paying: func(arg0: capability-user-id, arg1: string, arg2: payments-payment) -> result<domain-order-status, domain-order-error>;
+        send: func(arg0: capability-user-id, arg1: string) -> result<domain-order-status, domain-order-error>;
         settle: func(arg0: capability-user-id, arg1: string, arg2: payments-payment-status) -> result<domain-order-status, domain-order-error>;
     }
 }

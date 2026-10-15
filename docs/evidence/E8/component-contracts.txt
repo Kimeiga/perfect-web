@@ -125,16 +125,22 @@ store.page.CartPage  abi f00a4fe14eeded6f
   host      pw:host/principal#read  (session.read)
   exports   page CartPage
 
-store.page.Checkout  abi 2a4f5e5512ea925a
+store.page.Checkout  abi 0bf6aebc79003f96
   runs at   origin
   needs     clock.compare
+  needs     clock.zone
   needs     database.read<Carts>
   needs     database.read<Orders>
   needs     database.read<Stores>
+  host      pw:host/clock#at  (clock.zone)
+  host      pw:host/clock#date  (clock.zone)
   host      pw:host/clock#passed  (clock.compare)
+  host      pw:host/clock#time  (clock.zone)
+  host      pw:host/clock#today  (clock.compare)
   host      store:data/checkout#chosen  (database.read<Carts>)
   host      store:data/checkout#parts  (database.read<Carts>)
   host      store:data/fees#for-stores  (database.read<Stores>)
+  host      store:data/hours#for-stores  (database.read<Stores>)
   host      store:data/promos#find  (database.read<Stores>)
   exports   query Checkout
 
@@ -190,9 +196,13 @@ store.page.OrderPage.derived_3  abi 23ce3b89fcf1ed87
   runs at   origin
   exports   derived derived$3
 
-store.page.OrderPage.derived_8  abi 1eb10587a8b0b5db
+store.page.OrderPage.derived_4  abi d0f2f87eff133f23
   runs at   origin
-  exports   derived derived$8
+  exports   derived derived$4
+
+store.page.OrderPage.derived_9  abi e58a44b06458557f
+  runs at   origin
+  exports   derived derived$9
 
 store.page.OrderTotal  abi 86fcfe11a02abe0a
   runs at   origin
@@ -261,6 +271,29 @@ store.page.StorePage  abi d803b26130c7cf49
   component pw:app/store.page.remove_from_cart#remove_from_cart
   host      pw:host/principal#read  (session.read)
   exports   page StorePage
+
+store.page.TimePage  abi 881bdfdcf009c063
+  runs at   origin
+  needs     session.read
+  component pw:app/store.page.TimesOffered#TimesOffered
+  component pw:app/store.page.choose_time#choose_time
+  host      pw:host/principal#read  (session.read)
+  exports   page TimePage
+
+store.page.TimesOffered  abi 204794d4a761e63a
+  runs at   origin
+  needs     clock.compare
+  needs     clock.zone
+  needs     database.read<Carts>
+  needs     database.read<Stores>
+  host      pw:host/clock#at  (clock.zone)
+  host      pw:host/clock#date  (clock.zone)
+  host      pw:host/clock#passed  (clock.compare)
+  host      pw:host/clock#time  (clock.zone)
+  host      pw:host/clock#today  (clock.compare)
+  host      store:data/checkout#chosen  (database.read<Carts>)
+  host      store:data/hours#for-cart  (database.read<Stores>)
+  exports   query TimesOffered
 
 store.page.add_address  abi 083883ce01812277
   runs at   origin
@@ -340,6 +373,25 @@ store.page.choose_address  abi 336d5d3e75e83603
   host      store:data/addresses#choose  (database.write<Addresses>)
   exports   command choose_address
 
+store.page.choose_time  abi 366ad9c895e82b38
+  runs at   origin
+  needs     clock.compare
+  needs     clock.zone
+  needs     database.read<Carts>
+  needs     database.read<Stores>
+  needs     database.write<Carts>
+  needs     outbox.write
+  needs     session.read
+  host      pw:host/clock#at  (clock.zone)
+  host      pw:host/clock#passed  (clock.compare)
+  host      pw:host/clock#today  (clock.compare)
+  host      pw:host/invalidations#store-page-checkout  (outbox.write)
+  host      pw:host/outbox#user-cart-changed  (outbox.write)
+  host      pw:host/principal#read  (session.read)
+  host      store:data/checkout#set-time  (database.write<Carts>)
+  host      store:data/hours#for-cart  (database.read<Stores>)
+  exports   command choose_time
+
 store.page.choose_tip  abi 17733c2240e354f0
   runs at   origin
   needs     database.write<Carts>
@@ -406,12 +458,14 @@ store.page.increase_in_cart  abi ea834328e33999c3
   host      store:data/user-carts#add  (database.write<Carts>)
   exports   command increase_in_cart
 
-store.page.place_order  abi e428270e6485b6f2
+store.page.place_order  abi 3e27a7aadfefbcbb
   runs at   origin
   needs     clock.compare
   needs     clock.schedule
   needs     clock.zone
+  needs     database.read<Addresses>
   needs     database.read<Carts>
+  needs     database.read<Estimates>
   needs     database.read<Orders>
   needs     database.read<Stores>
   needs     database.write<Carts>
@@ -420,7 +474,9 @@ store.page.place_order  abi e428270e6485b6f2
   needs     payments.begin
   needs     session.read
   host      pw:host/clock#at  (clock.zone)
+  host      pw:host/clock#date  (clock.zone)
   host      pw:host/clock#passed  (clock.compare)
+  host      pw:host/clock#time  (clock.zone)
   host      pw:host/clock#today  (clock.compare)
   host      pw:host/invalidations#store-page-cart  (outbox.write)
   host      pw:host/invalidations#store-page-checkout  (outbox.write)
@@ -431,11 +487,13 @@ store.page.place_order  abi e428270e6485b6f2
   host      pw:host/payments#begin  (payments.begin)
   host      pw:host/principal#read  (session.read)
   host      pw:host/schedules#store-page-expire-order-after  (clock.schedule)
+  host      pw:host/schedules#store-page-send-to-store-at  (clock.schedule)
   host      store:data/checkout#chosen  (database.read<Carts>)
   host      store:data/checkout#parts  (database.read<Carts>)
   host      store:data/fees#for-stores  (database.read<Stores>)
   host      store:data/hours#for-cart  (database.read<Stores>)
   host      store:data/promos#find  (database.read<Stores>)
+  host      store:data/user-estimates#for-store  (database.read<Estimates>)
   host      store:data/user-orders#await-payment  (database.write<Orders>)
   host      store:data/user-orders#paying  (database.write<Orders>)
   host      store:data/user-orders#settle  (database.write<Orders>)
@@ -486,6 +544,17 @@ store.page.rename_address  abi 7e1a5f55cd7ee9c6
   host      store:data/addresses#rename  (database.write<Addresses>)
   exports   command rename_address
 
+store.page.send_to_store  abi 3e017e0550a4f7ce
+  runs at   origin
+  needs     database.write<Orders>
+  needs     outbox.write
+  needs     session.read
+  host      pw:host/invalidations#store-page-order  (outbox.write)
+  host      pw:host/outbox#user-order-changed  (outbox.write)
+  host      pw:host/principal#read  (session.read)
+  host      store:data/user-orders#send  (database.write<Orders>)
+  exports   command send_to_store
+
 store.page.settle_payment  abi 8ac6e1f4e1759bef
   runs at   origin
   needs     clock.schedule
@@ -501,6 +570,7 @@ store.page.settle_payment  abi 8ac6e1f4e1759bef
   host      pw:host/outbox#user-order-changed  (outbox.write)
   host      pw:host/principal#read  (session.read)
   host      pw:host/schedules#store-page-expire-order-cancel  (clock.schedule)
+  host      pw:host/schedules#store-page-send-to-store-at  (clock.schedule)
   host      store:data/user-orders#settle  (database.write<Orders>)
   exports   command settle_payment
 
