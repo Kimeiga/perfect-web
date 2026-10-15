@@ -23,6 +23,24 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0337, 2026-10-14: a read is bounded by construction** (W9's design
+note for NEXT 4c; track `bounded-reads`, merged from `8bc1fe68`; ruled by
+the integrator 2026-10-14). Docs only: nothing is built yet.
+- Above the seam, a page's and a command's source calls are bounded by
+  its text: a read keyed by a loop's element is refused (PW0405), its set
+  read the repair. Below it, each source operation states what one call
+  costs (`sets`), measured by a conformance suite at two data sizes, and a
+  budget that grows on a source that does not batch is warned of (PW0406).
+  The store's composites move above the seam.
+- Its measurements are 4b's (ADR-0336), and its two cases are settled: one
+  command's repeated reads are read once above the seam, not coalesced by
+  the host; one render's identical calls are made once, in one snapshot.
+- Built in the ruling's order: the render merge (track `render-merge`);
+  PW0405, `set` pairs, `sets` and PW0406 (track `bounded-checker`); the
+  conformance suite, one with the three-database note's; then the
+  composites, one at a time.
+Verify TRAIN_RUN green, with train-8.
+
 **ADR-0336, 2026-10-14: a read is a bounded number of statements on
 PostgreSQL** (W9's; NEXT 4b; track `bounded-statements`, merged from
 `a59a18a3`, with the integrator's rulings of 2026-10-14).

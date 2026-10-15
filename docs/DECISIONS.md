@@ -2951,3 +2951,11 @@ a read is a bounded number of statements on PostgreSQL (W9's; NEXT 4b).
   operation, page and command counted at the seed and with fifty stores
   more, pinned and equal at both; a command's commit counted with it;
   `place_order` pinned by scenario.
+[ADR-0337](DECISIONS/ADR-0337-a-read-is-bounded-by-construction.md):
+a read is bounded by construction (W9's design note for NEXT 4c, ruled by
+the integrator 2026-10-14; nothing built yet).
+- A read keyed by a loop's element refused above the seam (PW0405), its
+  set read the repair; each source operation's cost per call stated below
+  it (`sets`, PW0406) and measured by one conformance suite; the store's
+  composites moved above the seam. Built in order: the render merge, the
+  checker's rules, the suite, the composites.

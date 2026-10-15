@@ -804,16 +804,21 @@ E14 comes before E11-E13. Its plan, controls and task list are
              the seed and with fifty stores more, pinned and equal at both;
              mutants restore each loop;
           4c. **a read is bounded by construction** (the owner's proposal,
-             the integrator's ruling of 2026-10-13, PARALLEL.md): a page's
+             the integrator's ruling of 2026-10-13, PARALLEL.md; W9's design
+             note ADR-0337, ruled 2026-10-14, merged on train-8): a page's
              and a command's source calls bounded by its text, a read keyed
-             by a loop's element refused with its set read as the repair,
-             the host coalescing its own sibling bindings; each source
-             operation's cost per call stated with its guarantees
-             (ADR-0207) and measured by a conformance suite every layer
-             runs at two data sizes; the budget, calls times cost, recorded
-             as evidence and checked against the host's counter. W9's,
-             after 4b, a design note first, its shape an ADR; before the
-             capability matrix's apps;
+             by a loop's element refused with its set read as the repair;
+             each source operation's cost per call stated with its
+             guarantees (ADR-0207) and measured by a conformance suite every
+             layer runs at two data sizes; the budget, calls times cost,
+             recorded as evidence and checked against the host's counter.
+             Built in the ruling's order, each its own track: (1) the render
+             merge, one snapshot per render and identical calls made once
+             (track `render-merge`, in flight); (2) PW0405, `set` pairs,
+             `sets` and PW0406 (track `bounded-checker`, in flight); (3) the
+             conformance suite, one with the three-database note's decision
+             5.5; (4) the store's composites moved above the seam, one at a
+             time. Before the capability matrix's apps;
           5. ~~**idempotency committed with the writes**~~ (ADR-0325,
              merged 2026-10-12): an interaction's answer commits in its
              command's transaction, on both layers, and answers a day;
