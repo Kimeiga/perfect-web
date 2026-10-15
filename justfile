@@ -26,6 +26,7 @@ import 'just/order-total.just'
 import 'just/payments.just'
 import 'just/page-policy.just'
 import 'just/scheduled.just'
+import 'just/each-head-effects.just'
 
 default:
     @just --list
