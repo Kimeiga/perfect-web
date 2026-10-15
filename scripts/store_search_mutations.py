@@ -259,8 +259,9 @@ MUTANTS = [
         PROGRAM,
         # Re-anchored by ADR-0308's amendment: a reader's search.
         # Re-anchored by track store-hours: a store's hours change it too.
-        "    invalidates_on MenuChanged(_), InventoryChanged(_, _), AddressesChanged(reader), StoreChanged(_)\n",
-        "    invalidates_on AddressesChanged(reader), StoreChanged(_)\n",
+        # Re-anchored by track reviews: and a store's ratings.
+        "    invalidates_on MenuChanged(_), InventoryChanged(_, _), AddressesChanged(reader), StoreChanged(_), StoreRated(_)\n",
+        "    invalidates_on AddressesChanged(reader), StoreChanged(_), StoreRated(_)\n",
     ),
     (
         "the search box holds nothing of what was asked",
