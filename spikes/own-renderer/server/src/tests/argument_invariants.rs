@@ -338,3 +338,63 @@ fn a_pages_parameters_are_held_where_its_address_gives_them() {
         assert_eq!(body, why, "{path}");
     }
 }
+
+/// **A row written before its CHECK existed is refused where it is read,
+/// on PostgreSQL** (ADR-0179's data layer's answer, on the database): the
+/// store's `cart_lines` holds `quantity > 0` itself, so its constraint is
+/// dropped in the test's own schema, as a database made before it was added
+/// would lack it, and a line of 0 is written around the program. The cart's
+/// read then fails by name, and no page is served from it: the component
+/// never reads a `PositiveInt` of 0. In memory,
+/// `a_stored_line_of_nothing_is_a_failed_read` holds the same. Passes doing
+/// nothing without `PW_STORE_DATABASE_URL`.
+#[test]
+fn on_postgres_a_row_written_before_its_check_is_refused_where_it_is_read() {
+    let url = match std::env::var("PW_STORE_DATABASE_URL") {
+        Ok(url) if !url.is_empty() => url,
+        _ => {
+            eprintln!("skipped: PW_STORE_DATABASE_URL is not set");
+            return;
+        }
+    };
+    let layer =
+        Arc::new(crate::store_pg::StorePg::for_test(&url).expect("the store on PostgreSQL"));
+    let (dir, out) = built_from_patches_in("examples", |app| app.to_string(), &[]);
+    let server = Server::from_build_layers(out.clone(), out, None, Some(layer.clone()))
+        .expect("served on PostgreSQL");
+    let s = Served { server, _dir: dir };
+    s.serve_document("a");
+    let added = s
+        .command_answer(
+            "store.page.add_to_cart",
+            "a",
+            &[shown("espresso"), serde_json::json!(1)],
+            Some("press-1"),
+        )
+        .expect("a well-formed request");
+    assert!(added.committed, "{added:?}");
+    let refused = s
+        .store
+        .line_around(&s.owner("a"), 0, 0)
+        .expect_err("the database holds the invariant itself");
+    assert!(refused.contains("cart_lines_quantity_check"), "{refused}");
+    layer
+        .sql()
+        .batch_execute("ALTER TABLE cart_lines DROP CONSTRAINT cart_lines_quantity_check")
+        .expect("the constraint dropped in the test's schema");
+    s.store
+        .line_around(&s.owner("a"), 0, 0)
+        .expect("a row the database no longer refuses");
+    let why = match s.serve_store_document("a", STORE_ID) {
+        Err(Unread::Failed(why)) => why,
+        other => panic!("served from a line of 0: {other:?}"),
+    };
+    assert!(
+        why.contains("answered what breaks an invariant")
+            && why.contains(
+                "`ok.lines[0].quantity` is 0, and `domain.PositiveInt` holds `value >= 1`"
+            ),
+        "{why}"
+    );
+    drop(s);
+}
