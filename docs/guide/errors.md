@@ -128,7 +128,7 @@ page Write() {
         <title>Write</title>
         <button type="button" on:press={() => match post("Hello") {
             Ok(p) => last = "sent",
-            Err(_) => last = last,
+            Err(_) => (),
         }}>Post</button>
     }
 }
@@ -145,8 +145,7 @@ error: [PW0620] `post` answers whether it committed, not its value: `p` is bound
    = help: write `Ok(_)`, and read the value from the page's query
 ```
 
-Every arm of a handler assigns a signal. `last = last` is how an arm does
-nothing.
+An arm that does nothing is `()`, the unit value.
 
 ### A command a page can send twice
 
@@ -180,7 +179,7 @@ page Write() {
         <title>Write</title>
         <button type="button" on:press={() => match post("Hello") {
             Ok(_) => sent = sent + 1,
-            Err(_) => sent = sent,
+            Err(_) => (),
         }}>Post</button>
     }
 }
@@ -245,7 +244,7 @@ page Write() {
         <title>Write</title>
         <button type="button" on:press={() => match post("Hello") {
             Ok(_) => sent = sent + 1,
-            Err(_) => sent = sent,
+            Err(_) => (),
         }}>Post</button>
     }
 }
@@ -262,7 +261,7 @@ error: [PW5048] this control sends `post`, which `requires SignedIn`, and is sho
 ...  |
 33 | |/         <button type="button" on:press={() => match post("Hello") {
 34 | ||             Ok(_) => sent = sent + 1,
-35 | ||             Err(_) => sent = sent,
+35 | ||             Err(_) => (),
 36 | ||         }}>Post</button>
    | ||________________________^ this control sends `post`, which `requires SignedIn`, and is shown where the page does not ask `SignedIn`
 37 | |      }
