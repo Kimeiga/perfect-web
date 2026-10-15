@@ -1640,6 +1640,39 @@ async function flushSignals() {
   window.__pw.signals = Object.fromEntries(signals);
 }
 
+// --- the address's fragment, bound to a signal (track `todomvc`) ------------
+//
+// A page that states `fragment filter "/" => "all", "/active" => "active"`
+// binds the signal to its address's fragment, which no server sees: the
+// document says which signal and each form the fragment takes with the value
+// the signal takes then (`parts.fragment`). The signal follows the fragment:
+// at start, and on each `hashchange`, a link's or the back button's. A
+// fragment that is no form, or none, is the signal's first value, the page's
+// declared default, which the server rendered. The address is the signal's
+// only writer: the compiler refuses a handler that assigns it (PW6105), so
+// the two cannot differ.
+
+/** The value the signal takes at the address's fragment now. */
+function fragmentValue(binding) {
+  const form = location.hash.slice(1);
+  return binding.forms.find((f) => f.form === form)?.value ?? firstValues.get(binding.signal);
+}
+
+/** The signal set to what the fragment says, held and rendered as any
+ * signal's change is: the parts that read it, and a query it keys. */
+function followFragment(binding) {
+  const value = fragmentValue(binding);
+  if (signals.get(binding.signal) === value) return;
+  log.push(`fragment ${location.hash || "(none)"} -> ${binding.signal} ${JSON.stringify(value)}`);
+  setSignal(binding.signal, value, null);
+}
+
+/** The signal follows the fragment, from now: once it is read at start. */
+function bindFragment(binding) {
+  followFragment(binding);
+  addEventListener("hashchange", () => followFragment(binding), { signal: life.signal });
+}
+
 // --- ADR-0152: a key a page changes ---------------------------------------
 //
 // A page's query given a signal is read again, for the new key, when the
@@ -2327,6 +2360,8 @@ async function attach() {
   // A page whose values are its signals alone listens for nothing
   // (ADR-0130): no resource of its changes on the server.
   if (parts.listens !== false) subscribe();
+  // The signal a page binds to its address's fragment follows it from here.
+  if (parts.fragment) bindFragment(parts.fragment);
   window.__pw.signals = Object.fromEntries(signals);
   window.__pw.ready = true;
   document.documentElement.dataset.pwReady = "1";

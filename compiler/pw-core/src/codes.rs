@@ -22,6 +22,7 @@
 //! PW57xx   the notifications track's (ADR-0253): the typed principal, notifications
 //! PW58xx   the messages track's (ADR-0253): direct messages
 //! PW60xx   the kiokun track's (ADR-0253): kiokun.com in Pleris
+//! PW61xx   the todomvc track's (ADR-0253): TodoMVC in Pleris
 //! PW64xx   the payments track's (NEXT 6c): a command the platform invokes
 //! ```
 //!
@@ -124,6 +125,10 @@ pub enum Owner {
     /// The scheduled-commands track's codes, PW65xx (the integrator's): a
     /// command the platform runs when the clock passes its time.
     Schedules,
+    /// ADR-0253: the todomvc track's codes, PW61xx: TodoMVC in Pleris, held
+    /// to its own spec and tests (docs/PARALLEL.md, W7's plan). A signal a
+    /// page binds to its address's fragment.
+    Todomvc,
 }
 
 impl fmt::Display for Code {
@@ -862,6 +867,25 @@ codes! {
     FILE_FORM_POSTS_TO_NO_UPLOAD = "PW5603" / file_form_posts_to_no_upload / 1, Uploads,
         "a form that sends a file posts it, as multipart/form-data, to an upload the program declares";
 
+    // --- the todomvc track (PW61xx; track `todomvc`, W7) --------------------
+    //
+    // `fragment filter "/" => "all", "/active" => "active"`: a signal a page
+    // binds to its address's fragment, which no server sees, with the forms
+    // the fragment takes. The runtime keeps the two in step; a server renders
+    // the signal's first value.
+    FRAGMENT_NAMES_NO_SIGNAL = "PW6101" / fragment_names_no_signal / 1, Todomvc,
+        "a page's `fragment` clause names a signal the page declares";
+    FRAGMENT_SIGNAL_NOT_TEXT = "PW6102" / fragment_signal_not_text / 1, Todomvc,
+        "a signal bound to the address's fragment is a `String`: a fragment is text";
+    FRAGMENT_FORMS = "PW6103" / fragment_forms / 1, Todomvc,
+        "a fragment's forms are written `\"form\" => \"value\"`, each form once, in characters a fragment holds";
+    FRAGMENT_DEFAULT = "PW6104" / fragment_default / 1, Todomvc,
+        "a signal bound to the fragment starts at a value one of the forms gives";
+    FRAGMENT_SIGNAL_ASSIGNED = "PW6105" / fragment_signal_assigned / 1, Todomvc,
+        "a signal bound to the fragment is written by the address alone, and no handler assigns it";
+    LINK_NAMES_NO_FORM = "PW6106" / link_names_no_form / 1, Todomvc,
+        "a link to a fragment of a page that binds its fragment names a form the page takes";
+
     // --- the payments track (PW64xx; NEXT 6c, the integrator's) ------------
     //
     // `invoked_by Payments`: the command a payment's outcome invokes, which
@@ -977,6 +1001,7 @@ impl Owner {
             Owner::Messages => "PW58",
             Owner::StorePg => "PW59",
             Owner::Kiokun => "PW60",
+            Owner::Todomvc => "PW61",
             Owner::StoreAccounts => "PW62",
             Owner::StoreSearch => "PW63",
             Owner::Payments => "PW64",
@@ -1044,6 +1069,7 @@ mod tests {
                 (Owner::Messages, "PW58"),
                 (Owner::StorePg, "PW59"),
                 (Owner::Kiokun, "PW60"),
+                (Owner::Todomvc, "PW61"),
                 (Owner::StoreAccounts, "PW62"),
                 (Owner::StoreSearch, "PW63"),
                 (Owner::Payments, "PW64"),

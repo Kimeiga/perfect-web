@@ -1,0 +1,37 @@
+# The todomvc track's recipes (ADR-0253, docs/PARALLEL.md, W7's plan): TodoMVC
+# in Pleris, held to TodoMVC's own spec and official tests. The track adds
+# its recipes here and nowhere else; the root justfile imports this file, and
+# its settings and variables (`set shell`, `PATH`) apply here as there. An
+# evidence recipe is `e14-<name>:`, writes `docs/evidence/E14/<name>.txt`, and
+# is planned by the verification run like any other (scripts/ci_plan.py reads
+# this file too).
+
+# Track `todomvc` (ADR-XXXX): a page binds a signal to its address's
+# fragment, which no server sees (`fragment filter "/" => "all", ..`), and the
+# runtime keeps the two in step. The compiler's checks (tests/address_fragment.rs,
+# PW6101 to PW6106, and the clause's own tests among the policy table's), the
+# host's (tests::address_fragment), the browser in three engines
+# (e2e/fragment.spec.mjs over examples/demo/fragment.pw), and the mutation
+# controls (scripts/address_fragment_mutations.py).
+e14-address-fragment:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server -p kiokun-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-XXXX - a page binds a signal to its address's fragment"; echo; \
+       echo "produced by: just e14-address-fragment"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the compiler (tests/address_fragment.rs, the policy table's tests)"; echo; \
+       cargo test --locked -p pw-core --test address_fragment 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       cargo test --locked -p pw-core --lib policy:: codes:: 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the host (tests::address_fragment)"; echo; \
+       cargo test --locked -p pw-dev-server -- tests::address_fragment:: 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the browser in three engines (e2e/fragment.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/fragment.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/address_fragment_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/address_fragment_mutations.py; \
+     } > docs/evidence/E14/address-fragment.txt
+    @grep -E "^test result|passed|mutants killed|^---- |panicked at" docs/evidence/E14/address-fragment.txt

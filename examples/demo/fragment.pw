@@ -1,0 +1,54 @@
+// @corpus: fixture
+// @id: DEMO-fragment
+// @category: UI state — a signal bound to the address's fragment
+// @charter: §8.2
+// @milestone: E14
+//
+// Track `todomvc` (ADR-XXXX): `fragment tab "/" => "overview", ..` binds the
+// signal `tab` to the page's address's fragment, which no server sees, and
+// names each form the fragment takes with the value the signal takes then.
+// What this shows, in each engine:
+// - the server renders the signal's first value, the declared default;
+// - the browser sets the signal to its address's form at start, and on each
+//   change of the address, a link's, the back button's or a script's;
+// - a fragment that is no form is the default;
+// - the signals it does not bind keep their values.
+
+module demo.fragment
+
+// How the open tab is marked: a value the browser computes from the signal.
+fn marked(tab: String) -> String !{} {
+    if tab == "specs" {
+        "specs-open"
+    } else {
+        "specs-shut"
+    }
+}
+
+page FragmentPage() {
+    cache    private
+    fragment tab "/" => "overview", "/specs" => "specs", "/reviews" => "reviews"
+
+    signal tab: String = "overview"
+    signal presses: Int = 0
+
+    view {
+        <title>Fragment</title>
+        <main>
+            <nav aria-label="Tabs">
+                <a id="to-overview" href="#/">Overview</a>
+                <a id="to-specs" href="#/specs">Specs</a>
+                <a id="to-reviews" href="#/reviews">Reviews</a>
+            </nav>
+            <p id="tab">{tab}</p>
+            <p id="marked" class={marked(tab)}>Marked by the tab</p>
+            {#if tab == "specs"}
+                <section id="specs" aria-label="Specs">
+                    <p>The specs.</p>
+                </section>
+            {/if}
+            <button id="press" type="button" on:press={() => presses = presses + 1}>Press</button>
+            <p id="presses">{presses}</p>
+        </main>
+    }
+}

@@ -9862,6 +9862,18 @@ fn signal_manifest(
     (signals, live, blocks)
 }
 
+/// **The signal a page binds to its address's fragment** (track `todomvc`,
+/// ADR-XXXX), as its plan states it: the signal and each form the fragment
+/// takes with the value the signal takes then, carried in the document's
+/// manifest. The browser keeps the signal in step with `location.hash`; this
+/// host renders the signal's first value, since a request carries no
+/// fragment.
+fn with_fragment(manifest: &mut serde_json::Value, plan: &serde_json::Value) {
+    if let Some(binding) = plan.get("fragment").filter(|f| !f.is_null()) {
+        manifest["fragment"] = binding.clone();
+    }
+}
+
 /// Each signal's first value, set into a rendering environment (ADR-0130).
 fn with_signals(mut env: Env, plan: &serde_json::Value) -> Env {
     for s in plan["signals"].as_array().into_iter().flatten() {
@@ -9931,6 +9943,8 @@ fn signal_document(
         "listens": false,
     });
     let mut manifest = manifest;
+    // The signal it binds to its address's fragment (track `todomvc`).
+    with_fragment(&mut manifest, plan);
     // What it computes from its signals (ADR-0227).
     if let Some(module) = computed_module(plan) {
         manifest["computed"] = serde_json::Value::String(module);
@@ -10111,6 +10125,8 @@ fn document(
         manifest["live"] = live;
         manifest["blocks"] = serde_json::Value::Object(blocks);
     }
+    // The signal it binds to its address's fragment (track `todomvc`).
+    with_fragment(&mut manifest, plan);
     // What it computes from them (ADR-0227).
     if let Some(module) = computed_module(plan) {
         manifest["computed"] = serde_json::Value::String(module);
@@ -13853,6 +13869,10 @@ public query Store(",
     // TRACK SEAM (kiokun): kiokun.com's word page, served from kiokun's
     // files (docs/PARALLEL.md, W6).
     mod kiokun;
+
+    // TRACK SEAM (todomvc): a page's fragment binding reaches its document
+    // (docs/PARALLEL.md, W7).
+    mod address_fragment;
 
     // TRACK SEAM (store-search): the store's search page, served (W9).
     mod store_search;
