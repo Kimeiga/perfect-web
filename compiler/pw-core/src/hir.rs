@@ -160,6 +160,11 @@ pub enum DeclKind {
     /// `source StoreData` (ADR-0207): a database the program's effects name,
     /// and what it guarantees. Named by nothing a program writes.
     Source,
+    /// `table Todos` (track `tables`, ADR-0338): an app's data, declared: its
+    /// row, key, order, indexes, references and bound. Named by nothing a
+    /// program writes: its module, which has its name, holds the reads and
+    /// writes generated from it (`tables::generate`).
+    Table,
     /// `upload PostImage` (track `uploads`, ADR-0260): a file a form posts to
     /// its `route`, served once committed under `serves`, and its limits.
     /// Named by nothing a program writes; `pw build` writes it for the host.

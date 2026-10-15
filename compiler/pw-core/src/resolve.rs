@@ -110,10 +110,12 @@ impl Namespace {
             DeclKind::Predicate => Namespace::Predicate,
             DeclKind::Effect => Namespace::Effect,
             // A source is named by nothing a program writes (ADR-0207), and
-            // nor is an upload (track `uploads`).
+            // nor is an upload (track `uploads`), nor a table (track
+            // `tables`): its module, which has its name, is.
             DeclKind::Import
             | DeclKind::Prelude
             | DeclKind::Source
+            | DeclKind::Table
             | DeclKind::Upload
             | DeclKind::Other => {
                 return None;

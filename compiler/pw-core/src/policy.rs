@@ -162,6 +162,25 @@ pub enum Domain {
     /// `max_bytes 5_000_000`, `max_width 4096`. A literal, so a limit is
     /// what the program states and nothing computes it.
     Count,
+    /// **A table's row** (track `tables`, ADR-0338): `row Todo`, a record
+    /// type declared in the table's module. Resolved, and held to that, by
+    /// `tables::check` (PW0361).
+    RowType,
+    /// **Fields of a table's row**, by their names: `key owner, id`, `order
+    /// added`. Held to the row by `tables::check` (PW0361). A query's `key`
+    /// names its parameters instead (`ParamRef`): see [`domain_on`].
+    Fields,
+    /// **An index on a table's row**: `index by_owner on owner`, `unique
+    /// by_email on email`, its name and its fields. Held by `tables::check`.
+    Index,
+    /// **A reference from a field of a table's row to a table**: `refers
+    /// owner to Users`. Held by `tables::check`.
+    Reference,
+    /// **A table's change from the schema last released**: `migrate title
+    /// renamed from name`, `migrate notes dropped`, `migrate rank backfilled
+    /// with 0`. Its words are held by `tables::check` (PW0361), and its use by
+    /// the schema's diff (PW0366).
+    Migration,
 }
 
 /// One policy operator, with the semantic kind of each argument.
@@ -365,6 +384,15 @@ pub fn domain_of(head: &str) -> Option<Domain> {
         "transactions" => Domain::Word(&["serializable", "snapshot", "read_committed", "none"]),
         "reads" => Domain::Words(&["strong", "snapshot", "read_your_writes", "eventual"]),
         "changes" => Domain::Word(&["none", "feed"]),
+        // --- a table's (track `tables`, ADR-0338): its row, its order, its
+        // indexes, its references, its bound, and its change from the
+        // schema released. Its `key` is `domain_on`'s.
+        "row" => Domain::RowType,
+        "order" => Domain::Fields,
+        "index" | "unique" => Domain::Index,
+        "refers" => Domain::Reference,
+        "bounded" => Domain::Count,
+        "migrate" => Domain::Migration,
         // An upload's (track `uploads`, ADR-0260): where its committed files
         // are served, its limits, and its kinds, a closed set each sniffed
         // from a file's bytes.
@@ -400,6 +428,17 @@ pub fn domain_of(head: &str) -> Option<Domain> {
 
         _ => return None,
     })
+}
+
+/// **What `head`'s value means on a declaration of `kind`**: [`domain_of`],
+/// but for the one head two kinds of declaration share with two meanings. A
+/// query's `key` names its parameters (`ParamRef`); a table's names its row's
+/// fields (track `tables`).
+pub fn domain_on(head: &str, kind: crate::hir::DeclKind) -> Option<Domain> {
+    match (head, kind) {
+        ("key", crate::hir::DeclKind::Table) => Some(Domain::Fields),
+        _ => domain_of(head),
+    }
 }
 
 /// **The execution context a block policy's contents run in.**
@@ -504,6 +543,7 @@ pub fn declared_by(head: &str) -> Option<(&'static [crate::hir::DeclKind], &'sta
         K::Event,
         K::Effect,
         K::Source,
+        K::Table,
         K::Upload,
         K::Prelude,
         K::Task,
@@ -539,9 +579,14 @@ pub fn declared_by(head: &str) -> Option<(&'static [crate::hir::DeclKind], &'sta
         ),
         "depends_on" => (&[K::Materialize], "a materialization"),
         // A cached read's: what a host keeps of it, and for how long.
-        "freshness" | "consistency" | "concurrency" | "key" | "dedupe_by" | "timeout" => {
+        "freshness" | "consistency" | "concurrency" | "dedupe_by" | "timeout" => {
             (READS, "a query, a subscription or a resource")
         }
+        // A cached read's key, or a table's (track `tables`).
+        "key" => (
+            &[K::Query, K::Subscription, K::Resource, K::Table],
+            "a query, a subscription, a resource or a table",
+        ),
         "cache" => (
             &[K::Query, K::Subscription, K::Resource, K::Page],
             "a query, a subscription, a resource or a page",
@@ -596,6 +641,10 @@ pub fn declared_by(head: &str) -> Option<(&'static [crate::hir::DeclKind], &'sta
         "host" => (&[K::Fn, K::Effect], "a function"),
         // A data source's (ADR-0207).
         "holds" | "transactions" | "reads" | "changes" => (&[K::Source], "a data source"),
+        // A table's (track `tables`, ADR-0338).
+        "row" | "order" | "index" | "unique" | "refers" | "bounded" | "migrate" => {
+            (&[K::Table], "a table")
+        }
         // An upload's (track `uploads`, ADR-0260).
         "serves" | "max_bytes" | "types" | "max_width" | "max_height" => {
             (&[K::Upload], "an upload")
@@ -632,13 +681,24 @@ pub fn declared_by(head: &str) -> Option<(&'static [crate::hir::DeclKind], &'sta
     })
 }
 
-/// **May `head` be written more than once in one declaration?** Only an
+/// **May `head` be written more than once in one declaration?** An
 /// effect's `impact`: an effect has as many impacts as it has facets
-/// (`impact dom_write`, `impact layout_write when LayoutAffect`). Any other
-/// head written twice says two things, and every reader took the first
-/// (ADR-0098).
+/// (`impact dom_write`, `impact layout_write when LayoutAffect`); and a
+/// table's `index`, `unique`, `refers` and `migrate`, each one of several
+/// (track `tables`). Any other head written twice says two things, and every
+/// reader took the first (ADR-0098).
 pub fn repeats(head: &str) -> bool {
-    matches!(domain_of(head), Some(Domain::ConditionedWord(_)))
+    matches!(
+        domain_of(head),
+        Some(
+            Domain::ConditionedWord(_)
+                // A table has as many indexes, references and statements of
+                // its change as it states (track `tables`).
+                | Domain::Index
+                | Domain::Reference
+                | Domain::Migration
+        )
+    )
 }
 
 /// The operator a spelling names, within a head's domain.
@@ -1111,6 +1171,13 @@ mod tests {
         "on_scope_exit",
         "transaction",
         "holds",
+        "row",
+        "order",
+        "index",
+        "unique",
+        "refers",
+        "bounded",
+        "migrate",
         "transactions",
         "reads",
         "changes",

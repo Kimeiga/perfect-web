@@ -1499,7 +1499,9 @@ fn policy_value(
     use crate::policy::{Domain, ValueFault};
     use crate::resolve::Resolution;
     let decl = hir.decl(id);
-    let fault = match crate::policy::domain_of(head) {
+    // A table's `key` names its row's fields, which `tables::check` holds
+    // (track `tables`); a query's names its parameters.
+    let fault = match crate::policy::domain_on(head, decl.kind) {
         Some(domain @ (Domain::ParamRef | Domain::ParamList)) => value
             .split(',')
             .map(str::trim)
@@ -3295,6 +3297,7 @@ pub(crate) fn described(kind: DeclKind) -> &'static str {
         DeclKind::Task => "a task",
         DeclKind::Event => "an event",
         DeclKind::Source => "a data source",
+        DeclKind::Table => "a table",
         DeclKind::Upload => "an upload",
         DeclKind::Predicate => "a predicate",
         DeclKind::Effect => "an effect",

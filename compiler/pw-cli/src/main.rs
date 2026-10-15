@@ -215,6 +215,14 @@ fn explain_with(
                     let _ = writeln!(s, "             {} {}", p.name, p.value);
                 }
             }
+            // Track `tables` (ADR-0338): an app's data, declared. Its reads
+            // and writes are its module's functions, shown as functions are.
+            DeclKind::Table => {
+                let _ = writeln!(s, "table        {name}");
+                for p in &d.policies {
+                    let _ = writeln!(s, "             {} {}", p.name, p.value);
+                }
+            }
             // Track `uploads` (ADR-0260): a file a form posts, and its limits.
             DeclKind::Upload => {
                 let _ = writeln!(s, "upload       {name}");

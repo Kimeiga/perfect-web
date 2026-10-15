@@ -159,6 +159,7 @@ fn decl_kind_of(node: &SyntaxNode, src: &str) -> DeclKind {
                 "materialize" => DeclKind::Materialize,
                 "event" => DeclKind::Event,
                 "source" => DeclKind::Source,
+                "table" => DeclKind::Table,
                 "upload" => DeclKind::Upload,
                 "predicate" => DeclKind::Predicate,
                 "task" => DeclKind::Task,
