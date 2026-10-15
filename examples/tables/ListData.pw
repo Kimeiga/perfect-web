@@ -1,0 +1,21 @@
+// @corpus: fixture
+// @id: TABLES-ListData
+// @category: application data — the source that holds two tables (ADR-0207, ADR-0338)
+// @charter: §9.2
+// @milestone: E14
+//
+// What the database holding the lists and their items guarantees (ADR-0207):
+// a deployment names it (`PW_SOURCE_LISTDATA`, ADR-0338 5.1), and its adapter
+// is held to these clauses before it serves. One source, so an item's
+// reference to its list is a foreign key the database holds.
+
+module ListData
+
+import Lists
+import Items
+
+source ListData
+    holds        Lists, Items
+    transactions serializable
+    reads        strong
+    changes      none

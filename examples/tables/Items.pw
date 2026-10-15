@@ -1,0 +1,37 @@
+// @corpus: fixture
+// @id: TABLES-Items
+// @category: application data — a table keyed by two fields (ADR-0338, D1)
+// @charter: §9.2, §7.5
+// @milestone: E14
+//
+// A list's items: keyed by the list first, so a list's items are one prefix
+// of the key, `Items.of_list(list)`, and all of several lists' one set read,
+// `Items.of_list_many(lists)`; in the order they were added. An item names
+// its list, which the source holds beside it (`refers`).
+
+module Items
+
+import Lists.{ ListId }
+import Lists
+
+opaque type ItemId = String
+
+// How many of an item: at least one.
+opaque type Count = Int where value >= 1
+
+type Item = Item {
+    list: ListId,
+    id: ItemId,
+    title: String,
+    done: Bool,
+    count: Count,
+    added: Int,
+    note: Option<String>,
+}
+
+table Items
+    row    Item
+    key    list, id
+    order  added
+    index  by_done on done
+    refers list to Lists

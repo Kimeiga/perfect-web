@@ -1,0 +1,131 @@
+{
+  "schema": 1,
+  "hash": "0865aa8879f9fe33",
+  "tables": [
+    {
+      "name": "Items",
+      "source": "ListData",
+      "fields": [
+        {
+          "name": "list",
+          "type": "ListId",
+          "stored": {
+            "string": {}
+          }
+        },
+        {
+          "name": "id",
+          "type": "ItemId",
+          "stored": {
+            "string": {}
+          }
+        },
+        {
+          "name": "title",
+          "type": "String",
+          "stored": {
+            "string": {}
+          }
+        },
+        {
+          "name": "done",
+          "type": "Bool",
+          "stored": "bool"
+        },
+        {
+          "name": "count",
+          "type": "Count",
+          "stored": {
+            "int": {
+              "at_least": 1
+            }
+          }
+        },
+        {
+          "name": "added",
+          "type": "Int",
+          "stored": {
+            "int": {}
+          }
+        },
+        {
+          "name": "note",
+          "type": "Option<String>",
+          "stored": {
+            "option": {
+              "string": {}
+            }
+          }
+        }
+      ],
+      "key": [
+        "list",
+        "id"
+      ],
+      "order": "added",
+      "indexes": [
+        {
+          "name": "by_done",
+          "fields": [
+            "done"
+          ]
+        }
+      ],
+      "references": [
+        {
+          "field": "list",
+          "table": "Lists"
+        }
+      ]
+    },
+    {
+      "name": "Lists",
+      "source": "ListData",
+      "fields": [
+        {
+          "name": "id",
+          "type": "ListId",
+          "stored": {
+            "string": {}
+          }
+        },
+        {
+          "name": "name",
+          "type": "String",
+          "stored": {
+            "string": {}
+          }
+        },
+        {
+          "name": "slug",
+          "type": "Slug",
+          "stored": {
+            "string": {
+              "max_length": 64
+            }
+          }
+        },
+        {
+          "name": "added",
+          "type": "Int",
+          "stored": {
+            "int": {}
+          }
+        }
+      ],
+      "key": [
+        "id"
+      ],
+      "order": "added",
+      "indexes": [
+        {
+          "name": "by_slug",
+          "fields": [
+            "slug"
+          ],
+          "unique": true
+        }
+      ]
+    }
+  ]
+}

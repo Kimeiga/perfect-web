@@ -319,7 +319,7 @@ codes! {
     ALL_UNBOUNDED = "PW0364" / all_unbounded / 1, DeclarationRules,
         "a table is read whole, by `all()`, only where it states `bounded`";
     REFERS_ACROSS_SOURCES = "PW0365" / refers_across_sources / 1, DeclarationRules,
-        "a reference to a table another source holds is held by no database: the row it names may be missing";
+        "a reference to a table another source holds is held by no database, so its field says it may name no row: an `Option`";
     MIGRATION_UNSTATED = "PW0366" / migration_unstated / 1, DeclarationRules,
         "a change from the schema released that loses or reinterprets data is stated by a `migrate`, and each `migrate` states one";
 

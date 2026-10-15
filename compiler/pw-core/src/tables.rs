@@ -29,8 +29,9 @@
 //!   its rows (PW0362).
 //! - **Its checks**: the declaration's shape (PW0361), its rows reached only
 //!   through its functions (PW0362), `all()` only of a bounded table (PW0364),
-//!   a reference across two sources warned of (PW0365), and a change from the
-//!   schema released stated (PW0366, `schema`).
+//!   a reference across two sources by a field that says it may name no row,
+//!   an `Option` (PW0365), and a change from the schema released stated
+//!   (PW0366, `held_to`).
 //! - **What a host needs** (`TablesJson`): `pw build` writes `tables.json`,
 //!   each table's fields and their types, key, order, indexes, references,
 //!   source and functions, and `schema.lock`, the schema the build declares.
@@ -959,7 +960,7 @@ pub fn check(hirs: &[&Hir], unit: usize, ws: &Workspace, sigs: &Signatures) -> V
     let tables = declared(hir);
     for (i, t) in tables.iter().enumerate() {
         out.extend(shape(hirs, unit, ws, sigs, &module, t, i > 0));
-        out.extend(across_sources(hirs, unit, ws, t));
+        out.extend(across_sources(hirs, unit, ws, sigs, t));
     }
     out.extend(bindings(hirs, unit, ws));
     out
@@ -1337,39 +1338,69 @@ fn referring(
     )]
 }
 
-/// PW0365: a reference to a table another source holds.
-fn across_sources(hirs: &[&Hir], unit: usize, ws: &Workspace, t: &Table) -> Vec<Diagnostic> {
+/// **PW0365: a reference to a table another source holds**, whose field
+/// says it may name none (`Option`), or is refused. Within one source a
+/// reference is a foreign key the database holds; across two, nothing holds
+/// it, and the row it names may be missing.
+fn across_sources(
+    hirs: &[&Hir],
+    unit: usize,
+    ws: &Workspace,
+    sigs: &Signatures,
+    t: &Table,
+) -> Vec<Diagnostic> {
     let mine = source_of(hirs, &t.name);
+    // The row's fields, resolved where the row is declared.
+    let fields: Vec<(String, ResolvedType)> = match t
+        .row
+        .as_ref()
+        .map(|r| ws.resolve_in(unit, Namespace::Type, &r.value))
+    {
+        Some(Resolution::Local(def)) => sigs
+            .type_decl(def)
+            .and_then(|d| d.record.as_ref())
+            .map(|fs| {
+                fs.iter()
+                    .filter_map(|(n, ty)| Some((n.clone(), ty.resolved()?.clone())))
+                    .collect()
+            })
+            .unwrap_or_default(),
+        _ => Vec::new(),
+    };
     t.references
         .iter()
         .filter(|r| table_module(ws, hirs, unit, &r.value.table).is_some())
         .filter_map(|r| {
             let theirs = source_of(hirs, &r.value.table);
-            (theirs != mine).then(|| {
+            let (_, ty) = fields.iter().find(|(n, _)| *n == r.value.field)?;
+            let optional = ty.as_builtin() == Some(crate::resolved::Builtin::Option);
+            (theirs != mine && !optional).then(|| {
                 refusal(
                     codes::REFERS_ACROSS_SOURCES,
                     "refers_across_sources",
-                    Severity::Warning,
+                    Severity::Error,
                     format!(
-                        "`{}.{}` refers to `{}` in {}, and `{}` is in {}: no database holds a \
-                         reference across two",
+                        "`{}.{}` refers to `{}` in {}, and `{}` is in {}: no database holds the \
+                         reference, and `{}` is `{ty}`, which names a row always",
                         t.name,
                         r.value.field,
                         r.value.table,
                         source_named(&theirs),
                         t.name,
-                        source_named(&mine)
+                        source_named(&mine),
+                        r.value.field,
                     ),
                     r.span.clone(),
                     Vec::new(),
                     "Within one database a reference is a foreign key, which the database \
                      holds: a row is not written referring to one that is not there, and a row \
                      referred to is not deleted. Two databases hold nothing of each other, so the \
-                     row a reference names may be missing, and `get` answers it as `None`.",
+                     row a reference across them names may be missing, deleted by the other \
+                     database's writes, and `get` answers it as `None`. A field that refers \
+                     across two sources says it may name none: an `Option`.",
                     format!(
-                        "hold `{}` and `{}` in one source, or read the reference as one that may \
-                         name nothing",
-                        t.name, r.value.table
+                        "type `{}` as `Option<{ty}>`, or hold `{}` and `{}` in one source",
+                        r.value.field, t.name, r.value.table
                     ),
                 )
             })
