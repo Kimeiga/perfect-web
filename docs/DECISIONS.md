@@ -2944,3 +2944,10 @@ downloads approved by the owner, 2026-10-14).
   Wasmtime advisories. Every pin is 48.0.6; the engine stays as ADR-0244
   configured it; no advisory ignored. Two are reachable by a hostile
   component, and the version closes them.
+[ADR-0336](DECISIONS/ADR-0336-a-read-is-a-bounded-number-of-statements.md):
+a read is a bounded number of statements on PostgreSQL (W9's; NEXT 4b).
+- The store's rows read by set (`= ANY($1)`): stores by id, the stores of
+  a set of items, the hours and the coverage of a set of stores. Every
+  operation, page and command counted at the seed and with fifty stores
+  more, pinned and equal at both; a command's commit counted with it;
+  `place_order` pinned by scenario.

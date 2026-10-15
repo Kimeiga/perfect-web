@@ -797,18 +797,12 @@ E14 comes before E11-E13. Its plan, controls and task list are
              text; a plain `<form method="get">` and a link make the
              address. W6's kiokun search box and W9's store search move to
              it;
-          4b. **a read is a bounded number of statements on PostgreSQL**
-             (the integrator's finding, 2026-10-12): the store's logic is
-             written once over the layer's rows, a store's or a menu's at a
-             time, and on PostgreSQL each is a statement. `place_order`'s
-             reach runs one per line and store, a reader's search one per
-             store it found (each reading every store), and the hours one
-             per store. Every read and command counted (the layer's
-             statements, as Django's `assertNumQueries` and Rails'
-             `assert_queries_count` count them) at the seed and with fifty
-             stores more, pinned and equal at both; rows read by set
-             (`= ANY($1)`), a scan in memory; mutants restore each loop.
-             W9's, after 6b, on the counter W9's search brings;
+          4b. ~~**a read is a bounded number of statements on PostgreSQL**~~
+             (ADR-0336, merged 2026-10-15 on train-8, W9's, `just
+             e14-bounded-statements`): rows read by set (`= ANY($1)`), a
+             scan in memory; every operation, page and command counted at
+             the seed and with fifty stores more, pinned and equal at both;
+             mutants restore each loop;
           4c. **a read is bounded by construction** (the owner's proposal,
              the integrator's ruling of 2026-10-13, PARALLEL.md): a page's
              and a command's source calls bounded by its text, a read keyed

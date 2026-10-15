@@ -655,12 +655,12 @@ awaited in order. What remains:
     `current_user()` reaches every reader of it;
   - a guest's lines whose join failed are reachable by no one;
   - a user's order is their latest.
-- **The store's PostgreSQL reads grow with the data** (the integrator's
-  finding, 2026-10-12; NEXT 4b): the store's logic reads the layer's rows a
-  store's or a menu's at a time, and on PostgreSQL each is a statement.
-  `place_order`'s reach runs one per cart line and store, a reader's search
-  one per store it found, each reading every store, and the hours one per
-  store (ADR-0328).
+- **The store's reads are pinned, not bounded by construction** (ADR-0336):
+  each operation's, page's and command's statements are counted on
+  PostgreSQL and pinned, equal at the seed and with fifty stores more; a
+  program that reads per element is refused only once NEXT 4c is built.
+  Rows are not counted (`stores#list` and the home page read every store,
+  as they must), and a cart's lines are written a statement each.
 - **A store's hours look a week ahead** (ADR-0328): a store that next opens
   later says "Closed". A special date replaces its day's hours, never only
   extends them; item-level hours are not kept. On a day a transition skips
@@ -1116,8 +1116,6 @@ preserved, not replaced with invented results.
   sets each store's flags; CDTFA proposed in 2026 to end the DNC opt-out
   (unconfirmed): if it does, the platform is the retailer and the flags
   change.
-- **A cart's lines are mapped to their stores by a read per store**
-  (`checkout#parts`, as `hours#for-cart`), until NEXT 4b bounds every read.
 - **Payments** (ADR-0332): an order no one pays is taken back thirty
   minutes on (ADR-0334), at a time no deployment chooses; the provider is
   asked inside the

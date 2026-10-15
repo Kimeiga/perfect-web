@@ -23,6 +23,31 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0336, 2026-10-14: a read is a bounded number of statements on
+PostgreSQL** (W9's; NEXT 4b; track `bounded-statements`, merged from
+`a59a18a3`, with the integrator's rulings of 2026-10-14).
+- The store's logic read the layer's rows a store's or a menu's at a time,
+  and on PostgreSQL each was a statement: the order's reach one per line
+  and store, a reader's search one per store it found, the hours three per
+  store. The rows gain four set reads, each one statement on PostgreSQL
+  whatever its keys (`= ANY($1)`) and a scan in memory: stores by id, the
+  stores of a set of items, the hours of a set of stores (three statements)
+  and their coverage. The loops go; memory's scans are named, and the
+  mutants put them back.
+- Every one of the store layer's 63 operations, and every page and command,
+  counted on PostgreSQL at the seed and with fifty stores more, each count
+  pinned and equal at both (`tests/bounded_statements.rs`, as Django's
+  `assertNumQueries` pins a block's). A command's commit is counted with it
+  (its outbox, its interaction's record, its scheduled runs), and
+  `place_order` pinned by scenario: taking no payments, its operations 33,
+  its commit 7 and its queries read again 21; taking them, 37, then
+  `settle_payment` on the provider's word 17.
+- Locally on PostgreSQL 18.6 (the PC): `just e14-bounded-statements`, 4
+  passed and 7 of 7 mutants killed; `store_accounts_mutations.py` whole, 37
+  of 37; chromium's suite, 381 passed. Its own verify (38641214685) was
+  cancelled by a concurrency group: the train's run is its record.
+Verify TRAIN_RUN green, with train-8.
+
 **ADR-0335, 2026-10-14: Wasmtime 48.0.6, for RUSTSEC-2026-0353 to 0364**
 (the integrator's; track `wasmtime-48-0-6`, merged from `af18141a`; the
 release's 28 crates and its CLI archives approved by the owner 2026-10-14).

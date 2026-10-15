@@ -18,7 +18,7 @@
 
 use super::*;
 use crate::data::Ops;
-use crate::store::{Rows, With, Written};
+use crate::store::{With, Written};
 
 /// **One weekly period**: its ISO weekday (1, Monday, to 7, Sunday), and its
 /// opening and closing minutes from midnight, 0 to 1440. A closing not after
@@ -196,16 +196,6 @@ pub(crate) fn hours_from(v: &Val) -> Result<Hours, String> {
     })
 }
 
-/// **The store an item is listed by**: the first store whose menu has it.
-fn store_of(r: &mut dyn Rows, item: &str) -> Result<Option<String>, String> {
-    for s in r.stores()? {
-        if r.menu(&s.id)?.iter().any(|i| i.id == item) {
-            return Ok(Some(s.id));
-        }
-    }
-    Ok(None)
-}
-
 /// `{ store, hours }`, each store's, as `OpeningHoursOf` is.
 fn of(store: &str, h: &Hours) -> Val {
     Val::Record(vec![
@@ -240,18 +230,22 @@ pub(crate) fn ops(with: With) -> Ops {
     ops.insert(
         "store:data/hours#for-stores".to_string(),
         Arc::new(move |args: &[Val]| match args {
-            [Val::List(stores)] => w(&mut |r| {
-                let mut out = Vec::new();
-                for s in stores {
-                    let Val::String(store) = s else {
-                        return Err(format!("hours#for-stores received {s:?}"));
-                    };
-                    if let Some(h) = r.hours(store)? {
-                        out.push(of(store, &h));
-                    }
-                }
-                Ok(vec![Val::List(out)])
-            }),
+            [Val::List(stores)] => {
+                let stores = stores
+                    .iter()
+                    .map(|s| match s {
+                        Val::String(s) => Ok(s.clone()),
+                        other => Err(format!("hours#for-stores received {other:?}")),
+                    })
+                    .collect::<Result<Vec<_>, String>>()?;
+                // By set (NEXT 4b): one read of the stores' hours.
+                w(&mut |r| {
+                    let found = r.hours_of(&stores)?;
+                    Ok(vec![Val::List(
+                        found.iter().map(|(s, h)| of(s, h)).collect(),
+                    )])
+                })
+            }
             other => Err(format!("hours#for-stores received {other:?}")),
         }),
     );
@@ -259,25 +253,31 @@ pub(crate) fn ops(with: With) -> Ops {
         "store:data/hours#for-cart".to_string(),
         Arc::new(move |args: &[Val]| match args {
             [Val::String(reader)] => with(&mut |r| {
+                // By set (NEXT 4b): the cart's items' stores, their names and
+                // their hours, a read each whatever the cart holds.
+                let lines = r.cart(reader)?;
+                let items: Vec<String> = lines.iter().map(|l| l.item.clone()).collect();
+                let of_item = r.stores_of_items(&items)?;
                 let mut seen: Vec<String> = Vec::new();
-                for line in r.cart(reader)? {
-                    if let Some(store) = store_of(r, &line.item)?
-                        && !seen.contains(&store)
+                for line in &lines {
+                    if let Some(store) = of_item.get(&line.item)
+                        && !seen.contains(store)
                     {
-                        seen.push(store);
+                        seen.push(store.clone());
                     }
                 }
-                let names: BTreeMap<String, String> =
-                    r.stores()?.into_iter().map(|s| (s.id, s.name)).collect();
+                let names: BTreeMap<String, String> = r
+                    .stores_by_ids(&seen)?
+                    .into_iter()
+                    .map(|s| (s.id, s.name))
+                    .collect();
                 let mut out = Vec::new();
-                for store in seen {
-                    if let Some(h) = r.hours(&store)? {
-                        let Val::Record(mut fields) = of(&store, &h) else {
-                            unreachable!("a record")
-                        };
-                        fields[1].1 = Val::String(names.get(&store).cloned().unwrap_or_default());
-                        out.push(Val::Record(fields));
-                    }
+                for (store, h) in r.hours_of(&seen)? {
+                    let Val::Record(mut fields) = of(&store, &h) else {
+                        unreachable!("a record")
+                    };
+                    fields[1].1 = Val::String(names.get(&store).cloned().unwrap_or_default());
+                    out.push(Val::Record(fields));
                 }
                 Ok(vec![Val::List(out)])
             }),
@@ -315,6 +315,73 @@ pub(crate) fn host_writes(with: With, written: Arc<Mutex<Written>>) -> Ops {
         }),
     );
     ops
+}
+
+/// **The hours of a list of stores on PostgreSQL**, in three statements
+/// whatever their number (NEXT 4b): the stores' zones and cut-offs, their
+/// weekly periods and their special dates, each by set (`= ANY($1)`), in
+/// the orders a store's own read gives them (`pg_hours`).
+pub(crate) fn pg_hours_of(
+    c: &mut crate::store_pg::Counted<'_>,
+    stores: &[String],
+) -> Result<Vec<(String, Hours)>, String> {
+    let pg = crate::feed_pg::pg;
+    let held: BTreeMap<String, (String, i64)> = c
+        .query(
+            "SELECT id, time_zone, last_order_minutes FROM stores WHERE id = ANY($1)",
+            &[&stores],
+        )
+        .map_err(pg)?
+        .iter()
+        .map(|r| (r.get(0), (r.get(1), r.get(2))))
+        .collect();
+    let mut weekly: BTreeMap<String, Vec<Period>> = BTreeMap::new();
+    for r in c
+        .query(
+            "SELECT store, weekday, opens_minute, closes_minute FROM store_hours \
+             WHERE store = ANY($1) ORDER BY store, weekday, opens_minute",
+            &[&stores],
+        )
+        .map_err(pg)?
+    {
+        weekly.entry(r.get(0)).or_default().push(Period {
+            weekday: r.get(1),
+            opens: r.get(2),
+            closes: r.get(3),
+        });
+    }
+    let mut special: BTreeMap<String, Vec<Special>> = BTreeMap::new();
+    for r in c
+        .query(
+            "SELECT store, (day - DATE '1970-01-01')::bigint, opens_minute IS NULL, \
+                    coalesce(opens_minute, 0), coalesce(closes_minute, 0) \
+             FROM store_special_hours WHERE store = ANY($1) ORDER BY store, day",
+            &[&stores],
+        )
+        .map_err(pg)?
+    {
+        special.entry(r.get(0)).or_default().push(Special {
+            date: r.get(1),
+            closed: r.get(2),
+            opens: r.get(3),
+            closes: r.get(4),
+        });
+    }
+    Ok(stores
+        .iter()
+        .filter_map(|s| {
+            let (zone, last_order_minutes) = held.get(s)?.clone();
+            Some((
+                s.clone(),
+                Hours {
+                    zone,
+                    last_order_minutes,
+                    weekly: weekly.remove(s).unwrap_or_default(),
+                    special: special.remove(s).unwrap_or_default(),
+                },
+            ))
+        })
+        .collect())
 }
 
 /// **A store's hours on PostgreSQL**, on `c` in whatever transaction it is
