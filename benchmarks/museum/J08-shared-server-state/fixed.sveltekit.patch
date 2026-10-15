@@ -1,0 +1,43 @@
+diff --git b/src/routes/stores/[storeId]/+page.server.ts a/src/routes/stores/[storeId]/+page.server.ts
+index ccd30b7..1cebba6 100644
+--- b/src/routes/stores/[storeId]/+page.server.ts
++++ a/src/routes/stores/[storeId]/+page.server.ts
+@@ -1,22 +1,16 @@
+ import { error, fail } from "@sveltejs/kit";
+ import type { Actions, PageServerLoad } from "./$types";
+-import { addToCart, clearCart, getMenu, getStore, isMenuItem, lineCount } from "$lib/server/store";
+-import { ensureSession } from "$lib/server/session";
++import { addToCart, clearCart, getCart, getMenu, getStore, isMenuItem, lineCount } from "$lib/server/store";
++import { currentSession, ensureSession } from "$lib/server/session";
+ 
+-// The cart's count, kept from the last change so that a load need not read
+-// the cart again. The shape of SvelteKit's own example of shared server state
+-// (https://svelte.dev/docs/kit/state-management): a module's variable lives as
+-// long as the server, and every request reads the same one.
+-let cartCount = 0;
+-
+-export const load: PageServerLoad = ({ params }) => {
++export const load: PageServerLoad = ({ params, cookies }) => {
+   const store = getStore(params.storeId);
+   const menu = getMenu(params.storeId);
+   if (!store || !menu) error(404, "no such store");
+   return {
+     store,
+     menu,
+-    cartCount,
++    cartCount: lineCount(getCart(currentSession(cookies))),
+   };
+ };
+ 
+@@ -26,9 +20,9 @@ export const actions: Actions = {
+     if (!isMenuItem(params.storeId, item)) {
+       return fail(400, { error: `no menu item ${item}` });
+     }
+-    cartCount = lineCount(addToCart(ensureSession(cookies), item, 1));
++    addToCart(ensureSession(cookies), item, 1);
+   },
+   clear: async ({ cookies }) => {
+-    cartCount = lineCount(clearCart(ensureSession(cookies)));
++    clearCart(ensureSession(cookies));
+   },
+ };
