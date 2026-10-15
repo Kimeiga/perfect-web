@@ -56,7 +56,7 @@ import clock.{ minutes, Instant }
 import capability.{ Session, SessionId, User, UserId }
 import Events.{ MenuChanged, InventoryChanged, UserCartChanged, UserOrderChanged, AddressesChanged, StoreChanged }
 // TRACK SEAM (store-hours): each store's hours, and whether it is open.
-import store.hours.{ StoreStatus, StoresOpen, CartHours, hours_of_cart, closed_in, closing_said }
+import store.hours.{ StoreStatus, StoresOpen, CartHours, hours_of_cart, closing_said }
 // TRACK SEAM (order-total): the order's total, priced from the store's data.
 import store.checkout.{ Priced, Chosen, priced_for, shown_for, promo_for, promo_named, parts_of_cart,
     promo_said, set_tip, set_promo, negative_tip, dollars_typed, total_charged }
@@ -1125,8 +1125,8 @@ user page CartPage() {
                     Err(OrderError.AwaitingPayment) => notice = "An order of yours awaits its payment: pay it on your order's page.",
                     Err(OrderError.PaymentUnavailable) => notice = "Payment is unavailable just now. Try again in a moment.",
                     // Track `scheduled-orders`: the time chosen is an hour
-                    // away or less, or a store is not open then; the times
-                    // offered now are on its page.
+                    // away or less, or a store would take no order when its
+                    // stores are told; the times offered now are on its page.
                     Err(OrderError.NotOffered(_)) => notice = "The time you chose is no longer offered: choose another.",
                     Err(OrderError.Scheduled) => notice = "An order of yours is scheduled: you can place another once it is sent to its store.",
                 }}

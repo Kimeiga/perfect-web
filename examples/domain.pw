@@ -359,8 +359,9 @@ type OrderError =
     // (NEXT 6c): nothing is written, and the reader may press again.
     | PaymentUnavailable
     // The time the reader chose is no longer offered (track
-    // `scheduled-orders`): an hour away or less, or a store of the cart is
-    // not open then. The reader is shown the times offered now.
+    // `scheduled-orders`): an hour away or less, or a store of the cart
+    // would take no order when its stores are told for it. The reader is
+    // shown the times offered now.
     | NotOffered(Instant)
     // An order of the reader's is scheduled (track `scheduled-orders`): a
     // second is not placed beside it until it is sent to its stores.
