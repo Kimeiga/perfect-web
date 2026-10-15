@@ -318,6 +318,19 @@ pub(crate) trait Rows {
     /// `owner`'s latest order, its charges recorded.
     fn charge(&mut self, owner: &str, charged: &crate::checkout::Charged) -> Result<(), String>;
     fn charged(&mut self, owner: &str) -> Result<Option<crate::checkout::Charged>, String>;
+
+    // TRACK SEAM (scheduled-orders): an owner's order's time
+    // (`scheduled_orders.rs`), one for their latest order, as the payment it
+    // awaits is; `None` sets none.
+    fn order_time(
+        &mut self,
+        owner: &str,
+    ) -> Result<Option<crate::scheduled_orders::OrderTime>, String>;
+    fn set_order_time(
+        &mut self,
+        owner: &str,
+        time: Option<&crate::scheduled_orders::OrderTime>,
+    ) -> Result<(), String>;
 }
 
 /// **Where an operation's rows are**, each layer's: it runs `f` on them, in
@@ -357,7 +370,17 @@ const AWAITING: &str = "awaiting-payment";
 /// An order taken back before it was paid (step eight).
 const CANCELED: &str = "canceled";
 
-fn order_status(r: &mut dyn Rows, owner: &str, status: String) -> Result<Val, String> {
+pub(crate) fn order_status(r: &mut dyn Rows, owner: &str, status: String) -> Result<Val, String> {
+    // TRACK SEAM (scheduled-orders): a scheduled order carries its time.
+    if status == crate::scheduled_orders::SCHEDULED {
+        let time = r
+            .order_time(owner)?
+            .ok_or_else(|| format!("{owner}'s order is scheduled and has no time"))?;
+        return Ok(Val::Variant(
+            status,
+            Some(Box::new(crate::scheduled_orders::scheduled_val(&time))),
+        ));
+    }
     if status != AWAITING {
         return Ok(Val::Variant(status, None));
     }
@@ -395,11 +418,11 @@ fn take_back(r: &mut dyn Rows, owner: &str) -> Result<(), String> {
     r.set_awaiting(owner, None)
 }
 
-fn ok(v: Val) -> Vec<Val> {
+pub(crate) fn ok(v: Val) -> Vec<Val> {
     vec![Val::Result(Ok(Some(Box::new(v))))]
 }
 
-fn declared(case: &str) -> Vec<Val> {
+pub(crate) fn declared(case: &str) -> Vec<Val> {
     vec![Val::Result(Err(Some(Box::new(Val::Variant(
         case.into(),
         None,
@@ -1362,10 +1385,21 @@ pub(crate) fn writes(
         Arc::new(move |args: &[Val]| {
             let op = "user-orders#await-payment";
             let (owner, rest) = reader_of(op, args)?;
+            // TRACK SEAM (scheduled-orders): the time it is for, last, none
+            // for as soon as possible.
+            let Some((time, rest)) = rest.split_last() else {
+                return Err(format!("{op} received {args:?}"));
+            };
             let charged = crate::checkout::place_args(rest)?;
             w(&mut |r| {
-                if r.order(owner)?.is_some_and(|o| o.status == AWAITING) {
+                let current = r.order(owner)?.map(|o| o.status);
+                if current.as_deref() == Some(AWAITING) {
                     return Ok(declared("awaiting-payment"));
+                }
+                // TRACK SEAM (scheduled-orders): nor beside one scheduled,
+                // which is sent to its stores later.
+                if current.as_deref() == Some(crate::scheduled_orders::SCHEDULED) {
+                    return Ok(declared("scheduled"));
                 }
                 let lines = r.cart(owner)?;
                 if lines.is_empty() {
@@ -1387,6 +1421,10 @@ pub(crate) fn writes(
                         ..Default::default()
                     }),
                 )?;
+                // TRACK SEAM (scheduled-orders): for a time, with it.
+                if let Some(t) = crate::scheduled_orders::time_from(time, &reference)? {
+                    r.set_order_time(owner, Some(&t))?;
+                }
                 let mut written = placed.lock().expect("written");
                 written.wrote = true;
                 written.cart_total = Some(0);
@@ -1447,7 +1485,17 @@ pub(crate) fn writes(
                     && r.awaiting(owner)?
                         .is_some_and(|a| a.reference == *reference);
                 if awaits && status == "succeeded" {
-                    r.set_status(owner, Some("placed"))?;
+                    // TRACK SEAM (scheduled-orders): for a time, scheduled,
+                    // its stores told nothing yet; placed otherwise.
+                    let timed = r
+                        .order_time(owner)?
+                        .is_some_and(|t| t.reference == *reference);
+                    let settled = if timed {
+                        crate::scheduled_orders::SCHEDULED
+                    } else {
+                        "placed"
+                    };
+                    r.set_status(owner, Some(settled))?;
                     r.set_awaiting(owner, None)?;
                     wrote.lock().expect("written").wrote = true;
                 }
@@ -1587,6 +1635,11 @@ pub(crate) fn writes(
     // TRACK SEAM (order-total): the checkout's writes, and the host's.
     ops.extend(crate::checkout::writes(with.clone(), written.clone()));
     ops.extend(crate::checkout::host_writes(with.clone(), written.clone()));
+    // TRACK SEAM (scheduled-orders): the time chosen, and an order sent.
+    ops.extend(crate::scheduled_orders::writes(
+        with.clone(),
+        written.clone(),
+    ));
     ops.extend(host_writes(with, session, written));
     ops
 }
@@ -1920,6 +1973,8 @@ pub(crate) struct State {
     charged: BTreeMap<String, crate::checkout::Charged>,
     /// NEXT 6c: the payment each owner's order awaits.
     awaiting: BTreeMap<String, crate::payments::Awaiting>,
+    /// TRACK SEAM (scheduled-orders): each owner's order's time.
+    times: BTreeMap<String, crate::scheduled_orders::OrderTime>,
 }
 
 impl State {
@@ -1970,6 +2025,7 @@ impl State {
             choices: BTreeMap::new(),
             charged: BTreeMap::new(),
             awaiting: BTreeMap::new(),
+            times: BTreeMap::new(),
         }
     }
 }
@@ -2193,6 +2249,28 @@ impl Rows for MemRows {
     }
     fn charged(&mut self, owner: &str) -> Result<Option<crate::checkout::Charged>, String> {
         Ok(self.state.charged.get(owner).cloned())
+    }
+    // TRACK SEAM (scheduled-orders): an order's time, in memory.
+    fn order_time(
+        &mut self,
+        owner: &str,
+    ) -> Result<Option<crate::scheduled_orders::OrderTime>, String> {
+        Ok(self.state.times.get(owner).cloned())
+    }
+    fn set_order_time(
+        &mut self,
+        owner: &str,
+        time: Option<&crate::scheduled_orders::OrderTime>,
+    ) -> Result<(), String> {
+        match time {
+            Some(t) => {
+                self.state().times.insert(owner.to_string(), t.clone());
+            }
+            None => {
+                self.state().times.remove(owner);
+            }
+        }
+        Ok(())
     }
 }
 

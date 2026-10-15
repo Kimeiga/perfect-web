@@ -84,6 +84,12 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "0015_schedules",
         include_str!("../migrations/store/0015_schedules.sql"),
     ),
+    // TRACK SEAM (scheduled-orders): the time chosen at checkout, and an
+    // order's time.
+    (
+        "0016_scheduled_orders",
+        include_str!("../migrations/store/0016_scheduled_orders.sql"),
+    ),
 ];
 
 /// **The schema a deployment's store is in**, unless it names another.
@@ -465,6 +471,21 @@ impl Rows for PgRows<'_> {
     }
     fn charged(&mut self, owner: &str) -> Result<Option<crate::checkout::Charged>, String> {
         crate::checkout::pg_charged(&mut self.0, owner)
+    }
+
+    // TRACK SEAM (scheduled-orders): an order's time (`scheduled_orders.rs`).
+    fn order_time(
+        &mut self,
+        owner: &str,
+    ) -> Result<Option<crate::scheduled_orders::OrderTime>, String> {
+        crate::scheduled_orders::pg_order_time(&mut self.0, owner)
+    }
+    fn set_order_time(
+        &mut self,
+        owner: &str,
+        time: Option<&crate::scheduled_orders::OrderTime>,
+    ) -> Result<(), String> {
+        crate::scheduled_orders::pg_set_order_time(&mut self.0, owner, time)
     }
 
     fn stores(&mut self) -> Result<Vec<StoreRow>, String> {

@@ -1,0 +1,345 @@
+// @corpus: fixture
+// @id: E14-scheduled-orders
+// @category: an order placed for a time its reader chooses: the times
+//            offered by the cart's stores' hours, compared with the
+//            platform's clock, and the words a page says them in
+// @charter: §15.1, §15.4, §7.5
+// @milestone: E14
+//
+// Track `scheduled-orders` (NEXT, the DoorDash customer app's item 4, its last
+// step; the integrator's design of 2026-10-14). The reader chooses when, at
+// checkout, as they choose a tip: as soon as possible, or a fifteen-minute
+// window from an hour to a week ahead (Uber Eats' bounds) whose start every
+// store of the cart is open at, by each store's hours in its own zone
+// (ADR-0328). The windows are computed here, by comparing the clock with them
+// (ADR-0304), never by the page, so a page that shows them is told when the
+// first one's hour comes. `place_order` holds a time to them again, in its
+// transaction; a store closed now takes an order for a time it is open. Paid
+// now, the order is sent to its stores when its preparation is due: the
+// window's start less their estimates at their most (ADR-0180) and five
+// minutes more, DoorDash's lead.
+
+module store.scheduled
+
+import List
+import clock
+import Addresses
+import Carts
+import Estimates
+import Orders
+import Stores
+import domain.{ OrderStatus, OrderError, ScheduledFor, count }
+import capability.{ User, UserId }
+import clock.{ Instant, Weekday, minutes, hours }
+import store.hours.{ OpeningHours, OpeningHoursOf, Span, DaySpan, spans_on, joined, instant, last_order,
+    closed_in, weekday_said, hours_of_stores }
+import store.checkout.{ Priced, Chosen, shown_for, chosen_by }
+
+// **The time the reader chose, none for as soon as possible**, as their
+// other choices are set.
+fn set_time(reader: User<UserId>, when: Option<Instant>) -> Chosen !{ database.write<Carts> }
+    host "store:data/checkout#set-time"
+
+// **The time the reader chose**, none for as soon as possible.
+fn chosen_when(reader: User<UserId>) -> Option<Instant> !{ database.read<Carts> } {
+    chosen_by(reader).when
+}
+
+// --- the windows ------------------------------------------------------------
+
+// **A day's quarter hours**, 0 to 95.
+fn day_quarters() -> List<Int> !{} {
+    let none: List<Int> = []
+    List.fold([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23], none, (out, h) => List.concat(out, [h * 4, h * 4 + 1, h * 4 + 2, h * 4 + 3]))
+}
+
+// **Nine days' quarter hours**: a week from late in a day reaches into the
+// eighth day after it.
+fn quarters() -> List<Int> !{} {
+    let none: List<Int> = []
+    let day = day_quarters()
+    List.fold([0, 1, 2, 3, 4, 5, 6, 7, 8], none, (out, d) => List.concat(out, List.map(day, q => d * 96 + q)))
+}
+
+// **Each window that could be offered**: the quarter hours from midnight
+// today in `zone`, stepped along the clock, so a day the clocks change has
+// its own number of them, each its own instant.
+fn candidates(zone: clock.TimeZone) -> List<Instant> !{ clock.compare, clock.zone } {
+    let midnight = clock.at(clock.today_in(zone), clock.midnight(), zone)
+    List.map(quarters(), k => clock.later(midnight, minutes(15 * k)))
+}
+
+// **Whether a window is within reach now**: more than an hour ahead, and a
+// week ahead at most. Compared with the clock, so what shows it holds until
+// the hour before the first window comes.
+fn in_reach(at: Instant) -> Bool !{ clock.compare } {
+    !clock.passed(clock.earlier(at, hours(1))) & clock.passed(clock.earlier(at, hours(168)))
+}
+
+// **A store's spans as instants, from yesterday to eight days ahead**, in its
+// own zone (ADR-0328's spans, a day further than its week, as a window may
+// be).
+fn spans_ahead(h: OpeningHours) -> List<Span> !{ clock.compare, clock.zone } {
+    let zone = clock.zone(h.zone)
+    let today = clock.day_number(clock.today_in(zone))
+    let none: List<DaySpan> = []
+    let days = List.map([0, 1, 2, 3, 4, 5, 6, 7, 8, 9], d => today - 1 + d)
+    let each = List.fold(days, none, (out, n) => List.concat(out, spans_on(h, n)))
+    List.map(List.fold(each, none, (out, s) => joined(out, s)), s => Span {
+        opens: instant(s.from_day, s.from, zone),
+        closes: instant(s.to_day, s.to, zone),
+        last_order: last_order(s, h.last_order_minutes, zone),
+        days: s,
+    })
+}
+
+// **Whether a store is open at `at`**: a span of its has opened by then and
+// not yet closed (ADR-0328's open, at the window, not now).
+fn open_at(spans: List<Span>, at: Instant) -> Bool !{} {
+    List.any(spans, s => !clock.is_before(at, s.opens) & clock.is_before(at, s.closes))
+}
+
+// **The windows offered now**: those every store of the cart is open at,
+// within reach; none for an empty cart.
+fn windows(stores: List<OpeningHoursOf>) -> List<Instant> !{ clock.compare, clock.zone } {
+    let none: List<Instant> = []
+    match List.get(stores, 0) {
+        None => none,
+        Some(first) => {
+            let each = List.map(stores, s => spans_ahead(s.hours))
+            List.filter(candidates(clock.zone(first.hours.zone)), w => List.all(each, spans => open_at(spans, w)) & in_reach(w))
+        },
+    }
+}
+
+// Whether `a` and `b` are one instant.
+fn same_instant(a: Instant, b: Instant) -> Bool !{} {
+    !clock.is_before(a, b) & !clock.is_before(b, a)
+}
+
+// **Whether `at` is a window offered now**, as `choose_time` and
+// `place_order` hold a time to the windows: one of the first store's quarter
+// hours, every store of the cart open then, within reach.
+fn offered_at(stores: List<OpeningHoursOf>, at: Instant) -> Bool !{ clock.compare, clock.zone } {
+    match List.get(stores, 0) {
+        None => false,
+        Some(first) => List.any(candidates(clock.zone(first.hours.zone)), w => same_instant(w, at)) & List.all(stores, s => open_at(spans_ahead(s.hours), at)) & in_reach(at),
+    }
+}
+
+// **Why an order is refused by when it is for, or nothing**: as soon as
+// possible, while a store of the cart is closed or past its last order (track
+// `store-hours`); a time, where it is no longer offered, though a store be
+// closed now.
+fn held_to(stores: List<OpeningHoursOf>, when: Option<Instant>) -> Option<OrderError> !{ clock.compare, clock.zone } {
+    match when {
+        None => match closed_in(stores) {
+            Some(closing) => Some(OrderError.Closed(closing)),
+            None => None,
+        },
+        Some(at) => if offered_at(stores, at) {
+            None
+        } else {
+            Some(OrderError.NotOffered(at))
+        },
+    }
+}
+
+// **What an order for `when` is scheduled for**, none for as soon as
+// possible: sent to its stores the time less their estimates to the reader at
+// their most and five minutes more (DoorDash's lead), and said in its first
+// store's zone. An estimate that cannot be made counts for nothing beyond the
+// five minutes.
+fn timed_for(stores: List<OpeningHoursOf>, when: Option<Instant>, reader: User<UserId>) -> Option<ScheduledFor> !{ clock.zone, database.read<Estimates>, database.read<Addresses> } {
+    match when {
+        None => None,
+        Some(at) => match List.get(stores, 0) {
+            None => None,
+            Some(first) => {
+                let most = List.fold(stores, 0, (m, s) => match Addresses.estimate_to(s.store, reader) {
+                    Ok(e) => if count(e.max_minutes) > m { count(e.max_minutes) } else { m },
+                    Err(_) => m,
+                })
+                Some(scheduled_for(at, clock.earlier(at, minutes(most + 5)), clock.zone(first.hours.zone)))
+            },
+        },
+    }
+}
+
+// **An order's time, with its day and time in `zone`**, which a page words.
+fn scheduled_for(at: Instant, sends: Instant, zone: clock.TimeZone) -> ScheduledFor !{ clock.zone } {
+    ScheduledFor { at: at, sends: sends, day: clock.weekday(clock.date_of(at, zone)), time: clock.time_of(at, zone) }
+}
+
+// --- words --------------------------------------------------------------------
+
+// **"6:30 PM"**, a minute of a day as en-US writes a time.
+fn clock_time_said(minute: Int) -> String !{} {
+    let h = minute / 60
+    let m = minute % 60
+    let hour = if h == 0 { 12 } else if h > 12 { h - 12 } else { h }
+    let half = if h < 12 { "AM" } else { "PM" }
+    let pad = if m < 10 { "0" } else { "" }
+    "{hour}:{pad}{m} {half}"
+}
+
+// **"Thu"**.
+fn weekday_short(w: Weekday) -> String !{} {
+    match w {
+        Monday => "Mon",
+        Tuesday => "Tue",
+        Wednesday => "Wed",
+        Thursday => "Thu",
+        Friday => "Fri",
+        Saturday => "Sat",
+        Sunday => "Sun",
+    }
+}
+
+// **"Thu 6:30 PM"**: when a scheduled order is for, in its first store's
+// zone, as its page says it, from the data alone.
+fn scheduled_said(s: ScheduledFor) -> String !{} {
+    "{weekday_short(s.day)} {clock_time_said(clock.minute_of_day(s.time))}"
+}
+
+// **When the reader's order is scheduled for, in words**, from its status
+// alone, as its page computes it; nothing where it is not scheduled.
+fn when_scheduled(order: Option<OrderStatus>) -> String !{} {
+    match order {
+        Some(status) => match status {
+            OrderStatus.Scheduled(s) => scheduled_said(s),
+            _ => "",
+        },
+        None => "",
+    }
+}
+
+// **A window as the checkout says it**, in `zone`.
+fn window_said(at: Instant, zone: clock.TimeZone) -> String !{ clock.zone } {
+    scheduled_said(scheduled_for(at, at, zone))
+}
+
+// **What the checkout says of when**: as soon as possible; the time chosen,
+// while it is offered; or that it is no longer.
+fn when_said(stores: List<OpeningHoursOf>, when: Option<Instant>) -> String !{ clock.compare, clock.zone } {
+    match when {
+        None => "As soon as possible",
+        Some(at) => match List.get(stores, 0) {
+            None => "As soon as possible",
+            Some(first) => if offered_at(stores, at) {
+                "Scheduled for {window_said(at, clock.zone(first.hours.zone))}"
+            } else {
+                "{window_said(at, clock.zone(first.hours.zone))} is no longer offered: choose another time."
+            },
+        },
+    }
+}
+
+// **The checkout, priced, and what it says of when**: `shown_for`'s, the
+// time chosen worded from the cart's stores' hours.
+fn checkout_shown(reader: User<UserId>) -> Priced !{ database.read<Carts>, database.read<Stores>, database.read<Orders>, clock.compare, clock.zone } {
+    let p = shown_for(reader)
+    let stores = hours_of_stores(List.map(p.charged.parts, part => part.store))
+    Priced {
+        charged: p.charged,
+        charges: p.charges,
+        promo: p.promo,
+        tip: p.tip,
+        said: p.said,
+        any: p.any,
+        discount_said: p.discount_said,
+        when: p.when,
+        when_said: when_said(stores, p.when),
+    }
+}
+
+// --- the page of times ----------------------------------------------------------
+
+// **A window the page offers**: its start; its place among the day's, the
+// page's key; and how the page says it, alone and with its day.
+type Window = Window { start: Instant, key: Int, said: String, whole: String }
+
+// **A day with windows**: its number, as the page's address names it, and
+// what the page calls it.
+type DayShown = DayShown { key: String, said: String }
+
+// **What the page of times shows**: what the checkout says of when; the days
+// with windows; the day shown, and its windows.
+type TimesShown = TimesShown { said: String, days: List<DayShown>, day: String, windows: List<Window> }
+
+// A day's windows, by its number.
+type OfferedDay = OfferedDay { number: Int, said: String, windows: List<Instant> }
+
+// **"Today", "Tomorrow", a weekday, or "Next" one a week on.**
+fn day_said(n: Int, today: Int) -> String !{} {
+    if n == today {
+        "Today"
+    } else if n == today + 1 {
+        "Tomorrow"
+    } else if n >= today + 7 {
+        "Next {weekday_said(clock.weekday(clock.numbered_day(n)))}"
+    } else {
+        weekday_said(clock.weekday(clock.numbered_day(n)))
+    }
+}
+
+// **Day `n`'s windows among `offered`**: those from its midnight in `zone`
+// to the next.
+fn offered_day(n: Int, today: Int, zone: clock.TimeZone, offered: List<Instant>) -> OfferedDay !{ clock.zone } {
+    let starts = clock.at(clock.numbered_day(n), clock.midnight(), zone)
+    let ends = clock.at(clock.numbered_day(n + 1), clock.midnight(), zone)
+    OfferedDay {
+        number: n,
+        said: day_said(n, today),
+        windows: List.filter(offered, w => !clock.is_before(w, starts) & clock.is_before(w, ends)),
+    }
+}
+
+// **A day's windows as the page offers them**, each said in `zone`.
+fn windows_of(day: OfferedDay, zone: clock.TimeZone) -> List<Window> !{ clock.zone } {
+    let none: List<Window> = []
+    List.fold(day.windows, none, (out, w) => List.concat(out, [window(w, List.length(out), day.said, zone)]))
+}
+
+// **A window as the page offers it**, its place `key` among its day's.
+fn window(at: Instant, key: Int, day: String, zone: clock.TimeZone) -> Window !{ clock.zone } {
+    let said = clock_time_said(clock.minute_of_day(clock.time_of(at, zone)))
+    Window { start: at, key: key, said: said, whole: "{day}, {said}" }
+}
+
+// **What the page of times shows** for the cart's stores, the time chosen,
+// and the day its address names, the first with windows where it names none
+// of them.
+fn times_shown(stores: List<OpeningHoursOf>, when: Option<Instant>, day: Option<String>) -> TimesShown !{ clock.compare, clock.zone } {
+    let said = when_said(stores, when)
+    let no_days: List<DayShown> = []
+    let no_windows: List<Window> = []
+    match List.get(stores, 0) {
+        None => TimesShown { said: said, days: no_days, day: "", windows: no_windows },
+        Some(first) => {
+            let zone = clock.zone(first.hours.zone)
+            let today = clock.day_number(clock.today_in(zone))
+            let offered = windows(stores)
+            let days = List.filter(List.map([0, 1, 2, 3, 4, 5, 6, 7, 8], d => offered_day(today + d, today, zone, offered)), d => List.length(d.windows) > 0)
+            let named = match day {
+                Some(key) => match List.find(days, d => "{d.number}" == key) {
+                    Some(d) => Some(d),
+                    None => List.get(days, 0),
+                },
+                None => List.get(days, 0),
+            }
+            TimesShown {
+                said: said,
+                days: List.map(days, d => DayShown { key: "{d.number}", said: d.said }),
+                day: match named {
+                    Some(d) => d.said,
+                    None => "",
+                },
+                windows: match named {
+                    Some(d) => windows_of(d, zone),
+                    None => no_windows,
+                },
+            }
+        },
+    }
+}

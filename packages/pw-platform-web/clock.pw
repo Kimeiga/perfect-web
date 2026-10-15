@@ -46,6 +46,25 @@ fn hours(n: Int) -> Duration !{} {
     Duration(n * 3600000)
 }
 
+// **`at`, `by` later, and `by` earlier** (track `scheduled-orders`): an
+// instant moved along the clock, never read from it. A window's start an
+// hour or a week earlier, which `passed` compares; the start less its
+// store's preparation, when the store is told.
+fn later(at: Instant, by: Duration) -> Instant !{} {
+    Instant(at.value + by.value)
+}
+
+fn earlier(at: Instant, by: Duration) -> Instant !{} {
+    Instant(at.value - by.value)
+}
+
+// **Whether `a` is before `b`** (track `scheduled-orders`): two instants
+// ordered, as a window's start against a store's opening and closing. The
+// clock itself is compared by `passed` alone.
+fn is_before(a: Instant, b: Instant) -> Bool !{} {
+    a.value < b.value
+}
+
 // --- the clock a kept value reads, and the calendar (ADR-0304) ----------------
 
 // **A time zone**: an IANA name, as the host's tz database names it

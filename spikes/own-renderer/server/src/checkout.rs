@@ -67,11 +67,14 @@ pub(crate) enum Tip {
     Amount(i64),
 }
 
-/// **What a reader chose at checkout**: a tip, none at first, and a code.
+/// **What a reader chose at checkout**: a tip, none at first, and a code;
+/// and (track `scheduled-orders`) the time the order is for, in milliseconds
+/// since 1970, none for as soon as possible.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub(crate) struct Chosen {
     pub(crate) tip: Tip,
     pub(crate) promo: Option<String>,
+    pub(crate) when: Option<i64>,
 }
 
 /// **One store's part of an order, as charged** (the integrator's ruling of
@@ -276,6 +279,11 @@ pub(crate) fn chosen_val(c: &Chosen) -> Val {
         (
             "promo".into(),
             Val::Option(c.promo.clone().map(|p| Box::new(Val::String(p)))),
+        ),
+        // TRACK SEAM (scheduled-orders): the time chosen.
+        (
+            "when".into(),
+            Val::Option(c.when.map(|at| Box::new(Val::S64(at)))),
         ),
     ])
 }
@@ -760,9 +768,11 @@ fn tip_parts(t: &Tip) -> (&'static str, i64) {
 }
 
 pub(crate) fn pg_chosen(c: &mut Counted<'_>, owner: &str) -> Result<Chosen, String> {
+    // TRACK SEAM (scheduled-orders): and the time chosen, in the same row.
     let row = c
         .query_opt(
-            "SELECT tip_kind, tip_amount, promo FROM checkout_choices WHERE owner = $1",
+            "SELECT tip_kind, tip_amount, promo, scheduled_for FROM checkout_choices \
+             WHERE owner = $1",
             &[&owner],
         )
         .map_err(pg)?;
@@ -779,6 +789,7 @@ pub(crate) fn pg_chosen(c: &mut Counted<'_>, owner: &str) -> Result<Chosen, Stri
                     _ => Tip::None,
                 },
                 promo: r.get(2),
+                when: r.get(3),
             }
         }
     })
@@ -791,11 +802,11 @@ pub(crate) fn pg_set_chosen(
 ) -> Result<(), String> {
     let (kind, amount) = tip_parts(&chosen.tip);
     c.execute(
-        "INSERT INTO checkout_choices (owner, tip_kind, tip_amount, promo) \
-         VALUES ($1, $2, $3, $4) ON CONFLICT (owner) DO UPDATE SET \
+        "INSERT INTO checkout_choices (owner, tip_kind, tip_amount, promo, scheduled_for) \
+         VALUES ($1, $2, $3, $4, $5) ON CONFLICT (owner) DO UPDATE SET \
              tip_kind = EXCLUDED.tip_kind, tip_amount = EXCLUDED.tip_amount, \
-             promo = EXCLUDED.promo",
-        &[&owner, &kind, &amount, &chosen.promo],
+             promo = EXCLUDED.promo, scheduled_for = EXCLUDED.scheduled_for",
+        &[&owner, &kind, &amount, &chosen.promo, &chosen.when],
     )
     .map_err(pg)?;
     Ok(())
