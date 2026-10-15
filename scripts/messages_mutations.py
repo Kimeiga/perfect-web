@@ -38,6 +38,15 @@ BROWSER = "browser"
 PROGRAM = "program in the browser"
 
 # (what is undone, which tests, file, anchor, replacement)
+# The mutants the checker refuses, by the rule that is the protection each
+# takes away (`scripts/mutant_programs.py`): every other mutant here
+# leaves a program that checks.
+CHECKED = {
+    "the conversation is cached shared, every reader's": {'PW5001'},
+    'a follow does not open the composer: the conversation listens for no follow': {'PW5106'},
+    'reading reaches no other session: it invalidates nothing': {'PW5106'},
+}
+
 MUTANTS = [
     (
         "a third user sees a conversation: its rows are anyone's with either user",
