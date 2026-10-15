@@ -28,7 +28,7 @@ say. Built in this order, each its own track:
    decision 1's refusal and decision 2's statement, with the corpus
    checked against them (decision 4).
 3. **The conformance suite**, which is one suite with the three-database
-   note's decision 5.5 (ruled 2026-10-15): written once against the
+   note's decision 5.5 (ADR-0338, ruled 2026-10-15): written once against the
    `DataLayer` seam, run first against today's hand-written layers (memory
    and PostgreSQL, at two data sizes), and generated for every declared
    table later.

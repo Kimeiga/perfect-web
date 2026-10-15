@@ -23,6 +23,28 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0338, 2026-10-15: one app on three kinds of database, each held to
+what it gives** (a design note, track `threedb-design`, merged from
+`b60a9c71`; ruled by the integrator 2026-10-15). Docs only: nothing is
+built yet.
+- An app's data is declared in Pleris (`table`: its row, key, order,
+  indexes, uniqueness, references and bound), and one generic adapter per
+  database implements every app's, so that no app needs Rust; migrations
+  come from the declarations, and one conformance suite runs on every
+  layer. The store is placed on three sources, each held to what its
+  database gives (ADR-0207), with several layers in one host, a change
+  told to every host, and a command across sources.
+- The ruling amends its names (a set form ends in `_many`), its codes
+  (PW0354 to PW0366, declaration rules) and its suite (one with the 4c
+  note's, ADR-0337); TodoMVC is D2's first app with no Rust data layer.
+- Built as the note's tracks: D1 `tables` (in flight on `track/tables`),
+  then D2 the memory adapter with TodoMVC, D3 the PostgreSQL adapter, D4
+  and D5 the feed and the store declared, T1 several sources, T2 SQLite;
+  none downloads anything. The owner's decisions 1 to 7 (which database of
+  each pair, the downloads, what runs where) come before T3 (MongoDB), T4
+  (Cassandra or ScyllaDB) or T5 (CockroachDB) starts.
+Verify TRAIN_RUN green, with train-8.
+
 **2026-10-15: Pleris is developed on Windows inside WSL2** (the move to the
 owner's PC; track `pc-setup`, merged from `c7f4630b`).
 - A clone is LF on every platform: a root `.gitattributes` (`* text=auto

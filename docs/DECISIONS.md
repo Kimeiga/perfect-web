@@ -2959,3 +2959,10 @@ the integrator 2026-10-14; nothing built yet).
   it (`sets`, PW0406) and measured by one conformance suite; the store's
   composites moved above the seam. Built in order: the render merge, the
   checker's rules, the suite, the composites.
+[ADR-0338](DECISIONS/ADR-0338-three-databases.md):
+one app on three kinds of database, each held to what it gives (a design
+note, ruled by the integrator 2026-10-15; nothing built yet).
+- An app's data declared in Pleris (`table`), one generic adapter per
+  database implementing every app's, no app-specific Rust; one conformance
+  suite, the 4c note's; built as tracks D1 to D5 and T1 to T6, the owner's
+  decisions 1 to 7 before T3, T4 or T5.

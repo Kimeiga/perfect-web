@@ -1281,7 +1281,20 @@ E14 comes before E11-E13. Its plan, controls and task list are
              Each crate, npm package or server download, and running any of
              these servers locally, waits for the owner's approval, asked
              when it is reached; containers in CI are preferred, and nothing
-             is installed on the owner's machine without asking;
+             is installed on the owner's machine without asking.
+
+             **Ruled** (ADR-0338, the integrator, 2026-10-15): an app's data
+             declared in Pleris, one generic adapter per database
+             implementing every app's, no app-specific Rust; built as the
+             note's tracks, in order. **D1 `tables`**, the declaration, is in
+             flight on `track/tables`; **D2 the memory adapter** (the table
+             primitives and the generated conformance suite, with TodoMVC
+             the first app with no Rust data layer) is next; then D3 to D5,
+             T1 and T2, which download nothing. **The owner's decisions 1 to
+             7** (the note's last section: which database of each pair,
+             their downloads, what runs on the PC and on CI, CockroachDB,
+             the Cassandra slice, the store's program changes) are asked
+             before T3, T4 or T5 starts;
         - then what ruling 0073-a still refuses (several values, a page's
           parameter, the browser's values inside a block, instances), and
           everything below;
