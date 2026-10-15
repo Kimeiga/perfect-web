@@ -797,29 +797,28 @@ E14 comes before E11-E13. Its plan, controls and task list are
              text; a plain `<form method="get">` and a link make the
              address. W6's kiokun search box and W9's store search move to
              it;
-          4b. **a read is a bounded number of statements on PostgreSQL**
-             (the integrator's finding, 2026-10-12): the store's logic is
-             written once over the layer's rows, a store's or a menu's at a
-             time, and on PostgreSQL each is a statement. `place_order`'s
-             reach runs one per line and store, a reader's search one per
-             store it found (each reading every store), and the hours one
-             per store. Every read and command counted (the layer's
-             statements, as Django's `assertNumQueries` and Rails'
-             `assert_queries_count` count them) at the seed and with fifty
-             stores more, pinned and equal at both; rows read by set
-             (`= ANY($1)`), a scan in memory; mutants restore each loop.
-             W9's, after 6b, on the counter W9's search brings;
+          4b. ~~**a read is a bounded number of statements on PostgreSQL**~~
+             (ADR-0336, merged 2026-10-15 on train-8, W9's, `just
+             e14-bounded-statements`): rows read by set (`= ANY($1)`), a
+             scan in memory; every operation, page and command counted at
+             the seed and with fifty stores more, pinned and equal at both;
+             mutants restore each loop;
           4c. **a read is bounded by construction** (the owner's proposal,
-             the integrator's ruling of 2026-10-13, PARALLEL.md): a page's
+             the integrator's ruling of 2026-10-13, PARALLEL.md; W9's design
+             note ADR-0337, ruled 2026-10-14, merged on train-8): a page's
              and a command's source calls bounded by its text, a read keyed
-             by a loop's element refused with its set read as the repair,
-             the host coalescing its own sibling bindings; each source
-             operation's cost per call stated with its guarantees
-             (ADR-0207) and measured by a conformance suite every layer
-             runs at two data sizes; the budget, calls times cost, recorded
-             as evidence and checked against the host's counter. W9's,
-             after 4b, a design note first, its shape an ADR; before the
-             capability matrix's apps;
+             by a loop's element refused with its set read as the repair;
+             each source operation's cost per call stated with its
+             guarantees (ADR-0207) and measured by a conformance suite every
+             layer runs at two data sizes; the budget, calls times cost,
+             recorded as evidence and checked against the host's counter.
+             Built in the ruling's order, each its own track: (1) the render
+             merge, one snapshot per render and identical calls made once
+             (track `render-merge`, in flight); (2) PW0405, `set` pairs,
+             `sets` and PW0406 (track `bounded-checker`, in flight); (3) the
+             conformance suite, one with the three-database note's decision
+             5.5; (4) the store's composites moved above the seam, one at a
+             time. Before the capability matrix's apps;
           5. ~~**idempotency committed with the writes**~~ (ADR-0325,
              merged 2026-10-12): an interaction's answer commits in its
              command's transaction, on both layers, and answers a day;
@@ -855,6 +854,14 @@ E14 comes before E11-E13. Its plan, controls and task list are
             as the scheduled-commands track and C24 did; the 142 before are
             added a family at a time (Syntax's 22, Resolution's 10, UiState's
             10 and Capability's 5 first, none exercised);
+          - **the host's engine refuses function references** (ADR-0335's
+            answer, 2026-10-15): `wasm_function_references(false)` in
+            `engine::engine_config()` refuses RUSTSEC-2026-0359's types by
+            configuration, where Wasmtime 48.0.6 alone closes it today; the
+            backend's only reference is a `funcref` table behind
+            `call_indirect`. A hardening track of its own: a test that the
+            engine refuses them, and a full run, the development server's
+            suites among them;
           - **a program's declaration of another origin** (ADR-0195's
             ruling 13, its last clause; ADR-0333 built the rest): an origin a
             program declares, which its pages' policy allows and PW5052 lets
@@ -1207,7 +1214,18 @@ E14 comes before E11-E13. Its plan, controls and task list are
 
              Any npm or crates.io download it needs (Yjs, yrs, Automerge,
              ProseMirror, ...) waits for the owner's approval, asked when
-             it is reached;
+             it is reached.
+
+             **Ruled** (ADR-0339, the integrator, 2026-10-15): concurrent
+             edits merge in Automerge, behind `replicated`'s `rich_text`
+             policy; Pleris renders every reader's document, and an
+             editor's page mounts ProseMirror at the page's authority; presence
+             and sync ride the stream down, one sync request up. No
+             app-specific Rust: the app's own data is declared as tables on
+             the generic adapters (ADR-0338), so its phase 3 waits for D3.
+             **Its downloads wait for the owner** (the note's "Downloads for
+             the owner's approval", owner decision 2): no track that needs
+             one starts before the owner approves it;
           2. **end-to-end-encrypted direct messages**, ADR-0279's upgraded
              (the owner, relayed 2026-10-08), after the Docs app because both
              need the same foundation, data and computation that live in the
@@ -1274,7 +1292,20 @@ E14 comes before E11-E13. Its plan, controls and task list are
              Each crate, npm package or server download, and running any of
              these servers locally, waits for the owner's approval, asked
              when it is reached; containers in CI are preferred, and nothing
-             is installed on the owner's machine without asking;
+             is installed on the owner's machine without asking.
+
+             **Ruled** (ADR-0338, the integrator, 2026-10-15): an app's data
+             declared in Pleris, one generic adapter per database
+             implementing every app's, no app-specific Rust; built as the
+             note's tracks, in order. **D1 `tables`**, the declaration, is in
+             flight on `track/tables`; **D2 the memory adapter** (the table
+             primitives and the generated conformance suite, with TodoMVC
+             the first app with no Rust data layer) is next; then D3 to D5,
+             T1 and T2, which download nothing. **The owner's decisions 1 to
+             7** (the note's last section: which database of each pair,
+             their downloads, what runs on the PC and on CI, CockroachDB,
+             the Cassandra slice, the store's program changes) are asked
+             before T3, T4 or T5 starts;
         - then what ruling 0073-a still refuses (several values, a page's
           parameter, the browser's values inside a block, instances), and
           everything below;

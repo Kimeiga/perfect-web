@@ -13861,6 +13861,9 @@ public query Store(",
     mod store_hours;
     // TRACK SEAM (order-total): an order's total.
     mod order_total;
+    // TRACK SEAM (bounded-statements): a read is a bounded number of
+    // statements on PostgreSQL (NEXT 4b).
+    mod bounded_statements;
     /// What a page this host serves may load and run (`csp`).
     mod page_policy;
     // TRACK SEAM (payments): an order awaiting its payment, and settled.

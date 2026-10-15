@@ -1,8 +1,8 @@
 ADR-0290 - a verification run is dealt by the seconds its recipes last took
 
 produced by: just e14-dealt-by-time
-commit: 2fad034d799482be4add99c326919c49cf0f48ff
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38629460236 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 1824590b8d4c62d9923e4af049c525eecbd24977
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38773359015 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 python: Python 3.12.3
 
 == the plan and the fetch (scripts/tests/test_ci_scripts.py)
@@ -74,7 +74,7 @@ test_master_plans_from_the_newest_commit_a_run_passed_at (scripts.tests.test_ci_
 test_the_browser_suites_run_again_only_where_more_than_records_changed (scripts.tests.test_ci_scripts.VerifiedBase.test_the_browser_suites_run_again_only_where_more_than_records_changed) ... ok
 test_the_runs_are_read_through_gh_by_their_commit (scripts.tests.test_ci_scripts.VerifiedBase.test_the_runs_are_read_through_gh_by_their_commit) ... ok
 test_where_no_run_passed_master_plans_from_the_commit_before (scripts.tests.test_ci_scripts.VerifiedBase.test_where_no_run_passed_master_plans_from_the_commit_before) ... ok
-Ran 67 tests in 11.064s
+Ran 67 tests in 6.719s
 OK
 
 == mutation controls (scripts/dealt_by_time_mutations.py)
