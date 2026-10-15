@@ -17,7 +17,8 @@ in the same commit.
 - **not built here**: charter §2's "Do not initially build" list, or the
   owner's scope.
 
-Checked against `master` at `5da9c055` (2026-10-14), ADR-0001 to ADR-0334.
+Checked against train-8 (`track/train-8`, 2026-10-15): `master` at `bb2847f6`
+and the train's merges, ADR-0001 to ADR-0339.
 
 ## Built
 
@@ -40,7 +41,7 @@ Checked against `master` at `5da9c055` (2026-10-14), ADR-0001 to ADR-0334.
 | Recovery and reload | 0155, 0175, 0176, 0177 | |
 | A command outliving its page | 0268 | Within the Fetch standard's 64 KiB kept alive. |
 | Resumability | 0110, 0113, 0132, 0134, 0135, 0137, 0139, 0217, 0300 | A build is named by what it built, and the resume decision holds a document to the schema and scope its build says of its page (0300). Across deployments is risk R5, open: a page open across a deployment keeps its old table and document, and that skew is a deployment's (E8). Entries' generation is still the host's constant. |
-| Capabilities, WIT components, Wasm | 0006, 0008, 0020, 0026, 0032, 0033, 0116, 0244, 0262, 0266, 0267, 0283, 0287, 0291, 0317 | A component imports each host operation its compiled code calls, and a handler's work is held where it runs, in the browser (0283, 0287). A call through a local is charged its namesake's effects, which refuses work and grants none (0283). A frame phase's work is still held to a page's declared placement (0287). A component is compiled once a process; a host that loaded many builds would keep each one's, and none reloads a build yet (0317). |
+| Capabilities, WIT components, Wasm | 0006, 0008, 0020, 0026, 0032, 0033, 0116, 0244, 0335, 0262, 0266, 0267, 0283, 0287, 0291, 0317 | A component imports each host operation its compiled code calls, and a handler's work is held where it runs, in the browser (0283, 0287). A call through a local is charged its namesake's effects, which refuses work and grants none (0283). A frame phase's work is still held to a page's declared placement (0287). A component is compiled once a process; a host that loaded many builds would keep each one's, and none reloads a build yet (0317). |
 | Routing and not found | 0160, 0162, 0163, 0190, 0231, 0295, 0309 | A route's query part (`/search{?q}`) is typed text, `None` when the address leaves it out, and a plain GET form is checked against the route's names (0309). A page can say its address is another address of the page: 308 or 307 to its own route, carrying the route's one parameter and the address's query (0295). A move to another page, or one that adds to the query, is not expressed (0295); a list parameter and a typed number are not read (0309). A program cannot declare its own 404 view. |
 | Navigation and layouts | 0160, 0280, 0300, 0303, 0306, 0312 | Links; `navigate` after a command commits, the next page read after the commit (0280). A page names its layout, and a navigation between two pages of one layout and one build keeps the layout in place and shows the next page in it, for a link, a `navigate` and back and forward (0303, 0306). One layout, unnested, given nothing, with one slot and no title template (0303). A page of another layout or build, or with none, is loaded whole; a loop or a view that contains itself is taken whole; no view transition and no prefetch; the document left stays on the host until it is idle, 120 seconds (0306). A stopped navigation is noticed in Chromium only (0280). A link's path arguments are untyped (0280). |
 | XSS and CSRF | 0094–0097, 0258, 0333 | Every HTML answer carries a Content-Security-Policy generated from the build and the deployment (scripts and styles by hash, the payment provider framed only where a page frames it), every answer carries `nosniff`, and the build refuses a load from another origin (PW5052) (0333). A program cannot declare another origin; an address a value chooses loads from this origin alone, and nothing at build says so; no `report-to`, so a deployment hears of no refusal; no Trusted Types; one policy for a build's every page. |
@@ -55,7 +56,7 @@ Checked against `master` at `5da9c055` (2026-10-14), ADR-0001 to ADR-0334.
 | Accounts | 0258, 0263, 0264, 0265, 0270, 0318 | Pleris is the relying party (PKCE, CSRF); a typed principal; the feed and the store both use accounts, and a guest's cart joins the user's at sign-in (0318). | A development provider only, which refuses to run outside a loopback development deployment, and no other provider exists; no OIDC discovery, JWKS or ID-token check; sessions in memory (`track/second-host` is persisting them); no email, recovery, account linking or sign-in rate limits. Google is the owner's choice of first real provider, through a generic OIDC relying party (NEXT, the production path). |
 | Forms | 0142, 0143, 0221, 0227, 0265, 0309, 0319, 0331 | `bind:value` for a `String`, a textarea, labels, routes checked; a plain GET form checked against its route (0309); a handler sends a sum type (0331). The store saves, renames, removes and chooses delivery addresses, and checks out, with these (0319, 0329). | No checkbox or `<select>` binding; a form as one typed record waits (0131); nothing multi-step. |
 | Multi-tenancy | 0107, 0128, 0263, 0264 | A tenant in a cache key; an `Organization` label. | `current_organization()` is bound to `pw:host/organization#read`, which no host answers; no tenant model. |
-| Database independence | 0005, 0019, 0207, 0218, 0246, 0298, 0308, 0318, 0325, 0334 | The feed and the store each run in memory and on PostgreSQL behind one seam (the store's operations are written once over `Rows`); a source states its guarantees and the host holds the layer to them. The store's whole server suite runs on either layer. Search, interaction records, scheduled runs and owners' rows are in both layers. | Each data layer is written by hand in Rust, about 5,800 lines in `store.rs`, `store_pg.rs`, `feed.rs` and `feed_pg.rs`; PostgreSQL is the only database; one host (0246); the browser suite runs the store in memory; the store's reads grow with the data on PostgreSQL until NEXT 4b and 4c land (in flight). |
+| Database independence | 0005, 0019, 0207, 0218, 0246, 0298, 0308, 0318, 0325, 0334, 0336, 0337, 0338 | The feed and the store each run in memory and on PostgreSQL behind one seam (the store's operations are written once over `Rows`); a source states its guarantees and the host holds the layer to them. The store's whole server suite runs on either layer. Search, interaction records, scheduled runs and owners' rows are in both layers. | Each data layer is written by hand in Rust, about 5,800 lines in `store.rs`, `store_pg.rs`, `feed.rs` and `feed_pg.rs`; PostgreSQL is the only database; one host (0246); the browser suite runs the store in memory. The store's reads are set reads, and each operation's, page's and command's statements are pinned on PostgreSQL, equal at two data sizes (0336); a read is not yet bounded by construction (0337, ruled: `track/render-merge` and `track/bounded-checker` in flight). |
 | Third-party APIs | 0026, 0148, 0262, 0332 | `network.fetch` declared and granted; a host binding's shape checked. The host calls the payment provider over plain HTTP, waiting ten seconds at most, and checks the signature of the provider's webhooks (0332). | The host has no general outbound HTTP client and no TLS, so no real provider (a Stripe test-mode adapter waits for the owner to approve its crates); the recommender is simulated in process; nothing sends a webhook. |
 | Payments | 0332, 0334 | A payment flow against a development provider: a command the provider's signed word invokes settles an order (`invoked_by Payments`, HMAC-SHA256, five minutes either way); an order awaits its payment, and is taken back by its reader or by a sweep thirty minutes on; a provider that cannot be reached places nothing; the host holds the key and a program never does. | No real provider; no refunds, held captures or disputes; the reader's return is no second trigger; the provider is asked inside the command's transaction, so an intent begun for a command that then rolls back stays at the provider; `Secret<C>` does not build in a program; `examples/lib/Payments.pw`'s `capture` and `charge` are still `todo` fixtures. |
 | Search | 0037, 0041, 0207, 0308, 0309, 0313–0316 | kiokun: a search page over the whole dictionary (834,036 rows; kiokun.com's two FTS5 statements run in SQLite behind host operations, and the term expansion, grouping, scoring and page are Pleris), the reading index and homophones, and deinflection by rules of our own, each held to kiokun.com's own code where it runs alone (for the search, 351 of 355 sampled queries answer the same, and kiokun.com fails the other four). The store: stores and dishes found by name, cuisine and category in the data layer, on memory and PostgreSQL, to one stated meaning, from a plain GET form, filtered to the stores that reach the reader's chosen address (0308). | No search source an app declares: "a program cannot yet declare a full-text index or its ranking" (0314). The store's search folds no accent or stem, corrects nothing, ranks by no distance, rating or popularity, does not page, and reads every row (`LIKE`, no index). kiokun's `/api/search` has no route form (Pleris has none that answers JSON); Korean is not deinflected. |
@@ -72,17 +73,17 @@ Checked against `master` at `5da9c055` (2026-10-14), ADR-0001 to ADR-0334.
 | Email, outgoing webhooks and recurring jobs | A `task` declaration kind is parsed and does nothing (its signature skipped, Koka refusing it); `task.spawn` is checked statically (PW2001–PW2003); `pw-tasks` (0016) has Rust tests only, no timers, and the host does not use it. A command can be scheduled to run once (Built, 0334); there is no recurring schedule, no email and no outgoing webhook. The host hears one kind of webhook, the payment provider's, signed (0332). | The SaaS admin app. |
 | Charts and dashboards | None. | The SaaS admin app. |
 | i18n and l10n: locales, currencies, plurals, RTL | A locale as a cache key's dimension only (0056, 0169, 0180, 0186, 0255). A program has one set of words for a refusal (0302); `display` writes US dollars as en-US does (0169). | The SaaS admin app. |
-| Real-time collaboration and offline | `replicated` is parsed only (A-011); charter §9.1's kind 4. A design note (`track/docs-design`) is in flight. | The Google Docs-shaped app. |
-| Maps, canvas and custom widgets | A mounted resource is refused by the build (0075). | The Google Docs-shaped app's editor-surface ruling. |
+| Real-time collaboration and offline | `replicated` is parsed only (A-011); charter §9.1's kind 4. Its design is ruled (0339): Automerge behind `replicated`'s `rich_text` policy, sync and presence on the stream. Nothing is built, and its downloads wait for the owner. | The Google Docs-shaped app. |
+| Maps, canvas and custom widgets | A mounted resource is refused by the build (0075). | The Google Docs-shaped app's editor, ProseMirror mounted at the page's authority (ruled, 0339). |
 | End-to-end encryption | None: a device-only placement label, browser-placed computation and rendering, and device-local storage are each missing. | The end-to-end-encrypted messages after the Docs app. |
 | Video and media | Uploads are images only (0260). | No planned app yet. |
 | Experiments, feature flags, analytics events | `Analytics.pw` and `Telemetry.pw` are `todo` stubs. | No planned app yet. |
 | AI features: a model's tokens streamed into a region | A region renders once per document (0148). | No planned app yet. |
 | A second host, horizontal scale | A second host on one database hears nothing of the first's commits (0246). A session and a sign-in under way are in one host's memory (0258), and a page's command order is its host's (0305). An interaction's answer is committed with the writes (0325), and a scheduled run is keyed the same on every host (0334). | `track/second-host` (in flight). |
 | Production | Pieces, not a deployment: `PW_DEPLOYMENT` and `PW_ORIGIN`, a generated Content-Security-Policy, SQL migrations applied at start, `GET /metrics`. The host is the development server (notes below). | kiokun.com, the owner's production target (ADR-0285): served first on a preview origin, with no cutover without the owner's go (NEXT). |
-| Interop: JavaScript components and npm libraries in a page; incremental adoption into an existing site | Nothing loads JavaScript into a page, and nothing adopts Pleris into an existing site (notes below). | The Google Docs-shaped app's mounted editor (a design in `track/docs-design`) is the first use of a resource. |
+| Interop: JavaScript components and npm libraries in a page; incremental adoption into an existing site | Nothing loads JavaScript into a page, and nothing adopts Pleris into an existing site (notes below). | The Google Docs-shaped app's mounted editor (ruled, 0339) is the first use of a resource. |
 | Testing tools for app authors | `pw check` and `pw fmt --check`; no `test` declaration, no `pw test`, no fixtures or browser harness for an author (notes below). | No planned app yet. |
-| A data layer declared in Pleris, not hand-written Rust per app | A `source` declares guarantees only (0207); the layer behind it is about 5,800 lines of Rust for the feed and the store (notes below). | The app on three kinds of database (a design). |
+| A data layer declared in Pleris, not hand-written Rust per app | A `source` declares guarantees only (0207); the layer behind it is about 5,800 lines of Rust for the feed and the store (notes below). | Ruled (0338): an app's data declared as tables, one generic adapter per database; D1 `tables` in flight (`track/tables`), D2 the memory adapter with TodoMVC next. |
 
 ### The new rows, in detail
 
@@ -112,8 +113,8 @@ Checked against `master` at `5da9c055` (2026-10-14), ADR-0001 to ADR-0334.
   provider makes its webhook secret at start. Nothing manages a deployment's
   secrets.
 - Queued in NEXT and not built: migrations across live deploys, secrets
-  management, rate limiting and backups. Wasmtime's advisories are being
-  fixed in `track/wasmtime-48-0-6`.
+  management, rate limiting and backups. Wasmtime's advisories of
+  2026-10-14 are fixed by 48.0.6 (0335).
 
 **Interop**
 
@@ -152,9 +153,10 @@ Checked against `master` at `5da9c055` (2026-10-14), ADR-0001 to ADR-0334.
   them.
 - Replacing `store:data/carts` with compiled Pleris is E10-S10, open in the
   evidence ledger since E10.
-- `track/threedb-design` proposes tables, keys, indexes and references
-  declared in Pleris, one generic adapter per database, and migrations
-  generated from the declarations. It is a design.
+- ADR-0338 (ruled 2026-10-15) declares tables, keys, indexes and references
+  in Pleris, one generic adapter per database, and migrations generated from
+  the declarations. Nothing is built: D1, the `table` declaration, is in
+  flight on `track/tables`, and D2, the memory adapter with TodoMVC, is next.
 
 ## Not built here
 
@@ -181,7 +183,9 @@ source), and a CRDT or OT library behind `replicated`.
 
 ## In flight
 
-Branches being built now (2026-10-15, about 01:40 UTC). None is on `master`.
+Branches being built now (2026-10-15, about 12:15 UTC). None is on `master`;
+train-8 lands the Wasmtime bump (0335), NEXT 4b (0336), and the 4c,
+three-database and Docs notes, each ruled (0337 to 0339).
 A row moves when its branch merges with its ADR and its evidence, and not
 before; what a line says here is the branch's aim, and its state as its
 commits show it at that hour. The branches move; `git log` on each says
@@ -189,18 +193,20 @@ more.
 
 | Branch | What it builds, and where it stands | Rows it moves |
 |---|---|---|
-| `track/scheduled-orders` | An order placed for a time its reader chooses: a window picked at checkout, the order held and sent to the store ahead of it by a command the clock runs (ADR-0334's `schedule`). Checker and server tests, the store's statement counts re-pinned, a 41-mutant script (not yet run) and its ADR are written; not green. | Scheduled commands (a second use); time and the clock; forms (the picker). |
-| `track/reviews` | A rating of one to five stars and an optional comment on each store of a delivered order, once, public without the reader's name. Built on both data layers with its server tests green and its reads' statements pinned on PostgreSQL; work in progress. | Forms; privacy (reviewers unnamed); search (a store's rating). |
-| `track/render-merge` | NEXT 4c, first step: one render's identical reads made once, from one snapshot (a read-only repeatable-read transaction on PostgreSQL). Tested on memory and PostgreSQL; its ADR is written. | Database independence; reading and caching. |
-| `track/bounded-checker` | NEXT 4c's checker: a read inside a loop is refused by construction (PW0405, with a warning, PW0406), so an N+1 read does not compile. The checker, 23 tests, a corpus of refused loops and a 33-mutant script are written; work in progress. | Database independence (a read's cost bounded by the language); performance. |
-| `track/bounded-statements` | NEXT 4b: the store's reads are set reads, and the statements of each of the store's 63 data operations, and of each page and command, are pinned by test and equal at two data sizes. Ready for the next train. | Database independence; performance. |
-| `track/todomvc` | TodoMVC in Pleris, held to its spec and to its upstream Cypress suite. So far: a page binds a signal to its address's fragment (PW61xx), the platform declares a double press and a control losing focus, a patch that checks or unchecks a box sets the box's own state, the app, a Playwright spec and mutation controls. The Cypress run and the rest of the runtime fixes are left. | Routing (a fragment); forms; testing tools; the head-to-head comparison. |
-| `track/second-host` | Hosts sharing one database: each hears every commit from the outbox, and a session is the database's. Idempotency already commits with the writes (ADR-0325); the track keeps it so across hosts. The design is written and the outbox is built as a log in commit order that every host reads from its cursor; tests on two hosts, persisted sessions and browser tests on two ports are left. | Reading and live updates; accounts (sessions); a second host. |
-| `track/docs-design` | A design note, no code: the Google Docs-shaped collaborative app (Automerge in the host and in the editor's page, ProseMirror mounted as a resource, sync and presence down the stream). | Real-time collaboration and offline; maps, canvas and custom widgets. A design only. |
-| `track/threedb-design` | A design note, no code (1,303 lines): an app's data declared in Pleris, one generic adapter per database, migrations generated from the declarations, then the store across SQLite, MongoDB and Cassandra. | A data layer declared in Pleris; database independence, past SQL. A design only. |
-| `track/guide` | The language guide and tutorial, every example compiled by a test with the real compiler. So far: the example checker, a generated reference of the diagnostic codes, a "Why Pleris" page whose refusals compile, and a tutorial guestbook that checks clean and is served in a browser test; the rest of the guide is not written. | Developer experience. |
-| `track/proof` | The bug museum (each exhibit a census leaf with a dated primary source, reproduced in Next.js or SvelteKit, refused or missed in Pleris, with controls) and the head-to-head comparison. So far: the plan, a runner and four exhibits (J08 shown end to end; F01 and G01 written; H07, an N+1 read, written as a miss); no head-to-head measurement yet. | The evidence that answers "is Pleris perfect?", which is not a row. |
-| `track/wasmtime-48-0-6` | Wasmtime from 48.0.5 to 48.0.6, for RUSTSEC-2026-0353 to 0364. | Production (the supply chain). |
+| `track/scheduled-orders` | An order placed for a time its reader chooses: a window picked at checkout, the order held and sent to the store ahead of it by a command the clock runs (ADR-0334's `schedule`). Checker and server tests, the store's statement counts re-pinned, a 41-mutant script and its ADR are written; on 2026-10-15 a window is offered where its stores would take the order when it is sent (work in progress, not green). | Scheduled commands (a second use); time and the clock; forms (the picker). |
+| `track/reviews` | A rating of one to five stars and an optional comment on each store of a delivered order, once, public without the reader's name. Built on both data layers with its server tests green and its reads' statements pinned on PostgreSQL; its mutation controls, recipe and ADR written; work in progress. | Forms; privacy (reviewers unnamed); search (a store's rating). |
+| `track/render-merge` | NEXT 4c's first step by ADR-0337's ruling: one render's identical reads made once, from one snapshot (a read-only repeatable-read transaction on PostgreSQL). Tested on memory and PostgreSQL; its recipe and ADR are written. | Database independence; reading and caching. |
+| `track/bounded-checker` | NEXT 4c's second step: a read keyed by a loop's element is refused (PW0405), a set read's cost stated by its source (`sets`, with a warning, PW0406), and a pair's shape a rule of its own (PW0407, the integrator's ruling of 2026-10-15); its corpus C25 (R-075 to R-077). Work in progress, train-7 merged in. | Database independence (a read's cost bounded by the language); performance. |
+| `track/tables` | D1 of the three-database note (ADR-0338): the `table` declaration, its checks (PW0354 to PW0366), its generated functions, `tables.json` and a schema's diff. Started 2026-10-15; no commit yet. | A data layer declared in Pleris. |
+| `track/todomvc` | TodoMVC in Pleris, held to its spec and to its upstream Cypress suite; D2's first app with no Rust data layer (ADR-0338). So far: a page binds a signal to its address's fragment (PW61xx), the platform declares a double press and a control losing focus, a patch that checks or unchecks a box sets the box's own state, an element shown with `autofocus` takes focus, the app, a Playwright spec and mutation controls; Cypress 15.14.2 has run TodoMVC's own suite against it. The strict run, the evidence recipe and the ADR's result are left. | Routing (a fragment); forms; testing tools; the head-to-head comparison. |
+| `track/second-host` | Hosts sharing one database: each hears every commit from the outbox, and a session is the database's. The outbox is a log in commit order that every host reads from its cursor; a test's signed-in session is kept where the hosts keep sessions, and a commit through either layer waits for the outbox's lock and wakes another host, tested. Work in progress. | Reading and live updates; accounts (sessions); a second host. |
+| `track/guide` | The language guide and tutorial, every example compiled by a test with the real compiler: the example checker, a generated reference of the diagnostic codes, a "Why Pleris" page whose refusals compile, a tutorial guestbook served in three engines, and the README pointing a developer from outside to it; `just e14-guide` and the mutation controls drafted. Work in progress. | Developer experience. |
+| `track/proof` | The bug museum (each exhibit a census leaf with a dated primary source, reproduced in Next.js or SvelteKit, refused or missed in Pleris, with controls) and the head-to-head comparison. Five exhibits, four refused and one missed (H07, an N+1 read), 3 of 3 mutants killed, pushed; no head-to-head measurement yet. | The evidence that answers "is Pleris perfect?", which is not a row. |
+| `track/each-head-effects` | A finding: an effectful call, or a secret, in an `{#each}`'s head escapes the effect and privacy checks, as the head is kept as text (ADR-0242's not-claimed). A failing test is committed; the fix gives the head's list and key to every analysis as expressions. | Privacy and per-user isolation; capabilities (the checker's soundness). |
+| `track/argument-invariants` | A finding: an opaque type's `where` invariant is not held on a command's arguments a browser sends. Each value entering a program from outside to be read through its type's checked constructor, and refused with words where it fails. Started; no commit yet. | Commands; forms. |
+| `track/check-is-build` | A finding: `pw check` passes programs `pw build` refuses. The check to run the build's analyses, writing nothing, held by a test over the build's refusals. Started; no commit yet. | Developer experience. |
+| `track/evidence-integrity` | Findings about the evidence itself: stale Python bytecode can decide a mutant's verdict; a file's mutant count is not checked against its script (`E10/privacy-by-resolution.txt` says 4 of 4; its script has 3); the corpus's `@rule` headers are stale; `check_latency`'s wall-clock ceiling fails under load. Started; no commit yet. | The evidence, which is not a row. |
+| `track/parallel-mutants` | A mutation script's mutants run in parallel slots, each a copy of the tree: a coordinator with 17 tests on a toy tree, its 31 mutation controls and `e14-parallel-mutants` written; a run comparing sequential and parallel verdicts on two scripts was under way. Work in progress. | The evidence's speed, which is not a row. |
 
 ## The reference apps, by the rows they cover
 
@@ -211,8 +217,9 @@ In the owner's order (NEXT), with where each stands:
      database independence (the store on PostgreSQL, 0298), search (0308),
      time and the clock (store hours, 0304, 0328), money (0327, 0329),
      payments against a development provider (0332), forms (addresses,
-     0319, and checkout), and a command that runs at a time (an unpaid
-     order taken back, 0334).
+     0319, and checkout), a command that runs at a time (an unpaid order
+     taken back, 0334), and its reads by set, their statements pinned on
+     PostgreSQL (0336).
    - In flight: ratings and reviews (`track/reviews`) and orders scheduled
      for a time (`track/scheduled-orders`).
    - Its places are a fixture of eleven, not a geocoder, and its courier
@@ -227,7 +234,9 @@ In the owner's order (NEXT), with where each stands:
    - sharing and permissions;
    - version history.
 
-   A design note is in flight (`track/docs-design`).
+   Its design is ruled (0339): Automerge, a mounted ProseMirror, sync and
+   presence on the stream, its data declared as tables (0338). Nothing is
+   built, and its downloads wait for the owner.
 4. **End-to-end-encrypted messages**:
    - a device-only placement;
    - browser-placed computation;
@@ -243,8 +252,10 @@ In the owner's order (NEXT), with where each stands:
 6. **The app on three kinds of database**: database independence, past
    SQL, and a data layer declared in Pleris. The owner approved its
    databases (NEXT): SQLite, libSQL or D1; MongoDB or Firestore; Cassandra
-   or ScyllaDB; and, optionally, CockroachDB. A design note is in flight
-   (`track/threedb-design`).
+   or ScyllaDB; and, optionally, CockroachDB. Its design is ruled (0338):
+   the data declared in Pleris, one adapter per database. D1 `tables` is in
+   flight, D2 the memory adapter with TodoMVC next; the owner's decisions 1
+   to 7 come before the MongoDB, Cassandra and CockroachDB tracks.
 
 Beside that order:
 
@@ -256,7 +267,8 @@ Beside that order:
   partial) and 62 features (17 built, 10 partial, 35 missing as of
   2026-10-11). Static-data pages, accounts, in-browser features and outside
   services are not started. Its rows: search, static pages and SEO, routing.
-- **TodoMVC** is in flight (`track/todomvc`).
+- **TodoMVC** is in flight (`track/todomvc`), and D2's first app with no
+  Rust data layer (0338).
 
 **Rows no planned app covers yet**: video and media; experiments, flags and
 analytics; AI token streaming. They decide the app after these. Interop and
