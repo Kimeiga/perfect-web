@@ -3008,18 +3008,25 @@ fn sessions_stay_on_the_server(
         // latency, 2026-10-13).
         let mut types: Option<crate::values::BodyTypes> = None;
         for (_, node, _) in body.nodes.iter() {
-            let mut printed: Vec<ExprId> = match node {
-                Node::Interpolation(e) => vec![*e],
-                Node::Element { attrs, .. } => attrs
-                    .iter()
-                    .filter(|a| !matches!(a.namespace(), Some(("on", _))))
-                    .filter_map(|a| match a.value {
-                        crate::hir::AttrValue::Expr(e) => Some(e),
-                        _ => None,
-                    })
-                    .collect(),
-                _ => Vec::new(),
-            };
+            // What the node prints, by where each of its expressions is
+            // written (ADR-XXXX): a position this does not name is a compile
+            // error here, never one it skips.
+            let mut printed: Vec<ExprId> = node
+                .exprs()
+                .into_iter()
+                .filter(|(position, _)| match position {
+                    crate::hir::Position::Hole | crate::hir::Position::Attribute => true,
+                    // Run when a person acts; what a block decides by; the
+                    // list the rows come from; and the key, which the
+                    // document holds as a keyed digest, never as itself.
+                    crate::hir::Position::Handler
+                    | crate::hir::Position::Subject
+                    | crate::hir::Position::Condition
+                    | crate::hir::Position::List
+                    | crate::hir::Position::Key => false,
+                })
+                .map(|(_, e)| e)
+                .collect();
             // A string with holes prints each hole.
             printed = printed
                 .into_iter()

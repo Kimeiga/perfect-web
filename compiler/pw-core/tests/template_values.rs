@@ -164,12 +164,14 @@ fn a_directive_other_than_on_does_not_build() {
 
 #[test]
 fn a_loops_key_is_read_from_its_element() {
+    // Another name, which resolves: the key is an expression (ADR-XXXX), and
+    // one that names nothing is PW0021 as well.
     let found = reported(&view(
-        "<ul>{#each rs as x (item.id)}<li>{x.a}</li>{/each}</ul>",
+        "<ul>{#each rs as x (r.id)}<li>{x.a}</li>{/each}</ul>",
     ));
     assert_eq!(
         found,
-        vec!["PW5021 a loop's key is `x` or a field read from it, and this is `item.id`"]
+        vec!["PW5021 a loop's key is `x` or a field read from it, and this is `r.id`"]
     );
     for markup in [
         "<ul>{#each rs as x (x.id)}<li>{x.a}</li>{/each}</ul>",
