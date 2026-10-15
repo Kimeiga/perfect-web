@@ -117,6 +117,9 @@ fn item(id: &str) -> Val {
 /// What the host saw of each call, so a test can assert the COMPONENT made it.
 type Calls = Arc<Mutex<Vec<(String, Vec<Val>)>>>;
 
+/// Each predicate the deployment was asked, and what it was given.
+type Asked = Arc<Mutex<Vec<(String, Vec<Val>)>>>;
+
 /// The deployment's operations: the platform's session, and a data layer in
 /// which every item can be ordered.
 fn host(calls: &Calls, add_result: Val) -> BTreeMap<String, HostFn> {
@@ -766,7 +769,7 @@ fn an_argument_that_breaks_its_invariant_never_reaches_the_component() {
             predicate: "MayAdd".into(),
             arguments: vec![1],
         });
-    let asked: Arc<Mutex<Vec<(String, Vec<Val>)>>> = Arc::default();
+    let asked: Asked = Arc::default();
     let evaluate = |predicate: &str, read: &[&Val]| {
         asked.lock().unwrap().push((
             predicate.to_string(),
