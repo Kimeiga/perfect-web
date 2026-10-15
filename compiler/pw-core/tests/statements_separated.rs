@@ -173,7 +173,7 @@ fn a_clauses_word_where_no_clause_is_is_a_statement() {
 fn markup_written_on_one_line_after_a_root_is_one_statement() {
     // `<h1>a</h1><p>b</p>`, as HTML writes two roots: until 2026-10-09 the
     // second `<` was a comparison with the first, PW0009 at its `/` (found
-    // writing ADR-XXXX's refusals). A block's marker and a comment go on a
+    // writing ADR-0303's refusals). A block's marker and a comment go on a
     // line as an element does, and the space between two is kept.
     let view = |markup: &str| format!("module m\n\nview V() !{{}} {{\n    {markup}\n}}\n");
     for markup in [
