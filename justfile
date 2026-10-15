@@ -27,6 +27,7 @@ import 'just/bounded-statements.just'
 import 'just/payments.just'
 import 'just/page-policy.just'
 import 'just/scheduled.just'
+import 'just/argument-invariants.just'
 
 default:
     @just --list

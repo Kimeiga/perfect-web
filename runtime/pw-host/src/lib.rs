@@ -1028,28 +1028,6 @@ pub mod engine {
         declared_export(contract, export).map(|e| e.authorization.as_slice())
     }
 
-    /// **The type of the function an export path names**, as a call finds
-    /// it: a function the world exports directly, by one segment, or an
-    /// interface's, by two.
-    fn export_func(
-        engine: &wasmtime::Engine,
-        component: &wasmtime::component::Component,
-        export: &[&str],
-    ) -> Result<wasmtime::component::types::ComponentFunc, String> {
-        let [function] = export else {
-            return export_type(engine, component, export);
-        };
-        component
-            .component_type()
-            .exports(engine)
-            .find(|(name, _)| name == function)
-            .and_then(|(_, item)| match item.ty {
-                ComponentItem::ComponentFunc(func) => Some(func),
-                _ => None,
-            })
-            .ok_or_else(|| format!("the component exports no function `{function}`"))
-    }
-
     /// Evaluate every `requires` predicate before an invocation.
     ///
     /// Predicate names are deployment vocabulary. The host never guesses their
@@ -1316,6 +1294,10 @@ pub mod engine {
         /// of a type that contains itself as its nodes (ADR-0194), however it
         /// was given. Refused in a decoder's words: "argument refused: value
         /// 2 is 0, and `domain.PositiveInt` holds `value >= 1`".
+        ///
+        /// Only the compiler states what an argument holds, and its exports
+        /// are an interface's: a world's export (a hand-written guest's)
+        /// states nothing, and is called as before.
         pub fn hold_arguments(
             &self,
             contract: &crate::ComponentContract,
@@ -1326,12 +1308,12 @@ pub mod engine {
             if bounded.is_empty() {
                 return Ok(());
             }
-            let func = export_func(&self.engine, &self.component, export)?;
+            let func = export_type(&self.engine, &self.component, export)?;
             let passed: Vec<Val> = args
                 .iter()
                 .cloned()
                 .zip(func.params())
-                .map(|(v, (_, t))| graph::tangle(v, &t))
+                .map(|(given, (_, ty))| graph::tangle(given, &ty))
                 .collect::<Result<_, _>>()?;
             holds(bounded, &passed).map_err(|why| format!("argument refused: {why}"))
         }
@@ -1347,7 +1329,7 @@ pub mod engine {
             export: &[&str],
             args: &[wasmtime::component::Val],
         ) -> Result<Vec<wasmtime::component::Val>, String> {
-            // Decoded before anything (ADR-XXXX, argument invariants).
+            // Its arguments decoded first, before anything else.
             self.hold_arguments(contract, export, args)?;
             refuse_unevaluated_authorization(contract, export)?;
             run(
@@ -1377,7 +1359,7 @@ pub mod engine {
         where
             F: FnMut(&str, &[&Val]) -> Result<bool, String>,
         {
-            // Before a predicate reads them (ADR-XXXX, argument invariants).
+            // Its arguments decoded before a predicate reads them.
             self.hold_arguments(contract, export, args)?;
             authorize_export(contract, export, args, evaluate)?;
             run(
@@ -2539,7 +2521,7 @@ pub mod engine {
             export: &[&str],
             args: &[wasmtime::component::Val],
         ) -> Result<(Vec<wasmtime::component::Val>, Usage), String> {
-            // As every call is (ADR-XXXX, argument invariants).
+            // Its arguments decoded as every call's are.
             self.hold_arguments(contract, export, args)?;
             refuse_unevaluated_authorization(contract, export)?;
             run_measured(

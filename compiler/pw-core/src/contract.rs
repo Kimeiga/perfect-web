@@ -442,10 +442,20 @@ fn bounds_within(
         path.pop();
     };
     match key {
-        TypeKey::Builtin(Builtin::List, args) => {
+        // A set crosses as a list does (`list<t>`, ADR-0057).
+        TypeKey::Builtin(Builtin::List | Builtin::Set, args) => {
             if let Some(item) = args.first() {
                 step("*".into(), item, path, seen, out);
             }
+        }
+        // A map crosses as its entries, each a key and its value (`list<tuple
+        // <k, v>>`, ADR-0057): each entry's key at `0` and its value at `1`.
+        TypeKey::Builtin(Builtin::Map, args) => {
+            path.push("*".into());
+            for (i, arg) in args.iter().take(2).enumerate() {
+                step(i.to_string(), arg, path, seen, out);
+            }
+            path.pop();
         }
         TypeKey::Builtin(Builtin::Option, args) => {
             if let Some(some) = args.first() {

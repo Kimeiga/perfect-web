@@ -398,3 +398,53 @@ fn on_postgres_a_row_written_before_its_check_is_refused_where_it_is_read() {
     );
     drop(s);
 }
+
+/// **A label the store's type refuses never reaches its data layer**, on the
+/// layer the server's tests serve the store on: in memory, or on PostgreSQL
+/// under `PW_STORE_TEST_LAYER=postgres`, whose `addresses.label` holds any
+/// text, so the database would keep whatever the host passed it.
+/// `AddressLabel` holds 1 to 40 code points: an empty label and one of 41
+/// are refused where they arrive, 400 and why, and the reader's addresses
+/// are as they were; one of 40 is saved.
+#[test]
+fn a_label_the_stores_type_refuses_never_reaches_its_data_layer() {
+    let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+    let saved =
+        |s: &Server| match s.layer_read("guest", "store:data/addresses#list", &s.owner("guest")) {
+            Val::List(rows) => rows.len(),
+            other => panic!("addresses#list answered {other:?}"),
+        };
+    let label =
+        "`Addresses.AddressLabel` holds `String.length(value) >= 1 & String.length(value) <= 40`";
+    let add = |label: &str, interaction: &str| {
+        let answer = posted(
+            &s,
+            "/command/store.page.add_address",
+            "guest",
+            interaction,
+            &serde_json::json!([label, "dolores-park"]).to_string(),
+        );
+        let status = answer.lines().next().unwrap_or_default().to_string();
+        let body = answer
+            .split_once("\r\n\r\n")
+            .map(|(_, b)| b.to_string())
+            .unwrap_or_default();
+        (status, body)
+    };
+    for (given, long) in [(String::new(), 0), ("x".repeat(41), 41)] {
+        let (status, body) = add(&given, "forged");
+        assert!(status.starts_with("HTTP/1.1 400"), "{status} {body}");
+        let body: serde_json::Value = serde_json::from_str(&body).expect("a JSON answer");
+        assert_eq!(
+            body,
+            serde_json::json!({
+                "committed": false,
+                "error": format!("argument refused: value 1 is {long} code points long, and {label}"),
+            })
+        );
+        assert_eq!(saved(&s), 0, "nothing reached the layer");
+    }
+    let (status, body) = add(&"x".repeat(40), "held");
+    assert!(status.starts_with("HTTP/1.1 202"), "{status} {body}");
+    assert_eq!(saved(&s), 1, "forty is a label");
+}

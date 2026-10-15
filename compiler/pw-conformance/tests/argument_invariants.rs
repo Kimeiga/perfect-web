@@ -17,6 +17,8 @@ use pw_host::engine::{HostFn, Val};
 const PROGRAM: &str = r#"module held
 
 import List
+import Map
+import Set
 
 opaque type Likes = Int where value >= 0
 
@@ -40,6 +42,12 @@ fn leaves(t: Tree) -> Int {
 public query Size(c: Comment) -> Int { count(c) }
 
 public query Leaves(t: Tree) -> Int { leaves(t) }
+
+public query Valued(m: Map<String, Likes>) -> Int { Map.size(m) }
+
+public query Keyed(m: Map<Likes, String>) -> Int { Map.size(m) }
+
+public query Counted(s: Set<Likes>) -> Int { Set.size(s) }
 "#;
 
 fn compiled(id: &str) -> Runnable {
@@ -126,4 +134,50 @@ fn a_case_that_contains_itself_is_held_as_its_nodes_however_it_is_given() {
     for arg in [tree(-2), nodes(-2)] {
         assert_eq!(call(&leaves, arg.clone()), Err(said.clone()), "{arg:?}");
     }
+}
+
+/// **A map's entries and a set's items** (ADR-0057's `list<tuple<k, v>>`
+/// and `list<t>`): a value, a key and an item each held where it is, the
+/// entry by its index and the key or value by its place in the entry.
+#[test]
+fn a_maps_keys_and_values_and_a_sets_items_are_held() {
+    let entry = |k: Val, v: Val| Val::Tuple(vec![k, v]);
+    let text = |t: &str| Val::String(t.into());
+    let valued = compiled("held.Valued");
+    let values = |likes: i64| {
+        Val::List(vec![
+            entry(text("a"), Val::S64(1)),
+            entry(text("b"), Val::S64(likes)),
+        ])
+    };
+    assert_eq!(call(&valued, values(0)), Ok(Val::S64(2)));
+    assert_eq!(
+        call(&valued, values(-1)),
+        Err(format!(
+            "argument refused: value 1's `[1].1` is -1, and {LIKES}"
+        ))
+    );
+    let keyed = compiled("held.Keyed");
+    let keys = |likes: i64| {
+        Val::List(vec![
+            entry(Val::S64(likes), text("a")),
+            entry(Val::S64(3), text("b")),
+        ])
+    };
+    assert_eq!(call(&keyed, keys(0)), Ok(Val::S64(2)));
+    assert_eq!(
+        call(&keyed, keys(-5)),
+        Err(format!(
+            "argument refused: value 1's `[0].0` is -5, and {LIKES}"
+        ))
+    );
+    let counted = compiled("held.Counted");
+    let items = |likes: i64| Val::List(vec![Val::S64(likes), Val::S64(9)]);
+    assert_eq!(call(&counted, items(0)), Ok(Val::S64(2)));
+    assert_eq!(
+        call(&counted, items(-3)),
+        Err(format!(
+            "argument refused: value 1's `[0]` is -3, and {LIKES}"
+        ))
+    );
 }
