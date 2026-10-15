@@ -730,6 +730,9 @@ mod csp;
 // The scheduled-commands track: a command runs when the clock passes its
 // time.
 mod schedules;
+// Track `second-host` (ADR-XXXX): hosts on one database hear each other's
+// commits.
+mod hosts;
 
 struct Server {
     /// **The build this host serves, by its name** (ADR-0300): on each
@@ -3173,6 +3176,70 @@ impl Server {
     /// until** (ADR-0304), for as long as the host runs: woken when an
     /// instant is set or the clock is moved, and each second at least, as the
     /// clock moves with time.
+    /// **Every other host's commits, heard and told** (ADR-XXXX, track
+    /// `second-host`), for as long as the host runs: woken by a commit's
+    /// notification, and each [`hosts::WAIT_MS`] without one. A layer in
+    /// memory is one host by definition, and has nothing to hear.
+    fn hear_other_hosts(&self) {
+        let Some(tail) = self.data.tail() else {
+            return;
+        };
+        loop {
+            if !self.hear() {
+                tail.trim();
+                tail.wait(hosts::WAIT_MS);
+            }
+        }
+    }
+
+    /// **The other hosts' commits since this host's cursor, told** to each
+    /// session of this host that reads what they dropped, as a commit of its
+    /// own is told to the sessions other than its presser's (ADR-0219,
+    /// ADR-0297): each commit in the order they were made, the cursor moved
+    /// past it once it is told. Rows trimmed before this host read them tell
+    /// each of its documents to reload: what they said can no longer be told.
+    /// Whether more may be waiting.
+    fn hear(&self) -> bool {
+        let Some(tail) = self.data.tail() else {
+            return false;
+        };
+        let heard = match tail.heard() {
+            Ok(heard) => heard,
+            Err(why) => {
+                eprintln!("pw dev server: the other hosts' commits were not read: {why}");
+                return false;
+            }
+        };
+        if heard.missed {
+            let documents: Vec<Doc> = self
+                .pending
+                .lock()
+                .expect("pending")
+                .keys()
+                .cloned()
+                .collect();
+            for doc in &documents {
+                self.unshowable(
+                    doc,
+                    "another host's commits were trimmed before this host read them",
+                );
+            }
+        }
+        for (last, (events, invalidated)) in &heard.commits {
+            let reached = self.invalidate_queries("", invalidated, events);
+            if !reached.is_empty() {
+                self.telling
+                    .lock()
+                    .expect("telling")
+                    .push((String::new(), reached));
+            }
+            tail.passed(*last);
+        }
+        tail.passed(heard.through);
+        self.tell_waiting();
+        heard.more
+    }
+
     fn tell_when_time_passes(&self) {
         loop {
             let (told, wait) = self.tell_due();
@@ -7856,6 +7923,19 @@ fn main() {
     {
         let server = server.clone();
         std::thread::spawn(move || server.run_when_due());
+    }
+    // **Every other host's commits, told to this host's pages** (ADR-XXXX,
+    // track `second-host`), where its data layer's database is shared.
+    match server.data.tail() {
+        Some(tail) => {
+            println!(
+                "pw dev server hosts: {} on a shared database, hearing every host's commits",
+                tail.host()
+            );
+            let server = server.clone();
+            std::thread::spawn(move || server.hear_other_hosts());
+        }
+        None => println!("pw dev server hosts: one; its data layer shares no database"),
     }
 
     for stream in listener.incoming() {
