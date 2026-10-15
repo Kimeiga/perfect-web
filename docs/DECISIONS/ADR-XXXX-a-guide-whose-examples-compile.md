@@ -32,6 +32,9 @@ is in its info string, and a test reads every one:
 | `pw fails=PW0606` | a whole program the compiler refuses | `pw check` exits 1, and the codes it reports are exactly the ones named (comma-separated) |
 | `pw file=guestbook/app.pw` | part of the page's program | the page's `file=` blocks, each file's in order, are one program: checked clean and formatted |
 | `text pw-check` | what `pw check --plain` prints for the `pw fails=` block just before it | printed exactly, less the closing `pw check: N file(s), ..` line |
+| `pw gap=build` | a program `pw check` passes and `pw build` refuses: a gap in the checks the page says so about (§5) | checks clean and is formatted, and `pw build` refuses it |
+| `text pw-build` | what `pw build` prints for the `pw gap=build` block just before it, which must have it | printed exactly |
+| `pw gap=check` | a program `pw check` passes that the page says it should refuse (§5) | checks clean and is formatted; nothing is asked of the build |
 | `sh`, `text`, `ts`, `tsx`, `svelte`, `json` | commands, output, or another language's code for comparison | not compiled |
 
 A block with no info string, an unknown language or an unknown attribute is
@@ -106,6 +109,42 @@ failure of its own rather than an example silently skipped; and it counts the
 opening ```` ```pw ```` lines a plain scan finds against the blocks it
 extracted.
 
+### 5. A gap in the checks is held, not only stated
+
+The guide says what is true at its merge, and that includes where the
+compiler falls short. A sentence that says "the check does not catch this
+yet" is prose, and prose rots the day the compiler catches it: the guide
+would then claim what is not so, which is the failure this ADR exists to
+stop. So a gap is an example, with its own info string, and the test holds
+the gap open:
+
+- `pw gap=build`: a program `pw check` passes and `pw build` refuses, with
+  the output `pw build` prints (`text pw-build`);
+- `pw gap=check`: a program `pw check` passes that the page says it should
+  refuse.
+
+When the compiler closes a gap, the example goes red, with a message that
+says the gap is closed, and whoever closed it makes the page true: a
+`gap=build` example becomes a plain `pw` one or a `pw fails=` one, and the
+sentence that introduced it goes. The gaps at this ADR's merge, each in
+`docs/guide/tour-pages.md` ("Where `pw check` stops") and named in
+`docs/guide/why.md`:
+
+- a `<title>` that reads a signal checks clean, and `pw build` refuses it
+  (ADR-0137);
+- a template value computed from two signals checks clean, and `pw build`
+  refuses it (ruling 0073-a);
+- a computed list in an `{#each}` head checks clean, and `pw build` refuses
+  it; and the effect check does not look in that head, which the same example
+  shows, since it is a program the check passes with an effectful call in a
+  view that claims `!{}`;
+- an `<img>` with no `alt` checks clean (`gap=check`).
+
+A fifth gap is a message and not a program: `&&` is refused with "expected
+an expression, found `&`", which does not say that Pleris writes `&`. The
+refused example of it carries the message (`text pw-check`), so a better
+message turns that example red as well.
+
 ## Alternatives
 
 - **Hidden lines, as rustdoc's `# `**: a block compiled with context the
@@ -152,3 +191,81 @@ extracted.
 
 - `pw new`, which writes the tutorial's first step as a project.
 - An LSP on the check, which takes about 0.2 s for a small program.
+- Each gap above, closed in the compiler, and its example turned into the
+  plain or refused example the test then asks for.
+- A data layer a program declares in Pleris, so that the tutorial's app does
+  not borrow the feed's.
+
+## The integrator's rulings, 2026-10-15
+
+Each ruled by the integrator, 2026-10-15:
+
+1. **The guide's test lives at `compiler/pw-cli/tests/guide.rs`**: accepted
+   (ruled by the integrator, 2026-10-15). It is a new file in a package the
+   track did not own, and it reads `docs/guide/*.md` from the repository's
+   root.
+2. **Port 7741, the guestbook's hosts at `PORT+210..212`** (`GUESTBOOK_PORTS`
+   in `spikes/own-renderer/playwright.config.mjs`): accepted (ruled by the
+   integrator, 2026-10-15).
+3. **The track's own corrections are applied** (ruled by the integrator,
+   2026-10-15): a handler arm that does nothing is `()`, and every `on:`
+   lambda is resumable, its captures inferred, with no
+   `resumable(captures = ..)` (ADR-0134, ADR-0200). Applied in
+   `docs/guide/tutorial.md`, `docs/guide/errors.md` and `examples/guestbook`
+   together, the tutorial and the app byte for byte equal (the test holds it).
+4. **The checker findings are framework findings** (ruled by the
+   integrator, 2026-10-15): the integrator takes them to the tracks that own
+   them. The guide states what is true at its merge, as a current limit
+   where a reader would meet one, and neither teaches around it nor claims
+   what is not so. The three findings are `pw check` passing programs `pw
+   build` refuses, an effectful call in an `{#each}` head escaping the effect
+   check, and `&&` getting no hint that Pleris writes `&`. §5 holds each, and
+   the guide's page of limits names them.
+
+## Findings
+
+Found writing the guide, corrections first:
+
+- **Corrected during the work.** A handler arm that does nothing may be `()`
+  (`draft = draft` was the feed's style, not a rule), and no `on:` handler
+  needs `resumable(captures = ..)`. And the each-head hole is smaller than
+  first written: `pw build` refuses the program for another reason (a
+  computed list), so no program with it builds today; `pw check` alone
+  passes it.
+- **`pw check` is not the build.** Three shapes pass the check and are
+  refused by `pw build` (§5). The build's refusals have no code and are not
+  in the registry. A newcomer's green check is not a program that runs, so
+  the guide's test builds every clean example.
+- **No project file, no `pw new`.** To check one file, a newcomer names
+  `packages/pw-std/*.pw packages/pw-platform-web/*.pw` and the file on the
+  command line. An effect used means nothing until a package declares it.
+- **An app's storage is Rust.** The development server holds each data
+  layer as hand-written Rust (`feed.rs`, `store.rs`, `kiokun.rs`), chosen by
+  the operations' prefix. The tutorial's guestbook borrows the feed's, and
+  had to declare a type named `Post`, because the feed's grants name it and
+  an effect row must name a grant. A newcomer cannot run a new storage
+  without Rust.
+- **Surprising syntax.** A predicate used as a boolean in markup
+  (`hidden={!SignedIn}`, `{#if SignedIn}`) is how a page asks it of its
+  reader (PW5048); `List.length` needs `import List` where the type `List`
+  does not; a name in a pattern that starts with a capital is a case.
+- **Stale reading for a newcomer.** `docs/SEMANTICS.md` still reads as the
+  M0-era status ("Not yet enforced: no compiler exists" for pure rendering).
+  `docs/vision/capabilities.md` is dated 2026-10-08 (ADR-0279).
+- **Hazards in the harness.** Stopping a Playwright run with `pkill -f
+  "playwright test"` leaves its web servers on their ports (78 of them), and
+  the next run fails "port already used": kill by the servers' working
+  directory.
+
+## Questions for the integrator
+
+- `scripts/mutant_programs.py` (train-7) checks the mutants of `.pw` sources
+  under `examples/feed`, `kiokun`, `kiokun-site`, `store`, `lib`, `domain.pw`
+  and `packages/`. A mutant of `examples/guestbook` is outside its tables
+  (`PROGRAMS`, `OF`), so it is skipped; `scripts/guide_mutations.py` keeps
+  each of its `.pw` mutants a program (or names the rule that refuses it in
+  `CHECKED`) on its own. Adding a `guestbook` entry to those two tables would
+  put it under the gate; it is the integrator's script.
+- The gaps in §5 belong to the tracks that own the checker and the backend:
+  a refusal the check should make where the build makes one, the each head
+  in the effect check, the `<img>` rule, and the message for `&&`.
