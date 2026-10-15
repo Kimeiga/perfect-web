@@ -700,19 +700,23 @@ impl Identity {
     /// **`session` signed in as `user`, without the flow** (track
     /// `notifications`): the accounts model, a test's principal, so a test
     /// holds one user in two sessions and another user beside them. The
-    /// flow itself is `tests/sign_in.rs`'s to hold.
+    /// flow itself is `tests/sign_in.rs`'s to hold. Kept where the hosts
+    /// keep sessions, as a sign-in's is (ADR-XXXX): a request reads its
+    /// session from there, and would find no one.
     #[cfg(test)]
     pub fn signed_in_for_test(&self, session: &str, user: &str, name: &str) {
         self.principals.set_accounts(true);
-        self.principals.open(
-            session,
-            Principal {
-                user: user.to_string(),
-                handle: format!("@{user}"),
-                name: name.to_string(),
-                issuer: "https://id.example.test".to_string(),
-            },
-        );
+        self.principals
+            .sign_in(
+                session,
+                Principal {
+                    user: user.to_string(),
+                    handle: format!("@{user}"),
+                    name: name.to_string(),
+                    issuer: "https://id.example.test".to_string(),
+                },
+            )
+            .expect("signed in where sessions are kept");
     }
 
     /// **A request the identity track answers**, before any other route.
@@ -865,7 +869,7 @@ impl Identity {
         // once, whichever host began it.
         let taken = match self.principals.kept() {
             Some(kept) => match kept.take_sign_in(&kept_hash(&state)) {
-                Ok(taken) => taken.map(|(nonce, verifier, age)| (nonce, verifier, age)),
+                Ok(taken) => taken,
                 Err(why) => return Some(refused(&why)),
             },
             None => accounts
