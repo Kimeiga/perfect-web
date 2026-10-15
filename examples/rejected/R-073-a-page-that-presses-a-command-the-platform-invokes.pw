@@ -1,0 +1,34 @@
+// @corpus: rejected
+// @id: R-073
+// @category: a page that presses a command the platform invokes
+// @rule: PW6404
+// @invariant: invoked_command_pressed
+// @charter: §7.8
+// @milestone: 14
+// @expect-error: `settle` is invoked by Payments, and a page's handler sends it
+// @expect-error: no page presses a command the platform invokes
+//
+// A press is a reader's word. Sent by a page, `settle` would settle a
+// payment the provider never took.
+
+module payments_corpus.pressing
+
+import domain.{ InteractionId }
+import payments.{ Settled, PaymentStatus }
+
+command settle(settled: Settled) -> Result<Int, String>
+    invoked_by    Payments
+    idempotent_by InteractionId
+{
+    Ok(1)
+}
+
+page Paid() {
+    cache private
+
+    view {
+        <main>
+            <button type="button" on:press={() => { let _settled = settle(Settled { payment: "p-1", order: "o-1", status: PaymentStatus.Succeeded }) }}>Paid</button>
+        </main>
+    }
+}

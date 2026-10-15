@@ -1,5 +1,5 @@
 // @corpus: rejected
-// @id: R-071
+// @id: R-076
 // @category: a read per element in a for loop
 // @rule: PW0405
 // @invariant: read_per_element

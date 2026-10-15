@@ -2,7 +2,7 @@
 // @invariant: read_per_element
 // @dimension: generic callback, and aliasing — a function of the program's applies the callback, and a match arm binds the key
 //
-// Structurally different from R-070: the loop is a function of the
+// Structurally different from R-075: the loop is a function of the
 // program's, which passes its callback on to `List.map`, and the key is the
 // element's field, bound by a match arm on the way.
 

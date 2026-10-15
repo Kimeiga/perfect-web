@@ -1,5 +1,5 @@
 // @corpus: rejected
-// @id: R-072
+// @id: R-077
 // @category: a read per element in a recursion over data
 // @rule: PW0405
 // @invariant: read_per_element

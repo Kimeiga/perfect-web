@@ -1,0 +1,30 @@
+// @corpus: rejected
+// @id: R-072
+// @category: two commands a payment's outcome invokes
+// @rule: PW6403
+// @invariant: invoked_twice
+// @charter: §7.8
+// @milestone: 14
+// @expect-error: `settle` and `settle_again` are both invoked by Payments
+//
+// A payment's outcome has one answer. With two commands, which ran would be
+// the host's choice, not the program's.
+
+module payments_corpus.twice
+
+import domain.{ InteractionId }
+import payments.{ Settled }
+
+command settle(settled: Settled) -> Result<Int, String>
+    invoked_by    Payments
+    idempotent_by InteractionId
+{
+    Ok(1)
+}
+
+command settle_again(settled: Settled) -> Result<Int, String>
+    invoked_by    Payments
+    idempotent_by InteractionId
+{
+    Ok(2)
+}

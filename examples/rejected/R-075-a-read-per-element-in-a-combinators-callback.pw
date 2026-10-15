@@ -1,5 +1,5 @@
 // @corpus: rejected
-// @id: R-070
+// @id: R-075
 // @category: a read per element in a combinator's callback
 // @rule: PW0405
 // @invariant: read_per_element

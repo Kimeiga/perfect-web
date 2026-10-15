@@ -8,7 +8,7 @@
 # read on a source that cannot batch warned (PW0406), a keyed read's `set`
 # held to its shape (PW0335), a source's `sets`. The rules' tests
 # (tests/bounded_reads.rs, the store, the feed and kiokun-site among them),
-# the corpus's (corpus C24: R-070..R-072, A-037, the generality witnesses),
+# the corpus's (corpus C25: R-075..R-077, A-037, the generality witnesses),
 # the reference programs checked, and the mutation controls
 # (scripts/bounded_checker_mutations.py).
 e14-bounded-reads:

@@ -178,7 +178,7 @@ every guarantee (ADR-0207): one call, no warning (see the questions).
 - **The generality figure**: 49 / 49 becomes 50 / 50 (`read_per_element`);
   `tests/generality.rs` says so, and `docs/STATUS.md` and `docs/NEXT.md`
   carry the number.
-- **Corpus C24**: R-070, R-071, R-072 and A-037 (the numbers were free at
+- **Corpus C25**: R-075, R-076, R-077 and A-037 (the numbers were free at
   5da9c055).
 - **KNOWN_LIMITATIONS**: kiokun-site's four reads per element (Found 1);
   and the Not claimed below.
@@ -250,7 +250,7 @@ Recorded by `just e14-bounded-reads` in `docs/evidence/E14/bounded-reads.txt`:
   `sources.json` read as `per_key`; the store (clean, mutated per element
   and refused, with the two annotations); the feed; kiokun-site's known
   four. And `bounded`'s own: the call graph's cycles.
-- The corpus (corpus C24): R-070, R-071, R-072 each emit only PW0405 and
+- The corpus (corpus C25): R-075, R-076, R-077 each emit only PW0405 and
   convey their `@expect-error`s; A-037 and the whole accepted corpus check
   clean; the witnesses `examples/generality/read_per_element/` (generic
   callback with a match arm's key, helper extraction, cross-module, and a

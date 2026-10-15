@@ -1,0 +1,34 @@
+// @status: NEIGHBOUR
+// @invariant: invoked_command_pressed
+//
+// A page presses the command that schedules the clock's: the reader's word
+// is to schedule it, and the clock's to run it.
+
+module generality.pressing_scheduler
+
+import domain.{ InteractionId }
+import clock.{ minutes }
+
+command remind(order: String) -> Result<Int, String>
+    invoked_by    Clock
+    idempotent_by InteractionId
+{
+    Ok(1)
+}
+
+command remind_later(order: String) -> Result<Int, String> !{ clock.schedule }
+    idempotent_by InteractionId
+{
+    schedule remind(order) after minutes(30)
+    Ok(1)
+}
+
+page Remind() {
+    cache private
+
+    view {
+        <main>
+            <button type="button" on:press={() => { let _scheduled = remind_later("o-1") }}>Remind me</button>
+        </main>
+    }
+}

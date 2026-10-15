@@ -72,7 +72,7 @@ const ACCEPTED_CATEGORIES: &[&str] = &[
     "a page loads from its own origin",
     // The scheduled-commands track, corpus C23: a run the clock makes.
     "a command schedules one the clock invokes",
-    // 4c (track `bounded-checker`), corpus C24: a list's reads, one set read
+    // 4c (track `bounded-checker`), corpus C25: a list's reads, one set read
     // before its loop.
     "a list read together before its loop",
 ];
@@ -178,7 +178,13 @@ const REJECTED_CATEGORIES: &[&str] = &[
     "a schedule that names a command the clock does not invoke",
     "a schedule written outside a command",
     "a run scheduled at what is no instant",
-    // 4c (track `bounded-checker`), corpus C24: PW0405, a read keyed by its
+    // NEXT 6c's `invoked_by Payments`, corpus C24: PW6401 to PW6405.
+    "a command the platform invokes that requires a reader",
+    "a payment's command given what is no settled payment",
+    "two commands a payment's outcome invokes",
+    "a page that presses a command the platform invokes",
+    "a command the platform invokes with no key",
+    // 4c (track `bounded-checker`), corpus C25: PW0405, a read keyed by its
     // loop's element, in each loop form.
     "a read per element in a combinator's callback",
     "a read per element in a for loop",

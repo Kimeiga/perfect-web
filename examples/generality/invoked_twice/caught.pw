@@ -1,0 +1,30 @@
+// @status: GENERAL
+// @invariant: invoked_twice
+//
+// Structurally different from R-072: the second is apart from the first, a
+// command a reader presses between them, and answers another type.
+
+module generality.twice_apart
+
+import domain.{ InteractionId }
+import payments.{ Settled }
+
+command settle(settled: Settled) -> Result<Int, String>
+    invoked_by    Payments
+    idempotent_by InteractionId
+{
+    Ok(1)
+}
+
+command begin(order: String) -> Result<Int, String>
+    idempotent_by InteractionId
+{
+    Ok(1)
+}
+
+command refund(settled: Settled) -> Result<String, String>
+    invoked_by    Payments
+    idempotent_by InteractionId
+{
+    Ok("refunded")
+}

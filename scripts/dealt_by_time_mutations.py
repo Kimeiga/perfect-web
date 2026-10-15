@@ -46,6 +46,26 @@ VERIFY = ROOT / ".github/workflows/verify.yml"
 
 # (what is undone, file, anchor, replacement)
 MUTANTS = [
+    # And a source's own test module, by its module's filter (train-6's
+    # survivor's test, in `csp.rs`).
+    (
+        "a source's own test module plans no script that runs it",
+        PLAN,
+        "        if any(names_module(text, m) for m in modules):\n",
+        "        if False:\n",
+    ),
+    (
+        "a source's own test module plans no recipe that runs it",
+        PLAN,
+        "        or any(names_module(body.get(name, \"\"), m) for m in modules)\n",
+        "        or False\n",
+    ),
+    (
+        "a line before a source's test module is taken as its test's",
+        PLAN,
+        "        if start is not None and any(last >= start for _, last in hunks):\n",
+        "        if start is not None:\n",
+    ),
     # Train-6's finding: a server test module is run by its filter, and a
     # change to one plans what runs it.
     (

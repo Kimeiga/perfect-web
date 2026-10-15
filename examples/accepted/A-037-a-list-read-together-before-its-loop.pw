@@ -5,7 +5,7 @@
 // @milestone: 14
 //
 // 4c, a read is bounded by construction: a list's prices read in one set
-// read before the loop that uses them, in each form R-070, R-071 and R-072
+// read before the loop that uses them, in each form R-075, R-076 and R-077
 // read them per element, and a read in a loop whose key is no element's.
 // `price_of` names its set read, and the source states what one costs it.
 
@@ -38,13 +38,13 @@ fn cents_in(prices: List<ListPriceOf>, item: Int) -> Int !{} {
     }
 }
 
-// R-070's loop: the prices read before it, each looked up in it.
+// R-075's loop: the prices read before it, each looked up in it.
 fn priced(items: List<Int>) -> List<Int> !{ database.read<ListPrice> } {
     let prices = prices_of(items)
     List.map(items, item => cents_in(prices, item))
 }
 
-// R-071's.
+// R-076's.
 fn total(items: List<Int>) -> Int !{ database.read<ListPrice> } {
     let prices = prices_of(items)
     let mut sum = 0
@@ -54,7 +54,7 @@ fn total(items: List<Int>) -> Int !{ database.read<ListPrice> } {
     sum
 }
 
-// R-072's: the recursion is given what was read before it.
+// R-077's: the recursion is given what was read before it.
 fn walked(items: List<Int>, prices: List<ListPriceOf>) -> Int !{} {
     match List.get(items, 0) {
         None => 0,
