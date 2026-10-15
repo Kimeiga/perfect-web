@@ -63,7 +63,7 @@ fn estimating(s: &Server, least: i64, most: i64) {
 /// cart says it, or nothing: the rule `place_order` holds the hours to.
 fn cart_hours(s: &Server) -> String {
     match s
-        .query("store.page.CartHours", "a", &[Val::String(s.owner("a"))])
+        .query("store.hours.CartHours", "a", &[Val::String(s.owner("a"))])
         .expect("the cart's hours")
     {
         Val::String(said) => said,
