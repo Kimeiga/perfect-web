@@ -43,7 +43,8 @@ doctor:
 bootstrap:
     @bash scripts/bootstrap.sh
 
-# Record the current machine state into docs/environment/macbook.md. Charter §13.1.
+# Record this host's machine state into docs/environment/: macbook.md on the Mac
+# (and tools/versions.lock), pc-wsl.md or linux.md on Linux. Charter §13.1.
 env-record:
     @bash scripts/record-environment.sh
 

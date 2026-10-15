@@ -23,6 +23,26 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**2026-10-15: Pleris is developed on Windows inside WSL2** (the move to the
+owner's PC; track `pc-setup`, merged from `c7f4630b`).
+- A clone is LF on every platform: a root `.gitattributes` (`* text=auto
+  eol=lf`, the tree's binary types named), where Git for Windows would
+  check the tree out CRLF; the tree renormalizes to itself.
+- `just doctor` reads a Linux host, a WSL2 Ubuntu or CI's ubuntu-24.04: its
+  processor and memory, Chrome where Playwright installed it, Linux hints,
+  and a worktree, whose `.git` is a file. A version compares by its first
+  dotted number, so a build's stamp is no difference. The Mac's output is
+  as it was. `just env-record` writes the host's own record
+  (`docs/environment/pc-wsl.md` on WSL2) and leaves `tools/versions.lock`,
+  the Mac's record advanced by ADRs, alone.
+- CI's actions run on Node 24 (`setup-just@v4`, `pnpm/action-setup@v5`;
+  `fallow.yml` on the other workflows' versions), and setup-just installs
+  the pinned just 1.58.0 where it installed the newest. The README says to
+  develop inside WSL2, on WSL's own filesystem.
+- Its verify (38659086865) was green; its `ci` (38659086894) red in
+  "licenses and advisories" alone, Wasmtime 48.0.5's (ADR-0335 above).
+Verify TRAIN_RUN green, with train-8.
+
 **ADR-0337, 2026-10-14: a read is bounded by construction** (W9's design
 note for NEXT 4c; track `bounded-reads`, merged from `8bc1fe68`; ruled by
 the integrator 2026-10-14). Docs only: nothing is built yet.
