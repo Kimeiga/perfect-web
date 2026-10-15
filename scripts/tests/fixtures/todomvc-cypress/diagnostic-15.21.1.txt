@@ -1,0 +1,110 @@
+[316893:1015/165045.754179:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Failed to connect to socket /run/user/1000/bus: No such file or directory
+[316893:1015/165045.754320:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Failed to connect to socket /run/user/1000/bus: No such file or directory
+[316893:1015/165045.754342:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Failed to connect to socket /run/user/1000/bus: No such file or directory
+[316893:1015/165045.754361:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Failed to connect to socket /run/user/1000/bus: No such file or directory
+[316893:1015/165045.754370:ERROR:dbus/object_proxy.cc:590] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: 
+
+DevTools listening on ws://127.0.0.1:38595/devtools/browser/266f83a1-4d61-45e9-b5ef-3040c439d014
+[317148:1015/165045.773971:WARNING:ui/gfx/linux/gpu_memory_buffer_support_x11.cc:49] dri3 extension not supported.
+[317148:1015/165045.775323:WARNING:sandbox/policy/linux/sandbox_linux.cc:415] InitializeSandbox() called with multiple threads in process gpu-process.
+Warning: The allowCypressEnv configuration option is enabled. This allows any browser code to read values from Cypress.env(). This is insecure and will be removed in a future major version.
+
+1. Replace Cypress.env() calls with cy.env() (for sensitive values) or Cypress.expose() (for public configuration)
+2. Set allowCypressEnv: false in your Cypress configuration to disable Cypress.env()
+
+Learn more: https://on.cypress.io/cypress-env-migration
+
+
+================================================================================
+
+  (Run Starting)
+
+  ┌────────────────────────────────────────────────────────────────────────────────────────────────┐
+  │ Cypress:        15.21.1                                                                        │
+  │ Browser:        Electron 138 (headless)                                                        │
+  │ Node Version:   v22.21.1 (/home/user/.nvm/versions/node/v22.21.1/bin/node)                     │
+  │ Specs:          1 found (spec.cy.js)                                                           │
+  │ Searched:       cypress/e2e/**/*.cy.js                                                         │
+  └────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────
+                                                                                                    
+  Running:  spec.cy.js                                                                      (1 of 1)
+[316893:1015/165050.556204:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Failed to connect to socket /run/user/1000/bus: No such file or directory
+[316893:1015/165052.497396:INFO:CONSOLE:521] "framework %s has %d issue(s) puremvc 0", source: http://127.0.0.1:7684/__cypress/tests?p=cypress/e2e/spec.cy.js (521)
+[316893:1015/165052.497468:INFO:CONSOLE:673] "Running tests %d time(s) 1", source: http://127.0.0.1:7684/__cypress/tests?p=cypress/e2e/spec.cy.js (673)
+
+
+  TodoMVC - puremvc
+    When page is initially opened
+      ✓ should focus on the todo input field (159ms)
+    No Todos
+      ✓ starts with nothing (90ms)
+      ✓ should hide #main and #footer (104ms)
+    New Todo
+      ✓ should allow me to add todo items (614ms)
+      ✓ should clear text input field when an item is added (387ms)
+      ✓ should append new items to the bottom of the list (964ms)
+      ✓ should trim text input (491ms)
+      ✓ should show #main and #footer when items added (406ms)
+    Mark all as completed
+      ✓ should allow me to mark all items as completed (985ms)
+      ✓ should allow me to clear the complete state of all items (1088ms)
+      ✓ complete all checkbox should update state when items are completed / cleared (1110ms)
+    Item
+      ✓ should allow me to mark items as complete (754ms)
+      ✓ should allow me to un-mark items as complete (729ms)
+      ✓ should allow me to edit an item (1387ms)
+    Editing
+      ✓ should hide other controls when editing (1028ms)
+      ✓ should save edits on blur (1400ms)
+      ✓ should trim entered text (1384ms)
+      ✓ should remove the item if an empty text string was entered (1168ms)
+      ✓ should cancel edits on escape (1140ms)
+    Counter
+      ✓ should display the current number of todo items (575ms)
+    Clear completed button
+      ✓ should display the correct text (989ms)
+      ✓ should remove completed items when clicked (1064ms)
+      ✓ should be hidden when there are no items that are completed (1059ms)
+    Persistence
+      - should persist its data
+    Routing
+      ✓ should allow me to display active items (1081ms)
+      ✓ should respect the back button (1350ms)
+      ✓ should allow me to display completed items (1101ms)
+      ✓ should allow me to display all items (1294ms)
+      ✓ should highlight the currently applied filter (1398ms)
+
+
+  28 passing (26s)
+  1 pending
+
+
+  (Results)
+
+  ┌────────────────────────────────────────────────────────────────────────────────────────────────┐
+  │ Tests:        29                                                                               │
+  │ Passing:      28                                                                               │
+  │ Failing:      0                                                                                │
+  │ Pending:      1                                                                                │
+  │ Skipped:      0                                                                                │
+  │ Screenshots:  0                                                                                │
+  │ Video:        false                                                                            │
+  │ Duration:     26 seconds                                                                       │
+  │ Spec Ran:     spec.cy.js                                                                       │
+  └────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+
+  (Run Finished)
+
+
+       Spec                                              Tests  Passing  Failing  Pending  Skipped  
+  ┌────────────────────────────────────────────────────────────────────────────────────────────────┐
+  │ ✔  spec.cy.js                               00:26       29       28        -        1        - │
+  └────────────────────────────────────────────────────────────────────────────────────────────────┘
+    ✔  All specs passed!                        00:26       29       28        -        1        -  
+

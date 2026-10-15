@@ -13,7 +13,7 @@ mutant undoes one thing:
   build, no host) and where the verdict fails.
 
 At least one test of `scripts/tests/test_todomvc_cypress.py` must then fail.
-Its fixtures are real outputs of Cypress 15.14.2 against this app, and `run.sh`
+Its fixtures are real outputs of Cypress 15.14.2 and 15.21.1 against this app, and `run.sh`
 is run whole there with a Cypress that prints what the test says.
 
 Run from the repository root; `just e14-todomvc` records the output. The

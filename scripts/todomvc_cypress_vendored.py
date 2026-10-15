@@ -10,8 +10,9 @@ here, whoever's change it was.
 
     python3 scripts/todomvc_cypress_vendored.py        # exit 1 on any drift
 
-The suite's own package pins Cypress as that repository's lockfile does
-(15.14.2), which is held here too.
+The suite's own package pins Cypress too, and that is held here: 15.21.1, the
+last 15.x. (Upstream's lockfile pins 15.14.2, whose dependency tree carries six
+advisories, in `uuid`, `qs` and `extract-zip`, that this one's does not.)
 """
 
 import hashlib
@@ -32,7 +33,7 @@ BLOBS = {
     "cypress.config.js": "9557466f8850fd01fe05406acbc69d2e713fccd1",
     "LICENSE-todomvc.md": "9275d4371020294b6a107e454a0d1819f8b71c31",
 }
-CYPRESS = "15.14.2"
+CYPRESS = "15.21.1"
 
 
 def blob(data):

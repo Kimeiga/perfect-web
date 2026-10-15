@@ -69,16 +69,27 @@ records both runs; the suite is not part of `just ci`.
 
 # The binary
 
-Cypress 15.14.2 (the version that repository's own lockfile pins) is two
-downloads, approved by the owner on 2026-10-08 for this track:
+Cypress 15.21.1 is two downloads, approved by the owner on 2026-10-08 for
+this track:
 
-- the npm package `cypress@15.14.2` from the npm registry (7.4 MB installed;
-  162 packages with its dependency tree, held by `pnpm-lock.yaml`), and
+- the npm package `cypress@15.21.1` from the npm registry (7.6 MB installed,
+  with its dependency tree held by `pnpm-lock.yaml`), and
 - its binary, which pnpm 10 does not fetch (it runs no install scripts):
   `pnpm exec cypress install` fetches it from `download.cypress.io` into
-  Cypress's own cache (`~/.cache/Cypress/15.14.2`, 805 MB unzipped; the size
-  of the zip was not recorded). `just e14-todomvc` runs that command, which
-  does nothing where the binary is already there.
+  Cypress's own cache (`~/.cache/Cypress/15.21.1`): a zip of 248,957,235 bytes
+  (the length its CDN reports), 813 MB unzipped. `just e14-todomvc` runs that
+  command, which does nothing where the binary is already there.
+
+**Why 15.21.1 and not 15.14.2**, which that repository's own lockfile pins
+(first installed here, 2026-10-14): 15.14.2's dependency tree carries six
+advisories that `scripts/audit-node.sh` refuses (`uuid` GHSA-w5hq-g745-h8pq;
+`qs` GHSA-q8mj-m7cp-5q26, GHSA-x5fp-wj9c-mxmx and GHSA-4mjr-xmp4-gh2g;
+`extract-zip` GHSA-jmr9-qjv8-65gv and GHSA-7pqw-9j4j-h8q3), and 15.21.1's has
+none (its direct dependencies no longer include `extract-zip`, and
+`@cypress/request` is 4.x, as the registry's metadata shows). It is the
+last 15.x: the spec reads `Cypress.env()`, which Cypress 15 warns a future
+major will drop, so 16.x (16.2.0 is current) is not used. The suite printed the
+same outcomes on both (`scripts/tests/fixtures/todomvc-cypress/`).
 
 Cypress needs a display and starts Xvfb itself (`apt: xvfb`); `run.sh` fails
 where it is missing.

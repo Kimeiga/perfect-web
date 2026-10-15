@@ -4,8 +4,8 @@ judged by what it prints (`todomvc_cypress_result.py`), and run by `run.sh`.
 Track `todomvc` runs the official spec unchanged as its acceptance. That is a
 claim about bytes (the vendored files are upstream's) and a claim about a run
 (the suite ran, and each test came out as the app's design gives it). These
-tests hold the checks to both: the fixtures are real outputs of Cypress 15.14.2
-against this app (`fixtures/todomvc-cypress/`), each rule of the judgement is
+tests hold the checks to both: the fixtures are real outputs of Cypress 15.14.2 and
+15.21.1 against this app (`fixtures/todomvc-cypress/`), each rule of the judgement is
 broken in a copy of one of them, and `run.sh` is run whole with a stand-in
 Cypress that prints what a test says, so a suite that cannot run is seen to
 fail and not to be skipped.
@@ -44,10 +44,13 @@ def fixture(name):
     return (FIXTURES / name).read_text(encoding="utf-8")
 
 
+# Cypress 15.14.2 (the first three) and 15.21.1 (the last two), as they printed.
 ACCEPTANCE = fixture("acceptance.txt")  # the hook fails at test 7; 4 failing
 ACCEPTANCE_6 = fixture("acceptance-hook-at-6.txt")  # the hook fails at test 6; 3 failing
 DIAGNOSTIC = fixture("diagnostic.txt")  # 28 passing, 1 pending
 RACY = fixture("diagnostic-racy.txt")  # as it is when test 11 loses its race
+ACCEPTANCE_NEW = fixture("acceptance-15.21.1.txt")  # the hook fails at test 6; 3 failing
+DIAGNOSTIC_NEW = fixture("diagnostic-15.21.1.txt")  # 28 passing, 1 pending
 TESTS = result.spec_tests(result.SPEC.read_text(encoding="utf-8"))
 
 
@@ -166,6 +169,14 @@ class Parse(unittest.TestCase):
         self.assertEqual(run["errors"][4], "Error: Cannot determine what kind of selectors this app uses.")
         self.assertTrue(run["storage_denied"])
 
+    def test_the_newer_cypress_prints_the_same_lines(self):
+        run = result.parse_run(ACCEPTANCE_NEW)
+        self.assertEqual(run["cypress"], "15.21.1")
+        self.assertEqual(run["counts"]["Tests"], 29)
+        self.assertEqual(len(run["passed"]), 3)
+        self.assertTrue(run["storage_denied"])
+        self.assertEqual(result.parse_run(DIAGNOSTIC_NEW)["pending"], ["should persist its data"])
+
     def test_the_diagnostic_is_read(self):
         run = result.parse_run(DIAGNOSTIC)
         self.assertEqual(len(run["passed"]), 28)
@@ -188,7 +199,7 @@ class Parse(unittest.TestCase):
 
 class JudgeAcceptance(unittest.TestCase):
     def test_the_acceptances_the_app_gives_are_judged_right(self):
-        for text, status in ((ACCEPTANCE, 4), (ACCEPTANCE_6, 3)):
+        for text, status in ((ACCEPTANCE, 4), (ACCEPTANCE_6, 3), (ACCEPTANCE_NEW, 3)):
             st, problems = judged("acceptance", text, status)
             self.assertEqual(problems, [])
             self.assertEqual([st[n].state for n in (1, 2, 3)], ["pass"] * 3)
@@ -262,6 +273,9 @@ class JudgeAcceptance(unittest.TestCase):
 
 class JudgeDiagnostic(unittest.TestCase):
     def test_the_diagnostics_the_app_gives_are_judged_right(self):
+        for text in (DIAGNOSTIC, DIAGNOSTIC_NEW):
+            _, problems = judged("diagnostic", text, 0)
+            self.assertEqual(problems, [])
         st, problems = judged("diagnostic", DIAGNOSTIC, 0)
         self.assertEqual(problems, [])
         self.assertEqual(st[24].state, "pending")
@@ -368,7 +382,7 @@ FAKE_PNPM = """#!/bin/sh
 echo "$*" >> "$FAKE_CALLS"
 case "$3" in
   verify) exit "$FAKE_VERIFY" ;;
-  --version) echo "Cypress package version: 15.14.2"; exit 0 ;;
+  --version) echo "Cypress package version: 15.21.1"; exit 0 ;;
   run)
     echo "env DISPLAY=${DISPLAY-unset} WAYLAND_DISPLAY=${WAYLAND_DISPLAY-unset} ELECTRON_ENABLE_LOGGING=${ELECTRON_ENABLE_LOGGING-unset}" >> "$FAKE_CALLS"
     if [ "${ELECTRON_ENABLE_LOGGING-}" = 1 ]; then cat "$FAKE_OUTPUT"; else cat "$FAKE_OUTPUT_WITHOUT_LOG"; fi
