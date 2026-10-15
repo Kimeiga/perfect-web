@@ -1,7 +1,9 @@
 {
   "id": "J01-stale-page-after-save",
   "leaf": "J01",
-  "also": ["B06"],
+  "also": [
+    "B06"
+  ],
   "title": "A page shown after a save is the one read before it",
   "source": {
     "ref": "ADR-0280 (the owner's own Next.js case); S17",
@@ -11,6 +13,10 @@
     "says": "ADR-0280's reading: a `router.push` from an event handler goes through the client's Router Cache, whose `static` stale time keeps a static or fully prefetched page for five minutes; so a page pushed to after a save can be the one read before it, and the usual fixes are `router.refresh()`, a cache-busting parameter or a hard reload. S17: correct reuse depends on every response-varying input, not merely the URL"
   },
   "claim": "ADR-0280: a handler navigates after its command commits, and the page navigated to is read after the commit, by order alone (the server serves it after the session's turn, as `no-store`)",
+  "related": [
+    "docs/DECISIONS/ADR-0280-a-handler-navigates-after-its-command-commits.md",
+    "spikes/own-renderer/e2e/navigate.spec.mjs"
+  ],
   "repro": {
     "stack": "next-react",
     "bug": "next-react.patch",

@@ -10,9 +10,15 @@
     "says": "the census's reading: output contexts need different treatment, and safe text sinks, validated URLs and audited HTML sanitization are not interchangeable (S21); Trusted Types constrains values entering injection sinks through explicit policies (S27)"
   },
   "claim": "charter §8.2 (escaping is the default); `html.raw_html` performs `unsafe.raw_html`, and reaching it needs an audited capability with a justification (PW5010)",
+  "related": [
+    "examples/rejected/R-024-raw-unsafe-HTML-without-capability.pw",
+    "benchmarks/tasks/T09-notice-freshness"
+  ],
   "repro": {
     "stack": "sveltekit",
-    "base": ["benchmarks/tasks/T09-notice-freshness/setup/sveltekit.patch"],
+    "base": [
+      "benchmarks/tasks/T09-notice-freshness/setup/sveltekit.patch"
+    ],
     "bug": "sveltekit.patch",
     "fixed": "fixed.sveltekit.patch",
     "how": "T09's store notice, which staff post, rendered with Svelte's `{@html}` so that its formatting shows; the repair renders it as text, `{data.notice}`, which Svelte escapes"
@@ -20,7 +26,9 @@
   "pleris": {
     "kind": "diagnostic",
     "code": "PW5010",
-    "base": ["benchmarks/tasks/T09-notice-freshness/setup/pleris.patch"],
+    "base": [
+      "benchmarks/tasks/T09-notice-freshness/setup/pleris.patch"
+    ],
     "patch": "pleris.patch",
     "faithful": "The same notice, on the same store (T09's setup), rendered through `html.raw_html`: refused, naming the capability and the escaped alternative. Its neighbour is T09's `{notice}`, escaped by default."
   },

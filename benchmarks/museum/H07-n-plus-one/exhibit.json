@@ -10,6 +10,9 @@
     "says": "the census's own model: one remote lookup per list row; logical data demand should not impose unnecessary serial or per-row round trips (H07). S33 is the overload a multiplied demand causes, not an N+1 incident. A dated primary source is still to be found, so this exhibit does not yet qualify under the ADR's rule and is shown as a miss pending its source"
   },
   "claim": "none: the census marks H07 'specified but unproven' (batch only with equivalent authorization, consistency, limits and failure semantics; report unbatchable causes)",
+  "related": [
+    "examples/generality/undeclared_effect/complete-row.pw"
+  ],
   "repro": {
     "stack": "next-react",
     "bug": "next-react.patch",

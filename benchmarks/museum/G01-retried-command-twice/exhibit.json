@@ -1,7 +1,9 @@
 {
   "id": "G01-retried-command-twice",
   "leaf": "G01",
-  "also": ["M04"],
+  "also": [
+    "M04"
+  ],
   "title": "One press applied twice when its request is delivered twice",
   "source": {
     "ref": "S13, S14",
@@ -11,6 +13,10 @@
     "says": "the census's reading: caller intent identifiers differ from hashes of equal arguments, and idempotency needs a defined scope and atomic recording (S13); Stripe's API keys every POST by an idempotency key (S14). ADR-0154 adds RFC 9110 §9.2.2: a client must not retry a non-idempotent request automatically unless it knows the request is idempotent"
   },
   "claim": "ADR-0154 (a command a page's handler calls declares `idempotent_by`, PW0338); ADR-0121 (every press has an interaction)",
+  "related": [
+    "examples/rejected/R-014-retry-of-non-idempotent-command.pw",
+    "benchmarks/tasks/T08-duplicate-submissions"
+  ],
   "repro": {
     "stack": "next-react",
     "bug": null,

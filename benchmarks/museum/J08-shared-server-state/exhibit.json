@@ -13,6 +13,10 @@
     "says": "the census's reading (SOURCES.md S54): the documented server-global example leaks one user's data to another and loses state across restart"
   },
   "claim": "charter §7.8 (privacy labels); ADR-0128 (a key naming the reader does not make a shared cache safe)",
+  "related": [
+    "examples/rejected/R-004-private-cart-in-shared-cache.pw",
+    "benchmarks/tasks/T12-repair-cart-cache"
+  ],
   "repro": {
     "stack": "sveltekit",
     "bug": "sveltekit.patch",
