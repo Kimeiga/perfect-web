@@ -245,7 +245,7 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
             out.extend(crate::scheduled::check(&hirs, i, &workspace, &sigs));
             // 4c, a read is bounded by construction: no read in a loop over
             // data is keyed by its element (PW0405), a set read's source
-            // batches (PW0406), and a keyed read names its set form (PW0335).
+            // batches (PW0406), and a keyed read names its set form (PW0407).
             out.extend(bounded.check(i, &u.src));
             // ADR-0163: a page says when its address names nothing.
             out.extend(not_found_names_a_case(&u.hir, i, &sigs, &workspace));

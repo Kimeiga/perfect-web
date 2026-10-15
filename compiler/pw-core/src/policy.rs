@@ -166,7 +166,7 @@ pub enum Domain {
     /// `set hours_of_stores` on `fn hours_of(store: StoreId)`, a function of
     /// the same source given a list of the keyed read's key and answering a
     /// list of what it answers, with its key. Resolved, and held to that
-    /// shape, by `bounded::check` (PW0335).
+    /// shape, by `bounded::check` (PW0407).
     SetRead,
 }
 

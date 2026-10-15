@@ -9,7 +9,8 @@
 //! are accepted: a key that is no element's, the set read before the loop, a
 //! callback applied once, a parameter a recursion passes along, a write. A
 //! set read on a source that cannot batch is warned (PW0406), and the pair's
-//! shape held (PW0335). The store and the feed read nothing per element, and
+//! shape held (PW0407, a rule of its own since the integrator's ruling of
+//! 2026-10-15). The store and the feed read nothing per element, and
 //! kiokun.com's four reads per element are the known ones.
 
 use pw_core::check::check_sources;
@@ -58,15 +59,15 @@ fn reported(src: &str) -> Vec<String> {
         .collect()
 }
 
-/// What this track's rules report of `m.pw`: PW0405, PW0406, and PW0335 of
-/// a `set` or a `sets`.
+/// What this track's rules report of `m.pw`: PW0405, PW0406, PW0407 (the
+/// pair's shape) and PW5105 of a clause on a declaration it is not for.
 fn bounded(src: &str) -> Vec<String> {
     reported(src)
         .into_iter()
         .filter(|d| {
             d.starts_with("PW0405")
                 || d.starts_with("PW0406")
-                || d.starts_with("PW0335 `set")
+                || d.starts_with("PW0407")
                 || d.starts_with("PW5105")
         })
         .collect()
@@ -599,15 +600,15 @@ fn a_set_names_a_function_of_the_same_source_given_and_answering_lists() {
     };
     assert_eq!(
         shaped("nothing_here", ""),
-        ["PW0335 `set nothing_here`: `nothing_here` names no function visible here"]
+        ["PW0407 `set nothing_here`: `nothing_here` names no function visible here"]
     );
     assert_eq!(
         shaped("Price", ""),
-        ["PW0335 `set Price`: `Price` names no function visible here"]
+        ["PW0407 `set Price`: `Price` names no function visible here"]
     );
     assert_eq!(
         shaped("price_of", ""),
-        ["PW0335 `set price_of`: `price_of` is `price_of` itself"]
+        ["PW0407 `set price_of`: `price_of` is `price_of` itself"]
     );
     assert_eq!(
         shaped(
@@ -616,7 +617,7 @@ fn a_set_names_a_function_of_the_same_source_given_and_answering_lists() {
              \"m:data/prices#one\"\n"
         ),
         [
-            "PW0335 `set price_one`: `price_one` takes `(Int)`, and a set read of `price_of` takes `(List<Int>)`"
+            "PW0407 `set price_one`: `price_one` takes `(Int)`, and a set read of `price_of` takes `(List<Int>)`"
         ]
     );
     assert_eq!(
@@ -626,7 +627,7 @@ fn a_set_names_a_function_of_the_same_source_given_and_answering_lists() {
              \"m:data/prices#cents\"\n"
         ),
         [
-            "PW0335 `set cents_of`: `cents_of` answers `List<Int>`, and a set read of `price_of` answers a list of `Price` with its `Int`"
+            "PW0407 `set cents_of`: `cents_of` answers `List<Int>`, and a set read of `price_of` answers a list of `Price` with its `Int`"
         ]
     );
     assert_eq!(
@@ -638,7 +639,7 @@ fn a_set_names_a_function_of_the_same_source_given_and_answering_lists() {
              \"m:data/others#for-items\"\n"
         ),
         [
-            "PW0335 `set elsewhere`: `elsewhere` reads from `Mirror`, and `price_of` from `Ledger`: a set read is of its keyed read's source"
+            "PW0407 `set elsewhere`: `elsewhere` reads from `Mirror`, and `price_of` from `Ledger`: a set read is of its keyed read's source"
         ]
     );
     // A list of the keyed result that holds its key is a set read too: here
@@ -662,7 +663,7 @@ fn a_set_belongs_to_a_function_that_reads_and_sets_to_a_source() {
     );
     assert_eq!(
         bounded(&pure),
-        ["PW0335 `set prices_of`: `item_of` reads no source, so it has no set read"]
+        ["PW0407 `set prices_of`: `item_of` reads no source, so it has no set read"]
     );
     // `set` on a query, and `sets` on a function, are each another's clause.
     let on_query = PROGRAM.replace(
@@ -791,7 +792,7 @@ fn bounded_in(program: &[(String, String)]) -> Vec<String> {
                 .map(move |d| format!("{path}: {} {}", d.code, d.message))
         })
         .filter(|d| {
-            d.contains(": PW0405 ") || d.contains(": PW0406 ") || d.contains(": PW0335 `set")
+            d.contains(": PW0405 ") || d.contains(": PW0406 ") || d.contains(": PW0407 ")
         })
         .collect()
 }

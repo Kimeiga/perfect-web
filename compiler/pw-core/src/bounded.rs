@@ -19,9 +19,9 @@
 //!   per_key`, or no `sets`) is a call per key, so the calls of the page or
 //!   the command that makes it grow with its data.
 //! - **`set`** on a keyed read names its set form, held to its shape
-//!   (PW0335): a function of the same source, given a list of the keyed
-//!   read's key, answering a list of what the keyed read answers, with its
-//!   key.
+//!   (PW0407, the pair's own rule): a function of the same source, given a
+//!   list of the keyed read's key, answering a list of what the keyed read
+//!   answers, with its key.
 //! - **`sets`** on a source: `one_call`, `chunked(k)` or `per_key`, which a
 //!   source that states none is.
 //!
@@ -241,7 +241,7 @@ impl<'p, 'i> Reads<'p, 'i> {
     }
 
     /// **What `unit` reads wrong**: its `set` clauses that do not fit
-    /// (PW0335), its reads per element (PW0405), and its set reads on a
+    /// (PW0407), its reads per element (PW0405), and its set reads on a
     /// source that cannot batch (PW0406).
     pub(crate) fn check(&self, unit: usize, src: &str) -> Vec<Diagnostic> {
         let mut out: Vec<Diagnostic> = self
@@ -1407,9 +1407,10 @@ impl<'p, 'i> Reads<'p, 'i> {
 
     // --- the `set` pair --------------------------------------------------------
 
-    /// **Each `set` clause, held to its shape** (PW0335): it names a function
-    /// of the same source, given a list of the keyed read's key, answering a
-    /// list of what the keyed read answers, with its key.
+    /// **Each `set` clause, held to its shape** (PW0407, the pair's own rule
+    /// since the integrator's ruling of 2026-10-15; it was PW0335's): it names
+    /// a function of the same source, given a list of the keyed read's key,
+    /// answering a list of what the keyed read answers, with its key.
     fn pair(&mut self) {
         let mut pairs = BTreeMap::new();
         let mut faults = Vec::new();
@@ -1431,8 +1432,8 @@ impl<'p, 'i> Reads<'p, 'i> {
                     Err((why, at)) => faults.push((
                         unit,
                         Diagnostic {
-                            code: codes::POLICY_VALUE.id,
-                            invariant: codes::POLICY_VALUE.invariant,
+                            code: codes::SET_PAIR_SHAPE.id,
+                            invariant: codes::SET_PAIR_SHAPE.invariant,
                             reason: "set_pair_shape",
                             detector: Detector::DeclarationRule,
                             severity: Severity::Error,
