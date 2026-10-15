@@ -122,6 +122,9 @@ pub(crate) struct Tail {
     conn: Mutex<Option<Client>>,
     /// When it last trimmed.
     trimmed: Mutex<Option<std::time::Instant>>,
+    /// A test's step between [`Tail::heard`]'s two reads, run once.
+    #[cfg(test)]
+    between: Mutex<Option<Box<dyn FnOnce() + Send>>>,
 }
 
 impl Tail {
@@ -136,6 +139,8 @@ impl Tail {
             cursor: Mutex::new(0),
             conn: Mutex::new(None),
             trimmed: Mutex::new(None),
+            #[cfg(test)]
+            between: Mutex::new(None),
         };
         let highest = tail.with(|c| {
             c.query_one("SELECT coalesce(max(id), 0)::bigint FROM outbox", &[])
@@ -200,18 +205,27 @@ impl Tail {
     /// its transaction, in commit order; its own passed by. It moves
     /// nothing: the host moves the cursor once it told each
     /// ([`Tail::passed`]).
+    ///
+    /// The rows are read first, and what was trimmed after them: a trim
+    /// that comes between the two reads leaves its mark past the cursor, and
+    /// the host's pages reload, at worst for rows it did read. Read the other
+    /// way round, a trim between them deletes rows past the cursor while the
+    /// mark read before it says none was missed, and they are passed by in
+    /// silence.
     pub(crate) fn heard(&self) -> Result<Heard, String> {
         let cursor = self.cursor();
-        let (trimmed, rows) = self.with(|c| {
-            let trimmed: i64 = c
-                .query_one("SELECT through FROM outbox_trimmed", &[])?
-                .get(0);
+        let (rows, trimmed) = self.with(|c| {
             let rows = c.query(
                 "SELECT id, host, committed_in::text, kind, name, args::text FROM outbox \
                  WHERE id > $1 ORDER BY id LIMIT $2",
-                &[&cursor.max(trimmed), &BATCH],
+                &[&cursor, &BATCH],
             )?;
-            Ok((trimmed, rows))
+            #[cfg(test)]
+            self.between_reads();
+            let trimmed: i64 = c
+                .query_one("SELECT through FROM outbox_trimmed", &[])?
+                .get(0);
+            Ok((rows, trimmed))
         })?;
         let mut heard = Heard {
             missed: trimmed > cursor,
@@ -234,8 +248,10 @@ impl Tail {
         };
         for row in &rows {
             let (id, host, txn): (i64, String, String) = (row.get(0), row.get(1), row.get(2));
-            heard.through = id;
-            if host == self.host {
+            heard.through = heard.through.max(id);
+            // Its own, which its committing thread told at once; and any at
+            // or below what was trimmed, which its pages reload for.
+            if host == self.host || id <= trimmed {
                 continue;
             }
             let same = commit.as_ref().is_some_and(|(t, _, _)| *t == txn);
@@ -249,6 +265,20 @@ impl Tail {
         }
         done(commit, &mut heard)?;
         Ok(heard)
+    }
+
+    /// A test's `step` run once between [`Tail::heard`]'s two reads.
+    #[cfg(test)]
+    pub(crate) fn between_reads_once(&self, step: impl FnOnce() + Send + 'static) {
+        *self.between.lock().expect("between") = Some(Box::new(step));
+    }
+
+    #[cfg(test)]
+    fn between_reads(&self) {
+        let step = self.between.lock().expect("between").take();
+        if let Some(step) = step {
+            step();
+        }
     }
 
     /// **Its cursor moved past `id`**, once what it read through `id` was

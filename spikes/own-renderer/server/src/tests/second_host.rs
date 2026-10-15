@@ -228,6 +228,40 @@ fn a_host_started_after_commits_starts_past_them() {
     );
 }
 
+/// **A host opening the database deletes nothing from its outbox**, in
+/// either layer: a row another host has yet to read stays. Until ADR-XXXX
+/// each opening deleted the outbox, so a host started, or restarted, beside
+/// a running one ate the rows that host had not read.
+#[test]
+fn a_host_opening_the_database_deletes_nothing_from_its_outbox() {
+    let Some(url) = database() else { return };
+    let unread = "INSERT INTO outbox (kind, name, args, host) \
+                  VALUES ('event', 'app.Changed', '[]', 'h-another')";
+    let db = Schema::new(&url, "opened");
+    let _a = FeedPg::open(&url, Some(&db.name)).expect("A's layer");
+    db.sql()
+        .batch_execute(unread)
+        .expect("a row A has yet to read");
+    let _b = FeedPg::open(&url, Some(&db.name)).expect("B's layer");
+    assert_eq!(
+        db.count("SELECT count(*) FROM outbox"),
+        1,
+        "the feed's row kept"
+    );
+    let Some(url) = store_database() else { return };
+    let a = StorePg::for_test(&url).expect("A's layer");
+    a.sql()
+        .batch_execute(unread)
+        .expect("a row A has yet to read");
+    let _b = StorePg::open_with(&url, a.schema(), Isolation::Serializable).expect("B's layer");
+    let kept: i64 = a
+        .sql()
+        .query_one("SELECT count(*) FROM outbox", &[])
+        .expect("counted")
+        .get(0);
+    assert_eq!(kept, 1, "the store's row kept");
+}
+
 /// **A host whose cursor fell below what was trimmed reloads its pages**:
 /// what the trimmed rows said can no longer be told, so each document is
 /// told to reload, and the host goes on from the trimmed id, never skipping
@@ -243,6 +277,42 @@ fn a_host_behind_the_trim_tells_its_pages_to_reload() {
     tail(&a).trim_older_than("0 seconds").expect("trimmed");
     assert_eq!(db.count("SELECT count(*) FROM outbox"), 0, "trimmed");
     b.hear();
+    let told = frames(&b, &theirs);
+    assert!(
+        told.iter().any(|f| f.contains("Reload")),
+        "told to reload: {told:?}"
+    );
+    assert_eq!(
+        tail(&b).cursor(),
+        db.count("SELECT through FROM outbox_trimmed"),
+        "on from the trimmed id"
+    );
+}
+
+/// **A trim between a host's two reads is learned, never passed by in
+/// silence**: a host reads the rows after its cursor and only then what was
+/// trimmed, so a trim that comes between the two (here of every row, A's
+/// post's among them) leaves its mark past B's cursor, and B's pages
+/// reload. Read the other way round, the mark read before the trim said
+/// none was missed, and the rows, gone by the second read, were passed by.
+#[test]
+fn a_trim_between_a_hosts_two_reads_is_learned() {
+    let Some(url) = database() else { return };
+    let db = Schema::new(&url, "trim_between");
+    let a = feed_host(&url, &db);
+    let b = feed_host(&url, &db);
+    let theirs = home(&b, "b");
+    post(&a, "a", "Trimmed between B's two reads", "i-1");
+    let trimmer = Tail::open(&url, tail(&a).outbox().clone(), "h-trimmer").expect("a trimmer");
+    tail(&b).between_reads_once(move || {
+        trimmer.trim_older_than("0 seconds").expect("trimmed");
+    });
+    b.hear();
+    assert_eq!(
+        db.count("SELECT count(*) FROM outbox"),
+        0,
+        "trimmed between B's reads"
+    );
     let told = frames(&b, &theirs);
     assert!(
         told.iter().any(|f| f.contains("Reload")),
@@ -409,6 +479,80 @@ fn a_sign_in_begun_on_one_host_completes_on_another_and_holds_on_both() {
     );
 }
 
+/// The sign-in a browser begins on `s` as `sub`, stopped before its
+/// callback: the callback's path and the cookies the browser sends it.
+fn begun(s: &Server, provider: &TestProvider, sub: &str) -> (String, String) {
+    let started = get(s, "/sign-in", "pw-session=s-came");
+    let (state, _) = set_cookie(&started, "pw-sign-in").expect("the sign-in's cookie");
+    let back = provider.authenticate(&location(&started), sub, sub);
+    (
+        format!("/sign-in/callback?{back}"),
+        format!("pw-session=s-came; pw-sign-in={state}"),
+    )
+}
+
+/// **A sign-in completes once, whichever host its callback reaches again**
+/// (ADR-0258's "once", held across hosts): the callback B completed,
+/// replayed on A, is refused, its sign-in already taken from where the
+/// hosts keep it, and no session is given.
+#[test]
+fn a_sign_in_completed_on_one_host_is_refused_again_on_another() {
+    let Some(url) = database() else { return };
+    let db = Schema::new(&url, "replayed");
+    let provider = Arc::new(TestProvider::default());
+    let a = feed_host_signing_in(&url, &db, &provider);
+    let b = feed_host_signing_in(&url, &db, &provider);
+    let (callback, cookies) = begun(&a, &provider, "ada");
+    let first = get(&b, &callback, &cookies);
+    assert!(first.starts_with("HTTP/1.1 303"), "{first}");
+    let again = get(&a, &callback, &cookies);
+    assert!(again.starts_with("HTTP/1.1 400"), "{again}");
+    assert!(again.contains("already completed or is unknown"), "{again}");
+    assert!(set_cookie(&again, "pw-session").is_none(), "{again}");
+}
+
+/// **A sign-in begun more than ten minutes ago is refused on any host**
+/// (ADR-0258's lifetime): its age is the database's clock's, which every
+/// host reads alike, not the clock of the host that began it.
+#[test]
+fn a_sign_in_begun_too_long_ago_is_refused_on_another_host() {
+    let Some(url) = database() else { return };
+    let db = Schema::new(&url, "too_long");
+    let provider = Arc::new(TestProvider::default());
+    let a = feed_host_signing_in(&url, &db, &provider);
+    let b = feed_host_signing_in(&url, &db, &provider);
+    let (callback, cookies) = begun(&a, &provider, "ada");
+    db.sql()
+        .batch_execute("UPDATE sign_ins SET started = started - interval '11 minutes'")
+        .expect("begun eleven minutes ago");
+    let answer = get(&b, &callback, &cookies);
+    assert!(answer.starts_with("HTTP/1.1 400"), "{answer}");
+    assert!(answer.contains("took too long"), "{answer}");
+    assert!(set_cookie(&answer, "pw-session").is_none(), "{answer}");
+}
+
+/// **A sign-in abandoned is forgotten by the next one begun** on any host,
+/// once its ten minutes are past: the table holds the sign-ins under way,
+/// not every one ever begun.
+#[test]
+fn an_abandoned_sign_in_is_forgotten_by_the_next_one() {
+    let Some(url) = database() else { return };
+    let db = Schema::new(&url, "abandoned");
+    let provider = Arc::new(TestProvider::default());
+    let a = feed_host_signing_in(&url, &db, &provider);
+    let b = feed_host_signing_in(&url, &db, &provider);
+    begun(&a, &provider, "ada");
+    db.sql()
+        .batch_execute("UPDATE sign_ins SET started = started - interval '11 minutes'")
+        .expect("abandoned eleven minutes ago");
+    begun(&b, &provider, "grace");
+    assert_eq!(
+        db.count("SELECT count(*) FROM sign_ins"),
+        1,
+        "the one under way"
+    );
+}
+
 /// **A session signed out on one host is no one on another** (ADR-0258's
 /// sign-out, held across hosts): B's next request reads no session, and its
 /// post is refused for `SignedIn`.
@@ -545,7 +689,11 @@ fn a_readers_cart_changed_through_one_host_is_told_to_their_page_on_another() {
         .a
         .command(ADD, &ada, &add_shown("espresso", 1), false)
         .expect("ada adds through A");
-    assert_eq!(sets_of(&hosts.b, &doc).len(), before, "not before B reads it");
+    assert_eq!(
+        sets_of(&hosts.b, &doc).len(),
+        before,
+        "not before B reads it"
+    );
     hosts.b.hear();
     let told: Vec<String> = sets_of(&hosts.b, &doc)[before..]
         .iter()
