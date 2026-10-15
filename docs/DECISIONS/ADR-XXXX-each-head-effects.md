@@ -227,5 +227,19 @@ a refusal is missing.
   function (PW0614 refuses any other), whose type never holds a handle.
 - Sixteen mutants of six scripts re-anchored where the readers moved
   (`each_heads`, `lexical`, `names`, `row_reads`, `template_text`,
-  `template_value`) and two of `session`, each undoing the same piece; the
-  seven scripts are run whole.
+  `template_value`) and two of `session`, each undoing the same piece.
+- **Run whole, near what this changed** (2026-10-15): `each_heads` 12 of
+  12, `template_text` 16 of 16, `template_value` 11 of 11, `row_reads` 21
+  of 21, `session` 8 of 8, `dialogs` 5 of 5; and, since their tests write
+  a loop over a labelled value, `ids` 13 of 13, `labels` 16 of 16,
+  `nested_scope` 12 of 12, `provide` 29 of 29 (its browser half in
+  Chromium). Two survived the first run, each a test this change had made
+  too weak, and each test is now precise: `lexical` ("an `{#each}`
+  block's name carries no label": a secret list is a part now, refused
+  itself, so `lexical_scope` asks for the row's own refusal) and `names`
+  ("an `{#each}` source is not read": the names check reads a part no
+  node holds in the template's scope, which is the block's at the top of
+  a view; `every_name_resolves` adds a nested loop's list and a loop in an
+  arm). Run again: `lexical` 19 of 19, `names` 20 of 20.
+- The workspace suite, on a copy of the tree: one failure, `pw-resource`'s
+  count of the accepted corpus's resources, which A-037 moves to 14.
