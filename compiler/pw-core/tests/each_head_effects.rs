@@ -14,10 +14,17 @@
 //!   compiled it too;
 //! - the same in a loop's key, `(item.label)`, and in a nested loop;
 //! - a secret rendered through a computed list, `{#each [key] as k}`, where
-//!   the same list in a `let` is PW5003.
+//!   the same list in a `let` is PW5003;
+//! - a member's read in a text hole, `{item.label}`, where the loop's rows
+//!   are a computed list's: they had no type, so no member was found.
 //!
-//! Each test states one case, with its control; the last holds the
-//! neighbours that must stay accepted, so the fix does not over-refuse.
+//! And two readings the text gave wrongly: a dialog in a loop over a
+//! module's signal was "shown by nothing", and Marko wrote a list read from
+//! a parameter as a name of its own.
+//!
+//! Each test states one case, with its control; `a_loop_over_what_a_view_
+//! may_read_is_accepted` holds the neighbours that must stay accepted, so the
+//! fix does not over-refuse.
 
 use pw_core::check::check_sources;
 
@@ -197,4 +204,97 @@ fn a_loop_over_what_a_view_may_read_is_accepted() {
     assert_eq!(reported(pure), NOTHING);
     let markup = "    <ul>\n        {#each store.items as item (item.name)}\n            <li>{item.name}</li>\n        {/each}\n    </ul>";
     assert_eq!(reported(&member(PURE, markup)), NOTHING);
+}
+
+/// **A computed list's rows have its elements' type**, where what computes
+/// it names no type parameter: so a member read from a row is found, and
+/// what it performs is the view's. Until 2026-10-15 only a path's rows were
+/// typed, and `{item.label}`, a text hole every walker read, performed
+/// nothing in a loop over `all(given)`.
+#[test]
+fn a_member_read_from_a_computed_lists_row_is_found() {
+    let view = |hole: &str| {
+        format!(
+            "module t\n\n\
+             type Item = Item {{ name: String }}\n\n\
+             fn label(i: Item) -> String !{{ database.read<Item> }}\n    host \"shop:data/items#label\"\n\n\
+             fn all(given: List<Item>) -> List<Item> !{{}} {{\n    given\n}}\n\n\
+             view Menu(given: List<Item>) !{{}} {{\n    <ul>\n        \
+             {{#each all(given) as item (item.name)}}\n            <li>{{{hole}}}</li>\n        \
+             {{/each}}\n    </ul>\n}}\n"
+        )
+    };
+    assert_eq!(reported(&view("item.label")), one("PW0401", "item.label"));
+    // The control: a field of the row.
+    assert_eq!(reported(&view("item.name")), NOTHING);
+}
+
+/// Each diagnostic on `t.pw`, as its code and its message.
+fn said(src: &str) -> Vec<String> {
+    check_sources(&program(src))
+        .into_iter()
+        .filter(|(n, _)| n == "t.pw")
+        .flat_map(|(_, ds)| ds.into_iter().map(|d| format!("{} {}", d.code, d.message)))
+        .collect()
+}
+
+/// **A loop over a module's signal shows what it renders** (ADR-0141,
+/// ADR-0144), as a loop over a view's own signal does: the list is read as
+/// a block's subject is. Until 2026-10-15 its first name was looked up among
+/// the view's own bindings, and a dialog in a loop over a module's signal
+/// was refused as shown by nothing.
+#[test]
+fn a_dialog_in_a_loop_over_a_modules_signal_is_shown_by_it() {
+    let notes = |list: &str, close: &str| {
+        format!(
+            "module t\n\nsignal notes: List<String>\n\n\
+             view Notes(given: List<String>) !{{}} {{\n    <ul>\n        \
+             {{#each {list} as n (n)}}\n            \
+             <li><dialog aria-label=\"Note\"{close}><p>{{n}}</p></dialog></li>\n        \
+             {{/each}}\n    </ul>\n}}\n"
+        )
+    };
+    assert_eq!(
+        said(&notes("notes", "")),
+        vec![
+            "PW5303 this `<dialog>` is shown while `notes` renders it, and its closing is heard \
+             by nothing"
+                .to_string()
+        ]
+    );
+    // Its closing heard, it is the browser's modal dialog.
+    assert_eq!(
+        said(&notes("notes", " on:close={() => notes = []}")),
+        Vec::<String>::new()
+    );
+    // The control: a loop over a list no signal holds shows nothing.
+    let given = said(&notes("given", ""));
+    assert_eq!(given.len(), 1, "{given:?}");
+    assert!(
+        given[0].starts_with("PW5303 this `<dialog>` is shown by nothing"),
+        "{given:?}"
+    );
+}
+
+/// **Marko reads a loop's list as any expression** (ADR-0017): one read from
+/// a parameter is read from `input`, as every other use of one is. Until
+/// 2026-10-15 the list was text, and `store.items` was written as a name of
+/// its own, which the template does not have.
+#[test]
+fn marko_reads_a_list_from_a_parameter_from_input() {
+    let src = "module m\n\ntype Item = Item { id: String, name: String }\n\
+               type Store = Store { items: List<Item> }\n\n\
+               view V(store: Store) !{} {\n    <ul>{#each store.items as item (item.id)}<li>{item.name}</li>{/each}</ul>\n}\n";
+    let parsed = pw_syntax::parse_tree(src);
+    let out = pw_core::marko::render_module(
+        &pw_core::lower::lower_file(src, &parsed.green),
+        "test.pw",
+        &Default::default(),
+    );
+    assert!(out.skipped.is_empty(), "{:?}", out.skipped);
+    let (_, text) = &out.files[0];
+    assert!(
+        text.contains(r#"<for|item| of=input.store.items by="id">"#),
+        "{text}"
+    );
 }
