@@ -254,6 +254,9 @@ const PINNED: &[(&str, u64)] = &[
     ("store:data/checkout#chosen", 1),
     ("store:data/checkout#parts", 2),
     ("store:data/checkout#set-promo", 2),
+    // Track `scheduled-orders`: the time chosen, read and written as the
+    // tip is.
+    ("store:data/checkout#set-time", 2),
     ("store:data/checkout#set-tip", 2),
     ("store:data/coverage#for-store", 2),
     ("store:data/coverage#reaches", 2),
@@ -291,6 +294,10 @@ const PINNED: &[(&str, u64)] = &[
     ("store:data/user-orders#paying", 2),
     ("store:data/user-orders#place", 11),
     ("store:data/user-orders#placed", 1),
+    // Track `scheduled-orders`: the reader's order read, where it is not
+    // there (this reader has none); with an order, its lines and its time
+    // too, and its status written.
+    ("store:data/user-orders#send", 1),
     ("store:data/user-orders#settle", 2),
     ("store:host/carts#join", 1),
     ("store:host/estimates#set", 1),
@@ -517,16 +524,29 @@ const PAGES: &[(&str, u64)] = &[
     ("add_to_cart (48)", 11),
     ("add_address", 6),
     ("choose_tip", 6),
+    // Track `scheduled-orders`: as the tip is chosen.
+    ("choose_time (as soon as possible)", 6),
     ("/", 5),
     ("/stores/47", 16),
-    ("/cart", 13),
+    // Track `scheduled-orders`: 13 and 3 more, the cart's stores' hours,
+    // which the checkout words the time chosen by (`hours#for-stores`).
+    ("/cart", 16),
     ("/search?q=coffee", 8),
     ("/stores/47/address", 2),
-    ("place_order, taking no payments: its operations", 33),
+    // Track `scheduled-orders`: the page of times, its cart's stores' hours
+    // (6), the time chosen (1), and its layout's cart (1).
+    ("/cart/when", 8),
+    // Track `scheduled-orders`: 33 and 2 more, the time chosen
+    // (`checkout#chosen`) and, where the order is settled, its time
+    // (`user-orders#settle` 8, was 7).
+    ("place_order, taking no payments: its operations", 35),
     ("place_order, taking no payments: its commit", 7),
+    // Track `scheduled-orders`: 21 and 11 more, the checkout's stores'
+    // hours (3), and the open page of times read again: its time chosen
+    // (1), its stores' hours (6) and its layout's cart (1).
     (
         "place_order, taking no payments: its queries read again",
-        21,
+        32,
     ),
     ("/order", 5),
 ];
@@ -749,11 +769,13 @@ fn placing_and_settling_where_payments_are_taken_is_bounded() {
 // Since ADR-0334 a command's commit writes its scheduled runs too: a delete
 // for each, and an insert for each run due. `place_order` schedules its
 // sweep (2), `settle_payment` and `cancel_order` cancel it (1).
+// Track `scheduled-orders`: `place_order` reads the time chosen (1 more),
+// and `settle_payment` the order's time where it settles one paid (1 more).
 const AWAITING: &[(&str, u64)] = &[
-    ("place_order, taking payments: its transaction", 37),
+    ("place_order, taking payments: its transaction", 38),
     (
         "settle_payment, on the provider's word: its transaction",
-        17,
+        18,
     ),
     ("cancel_order: its transaction", 25),
     (
@@ -764,5 +786,22 @@ const AWAITING: &[(&str, u64)] = &[
     (
         "settle_payment, on the provider's word of the sweep's cancel: its transaction",
         12,
+    ),
+    // Track `scheduled-orders`: an order for a time. Its time chosen, held
+    // to the cart's stores' hours; placed, the estimate read and the time
+    // written with it; paid, its send scheduled in the commit (a delete
+    // and an insert); and sent when its preparation is due.
+    ("choose_time, for a time: its transaction", 11),
+    (
+        "place_order, for a time, taking payments: its transaction",
+        40,
+    ),
+    (
+        "settle_payment, on the provider's word, for a time: its transaction",
+        21,
+    ),
+    (
+        "send_to_store, run when its preparation is due: its transaction",
+        9,
     ),
 ];
