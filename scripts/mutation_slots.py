@@ -326,6 +326,11 @@ def git_of(root, slot):
     alternates = slot / ".git" / "objects" / "info" / "alternates"
     alternates.parent.mkdir(parents=True, exist_ok=True)
     alternates.write_text(str(pathlib.Path(common) / "objects") + "\n")
+    # The links to the tree's `node_modules` are no directories, which the
+    # tree's `node_modules/` ignores: ignored all the same.
+    exclude = slot / ".git" / "info" / "exclude"
+    exclude.parent.mkdir(parents=True, exist_ok=True)
+    exclude.write_text("node_modules\n")
     head = git("rev-parse", "HEAD", cwd=root)
     git("update-ref", "--no-deref", "HEAD", head, cwd=slot)
     git("read-tree", head, cwd=slot)
