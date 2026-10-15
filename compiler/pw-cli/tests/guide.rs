@@ -1120,7 +1120,7 @@ fn page(name: &str, md: &str) -> (String, String) {
 #[test]
 fn a_page_with_no_example_or_a_block_unseen_is_reported() {
     let right = page("a.md", "```pw\nmodule a\n```\n");
-    let (examples, problems) = survey(&[right.clone()]);
+    let (examples, problems) = survey(std::slice::from_ref(&right));
     assert_eq!((examples.len(), problems), (1, Vec::new()));
     // A page teaches by example: the index and the reference of codes aside.
     let prose = page("b.md", "No example here.\n");
