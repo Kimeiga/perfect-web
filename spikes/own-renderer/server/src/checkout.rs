@@ -351,23 +351,16 @@ pub(crate) fn charged_from(v: &Val, promo: Option<String>) -> Result<Charged, St
     })
 }
 
-/// **The store an item is listed by**: the first store whose menu has it.
-/// A read per store until the track that bounds every read (NEXT).
-fn store_of(r: &mut dyn Rows, item: &str) -> Result<Option<String>, String> {
-    for s in r.stores()? {
-        if r.menu(&s.id)?.iter().any(|i| i.id == item) {
-            return Ok(Some(s.id));
-        }
-    }
-    Ok(None)
-}
-
 /// **A reader's cart, each store's lines**, as the program's `CartPart`s
 /// are, in the order the cart first lists a store's line.
 fn parts_val(r: &mut dyn Rows, reader: &str) -> Result<Val, String> {
+    let lines = r.cart(reader)?;
+    // By set (NEXT 4b): each line's store in one read.
+    let items: Vec<String> = lines.iter().map(|l| l.item.clone()).collect();
+    let of_item = r.stores_of_items(&items)?;
     let mut parts: Vec<(String, Lines)> = Vec::new();
-    for line in r.cart(reader)? {
-        let store = store_of(r, &line.item)?.unwrap_or_default();
+    for line in lines {
+        let store = of_item.get(&line.item).cloned().unwrap_or_default();
         match parts.iter_mut().find(|(s, _)| *s == store) {
             Some((_, lines)) => lines.push(line),
             None => parts.push((store, vec![line])),

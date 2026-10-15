@@ -47,6 +47,10 @@ just bootstrap    # Set up the repository's pinned dependencies.
 just ci           # Run the existing project checks.
 ```
 
+The toolchain is Unix-only and CI runs Ubuntu, so on Windows develop inside WSL2,
+with the checkout on WSL's own filesystem (`~/code/…`, not `/mnt/c`).
+`.gitattributes` keeps a clone LF even where Git for Windows would make it CRLF.
+
 The census and targeted attribution regression tests do not require the Rust build:
 
 ```sh

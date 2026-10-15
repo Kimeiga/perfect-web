@@ -238,14 +238,137 @@ thread_local! {
     pub(crate) static STATEMENTS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
 }
 
+/// **A store's row**, as `stores` and `stores_by_ids` select it.
+fn store_row(r: &postgres::Row) -> StoreRow {
+    StoreRow {
+        id: r.get(0),
+        name: r.get(1),
+        description: r.get(2),
+        opens_minute: r.get(3),
+        closes_minute: r.get(4),
+        zone: crate::places::Zone {
+            lat_e6: r.get(5),
+            lon_e6: r.get(6),
+            radius_m: r.get(7),
+        },
+        cuisine: r.get(8),
+    }
+}
+
+/// **The statements a layer's reads and commands ran, whatever thread ran
+/// them** (NEXT 4b): what a page's or a command's count is read from, each
+/// call's statements (`STATEMENTS`, counted on its own thread) added once
+/// it returns. Nothing in a build that is not a test's.
+#[derive(Clone, Default)]
+pub(crate) struct Tally {
+    #[cfg(test)]
+    total: Arc<std::sync::atomic::AtomicU64>,
+    /// Each operation's calls and statements, by its name: what a page's or
+    /// a command's count is made of (NEXT 4c's measured baseline).
+    #[cfg(test)]
+    by_op: Arc<Mutex<BTreeMap<String, (u64, u64)>>>,
+    /// Each command's transaction's statements, its operations' and its
+    /// commit's, in the order the commands began.
+    #[cfg(test)]
+    transactions: Arc<Mutex<Vec<u64>>>,
+}
+
+impl Tally {
+    fn around<T>(&self, f: impl FnOnce() -> T) -> T {
+        self.around_in(None, f)
+    }
+
+    /// [`around`](Tally::around), the statements also the command's
+    /// transaction `txn`'s, where it is one.
+    fn around_in<T>(&self, txn: Option<usize>, f: impl FnOnce() -> T) -> T {
+        #[cfg(not(test))]
+        let _ = txn;
+        #[cfg(test)]
+        let before = STATEMENTS.with(|n| n.get());
+        let out = f();
+        #[cfg(test)]
+        {
+            let ran = STATEMENTS.with(|n| n.get()) - before;
+            self.total
+                .fetch_add(ran, std::sync::atomic::Ordering::SeqCst);
+            if let Some(t) = txn {
+                self.transactions.lock().expect("transactions")[t] += ran;
+            }
+        }
+        out
+    }
+
+    /// A command's transaction begun: its place among the tally's.
+    fn begin(&self) -> Option<usize> {
+        #[cfg(test)]
+        {
+            let mut t = self.transactions.lock().expect("transactions");
+            t.push(0);
+            Some(t.len() - 1)
+        }
+        #[cfg(not(test))]
+        None
+    }
+
+    #[cfg(test)]
+    pub(crate) fn transactions(&self) -> Vec<u64> {
+        self.transactions.lock().expect("transactions").clone()
+    }
+
+    /// `ops`, each call's statements recorded by the operation's name: a
+    /// test's. Elsewhere `ops` as they are.
+    fn by_name(&self, ops: Ops, within: &'static str) -> Ops {
+        #[cfg(not(test))]
+        let _ = within;
+        #[cfg(test)]
+        let ops = ops
+            .into_iter()
+            .map(|(name, f)| {
+                let (by_op, key) = (self.by_op.clone(), format!("{within} {name}"));
+                let counted: crate::HostFn = Arc::new(move |args: &[Val]| {
+                    let before = STATEMENTS.with(|n| n.get());
+                    let out = f(args);
+                    let ran = STATEMENTS.with(|n| n.get()) - before;
+                    let mut by_op = by_op.lock().expect("by operation");
+                    let entry = by_op.entry(key.clone()).or_default();
+                    entry.0 += 1;
+                    entry.1 += ran;
+                    out
+                });
+                (name, counted)
+            })
+            .collect();
+        ops
+    }
+
+    #[cfg(test)]
+    pub(crate) fn get(&self) -> u64 {
+        self.total.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn by_op(&self) -> BTreeMap<String, (u64, u64)> {
+        self.by_op.lock().expect("by operation").clone()
+    }
+}
+
 /// **A connection whose every statement is counted** (`STATEMENTS`): what
 /// `PgRows` and the search's own statements (`search.rs`) run through.
 pub(crate) struct Counted<'c>(pub(crate) &'c mut Client);
 
 impl Counted<'_> {
     fn counted() {
+        Self::ran(1);
+    }
+
+    /// **`n` statements run on a connection that is not counted's**, by code
+    /// another layer shares (`feed_pg::record`, `feed_pg::delivered`),
+    /// counted where they are run.
+    pub(crate) fn ran(n: u64) {
+        #[cfg(not(test))]
+        let _ = n;
         #[cfg(test)]
-        STATEMENTS.with(|n| n.set(n.get() + 1));
+        STATEMENTS.with(|c| c.set(c.get() + n));
     }
 
     pub(crate) fn query<T: ?Sized + postgres::ToStatement>(
@@ -354,22 +477,40 @@ impl Rows for PgRows<'_> {
                 &[],
             )
             .map_err(pg)?;
-        Ok(rows
-            .iter()
-            .map(|r| StoreRow {
-                id: r.get(0),
-                name: r.get(1),
-                description: r.get(2),
-                opens_minute: r.get(3),
-                closes_minute: r.get(4),
-                zone: crate::places::Zone {
-                    lat_e6: r.get(5),
-                    lon_e6: r.get(6),
-                    radius_m: r.get(7),
-                },
-                cuisine: r.get(8),
-            })
-            .collect())
+        Ok(rows.iter().map(store_row).collect())
+    }
+
+    // TRACK SEAM (bounded-statements): rows read by set (NEXT 4b), one
+    // statement each whatever the number of keys.
+    fn stores_by_ids(&mut self, ids: &[String]) -> Result<Vec<StoreRow>, String> {
+        let rows = self
+            .0
+            .query(
+                "SELECT id, name, description, opens_minute, closes_minute, \
+                        lat_e6, lon_e6, radius_m, cuisine \
+                 FROM stores WHERE id = ANY($1) ORDER BY position",
+                &[&ids],
+            )
+            .map_err(pg)?;
+        Ok(rows.iter().map(store_row).collect())
+    }
+    fn stores_of_items(&mut self, items: &[String]) -> Result<BTreeMap<String, String>, String> {
+        let rows = self
+            .0
+            .query(
+                "SELECT DISTINCT ON (i.id) i.id, i.store \
+                 FROM menu_items i JOIN stores s ON s.id = i.store \
+                 WHERE i.id = ANY($1) ORDER BY i.id, s.position",
+                &[&items],
+            )
+            .map_err(pg)?;
+        Ok(rows.iter().map(|r| (r.get(0), r.get(1))).collect())
+    }
+    fn hours_of(
+        &mut self,
+        stores: &[String],
+    ) -> Result<Vec<(String, crate::hours::Hours)>, String> {
+        crate::hours::pg_hours_of(&mut self.0, stores)
     }
 
     fn menu(&mut self, store: &str) -> Result<Vec<Item>, String> {
@@ -748,6 +889,8 @@ pub(crate) struct StorePg {
     /// writer of the database, and a commit it refuses keeps nothing.
     writes: Mutex<()>,
     faults: Faults,
+    /// The statements its reads and commands ran (NEXT 4b).
+    tally: Tally,
     /// A test's schema, dropped with the layer.
     #[cfg(test)]
     owned: bool,
@@ -784,6 +927,7 @@ impl StorePg {
             isolation,
             writes: Mutex::new(()),
             faults: Faults::new(),
+            tally: Tally::default(),
             #[cfg(test)]
             owned: false,
         })
@@ -853,6 +997,9 @@ pub(crate) struct Staging<'a> {
     /// Whether its transaction committed; dropped otherwise, it rolls back.
     committed: bool,
     ops: Ops,
+    /// The layer's tally, and this command's place in it (NEXT 4b).
+    tally: Tally,
+    txn: Option<usize>,
 }
 
 impl crate::data::Staged for Staging<'_> {
@@ -871,6 +1018,26 @@ impl crate::data::Staged for Staging<'_> {
     }
 
     fn commit(
+        &mut self,
+        events: &[Handed],
+        invalidated: &[Dropped],
+        interaction: Option<&crate::data::Recorded<'_>>,
+        scheduled: &[crate::schedules::Scheduled],
+    ) -> Result<Option<Outboxed>, String> {
+        // The commit's statements are the command's (the integrator's ruling
+        // on NEXT 4b): what it handed the outbox, its interaction's record,
+        // the runs it scheduled or cancelled, and the outbox read back, each
+        // bounded by what the command hands the platform, never by the
+        // data's size.
+        let (tally, txn) = (self.tally.clone(), self.txn);
+        tally.around_in(txn, || {
+            self.committed_with(events, invalidated, interaction, scheduled)
+        })
+    }
+}
+
+impl Staging<'_> {
+    fn committed_with(
         &mut self,
         events: &[Handed],
         invalidated: &[Dropped],
@@ -901,7 +1068,7 @@ impl crate::data::Staged for Staging<'_> {
         let mut ids: Vec<i64> = Vec::new();
         for (kind, name, values) in handed {
             let args = json_of(name, &values)?;
-            let row = c
+            let row = Counted(c)
                 .query_one(
                     "INSERT INTO outbox (kind, name, args) VALUES ($1, $2, $3::text::jsonb) \
                      RETURNING id",
@@ -913,15 +1080,26 @@ impl crate::data::Staged for Staging<'_> {
         // **The interaction's answer, with the writes** (ADR-0325).
         if let Some(r) = interaction {
             crate::feed_pg::record(c, r)?;
+            // Its two: the expired records deleted, the answer inserted.
+            Counted::ran(2);
         }
         // **And the runs it scheduled, or cancelled** (the
         // scheduled-commands track).
         crate::schedules::pg::write(c, scheduled).map_err(pg)?;
+        // Its statements: a delete for each, and an insert for each run due.
+        Counted::ran(
+            scheduled
+                .iter()
+                .map(|s| 1 + u64::from(s.due_ms.is_some()))
+                .sum(),
+        );
         // The writes and the outbox's rows, at once or not at all. A commit
         // the database refuses (a serialization failure, a deferred
         // constraint) has rolled back, and nothing is delivered.
         c.batch_execute("COMMIT").map_err(pg)?;
         self.committed = true;
+        // The outbox's rows read back, one statement.
+        Counted::ran(1);
         match delivered(c, &ids) {
             Ok(read) => Ok(Some(read)),
             // Committed, and not read back: what it handed is what
@@ -997,24 +1175,47 @@ impl crate::data::DataLayer for StorePg {
         crate::feed_pg::recalled(conn.client(), key, since_ms).map_err(pg)
     }
 
+    #[cfg(test)]
+    fn statements(&self) -> Option<u64> {
+        Some(self.tally.get())
+    }
+
+    #[cfg(test)]
+    fn statements_by_op(&self) -> BTreeMap<String, (u64, u64)> {
+        self.tally.by_op()
+    }
+
+    #[cfg(test)]
+    fn statements_by_transaction(&self) -> Vec<u64> {
+        self.tally.transactions()
+    }
+
+    #[cfg(test)]
+    fn execute_for_test(&self, sql: &str) -> Result<(), String> {
+        self.sql().batch_execute(sql).map_err(pg)
+    }
+
     fn runs(&self) -> Option<&dyn crate::schedules::Runs> {
         Some(self)
     }
 
     fn reads(&self, session: &str, stopped: Option<Stopped>) -> Ops {
-        let pool = self.pool.clone();
+        let (pool, tally) = (self.pool.clone(), self.tally.clone());
         let with: With = Arc::new(move |f| {
             let mut conn = pool.take()?;
             let c = conn.client();
             c.batch_execute("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY")
                 .map_err(pg)?;
-            let out = f(&mut PgRows(Counted(c)));
+            let out = tally.around(|| f(&mut PgRows(Counted(c))));
             if c.batch_execute("COMMIT").is_err() {
                 conn.discard();
             }
             out
         });
-        crate::store::reads(with, session, &self.faults, stopped)
+        self.tally.by_name(
+            crate::store::reads(with, session, &self.faults, stopped),
+            "read",
+        )
     }
 
     fn begin<'a>(&'a self, session: &str) -> Box<dyn crate::data::Staged + 'a> {
@@ -1034,17 +1235,21 @@ impl crate::data::DataLayer for StorePg {
             Err(why) => (None, why),
         };
         let conn = Arc::new(Mutex::new(conn));
+        let txn = self.tally.begin();
         let with: With = {
-            let conn = conn.clone();
+            let (conn, tally) = (conn.clone(), self.tally.clone());
             Arc::new(
                 move |f| match conn.lock().expect("the command's connection").as_mut() {
-                    Some(c) => f(&mut PgRows(Counted(c.client()))),
+                    Some(c) => tally.around_in(txn, || f(&mut PgRows(Counted(c.client())))),
                     None => Err(why.clone()),
                 },
             )
         };
         let written: Arc<Mutex<Written>> = Arc::default();
-        let ops = crate::store::writes(with, session, &self.faults, fail, written.clone());
+        let ops = self.tally.by_name(
+            crate::store::writes(with, session, &self.faults, fail, written.clone()),
+            "command",
+        );
         Box::new(Staging {
             _writes: writes,
             session: session.to_string(),
@@ -1052,6 +1257,8 @@ impl crate::data::DataLayer for StorePg {
             written,
             committed: false,
             ops,
+            tally: self.tally.clone(),
+            txn,
         })
     }
 
