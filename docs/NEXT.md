@@ -814,11 +814,20 @@ E14 comes before E11-E13. Its plan, controls and task list are
              recorded as evidence and checked against the host's counter.
              Built in the ruling's order, each its own track: (1) the render
              merge, one snapshot per render and identical calls made once
-             (track `render-merge`, in flight); (2) PW0405, `set` pairs,
-             `sets` and PW0406 (track `bounded-checker`, in flight); (3) the
-             conformance suite, one with the three-database note's decision
-             5.5; (4) the store's composites moved above the seam, one at a
-             time. Before the capability matrix's apps;
+             (track `render-merge`, in flight); (2) ~~PW0405, `set` pairs,
+             `sets` and PW0406~~ (ADR-0340, merged 2026-10-15 on train-9,
+             with PW0407 for the pair's shape, `just e14-bounded-reads`). What
+             it leaves: the store's own pair, `set hours_of_stores` with
+             `sets one_call` on `StoreData`, written together as
+             `bounded_reads.rs` applies them; kiokun-site's four reads per
+             element, warnings until kiokun's layer has set forms and the
+             pair takes a list of key records (built with the kiokun track
+             or D1's key records); the pair's key field matched by name
+             (track `pair-key-by-name`); and the bound emitted beside each
+             page's plan; (3) the conformance suite, one with the
+             three-database note's decision 5.5, next; (4) the store's
+             composites moved above the seam, one at a time. Before the
+             capability matrix's apps;
           5. ~~**idempotency committed with the writes**~~ (ADR-0325,
              merged 2026-10-12): an interaction's answer commits in its
              command's transaction, on both layers, and answers a day;
@@ -847,7 +856,9 @@ E14 comes before E11-E13. Its plan, controls and task list are
           Then the language's, found on the way:
           - **the corpus specifies a quarter of the codes** (the
             integrator's finding, 2026-10-14, corpus C24): the rejected
-            corpus exercises 54 of the 196 codes; the rest are held by the
+            corpus exercises 56 of the 199 codes (C25 added PW0405 and
+            PW0407; PW0406, a warning, is held by `bounded_reads.rs`
+            alone); the rest are held by the
             compiler's own tests where they have them, and the conformance
             figure and generality score say nothing of them. From C24 on, a track that
             adds a code adds its rejected fixture and its generality pair,

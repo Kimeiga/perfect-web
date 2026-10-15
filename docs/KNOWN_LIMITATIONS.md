@@ -675,10 +675,24 @@ awaited in order. What remains:
   - a user's order is their latest.
 - **The store's reads are pinned, not bounded by construction** (ADR-0336):
   each operation's, page's and command's statements are counted on
-  PostgreSQL and pinned, equal at the seed and with fifty stores more; a
-  program that reads per element is refused only once NEXT 4c is built.
-  Rows are not counted (`stores#list` and the home page read every store,
-  as they must), and a cart's lines are written a statement each.
+  PostgreSQL and pinned, equal at the seed and with fifty stores more. A
+  program's read keyed by a loop's element is refused (PW0405, ADR-0340),
+  but no bound is computed or emitted for a page or a command, and the
+  store's own `set` pair is not written yet (NEXT 4c). Rows are not counted
+  (`stores#list` and the home page read every store, as they must), and a
+  cart's lines are written a statement each.
+- **What PW0405 does not see** (ADR-0340's Not claimed): a write per
+  element (refused only where the call also reads); a key traced through
+  another read's answer, a `use` or a function value's call; a recursion
+  through a function named as a value, which is its combinator's loop; the
+  page's own loops (an `{#each}` and its instances, the render merge's); a
+  member call that reads, resolved by its receiver's type; and what a
+  source costs under throttling, which the conformance suite measures.
+  kiokun-site's four reads per element (`search_reading` three times,
+  `read_pitch` once) are warnings, listed in `KNOWN_READS_PER_ELEMENT`,
+  until kiokun's layer has set forms and the pair takes a list of key
+  records. A set form pairs with its keyed read by a field of the key's
+  type, any such field, until track `pair-key-by-name` names it.
 - **A store's hours look a week ahead** (ADR-0328): a store that next opens
   later says "Closed". A special date replaces its day's hours, never only
   extends them; item-level hours are not kept. On a day a transition skips

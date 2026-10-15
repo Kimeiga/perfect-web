@@ -1,0 +1,44 @@
+// @corpus: rejected
+// @id: R-077
+// @category: a read per element in a recursion over data
+// @rule: PW0405
+// @invariant: read_per_element
+// @charter: §9.5, §7.2
+// @milestone: 14
+// @expect-error: `price_of` reads `WalkedPrice` once for each call of `total`, which recurses over `items`
+// @expect-error: its key `item` comes from `items`, a part of which `total` passes to its recursive call
+// @expect-error: `total` recurses here
+//
+// 4c, a read is bounded by construction: a function that walks its list by
+// calling itself on the rest reads a price at each step, as many as the list
+// is long. A-037 reads the prices before the recursion and passes them down.
+
+module store.walked_prices
+
+import List
+
+type WalkedPrice = WalkedPrice { item: Int, cents: Int }
+
+type WalkedPriceOf = WalkedPriceOf { item: Int, price: WalkedPrice }
+
+fn price_of(item: Int) -> Result<WalkedPrice, String> !{ database.read<WalkedPrice> }
+    host "store:data/walked-prices#for-item"
+    set  prices_of
+
+fn prices_of(items: List<Int>) -> List<WalkedPriceOf> !{ database.read<WalkedPrice> }
+    host "store:data/walked-prices#for-items"
+
+fn cents(found: Result<WalkedPrice, String>) -> Int !{} {
+    match found {
+        Ok(p) => p.cents,
+        Err(_) => 0,
+    }
+}
+
+fn total(items: List<Int>) -> Int !{ database.read<WalkedPrice> } {
+    match List.get(items, 0) {
+        None => 0,
+        // ERROR: a read at each step, keyed by the part of `items` it is at.
+        Some(item) => cents(price_of(item)) + total(List.drop(items, 1)),
+    }
+}

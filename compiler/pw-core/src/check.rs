@@ -215,6 +215,9 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
     // And each command a page's handler calls (ADR-0154): what a browser
     // sends, and can send twice.
     let sent = crate::resume::sent_commands(&hirs, &sigs);
+    // 4c: what keys each source read, and what loops over it, over every
+    // unit, since a loop in one module calls a read in another.
+    let bounded = crate::bounded::Reads::of(&hirs, &workspace, &sigs, &inference, &sources);
     let paths: Vec<&str> = units.iter().map(|u| u.path.as_str()).collect();
     units
         .iter()
@@ -240,6 +243,10 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
             // The scheduled-commands track: a schedule names a command the
             // clock invokes, in a command, at its time (PW65xx).
             out.extend(crate::scheduled::check(&hirs, i, &workspace, &sigs));
+            // 4c, a read is bounded by construction: no read in a loop over
+            // data is keyed by its element (PW0405), a set read's source
+            // batches (PW0406), and a keyed read names its set form (PW0407).
+            out.extend(bounded.check(i, &u.src));
             // ADR-0163: a page says when its address names nothing.
             out.extend(not_found_names_a_case(&u.hir, i, &sigs, &workspace));
             // ADR-0295: and when it is another address of the page.
@@ -5479,21 +5486,25 @@ fn view_elements(
 /// by the names the program's effects give them, and what it guarantees.
 /// A clause left out guarantees nothing.
 #[derive(Debug, Clone)]
-struct Source {
-    name: String,
-    unit: usize,
-    span: crate::hir::Span,
-    holds: Vec<(String, crate::hir::Span)>,
+pub(crate) struct Source {
+    pub(crate) name: String,
+    pub(crate) unit: usize,
+    pub(crate) span: crate::hir::Span,
+    pub(crate) holds: Vec<(String, crate::hir::Span)>,
     /// The isolation its transactions have, `none` for none.
     transactions: String,
     /// What its reads may promise.
     reads: BTreeSet<String>,
     /// Whether it tells what changed, once committed.
     feed: bool,
+    /// **What one set read costs it** (4c), as its `sets` clause says:
+    /// `one_call`, `chunked(k)` or `per_key`. `None` where it states none,
+    /// which guarantees nothing: `per_key`.
+    pub(crate) sets: Option<String>,
 }
 
 /// Every source the program declares.
-fn declared_sources(hirs: &[&Hir]) -> Vec<Source> {
+pub(crate) fn declared_sources(hirs: &[&Hir]) -> Vec<Source> {
     let mut out = Vec::new();
     for (unit, hir) in hirs.iter().enumerate() {
         for (id, decl) in hir.all_decls() {
@@ -5538,6 +5549,7 @@ fn declared_sources(hirs: &[&Hir]) -> Vec<Source> {
                     reads
                 },
                 feed: words("changes").first().is_some_and(|w| w == "feed"),
+                sets: decl.policy("sets").map(|p| p.value.trim().to_string()),
             });
         }
     }
@@ -5548,7 +5560,7 @@ fn declared_sources(hirs: &[&Hir]) -> Vec<Source> {
 /// database provides** (ADR-0207's "Not claimed", ADR-0246): what `pw build`
 /// writes to `sources.json`. Read as the checker reads them: a clause left
 /// out guarantees nothing, so `transactions` is `none`, `reads` is
-/// `eventual` and `changes` is `none`.
+/// `eventual`, `changes` is `none` and `sets` is `per_key` (4c).
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct SourceClauses {
     pub name: String,
@@ -5559,6 +5571,15 @@ pub struct SourceClauses {
     pub reads: Vec<String>,
     /// `feed` or `none`.
     pub changes: String,
+    /// **What one set read costs it** (4c): `one_call`, `chunked(k)` or
+    /// `per_key`, the last where it states none. Defaulted where a build
+    /// from before 4c is read.
+    #[serde(default = "per_key")]
+    pub sets: String,
+}
+
+fn per_key() -> String {
+    "per_key".to_string()
 }
 
 /// Every source the program declares, as [`SourceClauses`].
@@ -5571,6 +5592,7 @@ pub fn source_clauses(hirs: &[&Hir]) -> Vec<SourceClauses> {
             transactions: s.transactions,
             reads: s.reads.into_iter().collect(),
             changes: if s.feed { "feed" } else { "none" }.to_string(),
+            sets: crate::bounded::Sets::of(s.sets.as_deref()).written(),
         })
         .collect()
 }

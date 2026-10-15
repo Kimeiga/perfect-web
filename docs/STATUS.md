@@ -23,6 +23,33 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0340, 2026-10-15: a read keyed by its loop's element is refused**
+(NEXT 4c's second step, the checker's half of ADR-0337; track
+`bounded-checker`, merged from `e5b8cdb9`, with the integrator's rulings
+and answers of 2026-10-15; corpus C25).
+- PW0405, an error: a call that performs a source read inside a loop over
+  data, its key from the loop's element, is refused, its set read the
+  repair. A loop is a combinator's callback (a standard function by its
+  signature, the program's own by its call graph), a `for`, or a recursion
+  over data; a key comes through a field, a `let`, a match arm or a pure
+  call. `set` names a keyed read's set form, held to its shape by PW0407;
+  `sets one_call | chunked(k) | per_key` states what a set read costs a
+  source, and PW0406 warns of a set read on one that cannot batch.
+- The store, the feed and the accepted corpus read nothing per element.
+  kiokun-site reads four times per element, as kiokun.com does, each a
+  warning through `KNOWN_READS_PER_ELEMENT` until kiokun's layer has set
+  forms and the pair takes a list of key records (the integrator's
+  answer). The pair matches its key's field by type until track
+  `pair-key-by-name` matches it by name.
+- Corpus C25: R-075 to R-077 (PW0405, one per loop form), R-078 (PW0407)
+  and A-037; generality 56 / 56. The rejected corpus exercises 56 of the
+  199 codes (`pw check` over each fixture as `checking_source.rs` builds
+  it).
+- The track's own runs: `bounded_checker_mutations.py` whole, 40 of 40, and
+  `just ci` green twice, the second at its head; its `verify`
+  (38780144526) green in every job that had finished when it was merged.
+Verify TRAIN_RUN green, with train-9.
+
 **ADR-0339, 2026-10-15: a collaborative document is merged by Automerge,
 edited in a mounted ProseMirror, and told on the stream** (a design note
 for NEXT's Google Docs-shaped app, track `docs-design`, merged from

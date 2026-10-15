@@ -147,14 +147,21 @@ fn a_host_call_one_function_down_is_imported_and_built() {
 
 #[test]
 fn a_function_passed_by_name_is_compiled_in_and_performed_where_named() {
-    // `found` is passed to `List.map`, not called: its code is compiled into
-    // the query, its host call is imported, and its read is the query's, so
-    // the query runs where the database is.
+    // `found_home` is passed to `List.map`, not called: its code is compiled
+    // into the query, its host call is imported, and its read is the query's,
+    // so the query runs where the database is. It reads by a key that is no
+    // element's: a read keyed by each element, `List.map(names, found)`, is
+    // PW0405's (4c), and this program has to check to be built.
     let mapped = query(
         "Mapped",
         "names: List<String>",
         "List<Bool>",
-        "List.map(names, found)",
+        "List.map(names, found_home)",
+    )
+    .replace(
+        "public query",
+        "fn found_home(name: String) -> Bool !{ database.read<Thing> } {\n    found(\"home\")\n}\n\n\
+         public query",
     );
     let c = contract(&mapped, "probe.things.Mapped");
     assert_eq!(imports(&c), [READ]);

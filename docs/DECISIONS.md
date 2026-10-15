@@ -2974,3 +2974,12 @@ integrator 2026-10-15; nothing built yet).
   `rich_text` policy; Pleris renders the document and an editor's page
   mounts ProseMirror; presence and sync on the stream. Its data declared
   as tables (ADR-0338); its downloads wait for the owner's approval.
+[ADR-0340](DECISIONS/ADR-0340-a-read-is-bounded-by-construction-the-checkers-half.md):
+a read keyed by its loop's element is refused (NEXT 4c's second step,
+ADR-0337's checker; corpus C25).
+- PW0405 refuses a source read inside a loop over data whose key comes
+  from the loop's element, its set read the repair; `set` pairs a keyed
+  read with its set form, held by PW0407; `sets` states a source's cost per
+  set read, and PW0406 warns of one that cannot batch. kiokun-site's four
+  reads per element are warnings until its layer has set forms and key
+  records.

@@ -1048,3 +1048,37 @@ Generality at open:        54/54 invariants generality-tested
 | `invoked_twice` | a GENERAL witness, the second apart from the first, answering another type, and a NEIGHBOUR one, two of the clock's | new invariant |
 | `invoked_command_pressed` | a GENERAL witness, the clock's command pressed before its time, and a NEIGHBOUR one, a page pressing the command that schedules it | new invariant |
 | `invoked_command_not_idempotent` | a GENERAL witness, the clock's command keyed by nothing, and a NEIGHBOUR one, a command a reader presses keyed by nothing | new invariant |
+
+## C25: a read keyed by its loop's element, 2026-10-15
+
+Opened because the specification changed: a source read inside a loop over
+data whose key comes from the loop's element is refused (`PW0405`), its set
+read the repair, and the set form a keyed read's `set` names is held to the
+pair's shape (`PW0407`): NEXT 4c's checker, track `bounded-checker`.
+[ADR-0340](DECISIONS/ADR-0340-a-read-is-bounded-by-construction-the-checkers-half.md)
+is the decision, and ADR-0337 the design. No invariant is retired, no
+`@expect-error` line of an earlier fixture changed, and no fixture moved.
+Three generality witnesses of `undeclared_effect` (`caught`,
+`complete-row`, `via-callback`) read a store per element, incidental to
+their subject, the effect row: each reads by a parameter now, its shape and
+its verdict kept. `PW0406`, a warning, has no fixture: the rejected corpus
+holds errors, and `tests/bounded_reads.rs` holds it.
+
+```text
+Corpus version:            C25
+Accepted programs:         37
+Rejected programs:         78
+Charter categories:        37/37 accepted, 78/78 rejected
+Generality at open:        56/56 invariants generality-tested
+```
+
+| Fixture | Change | Kind |
+|---|---|---|
+| R-075 | added: a list's prices read one at a time in `List.map`'s callback (`PW0405`) | new category |
+| R-076 | added: a total summed in a `for` that reads each item's price, its key bound by a `let` (`PW0405`) | new category |
+| R-077 | added: a function that recurses over its list and reads a price at each step (`PW0405`) | new category |
+| R-078 | added: a set form that answers the cents alone, with no key (`PW0407`) | new category |
+| A-037 | added: a list's prices read by one set read before the loop, in each of R-075's, R-076's and R-077's forms, and a read in a loop keyed by no element | new category, `a list read together before its loop` |
+| `read_per_element` | a GENERAL witness, a generic callback with a match arm's key, a function named as the callback, and another module's read, pair and source, and a NEIGHBOUR one, a key no element's and a callback applied once | new invariant |
+| `set_pair_shape` | a GENERAL witness, a set form that drops a reader the keyed read passes along, and another module's set form of another source, and a NEIGHBOUR one, the shapes a set form may take | new invariant |
+| `undeclared_effect` | changed: its three witnesses read by a parameter, not per element | its invariant kept |

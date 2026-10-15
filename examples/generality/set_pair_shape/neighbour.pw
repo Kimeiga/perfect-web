@@ -1,0 +1,36 @@
+// @status: NEIGHBOUR
+// @invariant: set_pair_shape
+// @dimension: valid neighbour — the shapes a set form may take: a reader passed along, an answer that holds its key itself, another module's set form of the same source
+//
+// A set form of a keyed read is a function of its source, given a list of the
+// key and what the keyed read is given besides, answering a list of the
+// results each with its key: the key in a record beside the result, or in the
+// result. A rule that banned `set`, or any set form another module declares,
+// rather than one that does not fit, would refuse all three.
+
+module generality.hours_by_day_paired
+
+import List
+import store.list_prices.{ ListPrice, prices_of }
+
+type DayOpen = DayOpen { store: Int, day: Int, open: Bool }
+
+type DayOpenOf = DayOpenOf { store: Int, hours: DayOpen }
+
+fn open_of(store: Int, day: Int) -> Result<DayOpen, String> !{ database.read<DayOpen> }
+    host "generality:data/day-open#for-store"
+    set  open_of_stores
+
+fn open_of_stores(stores: List<Int>, day: Int) -> List<DayOpen> !{ database.read<DayOpen> }
+    host "generality:data/day-open#for-stores"
+
+fn open_with_key(store: Int, day: Int) -> Result<DayOpen, String> !{ database.read<DayOpen> }
+    host "generality:data/day-open#with-key"
+    set  open_with_keys
+
+fn open_with_keys(stores: List<Int>, day: Int) -> List<DayOpenOf> !{ database.read<DayOpen> }
+    host "generality:data/day-open#with-keys"
+
+fn price_here(item: Int) -> Result<ListPrice, String> !{ database.read<ListPrice> }
+    host "generality:data/prices-here#for-item"
+    set  prices_of
