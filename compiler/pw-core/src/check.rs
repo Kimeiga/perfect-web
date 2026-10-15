@@ -3015,7 +3015,9 @@ fn sessions_stay_on_the_server(
                 .exprs()
                 .into_iter()
                 .filter(|(position, _)| match position {
-                    crate::hir::Position::Hole | crate::hir::Position::Attribute => true,
+                    // Written as text, in the document or an attribute.
+                    crate::hir::Position::Hole => true,
+                    crate::hir::Position::Attribute => true,
                     // Run when a person acts; what a block decides by; the
                     // list the rows come from; and the key, which the
                     // document holds as a keyed digest, never as itself.
