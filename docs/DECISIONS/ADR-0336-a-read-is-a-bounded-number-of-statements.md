@@ -1,7 +1,8 @@
-# ADR-XXXX: a read is a bounded number of statements on PostgreSQL
+# ADR-0336: a read is a bounded number of statements on PostgreSQL
 
-Status: proposed by W9, NEXT 4b (track `bounded-statements`), under the
-owner's delegation of 2026-10-02. Date: 2026-10-14. Builds on ADR-0308
+Status: accepted under the owner's delegation of 2026-10-02 (W9's, NEXT 4b,
+track `bounded-statements`, with the integrator's rulings of 2026-10-14;
+merged on train-8). Date: 2026-10-14. Builds on ADR-0308
 amended (the counted connection), ADR-0328 and ADR-0329 (whose
 KNOWN_LIMITATIONS lines this answers), and feeds NEXT 4c's design note (a
 read is bounded by construction), whose "Measurements (4b)" are this

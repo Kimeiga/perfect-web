@@ -3,7 +3,7 @@
 # `e14-<name>:`, writes `docs/evidence/E14/<name>.txt`, and is planned by the
 # verification run like any other.
 
-# NEXT 4b (ADR-XXXX): every operation of the store's data layer, and every
+# NEXT 4b (ADR-0336): every operation of the store's data layer, and every
 # page and command of the store, counted on PostgreSQL at the seed and with
 # fifty stores more, each count pinned and equal at both
 # (tests/bounded_statements.rs); and the mutation controls, each restoring a
