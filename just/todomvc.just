@@ -35,3 +35,30 @@ e14-address-fragment:
        CARGO_INCREMENTAL=0 python3 scripts/address_fragment_mutations.py; \
      } > docs/evidence/E14/address-fragment.txt
     @grep -E "^test result|passed|mutants killed|^---- |panicked at" docs/evidence/E14/address-fragment.txt
+
+# Track `todomvc` (ADR-XXXX): the platform declares a double press
+# (`on:dblclick`) and a control's losing focus (`on:blur`), which the runtime
+# listens for and gives its handler the record it reads in the listener: where
+# the pointer was, and the value the control held. The compiler's tests
+# (tests/declared_events.rs, events.rs, platform_contracts.rs), the browser in
+# three engines (e2e/events.spec.mjs over examples/demo/events.pw), and the
+# mutation controls (scripts/dom_events_mutations.py).
+e14-dom-events:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server -p kiokun-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-XXXX - a double press and a control's losing focus are events the platform declares"; echo; \
+       echo "produced by: just e14-dom-events"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== the compiler (tests/declared_events.rs, events.rs, platform_contracts.rs)"; echo; \
+       cargo test --locked -p pw-core --test declared_events --test events --test platform_contracts 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the browser in three engines (e2e/events.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/events.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/dom_events_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/dom_events_mutations.py; \
+     } > docs/evidence/E14/dom-events.txt
+    @grep -E "^test result|passed|mutants killed|^---- |panicked at" docs/evidence/E14/dom-events.txt

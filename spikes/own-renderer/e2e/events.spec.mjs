@@ -71,5 +71,54 @@ test("the manifest says each part's event and modifiers", async ({ request }) =>
     ["input", []],
     ["keydown", []],
     ["submit", ["prevent"]],
+    ["press", []],
+    ["dblclick", []],
+    ["blur", []],
   ]);
+});
+
+// Track `todomvc` (ADR-XXXX): a double press and a control's losing focus.
+test("a double press runs its own handler, given where the pointer was", async ({ page }) => {
+  await ready(page);
+  const word = page.locator("#word");
+  // One press is a press: it runs the press's handler and not the double
+  // press's.
+  await word.click();
+  await expect(page.locator("#single")).toHaveText("1");
+  await page.waitForTimeout(150);
+  await expect(page.locator("#doubled")).toHaveText("0");
+  await expect(page.locator("#where")).toHaveText("none");
+  // A pair is two presses and a double press.
+  const box = await word.boundingBox();
+  await word.dblclick({ position: { x: 12, y: 7 } });
+  await expect(page.locator("#doubled")).toHaveText("1");
+  await expect(page.locator("#single")).toHaveText("3");
+  const [x, y] = (await page.locator("#where").textContent()).split(",").map(Number);
+  expect(Math.abs(x - (box.x + 12))).toBeLessThanOrEqual(1);
+  expect(Math.abs(y - (box.y + 7))).toBeLessThanOrEqual(1);
+  // Each pair is counted.
+  await word.dblclick();
+  await expect(page.locator("#doubled")).toHaveText("2");
+});
+
+test("a control losing focus runs its handler, given the value it held", async ({ page }) => {
+  await ready(page);
+  const leave = page.locator("#leave");
+  await leave.focus();
+  await leave.pressSequentially("abc");
+  // Typing is not leaving.
+  await page.waitForTimeout(150);
+  await expect(page.locator("#left-with")).toHaveText("none");
+  await page.locator("#q").focus();
+  await expect(page.locator("#left-with")).toHaveText("abc");
+  // Again: its value is what it holds then.
+  await leave.focus();
+  await leave.fill("d");
+  await page.locator("#q").focus();
+  await expect(page.locator("#left-with")).toHaveText("d");
+  // The control that has no handler for it, leaving, runs none.
+  await page.locator("#q").pressSequentially("x");
+  await leave.focus();
+  await page.waitForTimeout(150);
+  await expect(page.locator("#left-with")).toHaveText("d");
 });

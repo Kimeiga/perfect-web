@@ -486,7 +486,11 @@ fn the_trusted_platform_contract_is_hashed() {
     // 2026-10-14: `clock.pw` declares `Duration` and `seconds`, `minutes`
     // and `hours`; `effects.pw` declares `clock.schedule` (the
     // scheduled-commands track).
-    const EXPECTED: u64 = 0xd948_f12f_5148_1319;
+    // 2026-10-14: `events` declares `dblclick`, a double press, read as a
+    // press is, and `blur`, a control's losing focus, with a `BlurEvent`
+    // holding the value it held (track `todomvc`: an edit begun by a double
+    // press and saved on blur).
+    const EXPECTED: u64 = 0x02fa_8d3a_6858_353d;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

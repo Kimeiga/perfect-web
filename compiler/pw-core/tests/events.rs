@@ -64,7 +64,7 @@ fn build(src: &str) -> pw_core::build::Build {
 /// A page with a signal `q`, whose view holds `markup`.
 fn page(markup: &str) -> String {
     format!(
-        "module t\n\nimport events.{{ InputEvent, PressEvent, KeyEvent }}\n\n\
+        "module t\n\nimport events.{{ InputEvent, PressEvent, KeyEvent, BlurEvent }}\n\n\
          page P() {{\n    cache private\n\n    signal q: String = \"\"\n\n    \
          view {{\n        <main>{markup}<p>{{q}}</p></main>\n    }}\n}}\n"
     )
@@ -276,4 +276,43 @@ fn an_element_s_handlers_are_lowered_last_and_together() {
     );
     assert_eq!(shape[input + 1], "event", "{shape:#?}");
     assert_eq!(shape[input + 2], "event", "{shape:#?}");
+}
+
+/// **A double press and a control's losing focus are events the platform
+/// declares** (track `todomvc`, ADR-XXXX): a double press is read as a press
+/// is, where the pointer was, and a blur as an input is, the value the
+/// control held. Each with its control: the other event's record is refused.
+#[test]
+fn a_double_press_and_a_blur_are_given_their_records() {
+    let double = page("<label on:dblclick={(e: PressEvent) => q = \"{e.x},{e.y}\"}>A word</label>");
+    assert_eq!(reported(&double), Vec::<String>::new());
+    let m = the_module(&build(&double));
+    assert_eq!(
+        sets(&m, r#"{"x":3,"y":4}"#),
+        serde_json::json!([["q", "3,4"]])
+    );
+    let blur = page(
+        "<input type=\"text\" aria-label=\"Leave\" on:blur={(e: BlurEvent) => q = e.value} />",
+    );
+    assert_eq!(reported(&blur), Vec::<String>::new());
+    let m = the_module(&build(&blur));
+    assert_eq!(
+        sets(&m, r#"{"value":"abc"}"#),
+        serde_json::json!([["q", "abc"]])
+    );
+    // The controls: a record that is another event's is refused, a key's for
+    // a blur and a blur's for a double press.
+    let wrong =
+        page("<input type=\"text\" aria-label=\"Leave\" on:blur={(e: KeyEvent) => q = e.key} />");
+    assert!(
+        reported(&wrong).iter().any(|r| r.starts_with("PW0602")),
+        "{:?}",
+        reported(&wrong)
+    );
+    let wrong = page("<label on:dblclick={(e: BlurEvent) => q = e.value}>A word</label>");
+    assert!(
+        reported(&wrong).iter().any(|r| r.starts_with("PW0602")),
+        "{:?}",
+        reported(&wrong)
+    );
 }

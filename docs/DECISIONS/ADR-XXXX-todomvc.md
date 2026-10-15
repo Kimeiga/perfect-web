@@ -124,7 +124,37 @@ ruling says, and each is cheap to change now.
 - **A route's `{#filter}`**: above.
 - **Writing the address back** from handlers: two writers, above.
 
-## Acceptance (the fragment)
+### 2. A double press and a control's losing focus are events the platform declares
+
+TodoMVC begins an edit on a double press of a todo's label, and saves it on the
+field's blur. `events.pw` declared `press`, `input`, `keydown`, `change`,
+`submit` and `close`; ADR-0138 listed `focus` and `blur` among the "events the
+platform does not declare", and a double press was not thought of. "Declaring a
+new event is a change to this file rather than to a checker" (`events.pw`), so:
+
+- **`dblclick`**, whose handler is given a `PressEvent`, where the pointer was:
+  a double press is read as a press is. The two presses of the pair are
+  presses still, and run the handlers an element has for them.
+- **`blur`**, whose handler is given a `BlurEvent { value }`, the value the
+  control held as it lost focus: the field's edit is saved from it, as an
+  `input`'s record is read. It does not bubble, so it is the element's own.
+- **The runtime** maps each to the browser's event of the name and reads its
+  record in the listener, before any code loads (ADR-0138, `DOM_EVENTS`,
+  `eventRecord`). The platform contract's hash moves
+  (`tests/platform_contracts.rs`), for `events.pw` alone.
+
+The names are the browser's, `dblclick` and `blur`, not `doublepress`: a double
+press has no other form (no key, no touch), and a reader of the program meets
+the name they know. A choice for the integrator to confirm or reverse.
+
+Not built, and not needed: `focus` (the pair of `blur`), `focusin` and
+`focusout`, a refinement of a checkbox's `change` to `checked` (ADR-0131), and a
+keyboard's way to begin an edit (TodoMVC's own is the double press, which the
+spec names, and a keyboard user cannot make one: a gap the spec has).
+
+## Acceptance
+
+### 1. The fragment
 
 - `compiler/pw-core/tests/address_fragment.rs`, 8 tests: the plan carries the
   binding and a page that states none has none; each of PW6101 to PW6106 with
@@ -146,6 +176,19 @@ ruling says, and each is cheap to change now.
   its address's.
 - `scripts/address_fragment_mutations.py`, 23 mutants, `just
   e14-address-fragment`.
+
+### 2. The two events
+
+- `compiler/pw-core/tests/declared_events.rs` (PW5022 lists both, and each is
+  accepted on an element) and `events.rs`
+  (`a_double_press_and_a_blur_are_given_their_records`: each handler given its
+  record, run under Node, and another event's record refused, PW0602).
+- `spikes/own-renderer/e2e/events.spec.mjs` over `examples/demo/events.pw`, 2
+  new tests in three engines: a single press runs the press's handler and
+  not the double press's, a pair runs the double press's once, given where
+  the pointer was; a control losing focus runs its handler, given its value,
+  typing is not leaving, and one with no handler for it runs none.
+- `scripts/dom_events_mutations.py`, 8 mutants, `just e14-dom-events`.
 
 ## Not claimed
 

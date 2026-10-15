@@ -2078,6 +2078,9 @@ const bound = new WeakMap();
  */
 const DOM_EVENTS = {
   press: "click",
+  // Track `todomvc` (ADR-XXXX): a double press, and a control's losing focus.
+  dblclick: "dblclick",
+  blur: "blur",
   input: "input",
   change: "change",
   keydown: "keydown",
@@ -2093,9 +2096,11 @@ const DOM_EVENTS = {
 function eventRecord(name, e) {
   switch (name) {
     case "press":
+    case "dblclick":
       return { x: Math.round(e.clientX ?? 0), y: Math.round(e.clientY ?? 0) };
     case "input":
     case "change":
+    case "blur":
       return { value: String(e.target?.value ?? "") };
     case "keydown":
       return { key: String(e.key ?? "") };
