@@ -1,0 +1,75 @@
+// @corpus: fixture
+// @id: LIB-Ratings
+// @category: application service — a store's ratings, given through orders
+// @charter: §15
+// @milestone: E14
+//
+// **A store's ratings** (track `reviews`, ADR-XXXX): each a customer's, of a
+// store of their delivered order, once; its stars and a comment, and no user,
+// since its order names its owner. Their own resource, `Ratings`: a rating is
+// written beside the orders and changes none of them, so a command that rates
+// owes the orders' readers nothing (PW5106).
+
+module Ratings
+
+import String
+// What a rating is given through: the reader's order, and its stores.
+import Orders
+import Stores
+import domain.{ StoreId }
+import capability.{ User, UserId }
+
+// **Stars, 1 to 5** (Uber Eats' scale, and the scale both DoorDash and Uber
+// Eats show a store's rating on; ADR-XXXX, decision 2).
+opaque type Stars = Int where value >= 1 & value <= 5
+
+// **A comment, as given**: trimmed, and at most 500 characters (code
+// points, as PostgreSQL's `char_length` counts them); empty where none.
+opaque type Comment = String where String.length(value) <= 500
+
+// **A store's ratings, as the layer counts them**: how many, and their stars
+// summed. A store no one rated is not listed.
+type RatingsOf = RatingsOf { store: StoreId, count: Int, stars: Int }
+
+// **A review**: a rating's stars and comment, by its own id. Who gave it is
+// not among them (ADR-XXXX, decision 5).
+type Review = Review { id: Int, stars: Int, comment: String }
+
+// **What a reader gave a store of their order.**
+type Given = Given { stars: Int, comment: String }
+
+// **A store of the reader's latest order**: its name, and what the reader
+// gave it, none before they rate it.
+type StoreOfOrder = StoreOfOrder { store: StoreId, name: String, given: Option<Given> }
+
+// **The reader's latest order, as rating reads it**: whether it is
+// delivered, and each of its stores, in the order it was charged them.
+type OrderToRate = OrderToRate { delivered: Bool, stores: List<StoreOfOrder> }
+
+// **Why a rating was refused**: the reader's latest order is not delivered
+// (or there is none), is not from the store, or has its rating already.
+type RatingError =
+    | NotDelivered
+    | NotInOrder
+    | AlreadyRated
+
+// **The ratings of each of a list of stores, at once** (NEXT 4b): one read,
+// whatever their number.
+fn for_stores(stores: List<StoreId>) -> List<RatingsOf> !{ database.read<Ratings> }
+    host "store:data/ratings#for-stores"
+
+// **A store's newest reviews**: the five newest of its ratings with a
+// comment, newest first.
+fn reviews(store: StoreId) -> List<Review> !{ database.read<Ratings> }
+    host "store:data/ratings#reviews"
+
+// **The reader's latest order, as rating reads it**, in one read: none
+// delivered and no store where the reader has no order.
+fn for_order(reader: User<UserId>) -> OrderToRate !{ database.read<Ratings>, database.read<Orders>, database.read<Stores> }
+    host "store:data/ratings#for-order"
+
+// **A rating given** of `store`, through the reader's latest order, once:
+// the order read again in the command's transaction, and the rating written,
+// or refused; its stars where given.
+fn give(reader: User<UserId>, store: StoreId, stars: Stars, comment: Comment) -> Result<Int, RatingError> !{ database.write<Ratings>, database.read<Orders> }
+    host "store:data/ratings#rate"

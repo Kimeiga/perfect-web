@@ -29,9 +29,11 @@ import Carts
 import Orders
 import Estimates
 import Addresses
+// Track `reviews` (ADR-XXXX): a store's ratings, in the same database.
+import Ratings
 
 source StoreData
-    holds        Stores, Menus, Carts, Orders, Estimates, Addresses
+    holds        Stores, Menus, Carts, Orders, Estimates, Addresses, Ratings
     transactions serializable
     reads        strong
     changes      none

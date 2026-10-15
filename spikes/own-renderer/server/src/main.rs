@@ -730,6 +730,9 @@ mod csp;
 // The scheduled-commands track: a command runs when the clock passes its
 // time.
 mod schedules;
+// TRACK SEAM (reviews): a store's ratings and reviews, given through a
+// delivered order.
+mod reviews;
 
 struct Server {
     /// **The build this host serves, by its name** (ADR-0300): on each
@@ -13871,6 +13874,9 @@ public query Store(",
     // The scheduled-commands track: a command run when the clock passes its
     // time, and the store's sweep.
     mod store_scheduled;
+    // TRACK SEAM (reviews): a store's ratings and reviews, in memory and on
+    // PostgreSQL where a database is named.
+    mod reviews;
 
     /// **A second program is served by the same host** (ADR-0218): the
     /// feed's timeline from its data layer, and a post committed and sent
