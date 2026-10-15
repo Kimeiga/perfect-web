@@ -1579,7 +1579,11 @@ e14-value-labels:
     @grep -E "^test result|mutants killed|^---- |panicked at" docs/evidence/E14/value-labels.txt
 
 # ADR-0132: the browser's resume decision knows what the build compiled.
+# Its suite runs on the build it makes first, as every recipe's does (track
+# evidence-integrity: it ran on whatever a worktree or a shard had built).
 e14-resume-gate:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
     @{ echo "ADR-0132 - the browser's resume decision knows what the build compiled"; echo; \
        echo "produced by: just e14-resume-gate"; \
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
@@ -1598,8 +1602,11 @@ e14-resume-gate:
 
 # ADR-0133: a page holds its own UI state, the first slice of signals. The
 # compiler's tests, the browser's renderer, the page in each engine, and a
-# mutant per piece.
+# mutant per piece. Its suite runs on the build it makes first (track
+# evidence-integrity: it ran on whatever a worktree or a shard had built).
 e14-signals:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
     @{ echo "ADR-0133 - a page holds its own UI state (signals, first slice)"; echo; \
        echo "produced by: just e14-signals"; \
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
@@ -1704,8 +1711,10 @@ e14-events:
 # ADR-0139: a frame is forgotten when the page says it applied it. The
 # server's tests, the mutation controls, and the keyed-list suite twenty
 # times in a row, which failed intermittently before. The last needs the
-# build `spikes/own-renderer/run.sh` stages.
+# build `spikes/own-renderer/run.sh` stages, which it makes first (track
+# evidence-integrity: it ran on whatever a worktree or a shard had built).
 e14-stream-ack:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
     @{ echo "ADR-0139 - a frame is forgotten when the page says it applied it"; echo; \
        echo "produced by: just e14-stream-ack"; \
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
