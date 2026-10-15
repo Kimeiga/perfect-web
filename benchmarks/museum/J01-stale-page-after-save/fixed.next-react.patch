@@ -1,0 +1,13 @@
+diff --git a/app/stores/[storeId]/AddAndView.tsx b/app/stores/[storeId]/AddAndView.tsx
+index 3151a11..af47b35 100644
+--- a/app/stores/[storeId]/AddAndView.tsx
++++ b/app/stores/[storeId]/AddAndView.tsx
+@@ -12,6 +12,8 @@ export function AddAndView({ store, item }: { store: string; item: string }) {
+       type="button"
+       onClick={async () => {
+         await fetch("/api/cart", { method: "POST", body: JSON.stringify({ store, item }) });
++        // The pages this router keeps were read before the save.
++        router.refresh();
+         router.push(`/stores/${store}/cart`);
+       }}
+     >

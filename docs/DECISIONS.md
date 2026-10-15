@@ -2991,3 +2991,10 @@ unnamed (W9's; the DoorDash customer side's ratings and reviews).
   shown without their reviewer, public and unmoderated, the shared cache
   holding no reader's value (PW5001); read by set, one statement for a
   list of stores.
+[ADR-0342](DECISIONS/ADR-0342-the-claim-measured.md):
+the claim, measured: the bug museum and the head-to-head (track `proof`).
+- An exhibit is a census leaf with a dated primary source, its bug shown in
+  Next.js or SvelteKit with its repair as the control, and Pleris's answer,
+  misses first; five exhibits, H07's miss closed by ADR-0340's PW0405 on
+  the same train. The head-to-head's protocol, TodoMVC first; its
+  downloads wait for the owner.

@@ -29,6 +29,7 @@ import 'just/page-policy.just'
 import 'just/scheduled.just'
 import 'just/bounded-checker.just'
 import 'just/reviews.just'
+import 'just/proof.just'
 
 default:
     @just --list

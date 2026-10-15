@@ -23,6 +23,32 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0342, 2026-10-15: the claim, measured: the bug museum and the
+head-to-head** (NEXT's evidence that answers "is Pleris perfect?"; track
+`proof`, merged from `11531dba`, with the integrator's rulings of
+2026-10-15).
+- The museum's method: an exhibit is a census leaf with a dated primary
+  source, its bug shown happening in ADR-0120's Next.js or SvelteKit store
+  (a Playwright spec that passes on the bug and fails on its idiomatic
+  repair, built in place on the installed dependencies), and Pleris's
+  answer to the same change, a named code whose neighbour checks clean, a
+  runtime test, or a miss, reported first. Each refusing code has a
+  mutation control. The head-to-head's protocol is written (TodoMVC first);
+  nothing of it is measured, and its downloads wait for the owner.
+- Five exhibits: F01 (a real CVE's `{@html}`) refused by PW5010, G01 (one
+  press delivered twice) by PW0338, J08 (a server's shared state) by
+  PW5001, J01 (a page stale after a save, ADR-0280's case, in next@16.3.8)
+  at runtime; and H07 (a read per row), a miss at the museum's first
+  record.
+- **A finding, the museum working as meant: H07 is refused on this train.**
+  Merged after ADR-0340, the exhibit's unchanged program is refused by
+  PW0405, and the museum failed until the exhibit expected it: "refused,
+  PW0405: a miss the museum found, closed by ADR-0340's checker". Its
+  `--checks-only` run on the train: 4 refused, none otherwise than
+  expected; `proof_mutations.py` 4 of 4 killed, H07's new control among
+  them.
+Verify TRAIN_RUN green, with train-9.
+
 **ADR-0341, 2026-10-15: a store is rated through its delivered orders, and
 its reviewers go unnamed** (W9's; NEXT's ratings and reviews, the DoorDash
 customer side's last piece but scheduled orders; track `reviews`, merged

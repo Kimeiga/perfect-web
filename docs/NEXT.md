@@ -1161,8 +1161,18 @@ E14 comes before E11-E13. Its plan, controls and task list are
              museum) and statuses down to "missing"; and
              `web-recompiled/proof-roadmap.md` §3's Milestone 0, the shape
              planned (the familiar implementation, why it compiles, the
-             Pleris form, the refusal, a source and a runnable test). What
-             it lacks, in order:
+             Pleris form, the refusal, a source and a runnable test).
+             **Begun** (ADR-0342, track `proof`, merged 2026-10-15 on
+             train-9, `just e14-museum`): five exhibits, each a census leaf
+             with a dated primary source, its bug shown in Next.js or
+             SvelteKit and its repair the spec's control, and Pleris's
+             answer with its own: F01, G01 and J08 refused by a code, J01 at
+             runtime, and H07, a read per row, a miss at its first record and
+             refused since by ADR-0340's PW0405, the museum's first closed
+             miss. Next, the proof track's: J01's variant on a streamed page
+             (vercel/next.js#99028 reports `router.refresh()`, its repair,
+             fetching nothing there), then the head-to-head (item 2), and
+             the sixth exhibit, H01's lost update. What it lacks, in order:
              - each `R-*` exhibit linked to its census leaf and to a
                primary source where one exists (a postmortem, a CVE, a
                public incident report, a framework's issue);
@@ -1190,7 +1200,10 @@ E14 comes before E11-E13. Its plan, controls and task list are
           2. **the head-to-head comparison**, extending E14's three-stack
              store contract (ADR-0120) rather than starting again: TodoMVC
              first (W7), against TodoMVC's own implementations, then the
-             DoorDash customer side, in Pleris, Next.js and SvelteKit.
+             DoorDash customer side, in Pleris, Next.js and SvelteKit. Its
+             protocol is ADR-0342's (the metrics, their instruments and the
+             fairness rules); its downloads (TodoMVC's React and Svelte
+             examples, axe-core) wait for the owner's approval.
              - Fair: idiomatic in each framework, never a strawman, each
                stack's standard libraries allowed.
              - Measured by lines of code under a stated counting rule; the

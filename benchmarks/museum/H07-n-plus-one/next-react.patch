@@ -1,0 +1,85 @@
+diff --git a/app/bench/queries/route.ts b/app/bench/queries/route.ts
+new file mode 100644
+index 0000000..5365f67
+--- /dev/null
++++ b/app/bench/queries/route.ts
+@@ -0,0 +1,6 @@
++import { queryCount } from "@/lib/store";
++
++/** How many round trips the database has served. A benchmark's hook. */
++export function GET() {
++  return Response.json({ queries: queryCount() });
++}
+diff --git a/app/stores/[storeId]/page.tsx b/app/stores/[storeId]/page.tsx
+index 8d4f845..e4405aa 100644
+--- a/app/stores/[storeId]/page.tsx
++++ b/app/stores/[storeId]/page.tsx
+@@ -1,5 +1,5 @@
+ import { notFound } from "next/navigation";
+-import { getCart, getMenu, getStore, lineCount } from "@/lib/store";
++import { getCart, getMenu, getPrice, getStore, lineCount } from "@/lib/store";
+ import { currentSession } from "@/lib/session";
+ import { addToCartAction, clearCartAction } from "./actions";
+ 
+@@ -13,6 +13,9 @@ export default async function StorePage({
+   const menu = getMenu(storeId);
+   if (!store || !menu) notFound();
+   const cart = getCart(await currentSession());
++  // Each item's price, its reads started together (Promise.all), as
++  // independent reads are started in a Server Component.
++  const prices = await Promise.all(menu.map((item) => getPrice(item.id)));
+ 
+   return (
+     <main>
+@@ -20,9 +23,10 @@ export default async function StorePage({
+ 
+       <section aria-label="Menu">
+         <ul id="menu">
+-          {menu.map((item) => (
++          {menu.map((item, i) => (
+             <li key={item.id}>
+               <span>{item.name}</span>
++              <span className="price">{prices[i]}</span>
+               <form action={addToCartAction}>
+                 <input type="hidden" name="store" value={store.id} />
+                 <input type="hidden" name="item" value={item.id} />
+diff --git a/lib/store.ts b/lib/store.ts
+index 7291a61..dcfce39 100644
+--- a/lib/store.ts
++++ b/lib/store.ts
+@@ -46,6 +46,35 @@ export function getCart(session: string | undefined): Cart {
+   };
+ }
+ 
++// Each item's price, in cents, held as a database would hold it: reading
++// one is one round trip, and the round trips are counted.
++const PRICES: Record<MenuItemId, number> = { espresso: 300, cortado: 425, "cold-brew": 500 };
++const queries: { n: number } =
++  ((globalThis as Record<string, unknown>).__pwBenchQueries as { n: number }) ?? { n: 0 };
++(globalThis as Record<string, unknown>).__pwBenchQueries = queries;
++
++async function roundTrip(): Promise<void> {
++  queries.n += 1;
++  await new Promise((resolve) => setTimeout(resolve, 20));
++}
++
++/** One item's price: one round trip. */
++export async function getPrice(item: MenuItemId): Promise<number> {
++  await roundTrip();
++  return PRICES[item] ?? 0;
++}
++
++/** Several items' prices: one round trip for all of them. */
++export async function getPrices(items: MenuItemId[]): Promise<number[]> {
++  await roundTrip();
++  return items.map((item) => PRICES[item] ?? 0);
++}
++
++/** How many round trips the database has served. */
++export function queryCount(): number {
++  return queries.n;
++}
++
+ /** How many items the cart holds: what the page shows. */
+ export function lineCount(cart: Cart): number {
+   return cart.lines.reduce((n, line) => n + line.quantity, 0);
