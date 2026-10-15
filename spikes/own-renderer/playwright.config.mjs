@@ -131,6 +131,11 @@ export const KIOKUN_PORTS = Object.fromEntries(ENGINES.map((e, i) => [e, PORT + 
 export const STORE_ACCOUNTS_PORTS = Object.fromEntries(
   ENGINES.map((e, i) => [e, PORT + 160 + i]),
 );
+// TRACK SEAM (todomvc): TodoMVC's hosts (docs/PARALLEL.md, W7's plan):
+// TodoMVC in Pleris, built into `dist-todomvc` by `todomvc.sh`. One per
+// engine, because a session's todos are one host's. Served only when it is
+// built.
+export const TODOMVC_PORTS = Object.fromEntries(ENGINES.map((e, i) => [e, PORT + 140 + i]));
 // TRACK SEAM (store-search): the store's search hosts (docs/PARALLEL.md,
 // W9), the store's build, one per engine, because a test adds a dish to
 // store 47's menu, which is one per server.
@@ -210,6 +215,19 @@ if (KIOKUN_WHY !== null) {
 export const KIOKUN_BUILT =
   existsSync(new URL("./dist-kiokun/build", import.meta.url)) && KIOKUN_WHY === null;
 
+// TRACK SEAM (todomvc): TodoMVC's build, held to the same: its runtime and
+// its sources (`todomvc.sh`).
+const TODOMVC_WHY = !existsSync(new URL("./dist-todomvc/build", import.meta.url))
+  ? null
+  : builtWith("dist-todomvc") !== RUNTIME
+    ? "dist-todomvc was built with another pw-runtime.mjs"
+    : changedSince("dist-todomvc");
+if (TODOMVC_WHY !== null) {
+  console.warn(`${TODOMVC_WHY}: e2e/todomvc.spec.mjs is not run; run todomvc.sh again`);
+}
+export const TODOMVC_BUILT =
+  existsSync(new URL("./dist-todomvc/build", import.meta.url)) && TODOMVC_WHY === null;
+
 const HOSTS = process.env.PW_PERFORMANCE
   ? [MUTABLE_PORTS.performance.chromium]
   : [PORT, ...MUTATING.flatMap((suite) => Object.values(MUTABLE_PORTS[suite]))];
@@ -247,6 +265,8 @@ export default defineConfig({
     ...(FEED_BUILT && !process.env.PW_PERFORMANCE ? [] : ["**/messages.spec.mjs"]),
     // The kiokun track's, kiokun's build (`kiokun-site.sh`).
     ...(KIOKUN_BUILT && !process.env.PW_PERFORMANCE ? [] : ["**/kiokun-site.spec.mjs"]),
+    // TRACK SEAM (todomvc): TodoMVC's, its build (`todomvc.sh`).
+    ...(TODOMVC_BUILT && !process.env.PW_PERFORMANCE ? [] : ["**/todomvc.spec.mjs"]),
   ],
   fullyParallel: true,
   reporter: [["list"]],
@@ -351,6 +371,16 @@ export default defineConfig({
           reuseExistingServer: !!process.env.PW_REUSE,
           timeout: 60_000,
         }))),
+    // TRACK SEAM (todomvc): TodoMVC's hosts.
+    ...(TODOMVC_BUILT && !process.env.PW_PERFORMANCE
+      ? Object.values(TODOMVC_PORTS).map((port) => ({
+          command: `../../target/debug/pw-dev-server dist-todomvc`,
+          env: { PORT: String(port), ...IN_MEMORY },
+          port,
+          reuseExistingServer: !!process.env.PW_REUSE,
+          timeout: 60_000,
+        }))
+      : []),
     // The kiokun track's hosts: kiokun's build, its entries read from
     // KIOKUN_DATA where the caller names it, the repository's sample
     // otherwise.

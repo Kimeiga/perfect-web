@@ -152,6 +152,77 @@ Not built, and not needed: `focus` (the pair of `blur`), `focusin` and
 keyboard's way to begin an edit (TodoMVC's own is the double press, which the
 spec names, and a keyboard user cannot make one: a gap the spec has).
 
+### 3. TodoMVC, built
+
+A fourth program on the development server, beside the store, the feed and
+kiokun: `examples/todomvc/app.pw`, built by `spikes/own-renderer/todomvc.sh`
+into `dist-todomvc`, served on a host per engine (`TODOMVC_PORTS`, `PORT+140`
+to `PORT+142`, the plan's ports).
+
+- **Its data layer is a seam of its own** (`TRACK SEAM (todomvc)` in
+  `from_build_layers`): chosen where the program imports `todomvc:data/…`, as
+  kiokun's is. `todomvc.rs` keeps a session's todos in memory, oldest first,
+  under one lock from a command's call to its commit, as the feed's layer
+  does. Every operation names its session, and one that names another than
+  the command's or the query's own is refused, so no write or read reaches
+  another session's list. A session holds at most 500 todos (`full`), which
+  TodoMVC's spec does not state and a host guests write to needs.
+- **Its markup and class names are the template's**, and its stylesheets are
+  TodoMVC's own: `todomvc-common`'s `base.css` and `todomvc-app-css`'s
+  `index.css`, from the npm packages the owner approved on 2026-10-08, copied
+  as they are by `todomvc.sh`. The official sheet draws a todo's checkbox, a
+  circle and a ticked circle, as `data:` images, which a page's generated
+  policy refuses (`img-src 'self'`, ADR-0333). The spec allows an app's own
+  sheet over the official ("if you need to change some styles, use the app.css
+  file"), so `todomvc-styles.mjs` reads the two drawings out of the official
+  sheet as it ships, writes each as an SVG file of this origin, and writes
+  `todomvc-pleris.css`, the two rules that point at them, loaded after.
+  Nothing is drawn by hand; the host serves `.svg` as `image/svg+xml` (a
+  one-line change at its static route, marked as the track's), which a browser
+  asks for under `nosniff`.
+- **The licences.** `todomvc-common` is MIT. `todomvc-app-css` is **CC BY 4.0**,
+  at its source and on npm, not MIT as the plan says: it asks for credit, which
+  the page gives in its footer and the licence file served beside the sheet
+  (`/todomvc-app-css.license.txt`) carries, and nothing in it is changed. The
+  owner approved the package; whether CC BY 4.0 is what they meant is the
+  integrator's to confirm (a question below).
+- **The filters are the model's.** The page's read, `Board(session, filter,
+  editing)`, is keyed by the signals `filter`, which the fragment sets (§1), and
+  `editing`; the program's own pure functions filter (`shown`) and count
+  (`board_of`), and a change of the address is a read for a new key (ADR-0152).
+  The footer, the counter, the toggle-all and the clear button read counts of
+  every todo, which no filter changes.
+- **The editing mode is the page's signal, and the model says which row shows
+  its field.** TodoMVC's spec: "Editing mode should not be persisted", so the
+  mode is UI state (charter §9.1's first kind): the signal `editing` names the
+  todo, `edit_text` holds the field's text, and a double press sets both. A
+  signal read inside a query's loop, `{#if editing == row.id}` in a row, is not
+  built (ADR-0137 refuses it; ADR-0144's per-row instances, PW5307, are not
+  built either), so `editing` keys the page's read too and the model returns
+  each row with `editing: true` for the one: the row is shown again, with its
+  field. The cost is a read for each begin and end of an edit, and a row
+  re-rendered whole, which a change to its text by another tab of the session
+  would take the field from. A question for the integrator, below: this is
+  what the missing piece costs, and the proper fix is a signal a row can read.
+- **The new todo is cleared at Enter, and given back if it was not added.** The
+  spec says Enter "creates the todo, appends it to the todo list, and clears
+  the input". Cleared when the command answers, what a person typed while the
+  command was in flight was lost (found in WebKit, where the answer is slower);
+  cleared at once, it is not, and a todo the host refuses (`full`, a network
+  failure) is given back to the field where nothing has been typed since.
+- **A save ends only its own edit.** A blur saves the todo being edited and,
+  once the host answers, ends the edit unless another todo has been begun
+  since: a double press on a second todo begins it by leaving the first's
+  field, and the first's answer must not end the second's edit (found by the
+  suite: "editing another todo saves the first").
+- **Persistence is the framework's own**, the spec's allowance in place of
+  `localStorage`: a session's todos, kept by the host, outliving a reload, not a
+  restart of the host, and not a device that clears its cookies. **The version
+  on a device's own storage waits for charter §9.1's fourth kind of state**, which
+  starts with the Docs app (docs/NEXT.md), and is TodoMVC's second version then.
+  What the official Cypress suite says of an app that does not use
+  `localStorage` is the next section's.
+
 ## Acceptance
 
 ### 1. The fragment
@@ -189,6 +260,36 @@ spec names, and a keyboard user cannot make one: a gap the spec has).
   the pointer was; a control losing focus runs its handler, given its value,
   typing is not leaving, and one with no handler for it runs none.
 - `scripts/dom_events_mutations.py`, 8 mutants, `just e14-dom-events`.
+
+### 3. TodoMVC
+
+- `spikes/own-renderer/server/src/tests/todomvc.rs`, 14 tests of the host:
+  `.main` and `.footer` hidden, not absent, with no todos, and shown with one;
+  todos appended to the bottom, ids never reused; the host holding a title to
+  its invariant (empty and over 1000 refused, 1000 added); the counter's words
+  and its `<strong>`; toggling one and every todo, and the toggle-all's checked
+  state following them; clear completed, and its button hidden with none; an
+  edit saved trimmed and one emptied destroying the todo; a todo that is not
+  there not found; a session's todos its own, by the page, by a command and by
+  the layer; the bound; the model filtering by the page's key, and only what
+  changes sent; the key naming the row being edited; the template's classes,
+  the new-todo field's `autofocus`, the filters' links and TodoMVC's
+  stylesheets.
+- `spikes/own-renderer/e2e/todomvc.spec.mjs`, 43 tests in Chromium, Firefox
+  and WebKit, in the spec's own order: no todos; the new todo (Enter, the
+  field cleared and focused, appended, trimmed, never empty, bounded, markup
+  shown as text); mark all as complete; an item (its checkbox, hover for
+  `.destroy`); editing (a double press, Enter, blur, clicking away, trimmed,
+  emptied, Escape, not persisted, another todo's begin saving the first,
+  nothing changed, a completed todo being edited); the counter; clear
+  completed; persistence (a reload, another visitor, a second tab live);
+  routing (each filter and its `selected` link, the model filtering, an item
+  updated under a filter, the back button, a page opened at a route and kept
+  on reload, a fragment that is no route); the template's markup; and
+  TodoMVC's stylesheets, served and applied, and the licence beside them.
+- `scripts/todomvc_mutations.py`, 49 mutants: 38 of the program, each
+  checked to be a well-typed program before it runs, 10 of the layer and 1
+  of the host; `just e14-todomvc`.
 
 ## Not claimed
 

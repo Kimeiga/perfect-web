@@ -711,6 +711,8 @@ mod materializations;
 mod messages;
 // TRACK SEAM (kiokun): kiokun's dictionary, read (docs/PARALLEL.md, W6).
 mod kiokun;
+// TRACK SEAM (todomvc): a session's todos (docs/PARALLEL.md, W7).
+mod todomvc;
 // ADR-0304: the platform's clock, and what a value read by it holds until.
 mod clock;
 // ADR-0305: a page's commands run in the order it sent them.
@@ -1403,6 +1405,17 @@ impl Server {
             (
                 Arc::new(store::StoreData::new()),
                 Arc::new(kiokun::KiokunData::new()?),
+            )
+        } else if contracts
+            .iter()
+            .flat_map(|c| &c.imports)
+            .any(|i| i.interface.starts_with("todomvc:"))
+        {
+            // TRACK SEAM (todomvc): a session's todos, in memory, where the
+            // program imports `todomvc:data/…` (docs/PARALLEL.md, W7).
+            (
+                Arc::new(store::StoreData::new()),
+                Arc::new(todomvc::TodoData::new()),
             )
         } else {
             #[cfg(test)]
@@ -9784,6 +9797,10 @@ fn serve_file(server: &Server, stream: &mut TcpStream, route: &str) {
         // A stylesheet the build ships, which a page's policy allows from
         // this origin, and which a browser applies only as `text/css`.
         Some("css") => "text/css; charset=utf-8",
+        // TRACK SEAM (todomvc): a drawing the build ships, which the page's
+        // stylesheet draws a checkbox with (`img-src 'self'`, ADR-0333): a
+        // browser draws an image only as `image/svg+xml`, under `nosniff`.
+        Some("svg") => "image/svg+xml",
         _ => "application/octet-stream",
     };
     match std::fs::read(&path) {
@@ -13873,6 +13890,9 @@ public query Store(",
     // TRACK SEAM (todomvc): a page's fragment binding reaches its document
     // (docs/PARALLEL.md, W7).
     mod address_fragment;
+
+    // TRACK SEAM (todomvc): TodoMVC, built and served (docs/PARALLEL.md, W7).
+    mod todomvc;
 
     // TRACK SEAM (store-search): the store's search page, served (W9).
     mod store_search;

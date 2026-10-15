@@ -62,3 +62,33 @@ e14-dom-events:
        CARGO_INCREMENTAL=0 python3 scripts/dom_events_mutations.py; \
      } > docs/evidence/E14/dom-events.txt
     @grep -E "^test result|passed|mutants killed|^---- |panicked at" docs/evidence/E14/dom-events.txt
+
+# Track `todomvc` (ADR-XXXX): TodoMVC in Pleris, held to TodoMVC's own spec
+# (`app-spec.md`): every behaviour it states, each with its test. The program
+# (examples/todomvc) and its data layer's tests on the host (tests::todomvc::),
+# the browser in three engines over the program built by
+# spikes/own-renderer/todomvc.sh and served on a host per engine
+# (e2e/todomvc.spec.mjs), and the mutation controls
+# (scripts/todomvc_mutations.py), each program mutant checked to be a
+# well-typed program.
+e14-todomvc:
+    @bash spikes/own-renderer/todomvc.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server -p kiokun-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-XXXX - TodoMVC in Pleris, held to its own spec and its own tests"; echo; \
+       echo "produced by: just e14-todomvc"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; \
+       echo "todomvc-app-css: $(node -p "require('./spikes/own-renderer/node_modules/todomvc-app-css/package.json').version") ($(node -p "require('./spikes/own-renderer/node_modules/todomvc-app-css/package.json').license"))"; \
+       echo "todomvc-common: $(node -p "require('./spikes/own-renderer/node_modules/todomvc-common/package.json').version") ($(node -p "require('./spikes/own-renderer/node_modules/todomvc-common/package.json').license"))"; echo; \
+       echo "== the host: a session's todos, the commands over them, and the page (tests::todomvc::)"; echo; \
+       cargo test --locked -p pw-dev-server -- tests::todomvc:: 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the browser in three engines (e2e/todomvc.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test e2e/todomvc.spec.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/todomvc_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/todomvc_mutations.py; \
+     } > docs/evidence/E14/todomvc.txt
+    @grep -E "^test result|passed|mutants killed|^---- |panicked at" docs/evidence/E14/todomvc.txt
