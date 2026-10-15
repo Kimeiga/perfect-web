@@ -431,6 +431,51 @@ fn what_is_no_read_per_element_is_accepted() {
 }
 
 #[test]
+fn a_key_a_read_computes_ends_the_trace_and_its_read_is_refused_once() {
+    // The design note's limit: a key is traced through a name, a `let`, a
+    // field and a pure call, not through another read. The inner read is the
+    // loop's read per element, refused; the outer, keyed by what the inner
+    // answers, is the same turn of the same loop, and not refused again.
+    let src = with(
+        "fn per(lines: List<Line>) -> List<Int> !{ database.read<Price> } {\n    \
+         List.map(lines, l => cents(price_of(cents(price_of(l.item)))))\n}\n",
+    );
+    let found = diagnostics(&src);
+    let refused: Vec<&str> = found
+        .iter()
+        .filter(|d| d.code == "PW0405")
+        .map(|d| &src[d.primary_span.clone()])
+        .collect();
+    assert_eq!(refused, ["price_of(l.item)"]);
+}
+
+#[test]
+fn set_and_sets_head_a_clause_only_where_a_name_follows() {
+    // `set` and `sets` are names a body may begin with: in a block whose
+    // clauses come first, `set.size()` is a statement, not a clause.
+    let src = "module m\n\nimport Set\n\nview Count(set: Set<Int>) {\n    placement browser\n    \
+               set.size()\n}\n";
+    let p = pw_syntax::parse_tree(src);
+    let hir = pw_core::lower::lower_file(src, &p.green);
+    let (_, view) = hir
+        .all_decls()
+        .find(|(_, d)| d.name == "Count")
+        .expect("the view");
+    let heads: Vec<&str> = view.policies.iter().map(|p| p.name.as_str()).collect();
+    assert_eq!(heads, ["placement"]);
+    // Where a name follows, each is a clause.
+    let clause = with("");
+    let p = pw_syntax::parse_tree(&clause);
+    let hir = pw_core::lower::lower_file(&clause, &p.green);
+    let heads: Vec<&str> = hir
+        .all_decls()
+        .flat_map(|(_, d)| d.policies.iter().map(|p| p.name.as_str()))
+        .filter(|h| *h == "set" || *h == "sets")
+        .collect();
+    assert_eq!(heads, ["sets", "set"]);
+}
+
+#[test]
 fn a_reads_verdict_depends_on_its_key_and_on_nothing_else() {
     // ADR-0022's fifth check: renaming the element, binding the key by a
     // `let`, or a same-spelled read of another module's, changes nothing.

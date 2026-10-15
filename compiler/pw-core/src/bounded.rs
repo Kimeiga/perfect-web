@@ -180,6 +180,9 @@ pub(crate) struct Reads<'p, 'i> {
     set_reads: BTreeMap<DefId, DefId>,
     /// Each `set` whose shape does not fit, by its unit.
     faults: Vec<(usize, Diagnostic)>,
+    /// **Every body the walk saw**, each read once (4c's passes revisit
+    /// them until their facts settle), in unit and declaration order.
+    bodies: Vec<BodyCx<'p>>,
 }
 
 /// The rounds a fixed point takes at most: each adds a parameter, of
@@ -208,7 +211,15 @@ impl<'p, 'i> Reads<'p, 'i> {
             pairs: BTreeMap::new(),
             set_reads: BTreeMap::new(),
             faults: Vec::new(),
+            bodies: Vec::new(),
         };
+        for (unit, hir) in hirs.iter().enumerate() {
+            for (id, _) in hir.all_decls() {
+                if let Some(cx) = out.cx(unit, id) {
+                    out.bodies.push(cx);
+                }
+            }
+        }
         out.cycles = out.call_cycles();
         // What a callable applies to a list's elements, and what recurses
         // over data, each reading the other: a callback applied in a
@@ -239,15 +250,17 @@ impl<'p, 'i> Reads<'p, 'i> {
             .filter(|(u, _)| *u == unit)
             .map(|(_, d)| d.clone())
             .collect();
-        let Some(hir) = self.hirs.get(unit) else {
-            return out;
-        };
-        for (id, _) in hir.all_decls() {
-            let Some(cx) = self.cx(unit, id) else {
-                continue;
-            };
-            self.per_element(&cx, src, &mut out);
-            self.per_key(&cx, &mut out);
+        for cx in self.bodies.iter().filter(|cx| cx.unit == unit) {
+            let calls = &cx.performed.calls;
+            if calls
+                .iter()
+                .any(|c| self.keys.contains_key(&c.callee) || self.applies.contains_key(&c.callee))
+            {
+                self.per_element(cx, src, &mut out);
+            }
+            if calls.iter().any(|c| self.set_reads.contains_key(&c.callee)) {
+                self.per_key(cx, &mut out);
+            }
         }
         out
     }
@@ -670,18 +683,30 @@ impl<'p, 'i> Reads<'p, 'i> {
                 }
             }
         }
-        for (unit, hir) in self.hirs.iter().enumerate() {
-            for (id, _) in hir.all_decls() {
-                let Some(cx) = self.cx(unit, id) else {
-                    continue;
-                };
-                let found = self.applied_in(&cx);
-                if !found.is_empty() {
-                    out.insert(cx.def, found);
-                }
+        for cx in &self.bodies {
+            if !self.takes_a_function(cx) {
+                continue;
+            }
+            let found = self.applied_in(cx);
+            if !found.is_empty() {
+                out.insert(cx.def, found);
             }
         }
         out
+    }
+
+    /// **Could the body's declaration apply a parameter at all?** One whose
+    /// parameters are each written with a type, none of them a function's,
+    /// applies none.
+    fn takes_a_function(&self, cx: &BodyCx<'_>) -> bool {
+        let Some(sig) = self.sigs.by_def(cx.def) else {
+            return true;
+        };
+        sig.params.iter().any(|p| {
+            p.as_ref()
+                .and_then(TypeResolution::resolved)
+                .is_none_or(|t| t.as_builtin() == Some(Builtin::Function))
+        })
     }
 
     /// The parameters a body applies to a list's elements.
@@ -750,47 +775,42 @@ impl<'p, 'i> Reads<'p, 'i> {
     fn recursion(&self) -> BTreeMap<DefId, (BTreeSet<usize>, ExprId)> {
         let components = &self.cycles;
         let mut out = BTreeMap::new();
-        for (unit, hir) in self.hirs.iter().enumerate() {
-            for (id, _) in hir.all_decls() {
-                let def = Self::def(unit, id);
-                let Some(own) = components.get(&def) else {
+        for cx in &self.bodies {
+            let def = cx.def;
+            let Some(own) = components.get(&def) else {
+                continue;
+            };
+            let elements = Self::elements(&self.regions(cx, false));
+            let mut params = BTreeSet::new();
+            let mut first = None;
+            for c in &cx.performed.calls {
+                if components.get(&c.callee) != Some(own) {
+                    continue;
+                }
+                let Some(given) = self.given(cx, c.call) else {
                     continue;
                 };
-                let Some(cx) = self.cx(unit, id) else {
-                    continue;
-                };
-                let elements = Self::elements(&self.regions(&cx, false));
-                let mut params = BTreeSet::new();
-                let mut first = None;
-                for c in &cx.performed.calls {
-                    if components.get(&c.callee) != Some(own) {
-                        continue;
-                    }
-                    let Some(given) = self.given(&cx, c.call) else {
-                        continue;
-                    };
-                    for (k, arg) in given.iter().enumerate() {
-                        let Some(arg) = arg else { continue };
-                        for i in 0..cx.decl.params.len() {
-                            let whole = matches!(cx.body.expr(*arg), Expr::Name(_))
-                                && cx.lexical.binder(*arg) == Some(Binder::Param(i));
-                            if whole && c.callee == def && k == i {
-                                continue;
-                            }
-                            let wanted = |b: Binder| b == Binder::Param(i);
-                            if self
-                                .depends(&cx, *arg, &wanted, Some(&elements), &mut BTreeSet::new())
-                                .is_some()
-                            {
-                                params.insert(i);
-                                first.get_or_insert(c.call);
-                            }
+                for (k, arg) in given.iter().enumerate() {
+                    let Some(arg) = arg else { continue };
+                    for i in 0..cx.decl.params.len() {
+                        let whole = matches!(cx.body.expr(*arg), Expr::Name(_))
+                            && cx.lexical.binder(*arg) == Some(Binder::Param(i));
+                        if whole && c.callee == def && k == i {
+                            continue;
+                        }
+                        let wanted = |b: Binder| b == Binder::Param(i);
+                        if self
+                            .depends(cx, *arg, &wanted, Some(&elements), &mut BTreeSet::new())
+                            .is_some()
+                        {
+                            params.insert(i);
+                            first.get_or_insert(c.call);
                         }
                     }
                 }
-                if let Some(at) = first {
-                    out.insert(def, (params, at));
-                }
+            }
+            if let Some(at) = first {
+                out.insert(def, (params, at));
             }
         }
         out
@@ -799,18 +819,16 @@ impl<'p, 'i> Reads<'p, 'i> {
     /// **The call graph's cycles**, as the walk recorded each call
     /// (`Inferred::calls`): each declaration on one, by its component.
     fn call_cycles(&self) -> BTreeMap<DefId, usize> {
-        let mut edges: BTreeMap<DefId, BTreeSet<DefId>> = BTreeMap::new();
-        for (unit, hir) in self.hirs.iter().enumerate() {
-            for (id, decl) in hir.all_decls() {
-                if decl.body.is_none() {
-                    continue;
-                }
-                let def = Self::def(unit, id);
-                if let Some(found) = self.inference.performed_of(def) {
-                    edges.insert(def, found.calls.iter().map(|c| c.callee).collect());
-                }
-            }
-        }
+        let edges: BTreeMap<DefId, BTreeSet<DefId>> = self
+            .bodies
+            .iter()
+            .map(|cx| {
+                (
+                    cx.def,
+                    cx.performed.calls.iter().map(|c| c.callee).collect(),
+                )
+            })
+            .collect();
         components(&edges)
     }
 
@@ -867,34 +885,29 @@ impl<'p, 'i> Reads<'p, 'i> {
         }
         for _ in 0..ROUNDS {
             let mut changed = false;
-            for (unit, hir) in self.hirs.iter().enumerate() {
-                for (id, _) in hir.all_decls() {
-                    let Some(cx) = self.cx(unit, id) else {
+            for cx in &self.bodies {
+                for c in &cx.performed.calls {
+                    let Some(keyed) = out.get(&c.callee).cloned() else {
                         continue;
                     };
-                    for c in &cx.performed.calls {
-                        let Some(keyed) = out.get(&c.callee).cloned() else {
+                    let Some(given) = self.given(cx, c.call) else {
+                        continue;
+                    };
+                    for (k, reached) in keyed {
+                        let Some(Some(arg)) = given.get(k) else {
                             continue;
                         };
-                        let Some(given) = self.given(&cx, c.call) else {
-                            continue;
-                        };
-                        for (k, reached) in keyed {
-                            let Some(Some(arg)) = given.get(k) else {
+                        for i in 0..cx.decl.params.len() {
+                            if out.get(&cx.def).is_some_and(|m| m.contains_key(&i)) {
                                 continue;
-                            };
-                            for i in 0..cx.decl.params.len() {
-                                if out.get(&cx.def).is_some_and(|m| m.contains_key(&i)) {
-                                    continue;
-                                }
-                                let wanted = |b: Binder| b == Binder::Param(i);
-                                if self
-                                    .depends(&cx, *arg, &wanted, None, &mut BTreeSet::new())
-                                    .is_some()
-                                {
-                                    out.entry(cx.def).or_default().insert(i, reached.clone());
-                                    changed = true;
-                                }
+                            }
+                            let wanted = |b: Binder| b == Binder::Param(i);
+                            if self
+                                .depends(cx, *arg, &wanted, None, &mut BTreeSet::new())
+                                .is_some()
+                            {
+                                out.entry(cx.def).or_default().insert(i, reached.clone());
+                                changed = true;
                             }
                         }
                     }
