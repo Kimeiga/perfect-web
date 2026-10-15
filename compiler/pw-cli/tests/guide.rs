@@ -333,7 +333,14 @@ fn verdict(example: &Example, scratch: &Path) -> Option<String> {
     if err.contains("panicked") {
         return Some(format!("`pw check` stopped:\n{said}"));
     }
-    if fmt_code != Some(0) {
+    // Every example is as `pw fmt` writes it, but one that shows a syntax
+    // error: `pw fmt` formats a tree, and a text that does not parse has
+    // none to write.
+    let parses = example
+        .files
+        .iter()
+        .all(|(_, src)| pw_syntax::parse_tree(src).ok());
+    if fmt_code != Some(0) && (parses || matches!(example.expect, Expect::Clean)) {
         return Some(format!("not as `pw fmt` writes it:\n{fmt_out}"));
     }
     match &example.expect {
