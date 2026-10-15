@@ -44,7 +44,7 @@ page StorePage(id: StoreId) {
 - A page's parameters come from its route: `{id}` names `id`. A route
   names each parameter once (PW0340), and a path parameter is text: a
   `String`, or an opaque type over one (PW0621).
-- Every link is matched against the routes when you build (PW5009).
+- Every link is matched against the program's routes (PW5009).
 - A page with a route has a `<title>`, first in its view (PW5029).
 
 **Query parameters** are declared in the route, after `?`, and are optional
@@ -133,7 +133,8 @@ page MenuPage() {
   `count > 0`.
 - `{#each items as item (item.id)}`: every list is keyed by a field of its
   rows (PW5011), so a row keeps its place as rows come and go. There is no
-  index variable.
+  index variable (PW0016). The list is read by path (a signal, a query's
+  result, a field): a computed list is [a gap](#where-pw-check-stops).
 - `{#match v} {:Case} .. {/match}`: one arm a case, every case handled.
 - `view Row(item: Item)`: a view takes props and renders markup. It is
   used as an element, `<Row item={item} />`, and composed in place.
@@ -186,6 +187,11 @@ A handler that calls a command matches on its answer, as the
 [tutorial](tutorial.md) shows: `match post(text) { Ok(_) => draft = "",
 Err(_) => () }`. The answer says whether the command committed; the new
 data comes through the page's queries.
+
+A signal can be read in a part of the page, but not in a `<title>`, and a
+part cannot compute a value from two signals, as in `{a + b}`: `pw build`
+refuses both, and `pw check` does not yet
+([where `pw check` stops](#where-pw-check-stops)).
 
 ## Forms and `bind:value`
 
@@ -326,3 +332,112 @@ page About() {
   there (PW5043).
 - A layout has one slot (PW5044) and no parameters (PW0353). Layouts do
   not nest yet.
+
+## Where `pw check` stops
+
+`pw check` runs the compiler's checks. `pw build` goes on to the page's
+templates, and refuses some programs `pw check` passes. So a clean check is
+not yet a program that runs: build it, as the [tutorial](tutorial.md) does.
+`pw build` prints its refusals as `pw: refused: ..`, with no code.
+
+Each program below is a gap in the checks today. The test that compiles this
+guide holds each one: when the compiler closes a gap, that test fails on the
+example, and this page is updated.
+
+A `<title>` cannot read a signal, because the browser does not render the
+title again (ADR-0137):
+
+```pw gap=build
+module shop.titled
+
+page Counter() {
+    route "/counter"
+    cache private
+
+    signal count: Int = 0
+
+    view {
+        <title>Pressed {count}</title>
+        <button type="button" on:press={() => count = count + 1}>Press</button>
+    }
+}
+```
+
+```text pw-build
+pw: refused: `shop.titled.Counter`'s values: part 1 is a title part the signal `count` decides, which the browser does not render again (ADR-0137)
+pw: 1 refusal(s); nothing written
+```
+
+A part of a page cannot compute a value from two signals (ruling 0073-a):
+
+```pw gap=build
+module shop.sum
+
+page Sum() {
+    route "/sum"
+    cache private
+
+    signal a: Int = 1
+    signal b: Int = 2
+
+    view {
+        <title>Sum</title>
+        <main>
+            <p>{a + b}</p>
+            <button type="button" on:press={() => a = a + 1}>Add to a</button>
+            <button type="button" on:press={() => b = b + 1}>Add to b</button>
+        </main>
+    }
+}
+```
+
+```text pw-build
+pw: refused: `shop.sum.Sum`'s values: part 0 computes a value from `a` and `b`, and a host computes one from one value (ruling 0073-a)
+pw: 1 refusal(s); nothing written
+```
+
+An `{#each}` reads its list by path, and a call in its head computes the
+list, so `pw build` refuses it. `pw check` does not, and it does not look in
+the head for effects either: this view says `!{}`, and its `{#each}` calls a
+function that reads the database. The same call anywhere else in the view is
+refused by `pw check` (PW0401, [why Pleris](why.md)):
+
+```pw gap=build
+module shop.head
+
+type Item = Item { name: String }
+
+fn items() -> List<Item> !{ database.read<Item> }
+    host "shop:data/items#all"
+
+view Menu() !{} {
+    <ul>
+        {#each items() as item (item.name)}
+            <li>{item.name}</li>
+        {/each}
+    </ul>
+}
+```
+
+```text pw-build
+pw: a template part the renderer cannot render: shop.head.Menu: `{#each items() as item (item.name)}`: `{#each}` reads its list by path, and `items()` is computed
+```
+
+And an `<img>` with no `alt` is not refused, though an `<input>` with no
+label is (PW5014):
+
+```pw gap=check
+module shop.logo
+
+page Home() {
+    route "/"
+
+    view {
+        <title>Shop</title>
+        <main>
+            <img src="/logo.png" width="64" height="64">
+            <h1>Shop</h1>
+        </main>
+    }
+}
+```

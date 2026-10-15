@@ -70,6 +70,8 @@ view Menu() !{} {
 
 A page reads data only through a declared `query`, which has a key, a cache
 policy and a timeout (charter §7.4, §7.5). The [tour](tour.md) shows how.
+One gap: the check does not look in an `{#each}` head ([where `pw check`
+stops](tour-pages.md#where-pw-check-stops)).
 
 ### A function that says it is pure and is not
 
@@ -113,8 +115,7 @@ fn area(s: Shape) -> Int !{} {
 
 ### A link to nowhere
 
-Every internal link is matched against the program's routes at build time
-(ADR-0160):
+Every internal link is matched against the program's routes (ADR-0160):
 
 ```pw fails=PW5009
 module site
@@ -192,9 +193,15 @@ Pleris is a research project, and these are true today (2026-10-15):
   first's writes (ADR-0246).
 - **No project tooling.** There is no `pw new`, no project file and no
   editor support yet: you name the standard packages on the command line.
-- **Gaps in the checks.** An `<img>` without `alt` is not refused. An
-  effectful call written in an `{#each}` head is not yet caught in a view
-  that claims `!{}`, where the same call anywhere else in it is.
+- **Gaps in the checks.** `pw check` is not the whole build: `pw build`
+  refuses programs it passes (a `<title>` that reads a signal, a value
+  computed from two signals, a computed list in an `{#each}`), so build
+  before you trust a green check. The effect check does not look in an
+  `{#each}` head, where it refuses the same call anywhere else in a view
+  that claims `!{}`. An `<img>` without `alt` is not refused. [The tour's
+  last section](tour-pages.md#where-pw-check-stops) shows each, in programs
+  the guide's test compiles. And the message for `&&` does not say that
+  Pleris writes `&` ([errors](errors.md)).
 - **Missing features**: offline and real-time collaboration, i18n,
   background jobs beyond a scheduled command (ADR-0334), and charts.
   `docs/vision/capabilities.md` keeps the full matrix.

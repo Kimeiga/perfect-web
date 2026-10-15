@@ -84,7 +84,7 @@ fn words(draft: String) -> Option<Words> !{} {
 - `where ...` is the type's invariant. The compiler checks every place
   that makes a `Words` (`Words(text)`), and here it is shown to hold by
   the `if` around it. Construct one anywhere the condition is not known,
-  and the build fails.
+  and the compiler refuses it (PW0622).
 - `words` returns `Option<Words>`: `Some(words)` or `None`. There is no
   `null`.
 - `!{}` is the function's effect row, empty: the function is pure, and
@@ -167,9 +167,9 @@ fn viewer(s: Session<SessionId>) -> Viewer !{ session.read }
 ```
 
 - `database.read<Post>` and `database.write<Post>` are effects. A
-  function that calls `entries` performs `database.read<Post>` too, and so
-  does every function that calls that one, unless the effect is declared
-  where the compiler can see it.
+  function that calls `entries` performs `database.read<Post>` too. If it
+  writes an effect row, the row must name it (PW0400); if it writes none,
+  the compiler works the effects out, and they pass on to its callers.
 - `Session<SessionId>` is the reader's session, a value only the platform
   makes (`current_session()`). Anything read with it is private to that
   session.
@@ -377,15 +377,15 @@ Read it from the top:
 target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/guestbook/*.pw
 ```
 
-It prints:
-
-```text
-pw check: 24 file(s), no diagnostics
-```
+It ends with `no diagnostics`.
 
 Make a mistake to see what the compiler says. Take the `{#if SignedIn}`
 from around the Remove button, and `pw check` refuses the page, with
 PW5048, naming the button and the predicate the page does not ask.
+
+A clean check is not yet a build: `pw build` refuses some programs
+`pw check` passes ([where `pw check` stops](tour-pages.md#where-pw-check-stops)).
+The next step builds the app.
 
 ## 9. Run it
 

@@ -276,6 +276,15 @@ Wrapping the button in `{#if SignedIn} .. {/if}` repairs it, and the page
 must then be a `session page`: a page that asks something of its reader is
 not the same for every reader.
 
+## When the build refuses what the check passed
+
+`pw build` has refusals of its own. It prints them as `pw: refused: ..`,
+with no code, because they come from what the browser can do with a page. A
+program can check clean and be refused there, so build before you trust a
+green check. [The last section of part 3](tour-pages.md#where-pw-check-stops)
+shows what `pw check` does not say yet, in programs the guide's test
+compiles.
+
 ## Every code
 
 [The diagnostic codes](diagnostics.md) lists all of them, generated from the

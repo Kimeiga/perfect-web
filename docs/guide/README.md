@@ -34,6 +34,10 @@ with the standard packages:
 - an example meant to fail must fail with exactly the codes it names, and
   where the page shows the compiler's output, the compiler must print
   exactly that;
+- an example that shows a gap in the checks (`pw check` passes a program
+  `pw build` refuses, or one the page says it should refuse) must still be
+  one: when the compiler closes the gap, the test fails and the page is
+  updated;
 - the tutorial's code, reassembled from its page, must be byte for byte
   the app in `examples/guestbook/`, which a browser test drives in
   Chromium, Firefox and WebKit;

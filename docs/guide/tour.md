@@ -167,8 +167,22 @@ fn store(n: Int) -> StoreId !{} {
 
 `Handle(draft)` compiles because the `if` around it shows the invariant
 holds (ADR-0179, ADR-0225). Write `Handle(draft)` where nothing shows it,
-and the build fails. A `StoreId` and an `Int` are different types: a store
-id cannot be passed where an order id is expected.
+and the compiler refuses it (PW0622):
+
+```pw fails=PW0622
+module shop.handles
+
+import String
+
+opaque type Handle = String where String.length(value) >= 1 & String.length(value) <= 15
+
+fn handle(draft: String) -> Handle !{} {
+    Handle(draft)
+}
+```
+
+Two opaque types over `Int`, a `StoreId` and an `OrderId`, are different
+types: a store id cannot be passed where an order id is expected (PW0605).
 
 ## Sum types and matching
 
@@ -200,8 +214,8 @@ fn done(status: Status) -> Bool !{} {
 }
 ```
 
-- A `match` handles every case, or the build fails (PW0305). `_` matches
-  the rest.
+- A `match` handles every case, or the compiler refuses it (PW0305). `_`
+  matches the rest.
 - A name in a pattern that starts with a capital letter is a case; any
   other name binds. So a misspelt case is refused (PW0608) instead of
   silently matching everything (ADR-0195).
@@ -270,7 +284,7 @@ fn title(id: Int) -> String !{ database.read<Store> } {
 - `database.read<Store>` is an effect the web platform declares, with
   where it may run (the origin) and what grants it (ADR-0026).
 - `title` calls `load`, so it performs `database.read<Store>` too, and
-  says so. Declare `!{}` on it and the build fails (PW0400).
+  says so. Declare `!{}` on it and the compiler refuses it (PW0400).
 - A function with no row at all claims nothing, and its effects are
   inferred and passed to its callers.
 - A view and a page render with no effect (charter §7.4): they read data

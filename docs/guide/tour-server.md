@@ -226,8 +226,8 @@ fn pending(feed: List<Item>, text: PostText) -> List<Item> !{} {
   (ADR-0121). Required for a command a page sends (PW0338).
 - `emits Posted(..)`: an event, written in the command's own transaction,
   so it is sent if and only if the writes commit.
-- `invalidates Timeline(current_session(), _)`: drops entries directly, as
-  an event would.
+- `invalidates Timeline(current_session(), _)`, a clause this command does
+  not use: drops entries directly, as an event would.
 - `optimistic Timeline(..) as feed => pending(feed, text)`: the page shows
   `pending`'s value at once. `pending` must be pure (PW0330). If the
   command fails, the platform puts back what the page held: there is no
@@ -272,9 +272,48 @@ command post(text: String) -> Result<Post, FeedError>
 }
 ```
 
-And a command that shows a value before the server answers (`optimistic
-Timeline(..)`) must also invalidate what it speculated on (PW5107): remove
-`invalidates_on Posted(_)` from `Timeline` above and the build fails.
+And a command that shows a value before the server answers (`optimistic`)
+must also invalidate what it speculated on (PW5107), even where the query is
+let go stale. Here `Latest` is fresh for five seconds, which exempts it from
+the rule above, and nothing tells it what the speculation was about:
+
+```pw fails=PW5107
+module feed.speculative
+
+import context.{ current_session }
+import capability.{ Session, SessionId }
+
+opaque type InteractionId = String
+
+type Post = Post { id: String, text: String }
+
+type FeedError =
+    | Unavailable
+
+fn latest() -> List<Post> !{ database.read<Post> }
+    host "feed:data/posts#latest"
+
+fn publish(s: Session<SessionId>, text: String) -> Result<Post, FeedError> !{ database.write<Post> }
+    host "feed:data/posts#publish"
+
+public query Latest() -> List<Post>
+    freshness 5.seconds
+    cache     shared
+{
+    latest()
+}
+
+fn with_post(posts: List<Post>, text: String) -> List<Post> !{} {
+    posts
+}
+
+command post(text: String) -> Result<Post, FeedError>
+    idempotent_by InteractionId
+    optimistic    Latest() as posts => with_post(posts, text)
+{
+    publish(current_session(), text)
+}
+```
 
 A command is called only by a page's handler (PW0339), and the handler
 learns only whether it committed (PW0620): the new value reaches the page
@@ -364,8 +403,9 @@ fn open_now(shift: Shift) -> Bool !{ clock.compare } {
 
 `clock.passed(at)` is true once `at` has passed. A cached value or a page
 that asked it is kept until that instant, then read again and sent to every
-page that shows it (ADR-0304). `clock.now()` exists but answers `0`: no
-host grants the wall clock yet.
+page that shows it (ADR-0304). `clock.now()` and `now_wall()` exist and
+answer `0` (`packages/pw-platform-web/clock.pw`): no host implements a clock
+read yet.
 
 A command can schedule another for later, in its own transaction:
 
