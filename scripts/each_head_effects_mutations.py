@@ -149,12 +149,10 @@ MUTANTS = [
         "                    None if false && crate::lexical::path_root(body, *list).is_none() => types\n",
     ),
     (
-        "a loop over a module's signal shows nothing, as before the fix",
+        "a loop's list shows no dialog",
         SIGNALS,
-        "                    .and_then(|(_, list, _)| signal_of(list));\n",
-        "                    .and_then(|(_, _, head)| head)\n"
-        "                    .and_then(|b| signals.get(&b))\n"
-        "                    .map(|(name, _)| name.clone());\n",
+        "                let each = head.as_ref().and_then(|h| signal_of(h.list));\n",
+        "                let each = head.as_ref().and_then(|h| signal_of(h.list)).filter(|_| false);\n",
     ),
     (
         "Marko writes a loop's list as a name, as before the fix",

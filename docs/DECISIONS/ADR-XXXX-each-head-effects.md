@@ -86,7 +86,9 @@ follow values), ADR-0130 and ADR-0141 (signals, dialogs), ADR-0017 (Marko).
    PW5040 (a session's handle printed) reads `Node::exprs` with an
    exhaustive match: a hole and an attribute are printed, and a handler, a
    subject, a condition, a list and a key are not (the key is written as a
-   keyed digest, never as itself; `pw-document`'s `instance_token`).
+   keyed digest, never as itself; `pw-document`'s `instance_token`). What a
+   handler captures is the resume manifest's: a handle captured is PW5007,
+   or PW5018 in a page private to no one (probed 2026-10-15).
    PW5003 refuses a secret at every part, as it did an `{#if}`'s subject:
    a secret list or key now too.
 
