@@ -294,6 +294,7 @@ test("the tree a screen reader reads is the page's", async ({ page, request }) =
       - heading "Blue Bottle" [level=1]
       - paragraph: Coffee
       - paragraph: Open 24 hours
+      - paragraph: No ratings yet
       - paragraph: Small-batch coffee, served at the bar or carried out. The espresso changes with the season, and the pastries come in every morning.
       - paragraph: 3 items in 1 section
       - paragraph:
@@ -335,6 +336,9 @@ test("the tree a screen reader reads is the page's", async ({ page, request }) =
         - list:
           - listitem: Cortado
           - listitem: Cold Brew
+      - region "What customers said":
+        - heading "What customers said" [level=2]
+        - paragraph: No reviews yet.
   `);
 
   // A line, and a refusal said in the status region.
