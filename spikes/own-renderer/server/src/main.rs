@@ -3231,12 +3231,12 @@ impl Server {
             }
         }
         for (last, (events, invalidated)) in &heard.commits {
-            let reached = self.invalidate_queries("", invalidated, events);
-            if !reached.is_empty() {
+            let stale = self.invalidate_queries("", invalidated, events);
+            if !stale.is_empty() {
                 self.telling
                     .lock()
                     .expect("telling")
-                    .push((String::new(), reached));
+                    .push((String::new(), stale));
             }
             tail.passed(*last);
         }
