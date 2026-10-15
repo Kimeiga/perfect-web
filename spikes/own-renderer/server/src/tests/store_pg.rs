@@ -127,7 +127,8 @@ fn on_postgres_the_database_provides_what_the_store_states() {
 
 /// **A cart's change commits with its event, in one transaction**
 /// (ADR-0208): the line's row and the outbox's are written by one
-/// transaction, and what was delivered was consumed.
+/// transaction, and what was delivered is kept for the other hosts, the
+/// committing host's (ADR-XXXX).
 #[test]
 fn on_postgres_a_cart_change_commits_with_its_event_in_one_transaction() {
     let Some(url) = database() else { return };
@@ -155,10 +156,17 @@ fn on_postgres_a_cart_change_commits_with_its_event_in_one_transaction() {
         ],
         "written by the line's own transaction"
     );
+    // Delivered, and kept for the other hosts on the database, which read
+    // them from their cursors (ADR-XXXX): until then they were consumed.
+    let host = s.data.tail().expect("a shared database").host().to_string();
     assert_eq!(
-        s.count("SELECT count(*) FROM outbox"),
-        0,
-        "delivered, and consumed"
+        s.layer
+            .sql()
+            .query_one("SELECT count(*) FROM outbox WHERE host = $1", &[&host])
+            .expect("counted")
+            .get::<_, i64>(0),
+        2,
+        "delivered, and kept for the other hosts: the committing host's"
     );
 }
 
@@ -313,7 +321,17 @@ fn on_postgres_eight_sessions_adding_five_times_each_commit_all_forty() {
         40,
         "all forty committed"
     );
-    assert_eq!(s.count("SELECT count(*) FROM outbox"), 0);
+    // Each add's two rows kept for the other hosts (ADR-XXXX), each
+    // commit's consecutive: its ids taken under the outbox's lock.
+    assert_eq!(s.count("SELECT count(*) FROM outbox"), 80);
+    assert_eq!(
+        s.count(
+            "SELECT count(*) FROM (SELECT max(id) - min(id) + 1 AS span, count(*) AS n \
+             FROM outbox GROUP BY committed_in) c WHERE span <> n"
+        ),
+        0,
+        "each commit's rows consecutive"
+    );
 }
 
 /// **A retried interaction runs its command once** (ADR-0121): the second
@@ -475,8 +493,9 @@ fn on_postgres_a_second_hosts_commit_answers_what_the_first_committed() {
 
 /// **An order keeps its lines on PostgreSQL** (ADR-0193), and every event
 /// a commit staged is consumed once delivered: after orders are placed and
-/// moved along, neither the database's outbox nor the materializer's holds
-/// one.
+/// moved along, the materializer's outbox holds none, and the database's
+/// only what this host committed and read back, kept for the other hosts
+/// until it is trimmed (ADR-XXXX).
 #[test]
 fn on_postgres_an_order_keeps_its_lines_and_the_outboxes_hold_nothing() {
     let Some(url) = database() else { return };
@@ -522,7 +541,19 @@ fn on_postgres_an_order_keeps_its_lines_and_the_outboxes_hold_nothing() {
         0,
         "carts emptied"
     );
-    assert_eq!(s.count("SELECT count(*) FROM outbox"), 0);
+    // The database's outbox holds only what this host committed and read
+    // back, kept for the other hosts until it is trimmed (ADR-XXXX); the
+    // materializer's holds nothing.
+    let host = s.data.tail().expect("a shared database").host().to_string();
+    assert_eq!(
+        s.layer
+            .sql()
+            .query_one("SELECT count(*) FROM outbox WHERE host <> $1", &[&host])
+            .expect("counted")
+            .get::<_, i64>(0),
+        0,
+        "nothing but this host's"
+    );
     assert_eq!(s.materializer.retained_events(), 0);
 }
 
