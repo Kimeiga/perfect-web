@@ -100,9 +100,13 @@ MUTANTS = [
 
 
 def run_tests(_suite):
-    # `-B`: no bytecode kept, which a mutant of the same size written in the
-    # same second as it would not make stale.
-    out = subprocess.run([sys.executable, "-B", "tests/check.py"], cwd=ROOT, capture_output=True, text=True).stdout
+    # As the scripts' `bounded` runs a command: in a session of its own, so
+    # that a stop of the script's group leaves it, as it leaves cargo. `-B`:
+    # no bytecode kept, which a mutant of the same size written in the same
+    # second as it would not make stale.
+    p = subprocess.Popen([sys.executable, "-B", "tests/check.py"], cwd=ROOT, start_new_session=True,
+                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    out, _ = p.communicate()
     found = re.findall(r"test result: \\w+\\. (\\d+) passed; (\\d+) failed", out)
     if not found:
         return False, 0, 0
@@ -268,6 +272,10 @@ class Toy(unittest.TestCase):
         self.assertEqual(dealt.returncode, 1)
         self.assertIn("FAIL: the unmutated baseline is not green; no mutant can mean anything\n", out)
         self.assertNotIn("mutants killed", out)
+        # That slot's words alone: no other slot's verdict.
+        self.assertNotIn("KILLED", out)
+        self.assertNotIn("SURVIVED", out)
+        self.assertTrue(out.startswith("baseline ("), out)
         self.assertEqual((self.calc.read_bytes(), self.calc.stat().st_mtime_ns), self.before)
 
     def test_a_run_stopped_from_outside_leaves_no_mutant_and_no_process(self):
@@ -285,15 +293,50 @@ class Toy(unittest.TestCase):
         while not held.exists() and time.monotonic() < deadline:
             time.sleep(0.05)
         self.assertTrue(held.exists(), "a slot holds its mutant")
+        stopped = time.monotonic()
         p.send_signal(signal.SIGTERM)
         p.communicate(timeout=90)
+        # Each slot's script stopped by its signal, not waited out.
+        self.assertLess(time.monotonic() - stopped, 20)
         self.assertEqual((self.calc.read_bytes(), self.calc.stat().st_mtime_ns), self.before)
+        # The suite held in its own session too, as cargo is under `bounded`.
         for r in self.records():
             with self.assertRaises(ProcessLookupError, msg=r):
                 os.kill(r["pid"], 0)
         # The next run puts the slot back as the tree is, whatever was left.
         again = run_toy(self.root, 3)
         self.assertIn(b"6 of 7 mutants killed\n", again.stdout)
+
+    def test_a_second_run_waits_for_the_slots_the_first_holds(self):
+        held = self.dir / "held"
+        alone = run_toy(self.root)
+        env = {k: v for k, v in os.environ.items() if not k.startswith("PW_MUTANT_")}
+        env.update({"PW_MUTANT_SLOTS": "3", "TOY_HOLD": str(held), "PORT": "5000"})
+        first = subprocess.Popen(
+            [sys.executable, "scripts/toy_mutations.py"], cwd=self.root, env=env,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
+        second = None
+        try:
+            deadline = time.monotonic() + 60
+            while not held.exists() and time.monotonic() < deadline:
+                time.sleep(0.05)
+            env.pop("TOY_HOLD")
+            second = subprocess.Popen(
+                [sys.executable, "scripts/toy_mutations.py"], cwd=self.root, env=env,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            )
+            waiting = second.stderr.readline().decode()
+            self.assertIn("mutant slots: waiting for", waiting)
+            first.send_signal(signal.SIGTERM)
+            first.communicate(timeout=90)
+            out, _ = second.communicate(timeout=120)
+            self.assertEqual(out.decode(), alone.stdout.decode())
+        finally:
+            for p in (first, second):
+                if p is not None and p.poll() is None:
+                    p.send_signal(signal.SIGTERM)
+                    p.communicate(timeout=90)
 
 
 TOY_MUTANTS = [
