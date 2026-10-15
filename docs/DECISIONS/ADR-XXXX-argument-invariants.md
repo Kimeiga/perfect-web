@@ -177,17 +177,34 @@ Recorded by `just e14-argument-invariants` in
   refused as the browser's is (`reviews`' path); a page's parameters at both
   ends, routed and by name, 400 and why; and on PostgreSQL a row written
   before its CHECK existed is refused where it is read.
-- `e2e/argument-invariants.spec.mjs`, in Chromium, Firefox and WebKit: a
-  page's address at both ends; forged commands refused 400 with their
-  words, nested places named, and values just inside committed; a press
-  sends only what the page's constructors build; a press whose request is
-  altered on the way is refused and told where it was.
-- `scripts/argument_invariants_mutations.py`: each mutant removes one
-  boundary's check or one piece of how it reads; each `.pw` mutant is
-  checked to be a program first.
+- `e2e/argument-invariants.spec.mjs`, 12 of 12 in Chromium, Firefox and
+  WebKit: a page's address at both ends; forged commands refused 400 with
+  their words, nested places named, and values just inside committed; a
+  press sends only what the page's constructors build; a press whose
+  request is altered on the way is refused and told where it was. The host's
+  answer to the altered request is read where the test's route sends it on
+  (`route.fetch`): Chromium gave a test no body of the page's own refused
+  response, twice, with and without `keepalive` (the runtime reads none).
+- Counts at the track's head: `pw-core`'s 3, `pw-host`'s `pleris_component`
+  17, `pw-conformance`'s 3, the development server's 6 in memory and 6 on
+  PostgreSQL 18.6; and the whole of `pw-core` (1,588), `pw-conformance`
+  (168) and the development server (565) as before.
+- `scripts/argument_invariants_mutations.py`, 17 of 17 killed: each mutant
+  removes one boundary's check or one piece of how it reads (each of the
+  three call APIs; a predicate asked first; the check itself; the nodes'
+  form; the page's plan; a map's entries, a map's key, a set's items; a
+  routed page's and a named page's parameters; the plan's checks unread; a
+  refusal answered 404; and each of the fixture's three types stating
+  nothing); each `.pw` mutant is checked to be a program before its tests
+  run.
 
 Re-anchored, mutants unchanged: `invariants_mutations.py`'s "an export
 states no argument's invariant" (the line now assigns `bounded_params`).
+Run whole, as the scripts whose code or tests this changes:
+`invariants_mutations.py` 25 of 25, `string_invariants_mutations.py` 12
+of 12, `routes_mutations.py` 10 of 10 (its anchor beside the plan's new
+field), `recursive_types_mutations.py` 16 of 16 (its anchor beside the
+call's own making of nodes).
 
 ## Corrections found on the way
 
