@@ -666,8 +666,11 @@ Then what the build and the suite found:
 2. **A verification shard for `e14-todomvc` needs Cypress's binary and Xvfb.**
    The recipe fetches the binary itself (`pnpm exec cypress install`, a zip of
    about 249 MB; nothing where it is installed) and fails without Xvfb. The
-   GitHub image `ubuntu-24.04` is believed to carry Xvfb; that is not verified
-   here. Provisioning the binary in `verify.yml` instead is the other choice.
+   GitHub image `ubuntu-24.04` lists `xvfb` among its installed apt packages
+   (2:21.1.12-1ubuntu1.8, read 2026-10-15). Not checked: that Cypress's own
+   libraries (GTK 3, NSS, ALSA, GBM) are all there; the image's list names none
+   of them, and they may come with the browsers it carries. Provisioning the
+   binary in `verify.yml` instead is the other choice.
 3. **Cypress 15.21.1, not 15.14.2** (section 5): a deviation from upstream's
    lockfile, for the six advisories; the owner's approval names the package and
    its binary, not a version.
