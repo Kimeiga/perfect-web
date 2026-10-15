@@ -1,7 +1,7 @@
 // @corpus: rejected
 // @id: R-031
 // @category: unsafe escape hatch without justification
-// @rule: PW0329
+// @rule: PW5010
 // @invariant: unsafe_audit_incomplete
 // @charter: §7.5
 // @milestone: 5

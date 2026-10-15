@@ -1,7 +1,7 @@
 // @corpus: rejected
 // @id: R-023
 // @category: dead internal route
-// @rule: PW0321
+// @rule: PW5009
 // @invariant: dead_internal_link
 // @charter: §8.2
 // @milestone: 3

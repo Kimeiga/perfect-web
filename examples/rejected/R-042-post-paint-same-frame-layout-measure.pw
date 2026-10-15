@@ -1,7 +1,7 @@
 // @corpus: rejected
 // @id: R-042
 // @category: post-paint same-frame layout measure
-// @rule: PW3008
+// @rule: PW0402
 // @invariant: wrong_frame_phase
 // @charter: §7.5A
 // @milestone: 7

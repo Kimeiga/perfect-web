@@ -1,7 +1,7 @@
 // @corpus: rejected
 // @id: R-005
 // @category: cross-tenant cache key missing tenant
-// @rule: PW0303
+// @rule: PW5004
 // @invariant: cache_key_omits_partition
 // @charter: §7.8, §14 M5
 // @milestone: 5

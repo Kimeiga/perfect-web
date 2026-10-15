@@ -1,7 +1,7 @@
 // @corpus: rejected
 // @id: R-041
 // @category: custom paint mutates document
-// @rule: PW3007
+// @rule: PW0401
 // @invariant: forbidden_effect
 // @charter: §7.5A
 // @milestone: 7

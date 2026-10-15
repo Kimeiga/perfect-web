@@ -1,7 +1,7 @@
 // @corpus: rejected
 // @id: R-018
 // @category: unkeyed mutable list
-// @rule: PW0316
+// @rule: PW5011
 // @invariant: unkeyed_list
 // @charter: §8.2, §14 M2
 // @milestone: 2

@@ -1,7 +1,7 @@
 // @corpus: rejected
 // @id: R-035
 // @category: layout write during measure phase
-// @rule: PW3004
+// @rule: PW0402
 // @invariant: wrong_frame_phase
 // @charter: §7.5A
 // @milestone: 7

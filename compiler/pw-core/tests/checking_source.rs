@@ -582,7 +582,8 @@ fn the_structured_concurrency_rules_run_on_real_bodies() {
     };
 
     // R-013: `task.spawn(detached)` with no durable capability. The file
-    // declares PW0311, which aliases to the invariant's canonical code.
+    // declares PW2002, the invariant's code (it said PW0311, an alias, until
+    // track evidence-integrity held each header to its code as written).
     let (src, d) = find("R-013", "PW2002");
     let src = &src;
     // The primary span is the offending argument, the related span is where the
@@ -836,6 +837,112 @@ fn a_fixtures_declared_symbol_matches_the_symbol_it_is_caught_by() {
         checked,
         rejected_results().len(),
         "every rejected fixture must be checked"
+    );
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
+
+/// What is wrong with a rejected fixture's `@rule` and `@invariant`, read as
+/// written, against the codes its check reports (track evidence-integrity,
+/// finding 3).
+///
+/// The tests above read a header's number through `canonical_code`, so a
+/// number the registry had retired into an alias still passed: R-004 said
+/// `PW0100` where the code is `PW5001`, R-024 `PW0322` where it is `PW5010`,
+/// and forty fixtures in all named a number `pw check` never prints. A
+/// header is what a reader looks up, so it says the code itself.
+fn header_problems(name: &str, src: &str, reported: &[&str]) -> Vec<String> {
+    use pw_core::codes::{RETIRED, lookup};
+    use pw_core::diagnostics::DEPRECATED_ALIASES;
+    let header = |key: &str| {
+        src.lines()
+            .find_map(|l| l.trim().strip_prefix(key))
+            .map(str::trim)
+    };
+    let Some(rule) = header("// @rule:") else {
+        return vec![format!("{name}: no `// @rule:` line")];
+    };
+    if let Some((_, code)) = DEPRECATED_ALIASES.iter().find(|(alias, _)| *alias == rule) {
+        return vec![format!(
+            "{name}: @rule {rule} is a retired number, an alias of {code}, \
+             which is what `pw check` reports"
+        )];
+    }
+    if RETIRED.iter().any(|(id, _)| *id == rule) {
+        return vec![format!("{name}: @rule {rule} is a retired code")];
+    }
+    let Some(code) = lookup(rule) else {
+        return vec![format!("{name}: @rule {rule} is no registered code")];
+    };
+    let mut out = Vec::new();
+    let invariant = header("// @invariant:");
+    if invariant != Some(code.symbol) {
+        out.push(format!(
+            "{name}: @invariant {invariant:?}, and {rule} is `{}`",
+            code.symbol
+        ));
+    }
+    if !reported.contains(&rule) {
+        out.push(format!(
+            "{name}: @rule {rule}, and its check reports {reported:?}"
+        ));
+    }
+    out
+}
+
+#[test]
+fn a_fixtures_header_is_held_to_its_code_as_written() {
+    let src = |rule: &str, invariant: &str| {
+        format!("// @corpus: rejected\n// @rule: {rule}\n// @invariant: {invariant}\nmodule m\n")
+    };
+    let problems = |rule: &str, invariant: &str, reported: &[&str]| {
+        header_problems("R-0", &src(rule, invariant), reported).join("\n")
+    };
+    // The control: the code its check reports, and that code's invariant.
+    assert_eq!(
+        problems("PW5001", "private_in_shared_cache", &["PW5001"]),
+        ""
+    );
+    // As R-004's was: a number retired into an alias of the code reported.
+    assert!(
+        problems("PW0100", "private_in_shared_cache", &["PW5001"]).contains("an alias of PW5001"),
+        "an alias passed"
+    );
+    // A code its check does not report, another code's invariant, a code no
+    // one registered, and one retired.
+    assert!(
+        problems("PW5001", "private_in_shared_cache", &["PW5004"]).contains("its check reports"),
+        "a code not reported passed"
+    );
+    assert!(
+        problems("PW5001", "unsafe_audit_incomplete", &["PW5001"]).contains("@invariant"),
+        "another code's invariant passed"
+    );
+    assert!(
+        problems("PW9999", "private_in_shared_cache", &["PW9999"]).contains("no registered code"),
+        "an unknown code passed"
+    );
+    assert!(
+        problems("PW5102", "private_in_shared_cache", &["PW5102"]).contains("retired code"),
+        "a retired code passed"
+    );
+}
+
+/// **Every rejected fixture's `@rule` is a code `pw check` reports for it,
+/// as written, and its `@invariant` is that code's** (track
+/// evidence-integrity, finding 3): the fixture checked as its own program,
+/// by `check_sources`, which `pw check` runs.
+#[test]
+fn every_rejected_fixtures_rule_is_a_code_its_check_reports() {
+    let all = rejected_results();
+    let mut wrong = Vec::new();
+    for (name, src, diags) in &all {
+        let reported: Vec<&str> = diags.iter().map(|d| d.code).collect();
+        wrong.extend(header_problems(name, src, &reported));
+    }
+    assert!(
+        all.len() >= 44,
+        "expected the full rejected corpus, saw {}",
+        all.len()
     );
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }

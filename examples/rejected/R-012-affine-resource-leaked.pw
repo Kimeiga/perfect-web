@@ -1,7 +1,7 @@
 // @corpus: rejected
 // @id: R-012
 // @category: affine resource leaked
-// @rule: PW0310
+// @rule: PW2005
 // @invariant: affine_not_consumed_once
 // @charter: §7.7
 // @milestone: 9

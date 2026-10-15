@@ -1,7 +1,7 @@
 // @corpus: rejected
 // @id: R-028
 // @category: subscription outlives component scope
-// @rule: PW0326
+// @rule: PW2004
 // @invariant: scope_outlives_owner
 // @charter: §7.6
 // @milestone: 4
