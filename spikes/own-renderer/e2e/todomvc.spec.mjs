@@ -185,6 +185,41 @@ test("the toggle-all completes the rest where some are completed", async ({ page
   for (const n of [0, 1, 2]) await expect(items(page).nth(n)).toHaveClass(/completed/);
 });
 
+// A checkbox a person has pressed holds its own state: the attribute the page
+// patches no longer moves it. The page says what the box is, whoever pressed
+// it last, so a patch sets the box's state as well as the attribute (the
+// runtime's `setAttributeAt`). The official suite asks it of the toggle-all
+// ("should update state when items are completed / cleared").
+test("the toggle-all, pressed, still follows the todos: unchecked when one is cleared, checked when all are", async ({
+  page,
+}) => {
+  await open(page);
+  await add(page, ONE, TWO);
+  const all = page.locator(".toggle-all");
+  await expect(all).not.toBeChecked();
+  await all.check({ force: true });
+  await expect(all).toBeChecked();
+  await items(page).nth(0).locator(".toggle").uncheck();
+  await expect(items(page).nth(0)).not.toHaveClass(/completed/);
+  await expect(all).not.toBeChecked();
+  await items(page).nth(0).locator(".toggle").check();
+  await expect(all).toBeChecked();
+});
+
+test("the toggle-all, pressed, is not checked for a todo added once the completed are cleared", async ({
+  page,
+}) => {
+  await open(page);
+  await add(page, ONE);
+  await page.locator(".toggle-all").check({ force: true });
+  await expect(page.locator(".toggle-all")).toBeChecked();
+  await page.locator(".clear-completed").click();
+  await expect(items(page)).toHaveCount(0);
+  await add(page, TWO);
+  await expect(items(page).nth(0)).not.toHaveClass(/completed/);
+  await expect(page.locator(".toggle-all")).not.toBeChecked();
+});
+
 // --- Item ------------------------------------------------------------------
 
 test("a todo's checkbox completes it, toggling the class on its li", async ({ page }) => {
@@ -206,6 +241,22 @@ test("the same checkbox, pressed again, un-completes it", async ({ page }) => {
   await items(page).nth(0).locator(".toggle").uncheck();
   await expect(items(page).nth(0)).not.toHaveClass(/completed/);
   await expect(items(page).nth(1)).not.toHaveClass(/completed/);
+});
+
+test("a checkbox another tab cleared is shown cleared, though this tab had pressed it", async ({
+  page,
+}) => {
+  await open(page);
+  await add(page, ONE, TWO);
+  const second = await page.context().newPage();
+  await open(second);
+  await expect(items(second)).toHaveCount(2);
+  await items(page).nth(0).locator(".toggle").check();
+  await expect(items(second).nth(0)).toHaveClass(/completed/);
+  await items(second).nth(0).locator(".toggle").uncheck();
+  await expect(items(page).nth(0)).not.toHaveClass(/completed/);
+  await expect(items(page).nth(0).locator(".toggle")).not.toBeChecked();
+  await expect(items(page).nth(1).locator(".toggle")).not.toBeChecked();
 });
 
 test("hovering over a todo shows its remove button, which removes it", async ({ page }) => {

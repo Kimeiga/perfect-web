@@ -2434,6 +2434,15 @@ function addressKey(address) {
  * platform's own parser reads it, so a patched attribute means what a
  * rendered one does. Until 2026-10-03 no patch set an attribute: an Add button
  * kept the name of an item renamed since.
+ *
+ * **A checkbox's state follows the attribute** (track `todomvc`, ADR-XXXX).
+ * `checked` is an attribute only until a person has pressed the box: from
+ * then on the property is the box's own, and the attribute no longer moves it.
+ * A patch that unchecks the "toggle all" box, or checks it, is shown only if
+ * the property is set as well, as a signal-set attribute already does
+ * (`setAttributePart`). Until then a box a person had pressed stayed as they
+ * left it, whatever the page said it was. (An option's `selected` is the same
+ * and is not set here: no page has needed it yet, and none tests it.)
  */
 function setAttributeAt(address, op) {
   const part = (parts.parts ?? []).find((p) => p.id === address.part);
@@ -2443,6 +2452,7 @@ function setAttributeAt(address, op) {
   if (!element) return false;
   if (op.op === "remove_attribute") {
     element.removeAttribute(op.name);
+    if (op.name === "checked" && "checked" in element) element.checked = false;
     return true;
   }
   const parsed = document.createElement("template");
@@ -2451,6 +2461,7 @@ function setAttributeAt(address, op) {
   // A value set again, the same, is a change all the same, and a control's
   // name changed is said again where it has focus (ADR-0182).
   if (element.getAttribute(op.name) !== value) element.setAttribute(op.name, value);
+  if (op.name === "checked" && "checked" in element) element.checked = true;
   return true;
 }
 

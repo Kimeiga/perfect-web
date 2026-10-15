@@ -12,7 +12,9 @@ Each mutant undoes one thing the spec states, or one thing the layer keeps:
 - the layer (`spikes/own-renderer/server/src/todomvc.rs`): where a todo is
   added, ids a destroyed todo had, each write, the bound, and the session
   each operation holds a command to;
-- the host's media type for the checkbox's drawings.
+- the host's media type for the checkbox's drawings;
+- the browser's runtime (`spikes/own-renderer/public/pw-runtime.mjs`), where
+  a patch sets a checkbox's state as well as its attribute.
 
 **A program mutant must still be a well-typed program**: each is checked with
 `pw check` before anything runs, and one that does not check is no mutant,
@@ -37,10 +39,12 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 APP = ROOT / "examples/todomvc/app.pw"
 LAYER = ROOT / "spikes/own-renderer/server/src/todomvc.rs"
 SERVER = ROOT / "spikes/own-renderer/server/src/main.rs"
+RUNTIME_FILE = ROOT / "spikes/own-renderer/public/pw-runtime.mjs"
 
 PROGRAM = "program"
 LAYERED = "layer"
 HOST = "host"
+RUNTIME = "runtime"
 
 # (what is undone, which tests, file, anchor, replacement)
 MUTANTS = [
@@ -387,6 +391,20 @@ MUTANTS = [
         '        Some("svg") => "image/svg+xml",\n',
         '        Some("svg") => "application/octet-stream",\n',
     ),
+    (
+        "a patch that removes `checked` leaves the box as a person left it",
+        RUNTIME,
+        RUNTIME_FILE,
+        '    if (op.name === "checked" && "checked" in element) element.checked = false;\n',
+        "",
+    ),
+    (
+        "a patch that sets `checked` leaves the box as a person left it",
+        RUNTIME,
+        RUNTIME_FILE,
+        '  if (op.name === "checked" && "checked" in element) element.checked = true;\n',
+        "",
+    ),
 ]
 
 SERVER_TESTS = [
@@ -467,6 +485,7 @@ RUNS = {
     PROGRAM: [("server", server_tests), ("browser", browser_tests)],
     LAYERED: [("server", server_tests), ("browser", browser_tests)],
     HOST: [("browser", browser_tests)],
+    RUNTIME: [("browser", browser_tests)],
 }
 
 
