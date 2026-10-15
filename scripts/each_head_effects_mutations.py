@@ -8,7 +8,7 @@ parts without a loop's head (the reading before the fix); the head not
 lowered; the list read in no scope, or the key outside the row's; the
 names check reading neither; a row's label, type or dialog not its
 list's; Marko writing the list as a name; and the printed-handle rule
-printing what it must not. The tests of `each_head_effects.rs`,
+printing a loop's list. The tests of `each_head_effects.rs`,
 `view_positions.rs`, `each_heads.rs` and the dialogs' must then fail.
 
 Run from the repository root; `just e14-each-head-effects` records the
@@ -168,14 +168,11 @@ MUTANTS = [
         "                    | crate::hir::Position::Key => false,\n"
         "                    crate::hir::Position::List => true,\n",
     ),
-    (
-        "a handler is printed",
-        CHECK,
-        "                    crate::hir::Position::Handler\n"
-        "                    | crate::hir::Position::Subject\n",
-        "                    crate::hir::Position::Handler => true,\n"
-        "                    crate::hir::Position::Subject\n",
-    ),
+    # Not a mutant: "a handler is printed". A handler's value is a function
+    # (PW0614 refuses any other), whose type never holds a session's handle,
+    # so the rule printing it refuses nothing more: what a handler captures
+    # is the resume manifest's (PW5007). It survived on 2026-10-15, an
+    # equivalent mutant, and is left out.
 ]
 
 TESTS = [

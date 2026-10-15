@@ -141,8 +141,8 @@ a refusal is missing.
   kiokun-site, hello-static, render, koka, the benchmark baseline and the
   library: clean, as before. counter (PW5302), streamed (unresolved types)
   and robustness's regression fixture (PW0603) say what they said at
-  master, byte for byte for streamed; none has a loop over anything but a
-  path.
+  master, byte for byte (each checked with master's `pw` at bb2847f6);
+  none has a loop over anything but a path.
 - **Newly refused**: the shapes above; the corpus's R-080 and the
   generality witnesses below.
 - **Newly accepted**: a dialog in a loop over a module's signal, whose
@@ -220,8 +220,11 @@ a refusal is missing.
   `each-key-nested` (GENERAL) and `each-pure-member` (NEIGHBOUR);
   `secret_to_browser`'s `each-computed-list` (GENERAL). Each GENERAL one
   checked clean with master's `pw`;
-- mutation controls, `scripts/each_head_effects_mutations.py`: 21 mutants,
-  each a position taken from `Node::exprs` or one reader's visit of it.
+- mutation controls, `scripts/each_head_effects_mutations.py`: 20 mutants,
+  each a position taken from `Node::exprs` or one reader's visit of it,
+  20 of 20 killed (2026-10-15, run whole). A 21st, "a handler is printed"
+  (PW5040), survived and is left out as equivalent: a handler's value is a
+  function (PW0614 refuses any other), whose type never holds a handle.
 - Sixteen mutants of six scripts re-anchored where the readers moved
   (`each_heads`, `lexical`, `names`, `row_reads`, `template_text`,
   `template_value`) and two of `session`, each undoing the same piece; the
