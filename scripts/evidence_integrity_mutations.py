@@ -318,15 +318,14 @@ BOUND = 1800
 
 def counted(out):
     """(built, passed, failed) as a suite's output says: `unittest`'s `Ran`
-    and `FAILED (...)` lines, or cargo's `test result:` lines."""
+    and `OK (...)` or `FAILED (...)` lines (a skipped test neither passed nor
+    failed), or cargo's `test result:` lines."""
     ran = [int(n) for n in re.findall(r"^Ran (\d+) tests? in", out, re.M)]
     if ran:
-        failed = sum(
-            int(n)
-            for line in re.findall(r"^FAILED \((.*)\)$", out, re.M)
-            for n in re.findall(r"(?:failures|errors)=(\d+)", line)
-        )
-        return True, sum(ran) - failed, failed
+        ended = re.findall(r"^(?:OK|FAILED) \((.*)\)$", out, re.M)
+        failed = sum(int(n) for line in ended for n in re.findall(r"(?:failures|errors)=(\d+)", line))
+        skipped = sum(int(n) for line in ended for n in re.findall(r"skipped=(\d+)", line))
+        return True, sum(ran) - failed - skipped, failed
     found = re.findall(r"test result: \w+\. (\d+) passed; (\d+) failed", out)
     if not found:
         return False, 0, 0
