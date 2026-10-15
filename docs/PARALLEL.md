@@ -1812,3 +1812,60 @@ Each a decision for a track, with its date; a track's ADR records it too.
     refused by their named rule, none failing).
   - Landed from the PC by the integrator's delegate, across two usage
     cut-offs, from its progress file.
+- **2026-10-15, train-9** (`track/train-9`, from `master` at `22a0508e`;
+  the integrator's delegate, on the PC): three merges, each its own merge
+  commit with its ADR numbered and its documents, merged, resolved, then
+  numbered (ADR-0281), and three small commits.
+  - **What it carries.** NEXT 4c's checker (ADR-0340, track
+    `bounded-checker`, from `e5b8cdb9`): a read keyed by its loop's element
+    refused (PW0405), `set` pairs held to their shape (PW0407), `sets` and
+    PW0406; corpus C25. Ratings and reviews (ADR-0341, W9's, from
+    `2190221c`), the DoorDash customer side's last piece but scheduled
+    orders. The bug museum and the head-to-head's protocol (ADR-0342, track
+    `proof`, from `11531dba`). Then: the store page's two pinned shapes
+    brought to its ratings (`0483e495`); `scripts/doctor.sh` and
+    `scripts/record-environment.sh` executable again (train-8's finding);
+    and `statements_separated.rs`'s stale `ADR-XXXX`, ADR-0303.
+  - **The tracks' own runs.** `bounded-checker`'s verify (38780144526)
+    green in every job finished when it was merged, its longest shard still
+    running; `proof`'s (38734336242) green; each one's `ci` red only in
+    "licenses and advisories", Wasmtime 48.0.5's, fixed on `master` by
+    ADR-0335. `reviews`' verify (38781487357) failed its three browser
+    jobs (the finding below), fixed on the train.
+  - **Rulings and answers (the integrator's, 2026-10-15)**, in each ADR:
+    - ADR-0340: kiokun's two-value key is a list of key records, so that no
+      layer derives a key in app-specific Rust, built with the kiokun track
+      or D1's key records; the pair's key field is matched by name in a
+      follow-up track, `pair-key-by-name`, and not claimed until then. The
+      store's own pair (`set hours_of_stores` with `sets one_call`) is not
+      written at the merge: NEXT 4c holds it.
+    - ADR-0341: its browser hosts are PORT + 200 to 202 (+190 to 192 are
+      the payments hosts' providers'); the three scripts its seams
+      re-anchored (`descriptions`, `store_hours`, `store_search`) are run
+      whole by the train's verify, their record; KNOWN_LIMITATIONS says
+      reviews are public and unmoderated, with no merchant side.
+    - ADR-0342: H07, below. Its question, whether the own renderer's
+      Playwright config should start only the hosts a spec needs, is not
+      ruled here: open.
+  - **A finding, the museum working as meant: its first closed miss.**
+    Merged after ADR-0340 on the same train, the museum's `--checks-only`
+    run failed: H07's unchanged program, an N+1 read (`List.map` over
+    `Menus.price`), came out "refused after all (PW0405)" where its exhibit
+    expected a miss. A miss that starts being refused fails the recipe
+    until the exhibit says so, and the exhibit says so now, resolved in the
+    merge: "refused, PW0405: a miss the museum found, closed by ADR-0340's
+    checker", its patch, spec and reproduction unchanged, and a fourth
+    mutation control (`proof_mutations.py`, 4 of 4 killed).
+  - **A finding: a track's own suites missed two pinned shapes of the page
+    it changed.** `reviews` added a rating line and a reviews region to the
+    store's page; `accessibility.spec.mjs` (a screen reader's tree, a
+    serial file whose eight later tests then did not run) and
+    `store.spec.mjs` (the count of identity anchors, 84 then 88) still
+    described the page before it, in every engine. Its local `just ci` runs
+    no browser, and its own spec passed, so only its verify saw them. On
+    the train both files passed in the three engines (92 passed, 1
+    skipped). To every worker: a change to a page runs the browser suites
+    that pin that page's shape, not only its own spec, before its push.
+  - **A record's count, unchecked**: `bounded-checker`'s commit `1f0d772f`
+    says "41 in all" of a script that has 40 mutants (its ADR and its run
+    say 40); `track/evidence-integrity`'s family of findings.
