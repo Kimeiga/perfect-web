@@ -12,5 +12,9 @@ packages:
   - "benchmarks/baselines/next-react"
   - "benchmarks/baselines/sveltekit"
   - "benchmarks/harness"
+  # Track `todomvc` (W7): TodoMVC's own Cypress suite, vendored unchanged and
+  # run against TodoMVC in Pleris (`spikes/todomvc-cypress`). In the workspace
+  # so that `just audit` scans Cypress's dependency tree too (charter §3.6).
+  - "spikes/todomvc-cypress"
   # runtime/*, benchmarks/baselines/* and examples/* join as milestones need them
   # (PROJECT_CHARTER.md §12: do not create empty directories to look complete).

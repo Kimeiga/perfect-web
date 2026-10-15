@@ -38,15 +38,16 @@ the repository's `examples/`), its other frameworks' folders, and
 host of its own and runs the suite against it:
 
 ```
-cypress run --env framework=. --config baseUrl=http://127.0.0.1:<port>
+cypress run --env framework=page/todomvc.app.Todos --config baseUrl=http://127.0.0.1:<port>
 ```
 
-The suite visits `baseUrl + '/' + framework`; the name `.` is this host's root,
-where the app is, so nothing here proxies or rewrites an address. The name is in
-none of the suite's tables (`noLocalStorageCheck` and the rest), so every check
-the suite makes of an app it knows nothing about is made of this one: including
-`localStorage`, which this app does not use (see the ADR's section on the
-suite's result).
+The suite visits `baseUrl + '/' + framework`; the name is the page's own path
+on the host (`/page/todomvc.app.Todos`), so nothing here proxies or rewrites an
+address. (The root, `.`, was tried first: Cypress asks for `/.`, which no host
+here serves as `/`.) The name is in none of the suite's tables
+(`noLocalStorageCheck` and the rest), so every check the suite makes of an app
+it knows nothing about is made of this one: including `localStorage`, which this
+app does not use (see the ADR's section on the suite's result).
 
 # The binary
 

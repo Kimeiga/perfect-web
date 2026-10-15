@@ -1,0 +1,4 @@
+# Cypress writes these into the project on a run; they are not the suite and not evidence.
+cypress/screenshots/
+cypress/videos/
+cypress/downloads/

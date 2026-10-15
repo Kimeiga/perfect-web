@@ -7,9 +7,11 @@
 # and runs `cypress/e2e/spec.cy.js` as the repository ships it
 # (`UPSTREAM.md` holds each file to its upstream blob):
 #
-#     cypress run --env framework=. --config baseUrl=http://127.0.0.1:<port>
+#     cypress run --env framework=page/todomvc.app.Todos --config baseUrl=http://127.0.0.1:<port>
 #
-# The suite visits `baseUrl + '/' + framework`, and `.` is this host's root.
+# The suite visits `baseUrl + '/' + framework`: the name is the page's own
+# path on the host. (The root, `.`, was tried: Cypress asks for `/.`, which no
+# host here serves as `/`.) The name is in none of the suite's tables.
 #
 # Cypress's binary is not in the repository. Where it is not installed, this
 # says so and runs nothing (exit 0): `pnpm exec cypress install` fetches it,
@@ -17,8 +19,21 @@
 # where none is set, so the one WSLg or a desktop gives is left out of its
 # environment, and the run is the same on a machine with none.
 #
-# The suite's output goes to $OUT (default /tmp/pw-todomvc-cypress.txt), and
-# its summary is printed.
+# **The diagnostic** (`DIAGNOSTIC=1`, not the acceptance): the same unchanged
+# files, run as an app the suite's own tables treat as keeping nothing in
+# `localStorage` (`noLocalStorageCheck`: `puremvc`, which has no known issues
+# either), reached through the address's fragment, which the page ignores:
+#
+#     cypress run --env framework=puremvc --config baseUrl=http://127.0.0.1:<port>/page/todomvc.app.Todos#
+#
+# The acceptance's own name is in none of the tables, so each test that asks
+# `localStorage` for the todos fails, and the first test after a failed one
+# fails in its hook (the failed tests' polling of a storage that is gone
+# throws), which skips every test after it. The diagnostic shows what the rest
+# of the suite says of this app.
+#
+# The suite's output goes to $OUT (default /tmp/pw-todomvc-cypress.txt, or
+# /tmp/pw-todomvc-cypress-diagnostic.txt), and its summary is printed.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -26,7 +41,16 @@ REPO_ROOT="$(cd "$HERE/../.." && pwd)"
 SPIKE="$REPO_ROOT/spikes/own-renderer"
 DIST="$SPIKE/dist-todomvc"
 PORT="$(( ${PORT:-3141} + 143 ))"
-OUT="${OUT:-/tmp/pw-todomvc-cypress.txt}"
+if [ "${DIAGNOSTIC:-}" = 1 ]; then
+  FRAMEWORK="puremvc"
+  BASE="http://127.0.0.1:$PORT/page/todomvc.app.Todos#"
+  OUT="${OUT:-/tmp/pw-todomvc-cypress-diagnostic.txt}"
+  echo "cypress: the DIAGNOSTIC run (framework $FRAMEWORK, which the suite takes to keep nothing in localStorage): not the acceptance"
+else
+  FRAMEWORK="page/todomvc.app.Todos"
+  BASE="http://127.0.0.1:$PORT"
+  OUT="${OUT:-/tmp/pw-todomvc-cypress.txt}"
+fi
 
 cd "$HERE"
 
@@ -58,13 +82,14 @@ curl -fsS -o /dev/null "http://127.0.0.1:$PORT/" || { echo "run.sh: the host did
 
 set +e
 env -u DISPLAY -u WAYLAND_DISPLAY pnpm exec cypress run \
-  --env framework=. \
-  --config "baseUrl=http://127.0.0.1:$PORT" \
+  --env framework="$FRAMEWORK" \
+  --config "baseUrl=$BASE" \
   --reporter spec > "$OUT" 2>&1
 CODE=$?
 set -e
 
-# Cypress's table, and each test's line.
-sed 's/\x1b\[[0-9;]*[A-Za-z]//g' "$OUT" | grep -E "^ +(✓|✔|[0-9]+\)|-) |^ +(Tests|Passing|Failing|Pending|Skipped):|passing|failing|pending|✖|✔  All specs" || true
+# Each test's line, why each failed (the first line of its error), and
+# Cypress's own table of the counts.
+sed 's/\x1b\[[0-9;]*[A-Za-z]//g' "$OUT" | grep -E "^ +(✓|✔|[0-9]+\)|-) |^ +(AssertionError|CypressError|Error|SecurityError)|│ (Tests|Passing|Failing|Pending|Skipped):" || true
 echo "cypress exit status: $CODE"
 exit 0
