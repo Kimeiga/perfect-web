@@ -122,3 +122,14 @@ test("a control losing focus runs its handler, given the value it held", async (
   await page.waitForTimeout(150);
   await expect(page.locator("#left-with")).toHaveText("d");
 });
+
+// A blur is not a change: the browser fires `change` only where the text was
+// edited, and a person tabbing through a field has not edited it. TodoMVC's
+// edit field is left that way when its todo is "edited" and nothing is changed.
+test("a control left with nothing typed in it still runs its handler", async ({ page }) => {
+  await ready(page);
+  await expect(page.locator("#left-with")).toHaveText("none");
+  await page.locator("#leave").focus();
+  await page.locator("#q").focus();
+  await expect(page.locator("#left-with")).toHaveText("");
+});
