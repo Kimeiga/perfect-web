@@ -394,6 +394,7 @@ world store-page-checkout {
     import store:data/fees;
     import store:data/hours;
     import store:data/promos;
+    import store:data/user-estimates;
     export store-page-checkout-api;
 }
 
@@ -521,6 +522,7 @@ world store-page-times-offered {
     import pw:host/clock;
     import store:data/checkout;
     import store:data/hours;
+    import store:data/user-estimates;
     export store-page-times-offered-api;
 }
 
@@ -577,6 +579,7 @@ world store-page-choose-time {
     import pw:host/principal;
     import store:data/checkout;
     import store:data/hours;
+    import store:data/user-estimates;
     export store-page-choose-time-api;
 }
 

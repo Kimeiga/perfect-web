@@ -125,11 +125,13 @@ store.page.CartPage  abi f00a4fe14eeded6f
   host      pw:host/principal#read  (session.read)
   exports   page CartPage
 
-store.page.Checkout  abi 0bf6aebc79003f96
+store.page.Checkout  abi fd786a6e286b508f
   runs at   origin
   needs     clock.compare
   needs     clock.zone
+  needs     database.read<Addresses>
   needs     database.read<Carts>
+  needs     database.read<Estimates>
   needs     database.read<Orders>
   needs     database.read<Stores>
   host      pw:host/clock#at  (clock.zone)
@@ -142,6 +144,7 @@ store.page.Checkout  abi 0bf6aebc79003f96
   host      store:data/fees#for-stores  (database.read<Stores>)
   host      store:data/hours#for-stores  (database.read<Stores>)
   host      store:data/promos#find  (database.read<Stores>)
+  host      store:data/user-estimates#for-store  (database.read<Estimates>)
   exports   query Checkout
 
 store.page.Estimate  abi 94da90c7ccd7e563
@@ -280,11 +283,13 @@ store.page.TimePage  abi 881bdfdcf009c063
   host      pw:host/principal#read  (session.read)
   exports   page TimePage
 
-store.page.TimesOffered  abi 204794d4a761e63a
+store.page.TimesOffered  abi fb3dcc6917f6375f
   runs at   origin
   needs     clock.compare
   needs     clock.zone
+  needs     database.read<Addresses>
   needs     database.read<Carts>
+  needs     database.read<Estimates>
   needs     database.read<Stores>
   host      pw:host/clock#at  (clock.zone)
   host      pw:host/clock#date  (clock.zone)
@@ -293,6 +298,7 @@ store.page.TimesOffered  abi 204794d4a761e63a
   host      pw:host/clock#today  (clock.compare)
   host      store:data/checkout#chosen  (database.read<Carts>)
   host      store:data/hours#for-cart  (database.read<Stores>)
+  host      store:data/user-estimates#for-store  (database.read<Estimates>)
   exports   query TimesOffered
 
 store.page.add_address  abi 083883ce01812277
@@ -373,11 +379,13 @@ store.page.choose_address  abi 336d5d3e75e83603
   host      store:data/addresses#choose  (database.write<Addresses>)
   exports   command choose_address
 
-store.page.choose_time  abi 366ad9c895e82b38
+store.page.choose_time  abi 8c20b1cc883b6ee1
   runs at   origin
   needs     clock.compare
   needs     clock.zone
+  needs     database.read<Addresses>
   needs     database.read<Carts>
+  needs     database.read<Estimates>
   needs     database.read<Stores>
   needs     database.write<Carts>
   needs     outbox.write
@@ -390,6 +398,7 @@ store.page.choose_time  abi 366ad9c895e82b38
   host      pw:host/principal#read  (session.read)
   host      store:data/checkout#set-time  (database.write<Carts>)
   host      store:data/hours#for-cart  (database.read<Stores>)
+  host      store:data/user-estimates#for-store  (database.read<Estimates>)
   exports   command choose_time
 
 store.page.choose_tip  abi 17733c2240e354f0

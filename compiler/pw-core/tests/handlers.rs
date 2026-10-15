@@ -205,6 +205,9 @@ fn the_stores_handlers_compile_to_the_calls_their_bodies_make() {
             // 6c, step eight).
             "cancel_order",
             "choose_address",
+            // The page of times' two (track `scheduled-orders`): as soon as
+            // possible and a window, two modules of one name.
+            "choose_time",
             // Its tip: none, 15, 18 or 20 percent, four modules of one name;
             // and an amount, typed, which the handler reads as dollars first
             // (`dollars_typed`) (track `order-total`).
@@ -399,8 +402,10 @@ fn a_module_and_its_event_part_name_one_handler() {
     // And the cart page's checkout (track `order-total`): the code's and the
     // typed tip's bindings, the code applied and taken off, four tips by
     // percent and one by amount. And the order page's (NEXT 6c, step
-    // eight): an order awaiting its payment taken back.
-    assert_eq!(parts.len(), 25, "{parts:?}");
+    // eight): an order awaiting its payment taken back. And the page of
+    // times' two (track `scheduled-orders`): as soon as possible, and a
+    // window chosen.
+    assert_eq!(parts.len(), 27, "{parts:?}");
     // By identity: two of the address page's handlers have one name (both
     // test the label first, `address_label`), and each is its own module.
     let _ = &modules;

@@ -753,6 +753,14 @@
     },
     {
       "from": "store.page.Checkout",
+      "to": "Events.AddressesChanged",
+      "kind": "invalidated_by",
+      "key": [
+        "reader"
+      ]
+    },
+    {
+      "from": "store.page.Checkout",
       "to": "Events.StoreChanged",
       "kind": "invalidated_by",
       "key": [
@@ -975,6 +983,14 @@
       "key": [
         "current_user()",
         "day"
+      ]
+    },
+    {
+      "from": "store.page.TimesOffered",
+      "to": "Events.AddressesChanged",
+      "kind": "invalidated_by",
+      "key": [
+        "reader"
       ]
     },
     {
