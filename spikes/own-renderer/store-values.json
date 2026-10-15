@@ -13,6 +13,7 @@
   "checkout.charges.tax.display": "$0.00",
   "checkout.charges.tip.display": "$0.00",
   "checkout.said": "",
+  "checkout.when_said": "As soon as possible",
   "checkout.promo": { "$case": "none" },
   "code": "",
   "tip_typed": "",
@@ -23,7 +24,8 @@
     { "id": "48", "name": "Harbor Coffee", "cuisine": "Café, Bakery", "open": true, "said": "Open 24 hours", "description": "A neighborhood cafe by the water, pouring drip coffee brewed to order and matcha whisked by hand." }
   ],
   "order": { "$case": "none" },
-  "#store.page.OrderPage~8": { "$case": "none" },
+  "#store.page.OrderPage~4": "",
+  "#store.page.OrderPage~9": { "$case": "none" },
   "menu": [
     { "category": { "id": "coffee", "name": "Coffee" }, "items": [
       { "id": "espresso", "store_id": "47", "name": "Espresso", "description": "A double shot, pulled short.", "price": 350, "price.display": "$3.50", "available": true, "category": { "id": "coffee", "name": "Coffee" } },
@@ -47,5 +49,10 @@
   "search.said": "2 stores match “coffee”.",
   "search.near": "Choose a delivery address to see only the stores that deliver to it.",
   "search.stores": [],
-  "search.more": ""
+  "search.more": "",
+  "day": { "$case": "none" },
+  "times.said": "As soon as possible",
+  "times.days": [],
+  "times.day": "",
+  "times.windows": []
 }
