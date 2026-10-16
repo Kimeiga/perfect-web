@@ -285,6 +285,34 @@ class Plan(unittest.TestCase):
             self.assertEqual(plan.recipes_at(text, [(3, 3)], ["e14-track"]), {"e14-track"})
             self.assertEqual(plan.recipes_at(text, [(1, 1)], ["e14-track"]), set())
 
+    def test_a_recipe_whose_parameters_have_defaults_is_read(self) -> None:
+        # Track evidence-integrity-2: a header's default stopped the header's
+        # pattern until 2026-10-15, and `e10-browser`, `e10-close-bench` and
+        # `e14-harness` had no body: nothing they run planned them, and a
+        # shard dealt one set up neither browsers nor the build.
+        with tempfile.TemporaryDirectory() as d:
+            root = pathlib.Path(d)
+            (root / "justfile").write_text(
+                'set shell := ["bash", "-euo", "pipefail", "-c"]\nexport PATH := "x:" + env_var(\'PATH\')\n'
+                "toolchain_bin := justfile_directory()\n\n"
+                'e10-browser engines="chromium firefox" out="docs/evidence/E10/a:b.txt":\n'
+                "    bash scripts/run_suite.sh -- pnpm exec playwright test e2e/a.spec.mjs\n\n"
+                'e14-harness TASK="T08" *rest:\n    node bench.mjs controls --task {{TASK}}\n\n'
+                "evidence-fetch run *flags: e14-harness\n    python3 scripts/evidence_fetch.py {{run}}\n"
+            )
+            body = plan.bodies(root)
+            self.assertEqual(sorted(body), ["e10-browser", "e14-harness", "evidence-fetch"])
+            self.assertIn("e2e/a.spec.mjs", body["e10-browser"])
+            self.assertEqual(plan.needs(body["e10-browser"]), (True, True))
+            # The benchmark's controls grade each stack in a browser.
+            self.assertEqual(plan.needs(body["e14-harness"]), (True, True))
+            text = (root / "justfile").read_text().splitlines()
+            self.assertEqual(plan.recipes_at(text, [(6, 6)], ["e10-browser"]), {"e10-browser"})
+        # And the repository's: every recipe `just` knows has its body.
+        known = plan.recipes()
+        self.assertEqual([n for n in known if n not in plan.bodies()], [])
+        self.assertIn("e2e/performance.spec.mjs", plan.bodies()["e10-close-bench"])
+
     def test_a_recipe_run_against_a_database_is_a_shard_of_its_own(self) -> None:
         out = subprocess.run(
             [sys.executable, str(SCRIPTS / "ci_plan.py"), "--shards", "2", "e14-feed-postgres", "e14-feed"],

@@ -157,7 +157,18 @@ def recipes() -> list[str]:
 
 IMPORT = re.compile(r"""^import\??\s+(['"])(.+?)\1""")
 
-HEADER = re.compile(r"^([a-z0-9][a-z0-9-]*)\s*(?:[^:=]*)?:(?!=)")
+# **A recipe's header**: its name, its parameters, each with its default
+# where it has one, and its colon (not `:=`, an assignment's). Until
+# 2026-10-15 a parameter's default stopped it (`[^:=]*` before the colon),
+# so `e10-browser engines="..." out="..."`, `e10-close-bench RUNS="8"` and
+# `e14-harness TASK="T08"` had no body here: no change planned them by what
+# they run, and a shard dealt one set up neither browsers nor the build
+# (track evidence-integrity-2).
+HEADER = re.compile(
+    r"""^([a-z0-9][a-z0-9-]*)"""
+    r"""(?:\s+[$*+]?[A-Za-z_][A-Za-z0-9_-]*(?:=(?:"[^"]*"|'[^']*'|[^\s'":=]+))?)*"""
+    r"""\s*:(?!=)"""
+)
 
 
 def justfile_parts(root: pathlib.Path = ROOT) -> list[str]:
@@ -618,9 +629,12 @@ def deal(
 
 def needs(body: str) -> tuple[bool, bool]:
     """What a recipe's shard must set up (ADR-0249): browsers, for one that
-    runs Playwright; the build, for one that runs it, or reads what it
-    makes: the servers, the store's pages, `pw` itself."""
-    browsers = "playwright" in body
+    runs Playwright, itself or by the benchmark's `bench.mjs`, whose
+    controls grade each stack in a browser (track evidence-integrity-2: a
+    control that fails now fails its recipe); the build, for one that runs
+    it, or reads what it makes: the servers, the store's pages, `pw`
+    itself."""
+    browsers = "playwright" in body or "bench.mjs" in body
     build = browsers or bool(re.search(r"run\.sh|feed\.sh|keyed-store\.sh|target/debug/", body))
     return browsers, build
 
