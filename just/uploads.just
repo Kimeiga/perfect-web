@@ -29,9 +29,7 @@ e14-uploads:
        echo; echo "== the declaration and its checks (compiler/pw-core/tests/uploads.rs)"; echo; \
        cargo test --locked -p pw-core --test uploads 2>&1 | awk '/^(test |test result)/ { print } /panicked at/ { p = 5 } p > 0 { print; p-- }'; \
        echo; echo "== an image on a post in three engines (e2e/uploads.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/uploads.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/uploads.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/uploads_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/uploads_mutations.py; \
      } > docs/evidence/E14/uploads.txt

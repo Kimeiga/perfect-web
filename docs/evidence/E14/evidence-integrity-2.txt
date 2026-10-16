@@ -1,0 +1,176 @@
+Track evidence-integrity-2 - a failed browser test fails its recipe, and five more rulings
+
+produced by: just e14-evidence-integrity-2
+commit: caad384d1582aaeec3d1b64c6dfd48306f575474
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+python: Python 3.10.12
+just: just 1.58.0
+
+== 1. what the evidence recorded of failed browser tests while their recipes passed (scripts/recorded_browser_failures.py; a shallow checkout reads what it holds)
+
+2026-09-25 ebd4696a (still committed) docs/evidence/E10/handlers-browser-suite-687aaf4.txt (just e10-browser "chromium firefox webkit" docs/evidence/E10/handlers-browser-suite.txt, recorded at 687aaf4a) full run 2:
+    | 1) [webkit] › e2e/store.spec.mjs:130:3 › the update touches only what changed › only cart-related part ids update
+    | 1 failed
+2026-09-26 eeca1642 (still committed) docs/evidence/E10/handlers-browser-suite.txt (just e10-browser "chromium firefox webkit" docs/evidence/E10/handlers-browser-suite.txt, recorded at 12b3cb68) full run 1:
+    | 1) [webkit] › e2e/keyed-list.spec.mjs:231:1 › changing one item's field replaces no sibling ──────
+    | 1 failed
+    | 5 did not run
+2026-10-02 cc2088e5 (until cc2088e5) docs/evidence/E14/harness-T12.txt (just e14-harness T12, recorded at b64a9951) the controls (node bench.mjs controls --task T12):
+    | T12 pleris: negative ok, positive ok, unsafe FAIL, harness ok
+2026-10-03 1d8f8b30 (until 1d8f8b30) docs/evidence/E14/browser-suite.txt (just e10-browser "chromium firefox webkit" docs/evidence/E14/browser-suite.txt, recorded at da0fcffb) full run 1:
+    | 1) [firefox] › e2e/lazy-handler.spec.mjs:129:1 › two fast presses are one fetch ──────────────────
+    | 1 failed
+2026-10-05 91665c0d (until 91665c0d) docs/evidence/E14/stable-layout.txt (just e14-stable-layout, recorded at 1a00c28a) a thousand items, alone in Chromium (e2e/performance.spec.mjs, E7 g:
+    | ✘  1 [chromium] › e2e/performance.spec.mjs:260:1 › gate 10: a thousand-item menu keeps a bounded rendering cost (32.7s)
+    | 1 failed
+2026-10-09 64abfcff (until 64abfcff) docs/evidence/E14/computed-holes.txt (just e14-computed-holes, recorded at 4236e324) the feed in three engines (e2e/feed.spec.mjs):
+    | 1) [chromium] › e2e/feed.spec.mjs:663:1 › a follow reaches another reader of the page without a reload
+    | 2) [webkit] › e2e/feed.spec.mjs:419:1 › Load more shows the next page, and a post after it is shown over it
+    | 2 failed
+    | 13 did not run
+2026-10-09 64abfcff (until 64abfcff) docs/evidence/E14/feed.txt (just e14-feed, recorded at 4236e324) the feed in three engines (e2e/feed.spec.mjs):
+    | 1) [webkit] › e2e/feed.spec.mjs:419:1 › Load more shows the next page, and a post after it is shown over it
+    | 1 failed
+    | 10 did not run
+2026-10-09 64abfcff (until 64abfcff) docs/evidence/E14/string-invariants.txt (just e14-string-invariants, recorded at 4236e324) the feed in three engines (e2e/feed.spec.mjs):
+    | 1) [webkit] › e2e/feed.spec.mjs:419:1 › Load more shows the next page, and a post after it is shown over it
+    | 1 failed
+    | 10 did not run
+2026-10-10 59f3351e (until 59f3351e) docs/evidence/E14/navigate.txt (just e14-navigate, recorded at 6964ee77) the order placed and gone to, in three engines (e2e/navigate.spec.m:
+    | 1) [firefox] › e2e/navigate.spec.mjs:134:1 › a press made before the navigation is answered first, its answer first
+    | 1 failed
+recorded browser failures: 9 (2 still committed), in 2240 versions of evidence files read
+test_a_committed_report_does_not_become_a_new_failed_suite (scripts.tests.test_recorded_browser_failures.RecordedBrowserFailures) ... ok
+test_a_green_run_a_skip_a_mutant_and_a_cargo_failure_are_no_browser_failure (scripts.tests.test_recorded_browser_failures.RecordedBrowserFailures) ... ok
+test_each_failure_is_named_once_at_its_first_commit_and_whether_it_stands (scripts.tests.test_recorded_browser_failures.RecordedBrowserFailures) ... ok
+Ran 3 tests in 0.093s
+OK
+
+== 1. a failed browser test fails its recipe: the helper (scripts/run_suite.sh, test_run_suite.py)
+
+test_a_call_it_cannot_read_is_refused (scripts.tests.test_run_suite.RunSuite) ... ok
+test_a_failed_suite_fails_and_its_failure_is_recorded (scripts.tests.test_run_suite.RunSuite) ... ok
+test_a_passed_suite_passes_and_keeps_its_tests_and_evidence_lines (scripts.tests.test_run_suite.RunSuite) ... ok
+test_a_run_that_says_nothing_kept_shows_its_last_lines (scripts.tests.test_run_suite.RunSuite) ... ok
+test_a_suite_that_passed_no_test_fails (scripts.tests.test_run_suite.RunSuite) ... ok
+test_every_run_runs_and_the_first_failure_is_its_status (scripts.tests.test_run_suite.RunSuite) ... ok
+test_it_runs_from_the_directory_it_is_given (scripts.tests.test_run_suite.RunSuite) ... ok
+test_its_status_is_any_exit_but_zero (scripts.tests.test_run_suite.RunSuite) ... ok
+Ran 8 tests in 0.131s
+OK
+
+== 1. every suite in the justfile runs by it, its status its recipe's (scripts/suite_status.py, test_suite_status.py)
+
+suite status: 92 `playwright test` in the recipes' lines, 92 run by `scripts/run_suite.sh` with their status their recipe's; 2 `bench.mjs controls`; 0 refused
+test_a_justfile_with_no_suite_is_refused_as_read_nothing (scripts.tests.test_suite_status.SuiteStatus) ... ok
+test_a_recipe_or_a_shell_that_would_not_stop_is_refused (scripts.tests.test_suite_status.SuiteStatus) ... ok
+test_a_suite_not_run_by_the_helper_is_refused (scripts.tests.test_suite_status.SuiteStatus) ... ok
+test_each_way_of_swallowing_a_status_is_refused (scripts.tests.test_suite_status.SuiteStatus) ... ok
+test_the_helper_with_its_status_raised_passes (scripts.tests.test_suite_status.SuiteStatus) ... ok
+test_the_repository_runs_every_suite_by_the_helper_its_status_its_recipes (scripts.tests.test_suite_status.SuiteStatus) ...
+Ran 6 tests in 0.413s
+OK
+
+== 1. each suite failed in turn fails its recipe, and its evidence says so (test_suites_fail_their_recipes.py, test_builds_before_suites.py)
+
+test_every_browser_suite_fails_its_recipe_and_its_evidence_says_so (scripts.tests.test_suites_fail_their_recipes.SuitesFailTheirRecipes) ...
+suites fail their recipes: 87 recipes run a browser suite; 139 suite runs, each failed in turn
+test_the_stand_ins_tell_a_recipe_its_suite_fails_from_one_that_swallows_it (scripts.tests.test_suites_fail_their_recipes.SuitesFailTheirRecipes) ... ok
+test_every_recipe_that_runs_a_browser_suite_builds_first_and_stops_where_a_build_fails (scripts.tests.test_builds_before_suites.BuildsBeforeSuites) ...
+builds before suites: 84 recipes run the browser suite that serves `dist`; 194 builds before their suites, each failed in turn
+test_the_stand_ins_tell_a_build_that_stops_its_recipe_from_one_that_does_not (scripts.tests.test_builds_before_suites.BuildsBeforeSuites) ... ok
+test_a_build_of_another_runtime_or_of_changed_sources_is_refused (scripts.tests.test_builds_before_suites.DistIsWhole) ... ok
+test_a_build_stopped_part_way_or_never_made_is_refused (scripts.tests.test_builds_before_suites.DistIsWhole) ... ok
+test_a_whole_build_is_served (scripts.tests.test_builds_before_suites.DistIsWhole) ... ok
+Ran 7 tests in 85.687s
+OK
+
+== 2, 3. the planner reads every recipe, and the suite's configuration plans what runs under it (test_ci_scripts.py)
+
+test_a_change_to_the_suites_configuration_plans_every_recipe_that_runs_a_suite_under_it (scripts.tests.test_ci_scripts.Plan) ... ok
+test_a_changed_spec_or_a_module_its_specs_import_plans_what_runs_them (scripts.tests.test_ci_scripts.Plan) ... ok
+test_a_recipe_whose_parameters_have_defaults_is_read (scripts.tests.test_ci_scripts.Plan) ... ok
+Ran 75 tests in 6.524s
+OK
+
+== 4. mutant-programs finds every program a mutation script mutates (scripts/mutant_programs.py, test_mutant_programs.py)
+
+test_a_fixture_whose_directory_declares_a_module_twice_is_its_own_program (scripts.tests.test_mutant_programs.MutantPrograms) ... ok
+test_a_gate_that_judged_nothing_or_a_source_outside_every_program_fails (scripts.tests.test_mutant_programs.MutantPrograms) ... ok
+test_a_librarys_mutant_is_checked_in_each_program_that_imports_it (scripts.tests.test_mutant_programs.MutantPrograms) ... ok
+test_a_mutant_its_script_names_the_rule_for_passes (scripts.tests.test_mutant_programs.MutantPrograms) ... ok
+test_a_mutant_the_checker_refuses_for_another_reason_fails (scripts.tests.test_mutant_programs.MutantPrograms) ... ok
+test_a_named_rule_the_mutant_does_not_meet_fails (scripts.tests.test_mutant_programs.MutantPrograms) ... ok
+test_a_root_no_list_names_is_found_from_its_path (scripts.tests.test_mutant_programs.MutantPrograms) ... ok
+test_an_import_it_cannot_resolve_fails (scripts.tests.test_mutant_programs.MutantPrograms) ... ok
+test_the_control_a_mutant_that_leaves_a_program_passes (scripts.tests.test_mutant_programs.MutantPrograms) ... ok
+Ran 9 tests in 0.353s
+OK
+mutant programs: 239 mutants of a program's source, 239 judged, in 9 programs (benchmarks/baselines/pleris/store, examples, examples/feed, examples/kiokun, examples/kiokun-site, examples/lib, examples/rejected/R-004-private-cart-in-shared-cache.pw, examples/store, packages/pw-std); 344 checks; 11 refused by the rule their script names, 0 failing
+
+== 5. no comparison translates an old number (compiler/pw-core: diagnostics.rs, codes.rs)
+
+test codes::tests::an_old_number_is_no_registered_rule ... ok
+test diagnostics::tests::no_comparison_translates_an_old_number ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 184 filtered out; finished in 0.19s
+
+== 6. the corpus's enforcement table is what the corpus checks now (checking_source.rs)
+
+test the_committed_enforcement_table_is_what_the_corpus_checks_now ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 19 filtered out; finished in 22.16s
+74/74 enforce their declared invariant
+
+== 7. e9-latency names the machine it measured (test_e9_latency_recipe.py; the measurement is the integrator's, in a quiet window)
+
+test_the_evidence_names_this_machines_record_and_its_load (scripts.tests.test_e9_latency_recipe.LatencyNamesItsMachine) ... ok
+Ran 1 test in 0.102s
+OK
+
+== mutation controls (scripts/evidence_integrity_2_mutations.py)
+
+baseline (helper): 8 passed, 0 failed
+baseline (history): 3 passed, 0 failed
+baseline (gate): 6 passed, 0 failed
+baseline (recipes): 2 passed, 0 failed
+baseline (plan): 75 passed, 0 failed
+baseline (programs): 9 passed, 0 failed
+baseline (core): 186 passed, 0 failed
+baseline (corpus): 1 passed, 0 failed
+baseline (latency): 1 passed, 0 failed
+the helper exits 0 whatever the suite did [helper]: KILLED (5 failure reports in 8 tests run)
+the helper stops at the first failed run [helper]: KILLED (1 failure reports in 8 tests run)
+the helper passes a run that passed no test [helper]: KILLED (1 failure reports in 8 tests run)
+the helper keeps no failed count [helper]: KILLED (2 failure reports in 8 tests run)
+a recipe swallows its suite again, read by the gate [gate]: KILLED (1 failure reports in 6 tests run)
+a recipe swallows its suite again, run with stand-ins [recipes]: KILLED (1 failure reports in 2 tests run)
+the benchmark's controls are swallowed again [gate]: KILLED (1 failure reports in 6 tests run)
+the gate reads no `||` after a suite [gate]: KILLED (6 failure reports in 6 tests run)
+the gate reads no condition [gate]: KILLED (3 failure reports in 6 tests run)
+the gate reads no group or loop that holds a suite [gate]: KILLED (5 failure reports in 6 tests run)
+the gate reads no `set +e` [gate]: KILLED (1 failure reports in 6 tests run)
+the gate reads no `-` line [gate]: KILLED (1 failure reports in 6 tests run)
+the gate reads no shell without `-e` [gate]: KILLED (1 failure reports in 6 tests run)
+the gate lets a suite outside the helper be [gate]: KILLED (1 failure reports in 6 tests run)
+the gate reads no `bench.mjs` [gate]: KILLED (2 failure reports in 6 tests run)
+the gate has no floor [gate]: KILLED (2 failure reports in 6 tests run)
+the historical report is read as another failed suite [history]: KILLED (1 failure reports in 3 tests run)
+a zero run count with leading zeros passes [helper]: KILLED (2 failure reports in 8 tests run)
+a parameter's default stops a recipe's header again [plan]: KILLED (3 failure reports in 75 tests run)
+the benchmark's controls get no browsers [plan]: KILLED (1 failure reports in 75 tests run)
+a change to the configuration plans nothing by it [plan]: KILLED (1 failure reports in 75 tests run)
+a mutation script's suite does not count [plan]: KILLED (1 failure reports in 75 tests run)
+a changed e2e module reaches no spec [plan]: KILLED (1 failure reports in 75 tests run)
+a recipe that runs every spec is planned by none [plan]: KILLED (1 failure reports in 75 tests run)
+the programs are the old list again [programs]: KILLED (2 failure reports in 9 tests run)
+a mutant in no program is let be [programs]: KILLED (1 failure reports in 9 tests run)
+a library's mutant is checked only in its own program [programs]: KILLED (1 failure reports in 9 tests run)
+a fixture's directory is one program [programs]: KILLED (1 failure reports in 9 tests run)
+a tie between sources is resolved [programs]: KILLED (1 failure reports in 9 tests run)
+a fixture's own directory is a source of its imports [programs]: KILLED (1 failure reports in 9 tests run)
+the registry translates an old number again [core]: KILLED (1 failure reports in 186 tests run)
+the corpus's test translates an old number again [core]: KILLED (1 failure reports in 186 tests run)
+the committed table drifts from what the corpus checks [corpus]: KILLED (1 failure reports in 1 tests run)
+e9-latency names macbook.md wherever it runs [latency]: KILLED (1 failure reports in 1 tests run)
+e9-latency records no load [latency]: KILLED (1 failure reports in 1 tests run)
+35 of 35 mutants killed
+memory bound: no process was stopped

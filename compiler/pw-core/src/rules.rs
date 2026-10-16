@@ -439,8 +439,10 @@ fn check_resource(decl: &Decl, out: &mut Vec<Finding>) {
             // ONE code per invariant (architect ruling). `PW2004` is canonical:
             // "a resource cannot outlive the scope that owns it". This detector
             // finds it from the declaration header; `pw-core`'s scope graph finds
-            // the same invariant from handle flow. `PW0326` is a DEPRECATED ALIAS
-            // kept only until the corpus migrates — see `canonical_code`.
+            // the same invariant from handle flow. `PW0326` is an old number the
+            // corpus wrote for it, read nowhere a code is compared (track
+            // evidence-integrity-2): the old numbers are listed in
+            // `diagnostics.rs`, for the reference that prints them.
             err(
                 "PW2004",
                 "a resource cannot outlive the scope that owns it",
@@ -863,7 +865,6 @@ mod tests {
 #[cfg(test)]
 mod corpus_tests {
     use super::*;
-    use crate::diagnostics::canonical_code;
     use pw_syntax::parse_tree;
     use std::path::{Path, PathBuf};
 
@@ -937,7 +938,8 @@ mod corpus_tests {
                 continue; // needs body parsing or type checking; see below
             }
             caught += 1;
-            let expected = canonical_code(expected);
+            // As written: an old number is not the code `pw check` reports
+            // (track evidence-integrity-2).
             if !found.contains(&expected) {
                 mismatches.push(format!(
                     "{}: declares @rule {expected}, got {found:?}",

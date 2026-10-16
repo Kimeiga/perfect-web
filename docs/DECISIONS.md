@@ -3036,3 +3036,11 @@ when preparation is due, with windows held to every store's ASAP admission
 rule at send time. [ADR-0348](DECISIONS/ADR-0348-a-set-read-keeps-each-keys-result.md):
 set pairs can preserve each key's exact Result/Option. Accepted under the
 owner's delegation; train-10 integrated verification pending.
+
+### 2026-10-15 — a failed suite fails its recipe
+
+[ADR-0349](DECISIONS/ADR-0349-evidence-integrity-2.md): one browser-suite
+runner propagates failures, recipes and builds are checked behaviorally,
+the planner follows suite configuration and helper imports, mutation
+program checks cover every root, and diagnostic evidence is held current.
+Integrated train verification remains pending.

@@ -336,3 +336,15 @@ On train-9, 2026-10-15, and what the merge did:
   head's effects `track/each-head-effects`'; the `<img>` with no `alt`
   and the `&&` message have no track yet, and KNOWN_LIMITATIONS lists them
   with the others. Each is held by its example here until it closes.
+
+
+## Train-10 follow-up, 2026-10-15
+
+ADR-0345 closes the unchecked each-head effect example: it now requires
+PW0401. A separate pure computed-list example continues to hold the actual
+check/build gap. The check-is-build syntax follow-up gives doubled logical
+operators the Pleris spelling; the exact displayed output and prose now
+require its help. Historical findings above describe the original branch.
+ADR-0349 also requires current registered corpus codes in the generated
+reference and propagates tutorial browser failures through the shared
+suite runner. Full assembled guide controls remain pending.

@@ -196,12 +196,12 @@ Pleris is a research project, and these are true today (2026-10-15):
 - **Gaps in the checks.** `pw check` is not the whole build: `pw build`
   refuses programs it passes (a `<title>` that reads a signal, a value
   computed from two signals, a computed list in an `{#each}`), so build
-  before you trust a green check. The effect check does not look in an
-  `{#each}` head, where it refuses the same call anywhere else in a view
-  that claims `!{}`. An `<img>` without `alt` is not refused. [The tour's
-  last section](tour-pages.md#where-pw-check-stops) shows each, in programs
-  the guide's test compiles. And the message for `&&` does not say that
-  Pleris writes `&` ([errors](errors.md)).
+  before you trust a green check. Effects in an `{#each}` head are now
+  checked, including its list and key (ADR-0345). An `<img>` without `alt`
+  is not refused. [The tour's last section](tour-pages.md#where-pw-check-stops)
+  shows the remaining gaps and the repaired effect refusal in programs
+  the guide's test compiles. The message for `&&` now names Pleris's `&`
+  spelling ([errors](errors.md)).
 - **Missing features**: offline and real-time collaboration, i18n,
   background jobs beyond a scheduled command (ADR-0334), and charts.
   `docs/vision/capabilities.md` keeps the full matrix.

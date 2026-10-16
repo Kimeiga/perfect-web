@@ -26,9 +26,7 @@ e14-identity:
        echo "== the server (identity.rs, accounts.rs, tests/sign_in.rs)"; echo; \
        cargo test --locked -p pw-dev-server -- identity:: accounts:: sign_in:: 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the flows in three engines (e2e/identity.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/identity.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/identity.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/identity_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/identity_mutations.py; \
      } > docs/evidence/E14/identity.txt

@@ -39,9 +39,7 @@ e14-argument-invariants:
          PW_STORE_TEST_LAYER=postgres cargo test --locked -p pw-dev-server -- tests::argument_invariants:: 2>&1 | grep -E '^(test |test result)|panicked at'; \
        else echo "skipped: PW_STORE_DATABASE_URL is not set"; fi; \
        echo; echo "== the browser (e2e/argument-invariants.spec.mjs), three engines"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/argument-invariants.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/argument-invariants.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/argument_invariants_mutations.py)"; echo; \
        python3 scripts/argument_invariants_mutations.py; \
      } > docs/evidence/E14/argument-invariants.txt

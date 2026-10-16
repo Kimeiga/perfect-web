@@ -56,9 +56,7 @@ e14-payments:
        echo; echo "== the reader pays in the provider's page, in three engines (e2e/payments.spec.mjs)"; echo; \
        BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null 2>&1; \
        cargo build --quiet --locked -p pw-dev-server -p kiokun-server; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/payments.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/payments.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/payments_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/payments_mutations.py; \
      } > docs/evidence/E14/payments.txt; \

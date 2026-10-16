@@ -159,7 +159,18 @@ def recipes() -> list[str]:
 
 IMPORT = re.compile(r"""^import\??\s+(['"])(.+?)\1""")
 
-HEADER = re.compile(r"^([a-z0-9][a-z0-9-]*)\s*(?:[^:=]*)?:(?!=)")
+# **A recipe's header**: its name, its parameters, each with its default
+# where it has one, and its colon (not `:=`, an assignment's). Until
+# 2026-10-15 a parameter's default stopped it (`[^:=]*` before the colon),
+# so `e10-browser engines="..." out="..."`, `e10-close-bench RUNS="8"` and
+# `e14-harness TASK="T08"` had no body here: no change planned them by what
+# they run, and a shard dealt one set up neither browsers nor the build
+# (track evidence-integrity-2).
+HEADER = re.compile(
+    r"""^([a-z0-9][a-z0-9-]*)"""
+    r"""(?:\s+[$*+]?[A-Za-z_][A-Za-z0-9_-]*(?:=(?:"[^"]*"|'[^']*'|[^\s'":=]+))?)*"""
+    r"""\s*:(?!=)"""
+)
 
 
 def justfile_parts(root: pathlib.Path = ROOT) -> list[str]:
@@ -267,9 +278,75 @@ def parsed(diff: bytes) -> dict[str, list[tuple[int, int]]]:
     return out
 
 
-def changed_specs(changed: dict[str, list[tuple[int, int]]]) -> set[str]:
-    """The browser specs a change reaches, by file name: `pages.spec.mjs`."""
-    return {pathlib.Path(p).name for p in changed if p.endswith(".spec.mjs")}
+def changed_specs(changed: dict[str, list[tuple[int, int]]], root: pathlib.Path | None = None) -> set[str]:
+    """The browser specs a change reaches, by file name: `pages.spec.mjs`;
+    and each spec that imports a module of its own directory the change
+    reaches (`e2e/accessibility-rules.mjs`, which three specs import: until
+    2026-10-15 a change to it planned nothing, track evidence-integrity-2)."""
+    root = root or ROOT
+    out = {pathlib.Path(p).name for p in changed if p.endswith(".spec.mjs")}
+    for p in changed:
+        path = pathlib.Path(p)
+        if p.endswith(".spec.mjs") or path.suffix != ".mjs" or not (root / path.parent).is_dir():
+            continue
+        for spec in sorted((root / path.parent).glob("*.spec.mjs")):
+            try:
+                text = spec.read_text()
+            except OSError:
+                continue
+            if re.search(rf"""from\s+["']\./{re.escape(path.name)}["']""", text):
+                out.add(spec.name)
+    return out
+
+
+# **The browser suite's configuration** (the integrator's ruling 7,
+# 2026-10-15): every spec run from its directory runs under it, its hosts and
+# its checks of the builds, so a change to it plans each recipe that runs a
+# suite there, as a changed spec plans those that run it (ADR-0281). Until
+# then a change to it planned only a recipe whose mutant's anchor sat near
+# the change (track evidence-integrity's finding). The benchmark harness's
+# is under `benchmarks/`, whose changes plan each recipe that names it
+# (`body_inputs`).
+SUITE_DIRECTORY = "spikes/own-renderer"
+PLAYWRIGHT_CONFIG = f"{SUITE_DIRECTORY}/playwright.config.mjs"
+
+
+def suite_runs(body: str) -> list[tuple[str, str]]:
+    """Each browser suite a recipe's own lines run: (the directory it runs
+    from, its command), by `scripts/run_suite.sh` (from `spikes/own-renderer`
+    unless its `-C` names another directory) or after a `cd`."""
+    out = []
+    for line in body.replace("\\\n", " ").splitlines():
+        for options, command in re.findall(r"run_suite\.sh((?:\s+(?:-C|--runs)\s+\S+)*)\s+--\s+([^;]*)", line):
+            where = re.search(r"-C\s+(\S+)", options)
+            out.append(((where.group(1) if where else SUITE_DIRECTORY).rstrip("/"), command))
+        for directory, command in re.findall(r"cd\s+(\S+)\s+&&\s+([^;|)]*playwright\s+test[^;|)]*)", line):
+            out.append((directory.rstrip("/"), command))
+    return out
+
+
+def runs_browser_suite(body: str, directory: str = SUITE_DIRECTORY) -> bool:
+    """Whether a recipe runs a browser suite from `directory`, under its
+    configuration: in its own lines (`suite_runs`), or by a mutation script
+    it runs that runs Playwright and names the directory."""
+    if any(d == directory for d, _ in suite_runs(body)):
+        return True
+    for script in sorted(set(re.findall(r"scripts/([a-z0-9_]+_mutations\.py)", body))):
+        try:
+            text = (ROOT / "scripts" / script).read_text()
+        except OSError:
+            continue
+        if re.search(r'"playwright",\s*"test"|playwright\s+test', text) and re.search(
+            rf"""["']{re.escape(directory)}["']""", text
+        ):
+            return True
+    return False
+
+
+def runs_every_spec(body: str, directory: str = SUITE_DIRECTORY) -> bool:
+    """Whether a recipe's own lines run every spec of `directory`: a suite
+    run there that names no spec (`e10-browser`'s three full runs)."""
+    return any(d == directory and ".spec.mjs" not in command for d, command in suite_runs(body))
 
 
 def test_modules(changed: dict[str, list[tuple[int, int]]]) -> set[str]:
@@ -437,12 +514,18 @@ def recipes_for(changed: dict[str, list[tuple[int, int]]], near: int, names: lis
     specs = changed_specs(changed)
     tests = {pathlib.Path(p).stem for p in changed if "/tests/" in p and p.endswith(".rs")}
     modules = test_modules(changed)
+    every_spec = any(p.startswith(f"{SUITE_DIRECTORY}/e2e/") and p.endswith(".mjs") for p in changed)
     out = {
         name
         for name in names
         if any(f"scripts/{s}" in body.get(name, "") for s in scripts)
-        # A recipe that runs a browser spec the range changed (ADR-0281).
+        # A recipe that runs a browser spec the range changed (ADR-0281),
+        # by its name, or every spec of the suite.
         or any(s in body.get(name, "") for s in specs)
+        or (every_spec and runs_every_spec(body.get(name, "")))
+        # A recipe that runs a suite under the configuration the range
+        # changed (the integrator's ruling 7).
+        or (PLAYWRIGHT_CONFIG in changed and runs_browser_suite(body.get(name, "")))
         # And one that runs a server test module the range changed, by its
         # filter (train-6's finding).
         or any(f"tests::{t}::" in body.get(name, "") for t in tests)
@@ -620,9 +703,12 @@ def deal(
 
 def needs(body: str) -> tuple[bool, bool]:
     """What a recipe's shard must set up (ADR-0249): browsers, for one that
-    runs Playwright; the build, for one that runs it, or reads what it
-    makes: the servers, the store's pages, `pw` itself."""
-    browsers = "playwright" in body
+    runs Playwright, itself or by the benchmark's `bench.mjs`, whose
+    controls grade each stack in a browser (track evidence-integrity-2: a
+    control that fails now fails its recipe); the build, for one that runs
+    it, or reads what it makes: the servers, the store's pages, `pw`
+    itself."""
+    browsers = "playwright" in body or "bench.mjs" in body
     build = browsers or bool(re.search(r"run\.sh|feed\.sh|keyed-store\.sh|target/debug/", body))
     return browsers, build
 

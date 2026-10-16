@@ -23,6 +23,23 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0349, 2026-10-15: a failed suite fails its recipe** (train-10,
+from `3adbfe44`). Browser suites and benchmark controls propagate their
+failures through one helper; no-test runs fail. The planner follows suite
+configuration and helper imports. Mutated programs cover all roots, codes
+are compared as written, and E2D is held current. The worker's full ci was
+green: 2,890 Rust tests passed, 25 ignored; Python 214 passed, 2 skipped.
+Its five whole mutation scripts killed 158/158; behavioral injection
+covered 139 suite failures and 194 build failures. Parent integration
+updates the reviews, guide, argument and scheduling recipes. Raw worker
+evidence: [evidence-integrity-2](evidence/E14/evidence-integrity-2.txt).
+Integrated Python passes 221 tests with 2 intentional skips; guide 15/15,
+both strict-code tests and all 35 mutation controls pass. Behavioral
+injection covers 143 suite failures and 203 build failures. Corpus evidence
+is current at 79/79.
+[Integration commands and raw results](evidence/E14/train10-evidence-integrity.txt).
+Full assembled CI, verification and quiet-host latency remain pending.
+
 **ADR-0347 and ADR-0348, 2026-10-15: scheduled orders and batched
 estimates** (train-10, from `40e81d51` plus integration repairs). Windows
 use every store's ASAP admission rule at its send instant. Orders are paid
@@ -77,7 +94,9 @@ track `guide`, merged from `49967631`, with the integrator's rulings of
   which a browser test drives in three engines. Where the checks fall
   short, a gap is an example the test holds open, and turns red when the
   compiler closes it: three programs `pw check` passes and `pw build`
-  refuses, an `<img>` with no `alt`, and `&&`'s message.
+  refuses and an `<img>` with no `alt`. Train-10 closes the unchecked
+  each-head effects and improves `&&`'s message; the guide now requires
+  PW0401 for that effectful head and retains a pure computed-list build gap.
 - On the train: the reference regenerated for ADR-0340's three codes
   (199), the guide's test 15 of 15 and its generator's 7 of 7. The track's
   own runs: `guide_mutations.py` 74 of 74 and its recipe green locally;

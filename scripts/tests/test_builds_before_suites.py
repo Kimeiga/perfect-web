@@ -53,6 +53,9 @@ case "$name $*" in
   "psql"*) echo "18.0" ;;
   *)
     echo "test stand_in ... ok"
+    echo "test_stand_in ... ok"
+    echo "Ran 1 test"
+    echo "OK"
     echo "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out"
     echo "  ✓  1 [chromium] › stand-in"
     echo "  1 passed (0.1s)"
@@ -61,28 +64,46 @@ case "$name $*" in
     echo "1 of 1 mutants killed"
     echo "memory bound: no process was stopped"
     echo "page  stand-in domain.display"
+    echo "0 ERRORS 0 WARNINGS"
+    echo "ok 1 - stand-in"
     ;;
 esac
 if [ "$n" = "${STUB_FAIL_AT:-0}" ]; then
   echo "stand-in: $name $* fails" >&2
+  # What a failed suite says, where the caller asks for it.
+  if [ -n "${STUB_FAIL_SAYS:-}" ]; then printf '%s\n' "$STUB_FAIL_SAYS"; fi
   exit 9
 fi
 exit 0
 """
 PROGRAMS = ("cargo", "pnpm", "python3", "node", "rustc", "psql", "git", "npx")
-BUILD_SCRIPTS = ("run.sh", "feed.sh", "keyed-store.sh", "kiokun-site.sh", "baseline-store.sh")
+BUILD_SCRIPTS = ("run.sh", "feed.sh", "keyed-store.sh", "kiokun-site.sh", "baseline-store.sh", "guestbook.sh")
 SUITE = re.compile(r"playwright test")
 
 # A call: the program's name, where it ran from, and its arguments.
 Call = tuple[str, str, str]
 
 
+def serves_dist(body: str) -> bool:
+    """Whether a recipe runs the browser suite that serves `dist`:
+    Playwright, run by `scripts/run_suite.sh` from its own directory
+    (`spikes/own-renderer`, unless `-C` names another: the benchmark
+    harness's serves its own builds), or from that directory itself."""
+    if not SUITE.search(body):
+        return False
+    if "cd spikes/own-renderer" in body:
+        return True
+    for options in re.findall(r"run_suite\.sh((?:\s+(?:-C|--runs)\s+\S+)*)\s+--\s", body):
+        where = re.search(r"-C\s+(\S+)", options)
+        if where is None or where.group(1).rstrip("/") == "spikes/own-renderer":
+            return True
+    return False
+
+
 def suites(source: pathlib.Path = ROOT) -> list[str]:
     """Every recipe that runs the browser suite that serves `dist`, in every
     part of the justfile."""
-    return sorted(
-        n for n, b in ci_plan.bodies(source).items() if SUITE.search(b) and "cd spikes/own-renderer" in b
-    )
+    return sorted(n for n, b in ci_plan.bodies(source).items() if serves_dist(b))
 
 
 def is_build(call: Call) -> bool:
@@ -106,11 +127,35 @@ def run(recipe: str, fail_at: int = 0, source: pathlib.Path = ROOT) -> tuple[int
     """`recipe`, from `source`'s justfile and its imports, run by `just` in a
     tree of its own, its calls stood in for: (its exit status, its calls in
     order, what it said)."""
+    status, calls, said, _ = run_full(recipe, fail_at, source)
+    return status, calls, said
+
+
+# The repository's directories, without their files: a recipe that runs
+# from one (`cd benchmarks/harness`) finds it.
+DIRECTORIES = sorted(
+    {
+        str(pathlib.Path(p).parent)
+        for p in subprocess.run(
+            ["git", "ls-files"], cwd=ROOT, capture_output=True, text=True, check=True
+        ).stdout.splitlines()
+    }
+    - {"."}
+)
+
+
+def run_full(
+    recipe: str, fail_at: int = 0, source: pathlib.Path = ROOT, fail_says: str = ""
+) -> tuple[int, list[Call], str, dict[str, str]]:
+    """`run`, and each evidence file the recipe left, by its path, with its
+    text. The `fail_at`th call says `fail_says` as it fails."""
     with tempfile.TemporaryDirectory(prefix="pw-builds-") as d:
         root = pathlib.Path(d)
+        for directory in DIRECTORIES:
+            (root / directory).mkdir(parents=True, exist_ok=True)
         shutil.copy(source / "justfile", root / "justfile")
         if (source / "just").is_dir():
-            shutil.copytree(source / "just", root / "just")
+            shutil.copytree(source / "just", root / "just", dirs_exist_ok=True)
         # The programs, the build scripts, and what a build leaves that a
         # recipe runs or reads by its path.
         for where, names in (
@@ -123,9 +168,14 @@ def run(recipe: str, fail_at: int = 0, source: pathlib.Path = ROOT) -> tuple[int
             for name in names:
                 (where / name).write_text(STUB)
                 (where / name).chmod(0o755)
-        (root / "scripts").mkdir()
+        # The helper every suite runs by (track evidence-integrity-2), as the
+        # tree under test holds it.
+        (root / "scripts").mkdir(exist_ok=True)
+        helper = source / "scripts/run_suite.sh"
+        shutil.copy(helper if helper.exists() else ROOT / "scripts/run_suite.sh", root / "scripts/run_suite.sh")
         # Where the recipes write their evidence, as the repository holds it,
-        # and what one reads that no build makes: the kiokun shards' manifests.
+        # and what one reads that no build makes: the kiokun shards' manifests,
+        # and a benchmark run's result for each task (`e14-harness` lists them).
         for d in (ROOT / "docs/evidence").iterdir():
             if d.is_dir():
                 (root / "docs/evidence" / d.name).mkdir(parents=True, exist_ok=True)
@@ -133,6 +183,13 @@ def run(recipe: str, fail_at: int = 0, source: pathlib.Path = ROOT) -> tuple[int
             copy = root / manifest.relative_to(ROOT)
             copy.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy(manifest, copy)
+        (root / "benchmarks/results").mkdir(parents=True, exist_ok=True)
+        for task in (ROOT / "benchmarks/tasks").glob("T*"):
+            (root / "benchmarks/results" / f"{task.name[:3]}-stand-in.json").write_text("{}\n")
+        # And the harness's Playwright, whose version `e14-contract` names.
+        package = root / "benchmarks/harness/node_modules/@playwright/test/package.json"
+        package.parent.mkdir(parents=True, exist_ok=True)
+        package.write_text('{"version": "0.0.0"}\n')
         log = root / "calls.tsv"
         log.write_text("")
         env = {
@@ -143,6 +200,7 @@ def run(recipe: str, fail_at: int = 0, source: pathlib.Path = ROOT) -> tuple[int
         env.update(
             STUB_LOG=str(log),
             STUB_FAIL_AT=str(fail_at),
+            STUB_FAIL_SAYS=fail_says,
             NO_COLOR="1",
             # The recipes on a database skip without one.
             PW_STORE_DATABASE_URL="postgresql://stand-in/store",
@@ -162,7 +220,12 @@ def run(recipe: str, fail_at: int = 0, source: pathlib.Path = ROOT) -> tuple[int
         for line in log.read_text().splitlines():
             name, cwd, args = (line.split("\t", 2) + ["", ""])[:3]
             calls.append((name, cwd, args))
-        return out.returncode, calls, out.stdout + out.stderr
+        evidence = {
+            str(p.relative_to(root)): p.read_text(errors="replace")
+            for p in (root / "docs/evidence").rglob("*")
+            if p.is_file()
+        }
+        return out.returncode, calls, out.stdout + out.stderr, evidence
 
 
 def shown(call: Call) -> str:
