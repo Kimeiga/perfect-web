@@ -1,0 +1,525 @@
+produced by: python3 scripts/generic_effects_programs.py --pw /tmp/generic-effects/7fb47665-pw --baseline-pw /tmp/generic-effects/22a0508e-pw --baseline-ref 22a0508e
+commit: 1e8b1ccdee54ed7b0437e06575c4a5d9e6ac0ff3
+baseline ref: 22a0508e
+baseline binary: /tmp/generic-effects/22a0508e-pw SHA256 d52d080db1b63c578e4cdb666e7af0449fb3223607dbc2730eb86e43681908ef
+current binary: /tmp/generic-effects/7fb47665-pw SHA256 89658aa864861c956ee22bcbbba1d521d94095b2b5f582257e3b1dbf06be2a84
+Each program checked using both binaries, against identical current source files.
+Coverage: 562 .pw files, 441 program sets, 99 clean after, 31 diagnostic sets changed.
+All tracked and new .pw files covered; original historical sources are retained.
+
+streamed
+  ADDED error: [PW0408] the type of `item` is not known here, so what `.name` reads cannot be checked @ app.pw:38:34
+examples/rejected/R-090-a-generic-result-cannot-hide-a-views-member-effect.pw
+  ADDED error: [PW0401] `Names` performs `database.read<GenericItem>`, which a view may not do @ R-090-a-generic-result-cannot-hide-a-views-member-effect.pw:23:18
+examples/rejected/R-091-a-generic-result-cannot-hide-a-functions-member-effect.pw
+  ADDED error: [PW0400] `first` performs `database.read<GenericItem>` but does not declare it @ R-091-a-generic-result-cannot-hide-a-functions-member-effect.pw:21:16
+examples/rejected/R-092-a-member-read-needs-a-known-receiver.pw
+  ADDED error: [PW0408] the type of `item` is not known here, so what `.label` reads cannot be checked @ R-092-a-member-read-needs-a-known-receiver.pw:20:23
+examples/rejected/R-093-a-rigid-parameter-declares-no-members.pw
+  ADDED error: [PW0610] `T` has no member `label` @ R-093-a-rigid-parameter-declares-no-members.pw:20:5
+examples/rejected/R-094-a-function-value-receiver-keeps-its-effect.pw
+  ADDED error: [PW0401] `Show` performs `database.read<Item>`, which a view may not do @ R-094-a-function-value-receiver-keeps-its-effect.pw:19:23
+examples/rejected/R-095-a-recursive-generic-invocation-keeps-its-effect.pw
+  ADDED error: [PW0400] `first` performs `database.read<RecursiveItem>` but does not declare it @ R-095-a-recursive-generic-invocation-keeps-its-effect.pw:19:20
+examples/generality/forbidden_effect/function-receiver.pw
+  ADDED error: [PW0401] `Show` performs `database.read<Item>`, which a view may not do @ function-receiver.pw:14:23
+examples/generality/forbidden_effect/generic-result.pw
+  ADDED error: [PW0401] `Names` performs `database.read<GenericItem>`, which a view may not do @ generic-result.pw:20:18
+examples/generality/member_receiver_untyped/caught.pw
+  ADDED error: [PW0408] the type of `item` is not known here, so what `.name` reads cannot be checked @ caught.pw:17:31
+examples/generality/undeclared_effect/enclosing-generic.pw
+  ADDED error: [PW0400] `inspect` performs `database.read<Enclosed>` but does not declare it @ enclosing-generic.pw:15:9
+examples/generality/undeclared_effect/generic-result.pw
+  ADDED error: [PW0400] `first` performs `database.read<GenericItem>` but does not declare it @ generic-result.pw:16:23
+examples/generality/unknown_member/rigid-parameter.pw
+  ADDED error: [PW0610] `T` has no member `name` @ rigid-parameter.pw:10:5
+examples/rules/resume/loop-capture-untyped.pw
+  ADDED error: [PW0408] the type of `item` is not known here, so what `.id` reads cannot be checked @ loop-capture-untyped.pw:28:74
+examples/history/C0/R-001-network-request-inside-view.pw
+  ADDED error: [PW0408] the type of `store` is not known here, so what `.name` reads cannot be checked @ R-001-network-request-inside-view.pw:19:16
+examples/history/C0/R-004-private-cart-in-shared-cache.pw
+  ADDED error: [PW0408] the type of `cart` is not known here, so what `.line_count` reads cannot be checked @ R-004-private-cart-in-shared-cache.pw:26:32
+  ADDED error: [PW0408] the type of `store` is not known here, so what `.name` reads cannot be checked @ R-004-private-cart-in-shared-cache.pw:24:18
+examples/history/C0/R-010-nonserializable-handler-capture.pw
+  ADDED error: [PW0408] the type of `connection` is not known here, so what `.flush` reads cannot be checked @ R-010-nonserializable-handler-capture.pw:19:59
+examples/history/C0/R-030-private-data-in-resume-manifest.pw
+  ADDED error: [PW0408] the type of `cart` is not known here, so what `.id` reads cannot be checked @ R-030-private-data-in-resume-manifest.pw:19:66
+  ADDED error: [PW0408] the type of `cart` is not known here, so what `.line_count` reads cannot be checked @ R-030-private-data-in-resume-manifest.pw:21:24
+examples/history/C0/R-041-custom-paint-mutates-document.pw
+  ADDED error: [PW0408] the type of this value is not known here, so what `.set_text` reads cannot be checked @ R-041-custom-paint-mutates-document.pw:19:9
+examples/history/C8/A-015-phase-scheduled-measure-then-mutate.pw
+  ADDED error: [PW0408] the type of `anchor` is not known here, so what `.bounds` reads cannot be checked @ A-015-phase-scheduled-measure-then-mutate.pw:20:51
+  ADDED error: [PW0408] the type of `box` is not known here, so what `.bottom` reads cannot be checked @ A-015-phase-scheduled-measure-then-mutate.pw:22:53
+  ADDED error: [PW0408] the type of `box` is not known here, so what `.x` reads cannot be checked @ A-015-phase-scheduled-measure-then-mutate.pw:22:46
+examples/history/C8/A-016-multiple-measures-share-one-layout-snapshot.pw
+  ADDED error: [PW0408] the type of `it` is not known here, so what `.width` reads cannot be checked @ A-016-multiple-measures-share-one-layout-snapshot.pw:22:38
+examples/history/C8/A-017-batched-layout-affecting-mutations.pw
+  ADDED error: [PW0408] the type of `badge.style` is not known here, so what `.set_width` reads cannot be checked @ A-017-batched-layout-affecting-mutations.pw:21:17
+  ADDED error: [PW0408] the type of `badge` is not known here, so what `.style` reads cannot be checked @ A-017-batched-layout-affecting-mutations.pw:21:17
+  ADDED error: [PW0408] the type of `badges` is not known here, so what `.length` reads cannot be checked @ A-017-batched-layout-affecting-mutations.pw:18:76
+examples/history/C8/A-018-resize-observation-updates-derived-state.pw
+  ADDED error: [PW0408] the type of `item` is not known here, so what `.name` reads cannot be checked @ A-018-resize-observation-updates-derived-state.pw:23:22
+examples/history/C8/A-023-semantically-independent-contained-subtree.pw
+  ADDED error: [PW0408] the type of `row` is not known here, so what `.name` reads cannot be checked @ A-023-semantically-independent-contained-subtree.pw:29:30
+  ADDED error: [PW0408] the type of `row` is not known here, so what `.status` reads cannot be checked @ A-023-semantically-independent-contained-subtree.pw:29:49
+examples/history/C8/R-018-unkeyed-mutable-list.pw
+  ADDED error: [PW0408] the type of `line` is not known here, so what `.item_name` reads cannot be checked @ R-018-unkeyed-mutable-list.pw:20:18
+  ADDED error: [PW0408] the type of `line` is not known here, so what `.quantity` reads cannot be checked @ R-018-unkeyed-mutable-list.pw:20:36
+examples/history/C8/R-028-subscription-outlives-component-scope.pw
+  ADDED error: [PW0408] the type of `progress` is not known here, so what `.stage_label` reads cannot be checked @ R-028-subscription-outlives-component-scope.pw:21:38
+examples/history/C8/R-033-geometry-read-during-render.pw
+  ADDED error: [PW0408] the type of `item` is not known here, so what `.name` reads cannot be checked @ R-033-geometry-read-during-render.pw:21:59
+  ADDED error: [PW0408] the type of `items` is not known here, so what `.length` reads cannot be checked @ R-033-geometry-read-during-render.pw:21:42
+examples/history/C8/R-035-layout-write-during-measure-phase.pw
+  ADDED error: [PW0408] the type of `it.style` is not known here, so what `.set_padding` reads cannot be checked @ R-035-layout-write-during-measure-phase.pw:25:17
+  ADDED error: [PW0408] the type of `it` is not known here, so what `.style` reads cannot be checked @ R-035-layout-write-during-measure-phase.pw:25:17
+  ADDED error: [PW0408] the type of `it` is not known here, so what `.width` reads cannot be checked @ R-035-layout-write-during-measure-phase.pw:26:17
+examples/history/C8/R-036-measure-helper-hides-forbidden-geometry-read.pw
+  ADDED error: [PW0408] the type of `anchor` is not known here, so what `.offsetWidth` reads cannot be checked @ R-036-measure-helper-hides-forbidden-geometry-read.pw:19:5
+examples/history/C8/R-043-containment-with-cross-boundary-layout-dependency.pw
+  ADDED error: [PW0408] the type of `row` is not known here, so what `.name` reads cannot be checked @ R-043-containment-with-cross-boundary-layout-dependency.pw:28:57
+examples/history/C8/rules/annotations/option-matched-first.pw
+  ADDED error: [PW0408] the type of `s` is not known here, so what `.name` reads cannot be checked @ option-matched-first.pw:13:20
+
+Every program after:
+packages: exit 0, 0 diagnostics
+accepted: exit 0, 0 diagnostics
+store: exit 0, 0 diagnostics
+demo: exit 0, 0 diagnostics
+kiokun: exit 0, 0 diagnostics
+kiokun-site: exit 0, 0 diagnostics
+feed: exit 0, 0 diagnostics
+counter: exit 1, 1 diagnostics
+hello-static: exit 0, 0 diagnostics
+koka: exit 0, 0 diagnostics
+render: exit 0, 0 diagnostics
+streamed: exit 1, 6 diagnostics
+benchmark-pleris: exit 0, 0 diagnostics
+examples/rejected/R-001-network-request-inside-view.pw: exit 1, 1 diagnostics
+examples/rejected/R-002-database-access-in-browser.pw: exit 1, 1 diagnostics
+examples/rejected/R-003-secret-serialized-to-browser.pw: exit 1, 1 diagnostics
+examples/rejected/R-004-private-cart-in-shared-cache.pw: exit 1, 1 diagnostics
+examples/rejected/R-005-cross-tenant-cache-key-missing-tenant.pw: exit 1, 1 diagnostics
+examples/rejected/R-006-public-log-of-secret-value.pw: exit 1, 1 diagnostics
+examples/rejected/R-007-unhandled-ADT-variant.pw: exit 1, 1 diagnostics
+examples/rejected/R-008-ambient-null-assumption.pw: exit 1, 1 diagnostics
+examples/rejected/R-009-unchecked-external-cast.pw: exit 1, 1 diagnostics
+examples/rejected/R-010-nonserializable-handler-capture.pw: exit 1, 1 diagnostics
+examples/rejected/R-011-open-transaction-not-committed-or-rolled-back.pw: exit 1, 2 diagnostics
+examples/rejected/R-012-affine-resource-leaked.pw: exit 1, 1 diagnostics
+examples/rejected/R-013-detached-ordinary-task.pw: exit 1, 1 diagnostics
+examples/rejected/R-014-retry-of-non-idempotent-command.pw: exit 1, 1 diagnostics
+examples/rejected/R-015-unbounded-retry.pw: exit 1, 1 diagnostics
+examples/rejected/R-016-nondeterministic-static-render.pw: exit 1, 1 diagnostics
+examples/rejected/R-017-wall-clock-read-in-shared-deterministic-materialization.pw: exit 1, 1 diagnostics
+examples/rejected/R-018-unkeyed-mutable-list.pw: exit 1, 1 diagnostics
+examples/rejected/R-019-invalid-HTML-nesting.pw: exit 1, 1 diagnostics
+examples/rejected/R-020-button-behavior-implemented-on-inaccessible-div.pw: exit 1, 1 diagnostics
+examples/rejected/R-021-label-missing-from-form-control.pw: exit 1, 1 diagnostics
+examples/rejected/R-022-form-handler-type-mismatch.pw: exit 1, 1 diagnostics
+examples/rejected/R-023-dead-internal-route.pw: exit 1, 1 diagnostics
+examples/rejected/R-024-raw-unsafe-HTML-without-capability.pw: exit 1, 1 diagnostics
+examples/rejected/R-025-browser-only-API-on-origin.pw: exit 1, 1 diagnostics
+examples/rejected/R-026-server-secret-referenced-by-edge-artifact.pw: exit 1, 1 diagnostics
+examples/rejected/R-027-query-key-changes-without-stale-work-cancellation-policy.pw: exit 1, 1 diagnostics
+examples/rejected/R-028-subscription-outlives-component-scope.pw: exit 1, 1 diagnostics
+examples/rejected/R-029-optimistic-state-with-no-rollback-path.pw: exit 1, 6 diagnostics
+examples/rejected/R-030-private-data-in-resume-manifest.pw: exit 1, 1 diagnostics
+examples/rejected/R-031-unsafe-escape-hatch-without-justification.pw: exit 1, 1 diagnostics
+examples/rejected/R-032-synchronous-geometry-read-in-ordinary-code.pw: exit 1, 1 diagnostics
+examples/rejected/R-033-geometry-read-during-render.pw: exit 1, 1 diagnostics
+examples/rejected/R-034-layout-read-after-layout-affecting-write.pw: exit 1, 1 diagnostics
+examples/rejected/R-035-layout-write-during-measure-phase.pw: exit 1, 1 diagnostics
+examples/rejected/R-036-measure-helper-hides-forbidden-geometry-read.pw: exit 1, 1 diagnostics
+examples/rejected/R-037-generic-callback-smuggles-layout-measure.pw: exit 1, 1 diagnostics
+examples/rejected/R-038-resize-observer-layout-feedback-cycle.pw: exit 1, 1 diagnostics
+examples/rejected/R-039-intersection-observer-unscoped-subscription.pw: exit 1, 1 diagnostics
+examples/rejected/R-040-layout-affecting-operation-in-compositor-animation.pw: exit 1, 1 diagnostics
+examples/rejected/R-041-custom-paint-mutates-document.pw: exit 1, 2 diagnostics
+examples/rejected/R-042-post-paint-same-frame-layout-measure.pw: exit 1, 1 diagnostics
+examples/rejected/R-043-containment-with-cross-boundary-layout-dependency.pw: exit 1, 1 diagnostics
+examples/rejected/R-044-unaudited-imperative-dom-escape.pw: exit 1, 2 diagnostics
+examples/rejected/R-045-private-dependency-of-shared-materialization.pw: exit 1, 1 diagnostics
+examples/rejected/R-046-materialization-listens-for-an-undeclared-event.pw: exit 1, 1 diagnostics
+examples/rejected/R-047-page-without-a-title.pw: exit 1, 1 diagnostics
+examples/rejected/R-048-title-in-a-view.pw: exit 1, 1 diagnostics
+examples/rejected/R-049-duplicate-id.pw: exit 1, 1 diagnostics
+examples/rejected/R-050-reference-names-nothing.pw: exit 1, 1 diagnostics
+examples/rejected/R-051-unknown-aria-attribute.pw: exit 1, 1 diagnostics
+examples/rejected/R-052-metadata-in-a-view.pw: exit 1, 1 diagnostics
+examples/rejected/R-053-a-link-the-head-holds-in-markup.pw: exit 1, 2 diagnostics
+examples/rejected/R-054-a-type-no-finite-value-has.pw: exit 1, 1 diagnostics
+examples/rejected/R-055-a-case-named-in-lowercase.pw: exit 1, 1 diagnostics
+examples/rejected/R-056-a-misspelt-case-in-a-pattern.pw: exit 1, 1 diagnostics
+examples/rejected/R-057-a-selects-value-written-as-an-attribute.pw: exit 1, 1 diagnostics
+examples/rejected/R-058-a-computed-value-that-reads-the-clock.pw: exit 1, 1 diagnostics
+examples/rejected/R-059-a-condition-that-tests-a-number.pw: exit 1, 1 diagnostics
+examples/rejected/R-060-a-secret-kept-in-a-shared-fragment.pw: exit 1, 1 diagnostics
+examples/rejected/R-061-a-session-fragment-built-before-any-request.pw: exit 1, 1 diagnostics
+examples/rejected/R-062-a-session-read-through-a-built-pages-own-query.pw: exit 1, 2 diagnostics
+examples/rejected/R-063-a-canonical-address-written-as-text.pw: exit 1, 2 diagnostics
+examples/rejected/R-064-a-private-querys-record-in-a-public-manifest.pw: exit 1, 1 diagnostics
+examples/rejected/R-065-a-users-query-record-in-a-public-manifest.pw: exit 1, 1 diagnostics
+examples/rejected/R-066-a-load-from-another-origin.pw: exit 1, 1 diagnostics
+examples/rejected/R-067-a-schedule-that-names-a-command-the-clock-does-not-invoke.pw: exit 1, 1 diagnostics
+examples/rejected/R-068-a-schedule-written-outside-a-command.pw: exit 1, 1 diagnostics
+examples/rejected/R-069-a-run-scheduled-at-what-is-no-instant.pw: exit 1, 1 diagnostics
+examples/rejected/R-070-a-command-the-platform-invokes-that-requires-a-reader.pw: exit 1, 1 diagnostics
+examples/rejected/R-071-a-payments-command-given-what-is-no-settled-payment.pw: exit 1, 1 diagnostics
+examples/rejected/R-072-two-commands-a-payments-outcome-invokes.pw: exit 1, 1 diagnostics
+examples/rejected/R-073-a-page-that-presses-a-command-the-platform-invokes.pw: exit 1, 1 diagnostics
+examples/rejected/R-074-a-command-the-platform-invokes-with-no-key.pw: exit 1, 1 diagnostics
+examples/rejected/R-090-a-generic-result-cannot-hide-a-views-member-effect.pw: exit 1, 1 diagnostics
+examples/rejected/R-091-a-generic-result-cannot-hide-a-functions-member-effect.pw: exit 1, 1 diagnostics
+examples/rejected/R-092-a-member-read-needs-a-known-receiver.pw: exit 1, 1 diagnostics
+examples/rejected/R-093-a-rigid-parameter-declares-no-members.pw: exit 1, 1 diagnostics
+examples/rejected/R-094-a-function-value-receiver-keeps-its-effect.pw: exit 1, 1 diagnostics
+examples/rejected/R-095-a-recursive-generic-invocation-keeps-its-effect.pw: exit 1, 1 diagnostics
+examples/generality/affine_not_consumed_once/both-branches-release.pw: exit 0, 0 diagnostics
+examples/generality/affine_not_consumed_once/bound-to-underscore.pw: exit 1, 1 diagnostics
+examples/generality/affine_not_consumed_once/caught-match.pw: exit 1, 1 diagnostics
+examples/generality/affine_not_consumed_once/caught.pw: exit 1, 1 diagnostics
+examples/generality/affine_not_consumed_once/component-release-ends-nothing.pw: exit 1, 1 diagnostics
+examples/generality/affine_not_consumed_once/derived-value-escapes.pw: exit 0, 0 diagnostics
+examples/generality/affine_not_consumed_once/dropped-by-a-statement.pw: exit 1, 1 diagnostics
+examples/generality/affine_not_consumed_once/ended-where-made.pw: exit 0, 0 diagnostics
+examples/generality/affine_not_consumed_once/escapes.pw: exit 1, 1 diagnostics
+examples/generality/affine_not_consumed_once/given-to-a-helper.pw: exit 1, 1 diagnostics
+examples/generality/affine_not_consumed_once/held-behind-try-and-destroyed.pw: exit 0, 0 diagnostics
+examples/generality/affine_not_consumed_once/held-behind-try.pw: exit 1, 1 diagnostics
+examples/generality/affine_not_consumed_once/live-across-try.pw: exit 1, 1 diagnostics
+examples/generality/affine_not_consumed_once/moved-to-the-caller.pw: exit 0, 0 diagnostics
+examples/generality/affine_not_consumed_once/never-released.pw: exit 1, 1 diagnostics
+examples/generality/affine_not_consumed_once/parameter-not-released.pw: exit 1, 1 diagnostics
+examples/generality/affine_not_consumed_once/parameter-released.pw: exit 0, 0 diagnostics
+examples/generality/affine_not_consumed_once/release-ends-nothing.pw: exit 1, 1 diagnostics
+examples/generality/affine_not_consumed_once/released-before-return.pw: exit 0, 0 diagnostics
+examples/generality/affine_not_consumed_once/released-in-a-loop.pw: exit 1, 1 diagnostics
+examples/generality/affine_not_consumed_once/released-twice.pw: exit 1, 1 diagnostics
+examples/generality/affine_not_consumed_once/returned-by-a-function-value.pw: exit 1, 1 diagnostics
+examples/generality/affine_not_consumed_once/unit-body-drops-its-value.pw: exit 1, 1 diagnostics
+examples/generality/aria_unknown/caught.pw: exit 1, 1 diagnostics
+examples/generality/aria_unknown/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/cache_key_omits_partition/caught.pw: exit 1, 1 diagnostics
+examples/generality/cache_key_omits_partition/key-variation.pw: exit 1, 1 diagnostics
+examples/generality/cache_key_omits_partition/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/canonical_address/caught.pw: exit 1, 1 diagnostics
+examples/generality/canonical_address/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/case_name_capitalized/caught.pw: exit 1, 1 diagnostics
+examples/generality/case_name_capitalized/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/control_without_label/caught.pw: exit 1, 1 diagnostics
+examples/generality/control_without_label/id-alone.pw: exit 1, 1 diagnostics
+examples/generality/control_without_label/label-for-another.pw: exit 1, 1 diagnostics
+examples/generality/control_without_label/labelledby-heading.pw: exit 0, 0 diagnostics
+examples/generality/control_without_label/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/control_without_label/wrapped.pw: exit 0, 0 diagnostics
+examples/generality/dead_internal_link/caught.pw: exit 1, 1 diagnostics
+examples/generality/dead_internal_link/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/declared_placement_cannot_grant/browser-can-grant-device.pw: exit 0, 0 diagnostics
+examples/generality/declared_placement_cannot_grant/caught.pw: exit 1, 1 diagnostics
+examples/generality/declared_placement_cannot_grant/direct.pw: exit 1, 1 diagnostics
+examples/generality/declared_placement_cannot_grant/helper-chain.pw: exit 1, 1 diagnostics
+examples/generality/declared_placement_cannot_grant/origin-can-grant-secret.pw: exit 0, 0 diagnostics
+examples/generality/derived_not_pure/caught.pw: exit 1, 1 diagnostics
+examples/generality/derived_not_pure/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/duplicate_id/caught.pw: exit 1, 1 diagnostics
+examples/generality/duplicate_id/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/false_independence/caught.pw: exit 1, 1 diagnostics
+examples/generality/false_independence/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/forbidden_effect/build-page-clock.pw: exit 1, 1 diagnostics
+examples/generality/forbidden_effect/caught.pw: exit 1, 1 diagnostics
+examples/generality/forbidden_effect/function-receiver.pw: exit 1, 1 diagnostics
+examples/generality/forbidden_effect/generic-result.pw: exit 1, 1 diagnostics
+examples/generality/forbidden_effect/handler-may-fetch.pw: exit 0, 0 diagnostics
+examples/generality/forbidden_effect/named-callback.pw: exit 1, 1 diagnostics
+examples/generality/forbidden_effect/page-may-read-clock.pw: exit 0, 0 diagnostics
+examples/generality/forbidden_effect/painter.pw: exit 1, 2 diagnostics
+examples/generality/form_control_value/caught.pw: exit 1, 1 diagnostics
+examples/generality/form_control_value/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/graph_edge_unresolved/caught.pw: exit 1, 1 diagnostics
+examples/generality/graph_edge_unresolved/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/handler_on_inert/caught.pw: exit 1, 1 diagnostics
+examples/generality/handler_on_inert/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/handler_signature_mismatch/caught.pw: exit 1, 1 diagnostics
+examples/generality/handler_signature_mismatch/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/invalid_nesting/caught.pw: exit 1, 1 diagnostics
+examples/generality/invalid_nesting/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/invoked_command_not_idempotent/caught.pw: exit 1, 1 diagnostics
+examples/generality/invoked_command_not_idempotent/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/invoked_command_parameters/caught.pw: exit 1, 1 diagnostics
+examples/generality/invoked_command_parameters/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/invoked_command_pressed/caught.pw: exit 1, 1 diagnostics
+examples/generality/invoked_command_pressed/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/invoked_command_requires/caught.pw: exit 1, 1 diagnostics
+examples/generality/invoked_command_requires/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/invoked_twice/caught.pw: exit 1, 1 diagnostics
+examples/generality/invoked_twice/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/link_not_in_body/caught.pw: exit 1, 1 diagnostics
+examples/generality/link_not_in_body/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/load_from_another_origin/caught.pw: exit 1, 1 diagnostics
+examples/generality/load_from_another_origin/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/member_receiver_untyped/caught.pw: exit 1, 1 diagnostics
+examples/generality/member_receiver_untyped/typed-neighbour.pw: exit 0, 0 diagnostics
+examples/generality/metadata_misplaced/caught.pw: exit 1, 1 diagnostics
+examples/generality/metadata_misplaced/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/no_feasible_placement/caught.pw: exit 1, 1 diagnostics
+examples/generality/no_feasible_placement/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/no_finite_value/caught.pw: exit 1, 2 diagnostics
+examples/generality/no_finite_value/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/non_exhaustive_match/all-arms.pw: exit 0, 0 diagnostics
+examples/generality/non_exhaustive_match/caught.pw: exit 1, 1 diagnostics
+examples/generality/non_exhaustive_match/missing-one.pw: exit 1, 1 diagnostics
+examples/generality/non_exhaustive_match/or-pattern.pw: exit 1, 1 diagnostics
+examples/generality/non_exhaustive_match/wildcard-is-enough.pw: exit 0, 0 diagnostics
+examples/generality/observation_feedback_cycle/caught.pw: exit 1, 1 diagnostics
+examples/generality/observation_feedback_cycle/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/observation_feedback_cycle/property-choice.pw: exit 0, 0 diagnostics
+examples/generality/operand_type/caught.pw: exit 1, 1 diagnostics
+examples/generality/operand_type/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/optimistic_not_pure/caught.pw: exit 1, 1 diagnostics
+examples/generality/optimistic_not_pure/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/option_used_as_value/caught.pw: exit 1, 1 diagnostics
+examples/generality/option_used_as_value/nested.pw: exit 1, 1 diagnostics
+examples/generality/pattern_constructor/caught.pw: exit 1, 1 diagnostics
+examples/generality/pattern_constructor/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/private_in_resume_manifest/direct.pw: exit 1, 1 diagnostics
+examples/generality/private_in_resume_manifest/public-value.pw: exit 0, 0 diagnostics
+examples/generality/private_in_resume_manifest/rebound.pw: exit 1, 1 diagnostics
+examples/generality/private_in_shared_cache/branch-join.pw: exit 1, 1 diagnostics
+examples/generality/private_in_shared_cache/direct.pw: exit 1, 1 diagnostics
+examples/generality/private_in_shared_cache/keyed-by-reader.pw: exit 1, 1 diagnostics
+examples/generality/private_in_shared_cache/private-cache-is-fine.pw: exit 0, 0 diagnostics
+examples/generality/private_in_shared_cache/public-in-shared.pw: exit 0, 0 diagnostics
+examples/generality/private_in_shared_cache/rebound.pw: exit 1, 1 diagnostics
+examples/generality/private_in_shared_cache/relabelled.pw: exit 1, 2 diagnostics
+examples/generality/private_in_shared_cache/via-helper.pw: exit 1, 1 diagnostics
+examples/generality/private_in_shared_materialization/branch.pw: exit 1, 1 diagnostics
+examples/generality/private_in_shared_materialization/caught.pw: exit 1, 1 diagnostics
+examples/generality/private_in_shared_materialization/cross-module.pw: exit 1, 1 diagnostics
+examples/generality/private_in_shared_materialization/helper.pw: exit 1, 1 diagnostics
+examples/generality/private_in_shared_materialization/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/private_in_shared_materialization/private-cache.pw: exit 1, 1 diagnostics
+examples/generality/private_in_shared_materialization/public-dependency.pw: exit 0, 0 diagnostics
+examples/generality/private_in_shared_materialization/user-scoped.pw: exit 1, 1 diagnostics
+examples/generality/reference_names_nothing/caught.pw: exit 1, 1 diagnostics
+examples/generality/reference_names_nothing/labelledby-nothing.pw: exit 1, 1 diagnostics
+examples/generality/reference_names_nothing/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/resume_artifact_contract_mismatch/caught.pw: exit 1, 1 diagnostics
+examples/generality/resume_artifact_contract_mismatch/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/resume_capture_schema_unnameable/caught.pw: exit 1, 1 diagnostics
+examples/generality/resume_capture_schema_unnameable/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/retry_not_idempotent/caught.pw: exit 1, 1 diagnostics
+examples/generality/retry_not_idempotent/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/retry_unbounded/caught.pw: exit 1, 1 diagnostics
+examples/generality/retry_unbounded/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/schedule_names_no_clocked_command/caught.pw: exit 1, 1 diagnostics
+examples/generality/schedule_names_no_clocked_command/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/schedule_time/caught.pw: exit 1, 1 diagnostics
+examples/generality/schedule_time/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/scheduled_outside_a_command/caught.pw: exit 1, 1 diagnostics
+examples/generality/scheduled_outside_a_command/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/scope_outlives_owner/component-scope.pw: exit 0, 0 diagnostics
+examples/generality/scope_outlives_owner/direct.pw: exit 1, 1 diagnostics
+examples/generality/scope_outlives_owner/nested.pw: exit 1, 1 diagnostics
+examples/generality/scope_outlives_owner/session-in-component.pw: exit 1, 1 diagnostics
+examples/generality/secret_to_browser/branch-join.pw: exit 1, 1 diagnostics
+examples/generality/secret_to_browser/caught.pw: exit 1, 1 diagnostics
+examples/generality/secret_to_browser/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/stale_key_policy/caught.pw: exit 1, 1 diagnostics
+examples/generality/stale_key_policy/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/task_detached/caught.pw: exit 1, 1 diagnostics
+examples/generality/task_detached/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/task_detached/nested.pw: exit 1, 1 diagnostics
+examples/generality/title_misplaced/caught.pw: exit 1, 1 diagnostics
+examples/generality/title_misplaced/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/title_missing/caught.pw: exit 1, 1 diagnostics
+examples/generality/title_missing/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/unchecked_external_cast/caught.pw: exit 1, 1 diagnostics
+examples/generality/unchecked_external_cast/helper-return.pw: exit 1, 1 diagnostics
+examples/generality/unchecked_external_cast/neighbour.pw: exit 0, 0 diagnostics
+examples/generality/undeclared_effect/caught.pw: exit 1, 1 diagnostics
+examples/generality/undeclared_effect/complete-row.pw: exit 0, 0 diagnostics
+examples/generality/undeclared_effect/enclosing-generic.pw: exit 1, 1 diagnostics
+examples/generality/undeclared_effect/family-covers-member.pw: exit 0, 0 diagnostics
+examples/generality/undeclared_effect/generic-result.pw: exit 1, 1 diagnostics
+examples/generality/undeclared_effect/open-row.pw: exit 0, 0 diagnostics
+examples/generality/undeclared_effect/partial-row.pw: exit 1, 1 diagnostics
+examples/generality/undeclared_effect/via-callback.pw: exit 1, 1 diagnostics
+examples/generality/unkeyed_list/caught.pw: exit 1, 1 diagnostics
+examples/generality/unknown_member/rigid-parameter.pw: exit 1, 1 diagnostics
+examples/generality/unknown_member/whole-parameter.pw: exit 0, 0 diagnostics
+examples/generality/unsafe_audit_incomplete/caught.pw: exit 1, 2 diagnostics
+examples/generality/unserializable_capture/direct.pw: exit 1, 1 diagnostics
+examples/generality/unserializable_capture/identifier-capture.pw: exit 0, 0 diagnostics
+examples/generality/unserializable_capture/via-field.pw: exit 1, 1 diagnostics
+examples/generality/value_exceeds_sink_level/branch-join.pw: exit 1, 1 diagnostics
+examples/generality/value_exceeds_sink_level/cross-module.pw: exit 1, 1 diagnostics
+examples/generality/value_exceeds_sink_level/direct.pw: exit 1, 1 diagnostics
+examples/generality/value_exceeds_sink_level/helper-return.pw: exit 1, 1 diagnostics
+examples/generality/value_exceeds_sink_level/interpolation-hole.pw: exit 1, 1 diagnostics
+examples/generality/value_exceeds_sink_level/match-binding.pw: exit 1, 1 diagnostics
+examples/generality/value_exceeds_sink_level/rebound.pw: exit 1, 1 diagnostics
+examples/generality/value_exceeds_sink_level/record-field.pw: exit 1, 1 diagnostics
+examples/generality/value_exceeds_sink_level/valid-public-neighbour.pw: exit 0, 0 diagnostics
+examples/generality/wrong_frame_phase/caught.pw: exit 1, 1 diagnostics
+examples/generality/wrong_frame_phase/neighbour.pw: exit 0, 0 diagnostics
+examples/rules/affine/handle-stays-in-scope.pw: exit 0, 0 diagnostics
+examples/rules/affine/transaction-ended-on-every-path.pw: exit 0, 0 diagnostics
+examples/rules/annotations/decoded-not-cast.pw: exit 0, 0 diagnostics
+examples/rules/annotations/handler-matches-event.pw: exit 0, 0 diagnostics
+examples/rules/annotations/option-field-access.pw: exit 1, 1 diagnostics
+examples/rules/annotations/option-matched-first.pw: exit 0, 0 diagnostics
+examples/rules/materialization/listens-for-an-undeclared-event.pw: exit 1, 1 diagnostics
+examples/rules/materialization/private-dependency-of-shared-fragment.pw: exit 1, 1 diagnostics
+examples/rules/materialization/shared-fragment-of-public-data.pw: exit 0, 0 diagnostics
+examples/rules/privacy-sink/public-value-to-public-log.pw: exit 0, 0 diagnostics
+examples/rules/privacy-sink/secret-to-private-log.pw: exit 0, 0 diagnostics
+examples/rules/privacy-sink/secret-to-public-log.pw: exit 1, 1 diagnostics
+examples/rules/resolution/ambiguous-a.pw: exit 0, 0 diagnostics
+examples/rules/resolution/ambiguous-b.pw: exit 0, 0 diagnostics
+examples/rules/resolution/ambiguous-import.pw: exit 1, 3 diagnostics
+examples/rules/resolution/cycle-a.pw: exit 1, 1 diagnostics
+examples/rules/resolution/cycle-b.pw: exit 1, 1 diagnostics
+examples/rules/resolution/duplicate-declaration.pw: exit 1, 1 diagnostics
+examples/rules/resolution/lib-shared.pw: exit 0, 0 diagnostics
+examples/rules/resolution/ok-imported.pw: exit 1, 1 diagnostics
+examples/rules/resolution/private-declaration-access.pw: exit 1, 1 diagnostics
+examples/rules/resolution/unresolved-module.pw: exit 1, 1 diagnostics
+examples/rules/resolution/unresolved-name.pw: exit 1, 1 diagnostics
+examples/rules/resume/loop-capture-typed.pw: exit 0, 0 diagnostics
+examples/rules/resume/loop-capture-untyped.pw: exit 1, 3 diagnostics
+examples/rules/resume/serializable-capture.pw: exit 0, 0 diagnostics
+examples/rules/routes/link-to-declared-route.pw: exit 0, 0 diagnostics
+examples/rules/unsafe-audit/hidden-in-a-helper.pw: exit 1, 2 diagnostics
+examples/rules/unsafe-audit/missing-attribution.pw: exit 1, 1 diagnostics
+examples/rules/unsafe-audit/missing-justification.pw: exit 1, 1 diagnostics
+examples/rules/unsafe-audit/ok-complete-audit.pw: exit 0, 0 diagnostics
+examples/rules/unsafe-audit/unresolved-attribution.pw: exit 1, 1 diagnostics
+examples/robustness/regressions/R1-constructor-arity-panic.pw: exit 1, 1 diagnostics
+examples/robustness/regressions/R2-nested-or-pattern-panic.pw: exit 0, 0 diagnostics
+examples/history/C0/R-001-network-request-inside-view.pw: exit 1, 3 diagnostics
+examples/history/C0/R-004-private-cart-in-shared-cache.pw: exit 1, 7 diagnostics
+examples/history/C0/R-010-nonserializable-handler-capture.pw: exit 1, 3 diagnostics
+examples/history/C0/R-012-affine-resource-leaked.pw: exit 1, 5 diagnostics
+examples/history/C0/R-022-form-handler-type-mismatch.pw: exit 1, 1 diagnostics
+examples/history/C0/R-023-dead-internal-route.pw: exit 1, 4 diagnostics
+examples/history/C0/R-024-raw-unsafe-HTML-without-capability.pw: exit 1, 2 diagnostics
+examples/history/C0/R-025-browser-only-API-on-origin.pw: exit 1, 4 diagnostics
+examples/history/C0/R-030-private-data-in-resume-manifest.pw: exit 1, 5 diagnostics
+examples/history/C0/R-041-custom-paint-mutates-document.pw: exit 1, 3 diagnostics
+examples/history/C1/A-003-public-store-query.pw: exit 1, 1 diagnostics
+examples/history/C1/A-005-idempotent-command.pw: exit 1, 13 diagnostics
+examples/history/C1/A-008-streamed-public-recommendations.pw: exit 1, 1 diagnostics
+examples/history/C1/A-009-edge-materialized-menu.pw: exit 1, 5 diagnostics
+examples/history/C1/A-010-origin-only-secret-operation.pw: exit 1, 3 diagnostics
+examples/history/C1/R-017-wall-clock-read-in-shared-deterministic-materialization.pw: exit 1, 4 diagnostics
+examples/history/C1/R-029-optimistic-state-with-no-rollback-path.pw: exit 1, 13 diagnostics
+examples/history/C10/generality/control_without_label/label-for-another.pw: exit 1, 2 diagnostics
+examples/history/C10/generality/control_without_label/labelledby-nothing.pw: exit 1, 1 diagnostics
+examples/history/C16/generality/forbidden_effect/page-may-read-clock.pw: exit 1, 1 diagnostics
+examples/history/C16/generality/task_detached/nested.pw: exit 1, 2 diagnostics
+examples/history/C16/rules/annotations/decoded-not-cast.pw: exit 1, 1 diagnostics
+examples/history/C8/A-004-private-cart-query.pw: exit 1, 2 diagnostics
+examples/history/C8/A-005-idempotent-command.pw: exit 1, 8 diagnostics
+examples/history/C8/A-006-scoped-WebSocket-subscription.pw: exit 1, 1 diagnostics
+examples/history/C8/A-007-map-widget-resource-with-cleanup.pw: exit 1, 3 diagnostics
+examples/history/C8/A-010-origin-only-secret-operation.pw: exit 1, 2 diagnostics
+examples/history/C8/A-015-phase-scheduled-measure-then-mutate.pw: exit 1, 6 diagnostics
+examples/history/C8/A-016-multiple-measures-share-one-layout-snapshot.pw: exit 1, 3 diagnostics
+examples/history/C8/A-017-batched-layout-affecting-mutations.pw: exit 1, 5 diagnostics
+examples/history/C8/A-018-resize-observation-updates-derived-state.pw: exit 1, 2 diagnostics
+examples/history/C8/A-019-intersection-observation-controls-resource-lifetime.pw: exit 1, 1 diagnostics
+examples/history/C8/A-022-post-paint-non-layout-work.pw: exit 1, 1 diagnostics
+examples/history/C8/A-023-semantically-independent-contained-subtree.pw: exit 1, 3 diagnostics
+examples/history/C8/A-024-audited-imperative-widget-escape.pw: exit 1, 1 diagnostics
+examples/history/C8/R-001-network-request-inside-view.pw: exit 1, 3 diagnostics
+examples/history/C8/R-002-database-access-in-browser.pw: exit 1, 3 diagnostics
+examples/history/C8/R-003-secret-serialized-to-browser.pw: exit 1, 2 diagnostics
+examples/history/C8/R-004-private-cart-in-shared-cache.pw: exit 1, 4 diagnostics
+examples/history/C8/R-005-cross-tenant-cache-key-missing-tenant.pw: exit 1, 3 diagnostics
+examples/history/C8/R-006-public-log-of-secret-value.pw: exit 1, 2 diagnostics
+examples/history/C8/R-011-open-transaction-not-committed-or-rolled-back.pw: exit 1, 4 diagnostics
+examples/history/C8/R-012-affine-resource-leaked.pw: exit 1, 2 diagnostics
+examples/history/C8/R-013-detached-ordinary-task.pw: exit 1, 3 diagnostics
+examples/history/C8/R-014-retry-of-non-idempotent-command.pw: exit 1, 4 diagnostics
+examples/history/C8/R-015-unbounded-retry.pw: exit 1, 3 diagnostics
+examples/history/C8/R-018-unkeyed-mutable-list.pw: exit 1, 5 diagnostics
+examples/history/C8/R-019-invalid-HTML-nesting.pw: exit 1, 1 diagnostics
+examples/history/C8/R-023-dead-internal-route.pw: exit 1, 5 diagnostics
+examples/history/C8/R-025-browser-only-API-on-origin.pw: exit 1, 3 diagnostics
+examples/history/C8/R-026-server-secret-referenced-by-edge-artifact.pw: exit 1, 6 diagnostics
+examples/history/C8/R-027-query-key-changes-without-stale-work-cancellation-policy.pw: exit 1, 3 diagnostics
+examples/history/C8/R-028-subscription-outlives-component-scope.pw: exit 1, 3 diagnostics
+examples/history/C8/R-033-geometry-read-during-render.pw: exit 1, 4 diagnostics
+examples/history/C8/R-034-layout-read-after-layout-affecting-write.pw: exit 1, 2 diagnostics
+examples/history/C8/R-035-layout-write-during-measure-phase.pw: exit 1, 6 diagnostics
+examples/history/C8/R-036-measure-helper-hides-forbidden-geometry-read.pw: exit 1, 4 diagnostics
+examples/history/C8/R-042-post-paint-same-frame-layout-measure.pw: exit 1, 2 diagnostics
+examples/history/C8/R-043-containment-with-cross-boundary-layout-dependency.pw: exit 1, 3 diagnostics
+examples/history/C8/R-044-unaudited-imperative-dom-escape.pw: exit 1, 3 diagnostics
+examples/history/C8/generality/affine_not_consumed_once/both-branches-release.pw: exit 1, 1 diagnostics
+examples/history/C8/generality/affine_not_consumed_once/caught-match.pw: exit 1, 2 diagnostics
+examples/history/C8/generality/affine_not_consumed_once/caught.pw: exit 1, 3 diagnostics
+examples/history/C8/generality/affine_not_consumed_once/derived-value-escapes.pw: exit 1, 1 diagnostics
+examples/history/C8/generality/affine_not_consumed_once/escapes.pw: exit 1, 2 diagnostics
+examples/history/C8/generality/affine_not_consumed_once/released-before-return.pw: exit 1, 4 diagnostics
+examples/history/C8/generality/cache_key_omits_partition/caught.pw: exit 1, 3 diagnostics
+examples/history/C8/generality/cache_key_omits_partition/key-variation.pw: exit 1, 4 diagnostics
+examples/history/C8/generality/cache_key_omits_partition/neighbour.pw: exit 1, 3 diagnostics
+examples/history/C8/generality/declared_placement_cannot_grant/caught.pw: exit 1, 6 diagnostics
+examples/history/C8/generality/declared_placement_cannot_grant/direct.pw: exit 1, 3 diagnostics
+examples/history/C8/generality/declared_placement_cannot_grant/helper-chain.pw: exit 1, 3 diagnostics
+examples/history/C8/generality/declared_placement_cannot_grant/origin-can-grant-secret.pw: exit 1, 1 diagnostics
+examples/history/C8/generality/forbidden_effect/caught.pw: exit 1, 4 diagnostics
+examples/history/C8/generality/forbidden_effect/page-may-read-clock.pw: exit 1, 1 diagnostics
+examples/history/C8/generality/no_feasible_placement/caught.pw: exit 1, 4 diagnostics
+examples/history/C8/generality/no_feasible_placement/neighbour.pw: exit 1, 3 diagnostics
+examples/history/C8/generality/optimistic_not_pure/neighbour.pw: exit 1, 4 diagnostics
+examples/history/C8/generality/option_used_as_value/caught.pw: exit 1, 2 diagnostics
+examples/history/C8/generality/option_used_as_value/nested.pw: exit 1, 2 diagnostics
+examples/history/C8/generality/private_in_shared_cache/branch-join.pw: exit 1, 4 diagnostics
+examples/history/C8/generality/private_in_shared_cache/direct.pw: exit 1, 3 diagnostics
+examples/history/C8/generality/private_in_shared_cache/public-in-shared.pw: exit 1, 1 diagnostics
+examples/history/C8/generality/private_in_shared_cache/rebound.pw: exit 1, 3 diagnostics
+examples/history/C8/generality/private_in_shared_cache/via-helper.pw: exit 1, 5 diagnostics
+examples/history/C8/generality/private_in_shared_materialization/caught.pw: exit 1, 3 diagnostics
+examples/history/C8/generality/private_in_shared_materialization/cross-module.pw: exit 1, 2 diagnostics
+examples/history/C8/generality/private_in_shared_materialization/neighbour.pw: exit 1, 2 diagnostics
+examples/history/C8/generality/private_in_shared_materialization/private-cache.pw: exit 1, 3 diagnostics
+examples/history/C8/generality/private_in_shared_materialization/slips-through-branch.pw: exit 1, 4 diagnostics
+examples/history/C8/generality/private_in_shared_materialization/slips-through-helper.pw: exit 1, 3 diagnostics
+examples/history/C8/generality/retry_not_idempotent/caught.pw: exit 1, 5 diagnostics
+examples/history/C8/generality/retry_not_idempotent/neighbour.pw: exit 1, 5 diagnostics
+examples/history/C8/generality/retry_unbounded/caught.pw: exit 1, 5 diagnostics
+examples/history/C8/generality/retry_unbounded/neighbour.pw: exit 1, 4 diagnostics
+examples/history/C8/generality/secret_to_browser/neighbour.pw: exit 1, 3 diagnostics
+examples/history/C8/generality/stale_key_policy/caught.pw: exit 1, 4 diagnostics
+examples/history/C8/generality/stale_key_policy/neighbour.pw: exit 1, 3 diagnostics
+examples/history/C8/generality/unchecked_external_cast/helper-return.pw: exit 1, 3 diagnostics
+examples/history/C8/generality/unchecked_external_cast/neighbour.pw: exit 1, 1 diagnostics
+examples/history/C8/generality/undeclared_effect/caught.pw: exit 1, 7 diagnostics
+examples/history/C8/generality/undeclared_effect/complete-row.pw: exit 1, 4 diagnostics
+examples/history/C8/generality/undeclared_effect/family-covers-member.pw: exit 1, 2 diagnostics
+examples/history/C8/generality/undeclared_effect/open-row.pw: exit 1, 2 diagnostics
+examples/history/C8/generality/undeclared_effect/partial-row.pw: exit 1, 3 diagnostics
+examples/history/C8/generality/undeclared_effect/via-callback.pw: exit 1, 3 diagnostics
+examples/history/C8/generality/unsafe_audit_incomplete/caught.pw: exit 1, 3 diagnostics
+examples/history/C8/generality/value_exceeds_sink_level/branch-join.pw: exit 1, 3 diagnostics
+examples/history/C8/generality/value_exceeds_sink_level/cross-module.pw: exit 1, 2 diagnostics
+examples/history/C8/generality/value_exceeds_sink_level/direct.pw: exit 1, 2 diagnostics
+examples/history/C8/generality/value_exceeds_sink_level/helper-return.pw: exit 1, 2 diagnostics
+examples/history/C8/generality/value_exceeds_sink_level/interpolation-hole.pw: exit 1, 3 diagnostics
+examples/history/C8/generality/value_exceeds_sink_level/rebound.pw: exit 1, 2 diagnostics
+examples/history/C8/generality/value_exceeds_sink_level/record-field.pw: exit 1, 4 diagnostics
+examples/history/C8/generality/value_exceeds_sink_level/valid-public-neighbour.pw: exit 1, 2 diagnostics
+examples/history/C8/rules/affine/handle-stays-in-scope.pw: exit 1, 1 diagnostics
+examples/history/C8/rules/affine/transaction-ended-on-every-path.pw: exit 1, 3 diagnostics
+examples/history/C8/rules/annotations/decoded-not-cast.pw: exit 1, 2 diagnostics
+examples/history/C8/rules/annotations/option-matched-first.pw: exit 1, 3 diagnostics
+examples/history/C8/rules/privacy-sink/public-value-to-public-log.pw: exit 1, 2 diagnostics
+examples/history/C8/rules/privacy-sink/secret-to-private-log.pw: exit 1, 1 diagnostics
+examples/history/C8/rules/privacy-sink/secret-to-public-log.pw: exit 1, 2 diagnostics
+examples/history/C9/R-023-dead-internal-route.pw: exit 1, 2 diagnostics
+examples/history/C9/generality/dead_internal_link/caught.pw: exit 1, 2 diagnostics
+examples/history/C9/generality/dead_internal_link/neighbour.pw: exit 1, 1 diagnostics
+examples/history/C9/rules/routes/link-to-declared-route.pw: exit 1, 1 diagnostics

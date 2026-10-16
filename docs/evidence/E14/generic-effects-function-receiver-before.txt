@@ -1,0 +1,34 @@
+produced by: pw check packages/*/*.pw work/<probe>.pw (each probe independently)
+binary: target/debug/pw built at d00d2e12 before receiver correction
+These outcomes reproduce a miss and its valid module-path control.
+
+function-receiver
+source:
+module receiver_probe
+
+type Item = Item { name: String }
+fn stamp() -> String !{ database.read<Item> }
+    host "shop:data/items#label"
+fn apply(f: fn() -> String) -> String !{} { f() }
+view Show() !{} { <p>{stamp.apply}</p> }
+
+exit: 0
+pw check: 23 file(s), no diagnostics
+
+
+module-path
+source:
+module path_probe
+
+import List
+
+type Item = Item { name: String }
+fn List() -> String !{ database.read<Item> }
+    host "shop:data/items#label"
+view Show(given: List<Item>) !{} {
+    let xs = List.reverse(given)
+    <p>pure</p>
+}
+
+exit: 0
+pw check: 23 file(s), no diagnostics

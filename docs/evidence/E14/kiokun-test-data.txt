@@ -1,0 +1,11 @@
+Kiokun unit-test dataset isolation (ADR-0286)
+
+produced by: just e14-kiokun-test-data
+commit: 1e8b1ccdee54ed7b0437e06575c4a5d9e6ac0ff3
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+baseline: 1 passed, 0 failed
+a unit-test server reads the deployment dataset: KILLED (1 of 1 tests fail)
+the deployment loader ignores its configured label directory: KILLED (1 of 1 tests fail)
+2 of 2 mutants killed
+memory bound: no process was stopped
