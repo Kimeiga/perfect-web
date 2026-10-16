@@ -221,3 +221,28 @@ Its review of 2026-10-09, relayed by message:
 3. **Ports**: 7341 is the track's, 200 from W5's 7141.
 4. **kiokun.com's label table**: not reproduced (Differences, 4).
 5. **Fixed before the merge**: a word too long to be a file name (Found 4).
+
+
+## Unit-test dataset isolation, 2026-10-16
+
+Train-9's full local CI failed 16 server tests (563 passed, 9 ignored).
+The sample-oracle tests inherited `KIOKUN_DATA` and `KIOKUN_APP` from the
+machine's setup and read an external dataset being changed by another
+process. Responses included different search answers, disk I/O/readonly
+errors and memory exhaustion. The full failed log is preserved; this is
+not a passing CI result or evidence of sample parity.
+
+The test-only server factory must explicitly choose the committed sample,
+as its assertions require. Production startup continues to use deployment
+configuration. A child-process test sets both deployment paths to missing
+private paths and must still serve the sample through that test factory.
+It changes no process-global environment and touches no external checkout.
+The test must fail before the correction and pass after it. Full local CI
+and new GitHub verification remain required before landing.
+
+Inspection separately found that the production search cache reuses a
+digest's `.building` path and removes other cached versions during a new
+build. Concurrent publication/lifetime needs a private-fixture reproduction
+and repair; the observed I/O errors are consistent with that mechanism,
+but this note does not claim a causal reproduction yet. Test-data isolation
+does not prove production cache concurrency.
