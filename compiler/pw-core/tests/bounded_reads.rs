@@ -1089,3 +1089,49 @@ fn a_known_read_is_known_only_where_the_list_names_it() {
         ["`search_reading` reads `ReadingHit` once for each element of `readings`"]
     );
 }
+
+#[test]
+fn a_set_pairs_key_field_is_named_as_the_key_parameter() {
+    let source = r#"
+module key_name
+type Price = Price { item: Int, cents: Int }
+type PriceOf = PriceOf { item: Int, price: Price }
+source Ledger
+    holds Price
+    transactions serializable
+    reads strong
+    changes none
+    sets one_call
+fn price_of(item: Int) -> Result<Price, String> !{ database.read<Price> }
+    host "keys:data/prices#one"
+    set prices_of
+fn prices_of(items: List<Int>) -> List<PriceOf> !{ database.read<Price> }
+    host "keys:data/prices#many"
+"#;
+    assert!(diagnostics(source).is_empty(), "{:?}", reported(source));
+    for fields in ["other: Int, price: Price", "item: Bool, price: Price"] {
+        let wrong = source.replace("item: Int, price: Price", fields);
+        let found = diagnostics(&wrong);
+        assert_eq!(
+            found.iter().map(|d| d.code).collect::<Vec<_>>(),
+            ["PW0407"],
+            "{fields}: {found:?}"
+        );
+    }
+    // The result may carry the named key itself. The similarly typed cents
+    // field cannot stand in when the actual key field has another name.
+    let direct = source.replace("-> List<PriceOf>", "-> List<Price>");
+    assert!(diagnostics(&direct).is_empty(), "{:?}", reported(&direct));
+    let wrong = direct.replace("Price { item: Int, cents:", "Price { other: Int, cents:");
+    assert_eq!(
+        diagnostics(&wrong)
+            .iter()
+            .map(|d| d.code)
+            .collect::<Vec<_>>(),
+        ["PW0407"]
+    );
+    // The nominal name of the parameter is the authority, not `item` by
+    // convention: a consistent rename remains a valid pair.
+    let renamed = source.replace("item: Int", "product: Int");
+    assert!(diagnostics(&renamed).is_empty(), "{:?}", reported(&renamed));
+}
