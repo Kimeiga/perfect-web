@@ -1060,6 +1060,19 @@ mod tests {
         }
     }
 
+    /// Track evidence-integrity-2, the integrator's ruling 1: a corpus
+    /// `@rule` is read as written. An old number is no code `pw check`
+    /// reports, so a header naming one is `Unknown`, which the corpus's
+    /// ratchet fails; until 2026-10-15 it was classified as the code it became.
+    #[test]
+    fn an_old_number_is_no_registered_rule() {
+        assert!(!DEPRECATED_ALIASES.is_empty());
+        for (old, now) in DEPRECATED_ALIASES {
+            assert_eq!(rule_status(old), RuleStatus::Unknown, "{old} (now {now})");
+            assert!(matches!(rule_status(now), RuleStatus::Registered(c) if c.id == *now));
+        }
+    }
+
     #[test]
     fn every_alias_resolves_to_a_registered_code() {
         for (alias, canonical) in DEPRECATED_ALIASES {
