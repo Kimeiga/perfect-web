@@ -18,6 +18,8 @@ PROGRAM = ROOT / "compiler/pw-core/src/program.rs"
 BUILD = ROOT / "compiler/pw-core/src/build.rs"
 LOWER = ROOT / "compiler/pw-core/src/backend/lower.rs"
 WIT = ROOT / "compiler/pw-core/src/wit.rs"
+COMPONENT = ROOT / "compiler/pw-core/src/backend/component.rs"
+JUST = ROOT / "justfile"
 
 MUTANTS = [
     ('CLI check uses only partial-program semantics', CLI, 'pw_core::check::check_program_sources(&all)', 'pw_core::check::check_sources(&all)'),
@@ -37,12 +39,17 @@ MUTANTS = [
     ('a caller can mint a proof from a foreign context', LOWER, "impl<'a> Checked<'a> {", "impl<'a> Checked<'a> {\n    pub fn of(units: &'a [crate::check::Unit], cx: Context<'a>) -> Self {\n        Self { cx, units, pages: std::cell::OnceCell::new() }\n    }"),
     ('syntax refusal omits clean sibling diagnostics', PROGRAM, 'if parsed.iter().any(|file| !file.ok()) {', 'if false && parsed.iter().any(|file| !file.ok()) {'),
     ('a page failure hides its signal failure', BUILD, '(Err(why), Err(_)) => early.push(', '(Err(why), Err(_)) => Vec::<crate::program::Refusal>::new().push('),
+    ('the complete accepted-corpus gate is not run', JUST, '    cargo test --locked -p pw-cli --test check_build_corpus accepted_corpus_has_exactly_its_known_backend_refusals', '    true'),
+    ('the semantic accepted-corpus gate is not run', JUST, '    cargo test --locked -p pw-core --test checking_source no_accepted_corpus_file_reports_a_body_level_error', '    true'),
+    ('a parsed WIT failure loses its generated source identity', COMPONENT, '.find(|w| w.exports == name || w.name == name)', '.find(|_| false)'),
  ]
 COMMANDS = [
     ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--doc", "backend::lower::Checked"],
     ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--lib", "backend::lower::checked_input_tests"],
     ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "check_is_build"],
     ["cargo", "test", "--quiet", "--locked", "-p", "pw-cli", "--test", "check_is_build"],
+    ["cargo", "test", "--quiet", "--locked", "-p", "pw-cli", "--test", "check_build_corpus", "accepted_corpus"],
+    ["python3", "scripts/tests/test_check_build_gate.py"],
 ]
 BOUND = 180
 
@@ -60,6 +67,11 @@ def run_tests():
             stopped = True
         outputs.append(out)
         summaries = re.findall(r"test result: \w+\. (\d+) passed; (\d+) failed", out)
+        if command[0] == "python3":
+            ran = re.search(r"Ran (\d+) tests?", out)
+            if ran:
+                count = int(ran[1])
+                summaries = [(str(count if child.returncode == 0 else 0), str(0 if child.returncode == 0 else count))]
         count = sum(int(p) + int(f) for p, f in summaries)
         if not summaries or not count:
             built = False

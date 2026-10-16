@@ -134,3 +134,35 @@ Initial full-path latency after sharing: cold1788.36ms/edit1729.24ms, clean
 1992.95ms/rejected926.76ms (55 files), unchanged2s gate,2/2 tests. The final
 source requires a fresh measurement. The integrator's larger56-file train10
 program must be measured separately. No ceiling change is authorized or made.
+
+
+## Accepted language and current backend support
+
+The census exposed four existing build-only gaps in the exact whole accepted
+corpus program (85 files). The integrator ruled that the accepted corpus stays
+as the semantic language specification; no accepted source is edited or moved,
+and this track does not implement unrelated resource or layout features.
+`test-compile` now asserts semantic corpus conformance through its existing
+Rust suite, and separately pins complete CLI check/build to exactly these
+four source/stage/message/span refusals and no artifacts:
+
+| Source | Stage/subreason | Existing executable limitation |
+| --- | --- | --- |
+| A-007, StoreLocation | backend_template | mounting a resource element is not compiled |
+| A-008, Recommendations | backend_wit | duplicate generated API item store-recommendations-recommendations-api |
+| A-013, Terms | backend_page | a computed part performs build.input.read<WorkspaceFile> |
+| A-018, ResponsiveMenu | backend_template | style:grid-template-columns directive is not compiled |
+
+These are exposed backend gaps/ABI collision, not invalid language or completed
+features. The complete gate pins the exact set, not any PW6601 or a broad
+allowlist. Executing the real recipe with failing stand-in producers proves
+both gates run and propagate failure; mutation controls remove each gate.
+All supported reference program roots remain positive complete check/build
+controls. The final train must rerun the census after generic and D1 effects.
+The pinned local wit-parser 0.257.1's typed ParseError/ResolveError spans map
+the refused emitted world/API name through existing declaration identities;
+this is location metadata after the same parser refuses, not a second check.
+
+The first census detected two uncovered nested robustness regressions and
+failed its coverage assertion (561/563 tracked .pw files). The glob is corrected
+to include nested regressions; its final run remains pending.

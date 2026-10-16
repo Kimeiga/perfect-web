@@ -46,10 +46,50 @@ pub struct Component {
 
 /// Parse a WIT package text, as `wit::package` emits it, into a `Resolve`.
 pub fn parse(wit: &str) -> Result<(Resolve, PackageId), String> {
+    parse_located(wit).map_err(|failure| failure.message)
+}
+
+/// Upstream's typed error span locates the emitted ABI name; its existing
+/// world identity locates the responsible Pleris declaration. This metadata
+/// never decides support: the same upstream parser remains the authority.
+pub(crate) struct PreparationError {
+    pub message: String,
+    generated: Option<std::ops::Range<usize>>,
+}
+impl PreparationError {
+    pub(crate) fn declaration(
+        &self,
+        wit: &str,
+        worlds: &[crate::wit::World],
+    ) -> Option<crate::resolve::DefId> {
+        let name = wit.get(self.generated.clone()?)?.trim_start_matches('%');
+        worlds
+            .iter()
+            .rev()
+            .find(|w| w.exports == name || w.name == name)
+            .map(|w| w.declaration)
+    }
+}
+fn parse_located(wit: &str) -> Result<(Resolve, PackageId), PreparationError> {
     let mut resolve = Resolve::new();
-    let pkg = resolve
-        .push_str("pw-app.wit", wit)
-        .map_err(|e| format!("the generated WIT does not parse: {e:#}"))?;
+    let pkg = resolve.push_str("pw-app.wit", wit).map_err(|error| {
+        let generated = error.chain().find_map(|layer| {
+            let span = layer
+                .downcast_ref::<wit_parser::ParseError>()
+                .map(|e| e.kind().span())
+                .or_else(|| {
+                    layer
+                        .downcast_ref::<wit_parser::ResolveError>()
+                        .map(|e| e.kind().span())
+                })?;
+            span.is_known()
+                .then(|| span.start() as usize..span.end() as usize)
+        });
+        PreparationError {
+            message: format!("the generated WIT does not parse: {error:#}"),
+            generated,
+        }
+    })?;
     Ok((resolve, pkg))
 }
 
@@ -419,7 +459,7 @@ pub(crate) fn with_checked<R>(
     let (wit, worlds) =
         crate::wit::package_prepared(hirs, ws, contracts, cx.sigs, &checked.pages().derived)
             .map_err(|e| format!("WIT: {}", e.error))?;
-    with_package(checked, &wit, &worlds, f)
+    with_package(checked, &wit, &worlds, f).map_err(|failure| failure.message)
 }
 
 pub(crate) fn with_package<R>(
@@ -427,10 +467,10 @@ pub(crate) fn with_package<R>(
     wit: &str,
     worlds: &[crate::wit::World],
     f: impl FnOnce(&Program<'_>) -> Result<R, String>,
-) -> Result<R, String> {
+) -> Result<R, PreparationError> {
     let cx = checked.context();
     let (hirs, ws, contracts) = (cx.hirs, cx.ws, cx.contracts);
-    let (expected, package) = parse(wit)?;
+    let (expected, package) = parse_located(wit)?;
     let (lowered, refusals) = super::lower::program_by_declaration(checked);
     let idents = crate::wit::type_idents(hirs, ws);
     f(&Program {
@@ -442,6 +482,10 @@ pub(crate) fn with_package<R>(
         lowered: &lowered,
         idents: &idents,
         refusals: &refusals,
+    })
+    .map_err(|message| PreparationError {
+        message,
+        generated: None,
     })
 }
 

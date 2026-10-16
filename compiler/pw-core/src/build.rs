@@ -411,7 +411,16 @@ pub(crate) fn prepare(
                         Some((wit, components, modules, computed))
                     }
                     Err(why) => {
-                        early.push(Refusal::new(Stage::Wit, "", why));
+                        let owner = why
+                            .declaration(&wit, &worlds)
+                            .map(|def| {
+                                crate::contract::component_id(
+                                    hirs[def.unit],
+                                    crate::hir::DeclId(def.decl),
+                                )
+                            })
+                            .unwrap_or_default();
+                        early.push(Refusal::new(Stage::Wit, &owner, why.message));
                         None
                     }
                 }

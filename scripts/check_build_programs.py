@@ -44,7 +44,7 @@ def programs():
         out.append((str(fixture.relative_to(ROOT)), base + imported(fixture, accepted) + [fixture]))
     for fixture in paths('examples/generality/**/*.pw'):
         out.append((str(fixture.relative_to(ROOT)), base + accepted + [fixture]))
-    for fixture in paths('examples/robustness/*.pw') + paths('examples/history/**/*.pw'):
+    for fixture in paths('examples/robustness/**/*.pw') + paths('examples/history/**/*.pw'):
         out.append((str(fixture.relative_to(ROOT)), base + imported(fixture, accepted) + [fixture]))
     out.append(('historical benchmark baseline', std + paths('benchmarks/baselines/pleris/domain.pw') + paths('benchmarks/baselines/pleris/lib/*.pw') + paths('benchmarks/baselines/pleris/store/*.pw')))
     return out
