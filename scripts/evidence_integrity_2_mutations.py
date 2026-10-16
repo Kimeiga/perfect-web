@@ -368,7 +368,7 @@ def main():
         if not built:
             verdict = "KILLED (does not build)"
         elif failed:
-            verdict = f"KILLED ({failed} of {passed + failed} tests fail)"
+            verdict = f"KILLED ({failed} failure reports in {passed + failed} tests run)"
         else:
             verdict = "SURVIVED"
             survivors += 1

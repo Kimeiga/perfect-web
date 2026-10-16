@@ -119,7 +119,7 @@ class EvidenceGates(unittest.TestCase):
             (root / "runtime/pw-materialize/tests").mkdir(parents=True)
             (root / "tools").mkdir()
             (root / "tools/binding-report.py").write_text('print("binding report completed")\n')
-            (root / "docs/evidence/E2D/corpus-enforcement.txt").write_text("fixture corpus\n")
+            (root / "docs/evidence/E2D/corpus-enforcement.txt").write_text("1/1 enforce their declared invariant\n")
             env = os.environ.copy()
             # Do not let a caller's shell initialization change the tested shell.
             for name in ("BASH_ENV", "ENV", "SHELLOPTS", "BASHOPTS", "JUST_SHELL", "JUST_SHELL_ARG"):
