@@ -245,7 +245,8 @@ impl Diagnostic {
 /// code as written, so an old number in a header is an unregistered code.
 /// The list stays only where it is printed: the guide's reference of codes
 /// (`scripts/guide_diagnostics.py`, track guide, reads this constant by its
-/// name), and a refused header's message (`checking_source.rs`). The
+/// name and form, and its test `guide.rs` counts a row for each), and a
+/// refused header's message (`checking_source.rs`). The
 /// registry's tests hold it: no old number is a registered or retired code,
 /// and each names a registered one (`codes.rs`); nothing else reads it
 /// (`no_comparison_translates_an_old_number`).
@@ -358,6 +359,9 @@ mod tests {
             "compiler/pw-core/src/diagnostics.rs",
             "compiler/pw-core/src/codes.rs",
             "compiler/pw-core/tests/checking_source.rs",
+            // Track guide's test of the reference page, which counts a row for
+            // each old number (on its branch until it lands).
+            "compiler/pw-cli/tests/guide.rs",
         ];
         let mut readers = Vec::new();
         let mut translators = Vec::new();
