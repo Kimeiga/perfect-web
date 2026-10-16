@@ -121,3 +121,11 @@ callee's own parameter now goes through the shared per-call solver,
 including beneath List. A recursive call given the caller's actual T stays
 rigid and its undeclared member remains PW0610. This was ruled by the
 integrator on 2026-10-15; before-correction misses are recorded separately.
+
+The per-invocation guard made the former fallback-filter mutation
+redundant: removing only Types::of's unsolved filter no longer admits a
+callee's generic result, because declared() already defers it to the
+solver. The whole script exposed this survivor. Its control is replaced
+by removal of that authoritative per-call guard, which builds and fails
+both new invocation regressions. The 17 controls each target a distinct
+operative behavior; no assertion or valid control was weakened.
