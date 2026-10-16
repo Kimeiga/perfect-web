@@ -129,3 +129,12 @@ solver. The whole script exposed this survivor. Its control is replaced
 by removal of that authoritative per-call guard, which builds and fails
 both new invocation regressions. The 17 controls each target a distinct
 operative behavior; no assertion or valid control was weakened.
+
+The whole component-contract script likewise exposed two obsolete
+controls: performed() replaced by infer_at() no longer removes value
+effects, because infer_at now completes the shared root walk. Both
+consumer-specific controls remain, now substituting calls_from directly
+at effective_effects and effective_effects_excluding. Each removes exactly
+the intended member/value behavior at that consumer; all 12 controls and
+all performed-function-value assertions remain. The whole script reruns.
+No production source changes accompany this harness correction.
