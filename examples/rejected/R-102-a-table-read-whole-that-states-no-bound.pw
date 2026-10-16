@@ -11,7 +11,7 @@
 // page is as slow as the table is long. A table that a page reads whole
 // states the most rows it holds (`bounded`), and gives `all()`; any other
 // is read by its key, a prefix of the key, or an index (ADR-0338, 1.2).
-// `A-100`'s table is bounded, and read whole, accepted.
+// `A-050`'s table is bounded, and read whole, accepted.
 
 module Shops
 

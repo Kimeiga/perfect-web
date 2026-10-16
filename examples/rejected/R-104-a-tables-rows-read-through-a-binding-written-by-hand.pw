@@ -11,7 +11,7 @@
 // each a primitive one adapter per database implements for every table. A
 // binding written by hand is an operation the app's own Rust implements,
 // once for each database (ADR-0338, decision 1): the data layer a declared
-// table exists to remove. `A-100` reads its table through its functions.
+// table exists to remove. `A-050` reads its table through its functions.
 
 module Cards
 

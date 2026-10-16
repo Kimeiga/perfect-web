@@ -163,8 +163,33 @@ fn no_accepted_corpus_file_reports_a_body_level_error() {
         if !path.starts_with("A-") {
             continue;
         }
+        // An accepted program may deliberately exercise a warning. Hold it
+        // to exactly the warnings it names; an error never counts as one.
+        let src = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../examples/accepted")
+                .join(path),
+        )
+        .expect("accepted source");
+        let mut expected: Vec<&str> = src
+            .lines()
+            .filter_map(|l| l.trim().strip_prefix("// @expect-warning:"))
+            .map(str::trim)
+            .collect();
+        let mut actual = Vec::new();
         for d in diags {
-            bad.push(format!("{path}: [{}] {}", d.code, d.message));
+            if d.severity == pw_core::diagnostics::Severity::Warning {
+                actual.push(d.code);
+            } else {
+                bad.push(format!("{path}: [{}] {}", d.code, d.message));
+            }
+        }
+        expected.sort();
+        actual.sort();
+        if expected != actual {
+            bad.push(format!(
+                "{path}: expected warnings {expected:?}, got {actual:?}"
+            ));
         }
     }
     assert!(

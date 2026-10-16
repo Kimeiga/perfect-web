@@ -11,7 +11,7 @@
 // The schema released (`schema.lock`, beside this file) held each note's
 // body. This row has none, so a migration to it would drop every body a
 // database holds: a change that loses data is planned only where the
-// program states it, `migrate body dropped` (ADR-0338, 1.4). `A-103`
+// program states it, `migrate body dropped` (ADR-0338, 1.4). `A-053`
 // states its changes, accepted.
 
 module Notes

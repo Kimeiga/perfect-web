@@ -1,13 +1,13 @@
 // @corpus: accepted
-// @id: A-102
+// @id: A-052
 // @category: a reference across sources by a field that may name no row
 // @charter: §9.2
 // @milestone: 14
+// @expect-warning: PW0365
 //
-// A comment's author is a member, held by another source (A-101's
-// `MemberData`), which may delete the member: the field says the comment may
-// name none, `Option<MemberId>` (track `tables`, PW0365). The control for
-// R-105.
+// A comment refers to a member held in another source. No database holds
+// the relation: even an optional key may name a row that no longer exists.
+// PW0365 warns, and this program remains accepted (ADR-0338, decision 4).
 
 module Comments
 

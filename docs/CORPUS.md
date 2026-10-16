@@ -1021,7 +1021,7 @@ reader to a predicate (`PW6401`); a payment's command is given one
 (`PW6403`); no page presses a command the platform invokes (`PW6404`); and
 each is idempotent (`PW6405`). Exercising them found that `PW6402` and
 `PW6405` named no boundary span, which charter §16.3 requires: each names
-its `invoked_by` clause now. No invariant is retired; no fixture changed.
+its `invoked_by` clause now. No published invariant is retired. The unpublished D1 fixtures were corrected before integration: PW0365 is a warning, not a refusal; A-052 names it with @expect-warning, and the harness compares exactly those warning codes.
 
 No accepted program is added: `PW6403` is the whole program's, and a
 fixture's program is the accepted corpus with it, so an accepted command
@@ -1048,3 +1048,46 @@ Generality at open:        54/54 invariants generality-tested
 | `invoked_twice` | a GENERAL witness, the second apart from the first, answering another type, and a NEIGHBOUR one, two of the clock's | new invariant |
 | `invoked_command_pressed` | a GENERAL witness, the clock's command pressed before its time, and a NEIGHBOUR one, a page pressing the command that schedules it | new invariant |
 | `invoked_command_not_idempotent` | a GENERAL witness, the clock's command keyed by nothing, and a NEIGHBOUR one, a command a reader presses keyed by nothing | new invariant |
+
+## C27: an app's data, declared as tables, 2026-10-15
+
+Opened because the specification changed (track `tables`, ADR-0338's D1;
+C25 is track `bounded-checker`'s). A program declares its data: `table T`
+in `module T`, its `row` a record declared beside it, its `key`, `order`,
+`index` and `unique` the row's fields, its `refers` to other tables, its
+`bounded`, and its `migrate` from the schema released. Its reads and writes
+are the functions the declaration gives the module, and nothing else
+reaches its rows. Five codes: a malformed table (`PW0361`), a table's rows
+reached otherwise than through its functions (`PW0362`), `all()` of a table
+with no bound (`PW0364`), a warning for any reference across sources (`PW0365`), and a change from the schema released that loses
+or reinterprets data with no `migrate` (`PW0366`). A fixture of `PW0366`
+names the schema it is held to as released, `// @schema-lock: <file>`,
+beside it. No published invariant is retired. The unpublished D1 fixtures were corrected before integration: PW0365 is a warning, not a refusal; A-052 names it with @expect-warning, and the harness compares exactly those warning codes.
+
+```text
+Corpus version:            C27
+Accepted programs:         40
+Rejected programs:         82
+Charter categories:        40/40 accepted, 82/82 rejected
+Generality at open:        58/58 invariants generality-tested
+```
+
+| Fixture | Change | Kind |
+|---|---|---|
+| A-050 | added: a table keyed by two fields, indexed and bounded, read by its key, a prefix, an index and whole, and written, only through its functions | new category |
+| A-051 | added: a table that refers to itself, in one source | new category |
+| A-052 | added: a reference to a table another source holds, accepted with its explicit PW0365 warning | new category |
+| A-053 | added: a field renamed, one dropped and one backfilled from the schema released, each stated | new category |
+| R-100 | added: a table keyed by a `List` (`PW0361`) | new category |
+| R-101 | added: an index on a field its row does not have (`PW0361`) | new category |
+| R-102 | added: `all()` of a table with no `bounded` (`PW0364`) | new category |
+| R-103 | added: a read by an index the table does not declare (`PW0362`) | new category |
+| R-104 | added: a table's rows read through a `host` binding of the app's own (`PW0362`) | new category |
+| R-105 | added: a reference whose field holds no key of its target (`PW0361`) | new category |
+| R-106 | added: a field dropped from the schema released, unstated (`PW0366`) | new category |
+| R-107 | added: a field renamed from the schema released, unstated (`PW0366`) | new category |
+| `table_malformed` | a GENERAL witness, a reference whose field holds no key of the table it names, and a NEIGHBOUR one, the same reference by the key's type | new invariant |
+| `data_not_declared` | a GENERAL witness, a write by a binding of the app's own, and a NEIGHBOUR one, a function with a body over a read the table gives | new invariant |
+| `all_unbounded` | a GENERAL witness, `all()` called bare in the table's own module, and a NEIGHBOUR one, the same call of a bounded table | new invariant |
+| `refers_across_sources` | a GENERAL witness, the referring table in no source, and a NEIGHBOUR one, a self-reference within one source | new invariant |
+| `migration_unstated` | a GENERAL witness, a field's type changed, and a NEIGHBOUR one, the same change `backfilled with` a value | new invariant |

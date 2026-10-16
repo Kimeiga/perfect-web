@@ -10,7 +10,7 @@
 // A table's reads are its key's, its key's prefixes', and its indexes': a
 // read by a field none of them leads with does not exist, since no database
 // answers it but by reading every row (ADR-0338, 1.2). The repair is an
-// index, `index by_owner on owner`, as `A-100` declares one; or a filter,
+// index, `index by_owner on owner`, as `A-050` declares one; or a filter,
 // the program's own, over a read the table gives.
 
 module Tasks

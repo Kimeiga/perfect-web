@@ -1,12 +1,12 @@
 // @corpus: accepted
-// @id: A-101
+// @id: A-051
 // @category: a reference between tables one source holds
 // @charter: §9.2
 // @milestone: 14
 //
 // A member refers to the member who invited them, in the same table and so
 // in the same source: a foreign key the database holds (track `tables`,
-// ADR-0338). The members R-105 and A-102 refer to across sources.
+// ADR-0338). A-052 refers to these members across sources.
 
 module Members
 

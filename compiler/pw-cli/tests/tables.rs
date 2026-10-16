@@ -1,0 +1,96 @@
+//! The released-schema boundary exercised through the actual CLI.
+use std::path::{Path, PathBuf};
+use std::process::{Command, Output};
+
+fn root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
+}
+
+fn pw(command: &str, extra: &[&Path], source: &Path) -> Output {
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_pw"));
+    cmd.current_dir(root()).arg(command).args(extra).arg(source);
+    for dir in ["packages/pw-std", "packages/pw-platform-web"] {
+        let mut paths: Vec<_> = std::fs::read_dir(root().join(dir))
+            .unwrap()
+            .map(|p| p.unwrap().path())
+            .filter(|p| p.extension().is_some_and(|e| e == "pw"))
+            .collect();
+        paths.sort();
+        cmd.args(paths);
+    }
+    cmd.output().expect("pw runs")
+}
+
+fn shown(out: &Output) -> String {
+    format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    )
+}
+
+#[test]
+fn check_and_build_hold_a_program_to_the_named_release() {
+    let dir = std::env::temp_dir().join(format!("pw-cli-tables-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let source = dir.join("Notes.pw");
+    let released = "module Notes\ntype Note = Note { id: String, text: String }\ntable Notes\n    row Note\n    key id\n";
+    std::fs::write(&source, released).unwrap();
+    let built = dir.join("built");
+    let out = pw("build", &[Path::new("--out"), &built], &source);
+    assert!(out.status.success(), "{}", shown(&out));
+    assert!(built.join("tables.json").exists());
+    let lock = dir.join("released.lock");
+    std::fs::copy(built.join("schema.lock"), &lock).unwrap();
+    let after = released.replace(", text: String", "");
+    std::fs::write(&source, &after).unwrap();
+    let out = pw("check", &[], &source);
+    assert!(out.status.success(), "{}", shown(&out));
+    for command in ["check", "build"] {
+        let dest = dir.join(format!("refused-{command}"));
+        let mut args = vec![Path::new("--schema-lock"), lock.as_path()];
+        if command == "build" {
+            args.extend([Path::new("--out"), dest.as_path()]);
+        }
+        let out = pw(command, &args, &source);
+        assert!(!out.status.success(), "{command} accepted a dropped field");
+        assert!(shown(&out).contains("PW0366"), "{}", shown(&out));
+        assert!(!dest.join("tables.json").exists());
+    }
+    // The same dropped field, stated, is built with the plan and a new lock.
+    std::fs::write(&source, format!("{after}    migrate text dropped\n")).unwrap();
+    let out = pw(
+        "build",
+        &[
+            Path::new("--schema-lock"),
+            &lock,
+            Path::new("--out"),
+            &built,
+        ],
+        &source,
+    );
+    assert!(out.status.success(), "{}", shown(&out));
+    let tables = std::fs::read_to_string(built.join("tables.json")).unwrap();
+    assert!(tables.contains("drop_field"), "{tables}");
+    assert_ne!(
+        std::fs::read(&lock).unwrap(),
+        std::fs::read(built.join("schema.lock")).unwrap()
+    );
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn an_invalid_or_missing_release_is_an_error() {
+    let source = root().join("examples/tables/Lists.pw");
+    let missing = root().join("work/a-schema-that-does-not-exist.lock");
+    let out = pw("check", &[Path::new("--schema-lock"), &missing], &source);
+    assert_eq!(out.status.code(), Some(2), "{}", shown(&out));
+    let out = Command::new(env!("CARGO_BIN_EXE_pw"))
+        .arg("check")
+        .arg(&source)
+        .arg("--schema-lock")
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(2), "{}", shown(&out));
+    assert!(shown(&out).contains("needs a file"), "{}", shown(&out));
+}

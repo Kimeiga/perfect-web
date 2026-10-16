@@ -3,7 +3,7 @@
 //
 // Structurally different from R-105: the referring table is held by no
 // source (the host's own database), and the table it names by one
-// (`MemberData`, A-101): two databases all the same.
+// (`MemberData`, A-051): two databases all the same.
 
 module Replies
 

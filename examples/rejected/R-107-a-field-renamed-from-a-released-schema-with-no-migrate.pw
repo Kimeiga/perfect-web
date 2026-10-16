@@ -13,7 +13,7 @@
 // dropped beside a new one are the same text in a row's record; only the
 // program knows which it meant, and it says so, `migrate text renamed from
 // body`, or the migration would lose every memo's text (ADR-0338, 1.4).
-// `A-103` states its rename, accepted.
+// `A-053` states its rename, accepted.
 
 module Memos
 

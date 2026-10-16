@@ -1,9 +1,9 @@
 // @corpus: accepted
-// @id: A-103
+// @id: A-053
 // @category: a table's change from its released schema, stated
 // @charter: §9.2
 // @milestone: 14
-// @schema-lock: A-103-a-tables-change-from-its-released-schema-stated.schema.lock
+// @schema-lock: A-053-a-tables-change-from-its-released-schema-stated.schema.lock
 //
 // The schema released (`schema.lock`, beside this file) held each entry's
 // `body` and its `tags`. This release calls the body `text`, gives up the

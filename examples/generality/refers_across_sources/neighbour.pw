@@ -1,19 +1,22 @@
 // @status: NEIGHBOUR
 // @invariant: refers_across_sources
-// @dimension: valid neighbour — the same reference across sources, by a field that may name no row
+// @dimension: valid neighbour — the same reference held within one source
 //
-// The field says what no database holds for it: the member may be gone.
+// A self-reference stays within its table's source.
 
 module Answers
 
-import Members.{ MemberId }
-import Members
-
 opaque type AnswerId = String
 
-type Answer = Answer { id: AnswerId, author: Option<MemberId>, text: String }
+type Answer = Answer { id: AnswerId, author: Option<AnswerId>, text: String }
 
 table Answers
     row    Answer
     key    id
-    refers author to Members
+    refers author to Answers
+
+source AnswerData
+    holds        Answers
+    transactions serializable
+    reads        strong
+    changes      none

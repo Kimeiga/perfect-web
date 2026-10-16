@@ -73,7 +73,7 @@ const ACCEPTED_CATEGORIES: &[&str] = &[
     // The scheduled-commands track, corpus C23: a run the clock makes.
     "a command schedules one the clock invokes",
     // Track `tables` (ADR-0338, D1): an app's data, declared, and the
-    // controls of PW0361, PW0362, PW0364, PW0365 and PW0366.
+    // controls of PW0361, PW0362, PW0364 and PW0366.
     "a table read and written through the functions its declaration gives",
     "a reference between tables one source holds",
     "a reference across sources by a field that may name no row",
@@ -187,14 +187,14 @@ const REJECTED_CATEGORIES: &[&str] = &[
     "two commands a payment's outcome invokes",
     "a page that presses a command the platform invokes",
     "a command the platform invokes with no key",
-    // Track `tables` (ADR-0338, D1): PW0361, PW0362, PW0364, PW0365 and
-    // PW0366, each beside its accepted control (A-100 to A-103).
+    // Track `tables` (ADR-0338, D1): PW0361, PW0362, PW0364 and
+    // PW0366, each beside its accepted control (A-050 to A-053).
     "a table keyed by a field no database keys a row by",
     "an index on a field its row does not have",
     "a table read whole that states no bound",
     "a read a table's declaration does not give",
     "a table's rows read through a binding written by hand",
-    "a reference across sources by a field that names a row always",
+    "a reference whose field holds no key of its target",
     "a field dropped from a released schema with no migrate",
     "a field renamed from a released schema with no migrate",
 ];

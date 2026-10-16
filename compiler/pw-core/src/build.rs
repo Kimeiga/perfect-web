@@ -221,6 +221,16 @@ impl Build {
                     .as_deref()
                     .map_or("none released".to_string(), |h| format!("schema {h}"))
             ));
+        } else {
+            // Rebuilding into an existing directory must not leave a prior
+            // program's tables available to the host.
+            for name in ["tables.json", "schema.lock"] {
+                match std::fs::remove_file(dir.join(name)) {
+                    Ok(()) => {}
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                    Err(e) => return Err(e.to_string()),
+                }
+            }
         }
         for s in &self.speculations {
             if let crate::backend::wasm::Encoding::Encoded(m) = &s.module {

@@ -3,12 +3,9 @@
 //
 // Structurally different from R-100 and R-101: the key and the indexes are
 // sound, and the fault is a reference, whose field holds what is no key of
-// the table it names (`Members` is keyed by a `MemberId`, A-101). An
-// `Option`, so it is no reference across sources refused for that (PW0365).
+// the table it names, a self-reference keyed by BadgeId.
 
 module Badges
-
-import Members
 
 opaque type BadgeId = String
 
@@ -17,4 +14,4 @@ type Badge = Badge { id: BadgeId, holder: Option<String> }
 table Badges
     row    Badge
     key    id
-    refers holder to Members
+    refers holder to Badges

@@ -24,7 +24,6 @@
 //! executable cannot. `docs/evidence/P0/readiness.txt` lists these in prose;
 //! this is the same list, run.
 
-use pw_core::check::check_sources;
 use std::collections::{BTreeMap, BTreeSet};
 
 fn library() -> Vec<(String, String)> {
@@ -574,13 +573,13 @@ fn generality_is_reported_separately_from_conformance() {
     // 49 the same day: the scheduled-commands track's
     // `schedule_names_no_clocked_command`, `scheduled_outside_a_command`
     // and `schedule_time`. 54 / 54 the same day: corpus C24, the five of
-    // NEXT 6c's `invoked_by`, which no fixture exercised until then. 59 / 59
-    // on 2026-10-15: track `tables`' five, `table_malformed`,
-    // `data_not_declared`, `all_unbounded`, `refers_across_sources` and
-    // `migration_unstated`, an app's data declared (ADR-0338, D1).
+    // NEXT 6c's `invoked_by`, which no fixture exercised until then. 58 / 58
+    // on 2026-10-15: track `tables`' four refusals, `table_malformed`,
+    // `data_not_declared`, `all_unbounded` and `migration_unstated`, an app's
+    // data declared (ADR-0338, D1). PW0365's warning has witnesses too.
     assert_eq!(
         (general.len(), narrow.len(), untested.len()),
-        (59, 0, 0),
+        (58, 0, 0),
         "the published figure moved. If that is intended, update
          docs/STATUS.md and docs/NEXT.md in the same commit — a number in a
          status report that no test holds is a number that drifts."

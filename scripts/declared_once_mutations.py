@@ -62,7 +62,7 @@ MUTANTS = [
     (
         "no policy repeats",
         POLICY,
-        "    matches!(domain_of(head), Some(Domain::ConditionedWord(_)))",
+        "    matches!(\n        domain_of(head),\n        Some(\n            Domain::ConditionedWord(_)\n                // A table has as many indexes, references and statements of\n                // its change as it states (track `tables`).\n                | Domain::Index\n                | Domain::Reference\n                | Domain::Migration\n        )\n    )",
         "    false",
     ),
     (

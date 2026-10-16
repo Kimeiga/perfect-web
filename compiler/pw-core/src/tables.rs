@@ -29,8 +29,8 @@
 //!   its rows (PW0362).
 //! - **Its checks**: the declaration's shape (PW0361), its rows reached only
 //!   through its functions (PW0362), `all()` only of a bounded table (PW0364),
-//!   a reference across two sources by a field that says it may name no row,
-//!   an `Option` (PW0365), and a change from the schema released stated
+//!   a warning that no database holds a reference across two sources
+//!   (PW0365), and a change from the schema released stated
 //!   (PW0366, `held_to`).
 //! - **What a host needs** (`TablesJson`): `pw build` writes `tables.json`,
 //!   each table's fields and their types, key, order, indexes, references,
@@ -898,6 +898,43 @@ fn source_named(source: &Option<String>) -> String {
         .map_or_else(|| "the host's database".to_string(), |s| format!("`{s}`"))
 }
 
+/// Source identity is still a bare name at the existing host seam. Until
+/// that seam carries qualified identities, refuse an ambiguous spelling
+/// where a table or one of its references would use it (D1 interim guard).
+fn unambiguous_sources(hirs: &[&Hir], ws: &Workspace, t: &Table) -> Vec<Diagnostic> {
+    let mut out = Vec::new();
+    let mut seen = BTreeSet::new();
+    for (table, span) in std::iter::once((&t.name, &t.span))
+        .chain(t.references.iter().map(|r| (&r.value.table, &r.span)))
+    {
+        let Some(name) = source_of(hirs, table) else {
+            continue;
+        };
+        if !seen.insert(name.clone()) {
+            continue;
+        }
+        let sources: Vec<_> = hirs
+            .iter()
+            .enumerate()
+            .flat_map(|(unit, hir)| {
+                hir.all_decls()
+                    .filter(|(_, d)| d.kind == DeclKind::Source && d.name == name)
+                    .map(move |(id, _)| (unit, hir.decl_span(id)))
+            })
+            .collect();
+        if sources.len() > 1 {
+            out.push(malformed(
+                format!("`{name}` names {} source declarations: `{table}`'s database cannot be identified by this bare name", sources.len()),
+                span.clone(),
+                sources.into_iter().map(|(unit, span)| Related::in_unit(unit, span,
+                    format!("source `{}.{name}`", ws.module_of(unit).map_or("?", |m| m.name.as_str())))).collect(),
+                "name each source distinctly; the host seam needs qualified source identity before duplicate names can be accepted".into(),
+            ));
+        }
+    }
+    out
+}
+
 /// One table refusal.
 #[allow(clippy::too_many_arguments)]
 fn refusal(
@@ -961,7 +998,10 @@ pub fn check(hirs: &[&Hir], unit: usize, ws: &Workspace, sigs: &Signatures) -> V
     let module_span = hir.modules.iter().next().map(|(_, _, s)| s.clone());
     for (i, t) in tables.iter().enumerate() {
         let mut found = shape(hirs, unit, ws, sigs, &module, t, i > 0);
-        found.extend(across_sources(hirs, unit, ws, sigs, t));
+        found.extend(unambiguous_sources(hirs, ws, t));
+        if found.is_empty() {
+            found.extend(across_sources(hirs, unit, ws, t));
+        }
         // Each told beside the table it is about (charter §16.3's boundary
         // span), or, for the table itself, its module.
         for d in &mut found {
@@ -1160,6 +1200,39 @@ fn shape(
         seen.insert(format!("{}_many", index.name), i.span.clone());
         fields_of(clause, &index.fields, &i.span, &mut out);
     }
+    // Pascal-casing is readable but not injective: a_b,c and a,b_c both
+    // name ABC. Never reuse a generated record for a different tuple.
+    let mut tuples = Vec::new();
+    if let Some(key) = &t.key {
+        for end in 2..=key.value.len() {
+            tuples.push((&key.value[..end], &key.span));
+        }
+    }
+    tuples.extend(
+        t.indexes
+            .iter()
+            .filter(|i| i.value.fields.len() > 1)
+            .map(|i| (i.value.fields.as_slice(), &i.span)),
+    );
+    let mut shapes: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for (fields, span) in tuples {
+        let name = tuple_name(&t.name, fields);
+        if shapes
+            .get(&name)
+            .is_some_and(|first| first.as_slice() != fields)
+        {
+            out.push(malformed(
+                format!(
+                    "`{name}` would hold two different field tuples in `{}`",
+                    t.name
+                ),
+                span.clone(),
+                Vec::new(),
+                "rename a field so the generated key and index record names are distinct".into(),
+            ));
+        }
+        shapes.insert(name, fields.to_vec());
+    }
     for r in &t.references {
         out.extend(referring(
             hirs,
@@ -1353,57 +1426,31 @@ fn referring(
     )]
 }
 
-/// **PW0365: a reference to a table another source holds**, whose field
-/// says it may name none (`Option`), or is refused. Within one source a
+/// **PW0365: a reference to a table another source holds**, warned whether
+/// its field is optional or required (ADR-0338, decision 4). Within one source a
 /// reference is a foreign key the database holds; across two, nothing holds
 /// it, and the row it names may be missing.
-fn across_sources(
-    hirs: &[&Hir],
-    unit: usize,
-    ws: &Workspace,
-    sigs: &Signatures,
-    t: &Table,
-) -> Vec<Diagnostic> {
+fn across_sources(hirs: &[&Hir], unit: usize, ws: &Workspace, t: &Table) -> Vec<Diagnostic> {
     let mine = source_of(hirs, &t.name);
-    // The row's fields, resolved where the row is declared.
-    let fields: Vec<(String, ResolvedType)> = match t
-        .row
-        .as_ref()
-        .map(|r| ws.resolve_in(unit, Namespace::Type, &r.value))
-    {
-        Some(Resolution::Local(def)) => sigs
-            .type_decl(def)
-            .and_then(|d| d.record.as_ref())
-            .map(|fs| {
-                fs.iter()
-                    .filter_map(|(n, ty)| Some((n.clone(), ty.resolved()?.clone())))
-                    .collect()
-            })
-            .unwrap_or_default(),
-        _ => Vec::new(),
-    };
     t.references
         .iter()
         .filter_map(|r| {
             let (target_unit, target) = table_module(ws, hirs, unit, &r.value.table)?;
             let theirs = source_of(hirs, &r.value.table);
-            let (_, ty) = fields.iter().find(|(n, _)| *n == r.value.field)?;
-            let optional = ty.as_builtin() == Some(crate::resolved::Builtin::Option);
-            (theirs != mine && !optional).then(|| {
+            (theirs != mine).then(|| {
                 refusal(
                     codes::REFERS_ACROSS_SOURCES,
                     "refers_across_sources",
-                    Severity::Error,
+                    Severity::Warning,
                     format!(
                         "`{}.{}` refers to `{}` in {}, and `{}` is in {}: no database holds the \
-                         reference, and `{}` is `{ty}`, which names a row always",
+                         reference, so the referred row may be missing",
                         t.name,
                         r.value.field,
                         r.value.table,
                         source_named(&theirs),
                         t.name,
                         source_named(&mine),
-                        r.value.field,
                     ),
                     r.span.clone(),
                     vec![Related::in_unit(
@@ -1415,11 +1462,11 @@ fn across_sources(
                      holds: a row is not written referring to one that is not there, and a row \
                      referred to is not deleted. Two databases hold nothing of each other, so the \
                      row a reference across them names may be missing, deleted by the other \
-                     database's writes, and `get` answers it as `None`. A field that refers \
-                     across two sources says it may name none: an `Option`.",
+                     database's writes, and `get` answers it as `None`. This is true whether \
+                     the field holding the key is optional or required.",
                     format!(
-                        "type `{}` as `Option<{ty}>`, or hold `{}` and `{}` in one source",
-                        r.value.field, t.name, r.value.table
+                        "handle `None` from `{}`'s `get`, or hold `{}` and `{}` in one source",
+                        r.value.table, t.name, r.value.table
                     ),
                 )
             })
@@ -1730,11 +1777,22 @@ impl Stored {
 /// **What `ty` is stored as**, its type parameters given by `args` where
 /// `ty` is a declaration's own (`Box<T>`'s `T`).
 pub fn stored(sigs: &Signatures, ty: &ResolvedType) -> Stored {
-    stored_in(sigs, ty, &mut Vec::new())
+    stored_in(sigs, ty, &mut Vec::new(), &BTreeMap::new())
 }
 
-fn stored_in(sigs: &Signatures, ty: &ResolvedType, open: &mut Vec<DefId>) -> Stored {
+fn stored_in(
+    sigs: &Signatures,
+    ty: &ResolvedType,
+    open: &mut Vec<DefId>,
+    parameters: &BTreeMap<(DefId, u32), Stored>,
+) -> Stored {
     use crate::resolved::Builtin;
+    if let Some(binding) = ty.parameter_binding() {
+        return parameters
+            .get(&binding)
+            .cloned()
+            .unwrap_or_else(|| Stored::Recursive(ty.display_name()));
+    }
     if let Some(p) = ty.as_primitive() {
         return match p {
             Prim::Int => Stored::Int {
@@ -1753,7 +1811,7 @@ fn stored_in(sigs: &Signatures, ty: &ResolvedType, open: &mut Vec<DefId>) -> Sto
     let arg = |i: usize, open: &mut Vec<DefId>| {
         ty.args()
             .get(i)
-            .map_or(Stored::Unit, |a| stored_in(sigs, a, open))
+            .map_or(Stored::Unit, |a| stored_in(sigs, a, open, parameters))
     };
     if let Some(b) = ty.as_builtin() {
         return match b {
@@ -1785,20 +1843,20 @@ fn stored_in(sigs: &Signatures, ty: &ResolvedType, open: &mut Vec<DefId>) -> Sto
     let Some(decl) = sigs.type_decl(def) else {
         return Stored::Recursive(ty.display_name());
     };
-    // A type's own parameters, by its arguments here.
-    let given = |t: &ResolvedType| -> ResolvedType {
-        match t.parameter_binding() {
-            Some((binder, i)) if binder == def => ty
-                .args()
-                .get(i as usize)
-                .cloned()
-                .unwrap_or_else(|| t.clone()),
-            _ => t.clone(),
-        }
-    };
+    // Project supplied arguments before opening the definition: Box<Box<Int>>
+    // is finite, whereas a Box<T> field inside Box<T>'s definition recurs.
+    // The environment holds storage projections, not a second semantic type
+    // substitution; nested constructors look up parameters by binder identity.
+    let mut given = parameters.clone();
+    for (index, argument) in ty.args().iter().enumerate() {
+        given.insert(
+            (def, index as u32),
+            stored_in(sigs, argument, open, parameters),
+        );
+    }
     open.push(def);
     let out = if let Some(rep) = decl.representation.as_ref().and_then(|r| r.resolved()) {
-        let mut inner = stored_in(sigs, &given(rep), open);
+        let mut inner = stored_in(sigs, rep, open, &given);
         if let Some(inv) = &decl.invariant {
             let clamp = |n: Option<i128>| n.and_then(|n| i64::try_from(n).ok());
             match (&mut inner, inv.measure) {
@@ -1828,7 +1886,7 @@ fn stored_in(sigs: &Signatures, ty: &ResolvedType, open: &mut Vec<DefId>) -> Sto
                     name: name.clone(),
                     stored: t
                         .resolved()
-                        .map_or(Stored::Unit, |t| stored_in(sigs, &given(t), open)),
+                        .map_or(Stored::Unit, |t| stored_in(sigs, t, open, &given)),
                 })
                 .collect(),
         )
@@ -1842,7 +1900,7 @@ fn stored_in(sigs: &Signatures, ty: &ResolvedType, open: &mut Vec<DefId>) -> Sto
                         .iter()
                         .map(|t| {
                             t.resolved()
-                                .map_or(Stored::Unit, |t| stored_in(sigs, &given(t), open))
+                                .map_or(Stored::Unit, |t| stored_in(sigs, t, open, &given))
                         })
                         .collect(),
                 })

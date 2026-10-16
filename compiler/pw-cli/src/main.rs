@@ -1666,11 +1666,15 @@ fn run() -> ExitCode {
 
     // **The schema released** (track `tables`, ADR-0338): the `schema.lock`
     // a deployment holds the program's tables to, read whole or refused.
-    let released = match args
+    let release_path = args
         .iter()
         .position(|a| a == "--schema-lock")
-        .and_then(|i| args.get(i + 1))
-    {
+        .map(|i| args.get(i + 1));
+    if release_path == Some(None) {
+        eprintln!("pw: --schema-lock needs a file");
+        return ExitCode::from(2);
+    }
+    let released = match release_path.flatten() {
         Some(path) => match std::fs::read_to_string(path)
             .map_err(|e| e.to_string())
             .and_then(|text| pw_core::tables::Schema::read(&text))

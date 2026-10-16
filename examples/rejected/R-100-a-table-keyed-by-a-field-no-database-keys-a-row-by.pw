@@ -10,7 +10,7 @@
 // A table's key finds a row in every database that may hold it: a primary
 // key, a partition key and its clustering columns, a document's `_id`. No
 // adapter keys a row by a list, and two lists equal as values need not be
-// one key (track `tables`, ADR-0338). `A-100` is a table keyed by what every
+// one key (track `tables`, ADR-0338). `A-050` is a table keyed by what every
 // database keys, accepted.
 
 module Taggings

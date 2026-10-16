@@ -9,7 +9,7 @@
 //
 // An index is another way to find a table's rows, by fields its row has: an
 // index on a field no row holds finds nothing, and its read, `by_color`,
-// would be given a value no row could match. `A-100`'s index is on a field
+// would be given a value no row could match. `A-050`'s index is on a field
 // of its row, accepted.
 
 module Labels
