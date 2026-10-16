@@ -71,7 +71,8 @@ def run_tests():
             ran = re.search(r"Ran (\d+) tests?", out)
             if ran:
                 count = int(ran[1])
-                summaries = [(str(count if child.returncode == 0 else 0), str(0 if child.returncode == 0 else count))]
+                failures = sum(int(n) for n in re.findall(r"(?:failures|errors)=(\d+)", out))
+                summaries = [(str(count - failures), str(failures))]
         count = sum(int(p) + int(f) for p, f in summaries)
         if not summaries or not count:
             built = False

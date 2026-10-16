@@ -166,3 +166,27 @@ this is location metadata after the same parser refuses, not a second check.
 The first census detected two uncovered nested robustness regressions and
 failed its coverage assertion (561/563 tracked .pw files). The glob is corrected
 to include nested regressions; its final run remains pending.
+
+
+## Verification checkpoint before broad campaigns
+
+- Original whole16:16/16 killed, baseline18, zero bound stops. Expanded
+  whole20:20/20 killed, baseline22, zero bound stops; source restored. Its
+  Python failed-command counts were conservative (both tests counted failed
+  when one failed); reporting is corrected for the final recipe's whole rerun.
+- Core complete-program tests10/10; CLI witness tests7/7; rejected corpus78/78
+  actual check/build pairs agree (156 commands),46.97s. Exact accepted support
+  classification1/1,1.76s;9 supported roots check+build (18 commands),20.40s.
+- Guarded fmt and core-library Clippy passed; mutation anchors3064/267,
+  case-check2704 paths, Python evidence-gates170 tests1skip. Original probe
+  restored byte-identically to the recorded SHA256.
+- Committed source387bc12e census:407 program assemblies cover563/563 tracked
+  .pw files;11 clean,323 semantic/syntax refusals,73 new complete-program
+  refusals. Those73 are not73 mechanisms: semantic-clean generality suites
+  include the whole accepted corpus as their existing library, inheriting its
+  four backend gaps. There are16 distinct refusal messages. Raw classifications
+  are committed in docs/evidence/E14/check-is-build-programs.txt, with source
+  and immutable binary identity. A parent train must rerun after new effects.
+
+Whole affected mutation campaigns, full CI, own final recipe and final cost
+measurements are still pending; this checkpoint is not a ready claim.
