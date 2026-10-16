@@ -1,6 +1,6 @@
 # ADR-XXXX: guide mutation kills require valid producer outcomes
 
-Status: reviewed and implemented; complete guide74 and fresh full CI pending (2026-10-16).
+Status: locally complete and validated; integrator owns landing/numbering (2026-10-16).
 Parent: the reviewed evidence-integrity/check-is-build work. No diagnostic code,
 package, feature, ceiling, accepted source or browser-selection allocation.
 
@@ -190,3 +190,68 @@ the original untracked probe matched after final restoration; global anchors
 3090/269 matched before and after. This is instrument evidence, not a completed
 whole guide74/CI claim. The unchanged guide inventory/MUST/CHECKED/commands were
 compared by AST before implementation; no selector or retry changes.
+
+## Final local validation and integration boundary
+
+Tested source checkpoint: `0ff69eaaf309d56d59030bbfdb35479fcabbc6b4`. No source/harness commit preceded
+the complete own8, corrected guide74 and fresh full CI. Those whole74/CI runs
+used saved uncommitted v2 bytes at base e82, byte-equal to the source checkpoint;
+their base HEAD line is not presented as a clean-source claim. The all-input
+manifest SHA is 53f43939c583358a50427814ee110dc44df52b11455aa499dc33c00e1c2c1810.
+All 2,723 input bytes, original probe, immutable check/build ref and zero own-range
+listeners verified after each natural boundary. No cancellation was attempted.
+
+Corrected WHOLE guide74: 74/74 killed,0refused/0survived/0memory stops. Exclusive
+outcomes56 Rust only +7 Python assertion only +3 both +5 browser spec +3 named
+checker =74. The named exact sets remain PW5048/PW5048/PW5107. There were no
+Python body-error kills in actual74; the separate native body-error neighbour
+proves that approved category without relabeling it as an assertion. Wall19:43.56,
+user583.21s,sys42.14s,52%CPU; host load3.79/2.75/1.94 before and3.97/5.45/5.03 after.
+Raw SHA52e4d664e7aa48297ae207e67c21059047f6c633a768faae9eff5989311a2e68.
+
+Fresh full `just ci` completed naturally GREEN:Python RUN263,passed262,failed0,skipped1 (existing skip);
+2975 reported Rust passes across344 summaries,0failures,25ignored (reported passes are
+not a unique-mechanism census). Program controls248,11exact named compiler
+refusals,0failing. Anchors3090/269. Wall10:15.87,user2263.93s,sys109.88s,385%CPU;
+existing latency checks and ceilings unchanged. Full raw SHA0651f78a748af36d0aa8bb04af97a6dbff12a6d194b0a33738353f120f7e744d.
+The original probe was temporarily guarded at its approved same-worktree backup
+path for fmt/CI, then restored with exact SHA.
+
+The actual standalone focused recipe then ran on clean tested source0ff69eaa:
+40methods GREEN plus WHOLE8/8 intended structured body assertions,0invalid or
+survivors/stops. This repeats the same eight controls for a truthful clean-source
+recipe header; it is not sixteen mechanisms. Both runs and their costs are in
+the validation index. The immutable check/build branch remains e82b0d6c.
+
+Committed evidence: `guide-producer.txt`, `guide-producer-guide-whole.txt`,
+`guide-producer-ci.txt`, `guide-producer-history.txt`, `guide-producer-native.json`
+and `guide-producer-validation-index.json` under docs/evidence/E14. Historical
+RED28 and the parent's actual native fixture RED remain distinct from GREEN40
+and complete mutation runs. An intermediate test-helper missing-report error
+and external receipt-helper newline SyntaxError are retained honestly; the latter
+was fixed and mandatory restoration rerun before CI, without project edits.
+
+Canonical upstream v17's own whole82 was reported naturally GREEN by its owner,
+with unchanged producer902d/protocol91e9 hashes. That is upstream evidence, not
+an additional local campaign. The local consumer uses those exact files and the
+shared Cargo v1 authority; no competing result validator was introduced.
+
+The root justfile import of just/guide-producer.just remains integrator-owned;
+the current standalone command is recorded exactly in its report. Other23
+cleanup gaps remain parent-owned; the descriptions correction is another track.
+No all-framework validity, general cancellation correctness, universal browser
+propagation, train landing, push/merge or larger-train latency result is claimed.
+The assembler must measure its larger changed program and preserve the bound.
+
+The final validation index enumerates all nine tested source files, every one
+of the unchanged74 controls with its source/MUST/exact CHECKED set, all eight
+producer controls with full witness IDs, original command selections and shared
+authority hashes. AST equality to pre-correction source holds MUTANTS/MUST/CHECKED
+and all original command arrays unchanged. Focused Python RUN40,passed40,failed0,
+skipped0; full-CI Python RUN263,passed262,failed0,skipped1; Rust reported summed
+passes2975,failures0,ignored25 across344 result groups. The source commit is
+0ff69eaaf309d56d59030bbfdb35479fcabbc6b4; evidence metadata adds no runtime changes.
+
+Metadata patch hygiene initially refused one trailing space in an embedded old
+unittest log line. Only the embedded text normalizes trailing whitespace; the
+original raw bytes and hashes remain retained. No runtime source changed.
