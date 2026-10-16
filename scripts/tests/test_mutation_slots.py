@@ -194,6 +194,8 @@ def run_toy(root, slots_asked=None, args=(), extra=None, timeout=120):
     )
 
 
+@unittest.skipUnless(sys.platform.startswith('linux') and hasattr(os, 'pidfd_open')
+                     and hasattr(signal, 'pidfd_send_signal'), 'Linux pidfd private parallel children')
 class Toy(unittest.TestCase):
     """The toy script, in order and in slots."""
 

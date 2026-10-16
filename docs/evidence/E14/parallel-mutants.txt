@@ -1,0 +1,133 @@
+ADR-XXXX - parallel mutation slots and structured unittest body provenance
+
+produced by: python3 -B /tmp/parallel-instrument-whole82.py
+invokes: scripts/mutation_slots_mutations.py (the e14-parallel-mutants control runner)
+publication: complete final green report for e14-parallel-mutants; the just recipe itself was not invoked
+commit: 8e6388cbbe1e3eb6d4381d4b88ee90aee11ef969 + uncommitted changes
+python: 3.10.12
+platform: Linux; real pidfd private-child controls, guarded mocked cancellation controls
+source: exact /tmp/parallel-instrument-review-v17/expected.json, then metadata-only acceptance/report updates
+producer SHA256: 902dfef3cf62b16eaa264f0cba52a1bc30bc25d9c7e6bf0718ae6a2beea8b662
+protocol SHA256: 91e941dc2157d53292aa5a709c4c3f0d10210f61a2db23d9edcaeb1df691ee55
+runner SHA256: bc5b181215e7fb2f77d8017542343bc8e52e30e06fce857290d7383e3b3e87c4
+canonical cleanup SHA256: c87d148cb8bb586bb94e47651de2d1f6354dfec2f42f58fb29f19a16d0935b7a
+
+Whole82 owner2187231 ended naturally exit0. Every one of2598 input paths and all
+bytes restored. All82 actual source substitutions were unequal and changed SHA256
+before baseline or mutation writes. Full159/mock67 exact method IDs were frozen.
+82 body-failure controls:77 include assertions,12 include body errors,7 overlap,
+5 error-only. No invalid producer/build/stopped result earned a kill;0survivors.
+The complete83-report audit is /tmp/parallel-instrument-report-audit82.json.
+
+Authorized default just ci owner2219141 ended naturally0 with ci:OK. It used an
+isolated target, jobs4/threads4, Cargo offline, and both KIOKUN_DATA/KIOKUN_APP
+absent after private setup.315 Python tests ran:314passed,1skipped.336 Rust success summaries:
+2882passed,0failed,25ignored,0measured,0filtered. Python's one skip is the master-only
+evidence-presence gate, explicitly deferred on a branch until integrator merge.
+Corpus:377files already formatted,
+corpus-check:OK; example checks83/52/27/25files all had no diagnostics. BothClippy
+configurations, case check and full2964/262 global mutation anchors passed.
+All2598 input paths/bytes and all8 held-v17 file hashes remained unchanged afterCI.
+CI raw SHA256:c99f3e1c7ae1c99048ad0f7b156ad8c84815d01b99a1f8ecc88cc9a9ccc5e842
+
+History is retained separately, not relabelled as final coverage: historical58
+had42kills+16equivalent no-op survivors because the required preflight was omitted;
+the existing global gate independently rejected those16 controls. Historical59
+had59/59green on its older source, before later cancellation/deferred/hook gaps
+were found. All original bytes and actual red/review receipts remain outside the
+repository with provenance+SHA256 in /tmp/parallel-instrument-evidence-manifest.json.
+The independent review's private subprocess adapter is not pidfd cleanup proof.
+No whitespace exception is needed: git diff --check was clean before publication.
+
+== Complete original whole82 stdout/stderr, appended byte-identically ==
+frozen profiles: full=159, mocked=67; evidence /tmp/parallel-instrument-er2h719s
+launch verified v17 hashes,82 unequal substitutions,full159/mock67 exact IDs
+whole82 pid 2187231 inputs 2598 backup /tmp/parallel-instrument-whole82-input
+frozen profiles: full=159, mocked=67; evidence /tmp/parallel-instrument-f95qb8ni
+preflight: 82 actual unequal source/SHA substitutions recorded
+baseline: 159 passed, 0 failed
+a run asked for slots runs the script's loop in the tree: KILLED (5 of 159 test methods fail)
+a slot runs the tree's copy of the script: KILLED (6 of 159 test methods fail)
+a slot runs every mutant, not those dealt to it: KILLED (5 of 159 test methods fail)
+a slot's mutants are not checked against the count they were dealt from: KILLED (2 of 159 test methods fail)
+no slots is a number of slots: KILLED (2 of 159 test methods fail)
+the ask for slots reaches what a slot runs: KILLED (3 of 159 test methods fail)
+the mutants dealt reach what a slot runs: KILLED (1 of 159 test methods fail)
+every slot listens on the same ports: KILLED (3 of 159 test methods fail)
+every slot shares one temporary directory: KILLED (3 of 159 test methods fail)
+a slot builds in the tree's target: KILLED (3 of 159 test methods fail)
+slot 0 is not dealt a mutant of each suite first: KILLED (4 of 159 test methods fail)
+a run given arguments is dealt to slots: KILLED (1 of 159 test methods fail)
+the mutants are said in the slots' order, not the script's: KILLED (2 of 159 test methods fail)
+the slots do not wait for every baseline: KILLED (6 of 159 test methods fail)
+a red baseline in one slot is not said as the script says it: KILLED (1 of 159 test methods fail)
+a mutant's lines before its verdict are another's: KILLED (2 of 159 test methods fail)
+a slot's baseline is all it said before its first verdict: KILLED (2 of 159 test methods fail)
+a verdict that names no suite is no mutant's: KILLED (2 of 159 test methods fail)
+a longer description is taken for a shorter one: KILLED (2 of 159 test methods fail)
+the count is the first slot's: KILLED (3 of 159 test methods fail)
+the memory bound's line forgets a stop: KILLED (2 of 159 test methods fail)
+the run ends well though a slot's mutant survived: KILLED (1 of 159 test methods fail)
+a slot is brought to the tree by whether a file is there, not by its content: KILLED (4 of 159 test methods fail)
+what a run left in a slot is kept: KILLED (2 of 159 test methods fail)
+node_modules is copied, not linked: KILLED (3 of 159 test methods fail)
+the tree's target is copied into a slot: KILLED (2 of 159 test methods fail)
+a slot's git tracks nothing: KILLED (5 of 159 test methods fail)
+two runs share the slots at once: KILLED (1 of 159 test methods fail)
+a run stopped from outside leaves its slots running: KILLED (1 of 67 test methods fail)
+a stopped slot root is not terminated: KILLED (4 of 67 test methods fail)
+what a stopped slot started in a session of its own is left running: KILLED (2 of 67 test methods fail)
+a reused discovered identity is pinned: KILLED (1 of 67 test methods fail)
+a reuse while opening a pidfd is accepted: KILLED (2 of 67 test methods fail)
+a pinned signal is redirected to a numeric PID: KILLED (2 of 67 test methods fail)
+parallel launch omits its capability probe: KILLED (1 of 67 test methods fail)
+launch cancellation is raised before the child handoff: KILLED (2 of 67 test methods fail)
+repeated cancellation interrupts frozen-child cleanup: KILLED (1 of 67 test methods fail)
+a live unidentified descendant is treated as absent: KILLED (1 of 67 test methods fail)
+a descriptor closes without confirming process exit: KILLED (2 of 67 test methods fail)
+unreadable live root state counts as exited: KILLED (1 of 67 test methods fail)
+an invalid unittest exit earns a kill: KILLED (3 of 67 test methods fail)
+contradictory unittest inventories are accepted: KILLED (1 of 67 test methods fail)
+a report with different expected methods is accepted: KILLED (1 of 67 test methods fail)
+incomplete start or finish inventories are accepted: KILLED (1 of 67 test methods fail)
+unexecuted or repeated method bodies are accepted: KILLED (1 of 67 test methods fail)
+fixture events may earn a kill: KILLED (2 of 67 test methods fail)
+a refused or skipped producer may earn a kill: KILLED (2 of 67 test methods fail)
+failed subtest events invent failed method counts: KILLED (2 of 67 test methods fail)
+duplicate protocol keys are accepted: KILLED (1 of 67 test methods fail)
+producer cleanup uses communicate instead of a bounded wait: KILLED (8 of 67 test methods fail)
+an already exited producer root hides unproved orphans: KILLED (2 of 67 test methods fail)
+producer root is reaped before it is pinned: KILLED (8 of 67 test methods fail)
+mocked profile leaves process creation unguarded: KILLED (1 of 67 test methods fail)
+body exception provenance is discarded: KILLED (4 of 159 test methods fail)
+fixture exception provenance becomes body provenance: KILLED (5 of 159 test methods fail)
+executed subtest provenance is discarded: KILLED (5 of 159 test methods fail)
+loader failures become method inventories: KILLED (1 of 159 test methods fail)
+producer executes despite changed frozen method IDs: KILLED (1 of 159 test methods fail)
+secondary cleanup errors swallow cancellation: KILLED (7 of 67 test methods fail)
+output close replaces primary cancellation: KILLED (1 of 67 test methods fail)
+normal cleanup signals are not recorded: KILLED (3 of 67 test methods fail)
+a repeated callback replaces the first pending cancellation: KILLED (1 of 67 test methods fail)
+secondary cancellation is reduced to ordinary diagnostic text: KILLED (2 of 67 test methods fail)
+pending cancellation is not promoted after releases: KILLED (5 of 67 test methods fail)
+deferred invocation results are treated as synchronous: KILLED (13 of 159 test methods fail)
+runtime async generators are ignored: KILLED (2 of 159 test methods fail)
+instance cleanup checks only the discarding outer hook: KILLED (2 of 159 test methods fail)
+class and module cleanup callbacks bypass return observation: KILLED (2 of 159 test methods fail)
+class fixtures bypass return observation: KILLED (2 of 159 test methods fail)
+module fixtures bypass return observation: KILLED (2 of 159 test methods fail)
+restoration requeues consumed cleanups: KILLED (1 of 159 test methods fail)
+original fixture bindings are not restored: KILLED (8 of 159 test methods fail)
+deferred invocation results are never closed: KILLED (2 of 159 test methods fail)
+canonical execution and registration changes are ignored: KILLED (8 of 159 test methods fail)
+custom suite execution may omit fixtures: KILLED (2 of 159 test methods fail)
+effective instance execution hooks are not checked: KILLED (2 of 159 test methods fail)
+suite global dispatch helpers are not frozen: KILLED (2 of 159 test methods fail)
+runner and Outcome execution descriptors are not frozen: KILLED (1 of 159 test methods fail)
+suppressed captured exceptions are accepted: KILLED (2 of 159 test methods fail)
+a cached protocol replaces actual local validation authority: KILLED (1 of 67 test methods fail)
+body errors are relabelled as assertion failures: KILLED (1 of 67 test methods fail)
+deep malformed JSON escapes validation: KILLED (1 of 67 test methods fail)
+82 of 82 mutants killed
+postwhole restoration 2598 inputs; differences []
+memory bound: no process was stopped

@@ -42,11 +42,13 @@ import fcntl
 import os
 import pathlib
 import re
+import select
 import shutil
 import signal
 import subprocess
 import sys
 import threading
+import time
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
@@ -374,6 +376,7 @@ class Slot:
         self.closing = None  # what it said after its last verdict
         self.all = []  # every line, as it came
         self.proc = None
+        self.identity = None
         self.code = None
 
     @property
@@ -434,6 +437,8 @@ class Run:
         self.lock = threading.Condition()
         self.slots = []
         self.stopping = False
+        self.launching = False
+        self.cancel_requested = False
         import mutation_bound
 
         # The memory bound's account of the run, read from what it says.
@@ -499,28 +504,52 @@ class Run:
             if m:
                 w.verdict(m.group("what"))
 
-    def stop(self, why=None):
-        """Every slot still running, stopped: its script by SIGTERM (it
-        restores its slot's source), then what it started and left."""
+    def stop(self):
+        """Stop only pinned processes belonging to this run's slot roots.
+
+        Never signal numeric process groups or re-open a reaped root PID.
+        Each slot's source is restored when the next run mirrors the tree.
+        """
         self.stopping = True
+        errors = []
         for s in self.slots:
-            if s.proc and s.proc.poll() is None:
-                left = descendants_of(s.proc.pid)
+            if s.identity is None:
+                if s.proc is not None:
+                    try:
+                        kill_unreaped(s.proc)
+                    except BaseException as error:
+                        errors.append(str(error))
+                continue
+            frozen = {}
+            try:
+                freeze(s.identity, frozen)
+            except Exception as error:
+                errors.append(str(error))
+            finally:
+                # A failed kill/close must not skip the other handles.
+                for owned in [*reversed(list(frozen.values())), s.identity]:
+                    try:
+                        owned.send(signal.SIGKILL)
+                    except BaseException as error:
+                        errors.append(f"kill: {type(error).__name__}: {error}")
+                deadline = time.monotonic() + 5
+                for owned in [*frozen.values(), s.identity]:
+                    try:
+                        if not owned.wait_exited(deadline):
+                            errors.append("a pinned process did not terminate within five seconds")
+                    except BaseException as error:
+                        errors.append(f"exit: {type(error).__name__}: {error}")
+                for owned in frozen.values():
+                    try:
+                        owned.close()
+                    except BaseException as error:
+                        errors.append(f"close: {type(error).__name__}: {error}")
                 try:
-                    os.killpg(s.proc.pid, signal.SIGTERM)
-                except ProcessLookupError:
-                    pass
-                try:
-                    s.proc.wait(timeout=30)
-                except subprocess.TimeoutExpired:
-                    os.killpg(s.proc.pid, signal.SIGKILL)
-                    s.proc.wait()
-                for pid, started in left:
-                    if started_at(pid) == started:
-                        try:
-                            os.kill(pid, signal.SIGKILL)
-                        except ProcessLookupError:
-                            pass
+                    s.proc.wait(timeout=max(0, deadline - time.monotonic()))
+                except BaseException as error:
+                    errors.append(f"reap: {type(error).__name__}: {error}")
+        if errors:
+            raise RuntimeError("slot cleanup could not prove ownership: " + "; ".join(errors))
 
     # -- the run
 
@@ -531,16 +560,35 @@ class Run:
             previous[sig] = signal.signal(sig, self.stopped_from_outside)
         self.held = None
         try:
+            require_pidfds()
             self.dealt = deal(self.mutants, self.n)
             trees = self.prepare()
             return self.merge(trees)
         finally:
             for sig, handler in previous.items():
                 signal.signal(sig, handler)
+            errors = []
             if self.held is not None:
-                self.held.close()
+                try:
+                    self.held.close()
+                except BaseException as error:
+                    errors.append(str(error))
+            for slot in self.slots:
+                if slot.identity is not None:
+                    try:
+                        slot.identity.close()
+                    except BaseException as error:
+                        errors.append(str(error))
+            if errors:
+                raise RuntimeError("slot handles could not all close: " + "; ".join(errors))
 
     def stopped_from_outside(self, *_):
+        # Repeated cancellation must not interrupt release of frozen children.
+        if self.stopping:
+            return
+        if self.launching:
+            self.cancel_requested = True
+            return
         raise SystemExit(1)
 
     def start(self, trees):
@@ -548,15 +596,34 @@ class Run:
         relative = self.script.relative_to(self.root)
         for k, (picked, (slot, tmp)) in enumerate(zip(self.dealt, trees)):
             s = Slot(k, picked, self.mutants)
-            s.proc = subprocess.Popen(
-                [sys.executable, str(slot / relative), *self.argv],
-                cwd=slot,
-                env=env_of(k, slot, tmp, picked, total, self.environ),
-                stdout=subprocess.PIPE,
-                start_new_session=True,
-            )
+            # Register a recoverable record before a child can exist. Defer
+            # cancellation until its pin and listener handoff are complete;
+            # no blocked OS signal mask is inherited by the child.
             self.slots.append(s)
-            threading.Thread(target=self.listen, args=(s,), daemon=True).start()
+            self.launching = True
+            try:
+                s.proc = subprocess.Popen(
+                    [sys.executable, str(slot / relative), *self.argv],
+                    cwd=slot,
+                    env=env_of(k, slot, tmp, picked, total, self.environ),
+                    stdout=subprocess.PIPE,
+                    start_new_session=True,
+                )
+                # No listener can reap this direct child before its pin.
+                try:
+                    s.identity = pin(s.proc.pid)
+                    if s.identity is None:
+                        raise RuntimeError("cannot pin the unreaped slot root")
+                except BaseException:
+                    # This command owns SIGCHLD and has no other reaper for
+                    # the direct child. Its unreaped PID cannot be reused.
+                    kill_unreaped(s.proc)
+                    raise
+                threading.Thread(target=self.listen, args=(s,), daemon=True).start()
+            finally:
+                self.launching = False
+            if self.cancel_requested:
+                raise SystemExit(1)
 
     def merge(self, trees):
         try:
@@ -641,6 +708,172 @@ def descendants_of(pid):
         return []
     parents = mutation_bound.Linux.parents()
     return [(p, started_at(p)) for p in mutation_bound.descendants(parents, pid)]
+
+
+def kill_unreaped(proc):
+    """The startup-only fallback before any listener can reap this child."""
+    errors = []
+    try:
+        try:
+            proc.kill()
+        except BaseException as error:
+            errors.append(f"kill unreaped child: {type(error).__name__}: {error}")
+        try:
+            proc.wait(timeout=5)
+        except BaseException as error:
+            errors.append(f"reap unreaped child: {type(error).__name__}: {error}")
+    finally:
+        try:
+            proc.stdout.close()
+        except BaseException as error:
+            errors.append(f"close startup pipe: {type(error).__name__}: {error}")
+    if errors:
+        raise RuntimeError("startup child cleanup failed: " + "; ".join(errors))
+
+
+def require_pidfds():
+    """Refuse an unsafe parallel launch; serial execution is unchanged."""
+    if not sys.platform.startswith("linux") or not all(
+        callable(getattr(module, name, None))
+        for module, name in ((os, "pidfd_open"), (signal, "pidfd_send_signal"))
+    ):
+        raise RuntimeError("parallel mutant slots require Linux pidfd APIs; use one slot")
+    if signal.getsignal(signal.SIGCHLD) != signal.SIG_DFL:
+        raise RuntimeError("parallel mutant slots require ownership of child reaping; use one slot")
+    # Reset the default disposition through sigaction too, clearing native
+    # SA_NOCLDWAIT flags. This command is the sole reaper of its slot roots.
+    signal.signal(signal.SIGCHLD, signal.SIG_DFL)
+    probe = None
+    try:
+        probe = os.pidfd_open(os.getpid())
+        signal.pidfd_send_signal(probe, 0)
+    except OSError as error:
+        raise RuntimeError("parallel mutant slots cannot open and signal a Linux pidfd; use one slot") from error
+    finally:
+        if probe is not None:
+            os.close(probe)
+
+
+class PinnedProcess:
+    """One kernel process identity, retained until every signal is sent."""
+
+    def __init__(self, pid, started, fd):
+        self.pid, self.started, self.fd = pid, started, fd
+
+    def send(self, sig):
+        if self.fd is None:
+            raise RuntimeError("a closed process handle cannot be signalled")
+        try:
+            signal.pidfd_send_signal(self.fd, sig)
+            return True
+        except ProcessLookupError:
+            return False
+
+    def wait_exited(self, deadline):
+        if self.fd is None:
+            raise RuntimeError("a closed process handle cannot be waited on")
+        # Readiness is the pinned identity's exit, including an unreaped
+        # zombie. Never reopen a numeric PID to decide cleanup completed.
+        waiting = select.poll()
+        waiting.register(self.fd, select.POLLIN)
+        while True:
+            remaining = max(0, deadline - time.monotonic())
+            try:
+                events = waiting.poll(int(remaining * 1000))
+            except InterruptedError:
+                continue
+            if any(flags & (select.POLLERR | select.POLLNVAL) for _, flags in events):
+                raise RuntimeError("a pinned process descriptor cannot be polled")
+            return any(flags & select.POLLIN for _, flags in events)
+
+    def close(self):
+        if self.fd is not None:
+            fd, self.fd = self.fd, None
+            os.close(fd)
+
+
+def pin(pid, expected=None):
+    """Pin a discovered identity, refusing a reuse before the handle opens."""
+    observed = started_at(pid)
+    if observed is None or (expected is not None and observed != expected):
+        return None
+    try:
+        fd = os.pidfd_open(pid)
+    except ProcessLookupError:
+        return None
+    try:
+        if started_at(pid) != observed:
+            os.close(fd)
+            return None
+        return PinnedProcess(pid, observed, fd)
+    except BaseException:
+        os.close(fd)
+        raise
+
+
+def process_state(pid):
+    try:
+        raw = pathlib.Path(f"/proc/{pid}/stat").read_bytes()
+        return raw[raw.rfind(b")") + 2:].split()[0]
+    except (OSError, IndexError):
+        return None
+
+
+def stopped(owned, deadline):
+    """Wait for the pinned process to stop, or observe its exit."""
+    while owned.send(0):
+        state = process_state(owned.pid)
+        if state in (None, b"Z", b"X"):
+            if owned.wait_exited(time.monotonic()):
+                return False
+            raise RuntimeError("a live pinned process has no readable stopped state")
+        if state in (b"T", b"t"):
+            return True
+        if time.monotonic() >= deadline:
+            raise RuntimeError("a pinned slot process did not stop within five seconds")
+        time.sleep(0.005)
+    return False
+
+
+def freeze(root, frozen):
+    """Stop a pinned root and pin its currently provable descendants.
+
+    The stopped, still-live root cannot exit or fork while descent is
+    checked. A reused descendant PID is never used to send a signal.
+    Handles added to `frozen` remain the caller's even on an exception.
+    """
+    deadline = time.monotonic() + 5
+    if not root.send(signal.SIGSTOP) or not stopped(root, deadline):
+        return
+    while True:
+        new = [(p, t) for p, t in descendants_of(root.pid)
+               if (p, t) not in frozen]
+        if not new:
+            return
+        if time.monotonic() >= deadline:
+            raise RuntimeError("the stopped slot's descendants did not settle within five seconds")
+        for pid, started in new:
+            if started is None:
+                if any(p == pid for p, _ in descendants_of(root.pid)):
+                    raise RuntimeError("a live slot descendant has no provable process identity")
+                continue
+            owned = pin(pid, started)
+            if owned is None:
+                continue
+            # Recheck ownership after pinning, before any STOP. If this
+            # identity exits after validation, its pidfd cannot hit a reuse.
+            try:
+                belongs = root.send(0) and (pid, started) in descendants_of(root.pid)
+            except BaseException:
+                owned.close()
+                raise
+            if not belongs:
+                owned.close()
+                continue
+            frozen[(pid, started)] = owned
+            owned.send(signal.SIGSTOP)
+        for owned in frozen.values():
+            stopped(owned, deadline)
 
 
 def started_at(pid):
