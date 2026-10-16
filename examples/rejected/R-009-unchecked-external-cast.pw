@@ -1,7 +1,7 @@
 // @corpus: rejected
 // @id: R-009
 // @category: unchecked external cast
-// @rule: PW0307
+// @rule: PW0601
 // @invariant: unchecked_external_cast
 // @charter: §7.1, §7.10
 // @milestone: 2

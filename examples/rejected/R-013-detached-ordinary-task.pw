@@ -1,7 +1,7 @@
 // @corpus: rejected
 // @id: R-013
 // @category: detached ordinary task
-// @rule: PW0311
+// @rule: PW2002
 // @invariant: task_detached
 // @charter: §7.6
 // @milestone: 9

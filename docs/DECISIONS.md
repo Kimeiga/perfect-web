@@ -3006,3 +3006,11 @@ experience).
   byte for byte the guestbook a browser test drives, the codes' reference
   generated from the registry, and each gap in the checks an example held
   open until the compiler closes it.
+
+### 2026-10-15 — evidence integrity on train-10
+
+[ADR-0344](DECISIONS/ADR-0344-evidence-integrity.md): stale Python bytecode
+is discarded, evidence counts and corpus headers are checked, latency
+bounds thread CPU, suites require complete builds and trains require
+numbered decisions. Accepted under the owner's delegation; integrated
+verification is pending.

@@ -1,7 +1,7 @@
 // @corpus: rejected
 // @id: R-019
 // @category: invalid HTML nesting
-// @rule: PW0317
+// @rule: PW5012
 // @invariant: invalid_nesting
 // @charter: §8.2
 // @milestone: 3

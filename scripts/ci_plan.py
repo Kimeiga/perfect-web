@@ -15,7 +15,9 @@ The recipes are `just`'s own list, kept where they record evidence
   (`body_inputs`), or that runs a shell script the range changed; and each
   recipe whose own lines changed; and with `--current`, as a push plans,
   less each recipe whose committed evidence is current at HEAD (`current`,
-  ADR-0281, amended 2026-10-13 (6));
+  ADR-0281, amended 2026-10-13 (6)); and with `--stale`, as a train's push
+  and master's plan, each recipe whose committed evidence is stale at HEAD,
+  whatever the range (`stale`, track evidence-integrity);
 - or those named.
 
 Each is dealt, the longest first, to the shard where it ends soonest
@@ -32,7 +34,7 @@ Prints, for `$GITHUB_OUTPUT`, `shards=<json>`, a list of `{"index": i,
 nothing is to run.
 
     python3 scripts/ci_plan.py --shards 17 --all
-    python3 scripts/ci_plan.py --shards 17 --changed BASE HEAD [--current]
+    python3 scripts/ci_plan.py --shards 17 --changed BASE HEAD [--current] [--stale]
     python3 scripts/ci_plan.py --shards 17 e14-feed e14-read-whole
 """
 
@@ -532,6 +534,56 @@ def current(
     return out
 
 
+# **A file that names the commit it was recorded at**, whole or with changes
+# beside it: evidence the planner judges (`stale`). One that names none, an
+# artifact or an older recipe's text, is held to what made it by its own
+# test where one is (`evidence_is_current.rs`), and planned as before.
+NAMES_A_COMMIT = re.compile(r"^commit: [0-9a-f]{7,40}\b", re.M)
+
+
+def shown(head: str, path: str, root: pathlib.Path = ROOT) -> str | None:
+    """`path` as `head` holds it, or none where it holds no such file."""
+    out = subprocess.run(["git", "show", f"{head}:{path}"], cwd=root, capture_output=True)
+    if out.returncode != 0:
+        return None
+    return out.stdout.decode("utf-8", errors="replace")
+
+
+def stale(
+    names: list[str],
+    head: str,
+    near: int = NEAR,
+    body: dict[str, str] | None = None,
+    show: Callable[[str, str], str | None] | None = None,
+    **judge: Callable,
+) -> list[str]:
+    """**The recipes of `names` whose committed evidence is stale at
+    `head`** (track evidence-integrity, finding 2): each writes evidence,
+    every file of it, as `head` holds it, names the commit it was recorded
+    at or is missing, and it is not `current` (`judge` is `current`'s own
+    `read`, `descends_from` and `reach`).
+
+    A push plans what its range reaches, less what is current, so evidence
+    gone stale before the range was planned by no push; and the nightly,
+    which runs every recipe, keeps no evidence. So
+    `docs/evidence/E10/privacy-by-resolution.txt` said "4 of 4 mutants
+    killed" from 2026-10-07, when e0752896 retired the fourth from its
+    script, to this track; and 53 more recipes' evidence was stale at
+    master 22a0508e. A train's push and master's plan these too
+    (`--stale`), so the run whose evidence a merge takes records them
+    again."""
+    body = bodies() if body is None else body
+    show = show or shown
+    judged = []
+    for name in names:
+        files = evidence_files(body.get(name, ""))
+        texts = [show(head, f) for f in files]
+        if files and all(t is None or NAMES_A_COMMIT.search(t) for t in texts):
+            judged.append(name)
+    kept = current(judged, head, near, body, **judge)
+    return [n for n in judged if n not in kept]
+
+
 def joined(a: tuple[bool, bool], b: tuple[bool, bool]) -> tuple[bool, bool]:
     """What a shard sets up for two recipes: what either needs."""
     return (a[0] or b[0], a[1] or b[1])
@@ -715,6 +767,9 @@ def main() -> int:
     # With `--changed`: less each recipe whose committed evidence is current
     # at HEAD (`current`), as a push plans.
     parser.add_argument("--current", action="store_true")
+    # With `--changed`: and each recipe whose committed evidence is stale at
+    # HEAD (`stale`), as a train's push and master's plan.
+    parser.add_argument("--stale", action="store_true")
     parser.add_argument("recipes", nargs="*")
     args = parser.parse_args()
     known = recipes()
@@ -732,6 +787,11 @@ def main() -> int:
             for name, sha in sorted(kept.items()):
                 print(f"ci_plan: {name} is current, recorded at {sha[:8]}", file=sys.stderr)
             names = [n for n in names if n not in kept]
+        if args.stale:
+            old = [n for n in stale(evidence, args.changed[1], args.near) if n not in names]
+            for name in old:
+                print(f"ci_plan: {name}'s evidence is stale, so it is planned", file=sys.stderr)
+            names = sorted(set(names) | set(old))
     elif args.all:
         names = evidence
     else:

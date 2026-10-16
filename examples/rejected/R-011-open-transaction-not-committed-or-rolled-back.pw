@@ -1,7 +1,7 @@
 // @corpus: rejected
 // @id: R-011
 // @category: open transaction not committed or rolled back
-// @rule: PW0309
+// @rule: PW2005
 // @invariant: affine_not_consumed_once
 // @charter: §7.7
 // @milestone: 9

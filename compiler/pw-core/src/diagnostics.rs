@@ -237,8 +237,13 @@ impl Diagnostic {
 ///
 /// Two permanent codes for one invariant would be wrong. Aliasing during a
 /// migration is fine.
+///
+/// The corpus migrated on 2026-10-15 (track evidence-integrity): each
+/// rejected fixture's `@rule` is the code `pw check` reports, which never
+/// printed these numbers, and `checking_source.rs` refuses an alias in a
+/// header. What is left is the removal the rule above names.
 pub const DEPRECATED_ALIASES: &[(&str, &str)] = &[
-    // (alias as written in the corpus, canonical invariant code)
+    // (alias as the corpus wrote it until 2026-10-15, canonical invariant code)
     ("PW0326", "PW2004"), // a resource cannot outlive the scope that owns it
     ("PW0311", "PW2002"),
     // Not consumed on a path, and consumed somewhere the scope cannot see.
@@ -269,7 +274,7 @@ pub const DEPRECATED_ALIASES: &[(&str, &str)] = &[
     // R-006: a secret reaching a sink declared `Public`.
     ("PW0304", "PW5006"), // a secret cannot be rendered to the browser
     ("PW0303", "PW5004"), // a shared cache key must carry every partition
-    // R-004 declares PW0100, which `rules.rs` also uses for this invariant —
+    // R-004 declared PW0100, which `rules.rs` also used for this invariant —
     // the charter §16.3 worked example. The scope graph and the label algebra
     // reach the same conclusion by different routes, so one code, not two.
     ("PW0100", "PW5001"),

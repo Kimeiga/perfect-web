@@ -121,9 +121,9 @@ MUTANTS = [
     (
         "a push plans with no regard to the evidence",
         VERIFY,
-        ' --changed "$base" "$GITHUB_SHA" --current >> "$GITHUB_OUTPUT"\n'
+        ' --changed "$base" "$GITHUB_SHA" --current $stale >> "$GITHUB_OUTPUT"\n'
         "              # The chain's choice,",
-        ' --changed "$base" "$GITHUB_SHA" >> "$GITHUB_OUTPUT"\n'
+        ' --changed "$base" "$GITHUB_SHA" $stale >> "$GITHUB_OUTPUT"\n'
         "              # The chain's choice,",
     ),
     # ADR-0281, amended 2026-10-13: a shell script a recipe runs plans it.

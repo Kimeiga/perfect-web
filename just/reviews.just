@@ -41,6 +41,7 @@ e14-reviews:
            | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
        else \
          echo "FAILED: the build (spikes/own-renderer/run.sh, cargo build) did not finish, so the browser suite did not run"; \
+         exit 1; \
        fi; \
        echo; echo "== mutation controls (scripts/reviews_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/reviews_mutations.py; \

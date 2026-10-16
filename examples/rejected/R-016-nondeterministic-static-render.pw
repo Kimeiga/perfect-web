@@ -1,7 +1,7 @@
 // @corpus: rejected
 // @id: R-016
 // @category: nondeterministic static render
-// @rule: PW0314
+// @rule: PW0401
 // @invariant: forbidden_effect
 // @charter: §7.9, §9.3
 // @milestone: 6

@@ -1,7 +1,7 @@
 // @corpus: rejected
 // @id: R-043
 // @category: containment with cross-boundary layout dependency
-// @rule: PW3009
+// @rule: PW0404
 // @invariant: false_independence
 // @charter: §7.5A
 // @milestone: 7

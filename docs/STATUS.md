@@ -23,6 +23,15 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0344, 2026-10-15: evidence integrity** (train-10, from
+`83cdac27`). Mutation runs discard stale Python bytecode; train pushes
+plan stale evidence; counts and rejected fixture headers are held to their
+producers; checking latency bounds thread CPU time; browser suites require
+complete build outputs; trains and master require numbered ADRs.
+The branch recorded 32/32 own controls, plus whole related scripts. The
+integration also makes reviews' failed build fail its recipe. Integrated
+CI and verification are pending; this is not a landing claim.
+
 **ADR-0343, 2026-10-15: a guide whose examples compile** (NEXT's
 developer experience, its docs and tutorial for a developer from outside;
 track `guide`, merged from `49967631`, with the integrator's rulings of

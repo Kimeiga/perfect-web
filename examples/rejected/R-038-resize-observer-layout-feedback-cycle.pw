@@ -1,7 +1,7 @@
 // @corpus: rejected
 // @id: R-038
 // @category: resize observer layout feedback cycle
-// @rule: PW3005
+// @rule: PW0403
 // @invariant: observation_feedback_cycle
 // @charter: §7.5A
 // @milestone: 7
