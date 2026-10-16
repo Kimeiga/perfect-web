@@ -40,8 +40,13 @@ import pathlib
 import re
 import subprocess
 import sys
+import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
+if str(ROOT / "scripts") not in sys.path:
+    sys.path.insert(0, str(ROOT / "scripts"))
+import guide_python
+import cargo_test_results
 TEST = ROOT / "compiler/pw-cli/tests/guide.rs"
 GENERATOR = ROOT / "scripts/guide_diagnostics.py"
 GUIDE = ROOT / "docs/guide"
@@ -743,43 +748,114 @@ def run(cmd, cwd=ROOT):
     return r.returncode, re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", r.stdout + r.stderr)
 
 
+def _test_status(code, passed, failed, failure_status):
+    """Counts describe tests only after a consistent, nonempty producer exit."""
+    return passed + failed > 0 and code == (failure_status if failed else 0)
+
+
+def _stopped(watch):
+    return watch is not None and bool(watch.stopped)
+
+
+class CompilerRefusal(tuple):
+    """The actual app compiler exited1 with its complete error-code set."""
+    def __new__(cls, codes, output):
+        value = super().__new__(cls, (False, 0, 0, set(), output))
+        value.codes = frozenset(codes)
+        return value
+
+
+PYTHON_SELECTOR = pathlib.Path(PYTHON_TEST[-1]).stem
+PYTHON_SEARCH_DIR = ROOT / "scripts/tests"
+PYTHON_PATTERN = PYTHON_TEST[-1]
+PYTHON_EXPECTED_COUNT = 7
+_PYTHON_EXPECTED = None
+_PYTHON_EVIDENCE_ROOT = None
+
+
+class GuideResult(tuple):
+    def __new__(cls, ran, failed, names, output, cargo_failed=(), python_result=None):
+        value = super().__new__(cls, (ran, failed, names, output))
+        value.cargo_failed = frozenset(cargo_failed)
+        value.python_result = python_result
+        return value
+
+
+def freeze_python():
+    global _PYTHON_EVIDENCE_ROOT
+    _PYTHON_EVIDENCE_ROOT = pathlib.Path(tempfile.mkdtemp(prefix="pw-guide-python-evidence-"))
+    expected = guide_python.freeze(PYTHON_SELECTOR, PYTHON_SEARCH_DIR, PYTHON_PATTERN,
+                                   PYTHON_EXPECTED_COUNT, _PYTHON_EVIDENCE_ROOT)
+    if len({identity.rsplit(".", 1)[-1] for identity in expected}) != len(expected):
+        raise guide_python.DiscoveryRefused("bare MUST names would be ambiguous")
+    print(f"Python frozen full IDs: {expected}; evidence {_PYTHON_EVIDENCE_ROOT}", flush=True)
+    return expected
+
+
+def python_tests():
+    if _PYTHON_EXPECTED is None:
+        result = guide_python.unittest_protocol.Result(False, "Python inventory was not frozen")
+        return guide_python.PythonRun(result, result.reason, ROOT, None)
+    return guide_python.run(PYTHON_SELECTOR, _PYTHON_EXPECTED, PYTHON_SEARCH_DIR, _PYTHON_EVIDENCE_ROOT)
+
+
 def guide_tests():
-    """(ran, failed, names of the tests that failed) over the guide's test
-    and the generator's. `ran` is None where a test did not run at all."""
-    ran, failed, names = 0, 0, set()
+    """Cargo tests plus one canonical, provenance-validated Python result."""
     code, out = run(CARGO_TEST)
-    m = re.search(r"test result: \w+\. (\d+) passed; (\d+) failed", out)
-    if m is None:
-        return None, 0, set(), out
-    ran += int(m.group(1)) + int(m.group(2))
-    failed += int(m.group(2))
-    names |= set(re.findall(r"^test (\S+) \.\.\. FAILED", out, re.M))
-    code, out = run(PYTHON_TEST)
-    m = re.search(r"Ran (\d+) tests? in", out)
-    if m is None:
-        return None, 0, set(), out
-    ran += int(m.group(1))
-    bad = re.search(r"FAILED \((?:failures=(\d+))?(?:, )?(?:errors=(\d+))?\)", out)
-    if bad:
-        failed += int(bad.group(1) or 0) + int(bad.group(2) or 0)
-    names |= set(re.findall(r"^(?:FAIL|ERROR): (\S+)", out, re.M))
-    return ran, failed, names, out
+    outputs = [out]
+    cargo = cargo_test_results.parse(code, out)
+    if not cargo.valid:
+        outputs.append("Cargo result refused: " + cargo.reason)
+        return GuideResult(None, 0, set(), "\n".join(outputs))
+    ran = cargo.passed + cargo.failed
+    failed = cargo.failed
+    cargo_failed = set(cargo.failure_names)
+    python = python_tests()
+    outputs.append(python.output)
+    outcome = python.result
+    if not outcome.valid:
+        return GuideResult(None, 0, set(), "\n".join(outputs), cargo_failed, outcome)
+    # Full expected IDs and actual body provenance were validated by the shared
+    # authority before any bare MUST name is considered here.
+    names = cargo_failed | {identity.rsplit(".", 1)[-1] for identity in outcome.failed}
+    return GuideResult(ran + outcome.executed, failed + len(outcome.failed), names,
+                       "\n".join(outputs), cargo_failed, outcome)
+
+
+def failure_categories(result, intended):
+    categories = []
+    if result.cargo_failed & intended:
+        categories.append("Rust test failure")
+    python = result.python_result
+    if python is not None:
+        if {name.rsplit(".", 1)[-1] for name in python.assertion_failed} & intended:
+            categories.append("Python body assertion")
+        if {name.rsplit(".", 1)[-1] for name in python.body_errors} & intended:
+            categories.append("Python body error")
+    return ", ".join(categories)
 
 
 def browser_tests():
-    """(built, ran, failed, titles of the tests that failed): the app built,
-    and the spec run in Chromium."""
+    """(valid, ran, failed, failed titles, output), or typed compiler refusal."""
     code, out = run(APP_BUILD)
     if code != 0:
+        codes = set(re.findall(r"(?m)^error: \[(PW\d{4})\]", out))
+        if code == 1 and codes:
+            return CompilerRefusal(codes, out)
         return False, 0, 0, set(), out
-    code, out = run(SPEC, cwd=ROOT / "spikes/own-renderer")
+    code, out = run(
+        ["bash", str(ROOT / "scripts/run_suite.sh"), "-C", ".", "--", *SPEC],
+        cwd=ROOT / "spikes/own-renderer",
+    )
     passed = re.search(r"(\d+) passed", out)
     failed = re.search(r"(\d+) failed", out)
-    ran = int(passed.group(1) if passed else 0) + int(failed.group(1) if failed else 0)
+    passed = int(passed.group(1)) if passed else 0
+    failed = int(failed.group(1)) if failed else 0
     titles = set(re.findall(r"^\s+\d+\) \[chromium\] › \S+ › (.+?)(?: ─+)?$", out, re.M))
-    if ran == 0:
-        return False, 0, 0, set(), out
-    return True, ran, int(failed.group(1)) if failed else 0, titles, out
+    # The canonical helper owns real producer exit/no-test authority. These
+    # counts name witnesses only when the returned status is consistent.
+    valid = _test_status(code, passed, failed, 1)
+    return valid, passed + failed, failed, titles, out
 
 
 def judge(what, held, names, failed):
@@ -794,6 +870,9 @@ def judge(what, held, names, failed):
 
 def main():
     import mutation_baseline  # keeps what each command says, for a red baseline
+    watch = mutation_baseline.mutation_bound.start()
+    global _PYTHON_EXPECTED
+    _PYTHON_EXPECTED = None
 
     seen = set()
     for what, *_ in MUTANTS:
@@ -802,83 +881,99 @@ def main():
     assert set(MUST) == seen, "MUST names a mutant that is not one"
     assert set(CHECKED) <= seen, "CHECKED names a mutant that is not one"
 
-    ran, failed, names, out = guide_tests()
+    try:
+        _PYTHON_EXPECTED = freeze_python()
+    except guide_python.DiscoveryRefused as error:
+        print(f"REFUSED: Python discovery did not establish a frozen inventory: {error}")
+        return 1
+    result = guide_tests()
+    ran, failed, names, out = result
     print(f"baseline: the guide's tests, {ran} ran, {failed} failed")
-    if ran is None or failed or not ran:
+    if ran is None or failed or not ran or _stopped(watch):
         print(out[-2000:])
         print("FAIL: the unmutated baseline is not green; no mutant can mean anything")
         mutation_baseline.explain()
         return 1
     browser = any(held == "browser" for _, held, *_ in MUTANTS)
     if browser:
-        built, ran, failed, titles, out = browser_tests()
+        result = browser_tests()
+        valid, ran, failed, titles, out = result
         print(f"baseline: the guestbook in Chromium, {ran} ran, {failed} failed")
-        if not built or failed or not ran:
+        if not valid or failed or not ran or _stopped(watch):
             print(out[-3000:])
             print("FAIL: the unmutated baseline is not green; no mutant can mean anything")
             mutation_baseline.explain()
             return 1
 
-    survivors = 0
+    survivors = refused = killed = 0
     for what, held, path, anchor, replacement in MUTANTS:
         original = path.read_text()
         if original.count(anchor) != 1:
             print(f"{what}: ANCHOR NOT FOUND EXACTLY ONCE in {path.name}")
-            survivors += 1
+            refused += 1
             continue
         try:
             path.write_text(original.replace(anchor, replacement, 1))
             if held == "guide":
-                ran, failed, names, out = guide_tests()
-                if ran is None:
-                    verdict = "BROKEN (the mutant does not build or run)"
-                    survivors += 1
+                result = guide_tests()
+                ran, failed, names, out = result
+                if ran is None or not ran or _stopped(watch):
+                    verdict = "REFUSED (invalid or stopped guide producer; no kill)"
+                    refused += 1
                 elif not failed:
                     verdict = "SURVIVED"
                     survivors += 1
                 elif judge(what, held, names, failed):
                     shown = ", ".join(sorted(MUST[what] & names))
-                    verdict = f"KILLED by {shown} ({failed} of {ran} tests fail)"
+                    category = failure_categories(result, MUST[what] & names)
+                    verdict = f"KILLED by {shown} ({failed} of {ran} tests fail; {category})"
+                    killed += 1
                 else:
-                    verdict = f"KILLED, but not by {sorted(MUST[what])}: {sorted(names)}"
+                    verdict = f"SURVIVED (no intended witness failed: {sorted(names)})"
                     survivors += 1
             else:
-                built, ran, failed, names, out = browser_tests()
-                if what in CHECKED:
-                    if built:
-                        verdict = "SURVIVED (the checker takes it)"
-                        survivors += 1
+                result = browser_tests()
+                valid, ran, failed, names, out = result
+                if _stopped(watch):
+                    verdict = "REFUSED (stopped browser/build producer; no kill)"
+                    refused += 1
+                elif isinstance(result, CompilerRefusal):
+                    if what in CHECKED and result.codes == CHECKED[what]:
+                        verdict = f"KILLED by the checker ({', '.join(sorted(result.codes))})"
+                        killed += 1
                     else:
-                        codes = sorted(set(re.findall(r"\[(PW\d{4})\]", out)))
-                        if set(codes) == CHECKED[what]:
-                            verdict = f"KILLED by the checker ({', '.join(codes)})"
-                        else:
-                            verdict = f"REFUSED by {codes}, and the rule named is {sorted(CHECKED[what])}"
-                            survivors += 1
-                elif not built:
-                    verdict = "BROKEN (the mutant is refused: name its rule in CHECKED)"
+                        verdict = f"REFUSED by {sorted(result.codes)}, and the rule named is {sorted(CHECKED.get(what, set()))}"
+                        refused += 1
+                elif not valid or not ran:
+                    verdict = "REFUSED (invalid browser/build producer; no kill)"
+                    refused += 1
+                elif what in CHECKED:
+                    verdict = "SURVIVED (the checker takes it)"
                     survivors += 1
                 elif not failed:
                     verdict = "SURVIVED"
                     survivors += 1
                 elif judge(what, held, names, failed):
                     verdict = f"KILLED by the spec ({failed} of {ran} tests fail)"
+                    killed += 1
                 else:
-                    verdict = f"KILLED, but not by {sorted(MUST[what])}: {sorted(names)}"
+                    verdict = f"SURVIVED (no intended witness failed: {sorted(names)})"
                     survivors += 1
         finally:
             path.write_text(original)
         print(f"{what}: {verdict}", flush=True)
+        if verdict.startswith("REFUSED"):
+            print(out[-3000:], flush=True)
 
     if browser:
         # Leave the app built from the sources as they are.
         code, out = run(APP_BUILD)
-        if code != 0:
+        if code != 0 or _stopped(watch):
             print("FAIL: the app does not build again from the restored sources")
-            survivors += 1
+            refused += 1
 
-    print(f"{len(MUTANTS) - survivors} of {len(MUTANTS)} mutants killed")
-    return 1 if survivors else 0
+    print(f"{killed} of {len(MUTANTS)} mutants killed; {refused} refused; {survivors} survived")
+    return 1 if survivors or refused else 0
 
 
 if __name__ == "__main__":
