@@ -1,6 +1,6 @@
 Complete check program census; no artifacts
-commit: 387bc12e8f1e2a14b9b6ead2f1abdc66fc787681
-binary SHA256: 15227bf49fa8d87bf004c7deba0916b2bb4867afbf117c9eebddd887144e3cc9
+commit: d74e29ffe11cdbc382fcf99f4bcd892f28bc4bec
+binary SHA256: 012359a0d8dfb7654a1d27380d8f8f004efef409e46cd1a5ae675fd0a86516f9
 source diff SHA256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 accepted: new-support-refusal; 85 files; codes=['PW6601']
   [PW6601] a template part the renderer cannot render: store.map_widget.StoreLocation: `<map resource={..}>`: an element that mounts a resource is not compiled

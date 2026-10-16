@@ -423,3 +423,125 @@ current guide harness. The completed guide74 is historical evidence for its
 current controls, not proof of guide producer validity. A separate reviewed
 follow-up after the current source/recipe checkpoint will address it; neither
 this correction nor the two repaired browser scripts closes that gap.
+
+
+## Final check/build checkpoint: source d74e29ff
+
+The tested source checkpoint is `d74e29ffe11cdbc382fcf99f4bcd892f28bc4bec`.
+All applicable whole campaigns and full CI preceded that source commit. The
+original user timing probe remains untracked at its original path and SHA256
+`230eab1aea7b2dadc5b9477fc046c73d5a6d72215831be0e7cf70415e6c1cb6f`.
+It was temporarily relocated only under the approved fmt/CI restoration guard;
+no probe or backup is committed. No diagnostic ceiling or accepted source changed.
+
+After the test-only stream correction, `streams_and_resources` passed 4/4 and
+its sole selected whole mutation script passed 3/3 actual assertion kills
+(baseline 4, no memory stops). The exact complete accepted-corpus CLI refusal
+gate remained 1/1 green. The original stage-positive manifest assertion and
+complete A-008 Stage::Wit refusal are both explicit. Fresh own35 passed 35/35,
+baseline 75, zero bound stops; the entire frozen source/probe manifest matched
+before fresh full CI4.
+
+CI4 naturally passed lint, all workspace unit/doc tests, semantic conformance,
+the exact four complete-program accepted refusals, reference applications and
+248 program mutants (11 exact named checker refusals, zero failing). Raw CI4
+SHA256 `64e85b9e91bc2c9e766140f6418456ef32e9579c82bab28134f6e72a1fc91455`;
+launch SHA256 `b794ceff082e2383daa98c247d80163a124bbba3b28de925a5aa000350f5d20a`.
+CI4 ran against the frozen staged inputs at prior HEAD30f7e670, manifest SHA256
+`8d6f39d60798565e7065cdc875dd8475007ddf653829484b2e4e2df8f7f73ae8`;
+the source checkpoint commits those tested changes. Its wall time was 10:25.41,
+user 2387.97 s, system 121.97 s, CPU 401%, with load 3.47 to 9.38. All 2,289
+source/probe paths matched after CI, the probe backup was absent, and three
+samples of all 68 configured hosts plus provider ports were empty. Earlier
+Clippy/stream CI failures remain separate retained RED records.
+
+The actual `just e14-check-is-build` then ran from clean committed d74e29ff,
+with both deployment variables absent after setup. It passed core 10/10,
+CLI 7/7, corpus 3/3, corpus-producer regressions 2/2, full own35/35 (baseline75,
+zero bound stops), and latency 2/2. Its complete raw output is committed as
+`docs/evidence/E14/check-is-build.txt`; SHA256
+`5bd73722efcf7e1bd5223caf133d0f8d026a2e37f1a608435318194db688afa6`.
+The full recipe took wall 6:29.35, user 360.40 s, system 50.83 s, CPU 105%.
+Source and original probe bytes matched after natural completion; the coordinator
+and child were gone and three configured/provider listener samples were empty.
+The receipt index preserves exact source, raw-report and campaign hashes.
+
+The fresh census is 407 program assemblies covering all 563/563 tracked `.pw`
+files: 11 clean, 323 semantic/syntax refusals, and 73 support-refused assemblies.
+An exact extraction found 16 unique PW6601 messages. The 73 assemblies inherit
+accepted-corpus gaps through generality compositions; they are not 73 distinct
+mechanisms. The four accepted-language backend gaps remain exposed, with exact
+source/stage/subreason/message and no-artifact gates: mounted resources, the
+A-008 generated API collision, build-input page computation, and a style directive.
+Semantic language conformance remains clean. These are not invalid-language or
+completed-feature claims. The committed census now comes from the final compiler.
+
+For the unchanged 55-file store program, three complete CLI samples were:
+
+| Sample | Wall s | User s | System s | CPU |
+| --- | ---: | ---: | ---: | ---: |
+| 1 | 1.49 | 1.48 | 0.01 | 99% |
+| 2 | 1.48 | 1.47 | 0.00 | 100% |
+| 3 | 1.45 | 1.45 | 0.00 | 100% |
+
+Program-source SHA256 is
+`1ff8f9ebb52c8a16ffca9f5b268878c0ad53277294447cb8aab2821755b2d303`;
+compiler SHA256 is
+`012359a0d8dfb7654a1d27380d8f8f004efef409e46cd1a5ae675fd0a86516f9`.
+The latency gate measured cold 1405.93 ms, edit 1320.89 ms, clean 1390.39 ms,
+and reject 696.81 ms. Its full command took wall 34.48 s, user 34.27 s,
+system 0.26 s, CPU 100%; sampling load was about 5.15 to 5.00. The two-second
+ceiling is unchanged. These measurements describe this exact source and host
+condition, not a guaranteed speedup over earlier conditions. Integration adds a
+larger store and generic solving; its full-program cost must be measured again.
+No e9-latency campaign was run while other workers were active.
+
+The distinct completed whole inventory is 21 scripts / 287 controls; repeated
+own35 runs are counted once. The table indexes actual retained full reports,
+not a claim that every historical campaign ran at d74e29ff:
+
+| Script | Complete controls |
+| --- | ---: |
+| one_checker | 5/5 |
+| pure | 16/16 |
+| computed_signals | 17/17 |
+| derived | 3/3 |
+| handler_placement | 4/4 |
+| block_clauses | 13/13 |
+| policy_value | 14/14 |
+| rendered_children | 8/8 |
+| view_element | 6/6 |
+| template_value | 11/11 |
+| signals | 8/8 |
+| speculation | 5/5 |
+| page_speculation | 4/4 |
+| what_a_component_does | 12/12 |
+| wit_name | 5/5 |
+| build_id | 12/12 |
+| refusal | 30/30 |
+| guide | 74/74 |
+| check_is_build | 35/35 |
+| kiokun_test_data | 2/2 |
+| stream | 3/3 |
+
+The prior-head qualifications remain: the combined35/2/12/30 campaign inherited
+deployment variables; its browser launches had the narrowed legacy shard-loader
+exposure described above. Isolated guide74, CI4 and the final recipe unset both.
+Corrected build_id/refusal final restored browser runs were explicitly green
+1/1 and 11/11. Guide74's final cleanup gated APP_BUILD, not a second browser run.
+Its 74 current controls passed, but the integrator's independent invalid-exit
+probe proves a separate guide producer-validity gap. That is an assembled-train
+blocker and a separately reviewed follow-up, not a check/build source failure.
+No all-suite propagation or strict guide producer-validity claim is made here.
+
+The remaining 23 other-script cleanup gaps also remain explicit and parent-owned:
+block_parts, canonical, cart_lines, command_answers, command_order, command_retry,
+connection_faults, documents, holds, instance_changes, keepalive,
+materializer_failure, navigate, not_found, one_entry, page_policy, query_params,
+slots, soft_navigation, store_accounts, stores, stream_boot and test_controls.
+The integrator's mocked-main outcomes are unit-level harness evidence, not
+browser failures or completed whole campaigns. This checkpoint neither repairs
+nor silently credits those other scripts. Both interrupted campaigns remain
+partial/RED and earn no whole pass. The reservation ruling above remains an
+integration prerequisite owned by the parent. No merge, push, authoritative
+status edit, ADR numbering or larger-train landing is performed by this worker.
