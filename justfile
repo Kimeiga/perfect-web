@@ -317,10 +317,25 @@ e8-wit:
 # be attributed if one is ever built. In 2026-08 the finding was that it might
 # not need to be: 37 ms for the 36-file store program. In 2026-10 it is near a
 # second for 52 files (NEXT: the checker's latency).
+#
+# Each row gives the wall clock and the checking thread's CPU time, which the
+# test's ceiling bounds (track evidence-integrity, finding 4). The machine is
+# named by its record in docs/environment/ (`just env-record` writes it: the
+# Mac's macbook.md, a WSL2 PC's pc-wsl.md, another Linux's linux.md, as
+# scripts/record-environment.sh decides), with its load averages before and
+# after: a busy machine stretches both clocks (track evidence-integrity-2,
+# the integrator's ruling 3; recorded in a quiet window, LOCAL_ONLY).
 e9-latency:
     @{ echo "E9 gate item 4 - check latency"; echo; \
        echo "produced by: just e9-latency"; \
-       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; echo; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       case "$(uname -s)" in \
+         Darwin) machine=macbook ;; \
+         Linux) if grep -qi microsoft /proc/version 2>/dev/null; then machine=pc-wsl; else machine=linux; fi ;; \
+         *) machine=unknown ;; \
+       esac; \
+       echo "host: $(uname -m), $(sysctl -n machdep.cpu.brand_string 2>/dev/null || sed -n 's/^model name[[:space:]]*: //p' /proc/cpuinfo 2>/dev/null | head -1), $(getconf _NPROCESSORS_ONLN) CPUs; docs/environment/$machine.md"; \
+       echo "load before: $(uptime | sed 's/.*load averages*: //')"; echo; \
        echo "The gate asks for incremental checks fast enough for editor"; \
        echo "feedback. There is no query system: an edit costs a full check."; \
        echo "On 2026-08-08 a check of 36 files took 37 ms, and the gate passed"; \
@@ -329,12 +344,14 @@ e9-latency:
        echo "feedback, and NEXT carries the work."; echo; \
        cargo test -p pw-core --test check_latency -- --nocapture 2>&1 \
          | grep -E "^(check-latency|test result)|^---- |panicked at"; \
+       echo; echo "load after: $(uptime | sed 's/.*load averages*: //')"; \
        echo; echo "Median of 7 runs, in process, on the machine in"; \
-       echo "docs/environment/macbook.md. The rejected row is the one that"; \
-       echo "matters most: editor feedback is worth the most when the program"; \
-       echo "does not compile."; \
+       echo "docs/environment/$machine.md: the wall clock, and in brackets the"; \
+       echo "checking thread's CPU time, which the test's 2 s ceiling bounds. The"; \
+       echo "rejected row is the one that matters most: editor feedback is worth"; \
+       echo "the most when the program does not compile."; \
      } > docs/evidence/E9/check-latency.txt
-    @grep -E "^check-latency" docs/evidence/E9/check-latency.txt
+    @grep -E "^check-latency|^host:|^load" docs/evidence/E9/check-latency.txt
 
 # E9 gate item 2. Differential AGREEMENT with Koka on the common subset.
 #
