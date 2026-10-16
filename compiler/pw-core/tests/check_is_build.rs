@@ -1,8 +1,5 @@
 //! Complete executable validation beside intentional semantic-only checking.
-use pw_core::{
-    backend::lower::{Checked, Context},
-    check::{Unit, check_program_sources, check_sources},
-};
+use pw_core::check::{Unit, check_program_sources, check_sources};
 fn units(files: &[(&str, &str)]) -> Vec<Unit> {
     files
         .iter()
@@ -50,37 +47,12 @@ fn semantic_errors_short_circuit_support_diagnostics() {
     assert!(executable[0].1.iter().all(|d| d.code != "PW6601"));
 }
 #[test]
-fn a_proof_cannot_be_reused_for_other_hir_of_equal_length() {
-    let a = units(&[("a.pw", "module a\nquery N() -> Int { 1 }\n")]);
-    let b = units(&[("b.pw", "module b\nquery N() -> Int { 2 }\n")]);
-    let hirs: Vec<_> = b.iter().map(|u| &u.hir).collect();
-    let ws = pw_core::resolve::Workspace::build(&hirs);
-    let sigs = pw_core::signatures::Signatures::build(&ws, &hirs);
-    let contracts = pw_core::contract::contracts(&hirs, &sigs, &ws);
-    let make = || {
-        Checked::of(
-            &a,
-            Context {
-                hirs: &hirs,
-                ws: &ws,
-                sigs: &sigs,
-                contracts: &contracts,
-            },
-        )
-    };
-    assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(make)).is_err());
-    assert!(
-        Checked::of(
-            &b,
-            Context {
-                hirs: &hirs,
-                ws: &ws,
-                sigs: &sigs,
-                contracts: &contracts
-            }
-        )
-        .is_ok()
-    );
+fn the_public_callback_uses_the_exact_source_units() {
+    let input = units(&[("app.pw", "module app\nquery N() -> Int { 1 }\n")]);
+    pw_core::program::with_semantic_program(&input, |checked| {
+        assert!(std::ptr::eq(checked.context().hirs[0], &input[0].hir));
+    })
+    .unwrap();
 }
 #[test]
 fn a_partial_inspection_plan_cannot_be_written() {
@@ -91,4 +63,110 @@ fn a_partial_inspection_plan_cannot_be_written() {
     assert!(!path.exists());
     assert!(partial.write(&path).is_err());
     assert!(!path.exists());
+}
+
+#[test]
+fn a_wit_failure_preserves_independent_page_refusals_and_its_own_file() {
+    let inputs = units(&[
+        (
+            "page.pw",
+            "module page\npage Home() {\n route \"/\"\n cache private\n signal n: Int = 0\n view { <title>{n}</title><button type=\"button\" on:press={() => n = n + 1}>Add</button> }\n}\n",
+        ),
+        (
+            "collision.pw",
+            "module collision\nquery Foo() -> Int { 1 }\nquery foo() -> Int { 2 }\n",
+        ),
+    ]);
+    let report = pw_core::program::validate(&inputs);
+    let page = &report.diagnostics[0].1;
+    let wit = &report.diagnostics[1].1;
+    assert!(
+        page.iter()
+            .any(|d| d.reason == "backend_page" && d.message.contains("title part")),
+        "{page:?}"
+    );
+    let collision = wit
+        .iter()
+        .find(|d| d.reason == "backend_wit")
+        .expect("WIT failure at its responsible file");
+    assert!(inputs[1].src[collision.primary_span.clone()].contains("query foo"));
+    assert!(report.into_build().is_err());
+}
+
+#[test]
+fn an_unmappable_export_keeps_its_declaration_identity() {
+    let inputs = units(&[
+        ("other.pw", "module other\nfn one() -> Int !{} { 1 }\n"),
+        (
+            "wrapped.pw",
+            "module m\nopaque type Wrapped<T> = List<T>\nquery Pick() -> Wrapped<Int> { todo }\n",
+        ),
+    ]);
+    let report = pw_core::program::validate(&inputs);
+    assert!(report.diagnostics[0].1.is_empty());
+    let failure = report.diagnostics[1]
+        .1
+        .iter()
+        .find(|d| d.reason == "backend_wit")
+        .expect("unmappable export at its source");
+    assert!(failure.message.contains("has no WIT form"), "{failure:?}");
+    assert!(inputs[1].src[failure.primary_span.clone()].contains("query Pick"));
+}
+
+#[test]
+fn editing_a_report_cannot_turn_a_refused_plan_into_a_validated_one() {
+    let input = units(&[(
+        "app.pw",
+        "module m\nquery Count() -> Int { todo }\npage Home() {\n route \"/\"\n let n = query Count()\n view { <title>Home</title><p>{n}</p> }\n}\n",
+    )]);
+    let mut report = pw_core::program::validate(&input);
+    assert!(
+        report
+            .diagnostics
+            .iter()
+            .any(|(_, ds)| ds.iter().any(|d| d.is_error()))
+    );
+    report.diagnostics.clear();
+    assert!(
+        report.into_build().is_err(),
+        "public report data cannot mint the private validated plan"
+    );
+}
+#[test]
+fn syntax_errors_never_lend_a_backend_prerequisite_proof() {
+    let input = units(&[("broken.pw", "module broken\nquery Bad() -> Int { + }\n")]);
+    let called = std::cell::Cell::new(false);
+    let errors = pw_core::program::with_semantic_program(&input, |_| called.set(true))
+        .err()
+        .expect("syntax errors refuse the proof");
+    assert!(!called.get());
+    assert!(
+        errors
+            .iter()
+            .flat_map(|(_, ds)| ds)
+            .any(|d| d.code == "PW0009")
+    );
+}
+
+#[test]
+fn a_bad_signal_initial_value_is_not_hidden_by_a_page_refusal() {
+    let input = units(&[(
+        "both.pw",
+        "module both\npage Home() {\n route \"/\"\n cache private\n signal n: Int = 1 + 2\n view { <title>{n}</title><button type=\"button\" on:press={() => n = n + 1}>Add</button> }\n}\n",
+    )]);
+    let report = pw_core::program::validate(&input);
+    let errors = &report.diagnostics[0].1;
+    assert!(
+        errors
+            .iter()
+            .any(|d| d.reason == "backend_page" && d.message.contains("title part")),
+        "{errors:?}"
+    );
+    assert!(
+        errors
+            .iter()
+            .any(|d| d.reason == "backend_signal" && d.message.contains("operation")),
+        "{errors:?}"
+    );
+    assert!(report.into_build().is_err());
 }

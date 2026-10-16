@@ -64,16 +64,27 @@ pub fn modules(units: &[crate::check::Unit]) -> Result<Vec<(String, String)>, St
 
 pub(crate) fn modules_prepared(
     p: &super::component::Program<'_>,
-) -> Result<Vec<(String, String)>, String> {
-    super::component::pure_prepared(p, encode_modules)
+) -> Result<Vec<(String, String)>, crate::program::Refusal> {
+    encode_prepared(&super::component::pure_functions(p), p.lowered())
 }
 
 fn encode_modules(
     pure: &[(String, &Function)],
     program: &Program,
 ) -> Result<Vec<(String, String)>, String> {
+    encode_prepared(pure, program).map_err(|r| r.message)
+}
+
+fn encode_prepared(
+    pure: &[(String, &Function)],
+    program: &Program,
+) -> Result<Vec<(String, String)>, crate::program::Refusal> {
     pure.iter()
-        .map(|(id, function)| Ok((id.clone(), encode(id, function, program)?)))
+        .map(|(id, function)| {
+            encode(id, function, program)
+                .map(|source| (id.clone(), source))
+                .map_err(|why| crate::program::Refusal::new(crate::program::Stage::PureJs, id, why))
+        })
         .collect()
 }
 

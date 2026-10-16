@@ -62,13 +62,22 @@ use crate::signatures::Signatures;
 /// failing to emit rather than by being told.
 ///
 /// So the precondition is carried by a **type with a private field**. The only
-/// way to obtain a `Checked` is `Checked::of`, which runs the checker on the
-/// same units, and `program` takes one. A caller cannot hand the backend an
+/// public way to obtain a `Checked` is `program::with_semantic_program`,
+/// which constructs its own resolution/signature context, and `program`
+/// takes the proof it lends. A caller cannot hand the backend an
 /// unresolved program by forgetting a step: there is no step to forget.
 ///
 /// It is deliberately not a `bool` on `Context`, and not a documented
 /// convention. Both are things a caller can be wrong about, which is the shape
 /// of every entry in `docs/RISK_QUEUE.md`.
+///
+/// A caller cannot combine source with a foreign resolution/signature context:
+/// ```compile_fail
+/// use pw_core::{check::Unit, backend::lower::{Checked, Context}};
+/// fn forge<'a>(units: &'a [Unit], context: Context<'a>) {
+///     let _ = Checked::of(units, context);
+/// }
+/// ```
 pub struct Checked<'a> {
     cx: Context<'a>,
     units: &'a [crate::check::Unit],
@@ -76,31 +85,6 @@ pub struct Checked<'a> {
 }
 
 impl<'a> Checked<'a> {
-    /// The semantic prerequisite proof, bound to the exact HIR identities.
-    pub fn of(
-        units: &'a [crate::check::Unit],
-        cx: Context<'a>,
-    ) -> Result<Checked<'a>, Vec<crate::diagnostics::Diagnostic>> {
-        Self::diagnose(units, cx)
-            .map(|(checked, _)| checked)
-            .map_err(|by_file| {
-                by_file
-                    .into_iter()
-                    .flat_map(|(_, ds)| ds)
-                    .filter(|d| d.is_error())
-                    .collect()
-            })
-    }
-
-    pub(crate) fn diagnose(
-        units: &'a [crate::check::Unit],
-        cx: Context<'a>,
-    ) -> Result<(Checked<'a>, crate::program::Diagnostics), crate::program::Diagnostics> {
-        let mut inference = crate::effects::Inference::new(cx.sigs, cx.ws);
-        inference.run(cx.hirs);
-        Self::diagnose_inferred(units, cx, &inference)
-    }
-
     pub(crate) fn diagnose_inferred(
         units: &'a [crate::check::Unit],
         cx: Context<'a>,
@@ -6445,5 +6429,53 @@ fn construct_name(e: &Expr) -> &'static str {
         Expr::Keyword { .. } => "a body-level statement",
         Expr::Template { .. } => "markup",
         Expr::Error => "an expression that did not parse",
+    }
+}
+
+#[cfg(test)]
+mod checked_input_tests {
+    use super::*;
+    #[test]
+    fn another_program_of_equal_length_cannot_receive_the_proof() {
+        let units = |src: &str| {
+            vec![crate::check::Unit {
+                path: "app.pw".into(),
+                src: src.into(),
+                hir: crate::lower::lower_file(src, &pw_syntax::parse_tree(src).green),
+            }]
+        };
+        let a = units("module a\nquery N() -> Int { 1 }\n");
+        let b = units("module b\nquery N() -> Int { 2 }\n");
+        let hirs: Vec<_> = b.iter().map(|u| &u.hir).collect();
+        let ws = Workspace::build(&hirs);
+        let sigs = Signatures::build(&ws, &hirs);
+        let mut inference = crate::effects::Inference::new(&sigs, &ws);
+        inference.run(&hirs);
+        let make = || {
+            Checked::diagnose_inferred(
+                &a,
+                Context {
+                    hirs: &hirs,
+                    ws: &ws,
+                    sigs: &sigs,
+                    contracts: &[],
+                },
+                &inference,
+            )
+        };
+        assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(make)).is_err());
+        assert!(
+            Checked::diagnose_inferred(
+                &b,
+                Context {
+                    hirs: &hirs,
+                    ws: &ws,
+                    sigs: &sigs,
+                    contracts: &[]
+                },
+                &inference
+            )
+            .is_ok()
+        );
     }
 }

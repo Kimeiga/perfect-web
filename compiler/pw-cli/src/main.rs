@@ -1179,28 +1179,18 @@ fn audit_values_command(paths: &[&String]) -> ExitCode {
 /// the build, naming what was refused and why. No Koka and no Marko: neither
 /// backend is called (E10 gate item 1).
 fn build_command(paths: &[&String], out: &str) -> ExitCode {
-    let mut units = Vec::new();
+    let mut sources = Vec::new();
     for path in paths {
         let src = match std::fs::read_to_string(path) {
-            Ok(s) => s,
-            Err(e) => {
-                eprintln!("pw: cannot read {path}: {e}");
+            Ok(src) => src,
+            Err(error) => {
+                eprintln!("pw: cannot read {path}: {error}");
                 return ExitCode::from(2);
             }
         };
-        let parsed = pw_syntax::parse_tree(&src);
-        if !parsed.ok() {
-            eprintln!("pw: {path} does not parse; nothing built");
-            return ExitCode::FAILURE;
-        }
-        let hir = pw_core::lower::lower_file(&src, &parsed.green);
-        units.push(pw_core::check::Unit {
-            path: path.to_string(),
-            src,
-            hir,
-        });
+        sources.push((path.to_string(), src));
     }
-    let build = match pw_core::program::build(&units) {
+    let build = match pw_core::program::validate_sources(&sources).into_build() {
         Ok(b) => b,
         Err(e) => {
             eprintln!("pw: {e}");
@@ -1817,12 +1807,20 @@ fn run() -> ExitCode {
     // given them (ADR-0106). A map keyed by name kept the last file's for
     // every file of that name: `pw check a/app.pw b/app.pw` passed with an
     // error in `a/app.pw` until 2026-09-26.
-    let mut checked = pw_core::check::check_program_sources(&clean).into_iter();
+    let all: Vec<_> = inputs
+        .iter()
+        .map(|i| (i.display.clone(), i.src.clone()))
+        .collect();
+    let checked = pw_core::check::check_program_sources(&all);
     let body_diags: Vec<Vec<Diagnostic>> = inputs
         .iter()
-        .map(|i| match i.parsed.errors.is_empty() {
-            true => checked.next().map(|(_, d)| d).unwrap_or_default(),
-            false => Vec::new(),
+        .zip(checked)
+        .map(|(i, (_, diagnostics))| {
+            if i.parsed.errors.is_empty() {
+                diagnostics
+            } else {
+                Vec::new()
+            }
         })
         .collect();
 

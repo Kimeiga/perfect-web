@@ -14,9 +14,15 @@ code the compiler can emit, from its registry, `compiler/pw-core/src/codes.rs`.
 - **What the program must hold to**: the registry's own sentence.
 - **ADR**: the decisions its registry entry cites, where it cites one.
 
-199 codes are registered; 91 of them cite an ADR in the registry.
+200 codes are registered; 91 of them cite an ADR in the registry.
 A code whose entry cites none is marked `—`: search `docs/DECISIONS/` for its
 number or its symbol.
+
+## Check is build
+
+| Code | Symbol | What the program must hold to | ADR |
+|---|---|---|---|
+| PW6601 | `executable_program` | a semantically valid program is supported by the compiler's executable backends | — |
 
 ## Syntax
 

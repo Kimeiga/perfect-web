@@ -13,12 +13,8 @@
 //! `nothing_lowers_silently` is what says that cannot happen.
 
 use pw_core::backend::ir::{Instr, Lowering, Type};
-use pw_core::backend::lower::{Checked, Context, program};
-use pw_core::contract::contracts;
-use pw_core::hir::Hir;
+use pw_core::backend::lower::program;
 use pw_core::lower::lower_file;
-use pw_core::resolve::Workspace;
-use pw_core::signatures::Signatures;
 use pw_syntax::parse_tree;
 
 /// The store demo, as the one program it is.
@@ -113,23 +109,8 @@ fn lowered(
     pw_core::backend::ir::Program,
     Vec<Lowering<pw_core::backend::ir::Function>>,
 ) {
-    let refs: Vec<&Hir> = built.units.iter().map(|u| &u.hir).collect();
-    let ws = Workspace::build(&refs);
-    let sigs = Signatures::build(&ws, &refs);
-    let cs = contracts(&refs, &sigs, &ws);
-    let cx = Context {
-        hirs: &refs,
-        ws: &ws,
-        sigs: &sigs,
-        contracts: &cs,
-    };
-    let checked = Checked::of(&built.units, cx).unwrap_or_else(|ds| {
-        panic!(
-            "the program does not check, so the backend must not see it: {:?}",
-            ds.iter().map(|d| (d.code, &d.message)).collect::<Vec<_>>()
-        )
-    });
-    program(&checked)
+    pw_core::program::with_semantic_program(&built.units, program)
+        .unwrap_or_else(|diagnostics| panic!("the program must check: {diagnostics:?}"))
 }
 
 /// **The real `add_to_cart` lowers**, which is E10-A's subject.
@@ -588,23 +569,12 @@ command Add(id: Int) -> Int
 }
 ";
     let built = Built::new(&[("t.pw".to_string(), src.to_string())]);
-    let refs: Vec<&Hir> = built.units.iter().map(|u| &u.hir).collect();
-    let ws = Workspace::build(&refs);
-    let sigs = Signatures::build(&ws, &refs);
-    let cs = contracts(&refs, &sigs, &ws);
-    let cx = Context {
-        hirs: &refs,
-        ws: &ws,
-        sigs: &sigs,
-        contracts: &cs,
-    };
-    let refused = Checked::of(&built.units, cx).err().unwrap_or_else(|| {
-        panic!(
-            "the backend accepted a program calling a name that does not \
-             exist — which is precisely how `add_to_cart` came to be blocked \
-             by a defect no earlier stage reported"
-        )
-    });
+    let refused: Vec<_> = pw_core::program::with_semantic_program(&built.units, |_| ())
+        .err()
+        .expect("an unresolved call cannot receive a backend proof")
+        .into_iter()
+        .flat_map(|(_, diagnostics)| diagnostics)
+        .collect();
     assert!(
         refused.iter().any(|d| d.code == "PW0021"),
         "and it refused for the right reason: {:?}",
@@ -625,18 +595,8 @@ command Add(id: Int) -> Int
 }
 ";
     let built = Built::new(&[("t.pw".to_string(), ok.to_string())]);
-    let refs: Vec<&Hir> = built.units.iter().map(|u| &u.hir).collect();
-    let ws = Workspace::build(&refs);
-    let sigs = Signatures::build(&ws, &refs);
-    let cs = contracts(&refs, &sigs, &ws);
-    let cx = Context {
-        hirs: &refs,
-        ws: &ws,
-        sigs: &sigs,
-        contracts: &cs,
-    };
     assert!(
-        Checked::of(&built.units, cx).is_ok(),
+        pw_core::program::with_semantic_program(&built.units, |_| ()).is_ok(),
         "declaring the callee did not satisfy the gate"
     );
 }

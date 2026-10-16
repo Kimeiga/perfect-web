@@ -407,18 +407,7 @@ fn the_call_graph_sees_neither_position() {
 /// one.
 #[test]
 fn the_backend_is_never_handed_this_program() {
-    use pw_core::backend::lower::{Checked, Context};
     let built = Built::new();
-    let refs = built.refs();
-    let ws = Workspace::build(&refs);
-    let sigs = Signatures::build(&ws, &refs);
-    let cs = contracts(&refs, &sigs, &ws);
-    let cx = Context {
-        hirs: &refs,
-        ws: &ws,
-        sigs: &sigs,
-        contracts: &cs,
-    };
     let units: Vec<pw_core::check::Unit> = files()
         .into_iter()
         .zip(built.hirs.iter())
@@ -428,9 +417,12 @@ fn the_backend_is_never_handed_this_program() {
             hir: hir.clone(),
         })
         .collect();
-    let refused = Checked::of(&units, cx)
+    let refused: Vec<_> = pw_core::program::with_semantic_program(&units, |_| ())
         .err()
-        .expect("the probe renders a page that performs a database read");
+        .expect("the probe performs a database read in a page")
+        .into_iter()
+        .flat_map(|(_, diagnostics)| diagnostics)
+        .collect();
     assert!(
         refused.iter().any(|d| d.code == "PW0401"),
         "and for the reason the rows above are about — a page performing what a \

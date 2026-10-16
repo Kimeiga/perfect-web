@@ -102,6 +102,29 @@ impl std::fmt::Display for WitError {
     }
 }
 
+/// Source ownership for executable validation; the underlying public error and
+/// its wording are unchanged for existing WIT consumers.
+pub(crate) struct LocatedError {
+    pub error: WitError,
+    pub declaration: Option<DefId>,
+}
+impl LocatedError {
+    fn at(error: WitError, declaration: DefId) -> Self {
+        Self {
+            error,
+            declaration: Some(declaration),
+        }
+    }
+}
+impl From<WitError> for LocatedError {
+    fn from(error: WitError) -> Self {
+        Self {
+            error,
+            declaration: None,
+        }
+    }
+}
+
 /// **A WIT identifier from a Pleris name.**
 ///
 /// `store.page.StorePage` → `store-page-store-page`. Lowercase kebab, because
@@ -671,12 +694,23 @@ pub fn package(
     contracts: &[ComponentContract],
 ) -> Result<(String, Vec<World>), WitError> {
     let sigs = Signatures::build(ws, hirs);
-    let types = Types::build(hirs, ws, &sigs);
+    let derived = crate::page_values::derived(hirs, ws, &sigs);
+    package_prepared(hirs, ws, contracts, &sigs, &derived).map_err(|failure| failure.error)
+}
+
+pub(crate) fn package_prepared(
+    hirs: &[&Hir],
+    ws: &Workspace,
+    contracts: &[ComponentContract],
+    sigs: &Signatures,
+    derived: &[crate::page_values::Derived],
+) -> Result<(String, Vec<World>), LocatedError> {
+    let types = Types::build(hirs, ws, sigs);
     // A type that contains itself names its node type too (ADR-0194).
     let nodes: Vec<String> = types
         .by_def
         .iter()
-        .filter(|(def, _)| crate::recursion::contains_itself(&sigs, **def))
+        .filter(|(def, _)| crate::recursion::contains_itself(sigs, **def))
         .map(|(_, path)| node_name(path))
         .collect();
     no_collisions(types.known.keys().cloned().chain(nodes))?;
@@ -707,11 +741,10 @@ pub fn package(
     // contracts' ids: no declaration is one, so each is typed by what it
     // takes and answers, and found by its name beside the declaration its
     // expression is written in.
-    let derived: BTreeMap<String, crate::page_values::Derived> =
-        crate::page_values::derived(hirs, ws, &sigs)
-            .into_iter()
-            .map(|d| (d.component_id.clone(), d))
-            .collect();
+    let derived: BTreeMap<String, &crate::page_values::Derived> = derived
+        .iter()
+        .map(|d| (d.component_id.clone(), d))
+        .collect();
 
     let mut worlds = Vec::new();
     let mut apis: Vec<Api> = Vec::new();
@@ -763,7 +796,8 @@ pub fn package(
         let mut funcs = Vec::new();
         let mut used: BTreeSet<String> = BTreeSet::new();
         for e in &c.exports {
-            let (f, u) = wit_func(&ident(&e.name), &sig, &types)?;
+            let (f, u) = wit_func(&ident(&e.name), &sig, &types)
+                .map_err(|error| LocatedError::at(error, declaration))?;
             funcs.push(f);
             used.extend(u);
         }
@@ -822,7 +856,15 @@ pub fn package(
                     ty: "missing host signature".into(),
                     at: id.qualified(),
                 })?;
-            let (text, used) = wit_func(&id.name, &sig, &types)?;
+            let (text, used) = wit_func(&id.name, &sig, &types).map_err(|error| {
+                LocatedError::at(
+                    error,
+                    DefId {
+                        unit,
+                        decl: decl_id.0,
+                    },
+                )
+            })?;
             host_uses.extend(used.iter().cloned());
             let entry = hosts.entry(pkg.to_string()).or_insert_with(|| HostPackage {
                 name: pkg.to_string(),
@@ -878,7 +920,15 @@ pub fn package(
                         .collect(),
                     returns: None,
                 };
-                let (text, used) = wit_func(&name, &taking, &types)?;
+                let (text, used) = wit_func(&name, &taking, &types).map_err(|error| {
+                    LocatedError::at(
+                        error,
+                        DefId {
+                            unit,
+                            decl: decl_id.0,
+                        },
+                    )
+                })?;
                 host_uses.extend(used.iter().cloned());
                 let entry = hosts.entry(pkg.to_string()).or_insert_with(|| HostPackage {
                     name: pkg.to_string(),
@@ -923,7 +973,15 @@ pub fn package(
                 params: sig.params.clone(),
                 returns,
             };
-            let (text, used) = wit_func(&id.name, &answering, &types)?;
+            let (text, used) = wit_func(&id.name, &answering, &types).map_err(|error| {
+                LocatedError::at(
+                    error,
+                    DefId {
+                        unit,
+                        decl: decl_id.0,
+                    },
+                )
+            })?;
             host_uses.extend(used.iter().cloned());
             let entry = hosts.entry(pkg.to_string()).or_insert_with(|| HostPackage {
                 name: pkg.to_string(),
@@ -978,7 +1036,15 @@ pub fn package(
                     params,
                     returns: None,
                 };
-                let (text, used) = wit_func(&id.name, &taking, &types)?;
+                let (text, used) = wit_func(&id.name, &taking, &types).map_err(|error| {
+                    LocatedError::at(
+                        error,
+                        DefId {
+                            unit,
+                            decl: decl_id.0,
+                        },
+                    )
+                })?;
                 host_uses.extend(used.iter().cloned());
                 let entry = hosts.entry(pkg.to_string()).or_insert_with(|| HostPackage {
                     name: pkg.to_string(),
@@ -1009,7 +1075,7 @@ pub fn package(
         .flat_map(|a| a.uses.iter().cloned())
         .chain(host_uses)
         .collect();
-    let type_text = render_types(&types, &reachable(&types, seeds), &sigs)?;
+    let type_text = render_types(&types, &reachable(&types, seeds), sigs)?;
     Ok((render(&type_text, &apis, &worlds, &hosts), worlds))
 }
 

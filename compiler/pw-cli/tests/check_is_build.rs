@@ -18,7 +18,13 @@ impl Program {
     }
     fn run(&self, command: &str) -> Output {
         let mut cmd = Command::new(env!("CARGO_BIN_EXE_pw"));
-        cmd.arg(command).arg(self.0.join("app.pw"));
+        let mut paths: Vec<_> = std::fs::read_dir(&self.0)
+            .unwrap()
+            .map(|p| p.unwrap().path())
+            .filter(|p| p.extension().is_some_and(|e| e == "pw"))
+            .collect();
+        paths.sort();
+        cmd.arg(command).args(paths);
         if command == "check" {
             cmd.arg("--plain");
         }
@@ -109,4 +115,29 @@ fn a_supported_neighbor_checks_and_builds() {
         assert!(out.status.success(), "{command}: {}", text(&out));
     }
     assert!(program.0.join("dist/build-id").is_file());
+}
+
+#[test]
+fn syntax_refusals_keep_clean_siblings_errors_and_skip_backends() {
+    let program = Program::new("module broken\nquery Bad() -> Int { + }\n");
+    std::fs::write(
+        program.0.join("sibling.pw"),
+        "module sibling\nquery Wrong() -> Int { \"text\" }\n",
+    )
+    .unwrap();
+    std::fs::write(program.0.join("unsupported.pw"), "module unsupported\nopaque type Wrapped<T> = List<T>\nquery Pick() -> Wrapped<Int> { todo }\n").unwrap();
+    for command in ["check", "build"] {
+        let out = program.run(command);
+        let said = text(&out);
+        assert!(!out.status.success(), "{command}: {said}");
+        assert!(
+            said.contains("PW0009") && said.contains("PW0606"),
+            "{command}: {said}"
+        );
+        assert!(
+            !said.contains("PW6601"),
+            "{command} ran support validation after a syntax refusal: {said}"
+        );
+    }
+    assert!(!program.0.join("dist").exists());
 }

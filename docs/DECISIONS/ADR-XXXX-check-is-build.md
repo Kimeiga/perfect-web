@@ -105,3 +105,32 @@ their tests. Build-only IO errors remain build-only.
 - Measured latency/CPU/wall/load and any newly refused repository programs.
 
 No equivalence, latency or completion claim is made by this draft.
+
+## Implementation checkpoint (local WIP, not complete)
+
+- Semantic-only `check_units` and `check_sources` remain available for partial
+  and library HIR. `check_program_sources` is CLI check's executable promise;
+  `program::build` consumes that same validation. The historical `build::build`
+  API remains partial inspection compatibility, and `Build::write` now refuses
+  incomplete inspection plans.
+- A public `with_semantic_program` callback constructs its own context and
+  lends the prerequisite proof. The old public constructor taking an arbitrary
+  Context is removed: pointer identity alone cannot prove matching resolution
+  and signatures. Private constructors retain exact HIR identity checking.
+- The successful final plan is a private `Executable` variant, minted only by
+  the validator. Public diagnostic report data cannot grant acceptance. A new
+  regression was red before that separation (`/tmp/check-is-build-report-red.log`).
+- Effects, page plans/members/derived functions, handler modules, component IR,
+  parsed WIT and expected audit worlds are shared, including WIT's formerly
+  repeated page planning. No encoder, audit or support check is approximated.
+- Early WIT/template failures retain independent stage refusals. WIT generation
+  and pure-JS module errors carry typed declaration ownership. Tests cover a
+  two-file collision plus independent title refusal and an unmappable export.
+- The guide's semantic build gaps are PW6601 refusal examples. Its verdict tests
+  retain actual build failure coverage through an unwritable output destination;
+  semantic held-open gaps are explicitly tested as closed. Guide15/15 passed.
+
+Initial full-path latency after sharing: cold1788.36ms/edit1729.24ms, clean
+1992.95ms/rejected926.76ms (55 files), unchanged2s gate,2/2 tests. The final
+source requires a fresh measurement. The integrator's larger56-file train10
+program must be measured separately. No ceiling change is authorized or made.

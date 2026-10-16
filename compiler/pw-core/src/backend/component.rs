@@ -373,9 +373,6 @@ pub(crate) struct Program<'p> {
 }
 
 impl Program<'_> {
-    pub(crate) fn wit(&self) -> &str {
-        self.wit
-    }
     pub(crate) fn lowered(&self) -> &super::ir::Program {
         self.lowered
     }
@@ -410,7 +407,7 @@ fn with_program<R>(
     units: &[crate::check::Unit],
     f: impl FnOnce(&Program<'_>) -> Result<R, String>,
 ) -> Result<R, String> {
-    crate::program::with_checked(units, |checked| with_checked(checked, f))
+    crate::program::with_backend(units, |checked| with_checked(checked, f))
 }
 
 pub(crate) fn with_checked<R>(
@@ -420,16 +417,28 @@ pub(crate) fn with_checked<R>(
     let cx = checked.context();
     let (hirs, ws, contracts) = (cx.hirs, cx.ws, cx.contracts);
     let (wit, worlds) =
-        crate::wit::package(hirs, ws, contracts).map_err(|e| format!("WIT: {e}"))?;
-    let (expected, package) = parse(&wit)?;
+        crate::wit::package_prepared(hirs, ws, contracts, cx.sigs, &checked.pages().derived)
+            .map_err(|e| format!("WIT: {}", e.error))?;
+    with_package(checked, &wit, &worlds, f)
+}
+
+pub(crate) fn with_package<R>(
+    checked: &super::lower::Checked<'_>,
+    wit: &str,
+    worlds: &[crate::wit::World],
+    f: impl FnOnce(&Program<'_>) -> Result<R, String>,
+) -> Result<R, String> {
+    let cx = checked.context();
+    let (hirs, ws, contracts) = (cx.hirs, cx.ws, cx.contracts);
+    let (expected, package) = parse(wit)?;
     let (lowered, refusals) = super::lower::program_by_declaration(checked);
     let idents = crate::wit::type_idents(hirs, ws);
     f(&Program {
         expected: &expected,
         package,
         hirs,
-        wit: &wit,
-        worlds: contracts.iter().zip(&worlds).collect(),
+        wit,
+        worlds: contracts.iter().zip(worlds).collect(),
         lowered: &lowered,
         idents: &idents,
         refusals: &refusals,
@@ -480,6 +489,10 @@ pub(crate) fn pure_prepared<R>(
     p: &Program<'_>,
     f: impl FnOnce(&[(String, &super::ir::Function)], &super::ir::Program) -> Result<R, String>,
 ) -> Result<R, String> {
+    f(&pure_functions(p), p.lowered)
+}
+
+pub(crate) fn pure_functions<'a>(p: &'a Program<'_>) -> Vec<(String, &'a super::ir::Function)> {
     let mut pure = Vec::new();
     for (contract, world) in &p.worlds {
         let query = crate::resolve::declaration(p.hirs, world.declaration)
@@ -491,7 +504,7 @@ pub(crate) fn pure_prepared<R>(
             pure.push((contract.component_id.clone(), function));
         }
     }
-    f(&pure, p.lowered)
+    pure
 }
 
 /// **Compile one component of a program, end to end.**

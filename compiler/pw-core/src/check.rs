@@ -7745,7 +7745,7 @@ pub fn check_sources(files: &[(String, String)]) -> Vec<(String, Vec<Diagnostic>
 /// Full executable-program validation: what `pw check` and `pw build` share.
 /// Unlike semantic-only `check_sources`, this also requires backend support.
 pub fn check_program_sources(files: &[(String, String)]) -> Vec<(String, Vec<Diagnostic>)> {
-    check_sources_with(files, |units| crate::program::validate(units).diagnostics)
+    crate::program::validate_sources(files).diagnostics
 }
 
 fn check_sources_with(

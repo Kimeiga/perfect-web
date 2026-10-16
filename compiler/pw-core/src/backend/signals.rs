@@ -25,7 +25,7 @@ pub struct Compiled {
 
 /// **Every page's signals.** A page with none is not listed.
 pub fn compile(units: &[crate::check::Unit]) -> Result<Vec<Compiled>, String> {
-    crate::program::with_checked(units, compile_checked)
+    crate::program::with_backend(units, compile_checked)
 }
 
 pub(crate) fn compile_checked(

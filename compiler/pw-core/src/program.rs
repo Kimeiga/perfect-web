@@ -9,7 +9,7 @@ pub type Diagnostics = Vec<(String, Vec<Diagnostic>)>;
 
 /// The prerequisite gate used by each public backend and complete validation.
 /// A borrowed proof never leaves this callback or applies to different HIR.
-pub(crate) fn with_checked<R>(
+pub(crate) fn with_backend<R>(
     units: &[Unit],
     f: impl FnOnce(&crate::backend::lower::Checked<'_>) -> Result<R, String>,
 ) -> Result<R, String> {
@@ -27,6 +27,17 @@ pub(crate) fn with_checked<R>(
         })?;
         f(&checked)
     })
+}
+
+/// Run semantic checks with a context derived from these exact units, then
+/// lend the private prerequisite proof to a backend consumer. The callback
+/// cannot mint or retain a proof for another program. This is semantic-only;
+/// `validate` is the full executable-program authority used by CLI commands.
+pub fn with_semantic_program<R>(
+    units: &[Unit],
+    f: impl FnOnce(&crate::backend::lower::Checked<'_>) -> R,
+) -> Result<R, Diagnostics> {
+    with_preparation(units, |result| result.map(|(checked, _)| f(&checked)))
 }
 
 /// One implementation prepares and checks the shared semantic environment.
@@ -110,6 +121,19 @@ impl Refusal {
             at: None,
         }
     }
+    pub(crate) fn wit(failure: crate::wit::LocatedError, hirs: &[&crate::hir::Hir]) -> Self {
+        let error = failure.error;
+        let owner = failure
+            .declaration
+            .map(|def| crate::contract::component_id(hirs[def.unit], crate::hir::DeclId(def.decl)))
+            .unwrap_or_else(|| match &error {
+                crate::wit::WitError::Unmappable { at, .. } => at.clone(),
+                crate::wit::WitError::Collision { second, .. } => second.clone(),
+                crate::wit::WitError::Recursive { ty, .. } => ty.clone(),
+                crate::wit::WitError::Claimed { .. } => String::new(),
+            });
+        Self::new(Stage::Wit, &owner, format!("WIT: {error}"))
+    }
     pub fn at(mut self, text: &str) -> Self {
         self.at = Some(text.into());
         self
@@ -148,12 +172,23 @@ impl Refusal {
 /// with no errors can release the successful executable plan through build().
 pub struct Validation {
     pub diagnostics: Diagnostics,
-    plan: Result<crate::build::Build, String>,
+    plan: Plan,
+}
+// Neither public diagnostics nor a caller-provided backend Context can mint
+// this final proof. Its only constructor is Validation::finish below.
+struct Executable {
+    build: crate::build::Build,
+}
+enum Plan {
+    Validated(Executable),
+    Refused {
+        partial: Option<crate::build::Build>,
+        message: String,
+    },
 }
 impl Validation {
-    pub fn into_build(self) -> Result<crate::build::Build, String> {
-        let errors: Vec<_> = self
-            .diagnostics
+    fn finish(diagnostics: Diagnostics, partial: Result<crate::build::Build, String>) -> Self {
+        let errors: Vec<_> = diagnostics
             .iter()
             .flat_map(|(file, ds)| {
                 ds.iter()
@@ -161,24 +196,69 @@ impl Validation {
                     .map(move |d| format!("{file}: [{}] {}", d.code, d.message))
             })
             .collect();
-        if errors.is_empty() {
-            self.plan
-        } else {
-            Err(format!(
-                "the program does not check, so nothing is compiled: {}",
-                errors.join("; ")
-            ))
+        let plan = match (errors.is_empty(), partial) {
+            (true, Ok(build)) => Plan::Validated(Executable { build }),
+            (_, partial) => {
+                let (partial, fallback) = match partial {
+                    Ok(build) => (Some(build), String::new()),
+                    Err(why) => (None, why),
+                };
+                let message = if errors.is_empty() {
+                    fallback
+                } else {
+                    format!(
+                        "the program does not check, so nothing is compiled: {}",
+                        errors.join("; ")
+                    )
+                };
+                Plan::Refused { partial, message }
+            }
+        };
+        Self { diagnostics, plan }
+    }
+    pub fn into_build(self) -> Result<crate::build::Build, String> {
+        match self.plan {
+            Plan::Validated(ready) => Ok(ready.build),
+            Plan::Refused { message, .. } => Err(message),
         }
     }
-    /// Historical core inspection API. Build::write still refuses a partial
-    /// plan; the CLI uses into_build, never this inspection projection.
+    /// Historical core inspection API. Build::write refuses a partial plan;
+    /// the CLI uses into_build and cannot receive an unvalidated plan.
     pub(crate) fn inspect(self) -> Result<crate::build::Build, String> {
-        if self.plan.is_err() {
-            self.into_build()
-        } else {
-            self.plan
+        match self.plan {
+            Plan::Validated(ready) => Ok(ready.build),
+            Plan::Refused {
+                partial: Some(build),
+                ..
+            } => Ok(build),
+            Plan::Refused { message, .. } => Err(message),
         }
     }
+}
+
+/// Parse one complete source program. Syntax refusals retain independent
+/// semantic findings from clean siblings, but never enter executable backends.
+pub fn validate_sources(files: &[(String, String)]) -> Validation {
+    let parsed: Vec<_> = files
+        .iter()
+        .map(|(_, src)| pw_syntax::parse_tree(src))
+        .collect();
+    if parsed.iter().any(|file| !file.ok()) {
+        return Validation::finish(
+            crate::check::check_sources(files),
+            Err("the program does not parse".into()),
+        );
+    }
+    let units: Vec<_> = files
+        .iter()
+        .zip(parsed)
+        .map(|((path, src), parsed)| Unit {
+            path: path.clone(),
+            src: src.clone(),
+            hir: crate::lower::lower_file(src, &parsed.green),
+        })
+        .collect();
+    validate(&units)
 }
 
 pub fn build(units: &[Unit]) -> Result<crate::build::Build, String> {
@@ -190,10 +270,7 @@ pub fn validate(units: &[Unit]) -> Validation {
         let (checked, mut diagnostics) = match result {
             Ok(value) => value,
             Err(diagnostics) => {
-                return Validation {
-                    diagnostics,
-                    plan: Err("the program does not check".into()),
-                };
+                return Validation::finish(diagnostics, Err("the program does not check".into()));
             }
         };
         let (plan, refusals) = match crate::build::prepare(&checked) {
@@ -215,6 +292,6 @@ pub fn validate(units: &[Unit]) -> Validation {
                 diagnostics[unit].1.push(diagnostic);
             }
         }
-        Validation { diagnostics, plan }
+        Validation::finish(diagnostics, plan)
     })
 }

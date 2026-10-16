@@ -60,9 +60,11 @@ error: [PW0009] expected an expression, found `&`
   |
 4 |     open && staffed
   |           ^ expected an expression, found `&`
+  |
+  = help: Pleris writes `&` for and and `|` for or; write one operator
 ```
 
-The message does not say so yet: write `open & staffed`.
+The help names the Pleris spelling: write `open & staffed`.
 
 ### A module's functions, used without importing it
 

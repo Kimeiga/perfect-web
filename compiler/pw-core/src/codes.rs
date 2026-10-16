@@ -23,6 +23,7 @@
 //! PW58xx   the messages track's (ADR-0253): direct messages
 //! PW60xx   the kiokun track's (ADR-0253): kiokun.com in Pleris
 //! PW64xx   the payments track's (NEXT 6c): a command the platform invokes
+//! PW66xx   check-is-build: executable program support
 //! ```
 //!
 //! A parallel track registers its codes in its own block, with its own
