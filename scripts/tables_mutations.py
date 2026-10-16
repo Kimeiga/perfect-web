@@ -21,6 +21,12 @@ WIT = ROOT / "compiler/pw-core/src/wit.rs"
 MUTANTS = [
     ("lowering gives no table functions", LOWER,
      "    crate::tables::generate(&mut lo.hir);\n", ""),
+    ("table imports belong to the app instead of the platform", BACKEND,
+     "    let binding = match [PLATFORM_PACKAGE, TABLES_PACKAGE]\n",
+     "    let binding = match [PLATFORM_PACKAGE]\n"),
+    ("an empty Result case is emitted as an invalid empty tuple", WIT,
+     "            Builtin::Result => match (unit(0), unit(1)) {\n",
+     "            Builtin::Result => match (unit(0) && false, unit(1) && false) {\n"),
     ("a key names a field twice", TABLES,
      "        if out.iter().any(|o| o == n) {\n", "        if false && out.iter().any(|o| o == n) {\n"),
     ("a table has any module's name", TABLES,

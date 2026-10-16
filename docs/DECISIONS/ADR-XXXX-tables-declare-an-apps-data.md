@@ -80,6 +80,15 @@ imports, fixture build metadata, declaration refusals with accepted controls,
 schema diffs, and the whole mutation suite in `docs/evidence/E14/tables.txt`.
 Final measured counts are recorded after execution below.
 
+The two re-anchored older scripts were run whole at `697bbe5c`:
+`python3 scripts/declared_once_mutations.py` (5-test baseline, 10/10 killed)
+and `python3 scripts/computed_holes_mutations.py` (62-test baseline, 23/23
+killed). Neither stopped a process for memory. Their outputs are preserved
+as `tables-declared-once.txt` and `tables-computed-holes.txt` in D1's evidence.
+Two final direct D1 controls also cover the table namespace's platform
+ownership and the valid WIT representation of `Result<(), E>`; no production
+code changed to add them.
+
 Adversarial tests were red before the guards/projection repair: all three
 misses (duplicate source name, tuple-name collision and nested generic storage)
 reported in `docs/evidence/E14/tables-adversarial-before.txt`, produced by
