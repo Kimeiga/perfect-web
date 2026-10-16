@@ -231,8 +231,8 @@ call's own making of nodes).
   representation and trust it; the browser is not trusted, and what it
   sends is held where it arrives.
 - **Words a type gives a reader** of its own, as a predicate's `says`.
-- **A path segment that is no UTF-8** is answered 404 (no route matches),
-  where ADR-0309 says 400: found by this track's audit, not changed here.
+The audit also found a non-UTF-8 path segment answered 404 where ADR-0309
+says 400. The path-text follow-up below closes that mismatch.
 
 ## Questions for the integrator
 
@@ -245,5 +245,19 @@ call's own making of nodes).
 
 The mutant-programs gate must include every root a mutation script reaches,
 including examples/demo. Evidence-integrity-2 implements this follow-up.
-The non-UTF-8 path status remains open in NEXT; it is not closed by this
-boundary change. Integrated CI and verification remain pending on train-10.
+The initial boundary change left the non-UTF-8 path status open; the
+follow-up below repairs it. Integrated CI and verification remain pending
+on train-10.
+
+## ADR-0309 path-text follow-up, 2026-10-16
+
+The queued mismatch is corrected: malformed percent escapes or non-UTF-8
+decoded path bytes are refused 400 before route matching. The route parser
+uses its existing path decoder; escapes are decoded once, and a plus stays
+a plus. Valid Unicode and a literal escaped percent are accepted. A valid
+unknown path remains 404. The regression first failed with `/demo/invariants/%FF`
+returning 404. Memory and PostgreSQL server suites passed 6/6 each, Clippy passed, and
+the whole argument-invariants script killed 18/18 controls with no bound
+stops. The raw before/after and control evidence is
+`docs/evidence/E14/argument-path-text.txt`. Full assembled CI and verification
+remain pending; no landing is claimed here.

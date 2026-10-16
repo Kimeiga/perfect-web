@@ -15,7 +15,10 @@ The each-header and argument-boundary repairs below are integrated locally
 as ADR-0345/0346 and remain pending train verification. The browser command
 decoder already held opaque invariants; the actual gaps were direct
 component calls, page parameters, Map/Set contents and a vacuous PostgreSQL
-test. Generic-result effects are a separate unfinished track.
+test. Malformed path escapes and non-UTF-8 decoded path text now return
+400 before route matching (ADR-0309/0346); valid unknown paths remain 404.
+The HTTP regression and whole controls pass locally; full train verification
+remains pending. Generic-result effects are a separate unfinished track.
 
 Scheduled orders (ADR-0347) allow one current scheduled order per reader;
 hours are held at choice and placement, not at send; an already-due send

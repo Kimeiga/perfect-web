@@ -297,6 +297,9 @@ fn a_pages_parameters_are_held_where_its_address_gives_them() {
     for path in [
         "/demo/invariants/ab".to_string(),
         "/demo/invariants/abcdefgh".to_string(),
+        "/demo/invariants/%CE%B1%CE%B2".to_string(),
+        "/demo/invariants/%2B%2B".to_string(),
+        "/demo/invariants/%25FF".to_string(),
         format!("/demo/invariants/ab?note={}", "n".repeat(20)),
         format!("/demo/invariants/ab?note={twenty_emoji}"),
         "/page/demo.invariants.InvariantsPage?code=ab&note=x".to_string(),
@@ -308,6 +311,28 @@ fn a_pages_parameters_are_held_where_its_address_gives_them() {
         );
         assert!(body.contains("Rate a code"), "{path}: {body}");
     }
+    // Escapes are decoded once and must be UTF-8 before route matching;
+    // malformed text is a bad request, not an absent page (ADR-0309).
+    for path in [
+        "/demo/invariants/%FF",
+        "/demo/invariants/%C0%AF",
+        "/demo/invariants/%E2%82",
+        "/demo/invariants/%zz",
+        "/demo/invariants/%4",
+        "/unknown/%FF",
+    ] {
+        let (status, body) = asked(path);
+        assert!(
+            status.starts_with("HTTP/1.1 400"),
+            "{path}: {status} {body}"
+        );
+        assert_eq!(
+            body,
+            format!("`{path}`'s path is no text its route can read")
+        );
+    }
+    let (status, _) = asked("/unknown/valid");
+    assert!(status.starts_with("HTTP/1.1 404"), "{status}");
     for (path, why) in [
         (
             "/demo/invariants/a".to_string(),

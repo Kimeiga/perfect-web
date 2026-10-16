@@ -5700,6 +5700,16 @@ impl Server {
     /// gives it (ADR-0162): among the pages this build planned with one.
     /// One route is one page's (PW0341), so the first is the only one.
     fn routed(&self, path: &str, query: &str) -> Option<Result<(String, Params), String>> {
+        // ADR-0309: malformed path text is a bad request before matching,
+        // so a failed decode cannot masquerade as a missing page.
+        if path
+            .split('/')
+            .any(|segment| path_decoded(segment).is_none())
+        {
+            return Some(Err(format!(
+                "`{path}`'s path is no text its route can read"
+            )));
+        }
         self.plans.iter().find_map(|(page, plan)| {
             let route = plan["route"].as_str()?;
             let mut params = route_params(route_path(route), path)?;

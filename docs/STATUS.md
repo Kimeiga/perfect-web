@@ -60,8 +60,11 @@ invalid values; the repaired gaps were direct component calls, page
 parameters and nested Map/Set values. Arguments are held before predicates
 read them. Branch evidence recorded 17/17 own controls, four related whole
 scripts, and 12 browser tests in three engines. Integrated CI and
-verification are pending. A non-UTF-8 path still returns 404; its specified
-400 is an open follow-up.
+verification are pending. The path-text follow-up `49a2f90f` refuses
+malformed escapes and non-UTF-8 path text with 400, while valid unknown
+paths remain 404. Memory and PostgreSQL parameter suites passed 6/6 each;
+whole controls killed 18/18. [Raw correction evidence](evidence/E14/argument-path-text.txt).
+Full assembled verification remains pending.
 
 **ADR-0345, 2026-10-15: each-header expressions are checked**
 (train-10, from `839e8bfa`). Effects, privacy, signals and names now see a
