@@ -1644,7 +1644,10 @@ impl<'p, 'i> Reads<'p, 'i> {
                 })
         };
         let fits = answers.is_some_and(|e| {
-            (e.same_as(found) && holds(e, key)) || (holds(e, key) && holds(e, found))
+            // ADR-0348: preserve an operation's full Result/Option per key
+            // as well as the existing successful-value projection.
+            (e.same_as(found) && holds(e, key))
+                || (holds(e, key) && (holds(e, found) || holds(e, result)))
         });
         if !fits {
             return Err((

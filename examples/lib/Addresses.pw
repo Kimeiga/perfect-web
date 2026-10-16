@@ -109,3 +109,14 @@ fn reaches(store: StoreId, reader: User<UserId>) -> Bool !{ database.read<Addres
 // courier's, or `NoCoverage` where the store does not reach it.
 fn estimate_to(store: StoreId, reader: User<UserId>) -> Result<DeliveryEstimate, EstimateError> !{ database.read<Estimates>, database.read<Addresses> }
     host "store:data/user-estimates#for-store"
+    set estimates_to
+
+// Every store's estimate, with its key, read together. A declared refusal
+// is a result for that store; an unavailable estimator fails the operation.
+type EstimateFor = EstimateFor {
+    store: StoreId,
+    estimate: Result<DeliveryEstimate, EstimateError>,
+}
+
+fn estimates_to(stores: List<StoreId>, reader: User<UserId>) -> List<EstimateFor> !{ database.read<Estimates>, database.read<Addresses> }
+    host "store:data/user-estimates#for-stores"

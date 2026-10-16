@@ -289,9 +289,11 @@ MUTANTS = [
         "an order awaiting its payment does not stop another",
         MEMORY,
         STORE,
-        "                if r.order(owner)?.is_some_and(|o| o.status == AWAITING) {\n"
+        # Track `scheduled-orders` reads the reader's order's status once,
+        # for this refusal and its own beside a scheduled order.
+        "                if current.as_deref() == Some(AWAITING) {\n"
         '                    return Ok(declared("awaiting-payment"));\n',
-        "                if r.order(owner)?.is_some_and(|o| o.status == AWAITING) && false {\n"
+        "                if current.as_deref() == Some(AWAITING) && false {\n"
         '                    return Ok(declared("awaiting-payment"));\n',
     ),
     (

@@ -36,6 +36,13 @@ STORE_RS = SRC / "store.rs"
 # (what, suite, file, anchor, replacement)
 MUTANTS = [
     (
+        "set estimates read coverage once per store again",
+        "postgres",
+        STORE_RS,
+        "                let coverage = coverage_of(r, &stores, reader)?;\n",
+        "                let coverage = stores.iter().map(|store| Ok((store.clone(), coverage(r, store, reader)?))).collect::<Result<BTreeMap<_, _>, String>>()?;\n",
+    ),
+    (
         "PostgreSQL's items' stores are scanned store by store",
         "postgres",
         STORE_PG,

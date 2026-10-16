@@ -45,6 +45,12 @@ GRAMMAR = ROOT / "compiler/pw-syntax/src/grammar.rs"
 # (what, file, anchor, replacement)
 MUTANTS = [
     (
+        "a set pair drops each key's Result wrapper",
+        BOUNDED,
+        "|| (holds(e, key) && (holds(e, found) || holds(e, result)))",
+        "|| (holds(e, key) && holds(e, found))",
+    ),
+    (
         "`sets` is no clause",
         GRAMMAR,
         "    // begin with.\n    \"sets\",\n",

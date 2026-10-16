@@ -50,18 +50,23 @@ import domain.{ StoreId, Store, StoreError, CartError, MenuItem, MenuSection, In
     Money, USD, is_less, begin_payment, PaymentPage, CancelOrderError, AwaitedPayment }
 // NEXT 6c: a payment begun, and settled on the provider's word.
 import payments.{ Settled, PaymentStatus, BeginError, CancelError }
-// The scheduled-commands track: an order no one pays is taken back.
-import clock.{ minutes }
+// The scheduled-commands track: an order no one pays is taken back. Track
+// `scheduled-orders`: an order is for a time, an instant.
+import clock.{ minutes, Instant }
 import capability.{ Session, SessionId, User, UserId }
 import Events.{ MenuChanged, InventoryChanged, UserCartChanged, UserOrderChanged, AddressesChanged, StoreChanged }
 // TRACK SEAM (store-hours): each store's hours, and whether it is open.
-import store.hours.{ StoreStatus, StoresOpen, CartHours, hours_of_cart, closed_in, closing_said }
+import store.hours.{ StoreStatus, StoresOpen, CartHours, hours_of_cart, closing_said }
 // TRACK SEAM (order-total): the order's total, priced from the store's data.
 import store.checkout.{ Priced, Chosen, priced_for, shown_for, promo_for, promo_named, parts_of_cart,
     promo_said, set_tip, set_promo, negative_tip, dollars_typed, total_charged }
 // TRACK SEAM (reviews): a store's ratings and reviews, and the stores of the
 // reader's order to rate.
 import store.reviews.{ StoreRatings, OrderRatings }
+// TRACK SEAM (scheduled-orders): an order placed for a time its reader
+// chooses, offered by its stores' hours and sent to them when it is due.
+import store.scheduled.{ TimesShown, times_shown, checkout_shown, chosen_when, held_to, offered_at,
+    timed_for, set_time, when_scheduled, lead_of, lead_for }
 
 // Public. Same answer for every reader, so a shared cache is correct and the
 // key is just the store. A change to one store's menu drops that store's kept
@@ -287,18 +292,42 @@ user query Order(reader: User<UserId>) -> Result<Option<OrderStatus>, TrackingEr
 // **The reader's checkout** (track `order-total`): the cart priced from the
 // store's data, each store's fees and tax, the code applied and the tip
 // chosen, and what the page says of the code. Read again when the cart, a
-// choice or a store's data changes, or the clock passes a code's expiry.
+// choice or a store's data changes, or the clock passes a code's expiry. And
+// (track `scheduled-orders`) when the order is for, read again when the time
+// chosen is an hour away, or the reader's address changes: a time chosen is
+// held to the windows, which wait for the estimates to it. A cart for as soon
+// as possible asks no estimate.
 user query Checkout(reader: User<UserId>) -> Priced
     freshness      0.seconds
     consistency    read_your_writes
     cache          private
     key            reader
-    invalidates_on UserCartChanged(reader), UserOrderChanged(reader), StoreChanged(_)
+    invalidates_on UserCartChanged(reader), UserOrderChanged(reader), StoreChanged(_), AddressesChanged(reader)
     concurrency    one_per_key
     on_key_change  cancel
     timeout        2.seconds
 {
-    shown_for(reader)
+    checkout_shown(reader)
+}
+
+// **The times the reader may choose** (track `scheduled-orders`): the cart's
+// stores' fifteen-minute windows from an hour to a week ahead, those every
+// store takes an order for as soon as possible at when they are told, by
+// their hours; one day's shown. The reader's, read again when the cart, a
+// store's hours or the reader's address change (the estimates the lead
+// is), or the first window's hour comes.
+user query TimesOffered(reader: User<UserId>, day: Option<String>) -> TimesShown
+    freshness      0.seconds
+    consistency    read_your_writes
+    cache          private
+    key            reader, day
+    invalidates_on UserCartChanged(reader), StoreChanged(_), AddressesChanged(reader)
+    concurrency    one_per_key
+    on_key_change  cancel
+    timeout        2.seconds
+{
+    let stores = hours_of_cart(reader)
+    times_shown(stores, chosen_when(reader), day, lead_of(stores, reader))
 }
 
 // **What the reader's order was charged** (track `order-total`): its total,
@@ -435,10 +464,20 @@ command place_order(shown: Money<USD>)
     invalidates   Cart(current_user()), Order(current_user()), Checkout(current_user()), OrderTotal(current_user())
     emits         UserCartChanged(current_user()), UserOrderChanged(current_user())
 {
+    // TRACK SEAM (scheduled-orders): the time chosen at checkout, none for as
+    // soon as possible, and the cart's stores' hours, read in this
+    // transaction.
+    let when = chosen_when(current_user())
+    let hours = hours_of_cart(current_user())
+    // The stores are told `lead` before a time (none for as soon as possible,
+    // which asks no estimate).
+    let lead = lead_for(hours, when, current_user())
     // TRACK SEAM (store-hours): refused while a store of the cart is closed
-    // or past its last order, read in this transaction.
-    match closed_in(hours_of_cart(current_user())) {
-        Some(closing) => Err(OrderError.Closed(closing)),
+    // or past its last order. TRACK SEAM (scheduled-orders): an order for a
+    // time is held to the times offered now instead, so a store closed now
+    // takes one for a time it would take one.
+    match held_to(hours, when, lead) {
+        Some(refused) => Err(refused),
         // TRACK SEAM (order-total): priced again from the data, in this
         // transaction, never from the page's numbers; refused where the code
         // no longer applies, or the total is not the one the reader was
@@ -450,7 +489,9 @@ command place_order(shown: Money<USD>)
             } else {
                 // NEXT 6c: awaiting its payment, placed once it is paid, where
                 // the deployment takes payments; at once where it takes none.
-                match UserOrders.await_payment(current_user(), p.charged, p.promo) {
+                // TRACK SEAM (scheduled-orders): with its time, where it is
+                // for one, and when its stores are to be told.
+                match UserOrders.await_payment(current_user(), p.charged, p.promo, timed_for(hours, when, lead)) {
                     Err(e) => Err(e),
                     Ok(order) => match begin_payment(order, p.charged.total) {
                         // Taken back thirty minutes on where no one has paid
@@ -460,7 +501,16 @@ command place_order(shown: Money<USD>)
                             schedule expire_order(order) after minutes(30)
                             UserOrders.paying(current_user(), order, payment)
                         },
-                        Err(BeginError.NotTaken) => UserOrders.settle(current_user(), order, PaymentStatus.Succeeded),
+                        // TRACK SEAM (scheduled-orders): paid at once, an
+                        // order for a time is sent to its stores when it is
+                        // due, and they are told nothing before.
+                        Err(BeginError.NotTaken) => match UserOrders.settle(current_user(), order, PaymentStatus.Succeeded) {
+                            Ok(OrderStatus.Scheduled(s)) => {
+                                schedule send_to_store(order) at s.sends
+                                Ok(OrderStatus.Scheduled(s))
+                            },
+                            settled => settled,
+                        },
                         Err(BeginError.TransportFailed) => Err(OrderError.PaymentUnavailable),
                     },
                 }
@@ -472,7 +522,8 @@ command place_order(shown: Money<USD>)
 // **A payment settled, as the provider says it** (NEXT 6c): invoked by the
 // platform once it has its provider's word, on behalf of the reader who
 // began the payment, never pressed. Placed where it succeeded, its cart's
-// other pages told; awaiting still where it has not yet.
+// other pages told, or scheduled where it is for a time (track
+// `scheduled-orders`); awaiting still where it has not yet.
 command settle_payment(settled: Settled)
     -> Result<OrderStatus, OrderError>
     invoked_by    Payments
@@ -487,7 +538,15 @@ command settle_payment(settled: Settled)
     if settled_for_good(settled.status) {
         unschedule expire_order(settled.order)
     }
-    UserOrders.settle(current_user(), settled.order, settled.status)
+    // TRACK SEAM (scheduled-orders): paid, an order for a time is sent to its
+    // stores when it is due, and they are told nothing before.
+    match UserOrders.settle(current_user(), settled.order, settled.status) {
+        Ok(OrderStatus.Scheduled(s)) => {
+            schedule send_to_store(settled.order) at s.sends
+            Ok(OrderStatus.Scheduled(s))
+        },
+        other => other,
+    }
 }
 
 // **Whether a payment's status is its last**: paid, or given up.
@@ -606,6 +665,47 @@ command remove_promo()
     emits         UserCartChanged(current_user())
 {
     Ok(set_promo(current_user(), None))
+}
+
+// **When the order is for** (track `scheduled-orders`), a checkout choice as
+// the tip is: none for as soon as possible, or one of the times offered now,
+// held to them in this transaction. A time not offered now is refused by
+// name.
+command choose_time(when: Option<Instant>)
+    -> Result<Option<Instant>, OrderError>
+    idempotent_by InteractionId
+    retry         transport_only(max = 2, jitter = true)
+    transaction   serializable
+    invalidates   Checkout(current_user())
+    emits         UserCartChanged(current_user())
+{
+    match when {
+        Some(at) => {
+            let hours = hours_of_cart(current_user())
+            if offered_at(hours, at, lead_of(hours, current_user())) {
+                Ok(set_time(current_user(), when).when)
+            } else {
+                Err(OrderError.NotOffered(at))
+            }
+        },
+        None => Ok(set_time(current_user(), None).when),
+    }
+}
+
+// **An order for a time, sent to its stores** (track `scheduled-orders`):
+// run by the clock when its preparation is due, on its reader's behalf, and
+// placed then as an order for as soon as possible is placed at once: its
+// stores have it, and its reader's pages are told, once. An order no longer
+// scheduled, or another, stands as it is.
+command send_to_store(order: String)
+    -> Result<OrderStatus, OrderError>
+    invoked_by    Clock
+    idempotent_by InteractionId
+    transaction   serializable
+    invalidates   Order(current_user())
+    emits         UserOrderChanged(current_user())
+{
+    UserOrders.send(current_user(), order)
 }
 
 // **An address saved, and chosen as it is saved** (track `store-accounts`,
@@ -1017,6 +1117,9 @@ user page CartPage() {
                 }}>Add tip</button>
             </fieldset>
             <p id="cart-hours">{hours}</p>
+            <!-- TRACK SEAM (scheduled-orders): when the order is for, as soon
+                 as possible or a time chosen, and where another is chosen. -->
+            {#if checkout.any}<p id="cart-when">{checkout.when_said} <a id="choose-when" href="/cart/when">Choose a time</a></p>{/if}
             <p id="cart-notice" role="status">{notice}</p>
             <button
                 id="clear-cart"
@@ -1042,6 +1145,11 @@ user page CartPage() {
                     // NEXT 6c: an order of theirs awaits its payment, on its page.
                     Err(OrderError.AwaitingPayment) => notice = "An order of yours awaits its payment: pay it on your order's page.",
                     Err(OrderError.PaymentUnavailable) => notice = "Payment is unavailable just now. Try again in a moment.",
+                    // Track `scheduled-orders`: the time chosen is an hour
+                    // away or less, or a store would take no order when its
+                    // stores are told; the times offered now are on its page.
+                    Err(OrderError.NotOffered(_)) => notice = "The time you chose is no longer offered: choose another.",
+                    Err(OrderError.Scheduled) => notice = "An order of yours is scheduled: you can place another once it is sent to its store.",
                 }}
             >
                 Place order
@@ -1050,6 +1158,70 @@ user page CartPage() {
             {:Some(_)}<p id="order-link"><a href="/order">Follow your order</a></p>
             {:None}
             {/match}
+        </main>
+    }
+}
+
+// **When the order is for** (track `scheduled-orders`): as soon as possible,
+// or one of the times offered now, fifteen-minute windows by day, one day's
+// at a time, the day its address names (ADR-0309). Chosen, the reader is
+// back at the cart. The windows are the program's (`store.scheduled`),
+// computed by comparing the clock, never by the page.
+user page TimePage(day: Option<String>) {
+    route     "/cart/when{?day}"
+    layout    StoreLayout
+    placement origin
+    cache     private
+
+    let times = query TimesOffered(current_user(), day)
+    // Why a time was not chosen.
+    signal notice: String = ""
+
+    view {
+        <title>When to deliver</title>
+        <main>
+            <h1>When to deliver</h1>
+            <p id="when-said">{times.said}</p>
+            <button
+                id="when-soon"
+                type="button"
+                on:press={resumable() => match choose_time(None) {
+                    Ok(_) => navigate CartPage(),
+                    Err(_) => notice = "That could not be chosen just now.",
+                }}
+            >
+                As soon as possible
+            </button>
+            <!-- Each target stands in a paragraph of its own: a link or a button
+                 under 24 pixels tall needs another 24 away (WCAG 2.5.8), and
+                 a list of one-line items sets them 18 to 22 apart. -->
+            <nav aria-label="Days">
+                <ul id="when-days">
+                    {#each times.days as d (d.key)}
+                        <li><p><a href="/cart/when?day={d.key}">{d.said}</a></p></li>
+                    {/each}
+                </ul>
+            </nav>
+            <h2 id="when-day">{times.day}</h2>
+            <ul id="when-windows">
+                {#each times.windows as w (w.key)}
+                    <li>
+                        <p><button
+                            type="button"
+                            aria-label="{w.whole}"
+                            on:press={resumable(captures = { w }) => match choose_time(Some(w.start)) {
+                                Ok(_) => navigate CartPage(),
+                                Err(OrderError.NotOffered(_)) => notice = "That time is no longer offered: choose another.",
+                                Err(_) => notice = "That time could not be chosen just now.",
+                            }}
+                        >
+                            {w.said}
+                        </button></p>
+                    </li>
+                {/each}
+            </ul>
+            <p id="when-notice" role="status">{notice}</p>
+            <p><a href="/cart">Back to your cart</a></p>
         </main>
     }
 }
@@ -1154,6 +1326,7 @@ user page OrderPage() {
                     {:Delivered}<p id="order-status">Delivered.</p>
                     {:AwaitingPayment(_)}<p id="order-status">Awaiting your payment: pay below, on the provider's page.</p>
                     {:Canceled}<p id="order-status">Canceled: its items are back in your cart.</p>
+                    {:Scheduled(_)}<p id="order-status">Scheduled for {when_scheduled(order)}.</p>
                     {/match}
                     <!-- NEXT 6c: to pay, while it awaits its payment, which
                          nothing has charged yet; nothing, taken back before

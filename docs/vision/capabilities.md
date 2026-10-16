@@ -20,6 +20,24 @@ in the same commit.
 Checked against train-9 (`track/train-9`, 2026-10-15): `master` at `22a0508e`
 and the train's merges, ADR-0001 to ADR-0343.
 
+## Train-10 integration update, pending verification (2026-10-15)
+
+The rows below retain train-9's evidence scope. Locally on train-10,
+ADR-0345/0346 integrate the each-header and external-invariant repairs;
+the browser command decoder already checked invariants, while direct
+component calls, page parameters and Map/Set traversal were the real gaps.
+ADR-0347/0348 integrate scheduled orders and replace the per-store estimate
+read exposed by PW0405 with a set operation (3 statements at both sizes).
+Full integrated CI/browser/mutation verification is still in progress.
+
+TodoMVC is not accepted by the unchanged official Cypress suite. Its custom
+judge previously returned success for 3/29 tests passing; the corrective
+gate now requires every official test to pass with explicit exit zero.
+The actual run with that gate has 3 passes, 3 failures and 23 not run, and
+correctly fails. Separate Playwright and mutation results do not close this
+obligation. D1 table declarations are being validated; D2's generic adapter
+and migration of TodoMVC remain future implementation.
+
 ## Built
 
 | Capability | ADRs | Limits |
@@ -199,7 +217,7 @@ more.
 | `track/tables` | D1 of the three-database note (ADR-0338): the `table` declaration, its checks (PW0354 to PW0366), its generated functions, `tables.json` and a schema's diff. Its design settled on train-8's `master`; the grammar and lowering first. | A data layer declared in Pleris. |
 | `track/todomvc` | TodoMVC in Pleris, held to its spec and to its upstream Cypress suite; D2's first app with no Rust data layer (ADR-0338). A page binds a signal to its address's fragment, the platform declares a double press and a control losing focus, a checkbox's patch sets its state, `autofocus` on insert; the app, its layer, its tests, mutation controls and the ADR; its spec 141 of 141 in three engines, and TodoMVC's own Cypress suite run against it (Cypress 15.21.1). Its recipes and `just ci` are left. Local, not pushed. | Routing (a fragment); forms; testing tools; the head-to-head comparison. |
 | `track/second-host` | Hosts sharing one database: each hears every commit from the outbox, and a session is the database's. The outbox is a log in commit order that every host reads from its cursor; a commit through either layer waits for the outbox's lock and wakes another host, tested. Three review findings are being fixed. Local, not pushed. | Reading and live updates; accounts (sessions); a second host. |
-| `track/each-head-effects` | A finding: an effectful call, or a secret, in an `{#each}`'s head escapes the effect and privacy checks, as the head is kept as text (ADR-0242's not-claimed). The fix gives the head's list and key to every analysis as expressions: committed with its tests, a 21-mutant script and its ADR, train-8 merged in; the scripts it reaches are being run whole. | Privacy and per-user isolation; capabilities (the checker's soundness). |
+| `track/each-head-effects` | A finding: an effectful call, or a secret, in an `{#each}`'s head escapes the effect and privacy checks, as the head is kept as text (ADR-0242's not-claimed). The fix gives the head's list and key to every analysis as expressions: committed with its tests, a 20-mutant script (one equivalent control was removed) and its ADR, train-8 merged in; the scripts it reaches are being run whole. | Privacy and per-user isolation; capabilities (the checker's soundness). |
 | `track/argument-invariants` | A finding: an opaque type's `where` invariant is not held on a command's arguments a browser sends. Each value entering a program from outside to be read through its type's checked constructor, and refused with words where it fails. The reproduction is committed, failing by design; the boundaries are being audited, then the fix. | Commands; forms. |
 | `track/check-is-build` | A finding: `pw check` passes programs `pw build` refuses. The check to run the build's analyses, writing nothing, held by a test over the build's refusals. Started; no commit yet. | Developer experience. |
 | `track/evidence-integrity` | Findings about the evidence itself: stale Python bytecode can decide a mutant's verdict; a file's mutant count is not checked against its script; the corpus's `@rule` headers are stale; `check_latency`'s wall-clock ceiling fails under load. The first three are committed; `check_latency` is next. | The evidence, which is not a row. |

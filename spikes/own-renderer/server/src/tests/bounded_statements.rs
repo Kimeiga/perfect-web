@@ -135,6 +135,7 @@ fn arguments(op: &str, stores: &Val) -> Option<Vec<Val>> {
         "data/user-estimates#for-store" | "data/coverage#for-store" | "data/coverage#reaches" => {
             vec![s("47"), s(ADA)]
         }
+        "data/user-estimates#for-stores" => vec![stores.clone(), s(ADA)],
         "data/hours#for-stores" | "data/fees#for-stores" => vec![stores.clone()],
         "data/promos#find" => vec![s(ADA), s("WELCOME10")],
         "data/search#find" => vec![s("coffee")],
@@ -152,9 +153,14 @@ fn arguments(op: &str, stores: &Val) -> Option<Vec<Val>> {
         "data/addresses#remove" | "data/addresses#choose" => vec![s(ADA), s("addr-1")],
         "data/checkout#set-tip" => vec![s(ADA), Val::Variant("fifteen".into(), None)],
         "data/checkout#set-promo" => vec![s(ADA), Val::Option(None)],
-        "data/user-orders#await-payment" | "data/user-orders#place" => {
-            vec![s(ADA), charged, Val::Option(None)]
+        // Track `scheduled-orders`: the time chosen, none; an order sent; and
+        // an order awaiting its payment is given its time, none.
+        "data/checkout#set-time" => vec![s(ADA), Val::Option(None)],
+        "data/user-orders#send" => vec![s(ADA), s("ref-1")],
+        "data/user-orders#await-payment" => {
+            vec![s(ADA), charged, Val::Option(None), Val::Option(None)]
         }
+        "data/user-orders#place" => vec![s(ADA), charged, Val::Option(None)],
         "data/user-orders#paying" => vec![
             s(ADA),
             s("ref-1"),
@@ -268,6 +274,9 @@ const PINNED: &[(&str, u64)] = &[
     ("store:data/checkout#chosen", 1),
     ("store:data/checkout#parts", 2),
     ("store:data/checkout#set-promo", 2),
+    // Track `scheduled-orders`: the time chosen, read and written as the
+    // tip is.
+    ("store:data/checkout#set-time", 2),
     ("store:data/checkout#set-tip", 2),
     ("store:data/coverage#for-store", 2),
     ("store:data/coverage#reaches", 2),
@@ -304,6 +313,7 @@ const PINNED: &[(&str, u64)] = &[
     ("store:data/user-carts#decrease", 4),
     ("store:data/user-carts#remove", 3),
     ("store:data/user-estimates#for-store", 3),
+    ("store:data/user-estimates#for-stores", 3),
     ("store:data/user-orders#await-payment", 14),
     ("store:data/user-orders#awaited", 2),
     ("store:data/user-orders#charged", 1),
@@ -311,6 +321,10 @@ const PINNED: &[(&str, u64)] = &[
     ("store:data/user-orders#paying", 2),
     ("store:data/user-orders#place", 11),
     ("store:data/user-orders#placed", 1),
+    // Track `scheduled-orders`: the reader's order read, where it is not
+    // there (this reader has none); with an order, its lines and its time
+    // too, and its status written.
+    ("store:data/user-orders#send", 1),
     ("store:data/user-orders#settle", 2),
     ("store:host/carts#join", 1),
     ("store:host/estimates#set", 1),
@@ -377,12 +391,19 @@ fn steps(more: bool) -> Vec<(String, u64)> {
         )
         .expect("chosen")
     });
+    // Track `scheduled-orders`: as soon as possible chosen, which this
+    // scenario's order is for; and the page of times read below.
+    step("choose_time (as soon as possible)", &|| {
+        s.command("store.page.choose_time", "a", &[Val::Option(None)], false)
+            .expect("chosen")
+    });
     for path in [
         "/",
         "/stores/47",
         "/cart",
         "/search?q=coffee",
         "/stores/47/address",
+        "/cart/when",
     ] {
         step(path, &|| {
             fetched_as(&s, path, Some("a"));
@@ -572,26 +593,40 @@ const PAGES: &[(&str, u64)] = &[
     ("add_to_cart (48)", 11),
     ("add_address", 6),
     ("choose_tip", 6),
+    ("choose_time (as soon as possible)", 6),
     // TRACK SEAM (reviews): each list's ratings one read more, the store's
     // page two (its ratings and its reviews), the order page one.
     ("/", 6),
     ("/stores/47", 18),
-    ("/cart", 13),
+    ("/cart", 16),
     ("/search?q=coffee", 9),
     ("/stores/47/address", 2),
-    ("place_order, taking no payments: its operations", 33),
+    // Track `scheduled-orders`: the page of times, its cart's stores' hours
+    // (6), the time chosen (1), and its layout's cart (1); and the windows
+    // wait for all stores' estimates in one set read (ADR-0348): the
+    // address, store rows and estimate, 3 total regardless of key count.
+    // cart's own (16) asks none: a cart for as soon as possible has no lead.
+    ("/cart/when", 11),
+    // Track `scheduled-orders`: 33 and 2 more, the time chosen
+    // (`checkout#chosen`) and, where the order is settled, its time
+    // (`user-orders#settle` 8, was 7).
+    ("place_order, taking no payments: its operations", 35),
     ("place_order, taking no payments: its commit", 7),
+    // Track `scheduled-orders`: 21 and 11 more, the checkout's stores'
+    // hours (3), and the open page of times read again: its time chosen
+    // (1), its stores' hours (6) and its layout's cart (1).
     (
         "place_order, taking no payments: its queries read again",
-        21,
+        32,
     ),
     ("/order", 6),
     // TRACK SEAM (reviews): `rate_order`'s transaction (`MayRate`'s read,
     // `#rate`'s read and its row, and its commit); the reader's open pages
-    // read again after it, the seven the scenario left open, which its cart's
-    // event regenerates; and the rate page, its store and the layout's cart.
+    // read again after it, including scheduling's extra cart-hours read
+    // (3) and the times page with an empty cart (8): 42 + 11 = 53. The rate
+    // page reads its store and the layout's cart separately.
     ("rate_order: its transaction", 8),
-    ("rate_order: its reader's open pages read again", 42),
+    ("rate_order: its reader's open pages read again", 53),
     ("/order/rate/47", 2),
 ];
 
@@ -723,6 +758,71 @@ fn awaiting(more: bool) -> Vec<(String, u64)> {
                 .to_string(),
             told,
         ));
+        // Track `scheduled-orders`: the swept order's lines, back in the
+        // cart, ordered for a time, a quarter hour past the first offered;
+        // paid on the provider's page; and sent to its stores when its
+        // preparation is due, the window less the estimate's most (35
+        // minutes, no address chosen) and five more.
+        let window = ((s.now() + 3_600_000) / 900_000 + 2) * 900_000;
+        let before = quiet(s).len();
+        let chosen = s
+            .command_answered(
+                "store.page.choose_time",
+                "a",
+                &[Val::Option(Some(Box::new(Val::S64(window))))],
+                Some("time-1"),
+            )
+            .expect("answered");
+        assert!(chosen.committed, "{:?}", chosen.result);
+        let total = s.shown_total("a");
+        s.command_answered(
+            "store.page.place_order",
+            "a",
+            std::slice::from_ref(&total),
+            Some("place-4"),
+        )
+        .expect("answered");
+        let ran = quiet(s)[before..].to_vec();
+        let [choose, place] = ran[..] else {
+            panic!("choose_time's transaction, then place_order's: {ran:?}")
+        };
+        out.push((
+            "choose_time, for a time: its transaction".to_string(),
+            choose,
+        ));
+        out.push((
+            "place_order, for a time, taking payments: its transaction".to_string(),
+            place,
+        ));
+        let Some((status, Some(page))) = super::store_payments::status_of(s, "a") else {
+            panic!("an order awaiting its payment")
+        };
+        assert_eq!(status, "awaiting-payment");
+        let before = quiet(s).len();
+        let paid = super::store_payments::pay(&page, "4242424242424242");
+        assert!(paid.contains("Paid."), "{paid}");
+        let ran = quiet(s)[before..].to_vec();
+        let [settle] = ran[..] else {
+            panic!("settle_payment's transaction: {ran:?}")
+        };
+        out.push((
+            "settle_payment, on the provider's word, for a time: its transaction".to_string(),
+            settle,
+        ));
+        let sends = window - 40 * 60_000;
+        s.query_clock
+            .0
+            .advance(u64::try_from(sends - s.now()).expect("ahead") + 1000);
+        let before = quiet(s).len();
+        assert_eq!(s.run_due().0, 1, "the send, run");
+        let ran = quiet(s)[before..].to_vec();
+        let [send] = ran[..] else {
+            panic!("send_to_store's transaction: {ran:?}")
+        };
+        out.push((
+            "send_to_store, run when its preparation is due: its transaction".to_string(),
+            send,
+        ));
     });
     out
 }
@@ -748,11 +848,13 @@ fn placing_and_settling_where_payments_are_taken_is_bounded() {
 // Since ADR-0334 a command's commit writes its scheduled runs too: a delete
 // for each, and an insert for each run due. `place_order` schedules its
 // sweep (2), `settle_payment` and `cancel_order` cancel it (1).
+// Track `scheduled-orders`: `place_order` reads the time chosen (1 more),
+// and `settle_payment` the order's time where it settles one paid (1 more).
 const AWAITING: &[(&str, u64)] = &[
-    ("place_order, taking payments: its transaction", 37),
+    ("place_order, taking payments: its transaction", 38),
     (
         "settle_payment, on the provider's word: its transaction",
-        17,
+        18,
     ),
     ("cancel_order: its transaction", 25),
     (
@@ -763,5 +865,24 @@ const AWAITING: &[(&str, u64)] = &[
     (
         "settle_payment, on the provider's word of the sweep's cancel: its transaction",
         12,
+    ),
+    // Track `scheduled-orders`: an order for a time. Its time chosen, held
+    // to the windows its cart's stores take an order at when they are told:
+    // their hours and the cart's one store's estimate (2: no address is
+    // chosen here, so none to read; 3 where one is); placed, the estimate
+    // read and the time written with it; paid, its send scheduled in the
+    // commit (a delete and an insert); and sent when its preparation is due.
+    ("choose_time, for a time: its transaction", 13),
+    (
+        "place_order, for a time, taking payments: its transaction",
+        40,
+    ),
+    (
+        "settle_payment, on the provider's word, for a time: its transaction",
+        21,
+    ),
+    (
+        "send_to_store, run when its preparation is due: its transaction",
+        9,
     ),
 ];

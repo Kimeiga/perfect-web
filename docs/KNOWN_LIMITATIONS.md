@@ -9,6 +9,24 @@ CI existed. Its complete bytes are retained in
 [the historical limitations file](KNOWN_LIMITATIONS-history-2026-09-15.md).
 Those historical statements must not override current source or test results.
 
+## Train-10 integration, pending verification (2026-10-15)
+
+The each-header and argument-boundary repairs below are integrated locally
+as ADR-0345/0346 and remain pending train verification. The browser command
+decoder already held opaque invariants; the actual gaps were direct
+component calls, page parameters, Map/Set contents and a vacuous PostgreSQL
+test. Generic-result effects are a separate unfinished track.
+
+Scheduled orders (ADR-0347) allow one current scheduled order per reader;
+hours are held at choice and placement, not at send; an already-due send
+runs when payment settles. The times page and chosen-time checkout wait on
+the estimator. Splitting scheduling's words from Checkout is queued. The
+per-store estimate N+1 found during integration is repaired by a set read,
+with three statements at both fixture sizes (ADR-0348). Whole scheduled,
+bounded-checker and statement controls pass, as do 24 combined browser tests;
+full assembled CI and verification remain pending. No production-readiness
+claim follows.
+
 ## Value checking and generated execution
 
 **Open findings, each with the track fixing it** (the integrator's,

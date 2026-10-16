@@ -1,0 +1,278 @@
+Train-10 scheduled-orders integration, 2026-10-16 UTC
+Base: eea9af9a; merge input: 40e81d51; ADR-0347/0348.
+These results precede the remaining train merges. Full assembled just ci
+and GitHub verification are pending. No train landing is claimed.
+
+The first integration runs exposed a real PW0405 refusal in the estimate
+loop, then PW0407 for an exact keyed Result. The repair batches estimates,
+preserves per-key Results, and accepts the exact Result/Option pair shape.
+An initial PostgreSQL run was 49/50: measured page counts required updating
+from 14 to 11 and 42 to 53. The corrected four bounded tests passed below.
+
+Environment: WSL Ubuntu; offline cached dependencies; CARGO_BUILD_JOBS=4;
+CARGO_TARGET_DIR=/home/haki/code/pw-wt/train-10/target; PORT=12841.
+The private setup file supplies database configuration; values are omitted.
+
+Reproduce (from repository root after sourcing the local toolchain):
+cargo fmt --all -- --check
+python3 scripts/mutation_anchors.py
+cargo test --locked --offline -p pw-core --test bounded_reads --test data_sources
+cargo test --locked --offline -p pw-dev-server -- tests::scheduled_orders:: tests::argument_invariants:: tests::reviews::
+cargo test --locked --offline -p pw-dev-server -- tests::scheduled_orders::estimates_read_together
+PW_STORE_TEST_LAYER=postgres cargo test --locked --offline -p pw-dev-server -- tests::bounded_statements::
+cargo test --locked --offline -p pw-core --test evidence_is_current
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/bounded_checker_mutations.py
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/bounded_statements_mutations.py
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/scheduled_orders_mutations.py
+BUILD_ONLY=1 bash spikes/own-renderer/run.sh
+cargo build --locked --offline -p pw-dev-server -p kiokun-server
+(cd spikes/own-renderer && pnpm exec playwright test e2e/scheduled-orders.spec.mjs e2e/reviews.spec.mjs e2e/argument-invariants.spec.mjs --reporter=line)
+
+Focused corrected core tests: bounded_reads 31, data_sources 9, all passed.
+Focused memory server tests: 46 passed. Each whole scheduled mutation run
+also checks its 27 memory and 27 PostgreSQL baselines before controls.
+Combined browser command: 24 passed, no skips, Chromium/Firefox/WebKit.
+Both sequential shell drivers completed with exit 0.
+
+SHA256 of tested source inputs (before subsequent train merges):
+89d98c405bb5a7a8f8ba8dc1abb9b6ac7e5c9a9503c5fe49a5059ae7f2c4cfea  compiler/pw-core/src/bounded.rs
+6e2e0ee6f873706ca622e1ad5ad9b8e7e16df4eac812521ee7d069f88226e3e9  compiler/pw-core/tests/bounded_reads.rs
+a282267475cecb95ec1cb8553c481cd8f01be281838fc7d493cdd9d00e0c21db  examples/lib/Addresses.pw
+f140c2cd59f47ea65d6e1b719cce8c9bad21dceeb015b54e28c251426414bb27  examples/lib/StoreData.pw
+0face245a754e645d08ad3685af451ea787900c313cc101063efbedd6e6d39b8  examples/store/scheduled.pw
+bae0b1ed05b7b3df869a8d94d130236483a186be44b1acd6866cdf75152be0db  examples/store/hours.pw
+0064d6c6903e6e6eee1214e9349ce374f56940987f55e5c949fc406bbd36d735  spikes/own-renderer/server/src/store.rs
+69bd752cc8713e2529c0688d9db3ddb0a290687a68fb3e7dc3fbe7d405ae72d9  spikes/own-renderer/server/src/store_pg.rs
+4a1a816331e7adb3d67e8b38351b056322c5f4e79f8fed402de66ef797980ced  spikes/own-renderer/server/src/scheduled_orders.rs
+d0fa0278ad2ff4b86a4b884e14bc00a732171e7e3e42e2fe92f3aa6db225e56f  spikes/own-renderer/server/src/tests/scheduled_orders.rs
+d175c291e7a7e24cf9f6dd6c2363a0b56a77fb7e215f20a1d68221e48c4b1434  spikes/own-renderer/server/src/tests/bounded_statements.rs
+a9408974d50fc0d2d8d48a3090611c27ff1816820e9fa3e5aa83d6963c35a61e  scripts/bounded_checker_mutations.py
+4f3716911a80fbe489a5dcbf79d562e913ede089434ddaaa86fcb4ca86471b5a  scripts/bounded_statements_mutations.py
+ded4515391bd752eb90794218fa2205b5bcb74be43008dced984246652e49fbd  scripts/scheduled_orders_mutations.py
+
+--- Raw output: train10-controls.log ---
+mutation anchors: 3166 mutants in 270 scripts, each matching once
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+   Compiling pw-dev-server v0.0.0 (/home/haki/code/pw-wt/train-10/spikes/own-renderer/server)
+    Finished `test` profile [unoptimized] target(s) in 4.02s
+     Running unittests src/main.rs (target/debug/deps/pw_dev_server-ff76041b108b4a26)
+
+running 1 test
+test tests::scheduled_orders::estimates_read_together_preserve_each_stores_result ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 620 filtered out; finished in 17.44s
+
+    Finished `test` profile [unoptimized] target(s) in 0.08s
+     Running unittests src/main.rs (target/debug/deps/pw_dev_server-ff76041b108b4a26)
+
+running 4 tests
+test tests::bounded_statements::each_operation_is_a_bounded_number_of_statements_per_call ... ok
+test tests::bounded_statements::a_commands_commit_is_counted_with_it ... ok
+test tests::bounded_statements::each_page_and_command_is_a_bounded_number_of_statements ... ok
+test tests::bounded_statements::placing_and_settling_where_payments_are_taken_is_bounded ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 617 filtered out; finished in 33.99s
+
+handler ce4501910ab2a49a `add_to_cart` in `store.page.StorePage` calls `store.page.add_to_cart` (2953 bytes)
+handler 15483a28f370066a `decrease_in_cart` in `store.page.StorePage` calls `store.page.decrease_in_cart` (1456 bytes)
+handler e54d74c7f76a6a78 `increase_in_cart` in `store.page.StorePage` calls `store.page.increase_in_cart` (1946 bytes)
+handler 0884d13a19812a03 `remove_from_cart` in `store.page.StorePage` calls `store.page.remove_from_cart` (1456 bytes)
+handler b5c3e56ff370a6a8 `clear_cart` in `store.page.StorePage` calls `store.page.clear_cart` (1391 bytes)
+handler 15483a28f370066a `decrease_in_cart` in `store.page.CartPage` calls `store.page.decrease_in_cart` (1456 bytes)
+handler e54d74c7f76a6a78 `increase_in_cart` in `store.page.CartPage` calls `store.page.increase_in_cart` (1946 bytes)
+handler 0884d13a19812a03 `remove_from_cart` in `store.page.CartPage` calls `store.page.remove_from_cart` (1456 bytes)
+handler 029fa6a984724f1c `` in `store.page.CartPage` calls `` (330 bytes)
+handler a1b9d04f6c3d6962 `apply_promo` in `store.page.CartPage` calls `store.page.apply_promo` (6387 bytes)
+handler 481e071528717f3b `remove_promo` in `store.page.CartPage` calls `store.page.remove_promo` (6351 bytes)
+handler dc95ff389eaac1f1 `choose_tip` in `store.page.CartPage` calls `store.page.choose_tip` (1828 bytes)
+handler 1788d84a81fb0dc3 `choose_tip` in `store.page.CartPage` calls `store.page.choose_tip` (1829 bytes)
+handler 6157a6a5babb44ef `choose_tip` in `store.page.CartPage` calls `store.page.choose_tip` (1830 bytes)
+handler 8e028bbd31639049 `choose_tip` in `store.page.CartPage` calls `store.page.choose_tip` (1828 bytes)
+handler 55314a08032a0a1d `` in `store.page.CartPage` calls `` (335 bytes)
+handler 18a30e7eda6408b5 `dollars_typed` in `store.page.CartPage` calls `store.page.choose_tip` (8867 bytes)
+handler b5c3e56ff370a6a8 `clear_cart` in `store.page.CartPage` calls `store.page.clear_cart` (1391 bytes)
+handler 0567c01c8c1d4702 `place_order` in `store.page.CartPage` calls `store.page.place_order` (21028 bytes)
+handler 88497d21af8270bf `choose_time` in `store.page.TimePage` calls `store.page.choose_time` (3738 bytes)
+handler 54002ec8f031143d `choose_time` in `store.page.TimePage` calls `store.page.choose_time` (4459 bytes)
+handler 6f4329b46ef92224 `cancel_order` in `store.page.OrderPage` calls `store.page.cancel_order` (1909 bytes)
+handler 8ef712ee855dff03 `` in `store.page.AddressPage` calls `` (331 bytes)
+handler 8d96aa03266aae5b `choose_address` in `store.page.AddressPage` calls `store.page.choose_address` (1380 bytes)
+handler 26058453d2c7def8 `address_label` in `store.page.AddressPage` calls `store.page.rename_address` (2346 bytes)
+handler 2a2607ad200b08c0 `remove_address` in `store.page.AddressPage` calls `store.page.remove_address` (1344 bytes)
+handler 9b11646e3891a94e `address_label` in `store.page.AddressPage` calls `store.page.add_address` (2875 bytes)
+handler 609a1cdc3f764fa0 `` in `store.rate.RatePage` calls `` (599 bytes)
+handler 137b05e28516165a `` in `store.rate.RatePage` calls `` (599 bytes)
+handler caef098036bb24e4 `` in `store.rate.RatePage` calls `` (599 bytes)
+handler 144ae10590824570 `` in `store.rate.RatePage` calls `` (599 bytes)
+handler 8c99633129a756a0 `` in `store.rate.RatePage` calls `` (599 bytes)
+handler b2ef12af35e8d84f `` in `store.rate.RatePage` calls `` (333 bytes)
+handler 8d037e136bada386 `stars_of` in `store.rate.RatePage` calls `store.rate.rate_order` (4773 bytes)
+34 handler(s) written to docs/evidence/E10/handlers
+   Compiling pw-core v0.0.0 (/home/haki/code/pw-wt/train-10/compiler/pw-core)
+    Finished `test` profile [unoptimized] target(s) in 0.66s
+     Running tests/evidence_is_current.rs (target/debug/deps/evidence_is_current-5313076011474457)
+
+running 7 tests
+test the_check_would_notice_a_change ... ok
+test the_committed_contracts_are_what_the_compiler_derives_now ... ok
+test the_committed_wit_is_what_the_compiler_emits_now ... ok
+test the_committed_kiokun_build_is_what_the_compiler_builds_now ... ok
+test the_committed_handlers_are_what_the_compiler_emits_now ... ok
+test the_committed_page_plan_is_what_the_compiler_plans_now ... ok
+test the_committed_components_are_what_the_compiler_builds_now ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 22.49s
+
+mutation anchors: 3166 mutants in 270 scripts, each matching once
+mutation anchors: 3166 mutants in 270 scripts, each matching once
+mutation anchors: 3166 mutants in 270 scripts, each matching once
+
+--- Raw output: codex-train10-bounded-checker.log ---
+baseline: 31 passed, 0 failed
+a set pair drops each key's Result wrapper: KILLED (4 of 31 tests fail)
+`sets` is no clause: KILLED (23 of 31 tests fail)
+`set` is no clause: KILLED (24 of 31 tests fail)
+`set` and `sets` head a clause wherever they are written: KILLED (1 of 31 tests fail)
+`sets` takes any value: KILLED (2 of 31 tests fail)
+a chunk is of any size: KILLED (1 of 31 tests fail)
+the walk records no call: KILLED (17 of 31 tests fail)
+the walk records no pure call: KILLED (12 of 31 tests fail)
+no combinator applies its callback to its list's elements: KILLED (12 of 31 tests fail)
+a function of the program's applies no callback: KILLED (1 of 31 tests fail)
+a callback called in a loop is applied once: KILLED (1 of 31 tests fail)
+a callback bound by a `let` is in no loop: KILLED (1 of 31 tests fail)
+a `for` binds nothing: KILLED (1 of 31 tests fail)
+nothing recurses over data: KILLED (2 of 31 tests fail)
+a parameter passed along whole is walked: KILLED (2 of 31 tests fail)
+a parameter handed whole to a position another declaration walks is not walked: KILLED (1 of 31 tests fail)
+a recursive call is a read per element: KILLED (2 of 31 tests fail)
+a key through a `let` comes from nothing: KILLED (2 of 31 tests fail)
+a key through a field comes from nothing: KILLED (12 of 31 tests fail)
+a key through a match arm comes from nothing: KILLED (2 of 31 tests fail)
+a key passes through another read: KILLED (1 of 31 tests fail)
+any read in a loop is refused, whatever its key: KILLED (5 of 31 tests fail)
+a host read keys nothing: KILLED (15 of 31 tests fail)
+a host call that also writes is no read: KILLED (1 of 31 tests fail)
+a helper's parameter keys nothing: KILLED (1 of 31 tests fail)
+a function named as a callback is none: KILLED (1 of 31 tests fail)
+a source that states no `sets` batches: KILLED (4 of 31 tests fail)
+a source that batches is warned and one that cannot is not: KILLED (19 of 31 tests fail)
+a resource no source holds is the first source's: KILLED (1 of 31 tests fail)
+a chunked set read costs one call per chunk, rounded down: KILLED (1 of 31 tests fail)
+a set read takes any parameters: KILLED (1 of 31 tests fail)
+a set read answers anything: KILLED (3 of 31 tests fail)
+a set read reads any source: KILLED (1 of 31 tests fail)
+a keyed read that reads no source has a set read: KILLED (1 of 31 tests fail)
+a set that does not fit is refused as a policy's value: KILLED (4 of 31 tests fail)
+a set that does not fit states a policy value's invariant: KILLED (1 of 31 tests fail)
+a known read per element is refused: KILLED (2 of 31 tests fail)
+every read per element is known: KILLED (2 of 31 tests fail)
+a build writes no source's cost: KILLED (1 of 31 tests fail)
+an older build's clauses are read as no clauses: KILLED (1 of 31 tests fail)
+the rules run on no unit: KILLED (21 of 31 tests fail)
+41 of 41 mutants killed
+memory bound: no process was stopped
+
+--- Raw output: codex-train10-bounded-statements.log ---
+baseline (postgres): 4 passed, 0 failed
+set estimates read coverage once per store again [postgres]: KILLED (2 of 4 tests fail)
+PostgreSQL's items' stores are scanned store by store [postgres]: KILLED (3 of 4 tests fail)
+PostgreSQL's stores' hours are read a store at a time [postgres]: KILLED (3 of 4 tests fail)
+hours#for-stores reads each store's hours alone [postgres]: KILLED (2 of 4 tests fail)
+the search's reach reads each store it found alone [postgres]: KILLED (2 of 4 tests fail)
+checkout#parts scans every store's menu for each line's store [postgres]: KILLED (3 of 4 tests fail)
+hours#for-cart scans every store's menu for each line's store [postgres]: KILLED (3 of 4 tests fail)
+the order's reach scans every store's menu for each line's store [postgres]: KILLED (2 of 4 tests fail)
+8 of 8 mutants killed
+memory bound: no process was stopped
+
+--- Raw output: codex-train10-scheduled-orders.log ---
+baseline (memory): 27 passed, 0 failed
+baseline (postgres): 27 passed, 0 failed
+set estimates return only the first store [memory]: KILLED (1 of 27 tests fail)
+a window within the hour is offered [memory]: KILLED (4 of 27 tests fail)
+a window more than a week ahead is offered [memory]: KILLED (5 of 27 tests fail)
+a window is held to the hours at its start, not when its stores are told [memory]: KILLED (9 of 27 tests fail)
+a store is open before it opens [memory]: KILLED (11 of 27 tests fail)
+the last order is held to an order for as soon as possible alone [memory]: KILLED (7 of 27 tests fail)
+the last order is held to a window alone [memory]: KILLED (2 of 27 tests fail)
+an instant is not yet past when it is told [memory]: KILLED (3 of 27 tests fail)
+one store's hours stand for the cart's [memory]: KILLED (1 of 27 tests fail)
+a time between two quarter hours is held to be offered [memory]: KILLED (4 of 27 tests fail)
+a day's windows run past its midnight [memory]: KILLED (6 of 27 tests fail)
+an order is placed for a time no longer offered [memory]: KILLED (3 of 27 tests fail)
+the checkout says a time it no longer offers is scheduled [memory]: KILLED (1 of 27 tests fail)
+the store is told with no lead [memory]: KILLED (11 of 27 tests fail)
+the store is told the lead alone [memory]: KILLED (14 of 27 tests fail)
+the store is told at the window's start [memory]: KILLED (15 of 27 tests fail)
+the estimate's least is counted [memory]: KILLED (14 of 27 tests fail)
+the last store's estimate is counted, not the longest [memory]: KILLED (1 of 27 tests fail)
+a cart for as soon as possible asks the estimate [memory]: KILLED (1 of 27 tests fail)
+the page of times ignores the estimate [memory]: KILLED (6 of 27 tests fail)
+a time is chosen without the estimate [memory]: KILLED (1 of 27 tests fail)
+an order is placed for a time without the estimate [memory]: KILLED (7 of 27 tests fail)
+a window is said an hour off [memory]: KILLED (6 of 27 tests fail)
+a scheduled order is said an hour off [memory]: KILLED (7 of 27 tests fail)
+a scheduled order is said on another day [memory]: KILLED (7 of 27 tests fail)
+noon is said am [memory]: KILLED (6 of 27 tests fail)
+an evening is said on a 24-hour clock [memory]: KILLED (4 of 27 tests fail)
+a week on is said as this week [memory]: KILLED (3 of 27 tests fail)
+the day the page's address names is not shown [memory]: KILLED (5 of 27 tests fail)
+a time is chosen whatever it is [memory]: KILLED (1 of 27 tests fail)
+as soon as possible keeps the time chosen [memory]: KILLED (2 of 27 tests fail)
+an order for a time is held to the hours now [memory]: KILLED (4 of 27 tests fail)
+an order paid at the provider is sent at once [memory]: KILLED (1 of 27 tests fail)
+an order paid at the provider is never sent [memory]: KILLED (1 of 27 tests fail)
+an order paid at once is sent at once [memory]: KILLED (2 of 27 tests fail)
+the order page does not say when [memory]: KILLED (3 of 27 tests fail)
+the cart does not say when [memory]: KILLED (2 of 27 tests fail)
+the checkout is not read again when the reader's address changes [memory]: KILLED (26 of 27 tests fail)
+the page of times is not read again when the reader's address changes [memory]: KILLED (26 of 27 tests fail)
+an instant moved later moves back [memory]: KILLED (25 of 27 tests fail)
+an instant is before itself [memory]: KILLED (21 of 27 tests fail)
+an order paid for a time is placed at once [memory]: KILLED (11 of 27 tests fail)
+any time is taken as the paid order's [memory]: KILLED (1 of 27 tests fail)
+a second order is placed beside a scheduled one [memory]: KILLED (1 of 27 tests fail)
+memory keeps no order's time [memory]: KILLED (11 of 27 tests fail)
+a send places another order [memory]: KILLED (1 of 27 tests fail)
+a send places an order that is not scheduled [memory]: KILLED (1 of 27 tests fail)
+the time chosen is not kept [memory]: KILLED (16 of 27 tests fail)
+a time sent after its window starts is taken [memory]: KILLED (1 of 27 tests fail)
+PostgreSQL keeps the first time chosen [postgres]: KILLED (4 of 27 tests fail)
+PostgreSQL forgets the time chosen [postgres]: KILLED (16 of 27 tests fail)
+PostgreSQL reads an order's window as when it is sent [postgres]: KILLED (6 of 27 tests fail)
+PostgreSQL keeps the first order's reference for a later order's time [postgres]: KILLED (1 of 27 tests fail)
+53 of 53 mutants killed
+memory bound: no process was stopped
+
+--- Raw output: codex-train10-browser-focused.log ---
+
+Running 24 tests using 16 workers
+
+[1/24] [chromium] › e2e/reviews.spec.mjs:66:1 › a delivered order's store is rated once, and its page shows the review
+[2/24] [firefox] › e2e/reviews.spec.mjs:66:1 › a delivered order's store is rated once, and its page shows the review
+[3/24] [firefox] › e2e/argument-invariants.spec.mjs:60:1 › a command's argument that breaks its invariant is refused before it runs
+[4/24] [webkit] › e2e/argument-invariants.spec.mjs:60:1 › a command's argument that breaks its invariant is refused before it runs
+[5/24] [chromium] › e2e/reviews.spec.mjs:119:1 › another reader's open store page is told of a rating, unreloaded
+[6/24] [firefox] › e2e/scheduled-orders.spec.mjs:74:1 › an order for a time is paid now, says when, and is placed when its store is told
+[7/24] [chromium] › e2e/scheduled-orders.spec.mjs:74:1 › an order for a time is paid now, says when, and is placed when its store is told
+[8/24] [chromium] › e2e/argument-invariants.spec.mjs:60:1 › a command's argument that breaks its invariant is refused before it runs
+[9/24] [firefox] › e2e/argument-invariants.spec.mjs:140:1 › a press whose request is altered on the way is refused, and says so
+[10/24] [firefox] › e2e/argument-invariants.spec.mjs:117:1 › a press sends only what the page's own constructors build
+[11/24] [chromium] › e2e/argument-invariants.spec.mjs:117:1 › a press sends only what the page's own constructors build
+[12/24] [firefox] › e2e/argument-invariants.spec.mjs:29:1 › a page's parameters are held where its address gives them
+[13/24] [webkit] › e2e/argument-invariants.spec.mjs:29:1 › a page's parameters are held where its address gives them
+[14/24] [chromium] › e2e/argument-invariants.spec.mjs:29:1 › a page's parameters are held where its address gives them
+[15/24] [chromium] › e2e/argument-invariants.spec.mjs:140:1 › a press whose request is altered on the way is refused, and says so
+[16/24] [webkit] › e2e/argument-invariants.spec.mjs:140:1 › a press whose request is altered on the way is refused, and says so
+[17/24] [firefox] › e2e/reviews.spec.mjs:119:1 › another reader's open store page is told of a rating, unreloaded
+[18/24] [webkit] › e2e/reviews.spec.mjs:66:1 › a delivered order's store is rated once, and its page shows the review
+[19/24] [webkit] › e2e/argument-invariants.spec.mjs:117:1 › a press sends only what the page's own constructors build
+[20/24] [webkit] › e2e/reviews.spec.mjs:119:1 › another reader's open store page is told of a rating, unreloaded
+[21/24] [webkit] › e2e/scheduled-orders.spec.mjs:74:1 › an order for a time is paid now, says when, and is placed when its store is told
+[22/24] [chromium] › e2e/scheduled-orders.spec.mjs:110:1 › a time no longer offered is refused when the order is placed, and the times now are offered
+[23/24] [webkit] › e2e/scheduled-orders.spec.mjs:110:1 › a time no longer offered is refused when the order is placed, and the times now are offered
+[24/24] [firefox] › e2e/scheduled-orders.spec.mjs:110:1 › a time no longer offered is refused when the order is placed, and the times now are offered
+  24 passed (5.7m)

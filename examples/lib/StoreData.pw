@@ -37,3 +37,4 @@ source StoreData
     transactions serializable
     reads        strong
     changes      none
+    sets         one_call

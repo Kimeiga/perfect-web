@@ -155,6 +155,14 @@ export const REVIEWS_PORTS = Object.fromEntries(ENGINES.map((e, i) => [e, PORT +
 // provider. One per engine, because an entry is every reader's on a host.
 // Served only when it is built.
 export const GUESTBOOK_PORTS = Object.fromEntries(ENGINES.map((e, i) => [e, PORT + 210 + i]));
+// TRACK SEAM (scheduled-orders): the store's build taking payments from the
+// development provider, as the payments' hosts do, on hosts of their own, one
+// per engine, because a test of an order for a time moves its host's clock
+// forward, which would sweep another suite's order awaiting its payment. Each
+// host's provider is ten ports above it.
+export const SCHEDULED_ORDERS_PORTS = Object.fromEntries(
+  ENGINES.map((e, i) => [e, PORT + 183 + i]),
+);
 // A build serves the runtime it was built with. One built before the runtime
 // changed runs the old runtime against the new server, and fails for a reason
 // that is no test's: `dist-keyed` did, once each page's subscription named
@@ -375,6 +383,21 @@ export default defineConfig({
     ...(process.env.PW_PERFORMANCE
       ? []
       : Object.values(STORE_PAYMENTS_PORTS).map((port) => ({
+          command: `../../target/debug/pw-dev-server dist`,
+          env: {
+            PORT: String(port),
+            PW_PAYMENTS: "dev",
+            PW_PAYMENTS_PORT: String(port + 10),
+            ...IN_MEMORY,
+          },
+          port,
+          reuseExistingServer: !!process.env.PW_REUSE,
+          timeout: 60_000,
+        }))),
+    // TRACK SEAM (scheduled-orders): the store's hosts whose clock a test moves.
+    ...(process.env.PW_PERFORMANCE
+      ? []
+      : Object.values(SCHEDULED_ORDERS_PORTS).map((port) => ({
           command: `../../target/debug/pw-dev-server dist`,
           env: {
             PORT: String(port),

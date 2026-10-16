@@ -34,6 +34,7 @@ import 'just/guide.just'
 import 'just/evidence-integrity.just'
 import 'just/each-head-effects.just'
 import 'just/argument-invariants.just'
+import 'just/scheduled-orders.just'
 
 default:
     @just --list

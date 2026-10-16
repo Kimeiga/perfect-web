@@ -4,6 +4,12 @@ The next executable tasks, in order, with acceptance criteria. Charter §3.4.
 
 ## Integration follow-ups, 2026-10-15
 
+- ADR-0347: split scheduling's when_said from Checkout so an estimator
+  outage degrades that line alone; offer delivery-streamed times. The
+  current chosen-time checkout and times page both wait on the estimator.
+- ADR-0348: the scheduled estimate N+1 is repaired by a set operation;
+  continue the common per-adapter conformance suite and composite migration.
+
 - ADR-0346's path audit: answer a matched route's non-UTF-8 path segment
   with 400 as ADR-0309 specifies, with an HTTP regression test; currently
   it falls through to 404. No invariant-boundary completion claim includes

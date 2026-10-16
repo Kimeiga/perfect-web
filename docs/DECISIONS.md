@@ -3028,3 +3028,11 @@ Accepted under the owner's delegation; train-10 verification pending.
 component arguments before predicates and execution, page parameters at
 arrival, and invariants within maps and sets. Accepted under the owner's
 delegation; integrated train-10 verification pending.
+
+### 2026-10-15 — scheduled orders and set-result preservation
+
+[ADR-0347](DECISIONS/ADR-0347-scheduled-orders.md): paid orders are sent
+when preparation is due, with windows held to every store's ASAP admission
+rule at send time. [ADR-0348](DECISIONS/ADR-0348-a-set-read-keeps-each-keys-result.md):
+set pairs can preserve each key's exact Result/Option. Accepted under the
+owner's delegation; train-10 integrated verification pending.

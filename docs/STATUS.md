@@ -23,6 +23,20 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0347 and ADR-0348, 2026-10-15: scheduled orders and batched
+estimates** (train-10, from `40e81d51` plus integration repairs). Windows
+use every store's ASAP admission rule at its send instant. Orders are paid
+now and sent when preparation is due. Integration with PW0405 exposed a
+per-store estimate read; its set repair preserves each keyed Result and
+has a three-statement bound at both fixture sizes. The 56-file store checks
+without diagnostics; 46 focused memory tests and all four PostgreSQL
+bounded tests passed. Whole controls killed 53/53 scheduled, 41/41 bounded
+checker and 8/8 statement mutants. Combined browser tests passed 24/24 in
+three engines. [Commands and raw results](evidence/E14/train10-scheduled-integration.txt).
+Full integrated CI remains pending. Estimator isolation,
+send-time hours rechecking and multiple current scheduled orders remain
+limitations.
+
 **ADR-0346, 2026-10-15: argument and page-parameter invariants**
 (train-10, from `ac3f2553`). The browser command decoder already refused
 invalid values; the repaired gaps were direct component calls, page

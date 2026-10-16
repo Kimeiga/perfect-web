@@ -334,6 +334,19 @@ pub(crate) trait Rows {
     fn to_rate(&mut self, owner: &str) -> Result<Option<crate::reviews::ToRate>, String>;
     /// A rating written, or `false` where its order has one of its store.
     fn rate(&mut self, rating: &crate::reviews::Rating) -> Result<bool, String>;
+    // TRACK SEAM (scheduled-orders): an owner's order's time
+    // (`scheduled_orders.rs`), one for their latest order that was placed for
+    // a time, written as it awaits its payment; read only with the order's
+    // reference, so one kept past its order is another order's to no one.
+    fn order_time(
+        &mut self,
+        owner: &str,
+    ) -> Result<Option<crate::scheduled_orders::OrderTime>, String>;
+    fn set_order_time(
+        &mut self,
+        owner: &str,
+        time: &crate::scheduled_orders::OrderTime,
+    ) -> Result<(), String>;
 }
 
 /// **Where an operation's rows are**, each layer's: it runs `f` on them, in
@@ -373,7 +386,17 @@ const AWAITING: &str = "awaiting-payment";
 /// An order taken back before it was paid (step eight).
 const CANCELED: &str = "canceled";
 
-fn order_status(r: &mut dyn Rows, owner: &str, status: String) -> Result<Val, String> {
+pub(crate) fn order_status(r: &mut dyn Rows, owner: &str, status: String) -> Result<Val, String> {
+    // TRACK SEAM (scheduled-orders): a scheduled order carries its time.
+    if status == crate::scheduled_orders::SCHEDULED {
+        let time = r
+            .order_time(owner)?
+            .ok_or_else(|| format!("{owner}'s order is scheduled and has no time"))?;
+        return Ok(Val::Variant(
+            status,
+            Some(Box::new(crate::scheduled_orders::scheduled_val(&time))),
+        ));
+    }
     if status != AWAITING {
         return Ok(Val::Variant(status, None));
     }
@@ -411,11 +434,11 @@ fn take_back(r: &mut dyn Rows, owner: &str) -> Result<(), String> {
     r.set_awaiting(owner, None)
 }
 
-fn ok(v: Val) -> Vec<Val> {
+pub(crate) fn ok(v: Val) -> Vec<Val> {
     vec![Val::Result(Ok(Some(Box::new(v))))]
 }
 
-fn declared(case: &str) -> Vec<Val> {
+pub(crate) fn declared(case: &str) -> Vec<Val> {
     vec![Val::Result(Err(Some(Box::new(Val::Variant(
         case.into(),
         None,
@@ -789,6 +812,94 @@ fn unfaulted(with: With, session: &str, faults: &Faults) -> Ops {
                     ("max-minutes".into(), Val::S64(max + travel)),
                     ("generated-at".into(), Val::S64(wall_millis())),
                 ])))
+            })
+        }),
+    );
+    // ADR-0347 integration: estimates for all stores in one operation.
+    // Read the address, store rows and estimate once. Folding the returned
+    // values never issues another database read, whatever the key count.
+    let estimator = faults
+        .estimators
+        .lock()
+        .expect("estimators")
+        .get(session)
+        .cloned()
+        .unwrap_or_default();
+    let (this, w) = (session.to_string(), with.clone());
+    ops.insert(
+        "store:data/user-estimates#for-stores".to_string(),
+        Arc::new(move |args: &[Val]| {
+            let [Val::List(keys), Val::String(reader)] = args else {
+                return Err(format!("user-estimates#for-stores received {args:?}"));
+            };
+            let stores: Vec<String> = keys
+                .iter()
+                .map(|key| match key {
+                    Val::String(id) => Ok(id.clone()),
+                    other => Err(format!("user-estimates#for-stores received key {other:?}")),
+                })
+                .collect::<Result<_, _>>()?;
+            if stores.is_empty() {
+                return Ok(vec![Val::List(Vec::new())]);
+            }
+            std::thread::sleep(std::time::Duration::from_millis(estimator.delay_ms));
+            if estimator
+                .fail
+                .as_deref()
+                .is_some_and(|why| why != "declared")
+            {
+                return Err("the estimator is down".to_string());
+            }
+            if estimator.fail.as_deref() == Some("declared") {
+                let refused = stores
+                    .iter()
+                    .map(|store| {
+                        Val::Record(vec![
+                            ("store".into(), Val::String(store.clone())),
+                            (
+                                "estimate".into(),
+                                declared("location-unavailable").remove(0),
+                            ),
+                        ])
+                    })
+                    .collect();
+                return Ok(vec![Val::List(refused)]);
+            }
+            w(&mut |r| {
+                let coverage = coverage_of(r, &stores, reader)?;
+                let bounds = r.estimate(&this)?;
+                let (minutes, max) = bounds.unwrap_or(DEFAULT_ESTIMATE);
+                let upper = max.unwrap_or(minutes + 10);
+                let generated_at = wall_millis();
+                let values = stores
+                    .iter()
+                    .map(|store| {
+                        let estimate = if coverage
+                            .get(store)
+                            .and_then(|c| c.as_ref())
+                            .is_some_and(|c| !c.delivers)
+                        {
+                            declared("no-coverage").remove(0)
+                        } else {
+                            let travel = coverage
+                                .get(store)
+                                .and_then(|c| c.as_ref())
+                                .map_or(0, |c| c.minutes);
+                            ok(Val::Record(vec![
+                                ("minutes".into(), Val::S64(minutes + travel)),
+                                ("min-minutes".into(), Val::S64(minutes + travel)),
+                                ("max-minutes".into(), Val::S64(upper + travel)),
+                                ("generated-at".into(), Val::S64(generated_at)),
+                            ]))
+                            .remove(0)
+                        };
+                        Val::Record(vec![
+                            ("store".into(), Val::String(store.clone())),
+                            ("estimate".into(), estimate),
+                        ])
+                    })
+                    .collect();
+                Ok(vec![Val::List(values)])
             })
         }),
     );
@@ -1379,10 +1490,21 @@ pub(crate) fn writes(
         Arc::new(move |args: &[Val]| {
             let op = "user-orders#await-payment";
             let (owner, rest) = reader_of(op, args)?;
+            // TRACK SEAM (scheduled-orders): the time it is for, last, none
+            // for as soon as possible.
+            let Some((time, rest)) = rest.split_last() else {
+                return Err(format!("{op} received {args:?}"));
+            };
             let charged = crate::checkout::place_args(rest)?;
             w(&mut |r| {
-                if r.order(owner)?.is_some_and(|o| o.status == AWAITING) {
+                let current = r.order(owner)?.map(|o| o.status);
+                if current.as_deref() == Some(AWAITING) {
                     return Ok(declared("awaiting-payment"));
+                }
+                // TRACK SEAM (scheduled-orders): nor beside one scheduled,
+                // which is sent to its stores later.
+                if current.as_deref() == Some(crate::scheduled_orders::SCHEDULED) {
+                    return Ok(declared("scheduled"));
                 }
                 let lines = r.cart(owner)?;
                 if lines.is_empty() {
@@ -1404,6 +1526,10 @@ pub(crate) fn writes(
                         ..Default::default()
                     }),
                 )?;
+                // TRACK SEAM (scheduled-orders): for a time, with it.
+                if let Some(t) = crate::scheduled_orders::time_from(time, &reference)? {
+                    r.set_order_time(owner, &t)?;
+                }
                 let mut written = placed.lock().expect("written");
                 written.wrote = true;
                 written.cart_total = Some(0);
@@ -1464,7 +1590,17 @@ pub(crate) fn writes(
                     && r.awaiting(owner)?
                         .is_some_and(|a| a.reference == *reference);
                 if awaits && status == "succeeded" {
-                    r.set_status(owner, Some("placed"))?;
+                    // TRACK SEAM (scheduled-orders): for a time, scheduled,
+                    // its stores told nothing yet; placed otherwise.
+                    let timed = r
+                        .order_time(owner)?
+                        .is_some_and(|t| t.reference == *reference);
+                    let settled = if timed {
+                        crate::scheduled_orders::SCHEDULED
+                    } else {
+                        "placed"
+                    };
+                    r.set_status(owner, Some(settled))?;
                     r.set_awaiting(owner, None)?;
                     wrote.lock().expect("written").wrote = true;
                 }
@@ -1606,6 +1742,11 @@ pub(crate) fn writes(
     ops.extend(crate::checkout::host_writes(with.clone(), written.clone()));
     // TRACK SEAM (reviews): a rating given.
     ops.extend(crate::reviews::writes(with.clone(), written.clone()));
+    // TRACK SEAM (scheduled-orders): the time chosen, and an order sent.
+    ops.extend(crate::scheduled_orders::writes(
+        with.clone(),
+        written.clone(),
+    ));
     ops.extend(host_writes(with, session, written));
     ops
 }
@@ -1946,6 +2087,8 @@ pub(crate) struct State {
     /// orders were made, the last one's id.
     ratings: Vec<crate::reviews::Rating>,
     orders_made: i64,
+    /// TRACK SEAM (scheduled-orders): each owner's order's time.
+    times: BTreeMap<String, crate::scheduled_orders::OrderTime>,
 }
 
 impl State {
@@ -1999,6 +2142,7 @@ impl State {
             // TRACK SEAM (reviews): none rated, and no order made.
             ratings: Vec::new(),
             orders_made: 0,
+            times: BTreeMap::new(),
         }
     }
 
@@ -2262,6 +2406,21 @@ impl Rows for MemRows {
     }
     fn rate(&mut self, rating: &crate::reviews::Rating) -> Result<bool, String> {
         Ok(crate::reviews::mem_rate(&mut self.state().ratings, rating))
+    }
+    // TRACK SEAM (scheduled-orders): an order's time, in memory.
+    fn order_time(
+        &mut self,
+        owner: &str,
+    ) -> Result<Option<crate::scheduled_orders::OrderTime>, String> {
+        Ok(self.state.times.get(owner).cloned())
+    }
+    fn set_order_time(
+        &mut self,
+        owner: &str,
+        time: &crate::scheduled_orders::OrderTime,
+    ) -> Result<(), String> {
+        self.state().times.insert(owner.to_string(), time.clone());
+        Ok(())
     }
 }
 

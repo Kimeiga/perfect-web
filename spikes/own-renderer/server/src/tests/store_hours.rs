@@ -24,12 +24,12 @@ fn sf() -> std::sync::Arc<pw_time::Zone> {
 }
 
 /// The instant, in milliseconds, of a wall-clock minute in San Francisco.
-fn at(y: i64, m: u32, d: u32, hour: i64, minute: i64) -> i64 {
+pub(super) fn at(y: i64, m: u32, d: u32, hour: i64, minute: i64) -> i64 {
     sf().instant(pw_time::days(y, m, d), (hour * 60 + minute) * 60) * 1000
 }
 
 /// The host's clock moved forward to `to`.
-fn clock_to(s: &Server, to: i64) {
+pub(super) fn clock_to(s: &Server, to: i64) {
     let now = s.now();
     assert!(to >= now, "a test's clock moves forward");
     s.query_clock
@@ -38,7 +38,7 @@ fn clock_to(s: &Server, to: i64) {
 }
 
 /// Every day `opens` to `closes`, in minutes.
-fn daily(opens: i64, closes: i64) -> Hours {
+pub(super) fn daily(opens: i64, closes: i64) -> Hours {
     Hours {
         zone: "America/Los_Angeles".to_string(),
         last_order_minutes: 20,
@@ -55,7 +55,7 @@ fn daily(opens: i64, closes: i64) -> Hours {
 
 /// A store's hours set, written with the `StoreChanged` that drops what read
 /// them.
-fn set_hours(s: &Server, store: &str, hours: &Hours) {
+pub(super) fn set_hours(s: &Server, store: &str, hours: &Hours) {
     s.store_write(
         "",
         "store:host/hours#set",
@@ -75,7 +75,7 @@ fn set_hours(s: &Server, store: &str, hours: &Hours) {
 }
 
 /// What a page shows `session`, as text.
-fn page(s: &Server, session: &str, path: &str) -> String {
+pub(super) fn page(s: &Server, session: &str, path: &str) -> String {
     let whole: String = fetched_as(s, path, Some(session))
         .into_iter()
         .map(|(_, c)| c)
@@ -394,7 +394,7 @@ fn weekly(periods: &[(i64, i64, i64)]) -> Hours {
 }
 
 /// Every day's `periods`, in the order given.
-fn every_day(periods: &[(i64, i64)]) -> Hours {
+pub(super) fn every_day(periods: &[(i64, i64)]) -> Hours {
     let each: Vec<(i64, i64, i64)> = (1..=7)
         .flat_map(|d| periods.iter().map(move |&(o, c)| (d, o, c)))
         .collect();

@@ -733,6 +733,9 @@ mod schedules;
 // TRACK SEAM (reviews): a store's ratings and reviews, given through a
 // delivered order.
 mod reviews;
+// TRACK SEAM (scheduled-orders): an order placed for a time its reader
+// chooses, sent to its stores when it is due (W9).
+mod scheduled_orders;
 
 struct Server {
     /// **The build this host serves, by its name** (ADR-0300): on each
@@ -13931,6 +13934,9 @@ public query Store(",
     // TRACK SEAM (argument-invariants): a value from a browser held to its
     // type's invariant where it arrives (ADR-0346).
     mod argument_invariants;
+    // TRACK SEAM (scheduled-orders): an order placed for a time its reader
+    // chooses, and sent to its stores when it is due.
+    mod scheduled_orders;
 
     /// **A second program is served by the same host** (ADR-0218): the
     /// feed's timeline from its data layer, and a post committed and sent
@@ -15677,13 +15683,14 @@ public query Store(",
             |app| {
                 // `add_to_cart`'s, the first command's. And what a cart's
                 // change would drop that it then says nothing of: the cart's
-                // hours (track `store-hours`) and its checkout (track
-                // `order-total`), which read the cart too.
+                // hours (track `store-hours`), its checkout (track
+                // `order-total`) and the times its stores offer (track
+                // `scheduled-orders`), which read the cart too.
                 let emits = "    emits         UserCartChanged(current_user())\n";
                 assert!(app.contains(emits), "the store's add_to_cart emits");
                 app.replacen(emits, "", 1).replacen(
                     "    invalidates   Cart(current_user())\n",
-                    "    invalidates   Cart(current_user()), CartHours(current_user()), Checkout(current_user())\n",
+                    "    invalidates   Cart(current_user()), CartHours(current_user()), Checkout(current_user()), TimesOffered(current_user(), _)\n",
                     1,
                 )
             },
@@ -15731,10 +15738,10 @@ public query Store(",
         // code's and the typed tip's bindings (track `order-total`); and the
         // order page's, an order awaiting its payment taken back (NEXT 6c);
         // and the rate page's, five stars chosen, the comment's binding and
-        // the rating sent (track `reviews`).
+        // the rating sent (track `reviews`), plus the page of times' two.
         assert_eq!(
             named.len(),
-            28,
+            30,
             "add_to_cart, clear_cart, a line's three (ADR-0172), place_order and an address's five: {named:?}"
         );
         assert_eq!(
