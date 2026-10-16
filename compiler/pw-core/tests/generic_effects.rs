@@ -818,3 +818,43 @@ fn a_function_receiver_keeps_its_capability_and_privacy() {
         NOTHING
     );
 }
+
+#[test]
+fn a_recursive_call_instantiates_its_own_generic_result() {
+    let src = reading(
+        "fn first<T>(value: T, count: Int) -> T !{} {\n    if count > 0 {\n        let item = first(Item { name: \"x\" }, 0)\n        let text = item.label\n    }\n    value\n}\n",
+    );
+    // The recursive call is the first effectful operation once this
+    // function's body has an inferred row, so PW0400 points there.
+    assert_eq!(
+        reported(&src),
+        one("PW0400", "first(Item { name: \"x\" }, 0)")
+    );
+    assert_eq!(reported(&src.replace("item.label", "item.name")), NOTHING);
+    // Keep the generic result nested too: identity must be checked below
+    // List, and the loop binder reads the concrete recursive invocation.
+    let nested = reading(
+        "fn first<T>(values: List<T>, count: Int) -> List<T> !{} {\n    if count > 0 {\n        let items = first([Item { name: \"x\" }], 0)\n        for item in items { let text = item.label }\n    }\n    values\n}\n",
+    );
+    assert_eq!(
+        reported(&nested),
+        one("PW0400", "first([Item { name: \"x\" }], 0)")
+    );
+    assert_eq!(
+        reported(&nested.replace("item.label", "item.name")),
+        NOTHING
+    );
+}
+
+#[test]
+fn a_nested_function_instantiates_an_enclosing_generics_result() {
+    let src = reading(
+        "fn first<T>(value: T) -> T !{} {\n    fn inspect() -> String !{} {\n        let item = first(Item { name: \"x\" })\n        item.label\n    }\n    value\n}\n",
+    );
+    refused_with_control(&src, "PW0400", "item.label");
+    // The caller's actual rigid T stays rigid when the argument IS that T.
+    let rigid = reading(
+        "fn first<T>(value: T, count: Int) -> T !{} {\n    if count > 0 {\n        let item = first(value, 0)\n        let text = item.label\n    }\n    value\n}\n",
+    );
+    assert_eq!(reported(&rigid), one("PW0610", "item.label"));
+}

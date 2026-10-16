@@ -1,0 +1,39 @@
+Per-call recursive/enclosing generic baseline miss; HEAD2d2c5f05 before correction
+
+== recursive
+module recursive_probe
+
+type Item = Item { name: String }
+
+fn label(i: Item) -> String !{ database.read<Item> }
+    host "shop:data/items#label"
+
+fn first<T>(value: T, count: Int) -> T !{} {
+    if count > 0 {
+        let item = first(Item { name: "x" }, 0)
+        let text = item.label
+    }
+    value
+}
+
+exit: 0
+pw check: 23 file(s), no diagnostics
+
+== enclosing
+module recursive_probe
+
+type Item = Item { name: String }
+
+fn label(i: Item) -> String !{ database.read<Item> }
+    host "shop:data/items#label"
+
+fn first<T>(value: T) -> T !{} {
+    fn inspect() -> String !{} {
+        let item = first(Item { name: "x" })
+        item.label
+    }
+    value
+}
+
+exit: 0
+pw check: 23 file(s), no diagnostics

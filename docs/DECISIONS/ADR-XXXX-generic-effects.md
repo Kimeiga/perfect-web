@@ -111,3 +111,13 @@ privacy regression retains a secret-derived String through the function
 receiver, where neither the function's declared result nor the applying
 member's signature declares a secret. No privacy propagation is inferred
 from the effect refusal.
+
+The recursive invocation audit at 2d2c5f05 exposed a second distinction:
+callee and caller may share the same DefId, yet the invocation substitutes
+its own arguments. A recursive first<T> called with Item, or a nested
+function calling its enclosing first<T>, could retain the enclosing rigid
+T and silently lose Item.label's effects. Any result mentioning the
+callee's own parameter now goes through the shared per-call solver,
+including beneath List. A recursive call given the caller's actual T stays
+rigid and its undeclared member remains PW0610. This was ruled by the
+integrator on 2026-10-15; before-correction misses are recorded separately.

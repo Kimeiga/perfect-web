@@ -1,0 +1,18 @@
+// @status: GENERAL
+// @invariant: undeclared_effect
+// @dimension: a nested body invokes its enclosing generic with a concrete argument
+
+module enclosing_witness
+
+type Enclosed = Enclosed { name: String }
+
+fn label(i: Enclosed) -> String !{ database.read<Enclosed> }
+    host "shop:data/items#label"
+
+fn first<T>(value: T) -> T !{} {
+    fn inspect() -> String !{} {
+        let item = first(Enclosed { name: "x" })
+        item.label
+    }
+    value
+}

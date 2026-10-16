@@ -39,8 +39,8 @@
 //!
 //! # What it reads from the value relations' typer
 //!
-//! **A type it never answers: one naming a type parameter no declaration in
-//! scope binds** (ADR-XXXX, the generic-effects track). A generic call's
+//! **A type it never answers: a call's uninstantiated callee parameter**
+//! (ADR-XXXX, the generic-effects track). A generic call's
 //! declared result names the callee's own parameters: `List.reverse(given)`
 //! returns `List<T>`, and which `T` is the call's to say. Until ADR-XXXX this
 //! module answered `List<T>` as written, so a member read through the
@@ -672,6 +672,14 @@ impl<'a> Types<'a> {
             Expr::Call { callee, .. } => {
                 let sig = self.callee(body, *callee)?;
                 let result = sig.result()?;
+                // Even when this callee is the enclosing declaration (or
+                // this function itself), its parameters are instantiated at
+                // THIS call. Its declared T is not the caller's rigid T:
+                // first<T>(Item { .. }) can return an Item within first<T>.
+                // The shared solver, never the declaration, owns that type.
+                if names_parameter(result, sig.definition) {
+                    return None;
+                }
                 // A command answers its caller whether it committed, and its
                 // declared error if not: never the value (ADR-0157).
                 if self.sigs.kind_of(sig.definition) == Some(DeclKind::Command) {
@@ -924,4 +932,12 @@ pub fn path_of(body: &Body, id: ExprId) -> String {
         Expr::Field { base, name } => format!("{}.{}", path_of(body, *base), name),
         _ => String::new(),
     }
+}
+
+/// Whether a declared result contains this callee's own type parameters.
+/// Binding identity alone cannot distinguish its recursive invocation from
+/// the enclosing generic's rigid parameters; the call must instantiate it.
+fn names_parameter(t: &ResolvedType, binder: DefId) -> bool {
+    t.parameter_binding().is_some_and(|(b, _)| b == binder)
+        || t.args().iter().any(|a| names_parameter(a, binder))
 }
