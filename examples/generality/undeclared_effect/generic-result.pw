@@ -12,8 +12,8 @@ fn label(i: GenericItem) -> String !{ database.read<GenericItem> }
     host "generic:data/items#label"
 
 fn first(given: List<GenericItem>) -> String !{} {
-    for item in List.reverse(given) {
-        return item.label
+    match List.get(List.reverse(given), 0) {
+        Some(item) => item.label,
+        None => "none",
     }
-    "none"
 }

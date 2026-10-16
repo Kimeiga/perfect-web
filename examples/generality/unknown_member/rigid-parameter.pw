@@ -4,6 +4,8 @@
 
 module generic_effects.rigid
 
+fn same<T>(value: T) -> T !{} { value }
+
 fn missing<T>(value: T) -> String !{} {
-    value.name
+    same(value).name
 }

@@ -191,6 +191,10 @@ fn a_member_read_on_any_receiver_is_seen() {
         "type Box<T> = Box { v: T }\n\nfn first_label(b: Box<Item>) -> String !{} {\n    b.v.label\n}",
     );
     refused_with_control(&boxed, "PW0400", "b.v.label");
+    let nested = reading(
+        "type Box<T> = Box { v: Option<T> }\n\nfn first(b: Box<Item>) -> String !{} {\n    match b.v {\n        Some(x) => x.label,\n        None => \"none\",\n    }\n}",
+    );
+    refused_with_control(&nested, "PW0400", "x.label");
 }
 
 /// A module whose member `label` declares no row, and performs a read.
@@ -237,6 +241,17 @@ fn a_member_read_whose_receivers_type_nothing_states_is_refused() {
     assert_eq!(reported(&typed), one("PW0400", "x.label"));
     // The control: a field of the typed value, which performs nothing.
     assert_eq!(reported(&typed.replace("x.label", "x.name")), NOTHING);
+    // No argument can solve make's T: it must never escape as the callee's T.
+    let unsolved = reading(
+        "fn make<T>() -> T !{}\n    host \"shop:data/items#make\"\n\nfn first() -> String !{} {\n    let item = make()\n    item.label\n}",
+    );
+    assert_eq!(reported(&unsolved), one("PW0408", "item.label"));
+    let annotated = unsolved.replace("let item = make()", "let item: Item = make()");
+    assert_eq!(reported(&annotated), one("PW0400", "item.label"));
+    assert_eq!(
+        reported(&annotated.replace("item.label", "item.name")),
+        NOTHING
+    );
 }
 
 /// A module whose `Item` has a member `token` that is a secret, and a view
@@ -746,6 +761,60 @@ fn an_interfaces_term_roots_refuse_untyped_member_receivers() {
     assert_eq!(reported(&src), one("PW0408", "item.name"));
     assert_eq!(
         reported(&src.replace("(item) =>", "(item: Item) =>")),
+        NOTHING
+    );
+}
+
+#[test]
+fn a_function_named_as_a_member_receiver_performs_its_effects() {
+    let src = reading(
+        "fn stamp() -> String !{ database.read<Item> }\n    host \"shop:data/items#stamp\"\n\nfn apply(f: fn() -> String) -> String !{} { f() }\n\nview Show() !{} { <p>{stamp.apply}</p> }\n",
+    );
+    assert_eq!(reported(&src), one("PW0401", "stamp"));
+    assert_eq!(
+        reported(&src.replace("stamp.apply", "t.stamp.apply")),
+        one("PW0401", "t.stamp")
+    );
+    let pure = src.replace(
+        "fn stamp() -> String !{ database.read<Item> }",
+        "fn stamp() -> String !{}",
+    );
+    assert_eq!(reported(&pure), NOTHING);
+}
+
+#[test]
+fn a_module_path_prefix_is_never_charged_as_a_function_value() {
+    // The module List and function t.List occupy different namespaces.
+    // List.reverse is the resolved module path, so t.List is never read.
+    let src = reading(
+        "fn List() -> String !{ database.read<Item> }\n    host \"shop:data/items#stamp\"\n\nview Show(given: List<Item>) !{} {\n    let xs = List.reverse(given)\n    <p>pure</p>\n}\n",
+    );
+    assert_eq!(reported(&src), NOTHING);
+    assert_eq!(
+        reported(&src.replace("List.reverse(given)", "given.reverse")),
+        NOTHING
+    );
+}
+
+#[test]
+fn a_function_receiver_keeps_its_capability_and_privacy() {
+    let capability = reading(
+        "fn stamp() -> String !{ database.read<Item> }\n    host \"shop:data/items#stamp\"\n\nfn apply(f: fn() -> String) -> String !{} { f() }\n\nquery Answer() -> String { stamp.apply }\n",
+    );
+    assert_eq!(required(&capability, "t.Answer"), ["database.read<Item>"]);
+    let pure = capability.replace(
+        "fn stamp() -> String !{ database.read<Item> }",
+        "fn stamp() -> String !{}",
+    );
+    assert!(required(&pure, "t.Answer").is_empty());
+    // Labels already read the base's value. The function declares a public
+    // String, but its body returns a secret-derived String; only its summary
+    // and the field base's label preserve that fact through apply's public
+    // signature. This does not infer privacy from an effect refusal.
+    let private = "module t\n\nimport capability.{ Secret, Payments }\n\nfn token() -> Secret<Payments> !{}\n    host \"shop:data/secrets#token\"\n\nfn text<T>(value: T) -> String !{}\n    host \"shop:data/secrets#text\"\n\nfn stamp() -> String !{} { text(token()) }\n\nfn apply(f: fn() -> String) -> String !{} { f() }\n\nview Show() !{} { <p>{stamp.apply}</p> }\n";
+    assert_eq!(reported(private), one("PW5003", "stamp.apply"));
+    assert_eq!(
+        reported(&private.replace("text(token())", "\"public\"")),
         NOTHING
     );
 }

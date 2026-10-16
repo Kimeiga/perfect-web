@@ -370,7 +370,15 @@ impl<'a> Inference<'a> {
                     not_values.insert(*callee);
                 }
                 Expr::Field { base, .. } => {
-                    not_values.insert(*base);
+                    // Only a module/type path has a non-value prefix. A
+                    // function used as a receiver, stamp.apply, is still
+                    // named as a value and carries stamp's effects (ADR-0078).
+                    if matches!(
+                        types.member_read(body, id),
+                        Some(crate::infer::MemberRead::Path)
+                    ) {
+                        not_values.insert(*base);
+                    }
                 }
                 _ => {}
             }

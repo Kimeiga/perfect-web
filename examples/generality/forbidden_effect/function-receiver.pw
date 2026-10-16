@@ -1,0 +1,14 @@
+// @status: GENERAL
+// @invariant: forbidden_effect
+// @dimension: a module-qualified function is a real member receiver
+
+module generic_effects.qualified_receiver
+
+type Item = Item { name: String }
+
+fn stamp() -> String !{ database.read<Item> }
+    host "shop:data/items#stamp"
+
+fn apply(f: fn() -> String) -> String !{} { f() }
+
+view Show() !{} { <p>{generic_effects.qualified_receiver.stamp.apply}</p> }

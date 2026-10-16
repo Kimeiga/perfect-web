@@ -11,8 +11,10 @@ type GenericItem = GenericItem { name: String }
 fn label(i: GenericItem) -> String !{ database.read<GenericItem> }
     host "generic:data/items#label"
 
+fn same<T>(x: T) -> T !{} { x }
+
 view Names(given: List<GenericItem>) !{} {
-    let all = List.reverse(given)
+    let all = List.reverse(List.take(same(given), 2))
     <ul>
         {#each all as item (item.name)}
             <li>{item.label}</li>

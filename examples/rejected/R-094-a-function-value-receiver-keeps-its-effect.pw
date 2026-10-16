@@ -1,0 +1,19 @@
+// @corpus: rejected
+// @id: R-094
+// @category: a function value receiver keeps its effect
+// @rule: PW0401
+// @invariant: forbidden_effect
+// @charter: §7.4
+// @milestone: 7
+// @expect-error: a function named as a receiver retains its effects
+
+module generic_effects.receiver
+
+type Item = Item { name: String }
+
+fn stamp() -> String !{ database.read<Item> }
+    host "shop:data/items#stamp"
+
+fn apply(f: fn() -> String) -> String !{} { f() }
+
+view Show() !{} { <p>{stamp.apply}</p> }

@@ -93,3 +93,21 @@ now disable the actual solver's parameter mapping, temporary/persistent
 binding and pipe argument instead. No test is weakened to manufacture a
 kill, and a generic-field control likewise targets the canonical shared
 member substitution rather than a redundant caller-side branch.
+
+A further adversarial probe at d00d2e12 still accepted stamp.apply in a pure
+view, where stamp reads the database and apply invokes its function-valued
+receiver. The value walk discarded every field base as a path prefix. It
+now discards only canonical module/type paths; a real function receiver is
+charged where named under ADR-0078. A module path whose head shares a
+function's spelling stays a path. This addition was ruled by the integrator
+on 2026-10-15; its baseline miss is recorded separately. R-094 and a
+module-qualified generality witness retain the case.
+
+The function-receiver audit distinguishes analyses: component capabilities
+use the same performed-effects walk and did lose the database requirement;
+the query contract regression now requires it. Labels do not share the
+field-base exclusion: they already join the receiver's label. A separate
+privacy regression retains a secret-derived String through the function
+receiver, where neither the function's declared result nor the applying
+member's signature declares a secret. No privacy propagation is inferred
+from the effect refusal.

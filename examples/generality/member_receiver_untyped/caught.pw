@@ -11,7 +11,9 @@ type GenericItem = GenericItem { name: String }
 fn label(i: GenericItem) -> String !{ database.read<GenericItem> }
     host "generic:data/items#label"
 
+fn consume<T>(value: T) -> Int !{} { 0 }
+
 fn unknown() -> () !{} {
-    let f = (item) => item.name
+    let f = consume((item) => item.name)
     ()
 }

@@ -757,6 +757,15 @@ impl<'a> Types<'a> {
         let Expr::Field { base, name } = body.expr(id) else {
             return None;
         };
+        // A resolved module path is a path even if a declaration in this
+        // module shares its head's spelling (List.reverse beside fn List).
+        // A lexical receiver, however, is always that binding's value.
+        if crate::resume::root_name(body, id)
+            .is_some_and(|head| self.lexical.binder(head).is_none())
+            && self.by_path(&path_of(body, id)).is_some()
+        {
+            return Some(MemberRead::Path);
+        }
         if !self.is_value(body, *base) {
             return Some(MemberRead::Path);
         }

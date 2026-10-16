@@ -22,6 +22,8 @@ LABELS = ROOT / "compiler/pw-core/src/labels.rs"
 
 # (what is undone, file, anchor, replacement)
 MUTANTS = [
+    ('a function receiver is discarded as a path prefix', EFFECTS, '                        Some(crate::infer::MemberRead::Path)\n', '                        _\n'),
+    ('a resolved module path is treated as a value receiver', INFER, '&& self.by_path(&path_of(body, id)).is_some()', '&& false'),
     ('interface term roots silently accept unknown receivers', CHECK, '    for read in types.untyped_receivers(body) {', '    for read in types.untyped_receivers(body).into_iter().filter(|_| decl.body.is_some()) {'),
     ('a generic result keeps the callees unsolved parameter', INFER, '            Some(t) if !self.unsolved(&t) => Some(t),', '            Some(t) => Some(t),'),
     ('a missing declared type ignores the call solvers type', INFER, '            _ => self.resolved_from(self.solved.expr(id), body.expr_span(id)),', '            _ => None,'),
