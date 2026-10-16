@@ -4523,11 +4523,14 @@ generality:
 # The per-fixture enforcement table. Each rejected fixture is checked as its
 # own program — the shared library, the accepted modules it imports, and the
 # fixture — because five of them reuse module names with each other (E2B).
+# The same test, run by `just ci` without `PW_WRITE_EVIDENCE`, holds the
+# committed table to what the corpus checks now (track evidence-integrity-2:
+# it was two months stale).
 evidence-corpus:
     @PW_WRITE_EVIDENCE=1 cargo test --quiet -p pw-core --test checking_source \
-        corpus_enforcement_table -- --nocapture 2>&1 | grep -v '^$'
+        the_committed_enforcement_table -- --nocapture 2>&1 | grep -v '^$'
     @echo
-    @head -4 docs/evidence/E2D/corpus-enforcement.txt
+    @grep -m1 "enforce their declared invariant" docs/evidence/E2D/corpus-enforcement.txt
 
 # Superseded by `just evidence-corpus`. Checking all 44 fixtures as ONE program
 # asks a question nobody meant — five of them reuse module names with each other
