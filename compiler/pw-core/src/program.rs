@@ -168,8 +168,9 @@ impl Refusal {
     }
 }
 
-/// A complete validation report; its artifact plan is private. Only a report
-/// with no errors can release the successful executable plan through build().
+/// A complete validation report; its artifact plan is private. Acceptance
+/// records the original validation outcome; editing report data cannot mint
+/// or revoke the independently held successful executable plan.
 pub struct Validation {
     pub diagnostics: Diagnostics,
     plan: Plan,

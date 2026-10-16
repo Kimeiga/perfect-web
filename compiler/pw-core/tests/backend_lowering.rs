@@ -570,8 +570,7 @@ command Add(id: Int) -> Int
 ";
     let built = Built::new(&[("t.pw".to_string(), src.to_string())]);
     let refused: Vec<_> = pw_core::program::with_semantic_program(&built.units, |_| ())
-        .err()
-        .expect("an unresolved call cannot receive a backend proof")
+        .expect_err("an unresolved call cannot receive a backend proof")
         .into_iter()
         .flat_map(|(_, diagnostics)| diagnostics)
         .collect();

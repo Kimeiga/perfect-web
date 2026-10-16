@@ -1406,10 +1406,13 @@ impl Server {
         {
             // TRACK SEAM (kiokun): kiokun's files, read-only, where the
             // program imports `kiokun:data/…` (docs/PARALLEL.md, W6, Q2).
-            (
-                Arc::new(store::StoreData::new()),
-                Arc::new(kiokun::KiokunData::new()?),
-            )
+            // Unit tests assert the committed sample's answers. A developer's
+            // deployment environment must not replace that test fixture.
+            #[cfg(test)]
+            let kiokun = kiokun::KiokunData::at(kiokun::sample(), None);
+            #[cfg(not(test))]
+            let kiokun = kiokun::KiokunData::new()?;
+            (Arc::new(store::StoreData::new()), Arc::new(kiokun))
         } else {
             #[cfg(test)]
             let store = store.unwrap_or_else(store::layer_for_tests);

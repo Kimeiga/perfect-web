@@ -137,8 +137,7 @@ fn syntax_errors_never_lend_a_backend_prerequisite_proof() {
     let input = units(&[("broken.pw", "module broken\nquery Bad() -> Int { + }\n")]);
     let called = std::cell::Cell::new(false);
     let errors = pw_core::program::with_semantic_program(&input, |_| called.set(true))
-        .err()
-        .expect("syntax errors refuse the proof");
+        .expect_err("syntax errors refuse the proof");
     assert!(!called.get());
     assert!(
         errors

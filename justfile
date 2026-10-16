@@ -19,6 +19,7 @@ import 'just/uploads.just'
 import 'just/notifications.just'
 import 'just/messages.just'
 import 'just/kiokun.just'
+import 'just/kiokun-test-data.just'
 import 'just/store-accounts.just'
 import 'just/store-search.just'
 import 'just/store-hours.just'
@@ -128,7 +129,7 @@ test-unit:
 # Validates the accepted/rejected corpus. Four phases since E2:
 #   0. pw fmt --check — the corpus is canonically formatted (ADR-0013)
 #   1. corpus-check — header well-formedness and full charter §16 coverage
-#   2. pw check on accepted/ — must be CLEAN
+#   2. accepted semantic conformance is clean; complete check/build pin four backend refusals
 #   3. cargo test  — asserts rejected files are caught by their declared @rule,
 #                    that none of them is caught by the wrong one, and that
 #                    coverage does not regress (see pw-cli rules::corpus_tests)

@@ -218,3 +218,208 @@ the fresh green baseline. This configuration starts65 webServer entries
 (64 pw-dev-server+1 kiokun-server); inspected parents/arguments matched the
 registry. The dispatcher was held and reaped only after normal whole-suite
 source restoration; no live mutation/browser child was interrupted.
+
+
+## Scoped browser evidence repair (design before adoption)
+
+Whole computed_signals17/17 completed after the earlier RED15/16. The old
+build_id campaign observed12/12 kills and exit0, but inspection found its
+final restored browser tuple was discarded. The same defect exists in refusal.
+That refusal campaign was cancelled as a partial run, not a whole result;
+its raw report is retained externally at
+`/tmp/check-is-build-whole-refusal-cancelled-partial.log`, SHA256
+`588164807100d285af6bd36f42bc976c20e0bf8135378ffa62ad6872327c764e`.
+
+After all owned children exited and source/probe restoration was proven, these
+two scripts will adopt the exact existing `scripts/run_suite.sh` authority
+from immutable integrator commit `c67bf6ed`, together with its exact existing
+`test_run_suite.py` regressions. Provenance is recorded before adoption. This
+self-contained helper owns producer status and executed-test presence; the
+legacy numerical summaries remain reporting only. Both actual browser commands
+will invoke it, and each final restored browser tuple must also be green.
+Deterministic stand-in producers exercise each real script's main cleanup and
+command wiring/status, red before the correction and green afterward. Independent
+controls remove each cleanup gate, helper wiring and nonzero-status requirement.
+
+Refusal's four Chromium invocations may be batched only if actual before/after
+Playwright --list inventories have the identical selected-test multiset; no
+assertion, grep meaning, retries or thresholds may be weakened. Whole corrected
+build_id12/refusal30 plus guide74 and expanded own controls remain required.
+
+A read-only AST/callee audit found26 discarded final browser tuples in this
+base. Those are static failure-path witnesses, not26 observed failed runs. The
+integrator separately repairs descriptions; this scoped correction repairs
+build_id/refusal. The other23 remain explicit integration work: block_parts,
+canonical,cart_lines,command_answers,command_order,command_retry,connection_faults,
+documents,holds,instance_changes,keepalive,materializer_failure,navigate,not_found,
+one_entry,page_policy,query_params,slots,soft_navigation,store_accounts,stores,
+stream_boot,test_controls. There is no claim that all scripts propagate failure.
+
+Cancellation itself exposed an ownership defect: managed Ctrl-C left Linux
+children alive and an early runner selector missed @playwright/test/cli.js;
+15 shell/server pairs spawned during its grace interval. Exact stable pidfds
+and the original WSL relay/environment/cwd/argv/start identities allowed scoped
+cleanup. All122 pinned instances exited/reaped and three listener samples were
+empty before editing. Source HEAD30f7e670 and the original untracked timing probe
+were byte-identical. This records a process-owner regression target, not a claim
+of general cancellation correctness.
+
+The actual pre-batch Playwright1.58 inventories select7 identity+1 recovery+
+1 lazy-handler+2 accessibility tests. Replaying the exact list selects the
+identical11-test multiset. Before/after raw inventories and proof are retained
+externally as `/tmp/check-is-build-refusal-list-before-{1..4}.txt`,
+`/tmp/check-is-build-refusal-list-after.txt` and
+`/tmp/check-is-build-refusal-inventory-proof.json`. The implementation derives
+its replay list from the unchanged original selectors on every run and compares
+the replayed --list multiset before one actual assertion invocation. Failed
+inventory producers, zero selections and drift refuse the browser phase.
+It changes no grep meaning, retry or threshold. This guards future test changes
+instead of freezing a current title list.
+
+Initial deterministic cleanup/wiring/status regressions:12 methods,10 red
+failures with2 green neighbours before correction;12/12 afterward. Two added
+inventory-boundary methods give14/14 green. The exact canonical helper's8/8
+regressions pass. Eight independent controls extend this track's whole20 to28;
+the full28 rerun and whole build_id12/refusal30/guide74 remain pending. Canonical
+helper SHA256 `6aaf7b298aec45b1658455fd0f35256b109896a1dea15dec620002e992bd8161`,
+canonical test SHA256 `12939e2b3bce1a18473b6170028b50f9de72059ea9811ce5f66fa9173cdbe683`.
+Old observed build_id12 raw retained as
+`/tmp/check-is-build-whole-build-id-historical12.log`, SHA256
+`aee8b70eca4360bf6a848abedf3ece7e756f922c63976e2638f1b7a283293895`.
+
+## Diagnostic reservation integration ruling, 2026-10-16
+
+The integrator found that integrated ADR0339 had already reserved66/PW6601..6612
+for an unimplemented collaborative-docs design. This track's initial parent
+allocation therefore conflicted with an existing design reservation;66 was not
+historically free. After a read-only116-ref/98-head audit found no PW67 use and
+ADR0339 was reread, the integrator formally ruled to retain implemented/tested
+Owner::CheckIsBuild66/PW6601 and move only the unimplemented collaborative-docs
+design to67/PW6701..6712, preserving suffix meanings. This grants no documents
+implementation or package permission. The parent owns the corresponding ADR0339
+and authoritative reservation/status amendments before integration. No unrelated
+owner is silently reassigned by this worker.
+
+
+## Producer validity and interrupted own28 (before final whole35)
+
+The first own28 dispatcher-only stop was intended to leave its regular-file
+output child running. The child instead exited immediately after10 controls,
+leaving the11th mutation in build.rs. WSL managed-session teardown is an
+unresolved causal hypothesis, not a proven mechanism. The full partial report
+is retained at `/tmp/check-is-build-own28-dispatch-interrupted-partial.log`,
+SHA256 `b7cf75485edd34762289e387c86d155236a6328db3cfbf7c9c9b74a720ca7763`.
+It earns no whole28 result. All known session entries were gone and three
+worktree process samples found no owned descendants before restoration. The
+sole residue matched the exact11th replacement; immutable30f7e670 build.rs
+bytes matched its saved pre-run manifest hash and only that file was restored.
+The entire frozen source/probe manifest and3082/268 final anchors are verified
+after the subsequent hardening. Future campaigns run to their natural end.
+This interrupted28 and the earlier cancelled refusal/122-process cleanup are
+distinct histories.
+
+Review then caught a second validity gap: rejecting a producer as not-built
+would still have earned the legacy main a KILLED verdict. The two scoped
+scripts now accept only consistent nonempty test results: Cargo exit0 with
+positive passes/no failures, or exit101 with actual failures; the canonical
+browser helper exit0 with positive passes/no failures, or exit1 with actual
+failures. Other exits, missing summaries, zero tests, contradictory statuses
+and time/memory stops are REFUSED. They earn no kill and fail the campaign.
+The main has independent refusal/kill counters and verifies source restoration
+through its real finally in deterministic tests. No other script gains this
+stronger classification merely by association.
+
+The sole already-declared compiler exception remains exact: the named feed
+composer mutant may be killed by PW5048 from the actual feed CLI check exiting1.
+A typed CompilerRefusal retains its complete code set; the mutant name and
+exact predeclared set must agree. An unlisted name, additional PW6601, or exit67
+cannot use that exception. There are no broad build-failure kills in these
+two scripts.
+
+With valid fixtures, the new producer regressions were RED24/42 (the earlier
+fixture-name error attempt is retained separately), then GREEN45/45 including
+additional actual diagnostic/exception-boundary cases. Valid assertion-failure
+neighbours remain kills; invalid main states explicitly contain no KILLED
+verdict and restore their temporary source bytes. Seven independent producer
+controls extend own28 to35. Fresh complete35/2/12/30/74 and fullCI are pending;
+no source/harness commit is made before these required gates pass.
+
+
+## Natural results and guide inventory refusal
+
+Fresh own35/35 passed with baseline75 and zero bound stops. The exact shared
+Kiokun sample-data controls passed2/2 assertion kills. Corrected build_id12/12
+and refusal30/30 passed naturally with0refused/no memory stops; their final
+restored browser runs were explicitly green1/1 and11/11. Refusal's30 comprise
+18 Rust assertion cases,11 browser assertion cases and the actual exactly named
+PW5048 checker refusal. Every completed phase restored the entire frozen source
+and original timing-probe byte manifest, with3082 anchors/268 scripts.
+
+The following guide74 invocation refused before baseline or mutation because
+two controls renamed when closing guide build gaps were absent from the manual
+MUST inventory. The raw pre-baseline refusal is retained externally at
+`/tmp/check-is-build-guide74-inventory-refusal.log`, SHA256
+`cfa989d7d3b00961dad1dcdfb26767454b1db572ccf4778759e64760cc589fa9`.
+This is no whole74 result. Only the two stale inventory keys are corrected to
+match the existing control names, with the same GUIDE_TEST witnesses and all
+uniqueness/exact-set/CHECKED assertions retained. A fresh entire74 is required.
+No source commit precedes the required whole/CI gates.
+
+All2712 frozen inputs, including uncommitted source, original probe and reports,
+have byte copies in `/tmp/check-is-build-frozen35-byte-copies`; individual source
+hashes are retained separately. After the natural coordinator ended, its worker
+and coordinator entries were gone, every frozen source/probe hash matched, and
+three configured/provider listener samples were empty before the inventory edit.
+
+## Ordinary browser startup environment qualification
+
+The completed35/2/12/30 natural campaign inherited nonempty KIOKUN_DATA and
+KIOKUN_APP from setup. Exact selected values were recorded privately from its
+coordinator/worker environments, without inspecting external data contents.
+Earlier broad assumptions about no external startup read were incorrect.
+Code tracing narrows the path to the unconditional legacy kiokun-server at
+PORT+40: main calls load/data_dir and reads the configured KIOKUN_DATA shard.
+This campaign's65 hosts were49dist+15dist-feed+1legacy, with no Kiokun-site host.
+Do not attribute this exposure to all store/feed Server instances or claim
+external labels/glosses were loaded here; those constructors choose Kiokun only
+when their contracts import it. The legacy loader uses DATA, while APP was also
+present in the inherited environment. These historical browser results retain
+that environment qualification; there is no hermetic ordinary-host claim.
+
+Subsequent guide/fullCI/final-recipe launches explicitly unset both variables
+after setup so the legacy host selects the committed sample. The hermetic unit
+negative child still sets its own missing private paths; production deployment
+configuration remains supported. Later host-selection work owns ordinary browser
+configuration isolation; this track does not merge or implement that feature.
+
+## CI3 exposed the stream test's stage boundary
+
+Fresh post-style whole35 passed35/35 (baseline75,0bound stops), then CI3
+naturally failed only `streams_and_resources::a_stream_builds_as_a_part`.
+Its complete accepted A-008 fixture hit the already documented generated-WIT
+collision, not a new language error. Raw CI3 is retained externally as
+`/tmp/check-is-build-ci3-streams-red.log`, SHA256
+`b7dfc2290b6f7e090f11216097e84db890a5cabe9ca95bd48126fc4634cafe79`;
+launch SHA256 `3558e999357e5a44b84047fbdd534bc6c1c022e77efdf5db4dbe30fcaf6a905b`.
+CI3 stopped at test-unit (exit101), wall10:11.90,user2073.98,sys151.38,
+363%CPU,load4.91→9.37. No full-CI success is claimed. All2289 frozen source/probe
+paths matched the launch manifest after exit, the original probe was restored
+untracked, its backup was absent, and three68-host/provider listener samples
+were empty before editing.
+
+The integrator approved a test-only correction before its implementation:
+keep A-008 untouched, retain its exact complete-program PW6601/Stage::Wit
+reason, responsible query declaration and full refusal wording, and exercise
+stream template lowering through the existing semantic-program callback and
+`build::templates`. The original test inspected only the stream part manifest;
+it did not establish executable component support. A separate explicit complete
+negative now prevents that stage positive from being read as whole-program
+acceptance. Public CLI validation, artifact proof and backend behavior do not
+change. Mutation TESTS selections and full applicable campaigns must be audited
+and run before a source checkpoint; the fresh full CI remains required.
+
+The integrator also independently proved an invalid producer-exit gap in the
+current guide harness. The completed guide74 is historical evidence for its
+current controls, not proof of guide producer validity. A separate reviewed
+follow-up after the current source/recipe checkpoint will address it; neither
+this correction nor the two repaired browser scripts closes that gap.

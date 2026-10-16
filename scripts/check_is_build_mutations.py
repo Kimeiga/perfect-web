@@ -42,6 +42,21 @@ MUTANTS = [
     ('the complete accepted-corpus gate is not run', JUST, '    cargo test --locked -p pw-cli --test check_build_corpus accepted_corpus_has_exactly_its_known_backend_refusals', '    true'),
     ('the semantic accepted-corpus gate is not run', JUST, '    cargo test --locked -p pw-core --test checking_source no_accepted_corpus_file_reports_a_body_level_error', '    true'),
     ('a parsed WIT failure loses its generated source identity', COMPONENT, '.find(|w| w.exports == name || w.name == name)', '.find(|_| false)'),
+    ('build_id restored browser failure is accepted', ROOT / "scripts/build_id_mutations.py", '    if not built or failed or not passed or (watch is not None and watch.stopped):\n        print("FAIL: the restored browser suite is not green")', '    if False:\n        print("FAIL: the restored browser suite is not green")'),
+    ('build_id bypasses shared browser suite authority', ROOT / "scripts/build_id_mutations.py", '["bash", str(ROOT / "scripts/run_suite.sh"), "-C", ".", "--",', '["bash", "-c", "exit 0", "--",'),
+    ('build_id producer failure is hidden by passed counts', ROOT / "scripts/build_id_mutations.py", 'if code != (1 if command_failed else 0):', 'if False and code != (1 if command_failed else 0):'),
+    ('refusal restored browser failure is accepted', ROOT / "scripts/refusal_mutations.py", '    if not built or failed or not passed or (watch is not None and watch.stopped):\n        print("FAIL: the restored browser suite is not green")', '    if False:\n        print("FAIL: the restored browser suite is not green")'),
+    ('refusal bypasses shared browser suite authority', ROOT / "scripts/refusal_mutations.py", '["bash", str(ROOT / "scripts/run_suite.sh"), "-C", ".", "--",', '["bash", "-c", "exit 0", "--",'),
+    ('refusal producer failure is hidden by passed counts', ROOT / "scripts/refusal_mutations.py", 'if code != (1 if command_failed else 0):', 'if False and code != (1 if command_failed else 0):'),
+    ('refusal batched test inventory drifts', ROOT / "scripts/refusal_mutations.py", 'if actual is None or Counter(expected) != Counter(actual):', 'if actual is None:'),
+    ('refusal accepts a failed test inventory producer', ROOT / "scripts/refusal_mutations.py", '    if code != 0:\n        return None\n', '    if False and code != 0:\n        return None\n'),
+    ('build_id invalid producer earns an assertion kill', ROOT / "scripts/build_id_mutations.py", 'not built or passed + failed == 0 or stopped', 'False'),
+    ('build_id cargo producer status contradicts its counts', ROOT / "scripts/build_id_mutations.py", 'valid = code == (101 if failed else 0) and passed + failed > 0', 'valid = True'),
+    ('build_id memory-stopped mutant earns a kill', ROOT / "scripts/build_id_mutations.py", 'stopped = watch is not None and bool(watch.stopped)', 'stopped = False'),
+    ('refusal invalid producer earns an assertion kill', ROOT / "scripts/refusal_mutations.py", 'not built or passed + failed == 0 or stopped', 'False'),
+    ('refusal cargo producer status contradicts its counts', ROOT / "scripts/refusal_mutations.py", 'valid = code == (101 if failed else 0) and passed + failed > 0', 'valid = True'),
+    ('refusal memory-stopped mutant earns a kill', ROOT / "scripts/refusal_mutations.py", 'stopped = watch is not None and bool(watch.stopped)', 'stopped = False'),
+    ('refusal named checker exception accepts extra codes', ROOT / "scripts/refusal_mutations.py", 'result.codes == named', 'named <= result.codes'),
  ]
 COMMANDS = [
     ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--doc", "backend::lower::Checked"],
@@ -50,6 +65,8 @@ COMMANDS = [
     ["cargo", "test", "--quiet", "--locked", "-p", "pw-cli", "--test", "check_is_build"],
     ["cargo", "test", "--quiet", "--locked", "-p", "pw-cli", "--test", "check_build_corpus", "accepted_corpus"],
     ["python3", "scripts/tests/test_check_build_gate.py"],
+    ["python3", "scripts/tests/test_mutation_cleanup.py"],
+    ["python3", "scripts/tests/test_run_suite.py"],
 ]
 BOUND = 180
 

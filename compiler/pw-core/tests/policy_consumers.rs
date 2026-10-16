@@ -418,8 +418,7 @@ fn the_backend_is_never_handed_this_program() {
         })
         .collect();
     let refused: Vec<_> = pw_core::program::with_semantic_program(&units, |_| ())
-        .err()
-        .expect("the probe performs a database read in a page")
+        .expect_err("the probe performs a database read in a page")
         .into_iter()
         .flat_map(|(_, diagnostics)| diagnostics)
         .collect();
