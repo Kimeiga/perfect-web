@@ -677,7 +677,7 @@ impl<'a> Types<'a> {
                 // THIS call. Its declared T is not the caller's rigid T:
                 // first<T>(Item { .. }) can return an Item within first<T>.
                 // The shared solver, never the declaration, owns that type.
-                if names_parameter(result, sig.definition) {
+                if mentions_binder(result, sig.definition) {
                     return None;
                 }
                 // A command answers its caller whether it committed, and its
@@ -861,19 +861,6 @@ pub enum MemberRead<'s> {
     Unknown,
 }
 
-/// The element type of a written type, seeing through the carriers.
-///
-/// ```text
-/// List<MenuItem>                  -> MenuItem
-/// Result<List<MenuItem>, Error>   -> MenuItem
-/// Option<List<MenuItem>>          -> MenuItem
-/// MenuItem                        -> None, it is not a collection
-/// ```
-///
-/// `Result` and `Option` are seen through because a query returns one and the
-/// loop iterates what is inside. That is not the same as ignoring them: a
-/// `Result` still has to be handled, and `option_used_as_value` is the rule
-/// that says so. This answers a different question — what one element IS.
 /// Does this type mention a type parameter `binder` binds?
 fn mentions_binder(ty: &ResolvedType, binder: DefId) -> bool {
     ty.parameter_binding().is_some_and(|(b, _)| b == binder)
@@ -917,6 +904,19 @@ fn own_binder(sigs: &Signatures, module: Option<&str>, decl: &Decl) -> Option<De
     }
 }
 
+/// The element type of a written type, seeing through the carriers.
+///
+/// ```text
+/// List<MenuItem>                  -> MenuItem
+/// Result<List<MenuItem>, Error>   -> MenuItem
+/// Option<List<MenuItem>>          -> MenuItem
+/// MenuItem                        -> None, it is not a collection
+/// ```
+///
+/// `Result` and `Option` are seen through because a query returns one and the
+/// loop iterates what is inside. That is not the same as ignoring them: a
+/// `Result` still has to be handled, and `option_used_as_value` is the rule
+/// that says so. This answers a different question — what one element IS.
 pub fn element_of_type(ty: &ResolvedType) -> Option<&ResolvedType> {
     match ty.as_builtin()? {
         Builtin::List => ty.args().first(),
@@ -932,12 +932,4 @@ pub fn path_of(body: &Body, id: ExprId) -> String {
         Expr::Field { base, name } => format!("{}.{}", path_of(body, *base), name),
         _ => String::new(),
     }
-}
-
-/// Whether a declared result contains this callee's own type parameters.
-/// Binding identity alone cannot distinguish its recursive invocation from
-/// the enclosing generic's rigid parameters; the call must instantiate it.
-fn names_parameter(t: &ResolvedType, binder: DefId) -> bool {
-    t.parameter_binding().is_some_and(|(b, _)| b == binder)
-        || t.args().iter().any(|a| names_parameter(a, binder))
 }
