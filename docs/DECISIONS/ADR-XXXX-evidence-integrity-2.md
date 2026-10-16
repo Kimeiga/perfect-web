@@ -229,6 +229,10 @@ only; `unnumbered_adrs` held on trains as well as master. Nothing changed.
 
 ## Other findings
 
+- **The first full `just ci` caught Clippy's `manual_contains` lint** in
+  the table's raw-code membership check. `caad384d` uses `contains` for
+  the same comparison; targeted `pw-core` Clippy and the table's test pass.
+
 - **The first resumed `just evidence-gates` caught a stale stand-in**:
   `evidence-corpus` now checks its enforcement summary, but
   `test_evidence_gates.py` supplied `fixture corpus`. Its stand-in now
@@ -269,6 +273,9 @@ only; `unnumbered_adrs` held on trains as well as master. Nothing changed.
   the memory bound stopped no process. Both new controls fail their
   behavioural regressions: a committed census is not a new failed suite,
   and a count of zero with leading zeros cannot pass.
+  Repeated whole after the Clippy repair, at `caad384d`: **35 of 35**
+  again; the memory bound stopped no process. The raw evidence now records
+  that repaired code head.
 - The other scripts this change reaches, run whole on 2026-10-16 at
   `b7e400c6`: `dealt_by_time_mutations.py` **48 of 48**,
   `evidence_integrity_mutations.py` **32 of 32**,

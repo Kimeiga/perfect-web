@@ -1,7 +1,7 @@
 Track evidence-integrity-2 - a failed browser test fails its recipe, and five more rulings
 
 produced by: just e14-evidence-integrity-2
-commit: 1dbf5e655ccf87ba30676303dd7c154813fcc2c0
+commit: caad384d1582aaeec3d1b64c6dfd48306f575474
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 python: Python 3.10.12
 just: just 1.58.0
@@ -39,11 +39,11 @@ just: just 1.58.0
 2026-10-10 59f3351e (until 59f3351e) docs/evidence/E14/navigate.txt (just e14-navigate, recorded at 6964ee77) the order placed and gone to, in three engines (e2e/navigate.spec.m:
     | 1) [firefox] › e2e/navigate.spec.mjs:134:1 › a press made before the navigation is answered first, its answer first
     | 1 failed
-recorded browser failures: 9 (2 still committed), in 2239 versions of evidence files read
+recorded browser failures: 9 (2 still committed), in 2240 versions of evidence files read
 test_a_committed_report_does_not_become_a_new_failed_suite (scripts.tests.test_recorded_browser_failures.RecordedBrowserFailures) ... ok
 test_a_green_run_a_skip_a_mutant_and_a_cargo_failure_are_no_browser_failure (scripts.tests.test_recorded_browser_failures.RecordedBrowserFailures) ... ok
 test_each_failure_is_named_once_at_its_first_commit_and_whether_it_stands (scripts.tests.test_recorded_browser_failures.RecordedBrowserFailures) ... ok
-Ran 3 tests in 0.151s
+Ran 3 tests in 0.093s
 OK
 
 == 1. a failed browser test fails its recipe: the helper (scripts/run_suite.sh, test_run_suite.py)
@@ -56,7 +56,7 @@ test_a_suite_that_passed_no_test_fails (scripts.tests.test_run_suite.RunSuite) .
 test_every_run_runs_and_the_first_failure_is_its_status (scripts.tests.test_run_suite.RunSuite) ... ok
 test_it_runs_from_the_directory_it_is_given (scripts.tests.test_run_suite.RunSuite) ... ok
 test_its_status_is_any_exit_but_zero (scripts.tests.test_run_suite.RunSuite) ... ok
-Ran 8 tests in 0.187s
+Ran 8 tests in 0.131s
 OK
 
 == 1. every suite in the justfile runs by it, its status its recipe's (scripts/suite_status.py, test_suite_status.py)
@@ -68,7 +68,7 @@ test_a_suite_not_run_by_the_helper_is_refused (scripts.tests.test_suite_status.S
 test_each_way_of_swallowing_a_status_is_refused (scripts.tests.test_suite_status.SuiteStatus) ... ok
 test_the_helper_with_its_status_raised_passes (scripts.tests.test_suite_status.SuiteStatus) ... ok
 test_the_repository_runs_every_suite_by_the_helper_its_status_its_recipes (scripts.tests.test_suite_status.SuiteStatus) ... 
-Ran 6 tests in 0.460s
+Ran 6 tests in 0.413s
 OK
 
 == 1. each suite failed in turn fails its recipe, and its evidence says so (test_suites_fail_their_recipes.py, test_builds_before_suites.py)
@@ -82,7 +82,7 @@ test_the_stand_ins_tell_a_build_that_stops_its_recipe_from_one_that_does_not (sc
 test_a_build_of_another_runtime_or_of_changed_sources_is_refused (scripts.tests.test_builds_before_suites.DistIsWhole) ... ok
 test_a_build_stopped_part_way_or_never_made_is_refused (scripts.tests.test_builds_before_suites.DistIsWhole) ... ok
 test_a_whole_build_is_served (scripts.tests.test_builds_before_suites.DistIsWhole) ... ok
-Ran 7 tests in 86.273s
+Ran 7 tests in 85.687s
 OK
 
 == 2, 3. the planner reads every recipe, and the suite's configuration plans what runs under it (test_ci_scripts.py)
@@ -90,7 +90,7 @@ OK
 test_a_change_to_the_suites_configuration_plans_every_recipe_that_runs_a_suite_under_it (scripts.tests.test_ci_scripts.Plan) ... ok
 test_a_changed_spec_or_a_module_its_specs_import_plans_what_runs_them (scripts.tests.test_ci_scripts.Plan) ... ok
 test_a_recipe_whose_parameters_have_defaults_is_read (scripts.tests.test_ci_scripts.Plan) ... ok
-Ran 75 tests in 15.730s
+Ran 75 tests in 6.524s
 OK
 
 == 4. mutant-programs finds every program a mutation script mutates (scripts/mutant_programs.py, test_mutant_programs.py)
@@ -104,7 +104,7 @@ test_a_named_rule_the_mutant_does_not_meet_fails (scripts.tests.test_mutant_prog
 test_a_root_no_list_names_is_found_from_its_path (scripts.tests.test_mutant_programs.MutantPrograms) ... ok
 test_an_import_it_cannot_resolve_fails (scripts.tests.test_mutant_programs.MutantPrograms) ... ok
 test_the_control_a_mutant_that_leaves_a_program_passes (scripts.tests.test_mutant_programs.MutantPrograms) ... ok
-Ran 9 tests in 1.010s
+Ran 9 tests in 0.353s
 OK
 mutant programs: 239 mutants of a program's source, 239 judged, in 9 programs (benchmarks/baselines/pleris/store, examples, examples/feed, examples/kiokun, examples/kiokun-site, examples/lib, examples/rejected/R-004-private-cart-in-shared-cache.pw, examples/store, packages/pw-std); 344 checks; 11 refused by the rule their script names, 0 failing
 
@@ -112,18 +112,18 @@ mutant programs: 239 mutants of a program's source, 239 judged, in 9 programs (b
 
 test codes::tests::an_old_number_is_no_registered_rule ... ok
 test diagnostics::tests::no_comparison_translates_an_old_number ... ok
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 184 filtered out; finished in 0.06s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 184 filtered out; finished in 0.19s
 
 == 6. the corpus's enforcement table is what the corpus checks now (checking_source.rs)
 
 test the_committed_enforcement_table_is_what_the_corpus_checks_now ... ok
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 19 filtered out; finished in 14.45s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 19 filtered out; finished in 22.16s
 74/74 enforce their declared invariant
 
 == 7. e9-latency names the machine it measured (test_e9_latency_recipe.py; the measurement is the integrator's, in a quiet window)
 
 test_the_evidence_names_this_machines_record_and_its_load (scripts.tests.test_e9_latency_recipe.LatencyNamesItsMachine) ... ok
-Ran 1 test in 0.153s
+Ran 1 test in 0.102s
 OK
 
 == mutation controls (scripts/evidence_integrity_2_mutations.py)
