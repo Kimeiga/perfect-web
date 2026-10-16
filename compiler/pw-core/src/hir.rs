@@ -160,6 +160,11 @@ pub enum DeclKind {
     /// `source StoreData` (ADR-0207): a database the program's effects name,
     /// and what it guarantees. Named by nothing a program writes.
     Source,
+    /// `table Todos` (track `tables`, ADR-0338): an app's data, declared: its
+    /// row, key, order, indexes, references and bound. Named by nothing a
+    /// program writes: its module, which has its name, holds the reads and
+    /// writes generated from it (`tables::generate`).
+    Table,
     /// `upload PostImage` (track `uploads`, ADR-0260): a file a form posts to
     /// its `route`, served once committed under `serves`, and its limits.
     /// Named by nothing a program writes; `pw build` writes it for the host.
@@ -1410,6 +1415,11 @@ pub struct Hir {
     /// a clause's value, a string's hole, a block marker's expression — each
     /// span in the file. The checker reports them as it does the file's.
     pub syntax: Vec<pw_syntax::SyntaxError>,
+    /// **The declarations the compiler wrote, and what for** (track
+    /// `tables`, ADR-0338): each function and record a table's declaration
+    /// gives its module (`tables::generate`), by its id. A declaration not
+    /// here is the program's own.
+    pub generated: std::collections::BTreeMap<DeclId, crate::tables::Generated>,
 }
 
 impl Hir {

@@ -65,14 +65,14 @@ MUTANTS = [
     (
         "`set` is no clause",
         GRAMMAR,
-        "    \"set\",\n    // Track `uploads` (ADR-0260)",
-        "    // Track `uploads` (ADR-0260)",
+        "    \"set\",\n",
+        "",
     ),
     (
         "`set` and `sets` head a clause wherever they are written",
         GRAMMAR,
-        "const NAMED_HEADS: &[&str] = &[\"layout\", \"set\", \"sets\"];\n",
-        "const NAMED_HEADS: &[&str] = &[\"layout\"];\n",
+        '    "layout", "set", "sets", "row", "order", "index", "unique", "refers", "migrate",\n',
+        '    "layout", "row", "order", "index", "unique", "refers", "migrate",\n',
     ),
     (
         "`sets` takes any value",
@@ -310,27 +310,40 @@ MUTANTS = [
         "            out.extend(bounded.check(i, &u.src));\n",
         "            let _ = (&bounded, i);\n",
     ),
+    ('generated keyed reads have no set pair', BOUNDED, '                        pairs.insert(Self::def(unit, *id), Self::def(unit, *set));\n', '                        let _ = (id, set);\n'),
+    ('generated index pairs ignore their queried fields', BOUNDED, '                        .find(|(_, p, fields)| *p == many && fields == by)\n', '                        .find(|(_, p, fields)| *p == many && (fields == by || true))\n'),
+    ('generated index reads are paired with a prefix batch', BOUNDED, '                        Primitive::Index => Primitive::IndexMany,\n', '                        Primitive::Index => Primitive::PrefixMany,\n'),
+    ('generated flat batches replace each individual read in the repair', BOUNDED, '             then give each turn its matching rows from the flat result (or no row for a \\\n', '             then give every turn the entire batch from the flat result (or no row for a \\\n'),
+    ('generated composite keys are described as scalar keys', BOUNDED, '        let input = if by.len() == 1 {\n', '        let input = if true || by.len() == 1 {\n'),
 ]
 
 TESTS = [
-    ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "bounded_reads"],
+    ['cargo', 'test', '--quiet', '--locked', '-p', 'pw-core', '--test', 'bounded_reads'],
+    ['cargo', 'test', '--quiet', '--locked', '-p', 'pw-core', '--test', 'bounded_tables'],
 ]
 
 
 def run():
-    """(built, passed, failed) over every test command."""
+    """Count every Rust binary; a missing/contradictory result is not a kill."""
     passed = failed = 0
     for command in TESTS:
         r = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
         out = r.stdout + r.stderr
-        m = re.search(r"test result: \w+\. (\d+) passed; (\d+) failed", out)
-        if m is None:
-            if "error[" in out or "could not compile" in out:
+        summaries = re.findall(r"^test result: (ok|FAILED)\. (\d+) passed; (\d+) failed;", out, re.M)
+        if (not summaries or r.returncode < 0
+                or "error[" in out or "could not compile" in out):
+            return False, 0, 0
+        command_passed = command_failed = 0
+        for status, p, f in summaries:
+            p, f = int(p), int(f)
+            if not p + f or (status == "ok") != (f == 0):
                 return False, 0, 0
-            failed += 1
-            continue
-        passed += int(m.group(1))
-        failed += int(m.group(2))
+            command_passed += p
+            command_failed += f
+        if (r.returncode == 0) != (command_failed == 0):
+            return False, 0, 0
+        passed += command_passed
+        failed += command_failed
     return True, passed, failed
 
 
@@ -355,7 +368,8 @@ def main():
         finally:
             path.write_text(original)
         if not built:
-            verdict = "KILLED (does not build)"
+            verdict = "REFUSED (no consistent assertion-failure result)"
+            survivors += 1
         elif failed:
             verdict = f"KILLED ({failed} of {passed + failed} tests fail)"
         else:

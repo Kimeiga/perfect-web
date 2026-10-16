@@ -308,6 +308,20 @@ codes! {
         "a page's `layout` clause names a layout, once";
     LAYOUT_TAKES_NOTHING = "PW0353" / layout_takes_nothing / 1, DeclarationRules,
         "a layout is given nothing by the page it shows: it declares no parameters";
+    // ADR-0338 (track `tables`, D1): an app's data, declared as tables, whose
+    // generated functions are the program's only way to their rows. The
+    // integrator's assignment (ruling 4); PW0354 to PW0360 and PW0363 are
+    // the three-database note's other tracks'.
+    TABLE_MALFORMED = "PW0361" / table_malformed / 1, DeclarationRules,
+        "a table's row is a record declared beside it, in the module of its name, and its key, order, indexes and references name the row's fields, each of a type every adapter keys a row by";
+    DATA_NOT_DECLARED = "PW0362" / data_not_declared / 1, DeclarationRules,
+        "a table's rows are reached only through the functions its declaration gives";
+    ALL_UNBOUNDED = "PW0364" / all_unbounded / 1, DeclarationRules,
+        "a table is read whole, by `all()`, only where it states `bounded`";
+    REFERS_ACROSS_SOURCES = "PW0365" / refers_across_sources / 1, DeclarationRules,
+        "a reference to a table another source holds is held by no database: the referred row may be missing, which `get` answers as `None`";
+    MIGRATION_UNSTATED = "PW0366" / migration_unstated / 1, DeclarationRules,
+        "a change from the schema released that loses or reinterprets data is stated by a `migrate`, and each `migrate` states one";
 
     STALE_KEY_POLICY = "PW0325" / stale_key_policy / 1, DeclarationRules,
         "a keyed query must say what happens when its key changes";

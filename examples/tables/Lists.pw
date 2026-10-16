@@ -1,0 +1,35 @@
+// @corpus: fixture
+// @id: TABLES-Lists
+// @category: application data — a table, declared (ADR-0338, D1)
+// @charter: §9.2, §7.5
+// @milestone: E14
+//
+// Track `tables` (ADR-0338's D1): an app's data declared in Pleris, and no
+// Rust written for it. A table is declared in the module of its name; its
+// reads and writes are this module's functions, which the compiler writes
+// from the declaration (`tables::generate`), each bound to a primitive one
+// adapter per database implements for every table: `Lists.get(id)`,
+// `Lists.get_many(ids)`, `Lists.by_slug(slug)`, `Lists.all()`,
+// `Lists.insert(list)`, `Lists.put(list)`, `Lists.delete(id)`.
+//
+// The fixture program D2 serves first: these lists, their items
+// (`Items.pw`), the source that holds both (`ListData.pw`), and the
+// queries and commands over them (`app.pw`). `schema.lock` is its schema as
+// released, which `pw build --schema-lock` holds it to.
+
+module Lists
+
+opaque type ListId = String
+
+// A list's address, one list's alone (`unique`).
+opaque type Slug = String where String.length(value) <= 64
+
+type TodoList = TodoList { id: ListId, name: String, slug: Slug, added: Int }
+
+// Read whole on the home page, so it states the most lists it holds.
+table Lists
+    row     TodoList
+    key     id
+    order   added
+    unique  by_slug on slug
+    bounded 100

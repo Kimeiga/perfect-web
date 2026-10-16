@@ -1899,3 +1899,17 @@ Each a decision for a track, with its date; a track's ADR records it too.
   - **A record's count, unchecked**: `bounded-checker`'s commit `1f0d772f`
     says "41 in all" of a script that has 40 mutants (its ADR and its run
     say 40); `track/evidence-integrity`'s family of findings.
+
+## Train-10 local D1 compiler integration, 2026-10-16
+
+The integrator's pending merge of tables917fafbd into c67bf6ed passed
+full local CI and the final source receipt: 3,058 Rust pass/0fail/25ignore,
+Python233pass/2skip, source302 variants/16 named refusals/0fail. Whole
+bounded47 and PostgreSQL12 pass; all 2,366 frozen source hashes restored.
+Guide ordinary browser12/three engines passes with deployment dictionary
+variables absent; its whole74 has a separately recorded invalid-exit
+classification gap, owned by the guide-producer follow-up. D1 runtime cost
+admission and the complete assembled train remain open. Exact raw output
+and tested input hashes are in `evidence/E14/train10-d1-integration.txt`.
+The generic7ec, cache3019936e and check/build e82b0d6c checkpoints are
+separate integration inputs; none is claimed merged by this record.

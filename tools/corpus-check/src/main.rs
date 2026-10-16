@@ -77,6 +77,12 @@ const ACCEPTED_CATEGORIES: &[&str] = &[
     "a list read together before its loop",
     // The each-head-effects track, corpus C26: R-080's neighbour.
     "a loop over a query's value",
+    // Track `tables` (ADR-0338, D1): an app's data, declared, and the
+    // controls of PW0361, PW0362, PW0364 and PW0366.
+    "a table read and written through the functions its declaration gives",
+    "a reference between tables one source holds",
+    "a reference across sources by a field that may name no row",
+    "a table's change from its released schema, stated",
 ];
 
 /// Charter §16.2: "Create at least one minimal file for each".
@@ -195,6 +201,16 @@ const REJECTED_CATEGORIES: &[&str] = &[
     "a set read that answers no result with its key",
     // The each-head-effects track, corpus C26: PW0401 at a loop's head.
     "a database read in a loop's list",
+    // Track `tables` (ADR-0338, D1): PW0361, PW0362, PW0364 and
+    // PW0366, each beside its accepted control (A-050 to A-053).
+    "a table keyed by a field no database keys a row by",
+    "an index on a field its row does not have",
+    "a table read whole that states no bound",
+    "a read a table's declaration does not give",
+    "a table's rows read through a binding written by hand",
+    "a reference whose field holds no key of its target",
+    "a field dropped from a released schema with no migrate",
+    "a field renamed from a released schema with no migrate",
 ];
 
 /// Milestone 0 gate (charter §14 M0): ">= 10 accepted and 20 rejected".

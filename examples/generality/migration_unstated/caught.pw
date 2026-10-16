@@ -1,0 +1,17 @@
+// @status: GENERAL
+// @invariant: migration_unstated
+// @schema-lock: caught.schema.lock
+//
+// Structurally different from R-106 and R-107: no field dropped or renamed,
+// one kept and its type changed (`Int` released, `String` now), so each
+// row's value would be read as another type.
+
+module Scores
+
+opaque type ScoreId = String
+
+type Score = Score { id: ScoreId, points: String }
+
+table Scores
+    row Score
+    key id

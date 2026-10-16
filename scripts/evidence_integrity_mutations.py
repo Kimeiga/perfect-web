@@ -245,11 +245,11 @@ MUTANTS = [
         "checking is pathological: the program is checked five times over",
         "latency",
         CHECK,
-        "    let mut checked = check_units(&units).into_iter();\n",
+        "    let mut held = check_units(&units);\n",
         "    for _ in 0..4 {\n"
         "        let _ = check_units(&units);\n"
         "    }\n"
-        "    let mut checked = check_units(&units).into_iter();\n",
+        "    let mut held = check_units(&units);\n",
     ),
     (
         "the checking thread's clock reads nothing",

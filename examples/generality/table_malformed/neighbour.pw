@@ -1,0 +1,18 @@
+// @status: NEIGHBOUR
+// @invariant: table_malformed
+// @dimension: valid neighbour — a reference whose field holds the key of the table it names, or none
+//
+// The same reference, its field the `RibbonId` that keys `Ribbons`: a rule
+// that refused references, rather than references to another key, would
+// refuse it.
+
+module Ribbons
+
+opaque type RibbonId = String
+
+type Ribbon = Ribbon { id: RibbonId, holder: Option<RibbonId> }
+
+table Ribbons
+    row    Ribbon
+    key    id
+    refers holder to Ribbons

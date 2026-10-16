@@ -1,0 +1,31 @@
+// @corpus: rejected
+// @id: R-105
+// @category: a reference whose field holds no key of its target
+// @rule: PW0361
+// @invariant: table_malformed
+// @charter: §9.2, §2
+// @milestone: 14
+// @expect-error: `author` is `MemberId`, and `Posts` is keyed by `PostId`
+//
+// A relation carries the target table's key. Another opaque identifier is
+// a different type even where both store strings. A-051 is its control.
+
+module Posts
+
+import Members.{ MemberId }
+import Members
+
+opaque type PostId = String
+
+type Post = Post { id: PostId, author: MemberId, text: String }
+
+table Posts
+    row    Post
+    key    id
+    refers author to Posts
+
+source PostData
+    holds        Posts
+    transactions serializable
+    reads        strong
+    changes      none

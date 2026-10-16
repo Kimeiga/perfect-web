@@ -18,7 +18,7 @@ e14-bounded-reads:
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
        echo "rust: $(rustc --version)"; echo; \
        echo "== the rules (compiler/pw-core/tests/bounded_reads.rs, and bounded's own)"; echo; \
-       cargo test --locked -p pw-core --test bounded_reads 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       cargo test --locked -p pw-core --test bounded_reads --test bounded_tables 2>&1 | grep -E '^(test |test result)|panicked at'; \
        cargo test --locked -p pw-core --lib bounded:: 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the corpus: each fixture its own defect, and the generality witnesses (checking_source.rs, generality.rs)"; echo; \
        cargo test --locked -p pw-core --test checking_source --test generality 2>&1 | grep -E '^test result|^---- |panicked at'; \

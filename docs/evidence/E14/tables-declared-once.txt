@@ -1,0 +1,13 @@
+baseline: 5 passed, 0 failed
+the rule does not run: KILLED (5 of 5 tests fail)
+a parameter may be taken twice: KILLED (1 of 5 tests fail)
+a type parameter may be taken twice: KILLED (1 of 5 tests fail)
+a field may be declared twice: KILLED (1 of 5 tests fail)
+a case may be declared twice: KILLED (1 of 5 tests fail)
+a policy may be written twice: KILLED (1 of 5 tests fail)
+no policy repeats: KILLED (1 of 5 tests fail)
+a pattern may bind a name twice: KILLED (1 of 5 tests fail)
+an attribute may be given twice: KILLED (1 of 5 tests fail)
+an attribute's name is read as written: KILLED (1 of 5 tests fail)
+10 of 10 mutants killed
+memory bound: no process was stopped

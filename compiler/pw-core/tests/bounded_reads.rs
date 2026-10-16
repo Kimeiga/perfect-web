@@ -960,7 +960,7 @@ fn the_stores_pairs_and_source_cost_are_declared_together() {
     let stated = store();
     assert_eq!(bounded_in(&stated), Vec::<String>::new());
     let paired = edited(&stated, "StoreData.pw", "    sets         one_call\n", "");
-    let paired = edited(&paired, "Addresses.pw", "    set estimates_to\n", "");
+    let paired = edited(&paired, "Addresses.pw", "    set  estimates_to\n", "");
     assert_eq!(
         bounded_in(&paired),
         [

@@ -1,0 +1,25 @@
+// @corpus: rejected
+// @id: R-106
+// @category: a field dropped from a released schema with no migrate
+// @rule: PW0366
+// @invariant: migration_unstated
+// @charter: §9.2
+// @milestone: 14
+// @schema-lock: R-106-a-field-dropped-from-a-released-schema-with-no-migrate.schema.lock
+// @expect-error: `Notes.body` was released and is no field of `Notes`'s row
+//
+// The schema released (`schema.lock`, beside this file) held each note's
+// body. This row has none, so a migration to it would drop every body a
+// database holds: a change that loses data is planned only where the
+// program states it, `migrate body dropped` (ADR-0338, 1.4). `A-053`
+// states its changes, accepted.
+
+module Notes
+
+opaque type NoteId = String
+
+type Note = Note { id: NoteId, title: String }
+
+table Notes
+    row Note
+    key id

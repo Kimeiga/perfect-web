@@ -2,7 +2,20 @@
 
 The next executable tasks, in order, with acceptance criteria. Charter §3.4.
 
-## Integration follow-ups, 2026-10-15
+## Integration follow-ups, 2026-10-16
+
+- D1's local compiler integration gate is green (ADR-0350). Integrate the
+  completed generic-result effect repair and cache publication repair,
+  preserving canonical expression types and generated bounded-read pairs;
+  run the combined regression tests, applicable whole scripts and full CI.
+- Continue D2's common memory adapter and TodoMVC integration. Preserve
+  exact Result/Option answers, table ordering, atomic overflow/rollback and
+  measured source-cost admission. A declared one_call promise is not an
+  optimistic provider override; legacy cost conformance remains explicit.
+- Complete guide producer exit validation and browser host/port isolation.
+  Preserve the recorded negative witnesses, reject invalid producers and
+  keep the remaining restored-browser cleanup gaps visible. Final assembled
+  verification and quiet-host E9 remain required before a train landing.
 
 - ADR-0347: split scheduling's when_said from Checkout so an estimator
   outage degrades that line alone; offer delivery-streamed times. The

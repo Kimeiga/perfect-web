@@ -83,6 +83,8 @@ pub mod origins;
 pub mod scheduled;
 // 4c (track `bounded-checker`): a read is bounded by construction.
 pub mod bounded;
+// ADR-0350: tables give their generated data operations.
+pub mod tables;
 pub mod values;
 pub mod wit;
 

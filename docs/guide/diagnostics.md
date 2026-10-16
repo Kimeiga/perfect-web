@@ -14,7 +14,7 @@ code the compiler can emit, from its registry, `compiler/pw-core/src/codes.rs`.
 - **What the program must hold to**: the registry's own sentence.
 - **ADR**: the decisions its registry entry cites, where it cites one.
 
-199 codes are registered; 91 of them cite an ADR in the registry.
+204 codes are registered; 92 of them cite an ADR in the registry.
 A code whose entry cites none is marked `—`: search `docs/DECISIONS/` for its
 number or its symbol.
 
@@ -84,6 +84,11 @@ number or its symbol.
 | PW0313 | `retry_unbounded` | a retry policy must be bounded | — |
 | PW0352 | `layout_names_a_layout` | a page's `layout` clause names a layout, once | [0303](../DECISIONS/ADR-0303-a-page-is-shown-in-its-layout.md) |
 | PW0353 | `layout_takes_nothing` | a layout is given nothing by the page it shows: it declares no parameters | — |
+| PW0361 | `table_malformed` | a table's row is a record declared beside it, in the module of its name, and its key, order, indexes and references name the row's fields, each of a type every adapter keys a row by | [0338](../DECISIONS/ADR-0338-three-databases.md) |
+| PW0362 | `data_not_declared` | a table's rows are reached only through the functions its declaration gives | — |
+| PW0364 | `all_unbounded` | a table is read whole, by `all()`, only where it states `bounded` | — |
+| PW0365 | `refers_across_sources` | a reference to a table another source holds is held by no database: the referred row may be missing, which `get` answers as `None` | — |
+| PW0366 | `migration_unstated` | a change from the schema released that loses or reinterprets data is stated by a `migrate`, and each `migrate` states one | — |
 | PW0325 | `stale_key_policy` | a keyed query must say what happens when its key changes | — |
 | PW0327 | `written_rollback` | an optimistic transition's reversal is derived, not written | [0025](../DECISIONS/ADR-0025-an-optimistic-clause-targets-a-resource-entry.md) |
 | PW0330 | `optimistic_not_pure` | an optimistic transition must be a pure function of the resource's value | — |

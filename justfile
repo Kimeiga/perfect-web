@@ -19,6 +19,7 @@ import 'just/uploads.just'
 import 'just/notifications.just'
 import 'just/messages.just'
 import 'just/kiokun.just'
+import 'just/kiokun-test-data.just'
 import 'just/store-accounts.just'
 import 'just/store-search.just'
 import 'just/store-hours.just'
@@ -36,6 +37,7 @@ import 'just/each-head-effects.just'
 import 'just/argument-invariants.just'
 import 'just/scheduled-orders.just'
 import 'just/evidence-integrity-2.just'
+import 'just/tables.just'
 
 default:
     @just --list
@@ -142,7 +144,7 @@ test-unit:
 test-compile:
     # ADR-0276: the reference apps, the demo and the generality cases too;
     # `examples/history` keeps the sources as they were.
-    cargo run --quiet -p pw-cli -- fmt --check examples/*.pw examples/lib/*.pw examples/accepted/*.pw examples/rejected/*.pw examples/rules/*/*.pw examples/kiokun/*.pw examples/kiokun-site/*.pw packages/*/*.pw examples/feed/*.pw examples/store/*.pw examples/demo/*.pw examples/generality/*/*.pw
+    cargo run --quiet -p pw-cli -- fmt --check examples/*.pw examples/lib/*.pw examples/accepted/*.pw examples/rejected/*.pw examples/rules/*/*.pw examples/kiokun/*.pw examples/kiokun-site/*.pw packages/*/*.pw examples/feed/*.pw examples/store/*.pw examples/demo/*.pw examples/generality/*/*.pw examples/tables/*.pw
     cargo run --quiet -p corpus-check -- examples
     # The accepted corpus as the ONE program it is: the shared library plus
     # every accepted file. Feeding it the rejected files too would ask the

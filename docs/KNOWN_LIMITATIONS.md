@@ -30,6 +30,22 @@ bounded-checker and statement controls pass, as do 24 combined browser tests;
 full assembled CI and verification remain pending. No production-readiness
 claim follows.
 
+D1's compiler integration now passes local full CI (ADR-0350), but it does
+not supply a runtime table adapter. D2 memory execution, provider admission,
+TodoMVC migration and common cost conformance remain separate work. Generated
+many reads have the compiler's flat-row/key contract; each caller still
+selects its own matching rows. No one_call runtime promise is certified by
+compiler acceptance alone.
+
+The guide mutator reports 74/74 at these inputs, but private command-status
+injection proves it can accept stopped/contradictory output as a kill. That
+instrument must be corrected and rerun before a strict producer-validity
+claim. The ordinary 12-test/three-engine guide browser result is separate.
+Unrelated inherited browser hosts and overlapping slot port ranges remain
+open infrastructure issues; the final run unsets dictionary deployment
+variables after setup; older inherited-environment records retain their
+qualification.
+
 ## Value checking and generated execution
 
 **Open findings, each with the track fixing it** (the integrator's,

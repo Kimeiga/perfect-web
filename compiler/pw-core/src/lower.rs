@@ -39,6 +39,9 @@ pub fn lower_file(src: &str, root: &SyntaxNode) -> Hir {
         decls,
     };
     lo.hir.modules.alloc(m, module_span);
+    // A table's reads and writes are its module's declarations (track
+    // `tables`, ADR-0338): written here, so every way a file is read has them.
+    crate::tables::generate(&mut lo.hir);
     lo.hir
 }
 
@@ -159,6 +162,7 @@ fn decl_kind_of(node: &SyntaxNode, src: &str) -> DeclKind {
                 "materialize" => DeclKind::Materialize,
                 "event" => DeclKind::Event,
                 "source" => DeclKind::Source,
+                "table" => DeclKind::Table,
                 "upload" => DeclKind::Upload,
                 "predicate" => DeclKind::Predicate,
                 "task" => DeclKind::Task,

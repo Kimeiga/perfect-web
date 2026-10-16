@@ -291,6 +291,13 @@ pub fn intrinsic_binding(decl: &crate::hir::Decl) -> Option<Result<ir::Operation
 /// it rather than guessing from a function's name.
 pub const PLATFORM_PACKAGE: &str = "pw:host";
 
+/// **The platform's table primitives** (track `tables`, ADR-0338, 1.3):
+/// `pw:tables/todos#get`, a primitive one adapter per database implements
+/// for every table, imported per table. The narrower platform data
+/// primitives the architect's ruling of 2026-08-20 expects an app's data
+/// operations to become: the platform's, as `pw:host` is.
+pub const TABLES_PACKAGE: &str = "pw:tables";
+
 /// **The platform's outbox** (ADR-0208): each event a program declares is a
 /// function of it, taking what the event carries.
 pub const OUTBOX_INTERFACE: &str = "pw:host/outbox";
@@ -329,8 +336,9 @@ pub fn callable_of(
     capability: impl Fn(&str) -> Option<crate::contract::Capability>,
 ) -> Option<ir::CallableImport> {
     let id = host_binding(decl)?;
-    let binding = match id.interface == PLATFORM_PACKAGE
-        || id.interface.starts_with(&format!("{PLATFORM_PACKAGE}/"))
+    let binding = match [PLATFORM_PACKAGE, TABLES_PACKAGE]
+        .iter()
+        .any(|p| id.interface == *p || id.interface.starts_with(&format!("{p}/")))
     {
         true => ir::ImportBinding::PlatformHost,
         false => ir::ImportBinding::External,

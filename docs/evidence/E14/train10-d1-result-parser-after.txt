@@ -1,0 +1,13 @@
+test_a_later_build_failure_cannot_hide_behind_a_test_result (test_bounded_mutation_results.RustResults) ... ok
+test_a_missing_result_is_no_assertion_failure (test_bounded_mutation_results.RustResults) ... ok
+test_a_stopped_process_cannot_earn_a_kill (test_bounded_mutation_results.RustResults) ... ok
+test_a_successful_summary_cannot_hide_a_failed_command (test_bounded_mutation_results.RustResults) ... ok
+test_an_actual_assertion_failure_earns_a_kill_and_restores_source (test_bounded_mutation_results.RustResults) ... ok
+test_an_invalid_build_is_refused_and_fails_the_campaign (test_bounded_mutation_results.RustResults) ... ok
+test_every_binary_in_one_command_contributes_its_result (test_bounded_mutation_results.RustResults) ... ok
+test_every_command_contributes_its_result (test_bounded_mutation_results.RustResults) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.007s
+
+OK

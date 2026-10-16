@@ -698,6 +698,7 @@ fn every_policy_in_the_accepted_corpus_survives_lowering() {
     // The coverage property, again: assert the converse. A policy keyword the
     // lowering skipped would leave every test above passing.
     let mut total = 0usize;
+    let mut generated = 0usize;
     for path in corpus() {
         let name = path.file_name().unwrap().to_string_lossy().to_string();
         if !name.starts_with("A-") {
@@ -705,8 +706,19 @@ fn every_policy_in_the_accepted_corpus_survives_lowering() {
         }
         let src = std::fs::read_to_string(&path).expect("read");
         let hir = lower(&src);
-        for (_, d) in hir.all_decls() {
+        for (id, d) in hir.all_decls() {
             for p in &d.policies {
+                if let Some(origin) = hir.generated.get(&id) {
+                    // A derived host binding points to the table clause that
+                    // produces it; no `host` keyword was written there.
+                    let span = hir.decl_span(origin.table);
+                    assert_eq!(hir.decl(origin.table).kind, DeclKind::Table);
+                    assert_eq!(p.name, "host");
+                    assert!(span.start <= p.span.start && p.span.end <= span.end);
+                    assert!(!src[p.span.clone()].is_empty());
+                    generated += 1;
+                    continue;
+                }
                 total += 1;
                 assert!(!p.name.is_empty(), "{name}: a policy with no name");
                 assert!(
@@ -718,4 +730,5 @@ fn every_policy_in_the_accepted_corpus_survives_lowering() {
         }
     }
     assert!(total >= 20, "expected a real sample, saw {total} policies");
+    assert!(generated > 0, "the corpus exercises derived host policies");
 }

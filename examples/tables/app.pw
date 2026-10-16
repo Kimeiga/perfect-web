@@ -1,0 +1,77 @@
+// @corpus: fixture
+// @id: TABLES-app
+// @category: application — queries and commands over declared tables (ADR-0338, D1)
+// @charter: §9.2, §7.5
+// @milestone: E14
+//
+// Every read and write here is a function a table's declaration gives
+// (`Lists.pw`, `Items.pw`): no `host` binding of the app's own, and no Rust
+// behind any of them but the adapter's primitives (D2).
+
+module tables.app
+
+import List
+import Lists.{ TodoList, ListId, Slug }
+import Lists
+import Items.{ Item, ItemId }
+import Items
+
+// Every list, which `Lists` is bounded to read whole.
+query EveryList() -> List<TodoList>
+    consistency strong
+{
+    Lists.all()
+}
+
+query ListAt(slug: Slug) -> Option<TodoList>
+    consistency strong
+{
+    Lists.by_slug(slug)
+}
+
+query ItemsOf(list: ListId) -> List<Item>
+    consistency strong
+{
+    Items.of_list(list)
+}
+
+query OpenItems() -> List<Item>
+    consistency strong
+{
+    Items.by_done(false)
+}
+
+// Each list's items, in one set read rather than a read per list.
+query EveryItem() -> List<Item>
+    consistency strong
+{
+    Items.of_list_many(List.map(Lists.all(), l => l.id))
+}
+
+command make_list(list: TodoList) -> Result<(), TodoList>
+    transaction serializable
+    invalidates EveryList(), ListAt(list.slug), EveryItem()
+{
+    Lists.insert(list)
+}
+
+command keep_item(item: Item) -> ()
+    transaction serializable
+    invalidates ItemsOf(item.list), OpenItems(), EveryItem()
+{
+    Items.put(item)
+}
+
+command drop_item(list: ListId, item: ItemId) -> ()
+    transaction serializable
+    invalidates ItemsOf(list), OpenItems(), EveryItem()
+{
+    Items.delete(list, item)
+}
+
+command clear_list(list: ListId) -> ()
+    transaction serializable
+    invalidates ItemsOf(list), OpenItems(), EveryItem()
+{
+    Items.delete_of_list(list)
+}

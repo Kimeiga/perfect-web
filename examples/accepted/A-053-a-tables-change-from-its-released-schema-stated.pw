@@ -1,0 +1,26 @@
+// @corpus: accepted
+// @id: A-053
+// @category: a table's change from its released schema, stated
+// @charter: §9.2
+// @milestone: 14
+// @schema-lock: A-053-a-tables-change-from-its-released-schema-stated.schema.lock
+//
+// The schema released (`schema.lock`, beside this file) held each entry's
+// `body` and its `tags`. This release calls the body `text`, gives up the
+// tags, and adds a mood, which every entry released holds as `0`, and a
+// note, which is an `Option` and needs no value (track `tables`, ADR-0338,
+// 1.4). The control for R-106 and R-107: each change stated, a migration of
+// five steps.
+
+module Journals
+
+opaque type EntryId = String
+
+type Entry = Entry { id: EntryId, text: String, mood: Int, note: Option<String> }
+
+table Journals
+    row     Entry
+    key     id
+    migrate text renamed from body
+    migrate tags dropped
+    migrate mood backfilled with 0

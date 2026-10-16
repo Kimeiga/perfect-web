@@ -1,0 +1,30 @@
+// @corpus: accepted
+// @id: A-052
+// @category: a reference across sources by a field that may name no row
+// @charter: §9.2
+// @milestone: 14
+// @expect-warning: PW0365
+//
+// A comment refers to a member held in another source. No database holds
+// the relation: even an optional key may name a row that no longer exists.
+// PW0365 warns, and this program remains accepted (ADR-0338, decision 4).
+
+module Comments
+
+import Members.{ MemberId }
+import Members
+
+opaque type CommentId = String
+
+type Comment = Comment { id: CommentId, author: Option<MemberId>, text: String }
+
+table Comments
+    row    Comment
+    key    id
+    refers author to Members
+
+source CommentData
+    holds        Comments
+    transactions serializable
+    reads        strong
+    changes      none

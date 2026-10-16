@@ -1,0 +1,26 @@
+// @corpus: accepted
+// @id: A-051
+// @category: a reference between tables one source holds
+// @charter: §9.2
+// @milestone: 14
+//
+// A member refers to the member who invited them, in the same table and so
+// in the same source: a foreign key the database holds (track `tables`,
+// ADR-0338). A-052 refers to these members across sources.
+
+module Members
+
+opaque type MemberId = String
+
+type Member = Member { id: MemberId, name: String, invited_by: Option<MemberId> }
+
+table Members
+    row    Member
+    key    id
+    refers invited_by to Members
+
+source MemberData
+    holds        Members
+    transactions serializable
+    reads        strong
+    changes      none

@@ -23,6 +23,22 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0350, 2026-10-16: tables and bounded generated reads**
+(local train-10 integration). Table declarations generate their reads,
+writes, schema metadata and migration locks. The bounded checker uses
+table/primitive/field identity for generated pairs and gives repairs that
+select each key's matching rows from the flat batch. Whole controls passed
+47/47 bounded and 12/12 PostgreSQL, with all 2,366 input hashes restored.
+Full local `just ci` passed: 3,058 Rust tests, 0 failed, 25 ignored; Python
+233 passed and 2 skipped; all 302 source variants judged, 16 named-rule
+refusals and 0 failing cases. Corpus C27 is 42 accepted / 87 rejected;
+generality is 60/60. The guide's ordinary browser suite passed 12 tests
+in three engines with dictionary deployment variables absent. Its 74-control
+campaign is recorded with a separate known exit-status classification gap;
+strict guide-producer validity remains open. Runtime adapter conformance,
+generic-result integration, final assembled CI, verification and quiet-host
+E9 remain pending. [Commands, complete raw output and source manifest](evidence/E14/train10-d1-integration.txt).
+
 **ADR-0349, 2026-10-15: a failed suite fails its recipe** (train-10,
 from `3adbfe44`). Browser suites and benchmark controls propagate their
 failures through one helper; no-test runs fail. The planner follows suite
@@ -213,7 +229,7 @@ built, and nothing was downloaded.
 - The ruling amends it: no app-specific Rust, the app's own data declared
   as tables on the generic adapters (ADR-0338), so phase 3 waits for D3; a
   predicate on a read, `requires` on a query; the owner decisions that are
-  design (3 to 9) ruled under the delegation; PW6601 upward for its codes.
+  design (3 to 9) ruled under the delegation; PW6701 upward for its codes.
 - **Its downloads wait for the owner** (owner decision 2): Automerge,
   ProseMirror and what they bring, 16 npm packages shipped to an editor's
   page among them; nothing is fetched before that approval.
@@ -5059,6 +5075,15 @@ The former status file mixed chronological notes with obsolete headlines such as
 observations, not the current completion state. No old raw evidence is rewritten.
 
 ## last passing commit
+
+Latest local integration validation (2026-10-16): the D1 source snapshot
+`c67bf6ed` plus pending merge `917fafbd` and the exact manifest in
+`evidence/E14/train10-d1-input-sha256.json` passed full `just ci` with
+3,058 Rust tests and no failures. This records tested inputs before the
+local merge commit; it is not a master or GitHub verification claim.
+The latest committed train-9 source `289068a6` passed local full CI
+(2,948 Rust tests, 0 failed, 25 ignored) and GitHub CI38863243118;
+verify38863242953 is not yet complete. Older records follow.
 
 `4310769` (2026-10-07, ADR-0232 to ADR-0234, and the two survivors at
 `c7f999b` accounted for): `just ci` passes locally, the workspace's 2110

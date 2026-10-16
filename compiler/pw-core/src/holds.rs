@@ -93,6 +93,9 @@ pub fn named(hirs: &[&Hir], ws: &Workspace, sigs: &Signatures, unit: usize, name
                 DeclKind::Layout => Named::NoValue("a layout, which a page's `layout` names"),
                 DeclKind::Event => Named::NoValue("an event, which a command emits"),
                 DeclKind::Source => Named::NoValue("a data source"),
+                DeclKind::Table => {
+                    Named::NoValue("a table, whose module's functions read and write it")
+                }
                 DeclKind::Upload => Named::NoValue("an upload, which a form posts"),
                 DeclKind::Type | DeclKind::Opaque => Named::NoValue("a type"),
                 _ => Named::NoValue("a declaration that holds no value"),

@@ -3044,3 +3044,13 @@ runner propagates failures, recipes and builds are checked behaviorally,
 the planner follows suite configuration and helper imports, mutation
 program checks cover every root, and diagnostic evidence is held current.
 Integrated train verification remains pending.
+
+
+### 2026-10-16 — tables give an app its data operations
+
+[ADR-0350](DECISIONS/ADR-0350-tables-declare-an-apps-data.md) implements
+ADR-0338 D1: generated reads and writes, schema metadata and migration locks.
+The bounded checker consumes generated pair metadata and source costs.
+Accepted under the owner's delegation. The local compiler integration,
+bounded47/PostgreSQL12 controls and full CI pass; runtime D2 and final
+assembled train verification remain pending.
