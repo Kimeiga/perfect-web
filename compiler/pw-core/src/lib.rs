@@ -86,7 +86,7 @@ pub mod wit;
 
 pub use abi::{Decoder, Mode, Value};
 pub use capability::{CapabilityAudit, CapabilityManifest, RuntimeProfile, audit};
-pub use diagnostics::{Detector, Diagnostic, Severity, canonical_code};
+pub use diagnostics::{Detector, Diagnostic, Severity};
 pub use exhaust::{Arm, MatchReport, Pattern, check_match, render_witness};
 pub use scope::{HandleKind, Op, ScopeGraph, ScopeKind, ScopeViolation};
 pub use types::{Adt, Ctor, Program, Type};

@@ -946,13 +946,15 @@ pub const KNOWN_GAPS: &[(&str, &str, &str)] = &[
     // (code, intended owner, missing analysis)
 ];
 
-/// Classify a corpus `@rule`, after alias resolution.
+/// Classify a corpus `@rule` as written: an old number the corpus once wrote
+/// (`diagnostics::DEPRECATED_ALIASES`) is no code `pw check` reports, and is
+/// `Unknown` (track evidence-integrity-2, the integrator's ruling 1: nothing
+/// translates an old number where a code is compared).
 pub fn rule_status(declared: &str) -> RuleStatus {
-    let canonical = crate::diagnostics::canonical_code(declared);
-    if let Some(c) = lookup(canonical) {
+    if let Some(c) = lookup(declared) {
         return RuleStatus::Registered(c);
     }
-    if let Some((code, owner, analysis)) = KNOWN_GAPS.iter().find(|(c, _, _)| *c == canonical) {
+    if let Some((code, owner, analysis)) = KNOWN_GAPS.iter().find(|(c, _, _)| *c == declared) {
         return RuleStatus::KnownGap {
             code,
             intended_owner: owner,
@@ -1134,16 +1136,14 @@ mod tests {
                 lookup(code).is_none(),
                 "{code} is registered AND listed as a gap"
             );
-            // A gap the alias table already redirects is unreachable: nothing
-            // can ever resolve to it, so it is a work item that will never be
-            // picked up and a number that reads as unowned when it is not.
-            assert_eq!(
-                crate::diagnostics::canonical_code(code),
-                *code,
-                "{code} is listed as a gap but aliased to \
-                 {} — the gap entry is dead",
-                crate::diagnostics::canonical_code(code)
-            );
+            // A gap that is an old number names an invariant that already has
+            // its code: a work item that will never be picked up, and a
+            // number that reads as unowned when it is not.
+            if let Some((_, now)) = DEPRECATED_ALIASES.iter().find(|(old, _)| old == code) {
+                panic!(
+                    "{code} is listed as a gap but is an old number for {now}: the gap entry is dead"
+                );
+            }
             assert!(
                 owner.starts_with('E') || owner.starts_with('P'),
                 "{code}'s owner {owner:?} is not a milestone"
