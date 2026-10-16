@@ -624,10 +624,7 @@ e10-kiokun:
            | grep -oE "(whole shard|every word): .*|^test result.*"; \
        else echo "  (skipped: KIOKUN_DATA does not name a kiokun-data output_dictionary)"; fi; \
        echo; echo "== in browser engines (spikes/own-renderer/e2e/kiokun.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/kiokun.spec.mjs \
-          --project=chromium --project=firefox --project=webkit --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|passed|failed|flaky" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/kiokun.spec.mjs --project=chromium --project=firefox --project=webkit --reporter=line; \
      } > docs/evidence/E10/kiokun.txt
     @cat docs/evidence/E10/kiokun.txt
 
@@ -1593,8 +1590,7 @@ e14-resume-gate:
        cargo test --locked -p pw-resume-wasm 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the browser, each engine (e2e/lazy-handler.spec.mjs)"; echo; \
        for e in webkit chromium; do \
-         (cd spikes/own-renderer && pnpm exec playwright test e2e/lazy-handler.spec.mjs --project=$e --reporter=list 2>&1 \
-           | sed 's/\x1b\[[0-9;]*m//g' | grep -E "✓|✘|^ +[0-9]+ (passed|failed)") || true; \
+         bash scripts/run_suite.sh -- pnpm exec playwright test e2e/lazy-handler.spec.mjs --project=$e --reporter=list; \
        done; \
        echo; echo "== mutation controls (scripts/resume_gate_mutations.py)"; echo; \
        python3 scripts/resume_gate_mutations.py; \
@@ -1620,8 +1616,7 @@ e14-signals:
        ls -l target/wasm32-unknown-unknown/browser/pw_render_wasm.wasm 2>/dev/null | awk '{print "   pw-render.wasm: " $5 " bytes"}'; \
        echo; echo "== the page, each engine (e2e/signals.spec.mjs)"; echo; \
        for e in webkit chromium; do \
-         (cd spikes/own-renderer && pnpm exec playwright test e2e/signals.spec.mjs --project=$e --reporter=list 2>&1 \
-           | sed 's/\x1b\[[0-9;]*m//g' | grep -E "✓|✘|^ +[0-9]+ (passed|failed)") || true; \
+         bash scripts/run_suite.sh -- pnpm exec playwright test e2e/signals.spec.mjs --project=$e --reporter=list; \
        done; \
        echo; echo "== mutation controls (scripts/signals_mutations.py)"; echo; \
        python3 scripts/signals_mutations.py; \
@@ -1728,10 +1723,7 @@ e14-stream-ack:
        python3 scripts/stream_ack_mutations.py; \
        echo; echo "== the keyed-list suite, twenty runs"; echo; \
        cargo build --quiet --locked -p pw-dev-server; \
-       cd spikes/own-renderer && for i in $(seq 1 20); do \
-         npx playwright test e2e/keyed-list.spec.mjs --reporter=line 2>&1 \
-           | grep -E '[0-9]+ (passed|failed)' | tr -d '\033' | sed 's/\[1A\[2K//' | tr '\n' ' '; echo; \
-       done; \
+       bash scripts/run_suite.sh --runs 20 -- npx playwright test e2e/keyed-list.spec.mjs --reporter=line; \
      } > docs/evidence/E14/stream-ack.txt
     @grep -E "^test result|mutants killed|failed|^---- |panicked at" docs/evidence/E14/stream-ack.txt || true
 
@@ -1819,9 +1811,7 @@ e14-keyed-reads:
        echo; echo "== the server's keyed reads, among its tests (spikes/own-renderer/server)"; echo; \
        cargo test --locked -p pw-dev-server 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== keyed reads, the charter's store tests 6-8, and presses in order (e2e/keyed.spec.mjs, e2e/signals.spec.mjs), three engines"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/keyed.spec.mjs e2e/signals.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/keyed.spec.mjs e2e/signals.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/keyed_reads_mutations.py)"; echo; \
        python3 scripts/keyed_reads_mutations.py; \
        echo; echo "== the press-order control (scripts/press_order_mutations.py)"; echo; \
@@ -1841,9 +1831,7 @@ e14-runtime-recovery:
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
        echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
        echo "== the browser (e2e/transport.spec.mjs, e2e/recovery.spec.mjs), three engines"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/transport.spec.mjs e2e/recovery.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/transport.spec.mjs e2e/recovery.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/runtime_recovery_mutations.py)"; echo; \
        python3 scripts/runtime_recovery_mutations.py; \
      } > docs/evidence/E14/runtime-recovery.txt
@@ -1873,9 +1861,7 @@ e14-command-answers:
        echo; echo "== the development server (pw-dev-server)"; echo; \
        cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test (an_item_sold_out|a_kept_answer|tests::an_item_sold_out|tests::a_kept_answer)|^test result|^---- |panicked at'; \
        echo; echo "== the browser (e2e/availability.spec.mjs, e2e/resource-path.spec.mjs), three engines"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/availability.spec.mjs e2e/resource-path.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/availability.spec.mjs e2e/resource-path.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/command_answers_mutations.py)"; echo; \
        python3 scripts/command_answers_mutations.py; \
      } > docs/evidence/E14/command-answers.txt
@@ -1939,9 +1925,7 @@ e14-documents:
        echo "== the development server (pw-dev-server)"; echo; \
        cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_change_waiting|a_change_reaches|a_session_is_forgotten|a_read_older)|^test result|^---- |panicked at'; \
        echo; echo "== two tabs of one session (e2e/tabs.spec.mjs), and the keyed reads (e2e/keyed.spec.mjs), three engines"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/tabs.spec.mjs e2e/keyed.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/tabs.spec.mjs e2e/keyed.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/documents_mutations.py)"; echo; \
        python3 scripts/documents_mutations.py; \
      } > docs/evidence/E14/documents.txt
@@ -1961,9 +1945,7 @@ e14-stores:
        echo "== the development server (pw-dev-server)"; echo; \
        cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_path_gives|each_store_is|a_change_to_one_stores)|^test result|^---- |panicked at'; \
        echo; echo "== each store at its route, and test 11 (e2e/stores.spec.mjs), three engines"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/stores.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/stores.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/stores_mutations.py)"; echo; \
        python3 scripts/stores_mutations.py; \
      } > docs/evidence/E14/stores.txt
@@ -1988,9 +1970,7 @@ e14-not-found:
        echo; echo "== the development server (pw-dev-server)"; echo; \
        cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(each_store_is|a_store_that_is_not_there)|^test result|^---- |panicked at'; \
        echo; echo "== a store that is not there, three engines (e2e/stores.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/stores.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/stores.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/not_found_mutations.py)"; echo; \
        python3 scripts/not_found_mutations.py; \
      } > docs/evidence/E14/not-found.txt
@@ -2033,9 +2013,7 @@ e14-slots:
        echo; echo "== the development server (pw-dev-server)"; echo; \
        cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(the_store_sends_its_slots|a_menu_change_drops_that_stores)|^test result|^---- |panicked at'; \
        echo; echo "== the slots, three engines (e2e/slots.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/slots.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/slots.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/slots_mutations.py)"; echo; \
        python3 scripts/slots_mutations.py; \
      } > docs/evidence/E14/slots.txt
@@ -2061,9 +2039,7 @@ e14-descriptions:
        echo; echo "== the development server (pw-dev-server), the benchmark's store among its tests"; echo; \
        cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::the_store_and_each_item|^test result|^---- |panicked at'; \
        echo; echo "== the slots, three engines, WebKit painting the store before them (e2e/slots.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/slots.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/slots.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/descriptions_mutations.py)"; echo; \
        python3 scripts/descriptions_mutations.py; \
      } > docs/evidence/E14/descriptions.txt
@@ -2108,9 +2084,7 @@ e14-instance-changes:
        echo; echo "== the development server (pw-dev-server)"; echo; \
        cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_rename_sets_every_part|a_list_moves_what_moved)|^test result|^---- |panicked at'; \
        echo; echo "== each Add named by its item, renamed with it; an instance in place not moved (three engines)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/stores.spec.mjs e2e/keyed-list.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/stores.spec.mjs e2e/keyed-list.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/instance_changes_mutations.py)"; echo; \
        python3 scripts/instance_changes_mutations.py; \
      } > docs/evidence/E14/instance-changes.txt
@@ -2141,9 +2115,7 @@ e14-row-reads:
        echo; echo "== the development server (pw-dev-server)"; echo; \
        cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(each_menu_row_shows|an_inserted_item_arrives|a_menu_change_drops)|^test result|^---- |panicked at'; \
        echo; echo "== each price, and an inserted item's, in three engines"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/stores.spec.mjs e2e/store.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/stores.spec.mjs e2e/store.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/row_reads_mutations.py)"; echo; \
        python3 scripts/row_reads_mutations.py; \
      } > docs/evidence/E14/row-reads.txt
@@ -2216,9 +2188,7 @@ e14-cart-lines:
        echo; echo "== the development server (pw-dev-server)"; echo; \
        cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_lines_steps|a_line_records|a_sessions_changes|a_speculating_page|the_compiled_command_carries)|^test result|^---- |panicked at'; \
        echo; echo "== the cart in three engines (e2e/cart.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/cart.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/cart.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/cart_lines_mutations.py)"; echo; \
        python3 scripts/cart_lines_mutations.py; \
      } > docs/evidence/E14/cart-lines.txt
@@ -2239,9 +2209,7 @@ e14-command-retry:
        echo "== a retried command is idempotent; what a handler passes (compiler/pw-core)"; echo; \
        cargo test --locked -p pw-core --test policy_values --test handlers 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== sent again where no answer came, in three engines (e2e/retry.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/retry.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/retry.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/command_retry_mutations.py)"; echo; \
        python3 scripts/command_retry_mutations.py; \
      } > docs/evidence/E14/command-retry.txt
@@ -2262,9 +2230,7 @@ e14-test-controls:
        echo "== the development server (pw-dev-server)"; echo; \
        cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_one_shot|a_delay_slows)|^test result|^---- |panicked at'; \
        echo; echo "== the controls, and a rolled-back command, in three engines"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/controls.spec.mjs e2e/resource-path.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/controls.spec.mjs e2e/resource-path.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/test_controls_mutations.py)"; echo; \
        python3 scripts/test_controls_mutations.py; \
      } > docs/evidence/E14/test-controls.txt
@@ -2285,9 +2251,7 @@ e14-connection-faults:
        echo "== the development server, over real connections (pw-dev-server)"; echo; \
        cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_dropped_command|a_forced_reconnect)|^test result|^---- |panicked at'; \
        echo; echo "== the page, in three engines (e2e/connections.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/connections.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/connections.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/connection_faults_mutations.py)"; echo; \
        python3 scripts/connection_faults_mutations.py; \
      } > docs/evidence/E14/connection-faults.txt
@@ -2307,9 +2271,7 @@ e14-materializer-failure:
        echo "== the development server (pw-dev-server)"; echo; \
        cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::a_regeneration_that_fails|^test result|^---- |panicked at'; \
        echo; echo "== the page, in three engines (e2e/materializer.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/materializer.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/materializer.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/materializer_failure_mutations.py)"; echo; \
        python3 scripts/materializer_failure_mutations.py; \
      } > docs/evidence/E14/materializer-failure.txt
@@ -2334,9 +2296,7 @@ e14-last-known-good:
        echo; echo "== the development server (pw-dev-server)"; echo; \
        cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::a_failed_origin|^test result|^---- |panicked at'; \
        echo; echo "== the page, in three engines (e2e/controls.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/controls.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/controls.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/last_known_good_mutations.py)"; echo; \
        python3 scripts/last_known_good_mutations.py; \
      } > docs/evidence/E14/last-known-good.txt
@@ -2363,9 +2323,7 @@ e14-availability:
        echo; echo "== the development server (pw-dev-server)"; echo; \
        cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_sold_out|a_stock_change|an_untold_stock|a_document_read_behind|a_change_sends|an_insert_keeps|a_menu_changed_at_its_source|a_rename_sets|an_item_sold_out)|^test result|^---- |panicked at'; \
        echo; echo "== the page, in three engines (e2e/availability.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/availability.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/availability.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/availability_mutations.py)"; echo; \
        python3 scripts/availability_mutations.py; \
      } > docs/evidence/E14/availability.txt
@@ -2395,9 +2353,7 @@ e14-invariants:
        echo; echo "== the development server (pw-dev-server)"; echo; \
        cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_quantity_that_is_no_positive_int|a_stored_line_of_nothing)|^test result|^---- |panicked at'; \
        echo; echo "== the page, in three engines (e2e/compiled-handler.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/compiled-handler.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/compiled-handler.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/invariants_mutations.py)"; echo; \
        python3 scripts/invariants_mutations.py; \
      } > docs/evidence/E14/invariants.txt
@@ -2457,9 +2413,7 @@ e14-estimate-range:
        echo "== the development server (pw-dev-server)"; echo; \
        cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_delivery_estimate_is_a_range|the_store_sends_its_slots|a_session_s_estimate|a_failed_estimate)|^test result|^---- |panicked at'; \
        echo; echo "== the page, in three engines (e2e/slots.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/slots.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/slots.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/estimate_range_mutations.py)"; echo; \
        python3 scripts/estimate_range_mutations.py; \
      } > docs/evidence/E14/estimate-range.txt
@@ -2484,9 +2438,7 @@ e14-menu-categories:
        echo; echo "== the development server (pw-dev-server)"; echo; \
        cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_menu_is_grouped|a_rename_sets|a_stock_change_told|an_insert_and_what|a_change_sends_what)|^test result|^---- |panicked at'; \
        echo; echo "== the pages, in three engines (e2e/stores.spec.mjs, e2e/keyed-list.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/stores.spec.mjs e2e/keyed-list.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/stores.spec.mjs e2e/keyed-list.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/menu_categories_mutations.py)"; echo; \
        python3 scripts/menu_categories_mutations.py; \
      } > docs/evidence/E14/menu-categories.txt
@@ -2505,9 +2457,7 @@ e14-accessibility:
        echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
        echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
        echo "== the page, in three engines (e2e/accessibility.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/accessibility.spec.mjs --reporter=list 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +(✓|✘|-) |^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/accessibility.spec.mjs --reporter=list; \
        echo; echo "== mutation controls (scripts/accessibility_mutations.py)"; echo; \
        python3 scripts/accessibility_mutations.py; \
      } > docs/evidence/E14/accessibility.txt
@@ -2536,9 +2486,7 @@ e14-titles:
        echo; echo "== the development server (pw-dev-server)"; echo; \
        cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_store_s_page_is_titled|a_title_that_changed)|^test result|^---- |panicked at'; \
        echo; echo "== the page, in three engines (e2e/accessibility.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/accessibility.spec.mjs --reporter=list 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +(✓|✘|-) |^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/accessibility.spec.mjs --reporter=list; \
        echo; echo "== mutation controls (scripts/titles_mutations.py)"; echo; \
        python3 scripts/titles_mutations.py; \
      } > docs/evidence/E14/titles.txt
@@ -2559,9 +2507,7 @@ e14-shared-output:
        echo "== the development server, running the store (pw-dev-server)"; echo; \
        cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_session_s_response_is_kept|what_a_shared_cache_keeps)|^test result|^---- |panicked at'; \
        echo; echo "== the page, in three engines (e2e/shared-output.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/shared-output.spec.mjs --reporter=list 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +(✓|✘|-) |^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/shared-output.spec.mjs --reporter=list; \
        echo; echo "== mutation controls (scripts/shared_output_mutations.py)"; echo; \
        python3 scripts/shared_output_mutations.py; \
      } > docs/evidence/E14/shared-output.txt
@@ -2637,10 +2583,8 @@ e14-pages:
        echo "== the development server (pw-dev-server)"; echo; \
        cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_page_that_binds_a_query|a_change_reaches_each_page|a_page_without_the_menu)|^test result|^---- |panicked at'; \
        echo; echo "== the cart's own page, in three engines (e2e/pages.spec.mjs, e2e/accessibility.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/pages.spec.mjs e2e/accessibility.spec.mjs \
-          -g "cart|page of its own|reaches the other|links to the cart" --reporter=list 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +(✓|✘|-) |^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/pages.spec.mjs e2e/accessibility.spec.mjs \
+          -g "cart|page of its own|reaches the other|links to the cart" --reporter=list; \
        echo; echo "== mutation controls (scripts/pages_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/pages_mutations.py; \
      } > docs/evidence/E14/pages.txt
@@ -2661,9 +2605,7 @@ e14-page-speculation:
        echo "== the development server (pw-dev-server)"; echo; \
        cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_page_that_binds_a_query|a_change_reaches_each_page)|^test result|^---- |panicked at'; \
        echo; echo "== the cart's page, in three engines (e2e/pages.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/pages.spec.mjs --reporter=list 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +(✓|✘|-) |^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/pages.spec.mjs --reporter=list; \
        echo; echo "== mutation controls (scripts/page_speculation_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/page_speculation_mutations.py; \
      } > docs/evidence/E14/page-speculation.txt
@@ -2683,10 +2625,8 @@ e14-home:
        echo "== the development server (pw-dev-server)"; echo; \
        cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::the_stores_are_the_home_page|^test result|^---- |panicked at'; \
        echo; echo "== the home page, in three engines (e2e/pages.spec.mjs, e2e/accessibility.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/pages.spec.mjs e2e/accessibility.spec.mjs \
-          -g "home page|stores are the home" --reporter=list 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +(✓|✘|-) |^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/pages.spec.mjs e2e/accessibility.spec.mjs \
+          -g "home page|stores are the home" --reporter=list; \
        echo; echo "== mutation controls (scripts/home_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/home_mutations.py; \
      } > docs/evidence/E14/home.txt
@@ -2707,10 +2647,7 @@ e14-orders:
        echo "== the development server (pw-dev-server)"; echo; \
        cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(an_order_is_placed|an_empty_cart_places|the_store_moving_an_order)|^test result|^---- |panicked at'; \
        echo; echo "== the order's flow, in three engines (e2e/pages.spec.mjs, e2e/accessibility.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/pages.spec.mjs e2e/accessibility.spec.mjs \
-          -g "order" --reporter=list 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +(✓|✘|-) |^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/pages.spec.mjs e2e/accessibility.spec.mjs -g "order" --reporter=list; \
        echo; echo "== mutation controls (scripts/orders_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/orders_mutations.py; \
      } > docs/evidence/E14/orders.txt
@@ -2756,9 +2693,7 @@ e14-view-instances:
        cargo test --locked -p pw-render --test properties 2>&1 | grep -E '^test result|^---- |panicked at'; \
        cargo test --locked -p pw-render-wasm 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the thread page (spikes/own-renderer/e2e/thread.spec.mjs), three engines"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/thread.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/thread.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/view_instances_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/view_instances_mutations.py; \
      } > docs/evidence/E14/view-instances.txt
@@ -2784,9 +2719,7 @@ e14-graphs-on-the-wire:
        echo; echo "== the host and a component (compiler/pw-conformance/tests/browser_graphs.rs)"; echo; \
        cargo test --locked -p pw-conformance --test browser_graphs 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the thread page (spikes/own-renderer/e2e/thread.spec.mjs), three engines"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/thread.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/thread.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/graphs_on_the_wire_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/graphs_on_the_wire_mutations.py; \
      } > docs/evidence/E14/graphs-on-the-wire.txt
@@ -2831,9 +2764,7 @@ e14-string-invariants:
        echo; echo "== the server (spikes/own-renderer/server/src/main.rs)"; echo; \
        cargo test --locked -p pw-dev-server -- a_posts_text_is_held_to_its_length_where_it_arrives 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the feed in three engines (e2e/feed.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/feed.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/feed.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/string_invariants_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/string_invariants_mutations.py; \
      } > docs/evidence/E14/string-invariants.txt
@@ -2860,9 +2791,7 @@ e14-computed-holes:
        echo; echo "== the server (spikes/own-renderer/server/src/main.rs)"; echo; \
        cargo test --locked -p pw-dev-server -- computed 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the feed in three engines (e2e/feed.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/feed.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/feed.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/computed_holes_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/computed_holes_mutations.py; \
      } > docs/evidence/E14/computed-holes.txt
@@ -2886,9 +2815,7 @@ e14-computed-signals:
        echo; echo "== the server (spikes/own-renderer/server/src/main.rs)"; echo; \
        cargo test --locked -p pw-dev-server -- from_a_signal signals_alone 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the feed in three engines (e2e/feed.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/feed.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/feed.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/computed_signals_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/computed_signals_mutations.py; \
      } > docs/evidence/E14/computed-signals.txt
@@ -2911,9 +2838,7 @@ e14-computed-rows:
        echo; echo "== the server (spikes/own-renderer/server/src/main.rs)"; echo; \
        cargo test --locked -p pw-dev-server -- each_rows_and_sent compares_as_its_representation 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the feed in three engines (e2e/feed.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/feed.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/feed.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/computed_rows_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/computed_rows_mutations.py; \
      } > docs/evidence/E14/computed-rows.txt
@@ -2936,9 +2861,7 @@ e14-computed-conditions:
        echo; echo "== the server (spikes/own-renderer/server/src/main.rs)"; echo; \
        cargo test --locked -p pw-dev-server -- a_condition_ 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the feed in three engines (e2e/feed.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/feed.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/feed.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/computed_conditions_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/computed_conditions_mutations.py; \
      } > docs/evidence/E14/computed-conditions.txt
@@ -2992,9 +2915,7 @@ e14-whole-fills:
        echo "== the patch and the comment after it (runtime/pw-render/tests/streams.rs)"; echo; \
        cargo test --locked -p pw-render --test streams 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the slots in three engines (e2e/slots.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/slots.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/slots.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/whole_fills_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/whole_fills_mutations.py; \
      } > docs/evidence/E14/whole-fills.txt
@@ -3017,9 +2938,7 @@ e14-optimistic-posts:
        echo; echo "== the server (spikes/own-renderer/server/src/main.rs)"; echo; \
        cargo test --locked -p pw-dev-server -- a_post_is_shown_before_the_server_answers a_speculated_value_that_did_not_change_is_not_sent_again a_page_that_reads_more_holds_what_it_shows a_speculating_page_is_sent_its_carts_value 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the feed in three engines (e2e/feed.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/feed.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/feed.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/optimistic_posts_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/optimistic_posts_mutations.py; \
      } > docs/evidence/E14/optimistic-posts.txt
@@ -3038,9 +2957,7 @@ e14-waiting-rows:
        echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
        echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
        echo "== the feed in three engines (e2e/feed.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/feed.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/feed.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/waiting_rows_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/waiting_rows_mutations.py; \
      } > docs/evidence/E14/waiting-rows.txt
@@ -3066,9 +2983,7 @@ e14-form-controls:
        cargo run --quiet --locked -p corpus-check -- examples 2>&1 | tail -5; \
        cargo test --locked -p pw-core --test generality 2>&1 | grep -E '^test result|^---- |panicked at'; \
        echo; echo "== bound fields in three engines (e2e/bind.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/bind.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/bind.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/form_controls_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/form_controls_mutations.py; \
      } > docs/evidence/E14/form-controls.txt
@@ -3090,9 +3005,7 @@ e14-feed:
        echo "== the server (spikes/own-renderer/server/src/main.rs)"; echo; \
        cargo test --locked -p pw-dev-server -- the_feeds_page_opening_its_stream_is_not_told_to_reload a_page_carries_its_data_layers_style_and_no_other a_guests_post_names_the_guest_to_every_reader 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the feed in three engines (e2e/feed.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/feed.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/feed.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/feed_served_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/feed_served_mutations.py; \
      } > docs/evidence/E14/feed.txt
@@ -3553,9 +3466,7 @@ e14-metadata:
        echo; echo "== the development server (pw-dev-server)"; echo; \
        cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(a_store_s_page_describes_itself|a_signal_page_s_head_holds)|^test result|^---- |panicked at'; \
        echo; echo "== each store's page, in three engines (e2e/stores.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/stores.spec.mjs --reporter=list 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +(✓|✘|-) |^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/stores.spec.mjs --reporter=list; \
        echo; echo "== the corpus at C11 (corpus-check, generality.rs, checking_source.rs)"; echo; \
        cargo run --quiet --locked -p corpus-check -- examples 2>&1 | tail -5; \
        cargo test --locked -p pw-core --test generality --test checking_source 2>&1 \
@@ -3586,14 +3497,10 @@ e14-stable-layout:
        echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
        echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
        echo "== the page, in three engines (e2e/stable-layout.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/stable-layout.spec.mjs --reporter=list 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +(✓|✘|-) |^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/stable-layout.spec.mjs --reporter=list; \
        echo; echo "== a thousand items, alone in Chromium (e2e/performance.spec.mjs, E7 gate item 10)"; echo; \
-       (cd spikes/own-renderer && PW_PERFORMANCE=1 pnpm exec playwright test e2e/performance.spec.mjs \
-          --project=chromium --workers=1 --reporter=list -g "gate 10" 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g' \
-         | grep -E "EVIDENCE|^ +(✓|✘|-) |^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       PW_PERFORMANCE=1 bash scripts/run_suite.sh -- pnpm exec playwright test e2e/performance.spec.mjs --project=chromium --workers=1 --reporter=list \
+          -g "gate 10"; \
        echo; echo "== mutation controls (scripts/stable_layout_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/stable_layout_mutations.py; \
      } > docs/evidence/E14/stable-layout.txt
@@ -3612,10 +3519,7 @@ e14-runtime-size:
        echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
        echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
        echo "== the sizes, as served and as sent (e2e/runtime-size.spec.mjs, Chromium)"; echo; \
-       (cd spikes/own-renderer && PW_PERFORMANCE=1 pnpm exec playwright test e2e/runtime-size.spec.mjs \
-          --project=chromium --workers=1 --reporter=list 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g' \
-         | grep -E "EVIDENCE|^ +(✓|✘|-) |^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       PW_PERFORMANCE=1 bash scripts/run_suite.sh -- pnpm exec playwright test e2e/runtime-size.spec.mjs --project=chromium --workers=1 --reporter=list; \
        echo; echo "== controls (scripts/runtime_size_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/runtime_size_mutations.py; \
      } > docs/evidence/E14/runtime-size.txt
@@ -3719,9 +3623,7 @@ e14-streams:
        cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw \
          examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | tail -1; \
        echo; echo "== the browser (e2e/stream.spec.mjs), three engines and the host's Chrome"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/stream.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/stream.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/streams_mutations.py)"; echo; \
        python3 scripts/streams_mutations.py; \
      } > docs/evidence/E14/streams.txt
@@ -3755,9 +3657,7 @@ e14-query-blocks:
        echo; echo "== the server (spikes/own-renderer/server)"; echo; \
        cargo test --locked -p pw-dev-server 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the browser (e2e/resource-path.spec.mjs), three engines"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/resource-path.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/resource-path.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/query_blocks_mutations.py)"; echo; \
        python3 scripts/query_blocks_mutations.py; \
      } > docs/evidence/E14/query-blocks.txt
@@ -3781,9 +3681,7 @@ e14-patch-set:
        echo; echo "== pw-render --plan (runtime/pw-render/tests/plan_lists.rs)"; echo; \
        cargo test --locked -p pw-render --test plan_lists 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the browser (e2e/resource-path.spec.mjs, e2e/store.spec.mjs), three engines"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/resource-path.spec.mjs e2e/store.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/resource-path.spec.mjs e2e/store.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/patch_set_mutations.py)"; echo; \
        python3 scripts/patch_set_mutations.py; \
      } > docs/evidence/E14/patch-set.txt
@@ -3803,9 +3701,7 @@ e14-provide:
        echo "== the compiler (compiler/pw-core/tests/provide.rs)"; echo; \
        cargo test --locked -p pw-core --test provide 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the browser (spikes/own-renderer/e2e/provide.spec.mjs), three engines"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/provide.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/provide.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/provide_mutations.py)"; echo; \
        python3 scripts/provide_mutations.py; \
      } > docs/evidence/E14/provide.txt
@@ -4337,12 +4233,10 @@ e10-close-bench RUNS="8":
        cargo test --quiet --locked --release -p pw-host --features engine --test bench -- --include-ignored --nocapture --test-threads=1 2>&1 \
          | grep -E "^bench:|^test result|^---- |panicked at"; \
        echo; echo "== E7 gate 8, {{RUNS}} runs (chromium, 1 worker): every result"; echo; \
-       for i in $(seq {{RUNS}}); do \
-         (cd spikes/own-renderer && PW_PERFORMANCE=1 PORT=3141 pnpm exec playwright test e2e/performance.spec.mjs \
-            --project=chromium --workers=1 --reporter=list -g 'gate 8' 2>&1 \
-            | grep -oE 'interaction-long-frames=[0-9]+ worst-ms=[0-9.]+' | sed "s/^/  run $i: /") || true; \
-       done; \
-       echo; echo "  A run reporting a long frame fails gate 8's assertion; it is recorded, not retried."; \
+       echo "  A run reporting a long frame fails gate 8's assertion; it is recorded, not retried, and"; \
+       echo "  once every run has run, it fails the recipe (scripts/run_suite.sh)."; echo; \
+       PW_PERFORMANCE=1 PORT=3141 bash scripts/run_suite.sh --runs {{RUNS}} -- pnpm exec playwright test e2e/performance.spec.mjs \
+          --project=chromium --workers=1 --reporter=list -g 'gate 8'; \
      } > docs/evidence/E10/close-bench.txt
     @cat docs/evidence/E10/close-bench.txt
 
@@ -4371,8 +4265,7 @@ e14-contract:
        (cd benchmarks/baselines/sveltekit && pnpm --silent build > /dev/null 2>&1 && echo "  sveltekit: built" && pnpm --silent typecheck --output machine 2>&1 | grep -oE "[0-9]+ ERRORS [0-9]+ WARNINGS" | sed 's/^/  sveltekit: svelte-check /'); \
        ./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw benchmarks/baselines/pleris/domain.pw benchmarks/baselines/pleris/lib/*.pw benchmarks/baselines/pleris/store/*.pw | sed 's/^/  pleris: /'; \
        echo; echo "== the contract, every stack, three times (benchmarks/harness/contract)"; echo; \
-       (cd benchmarks/harness && pnpm exec playwright test --repeat-each=3 --reporter=list 2>&1 \
-         | sed 's/\x1b\[[0-9;]*m//g' | grep -E "^ +[0-9]+ (passed|failed|flaky)|✘" ); \
+       bash scripts/run_suite.sh -C benchmarks/harness -- pnpm exec playwright test --repeat-each=3 --reporter=list; \
        echo; echo "== negative controls (scripts/bench_contract_mutations.py)"; echo; \
        python3 scripts/bench_contract_mutations.py; \
      } > docs/evidence/E14/contract.txt
@@ -4397,8 +4290,7 @@ e14-idempotent-commands:
        cargo test --locked -p pw-dev-server -- interaction 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the browser, each engine alone (e2e/idempotent-command.spec.mjs)"; echo; \
        for e in chromium firefox webkit; do \
-         (cd spikes/own-renderer && pnpm exec playwright test e2e/idempotent-command.spec.mjs --project=$e --reporter=list 2>&1 \
-           | sed 's/\x1b\[[0-9;]*m//g' | grep -E "✓|✘|^ +[0-9]+ (passed|failed)") || true; \
+         bash scripts/run_suite.sh -- pnpm exec playwright test e2e/idempotent-command.spec.mjs --project=$e --reporter=list; \
        done; \
        echo; echo "== mutation controls (scripts/idempotent_commands_mutations.py)"; echo; \
        python3 scripts/idempotent_commands_mutations.py; \
@@ -4422,8 +4314,7 @@ e14-optimistic:
        cargo test --locked -p pw-dev-server -- speculat 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the browser, each engine alone (e2e/optimistic.spec.mjs)"; echo; \
        for e in chromium firefox webkit; do \
-         (cd spikes/own-renderer && pnpm exec playwright test e2e/optimistic.spec.mjs --project=$e --reporter=list 2>&1 \
-           | sed 's/\x1b\[[0-9;]*m//g' | grep -E "✓|✘|^ +[0-9]+ (passed|failed)") || true; \
+         bash scripts/run_suite.sh -- pnpm exec playwright test e2e/optimistic.spec.mjs --project=$e --reporter=list; \
        done; \
        echo; echo "== mutation controls (scripts/optimistic_transitions_mutations.py)"; echo; \
        python3 scripts/optimistic_transitions_mutations.py; \
@@ -4431,7 +4322,10 @@ e14-optimistic:
     @grep -E "^ +[0-9]+ (passed|failed)|^test result|mutants killed|^---- |panicked at" docs/evidence/E14/optimistic.txt
 
 # ADR-0123/0124: the offline benchmark harness. Its isolation self-test, and
-# each task's four controls on every stack, every run's result kept.
+# each task's four controls on every stack, every run's result kept. A
+# control that fails fails the recipe (track evidence-integrity-2: until
+# 2026-10-15 `|| true` kept it green, and T12's evidence of 2026-10-02 said
+# "unsafe FAIL" in a passing recipe).
 e14-harness TASK="T08":
     @cargo build --quiet --locked -p pw-cli -p pw-dev-server
     @mkdir -p docs/evidence/E14
@@ -4442,7 +4336,7 @@ e14-harness TASK="T08":
        echo "== isolation (benchmarks/harness/test/isolation.test.mjs)"; echo; \
        (cd benchmarks/harness && node --test test/isolation.test.mjs 2>&1 | grep -E "^(ok|not ok) "); \
        echo; echo "== the controls (node bench.mjs controls --task {{TASK}})"; echo; \
-       (cd benchmarks/harness && node bench.mjs controls --task {{TASK}} 2>&1) || true; \
+       (cd benchmarks/harness && node bench.mjs controls --task {{TASK}} 2>&1); \
        echo; echo "== each run, from benchmarks/results/ (this recipe's runs)"; echo; \
        ls -t benchmarks/results/{{TASK}}-*.json | head -9 | sort | while read -r f; do \
          node -e 'const r=require("./"+process.argv[1]); const t=r.stages.filter(s=>"passed" in s).map(s=>`${s.name} ${s.passed}/${s.passed+s.failed}`).join(", "); console.log(`  ${r.stack} ${r.agent}: score ${r.score}${r.failed_at?" (failed at "+r.failed_at+")":""}; ${t||"no tests run"}; ${r.changed_lines} line(s)`)' "$f"; \
@@ -4452,7 +4346,9 @@ e14-harness TASK="T08":
 
 # Every task's four controls on the Pleris stack alone: what a change to the
 # compiler, the runtime or the benchmark's store can move, without rebuilding
-# the frameworks' stores, whose controls `just e14-harness TASK` records.
+# the frameworks' stores, whose controls `just e14-harness TASK` records. The
+# first task whose controls fail fails the recipe (track
+# evidence-integrity-2).
 e14-pleris-controls:
     @cargo build --quiet --locked -p pw-cli -p pw-dev-server
     @mkdir -p docs/evidence/E14
@@ -4461,7 +4357,7 @@ e14-pleris-controls:
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
        echo "node: $(node --version)  pnpm: $(pnpm --version)  rust: $(rustc --version)"; echo; \
        for t in $(ls benchmarks/tasks | grep -oE '^T[0-9]+' | sort -u); do \
-         (cd benchmarks/harness && node bench.mjs controls --task $t --stack pleris 2>&1) || true; \
+         (cd benchmarks/harness && node bench.mjs controls --task $t --stack pleris 2>&1); \
        done; \
      } > docs/evidence/E14/pleris-controls.txt
     @cat docs/evidence/E14/pleris-controls.txt
@@ -4536,7 +4432,8 @@ e10-handlers:
 
 # E10-I in the browser: the store page whose Add and Clear buttons reach the
 # COMPILED commands, in all three engine families, three full runs — a flake
-# shows up as a run that differs. Needs the Playwright browsers
+# shows up as a run that differs, and fails the recipe once the three have
+# run (scripts/run_suite.sh). Needs the Playwright browsers
 # (`pnpm --filter pw-own-renderer-spike exec playwright install chromium firefox
 # webkit`), so it is not part of `just ci`.
 #
@@ -4551,13 +4448,8 @@ e10-browser engines="chromium firefox webkit" out="docs/evidence/E10/browser-sui
        echo "produced by: just e10-browser \"{{engines}}\" {{out}}"; \
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
        echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
-       for i in 1 2 3; do \
-         echo "== full run $i"; \
-         (cd spikes/own-renderer && pnpm exec playwright test --reporter=line \
-           $(for e in {{engines}}; do printf -- '--project=%s ' "$e"; done) 2>&1) \
-           | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-           | grep -E "^ +[0-9]+\) |Error:|^ +(Expected|Received)|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
-       done; \
+       bash scripts/run_suite.sh --runs 3 -- pnpm exec playwright test --reporter=line \
+         $(for e in {{engines}}; do printf -- '--project=%s ' "$e"; done); \
      } > {{out}}
     @cat {{out}}
 
@@ -4753,9 +4645,7 @@ e14-page-parameters:
        echo; echo "== the server (spikes/own-renderer/server/src/main.rs)"; echo; \
        cargo test --locked -p pw-dev-server -- a_page_that_binds_a_query_is_rendered a_row_a_change_renders a_reply_is_its_threads 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the feed in three engines (e2e/feed.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/feed.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/feed.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/page_parameters_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/page_parameters_mutations.py; \
      } > docs/evidence/E14/page-parameters.txt
@@ -4847,9 +4737,7 @@ e14-speculated-routes:
        echo; echo "== the server (spikes/own-renderer/server/src/main.rs)"; echo; \
        cargo test --locked -p pw-dev-server -- a_speculated_thread_is_named a_speculating_document_carries 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the feed in three engines (e2e/feed.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/feed.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/feed.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/speculated_routes_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/speculated_routes_mutations.py; \
      } > docs/evidence/E14/speculated-routes.txt
@@ -4893,9 +4781,7 @@ e14-speculated-arms:
        echo; echo "== the parser (compiler/pw-syntax/src/grammar.rs)"; echo; \
        cargo test --locked -p pw-syntax --lib -- an_optimistic_clause_has_an_arm_for_each_entry 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the feed in three engines (e2e/feed.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/feed.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/feed.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/speculated_arms_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/speculated_arms_mutations.py; \
      } > docs/evidence/E14/speculated-arms.txt
@@ -5171,9 +5057,7 @@ e14-follows:
        echo "== the server (spikes/own-renderer/server/src/tests/follows.rs)"; echo; \
        cargo test --locked -p pw-dev-server -- tests::follows:: 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the feed in three engines (e2e/feed.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/feed.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/feed.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/follows_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/follows_mutations.py; \
      } > docs/evidence/E14/follows.txt
@@ -5300,10 +5184,8 @@ e14-keepalive:
        echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
        echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
        echo "== kept alive, in three engines (e2e/keepalive.spec.mjs; e2e/feed.spec.mjs, a post by its bytes)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/keepalive.spec.mjs --reporter=line 2>&1; \
-          pnpm exec playwright test e2e/feed.spec.mjs -g "kept alive, counted by its bytes" --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/keepalive.spec.mjs --reporter=line; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/feed.spec.mjs -g "kept alive, counted by its bytes" --reporter=line; \
        echo; echo "== mutation controls (scripts/keepalive_mutations.py)"; echo; \
        python3 scripts/keepalive_mutations.py; \
      } > docs/evidence/E14/keepalive.txt
@@ -5329,12 +5211,10 @@ e14-refusal:
        cargo test --locked -p pw-dev-server -- sign_in:: a_signal_page_holds_its_announcer 2>&1 \
          | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== told where the press was, in three engines (e2e/identity.spec.mjs; recovery, lazy-handler, accessibility)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/identity.spec.mjs --reporter=line 2>&1; \
-          pnpm exec playwright test e2e/recovery.spec.mjs -g "still stale" --reporter=line 2>&1; \
-          pnpm exec playwright test e2e/lazy-handler.spec.mjs -g "fails to load" --reporter=line 2>&1; \
-          pnpm exec playwright test e2e/accessibility.spec.mjs -g "announcer|same node from the start" --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/identity.spec.mjs --reporter=line; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/recovery.spec.mjs -g "still stale" --reporter=line; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/lazy-handler.spec.mjs -g "fails to load" --reporter=line; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/accessibility.spec.mjs -g "announcer|same node from the start" --reporter=line; \
        echo; echo "== mutation controls (scripts/refusal_mutations.py)"; echo; \
        python3 scripts/refusal_mutations.py; \
      } > docs/evidence/E14/refusal.txt
@@ -5355,10 +5235,8 @@ e14-command-order:
        cargo test --locked -p pw-dev-server -- order:: a_pages_command a_session_forgotten_takes_its_commands_order 2>&1 \
          | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== in three engines (e2e/command-order.spec.mjs; optimistic.spec, navigate.spec)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/command-order.spec.mjs --reporter=line 2>&1; \
-          pnpm exec playwright test e2e/optimistic.spec.mjs e2e/navigate.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/command-order.spec.mjs --reporter=line; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/optimistic.spec.mjs e2e/navigate.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/command_order_mutations.py)"; echo; \
        python3 scripts/command_order_mutations.py; \
      } > docs/evidence/E14/command-order.txt
@@ -5428,10 +5306,8 @@ e14-stream-boot:
        echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
        echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
        echo "== in the host's Chrome (e2e/stream.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/stream.spec.mjs \
-          -g "while the runtime boots|Chrome 150 and later" --project=chromium --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/stream.spec.mjs \
+          -g "while the runtime boots|Chrome 150 and later" --project=chromium --reporter=line; \
        echo; echo "== mutation controls (scripts/stream_boot_mutations.py)"; echo; \
        python3 scripts/stream_boot_mutations.py; \
      } > docs/evidence/E14/stream-boot.txt
@@ -5487,9 +5363,7 @@ e14-navigate:
        echo "== the compiler (compiler/pw-core/tests/navigate.rs)"; echo; \
        cargo test --locked -p pw-core --test navigate 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the order placed and gone to, in three engines (e2e/navigate.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/navigate.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/navigate.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/navigate_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/navigate_mutations.py; \
      } > docs/evidence/E14/navigate.txt
@@ -5514,9 +5388,7 @@ e14-materializations-kept:
        echo; echo "== the server (materializations.rs, tests/materializations.rs)"; echo; \
        cargo test --locked -p pw-dev-server -- materializations 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the store's chain in three engines (e2e/materialized.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/materialized.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/materialized.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/materializations_kept_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/materializations_kept_mutations.py; \
      } > docs/evidence/E14/materializations-kept.txt
@@ -5688,9 +5560,7 @@ e14-build-id:
        echo; echo "== the decision holds a document to its page (runtime/pw-resume-wasm)"; echo; \
        cargo test --locked -p pw-resume-wasm 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== a document of another schema, in three engines (e2e/recovery.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/recovery.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/recovery.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/build_id_mutations.py)"; echo; \
        python3 scripts/build_id_mutations.py; \
      } > docs/evidence/E14/build-id.txt
@@ -5713,9 +5583,7 @@ e14-layouts:
        echo; echo "== the store's pages, served in their layout"; echo; \
        cargo test --locked -p pw-dev-server -- a_store_page_is_shown_in_its_layout_and_its_count_is_told 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the store's pages in three engines (e2e/layouts.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/layouts.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/layouts.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/layouts_mutations.py)"; echo; \
        python3 scripts/layouts_mutations.py; \
      } > docs/evidence/E14/layouts.txt
@@ -5739,9 +5607,7 @@ e14-holds:
        echo; echo "== the host answers what a page asks of its reader"; echo; \
        cargo test --locked -p pw-dev-server -- sign_in:: 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the feed and the store, in three engines (e2e/feed.spec.mjs, e2e/identity.spec.mjs, e2e/store.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/feed.spec.mjs e2e/identity.spec.mjs e2e/store.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/feed.spec.mjs e2e/identity.spec.mjs e2e/store.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/holds_mutations.py)"; echo; \
        python3 scripts/holds_mutations.py; \
      } > docs/evidence/E14/holds.txt
@@ -5764,9 +5630,7 @@ e14-query-params:
        echo; echo "== the host reads a query as a browser's form writes it, and moves a page by its path"; echo; \
        cargo test --locked -p pw-dev-server -- a_query_is_read_as_a_browsers_form_writes_it a_route_with_a_query_part_is_moved_by_its_path 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the demo's search, in three engines (e2e/query.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/query.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/query.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/query_params_mutations.py)"; echo; \
        python3 scripts/query_params_mutations.py; \
      } > docs/evidence/E14/query-params.txt
@@ -5785,13 +5649,9 @@ e14-soft-navigation:
        echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
        echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
        echo "== the store's pages, followed softly, in three engines (e2e/soft-navigation.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/soft-navigation.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/soft-navigation.spec.mjs --reporter=line; \
        echo; echo "== a handler's navigation after its commit, in three engines (e2e/navigate.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/navigate.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/navigate.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/soft_navigation_mutations.py)"; echo; \
        python3 scripts/soft_navigation_mutations.py; \
      } > docs/evidence/E14/soft-navigation.txt
@@ -5820,9 +5680,7 @@ e14-canonical:
        cargo run --quiet --locked -p corpus-check -- examples 2>&1 | tail -5; \
        cargo test --locked -p pw-core --test generality --test checking_source 2>&1 | grep -E '^test result|panicked at'; \
        echo; echo "== a canonical address, and a navigation's head, in three engines (e2e/canonical.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/canonical.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/canonical.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/canonical_mutations.py)"; echo; \
        python3 scripts/canonical_mutations.py; \
      } > docs/evidence/E14/canonical.txt
@@ -5847,9 +5705,7 @@ e14-one-entry:
        echo; echo "== the host: one entry for the store's cart"; echo; \
        cargo test --locked -p pw-dev-server -- a_page_and_its_layout_show_one_entry_by_one_value 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the layout's count, in three engines (e2e/layouts.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/layouts.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/layouts.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/one_entry_mutations.py)"; echo; \
        python3 scripts/one_entry_mutations.py; \
      } > docs/evidence/E14/one-entry.txt
@@ -6033,9 +5889,8 @@ e14-block-parts:
        echo; echo "== the host: a block told part by part, one a speculation renders, and the search's sentence"; echo; \
        cargo test --locked -p pw-dev-server -- a_block_that_shows_the_arm_it_showed_is_told_part_by_part a_block_a_speculation_renders_is_rendered_again_whole a_block_whose_rendering_changed_is_rendered_again the_sentence_inside_its_arm_is_told_where_it_is an_open_search_page_is_told_of_a_menu_change 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the search's sentence told where it is, in three engines (e2e/store-search.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/store-search.spec.mjs -g "a dish added while the page is open reaches it" --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/store-search.spec.mjs \
+          -g "a dish added while the page is open reaches it" --reporter=line; \
        echo; echo "== mutation controls (scripts/block_parts_mutations.py)"; echo; \
        python3 scripts/block_parts_mutations.py; \
      } > docs/evidence/E14/block-parts.txt
@@ -6062,9 +5917,8 @@ e14-member-reads:
        echo; echo "== the host: a count inside a block, told where it is, and in a block a speculation renders"; echo; \
        cargo test --locked -p pw-dev-server -- a_member_read_inside_a_block_is_computed_and_told_where_it_is a_member_read_inside_a_speculated_block_is_rendered_with_it 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the checkout link's subtotal before the server answers, in three engines (e2e/cart.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/cart.spec.mjs -g "a line shows before the server answers|remove takes the line away" --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/cart.spec.mjs \
+          -g "a line shows before the server answers|remove takes the line away" --reporter=line; \
        echo; echo "== mutation controls (scripts/member_reads_mutations.py)"; echo; \
        python3 scripts/member_reads_mutations.py; \
      } > docs/evidence/E14/member-reads.txt

@@ -31,9 +31,7 @@ e14-notifications:
        echo; echo "== the server (notifications.rs, tests/notifications.rs)"; echo; \
        cargo test --locked -p pw-dev-server -- notifications 2>&1 | awk '/^(test |test result)/ { print } /panicked at/ { p = 5 } p > 0 { print; p-- }'; \
        echo; echo "== the browser in three engines (e2e/notifications.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/notifications.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/notifications.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/notifications_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/notifications_mutations.py; \
      } > docs/evidence/E14/notifications.txt
