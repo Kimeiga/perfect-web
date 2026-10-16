@@ -6008,7 +6008,7 @@ e14-logical-mixed:
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
        echo "rust: $(rustc --version)"; echo; \
        echo "== the parser's rule (compiler/pw-syntax/src/grammar.rs)"; echo; \
-       cargo test --locked -p pw-syntax --lib or_and_and_mixed_without_parentheses_is_refused 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       cargo test --locked -p pw-syntax --lib 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== every shipped program and the corpus parse as before (pw-syntax's corpus tests)"; echo; \
        cargo test --locked -p pw-syntax --test corpus_grammar --test corpus_lossless 2>&1 | grep -E '^test result|panicked at'; \
        echo; echo "== mutation controls (scripts/logical_mixed_mutations.py)"; echo; \

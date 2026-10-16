@@ -264,11 +264,10 @@ integrator, 2026-10-15**, question 3: confirmed).
   as its key and the rest as passed along; `read_pitch(shard, word)`, whose
   key is both, has no set form this shape accepts (Next; answered by the
   integrator, 2026-10-15: a list of key records).
-- **That the pair answers each key by its key field** (Found 6): "a record
-  with a field of the key's type" is satisfied by any field of that type, so
-  a set form whose records hold the key's type in another field pairs. Not
-  claimed until the follow-up track `pair-key-by-name` holds the field to
-  the key parameter's name (answered by the integrator, 2026-10-15).
+- **The key's runtime value**: the declared key field is now held to the
+  key parameter's name and resolved type (the follow-up below closes Found
+  6). The conformance suite must still prove an adapter returns the actual
+  corresponding values; a type/field match cannot prove host behavior.
 - **Keys the trace does not follow**: through another read's answer (the
   note's "keyed by computed values"), through a `use`, or through a
   function value's call.
@@ -472,3 +471,26 @@ rulings, and what the merge did:
   it; it edits the merged line now, the same refusal word for word, and
   `bounded_checker_mutations.py` ran whole on the train, 40 of 40
   (22:42 to 22:51Z).
+
+
+## Key-field follow-up decision (2026-10-15)
+
+Implement the accepted integrator ruling above: a handwritten set pair
+must carry the key in a field named as the keyed read's first parameter,
+with the same resolved type. A result wrapper's other payload fields
+continue to be matched by type. Another field of the key's type proves
+nothing about the key. This is a structural declaration check; the
+adapter conformance suite remains responsible for actual returned values.
+Generated table pairs use their generated metadata under ADR-0338 and
+are integrated separately. No spelling heuristic infers a table pair.
+
+The pre-fix regression failed because a wrapper's `other: Int` was
+accepted as an `item: Int` key. The correction passes 31 bounded-read tests,
+18 source/corpus tests and all six generality tests. The new generality
+witness has precisely PW0407. The whole bounded checker script kills
+41/41 mutants (one added), all by failed assertions; no memory stops.
+Package Clippy on all targets with warnings denied passed. Raw commands,
+pre-fix failure, post-fix tests, mutation output and source hashes are in
+`docs/evidence/E14/bounded-key-field-name.txt`. Integrated CI and the
+ADR-0348 exact Result/Option-wrapper interaction remain to be validated
+when merged into train-10. No landing claim is made here.

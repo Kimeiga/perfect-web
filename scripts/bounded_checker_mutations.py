@@ -45,10 +45,16 @@ GRAMMAR = ROOT / "compiler/pw-syntax/src/grammar.rs"
 # (what, file, anchor, replacement)
 MUTANTS = [
     (
+        "a set pair accepts any field of the key's type",
+        BOUNDED,
+        "                        field.is_none_or(|field| name.as_str() == field)\n",
+        "                        field.is_none_or(|_| true)\n",
+    ),
+    (
         "a set pair drops each key's Result wrapper",
         BOUNDED,
-        "|| (holds(e, key) && (holds(e, found) || holds(e, result)))",
-        "|| (holds(e, key) && holds(e, found))",
+        "|| (holds(e, key, key_field) && (holds(e, found, None) || holds(e, result, None)))",
+        "|| (holds(e, key, key_field) && holds(e, found, None))",
     ),
     (
         "`sets` is no clause",

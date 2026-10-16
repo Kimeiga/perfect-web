@@ -1632,22 +1632,27 @@ impl<'p, 'i> Reads<'p, 'i> {
             .result()
             .filter(|t| t.as_builtin() == Some(Builtin::List))
             .and_then(|t| t.args().first());
-        let holds = |record: &ResolvedType, t: &ResolvedType| {
+        let holds = |record: &ResolvedType, t: &ResolvedType, field: Option<&str>| {
             record
                 .def_id()
                 .and_then(|d| self.sigs.type_decl(d))
                 .and_then(|t| t.record.as_ref())
                 .is_some_and(|fields| {
-                    fields
-                        .iter()
-                        .any(|(_, f)| f.resolved().is_some_and(|f| f.same_as(t)))
+                    fields.iter().any(|(name, f)| {
+                        field.is_none_or(|field| name.as_str() == field)
+                            && f.resolved().is_some_and(|f| f.same_as(t))
+                    })
                 })
         };
+        // ADR-0340's key-field ruling: an unrelated field of the key's
+        // type does not identify the row. Payload fields need only carry the
+        // result type; the key field also bears the key parameter's name.
+        let key_field = keyed.params.first().map(|p| p.name.as_str());
         let fits = answers.is_some_and(|e| {
-            // ADR-0348: preserve an operation's full Result/Option per key
+            // ADR-0348: keep the operation's exact Result/Option per named key,
             // as well as the existing successful-value projection.
-            (e.same_as(found) && holds(e, key))
-                || (holds(e, key) && (holds(e, found) || holds(e, result)))
+            (e.same_as(found) && holds(e, key, key_field))
+                || (holds(e, key, key_field) && (holds(e, found, None) || holds(e, result, None)))
         });
         if !fits {
             return Err((

@@ -67,3 +67,25 @@ integrator's). Date: 2026-10-12. Milestone: E14 (the language). Found by W9
 - **Bitwise operators.** The language has none: `|` and `&` are Boolean.
 - **`|>`**, the pipeline, which is its own lowest power, and `|` in a type
   or a match's patterns, which no expression parses.
+
+
+## Diagnostic follow-up (2026-10-15, check-is-build takeover)
+
+The existing PW0009 refusal of `&&` and `||` now explains the spelling:
+"Pleris writes `&` for and and `|` for or; write one operator". This changes
+the advice on an invalid expression. It preserves parsing and recovery.
+The parser recognizes adjacent operator tokens where an expression was
+expected; strings, comments and markup are read in their own contexts, and
+separated stray operators receive no claim that they were doubled.
+
+`doubled_logical_operators_name_the_pleris_spelling` covers both operators,
+with and without spaces around them, the missing-left-operand case, valid
+single operators, grouped chains, strings, comments, markup and separated
+invalid operators. All 118 syntax/corpus tests passed. The whole logical
+mutation script now runs all 96 syntax unit tests and kills six mutants,
+including missing advice and advice on separated operators; no bound stop.
+Package Clippy with all targets and warnings denied passed. Recorded by
+`just e14-logical-mixed` in `docs/evidence/E14/logical-mixed.txt`.
+
+The broader check-versus-build validation work is still open. This spelling
+correction makes no claim that every checked program builds.
