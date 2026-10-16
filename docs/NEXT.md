@@ -2,6 +2,13 @@
 
 The next executable tasks, in order, with acceptance criteria. Charter §3.4.
 
+Train-9 landing gate, 2026-10-16: ADR-0352's completion/write-order fix and
+strict result producer pass local whole12 and fresh default CI. Push the
+reviewed train-9 head under the existing owner authorization, require both
+GitHub `ci` and `verify` at that exact head, then fetch only its green evidence
+and land. The failed38863242953 run cannot satisfy this gate. Keep the older
+neighbor whole/native-status and inventory-scope qualifications in the receipt.
+
 
 Integration follow-up, 2026-10-16: reproduce Kiokun search-cache publication
 and version-lifetime races with private fixtures, then repair them. Sample

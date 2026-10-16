@@ -1,0 +1,325 @@
+[
+  {
+    "command": [
+      "cargo",
+      "test",
+      "--quiet",
+      "--locked",
+      "-p",
+      "pw-dev-server",
+      "--",
+      "tests::bounded_statements::"
+    ],
+    "status": 0,
+    "control": "baseline",
+    "valid": true,
+    "passed": 10,
+    "failed": 0,
+    "failure_names": [],
+    "reason": "",
+    "stopped": false,
+    "raw": "docs/evidence/E14/train9-bounded-strict-commands/0000.txt",
+    "raw_sha256": "ec4f5cefaf01e83864a901fb9097df1d3b79e35fd0e4fb267176735d2d82f910"
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "--quiet",
+      "--locked",
+      "-p",
+      "pw-dev-server",
+      "--",
+      "tests::bounded_statements::"
+    ],
+    "status": 101,
+    "control": 0,
+    "valid": true,
+    "passed": 7,
+    "failed": 3,
+    "failure_names": [
+      "tests::bounded_statements::each_operation_is_a_bounded_number_of_statements_per_call",
+      "tests::bounded_statements::each_page_and_command_is_a_bounded_number_of_statements",
+      "tests::bounded_statements::placing_and_settling_where_payments_are_taken_is_bounded"
+    ],
+    "reason": "",
+    "stopped": false,
+    "raw": "docs/evidence/E14/train9-bounded-strict-commands/0001.txt",
+    "raw_sha256": "dd54489d759f240957828075698d4e789d24e39b92978df6cb94e92976354e80"
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "--quiet",
+      "--locked",
+      "-p",
+      "pw-dev-server",
+      "--",
+      "tests::bounded_statements::"
+    ],
+    "status": 101,
+    "control": 1,
+    "valid": true,
+    "passed": 7,
+    "failed": 3,
+    "failure_names": [
+      "tests::bounded_statements::each_operation_is_a_bounded_number_of_statements_per_call",
+      "tests::bounded_statements::each_page_and_command_is_a_bounded_number_of_statements",
+      "tests::bounded_statements::placing_and_settling_where_payments_are_taken_is_bounded"
+    ],
+    "reason": "",
+    "stopped": false,
+    "raw": "docs/evidence/E14/train9-bounded-strict-commands/0002.txt",
+    "raw_sha256": "79f290788e4203f910de2caeaf18e48624e64bd5d5d5801630fe0ca6147af9b9"
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "--quiet",
+      "--locked",
+      "-p",
+      "pw-dev-server",
+      "--",
+      "tests::bounded_statements::"
+    ],
+    "status": 101,
+    "control": 2,
+    "valid": true,
+    "passed": 8,
+    "failed": 2,
+    "failure_names": [
+      "tests::bounded_statements::each_operation_is_a_bounded_number_of_statements_per_call",
+      "tests::bounded_statements::each_page_and_command_is_a_bounded_number_of_statements"
+    ],
+    "reason": "",
+    "stopped": false,
+    "raw": "docs/evidence/E14/train9-bounded-strict-commands/0003.txt",
+    "raw_sha256": "4450c5933dfe23d4f2e78d750534260ffb978ad2baae7c02e615558bcf478bd0"
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "--quiet",
+      "--locked",
+      "-p",
+      "pw-dev-server",
+      "--",
+      "tests::bounded_statements::"
+    ],
+    "status": 101,
+    "control": 3,
+    "valid": true,
+    "passed": 8,
+    "failed": 2,
+    "failure_names": [
+      "tests::bounded_statements::each_operation_is_a_bounded_number_of_statements_per_call",
+      "tests::bounded_statements::each_page_and_command_is_a_bounded_number_of_statements"
+    ],
+    "reason": "",
+    "stopped": false,
+    "raw": "docs/evidence/E14/train9-bounded-strict-commands/0004.txt",
+    "raw_sha256": "e5b7667f6f60a472f99682c4f9c2a079df994e6816a8c2a01fe612c30916ce6c"
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "--quiet",
+      "--locked",
+      "-p",
+      "pw-dev-server",
+      "--",
+      "tests::bounded_statements::"
+    ],
+    "status": 101,
+    "control": 4,
+    "valid": true,
+    "passed": 7,
+    "failed": 3,
+    "failure_names": [
+      "tests::bounded_statements::each_operation_is_a_bounded_number_of_statements_per_call",
+      "tests::bounded_statements::each_page_and_command_is_a_bounded_number_of_statements",
+      "tests::bounded_statements::placing_and_settling_where_payments_are_taken_is_bounded"
+    ],
+    "reason": "",
+    "stopped": false,
+    "raw": "docs/evidence/E14/train9-bounded-strict-commands/0005.txt",
+    "raw_sha256": "124a03368cca68949ee9215b75a71f8f6ec672b49bc3e9564130abccb922cefa"
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "--quiet",
+      "--locked",
+      "-p",
+      "pw-dev-server",
+      "--",
+      "tests::bounded_statements::"
+    ],
+    "status": 101,
+    "control": 5,
+    "valid": true,
+    "passed": 7,
+    "failed": 3,
+    "failure_names": [
+      "tests::bounded_statements::each_operation_is_a_bounded_number_of_statements_per_call",
+      "tests::bounded_statements::each_page_and_command_is_a_bounded_number_of_statements",
+      "tests::bounded_statements::placing_and_settling_where_payments_are_taken_is_bounded"
+    ],
+    "reason": "",
+    "stopped": false,
+    "raw": "docs/evidence/E14/train9-bounded-strict-commands/0006.txt",
+    "raw_sha256": "9831ebbeddbe3f7033962a95c4531f48aa670573167e22d65bf1f2659db96098"
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "--quiet",
+      "--locked",
+      "-p",
+      "pw-dev-server",
+      "--",
+      "tests::bounded_statements::"
+    ],
+    "status": 101,
+    "control": 6,
+    "valid": true,
+    "passed": 8,
+    "failed": 2,
+    "failure_names": [
+      "tests::bounded_statements::each_operation_is_a_bounded_number_of_statements_per_call",
+      "tests::bounded_statements::each_page_and_command_is_a_bounded_number_of_statements"
+    ],
+    "reason": "",
+    "stopped": false,
+    "raw": "docs/evidence/E14/train9-bounded-strict-commands/0007.txt",
+    "raw_sha256": "3ab1afbab7cc8e930c7cca5184ad940156e370c37a811155d84b4b891338fb2b"
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "--quiet",
+      "--locked",
+      "-p",
+      "pw-dev-server",
+      "--",
+      "tests::bounded_statements::"
+    ],
+    "status": 101,
+    "control": 7,
+    "valid": true,
+    "passed": 9,
+    "failed": 1,
+    "failure_names": [
+      "tests::bounded_statements::a_pending_real_payment_webhook_is_not_a_complete_statement_count"
+    ],
+    "reason": "",
+    "stopped": false,
+    "raw": "docs/evidence/E14/train9-bounded-strict-commands/0008.txt",
+    "raw_sha256": "2839530f735b308af7e6fcda43aeaf087b00f538fb501aebce61043c5f068bd1"
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "--quiet",
+      "--locked",
+      "-p",
+      "pw-dev-server",
+      "--",
+      "tests::bounded_statements::"
+    ],
+    "status": 101,
+    "control": 8,
+    "valid": true,
+    "passed": 7,
+    "failed": 3,
+    "failure_names": [
+      "tests::bounded_statements::placing_and_settling_where_payments_are_taken_is_bounded",
+      "tests::bounded_statements::scheduled_state_writes_store_ran_waits_for_a_command",
+      "tests::bounded_statements::sweep_cleanup_and_payment_commit_share_the_same_write_guard"
+    ],
+    "reason": "",
+    "stopped": false,
+    "raw": "docs/evidence/E14/train9-bounded-strict-commands/0009.txt",
+    "raw_sha256": "b0fa78ccf8f5a063740fb1a31e6a26e1968e04d5ebeac3b8477658a49403d798"
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "--quiet",
+      "--locked",
+      "-p",
+      "pw-dev-server",
+      "--",
+      "tests::bounded_statements::"
+    ],
+    "status": 101,
+    "control": 9,
+    "valid": true,
+    "passed": 9,
+    "failed": 1,
+    "failure_names": [
+      "tests::bounded_statements::scheduled_state_writes_store_retry_waits_for_a_command"
+    ],
+    "reason": "",
+    "stopped": false,
+    "raw": "docs/evidence/E14/train9-bounded-strict-commands/0010.txt",
+    "raw_sha256": "d56a0e15ed20e00bc61fd039e876775a2e6596a24680d2fd55e495acb003e34b"
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "--quiet",
+      "--locked",
+      "-p",
+      "pw-dev-server",
+      "--",
+      "tests::bounded_statements::"
+    ],
+    "status": 101,
+    "control": 10,
+    "valid": true,
+    "passed": 9,
+    "failed": 1,
+    "failure_names": [
+      "tests::bounded_statements::scheduled_state_writes_feed_ran_waits_for_a_command"
+    ],
+    "reason": "",
+    "stopped": false,
+    "raw": "docs/evidence/E14/train9-bounded-strict-commands/0011.txt",
+    "raw_sha256": "9a509a9866b52d8775f813aeb03604abfc295401b8d60cbe3c7c9c8d071af6cd"
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "--quiet",
+      "--locked",
+      "-p",
+      "pw-dev-server",
+      "--",
+      "tests::bounded_statements::"
+    ],
+    "status": 101,
+    "control": 11,
+    "valid": true,
+    "passed": 9,
+    "failed": 1,
+    "failure_names": [
+      "tests::bounded_statements::scheduled_state_writes_feed_retry_waits_for_a_command"
+    ],
+    "reason": "",
+    "stopped": false,
+    "raw": "docs/evidence/E14/train9-bounded-strict-commands/0012.txt",
+    "raw_sha256": "55830c29ee7a66a7a17ef29615fe8f14005c9cfe4173201c310f147b8a422c74"
+  }
+]

@@ -1,0 +1,6 @@
+{
+  "diff_check": 0,
+  "all_evidence_blobs_byte_exact": 36,
+  "attribute_sha256": "9034c9faef79a95b8c3f0bfb59c96b19c12dd161b058562875d90da5cceae196",
+  "exact_four_paths_explicitly_restaged_with_renormalize": true
+}

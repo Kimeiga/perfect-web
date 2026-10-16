@@ -1,0 +1,23 @@
+2026-10-16T11:02:39Z
+   Compiling pw-dev-server v0.0.0 (/home/haki/code/pw-wt/train9-bounded-fix/spikes/own-renderer/server)
+    Finished `test` profile [unoptimized] target(s) in 2.98s
+     Running unittests src/main.rs (target/debug/deps/pw_dev_server-ff76041b108b4a26)
+
+running 1 test
+private settlement probe: intent=pi_dev000001 status=canceled outcome=Ok(Answered { committed: false, result: None, why: Some("PostgreSQL 40001: could not serialize access due to concurrent delete"), refused: None })
+private webhook probe: event=evt_dev000002 intent=pi_dev000001 response=Ok(500)
+forced overlap: cleanup_returned_early=true; completed_markers=0; transactions=[26, 12]
+
+thread 'tests::bounded_statements::sweep_cleanup_and_payment_commit_share_the_same_write_guard' (2384709) panicked at spikes/own-renderer/server/src/tests/bounded_statements.rs:889:13:
+cleanup crossed the active serializable payment transaction
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test tests::bounded_statements::sweep_cleanup_and_payment_commit_share_the_same_write_guard ... FAILED
+
+failures:
+
+failures:
+    tests::bounded_statements::sweep_cleanup_and_payment_commit_share_the_same_write_guard
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 590 filtered out; finished in 10.79s
+
+error: test failed, to rerun pass `-p pw-dev-server --bin pw-dev-server`

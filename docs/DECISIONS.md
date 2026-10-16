@@ -3006,3 +3006,11 @@ experience).
   byte for byte the guestbook a browser test drives, the codes' reference
   generated from the registry, and each gap in the checks an example held
   open until the compiler closes it.
+
+[ADR-0352](DECISIONS/ADR-0352-bounded-statements-wait-for-completed-payment.md):
+statement counts wait for the completed payment transaction.
+- Real delayed-webhook and staged PostgreSQL overlap witnesses establish the
+  completion and same-instance write-order defects; exact success pins are
+  retained. Strict Cargo producer classification refuses invalid/build/stopped
+  evidence with source restoration and no next control. Local strict12/12 and
+  fresh CI pass; exact-head remote gates and landing remain pending.

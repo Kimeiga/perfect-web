@@ -1,0 +1,124 @@
+{
+  "bounded_statements_mutations.py": [
+    {
+      "index": 0,
+      "what": [
+        "PostgreSQL's items' stores are scanned store by store",
+        "postgres"
+      ],
+      "path": "spikes/own-renderer/server/src/store_pg.rs",
+      "before": "9959c721f3b8e0f19afd6e3ab0c8bea114506fe6c5a085dfd8d427724b254215",
+      "after": "ab383f4255d7d0528bf6dbcc93ee0e05a0e7057ef289a2c6139be6e5ad175d14"
+    },
+    {
+      "index": 1,
+      "what": [
+        "PostgreSQL's stores' hours are read a store at a time",
+        "postgres"
+      ],
+      "path": "spikes/own-renderer/server/src/store_pg.rs",
+      "before": "9959c721f3b8e0f19afd6e3ab0c8bea114506fe6c5a085dfd8d427724b254215",
+      "after": "09ed5e07c43257e1aa2fed2174797d4f18d6483db9f7659762e2925559f14845"
+    },
+    {
+      "index": 2,
+      "what": [
+        "hours#for-stores reads each store's hours alone",
+        "postgres"
+      ],
+      "path": "spikes/own-renderer/server/src/hours.rs",
+      "before": "5aa3f92b22a5e0dfa5013756533289b458ecf8d524e42313623a9f68d06696ef",
+      "after": "ecd6089354f449f90cea7f40abe9fb9df253337f0019270d29dcf1554f8f086e"
+    },
+    {
+      "index": 3,
+      "what": [
+        "the search's reach reads each store it found alone",
+        "postgres"
+      ],
+      "path": "spikes/own-renderer/server/src/search.rs",
+      "before": "ae2640b903474618c9531481c3368c85b5e533a4e9c02177607c6b2ff7dbf934",
+      "after": "b05b66171594e36f9c4d2042f962f66699762b3117738f1a989f805a7ef16a02"
+    },
+    {
+      "index": 4,
+      "what": [
+        "checkout#parts scans every store's menu for each line's store",
+        "postgres"
+      ],
+      "path": "spikes/own-renderer/server/src/checkout.rs",
+      "before": "cd085a3cfc239ea3e05d6d03ef21e582b3306f3d1a789001f9b82fb36047b501",
+      "after": "6119a60e600d4650854713e012eefabb6081d1ddeefdcdc30e27b7b300046503"
+    },
+    {
+      "index": 5,
+      "what": [
+        "hours#for-cart scans every store's menu for each line's store",
+        "postgres"
+      ],
+      "path": "spikes/own-renderer/server/src/hours.rs",
+      "before": "5aa3f92b22a5e0dfa5013756533289b458ecf8d524e42313623a9f68d06696ef",
+      "after": "18b7ff4578ff02d45ffa29b14abee1fe67ae9e99e4ce99f287c02ad0ef00803f"
+    },
+    {
+      "index": 6,
+      "what": [
+        "the order's reach scans every store's menu for each line's store",
+        "postgres"
+      ],
+      "path": "spikes/own-renderer/server/src/store.rs",
+      "before": "ae1426cd805bf556e81e3dcfffca59c528e6a7e48341af4f02da3918d5325383",
+      "after": "bd3e3ebabf8d3648fcaff762436a3890cc92b9878f14094303949bbaa36e1821"
+    },
+    {
+      "index": 7,
+      "what": [
+        "unchanged statement counters stand for payment completion",
+        "postgres"
+      ],
+      "path": "spikes/own-renderer/server/src/tests/bounded_statements.rs",
+      "before": "9fcb276873dedafc696d3bb7372b87dd7dfb597f3e74aafff804902a88df3767",
+      "after": "ef5f527059b2113bbb0cfdbe2349ac66609641ec94589c14295a4bb3eef504cf"
+    },
+    {
+      "index": 8,
+      "what": [
+        "store_pg.rs ran bypasses the command write guard",
+        "postgres"
+      ],
+      "path": "spikes/own-renderer/server/src/store_pg.rs",
+      "before": "9959c721f3b8e0f19afd6e3ab0c8bea114506fe6c5a085dfd8d427724b254215",
+      "after": "c789ead4bdf450e762b94f8f1553abe930246c8015348558884e589909c14430"
+    },
+    {
+      "index": 9,
+      "what": [
+        "store_pg.rs retry bypasses the command write guard",
+        "postgres"
+      ],
+      "path": "spikes/own-renderer/server/src/store_pg.rs",
+      "before": "9959c721f3b8e0f19afd6e3ab0c8bea114506fe6c5a085dfd8d427724b254215",
+      "after": "90749a47e4c836e7bc6a86a0964c0a68c08ef824105f2512ecca969f5f8a1cd3"
+    },
+    {
+      "index": 10,
+      "what": [
+        "feed_pg.rs ran bypasses the command write guard",
+        "postgres"
+      ],
+      "path": "spikes/own-renderer/server/src/feed_pg.rs",
+      "before": "5f57a39e07ee6d73c5fe31d4da442f959806afe4ce59fa4145b9291788d6f975",
+      "after": "bdecdadf637d270a3b9a8d215a88a691a232a49b13150579d3aa2f0bab2304f1"
+    },
+    {
+      "index": 11,
+      "what": [
+        "feed_pg.rs retry bypasses the command write guard",
+        "postgres"
+      ],
+      "path": "spikes/own-renderer/server/src/feed_pg.rs",
+      "before": "5f57a39e07ee6d73c5fe31d4da442f959806afe4ce59fa4145b9291788d6f975",
+      "after": "4664ac3f17b50f6b4c11c0b1a423dd9acbaae4a2c1111dc4b364effa4233a191"
+    }
+  ]
+}

@@ -1164,6 +1164,7 @@ impl crate::schedules::Runs for StorePg {
     }
 
     fn ran(&self, id: i64) -> Result<(), String> {
+        let _writes = self.writes.lock().unwrap_or_else(|e| e.into_inner());
         let mut conn = self.pool.take()?;
         crate::schedules::pg::ran(conn.client(), id).map_err(pg)
     }
@@ -1175,6 +1176,7 @@ impl crate::schedules::Runs for StorePg {
         due_ms: i64,
         failed: Option<&str>,
     ) -> Result<(), String> {
+        let _writes = self.writes.lock().unwrap_or_else(|e| e.into_inner());
         let mut conn = self.pool.take()?;
         crate::schedules::pg::retry(conn.client(), id, attempts, due_ms, failed).map_err(pg)
     }

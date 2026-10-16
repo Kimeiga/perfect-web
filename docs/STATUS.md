@@ -14,6 +14,21 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**Train-9 payment/scheduler correction, 2026-10-16 (ADR-0352):** scheduled
+cleanup and retry acquire the existing StorePg/FeedPg write guard before a
+pool connection. Statement witnesses wait for successful completed settlement,
+with exact37/17/25/14/26/14 pins; the old12 sweep pin was an aborted transaction.
+The strict complete12-control campaign retains13 actual native Cargo results,
+with baseline0 and12 named101 test failures. Fresh `just ci` passes2954 Rust
+tests (25 explicitly ignored); all2280 frozen source/config inputs restore
+exactly. [Current receipt and raw results](evidence/E14/train9-bounded-strict-validation.json)
+distinguish the older112 reported neighbor kills, whose individual native
+statuses/full raw were not retained, and the old2222-path inventory omission.
+GitHub verify38863242953 remains failed. New exact-head `ci` and `verify` must
+both pass before evidence fetch and landing; no remote acceptance is claimed.
+The write guard orders one instance's writes, with cross-host serializable
+refusals still possible.
+
 **Train-9 corrective validation, 2026-10-16:** the absorbed description
 control is replaced by a withheld initial shell; the complete recipe passes
 all 21 browser tests in three engines and all 9 assertion controls. Unit-test

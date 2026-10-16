@@ -1,0 +1,37 @@
+
+running 10 tests
+.... 4/10
+tests::bounded_statements::scheduled_state_writes_store_ran_waits_for_a_command --- FAILED
+.. 7/10
+tests::bounded_statements::sweep_cleanup_and_payment_commit_share_the_same_write_guard --- FAILED
+. 9/10
+tests::bounded_statements::placing_and_settling_where_payments_are_taken_is_bounded --- FAILED
+
+failures:
+
+---- tests::bounded_statements::scheduled_state_writes_store_ran_waits_for_a_command stdout ----
+
+thread 'tests::bounded_statements::scheduled_state_writes_store_ran_waits_for_a_command' (2989041) panicked at spikes/own-renderer/server/src/tests/bounded_statements.rs:1006:9:
+scheduler transition retry=false crossed an active command transaction
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- tests::bounded_statements::sweep_cleanup_and_payment_commit_share_the_same_write_guard stdout ----
+forced overlap: cleanup_returned_early=true; completed_markers=0; transactions=[26, 12]
+
+thread 'tests::bounded_statements::sweep_cleanup_and_payment_commit_share_the_same_write_guard' (2989113) panicked at spikes/own-renderer/server/src/tests/bounded_statements.rs:933:13:
+cleanup crossed the active serializable payment transaction
+
+---- tests::bounded_statements::placing_and_settling_where_payments_are_taken_is_bounded stdout ----
+
+thread 'tests::bounded_statements::placing_and_settling_where_payments_are_taken_is_bounded' (2988719) panicked at spikes/own-renderer/server/src/tests/bounded_statements.rs:613:9:
+expected 3 completed payment outcomes, got 2; transactions: [0, 9, 10, 37, 17, 9, 36, 25, 14, 36, 26, 12]
+
+
+failures:
+    tests::bounded_statements::placing_and_settling_where_payments_are_taken_is_bounded
+    tests::bounded_statements::scheduled_state_writes_store_ran_waits_for_a_command
+    tests::bounded_statements::sweep_cleanup_and_payment_commit_share_the_same_write_guard
+
+test result: FAILED. 7 passed; 3 failed; 0 ignored; 0 measured; 585 filtered out; finished in 23.91s
+
+error: test failed, to rerun pass `-p pw-dev-server --bin pw-dev-server`

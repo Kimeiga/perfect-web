@@ -1899,3 +1899,19 @@ Each a decision for a track, with its date; a track's ADR records it too.
   - **A record's count, unchecked**: `bounded-checker`'s commit `1f0d772f`
     says "41 in all" of a script that has 40 mutants (its ADR and its run
     say 40); `track/evidence-integrity`'s family of findings.
+
+
+- **2026-10-16, train-9 completion and scheduler write ordering (ADR-0352).**
+  The integrator reproduced a late real signed webhook after an incomplete
+  stable statement snapshot, then a real PostgreSQL40001 settlement/cleanup
+  overlap. StorePg/FeedPg ran/retry now acquire the existing instance write
+  guard before the connection, and exact successful count witnesses wait on
+  the post-settlement marker. Strict12/12 has13 retained actual native Cargo
+  records; fresh same-input CI is green (2954 Rust passes/25ignored), with
+  all2280 frozen source/config inputs restored. Older112 reported whole kills
+  lack retained individual native statuses/raw and remain qualified history;
+  the old2222 inventory omitted55 quoted Unicode sample fixtures. Current
+  receipt: docs/evidence/E14/train9-bounded-strict-validation.json. Failed
+  verify38863242953 remains failed; new exact-head remote CI/verify, green
+  evidence fetch and main landing are pending. No cross-host serialization,
+  count relaxation or automatic payment retry is introduced.
