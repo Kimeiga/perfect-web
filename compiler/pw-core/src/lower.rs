@@ -309,7 +309,15 @@ impl Lowerer<'_> {
     /// **An `{#each}`'s head** (ADR-0242), parsed once by the grammar and
     /// padded to its place, so its parts' spans and its errors are the
     /// file's. `None` for another block, or a head with no list and name.
-    fn each_head(&mut self, node: &SyntaxNode) -> Option<crate::hir::EachHead> {
+    ///
+    /// Its list and its key are lowered into the body's arena (ADR-0345),
+    /// as a block marker's condition is: until 2026-10-15 they were kept as
+    /// text, and no walker of the body's expressions saw them.
+    fn each_head(
+        &mut self,
+        b: &mut BodyBuilder,
+        node: &SyntaxNode,
+    ) -> Option<crate::hir::EachHead> {
         let raw = text(self.src, node);
         let lead = raw.len() - raw.trim_start().len();
         let rest = raw.trim_start().strip_prefix("{#each")?;
@@ -342,13 +350,26 @@ impl Lowerer<'_> {
             .find(read);
         let written =
             |n: &SyntaxNode| pw_syntax::collapse_policy_whitespace(text(&padded, n).trim());
-        Some(crate::hir::EachHead {
+        let shown = crate::hir::EachWritten {
             list: written(&list),
-            list_span: span_of(&list),
-            binder: written(&name),
-            binder_span: span_of(&name),
             key: key.as_ref().map(written),
-            key_span: key.as_ref().map(span_of),
+        };
+        let (binder, binder_span) = (written(&name), span_of(&name));
+        // The list before the key, as written, with the real grammar's
+        // lowering over the head padded to its place: every span the file's.
+        let mut sub = Lowerer {
+            hir: std::mem::take(&mut self.hir),
+            src: &padded,
+        };
+        let list = sub.expr(b, &list);
+        let key = key.as_ref().map(|k| sub.expr(b, k));
+        self.hir = sub.hir;
+        Some(crate::hir::EachHead {
+            list,
+            binder,
+            binder_span,
+            key,
+            written: shown,
         })
     }
 
@@ -1266,25 +1287,17 @@ impl Lowerer<'_> {
                     .filter(|c| is_markup(c.kind()))
                     .map(|c| self.markup(b, &c))
                     .collect();
-                let mut parts: Vec<ExprId> = Vec::new();
-                for (_, n, _) in b.nodes.iter().skip(first) {
-                    match n {
-                        Node::Interpolation(e) => parts.push(*e),
-                        Node::Block {
-                            subject: Some(e), ..
-                        }
-                        | Node::Branch {
-                            condition: Some(e), ..
-                        } => parts.push(*e),
-                        Node::Element { attrs, .. } => {
-                            parts.extend(attrs.iter().filter_map(|a| match a.value {
-                                AttrValue::Expr(e) => Some(e),
-                                _ => None,
-                            }));
-                        }
-                        _ => {}
-                    }
-                }
+                // Every expression each node holds, at every position, as the
+                // one reading of them says (ADR-0345). Until 2026-10-15 this
+                // was a `match` that named the positions it knew and dropped
+                // the rest, and an `{#each}`'s list and key were none of them.
+                let mut parts: Vec<ExprId> = b
+                    .nodes
+                    .iter()
+                    .skip(first)
+                    .flat_map(|(_, n, _)| n.exprs())
+                    .map(|(_, e)| e)
+                    .collect();
                 parts.sort_by_key(|e| b.exprs.span_at(e.index()).map(|s| s.start).unwrap_or(0));
                 b.expr(Expr::Template { parts, roots }, span)
             }
@@ -1636,7 +1649,7 @@ impl Lowerer<'_> {
                 let subject = open.as_ref().and_then(|o| {
                     self.marker_expression(b, o, &["{#if", "{#match"], "a block's subject")
                 });
-                let each = open.as_ref().and_then(|o| self.each_head(o));
+                let each = open.as_ref().and_then(|o| self.each_head(b, o));
                 let mut children = Vec::new();
                 for c in node.children().filter(|c| is_markup(c.kind())) {
                     if Some(&c) == open.as_ref() || Some(&c) == close.as_ref() {

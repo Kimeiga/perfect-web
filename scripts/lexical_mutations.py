@@ -85,8 +85,8 @@ MUTANTS = [
     (
         "an `{#each}` block binds nothing",
         LEXICAL,
-        "                        scope.push((name, Binder::Each(*n)));",
-        "                        let _ = name;",
+        "                        scope.push((each.binder.clone(), Binder::Each(*n)));",
+        "                        let _ = &each.binder;",
     ),
     (
         "a `{#match}` arm binds nothing",
@@ -109,8 +109,11 @@ MUTANTS = [
     (
         "an `{#each}` collection's fields are not read",
         VALUES,
-        "            t = self.member_type(&t, segment);",
-        "            t = Ty::Unknown;",
+        "            if let Ty::Builtin(Builtin::List, args) = self.of(list)\n",
+        "            if let Ty::Builtin(Builtin::List, args) = (match self.body.expr(list) {\n"
+        "                Expr::Field { .. } => Ty::Unknown,\n"
+        "                _ => self.of(list),\n"
+        "            })\n",
     ),
     (
         "a `{#match}` arm's names are not typed",

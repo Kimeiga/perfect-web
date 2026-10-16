@@ -62,8 +62,8 @@ MUTANTS = [
         "a loop's list is not read for a member",
         "core",
         VALUES,
-        "            calls |= self.calls_a_member(&t, segment);\n",
-        "",
+        "            if self.calls_a_member(&self.of(*base), name) {\n",
+        "            if false && self.calls_a_member(&self.of(*base), name) {\n",
     ),
     (
         "an attribute's value is not a read",

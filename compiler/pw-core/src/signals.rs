@@ -243,8 +243,6 @@ fn dialogs(
     };
     fn walk(
         body: &Body,
-        lexical: &Lexical,
-        signals: &BTreeMap<Binder, (String, ExprId)>,
         signal_of: &dyn Fn(ExprId) -> Option<String>,
         n: crate::hir::NodeId,
         shown_by: Option<&str>,
@@ -270,22 +268,23 @@ fn dialogs(
                     }
                 }
                 for c in children {
-                    walk(body, lexical, signals, signal_of, *c, shown_by, out);
+                    walk(body, signal_of, *c, shown_by, out);
                 }
             }
             Node::Block {
-                subject, children, ..
+                subject,
+                each: head,
+                children,
+                ..
             } => {
-                let each = lexical
-                    .each_blocks()
-                    .find(|(node, ..)| *node == n)
-                    .and_then(|(_, _, head)| head)
-                    .and_then(|b| signals.get(&b))
-                    .map(|(name, _)| name.clone());
+                // A loop's list, read as the subject is (ADR-0345): a loop
+                // over a signal, the view's own or a module's, shows what it
+                // renders.
+                let each = head.as_ref().and_then(|h| signal_of(h.list));
                 let decided = subject.and_then(signal_of).or(each);
                 let shown = shown_by.map(str::to_string).or(decided);
                 for c in children {
-                    walk(body, lexical, signals, signal_of, *c, shown.as_deref(), out);
+                    walk(body, signal_of, *c, shown.as_deref(), out);
                 }
             }
             _ => {}
@@ -296,7 +295,7 @@ fn dialogs(
             continue;
         };
         for r in roots {
-            walk(body, lexical, signals, &signal_of, *r, None, out);
+            walk(body, &signal_of, *r, None, out);
         }
     }
 }

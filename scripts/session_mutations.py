@@ -37,14 +37,14 @@ MUTANTS = [
     (
         "a printed hole may hold a session's handle",
         CHECK,
-        "                Node::Interpolation(e) => vec![*e],\n",
-        "                Node::Interpolation(_) => Vec::new(),\n",
+        "                    crate::hir::Position::Hole => true,\n",
+        "                    crate::hir::Position::Hole => false,\n",
     ),
     (
         "an attribute's value may hold a session's handle",
         CHECK,
-        "                    .filter(|a| !matches!(a.namespace(), Some((\"on\", _))))\n",
-        "                    .filter(|a| a.name.is_empty())\n",
+        "                    crate::hir::Position::Attribute => true,\n",
+        "                    crate::hir::Position::Attribute => false,\n",
     ),
     (
         "a string's holes may hold a session's handle",

@@ -32,6 +32,7 @@ import 'just/reviews.just'
 import 'just/proof.just'
 import 'just/guide.just'
 import 'just/evidence-integrity.just'
+import 'just/each-head-effects.just'
 
 default:
     @just --list

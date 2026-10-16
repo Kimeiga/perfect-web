@@ -133,11 +133,29 @@ fn a_computed_list_needs_its_key_too() {
 #[test]
 fn a_loops_key_is_refused_at_the_key() {
     assert_eq!(
-        found(&view("xs as x (y)")),
+        found(&view("xs as x (ys)")),
         one(
             "PW5021",
-            "a loop's key is `x` or a field read from it, and this is `y`",
-            "y"
+            "a loop's key is `x` or a field read from it, and this is `ys`",
+            "ys"
         )
+    );
+    // A key is an expression (ADR-0345), so a name in it that nothing binds
+    // does not resolve, as anywhere. Until then the key was text, and `y`
+    // was read by this rule alone.
+    assert_eq!(
+        found(&view("xs as x (y)")),
+        vec![
+            (
+                "PW0021".to_string(),
+                "`y` does not resolve".to_string(),
+                "y".to_string()
+            ),
+            (
+                "PW5021".to_string(),
+                "a loop's key is `x` or a field read from it, and this is `y`".to_string(),
+                "y".to_string()
+            ),
+        ]
     );
 }

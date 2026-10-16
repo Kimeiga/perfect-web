@@ -75,6 +75,8 @@ const ACCEPTED_CATEGORIES: &[&str] = &[
     // 4c (track `bounded-checker`), corpus C25: a list's reads, one set read
     // before its loop.
     "a list read together before its loop",
+    // The each-head-effects track, corpus C26: R-080's neighbour.
+    "a loop over a query's value",
 ];
 
 /// Charter §16.2: "Create at least one minimal file for each".
@@ -191,6 +193,8 @@ const REJECTED_CATEGORIES: &[&str] = &[
     "a read per element in a for loop",
     "a read per element in a recursion over data",
     "a set read that answers no result with its key",
+    // The each-head-effects track, corpus C26: PW0401 at a loop's head.
+    "a database read in a loop's list",
 ];
 
 /// Milestone 0 gate (charter §14 M0): ">= 10 accepted and 20 rejected".

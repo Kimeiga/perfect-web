@@ -3014,3 +3014,10 @@ is discarded, evidence counts and corpus headers are checked, latency
 bounds thread CPU, suites require complete builds and trains require
 numbered decisions. Accepted under the owner's delegation; integrated
 verification is pending.
+
+### 2026-10-15 — every expression position in a view
+
+[ADR-0345](DECISIONS/ADR-0345-each-head-effects.md): a loop's list and key
+are semantic expressions. One exhaustive enumeration feeds view walkers;
+effects, privacy, signal and name checks cover all seven positions.
+Accepted under the owner's delegation; train-10 verification pending.

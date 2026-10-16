@@ -3015,18 +3015,27 @@ fn sessions_stay_on_the_server(
         // latency, 2026-10-13).
         let mut types: Option<crate::values::BodyTypes> = None;
         for (_, node, _) in body.nodes.iter() {
-            let mut printed: Vec<ExprId> = match node {
-                Node::Interpolation(e) => vec![*e],
-                Node::Element { attrs, .. } => attrs
-                    .iter()
-                    .filter(|a| !matches!(a.namespace(), Some(("on", _))))
-                    .filter_map(|a| match a.value {
-                        crate::hir::AttrValue::Expr(e) => Some(e),
-                        _ => None,
-                    })
-                    .collect(),
-                _ => Vec::new(),
-            };
+            // What the node prints, by where each of its expressions is
+            // written (ADR-0345): a position this does not name is a compile
+            // error here, never one it skips.
+            let mut printed: Vec<ExprId> = node
+                .exprs()
+                .into_iter()
+                .filter(|(position, _)| match position {
+                    // Written as text, in the document or an attribute.
+                    crate::hir::Position::Hole => true,
+                    crate::hir::Position::Attribute => true,
+                    // Run when a person acts; what a block decides by; the
+                    // list the rows come from; and the key, which the
+                    // document holds as a keyed digest, never as itself.
+                    crate::hir::Position::Handler
+                    | crate::hir::Position::Subject
+                    | crate::hir::Position::Condition
+                    | crate::hir::Position::List
+                    | crate::hir::Position::Key => false,
+                })
+                .map(|(_, e)| e)
+                .collect();
             // A string with holes prints each hole.
             printed = printed
                 .into_iter()
@@ -9559,13 +9568,18 @@ fn loop_keys(hir: &Hir, id: crate::hir::DeclId, decl: &Decl, out: &mut Vec<Diagn
         else {
             continue;
         };
-        let (binding, Some(key), Some(key_span)) = (&each.binder, &each.key, &each.key_span) else {
+        let (binding, Some(read)) = (&each.binder, each.key) else {
             continue;
         };
-        let head = key.split('.').next().unwrap_or_default().trim();
-        if head == binding {
+        // A path from the row: in the key's scope, the row's name is the
+        // innermost binding of it (ADR-0345).
+        let from_row = crate::lexical::path_root(body, read)
+            .is_some_and(|root| matches!(body.expr(root), Expr::Name(n) if n == binding));
+        if from_row {
             continue;
         }
+        let key = each.written.key.clone().unwrap_or_default();
+        let key_span = body.expr_span(read);
         out.push(Diagnostic {
             code: crate::codes::LOOP_KEY.id,
             invariant: crate::codes::LOOP_KEY.invariant,

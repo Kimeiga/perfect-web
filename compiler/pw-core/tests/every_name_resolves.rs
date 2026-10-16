@@ -118,6 +118,28 @@ fn an_each_block_binds_its_item_for_its_children() {
     assert_eq!(unresolved(after), ["g"], "the item is the block's");
 }
 
+/// **A loop's list is read where its block is**, an expression in the scope
+/// around it (ADR-0345): a nested loop's list reads the row of the loop
+/// around it, and a loop in an arm reads the arm's binding. Read in the
+/// template's scope, as a part no node holds is, neither would resolve.
+#[test]
+fn a_loops_list_is_read_in_the_scope_around_its_block() {
+    let src = "module m\n\ntype Group = Group { items: List<Int> }\n\n\
+               view V(groups: List<Group>, o: Option<List<Int>>) !{} {\n    <ul>\n        \
+               {#each groups as g (g)}\n            {#each g.items as i (i)}\n                \
+               <li>{i}</li>\n            {/each}\n        {/each}\n        \
+               {#match o}\n            {:Some(xs)}\n                \
+               {#each xs as x (x)}<li>{x}</li>{/each}\n            {:None}\n                \
+               <li>none</li>\n        {/match}\n    </ul>\n}\n";
+    assert_eq!(unresolved(src), Vec::<String>::new());
+    // The control: the inner loop after the outer one, where no `g` is.
+    let outside = src.replace(
+        "{#each g.items as i (i)}\n                <li>{i}</li>\n            {/each}\n        {/each}",
+        "{/each}\n        {#each g.items as i (i)}<li>{i}</li>{/each}",
+    );
+    assert_eq!(unresolved(&outside), ["g"]);
+}
+
 #[test]
 fn a_match_block_arm_binds_for_its_own_arm() {
     let src = "module m\n\nview V(o: Option<String>) !{} {\n    {#match o}\n        {:Some(x)}\n            <p>{x}</p>\n        {:None}\n            <p>{x}</p>\n    {/match}\n}\n";

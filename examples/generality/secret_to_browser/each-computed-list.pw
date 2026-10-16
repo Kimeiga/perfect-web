@@ -1,0 +1,22 @@
+// @status: GENERAL
+// @invariant: secret_to_browser
+// @dimension: equivalent syntax — the secret reaches the markup through a loop over a list computed from it
+//
+// Structurally different from the fixture: no name rendered is the
+// secret's own. The loop's rows are a list computed from the secrets, and
+// each row is rendered. Until ADR-0345 a row was labelled from its loop's
+// head as text, public unless the head's first name was a local's, so this
+// rendered every key and checked clean.
+
+module generality.secret_each
+
+import capability.{ Secret, Payments }
+import List
+
+view Keys(keys: List<Secret<Payments>>) !{} {
+    <ul aria-label="Keys">
+        {#each List.reverse(keys) as key (key)}
+            <li>{key}</li>
+        {/each}
+    </ul>
+}

@@ -1082,3 +1082,30 @@ Generality at open:        56/56 invariants generality-tested
 | `read_per_element` | a GENERAL witness, a generic callback with a match arm's key, a function named as the callback, and another module's read, pair and source, and a NEIGHBOUR one, a key no element's and a callback applied once | new invariant |
 | `set_pair_shape` | a GENERAL witness, a set form that drops a reader the keyed read passes along, and another module's set form of another source, and a NEIGHBOUR one, the shapes a set form may take | new invariant |
 | `undeclared_effect` | changed: its three witnesses read by a parameter, not per element | its invariant kept |
+
+## C26: what a loop's head reads, 2026-10-15
+
+Opened because the corpus did not specify a rule the language holds, and
+the checker did not hold it there. A view's effect row is empty (charter
+§7.4), and an `{#each}`'s list and key are what the view evaluates while
+it renders, as a text hole, an attribute or an `{#if}`'s condition is.
+They were text no walker of a view's expressions read (ADR-0242's "not
+claimed"), so a database read in a loop's list checked clean, where the
+same call anywhere else in the view was `PW0401`; written as a member of
+the store it built too (ADR-0345, the each-head-effects track). No
+invariant is retired; no fixture changed.
+
+```text
+Corpus version:            C26
+Accepted programs:         38
+Rejected programs:         79
+Charter categories:        38/38 accepted, 79/79 rejected
+Generality at open:        56/56 invariants generality-tested
+```
+
+| Fixture | Change | Kind |
+|---|---|---|
+| A-038 | added: a page's loop over the value of a query it names, the query reading the database | new category, `a loop over a query's value` |
+| R-080 | added: a view's loop over `Stores.list()`, which reads the database (`PW0401` at the list) | new category |
+| `forbidden_effect` | two GENERAL witnesses, a loop's list read through a member that reads the database and a nested loop's key that does, and a NEIGHBOUR one, the list read through a pure member | new witnesses |
+| `secret_to_browser` | a GENERAL witness, a loop over a list computed from secrets, each rendered | new witness |

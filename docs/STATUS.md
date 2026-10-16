@@ -23,6 +23,14 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0345, 2026-10-15: each-header expressions are checked**
+(train-10, from `839e8bfa`). Effects, privacy, signals and names now see a
+loop's list and key through an exhaustive enumeration of seven expression
+positions. Branch evidence recorded 20/20 own controls and twelve other
+whole scripts. Corpus collision resolved as C26/A-038, retaining
+bounded-read C25/A-037. Generic-result effects remain a separate open
+track. Integrated CI and verification are pending.
+
 **ADR-0344, 2026-10-15: evidence integrity** (train-10, from
 `83cdac27`). Mutation runs discard stale Python bytecode; train pushes
 plan stale evidence; counts and rejected fixture headers are held to their
