@@ -16,12 +16,18 @@ Each mutant undoes one thing the spec states, or one thing the layer keeps:
 - the browser's runtime (`spikes/own-renderer/public/pw-runtime.mjs`), where
   a patch sets a checkbox's state as well as its attribute, and the edit
   field a patch inserts takes focus (the runtime's own `autofocus` is
-  controlled in `scripts/autofocus_mutations.py`).
+  controlled in `scripts/autofocus_mutations.py`). A mutant of the runtime
+  rebuilds the pages too (`run.sh`), as every control that changes it does:
+  the Playwright config refuses to run against a `dist` built with another
+  runtime, and a suite that did not run kills nothing.
 
-**A program mutant must still be a well-typed program**: each is checked with
-`pw check` before anything runs, and one that does not check is no mutant,
-and fails this script (a rule that refused it would be killing it for the
-wrong reason). A mutant is run against the server's tests
+**A program mutant must still be a well-typed program, or name the rule it
+takes away** (`scripts/mutant_programs.py`, the integrator's audit of train-7):
+each is checked with `pw check` before anything runs, and one that does not
+check is no mutant and fails this script (a rule that refused it would be
+killing it for the wrong reason), unless the checker's refusal IS what it
+undoes and `CHECKED` says so, by the rule's code; such a mutant is killed by the
+checker, says so, and runs no test. A mutant is run against the server's tests
 (`tests::todomvc::`, which build the program as `pw build` does) and, where
 they hold, against the browser's (`e2e/todomvc.spec.mjs`, in Chromium); one
 the browser alone kills is one only a browser sees.
@@ -47,6 +53,17 @@ PROGRAM = "program"
 LAYERED = "layer"
 HOST = "host"
 RUNTIME = "runtime"
+
+# The program mutants the checker refuses, by the rule that is the protection
+# each takes away (`scripts/mutant_programs.py`): every other program mutant
+# here leaves a program that checks. Each is killed by the checker, and no test
+# is run for it.
+CHECKED = {
+    # `toggle` writes `Todo` and does not invalidate `Board`, which reads it.
+    "a toggle tells no page": {"PW5106"},
+    # `Board`'s `key` omits `filter`, which its body reads.
+    "the board is read the same for each filter": {"PW0336"},
+}
 
 # (what is undone, which tests, file, anchor, replacement)
 MUTANTS = [
@@ -463,9 +480,21 @@ def server_tests(_what=None):
     return True, sum(int(p) for p, _ in found), sum(int(f) for _, f in found)
 
 
-def browser_tests(_what=None):
+def browser_tests(_what=None, pages=False):
     """(built, passed, failed) over the browser's, after TodoMVC is built
-    again from the source as it is and the server with it."""
+    again from the source as it is and the server with it; with `pages`, the
+    demo's pages too (`run.sh`), which the Playwright config holds to the
+    runtime it serves."""
+    if pages:
+        rebuilt = subprocess.run(
+            ["bash", "spikes/own-renderer/run.sh"],
+            cwd=ROOT,
+            env={**os.environ, "BUILD_ONLY": "1"},
+            capture_output=True,
+            text=True,
+        )
+        if rebuilt.returncode != 0:
+            return False, 0, 0
     built = subprocess.run(
         ["bash", "spikes/own-renderer/todomvc.sh"], cwd=ROOT, capture_output=True, text=True
     )
@@ -489,12 +518,17 @@ def browser_tests(_what=None):
     return passed + failed > 0, passed, failed
 
 
+def runtime_browser_tests(_what=None):
+    """The browser's tests, over pages built with the runtime as it is."""
+    return browser_tests(pages=True)
+
+
 # What each kind of mutant is run against, in order.
 RUNS = {
     PROGRAM: [("server", server_tests), ("browser", browser_tests)],
     LAYERED: [("server", server_tests), ("browser", browser_tests)],
     HOST: [("browser", browser_tests)],
-    RUNTIME: [("browser", browser_tests)],
+    RUNTIME: [("browser", runtime_browser_tests)],
 }
 
 
@@ -523,9 +557,15 @@ def main():
             path.write_text(original.replace(anchor, replacement, 1))
             if kind == PROGRAM:
                 ok, said = checks()
-                if not ok:
+                named = CHECKED.get(what, set())
+                refused = set(re.findall(r"error: \[(PW\d{4})\]", said))
+                if not ok and refused and refused <= named:
+                    verdict = f"KILLED by the checker ({', '.join(sorted(refused))}, the rule this mutant takes away)"
+                elif not ok:
                     verdict = "INVALID: the mutant does not check, so it is no mutant"
                     print(said[-600:])
+                elif named:
+                    verdict = f"INVALID: the script names {sorted(named)}, and the program the mutant leaves checks"
             if verdict is None:
                 for name, run in RUNS[kind]:
                     built, passed, failed = run()
@@ -542,8 +582,8 @@ def main():
         if verdict.startswith(("SURVIVED", "INVALID")):
             survivors += 1
         print(f"{what} [{kind}]: {verdict}", flush=True)
-    # The page and the server are built again from the restored source.
-    browser_tests()
+    # The pages and the server are built again from the restored source.
+    browser_tests(pages=True)
 
     print(f"{len(MUTANTS) - survivors} of {len(MUTANTS)} mutants killed")
     return 1 if survivors else 0
