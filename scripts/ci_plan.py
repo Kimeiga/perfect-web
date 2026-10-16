@@ -549,13 +549,15 @@ def recipes_for(changed: dict[str, list[tuple[int, int]]], near: int, names: lis
 # and records no commit.
 RECORDED_AT = re.compile(r"^commit: ([0-9a-f]{40})[ \t]*$", re.M)
 
-# The evidence files a recipe's lines write: `} > docs/evidence/E14/x.txt`.
+# The evidence files a recipe writes directly or publishes after recording
+# beside its destination (ADR-0344). Both feed the same discovery authority.
 WRITES = re.compile(r">[ \t]*(docs/evidence/[\w./-]+\.txt)")
+PUBLISHES = re.compile(r'\bmv[ \t]+(?:"[^"\n]+"|[^ \t\r\n]+)[ \t]+(docs/evidence/[\w./-]+\.txt)')
 
 
 def evidence_files(body: str) -> list[str]:
     """The evidence files a recipe's lines write."""
-    return sorted(set(WRITES.findall(body)))
+    return sorted(set(WRITES.findall(body) + PUBLISHES.findall(body)))
 
 
 def recorded_at(head: str, path: str, root: pathlib.Path = ROOT) -> str | None:

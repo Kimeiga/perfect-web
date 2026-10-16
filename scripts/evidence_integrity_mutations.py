@@ -58,9 +58,31 @@ LATENCY = ROOT / "compiler/pw-core/tests/check_latency.rs"
 CONFIG = ROOT / "spikes/own-renderer/playwright.config.mjs"
 JUSTFILE = ROOT / "justfile"
 ADRS = ROOT / "scripts/unnumbered_adrs.py"
+RECIPE = ROOT / "just/evidence-integrity.just"
 
 # (what, suite, file, anchor, replacement)
 MUTANTS = [
+    (
+        'a report is visible while its own gate is reading it',
+        "atomic",
+        RECIPE,
+        '     } > "$report"; \\\n',
+        '     } > docs/evidence/E14/evidence-integrity.txt; \\\n',
+    ),
+    (
+        'a failed recording hides its diagnostic output',
+        "atomic",
+        RECIPE,
+        'then cat "$report" >&2; fi;',
+        'then :; fi;',
+    ),
+    (
+        "a published report disappears from evidence planning",
+        "atomic",
+        PLAN,
+        "    return sorted(set(WRITES.findall(body) + PUBLISHES.findall(body)))\n",
+        "    return sorted(set(WRITES.findall(body)))\n",
+    ),
     # 1. Bytecode.
     (
         "a mutation script's children write bytecode",
@@ -300,6 +322,7 @@ MUTANTS = [
 
 UNITTEST = [sys.executable, "-m", "unittest"]
 SUITES = {
+    "atomic": UNITTEST + ["scripts/tests/test_atomic_evidence.py"],
     "baseline": UNITTEST + ["scripts/tests/test_mutation_baseline.py"],
     "plan": UNITTEST + ["scripts/tests/test_ci_scripts.py", "scripts/tests/test_evidence_counts.py"],
     "corpus": [

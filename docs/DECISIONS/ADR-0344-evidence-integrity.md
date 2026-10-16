@@ -328,3 +328,47 @@ suite fails, and plan browser recipes for changes to their shared config.
 The implementation of the comparison, suite-status and planner follow-ups
 is the evidence-integrity-2 track. E9 latency waits for a quiet window.
 Train-10 carries this change; its integrated verification is pending.
+
+
+## A report cannot inspect its own partial bytes (2026-10-16)
+
+Verify 38824307495 at 83cdac27 failed its evidence recipe because the count
+gate read that recipe's incomplete report stamped with the current commit.
+Local runs on dirty source marked the same report stale and hid the cycle.
+The downloaded artifact stops at its count test. Three behavioral regression
+tests reproduce direct publication destroying a previous report, exposing
+a partial report on a first run, and retaining partial bytes after failure.
+
+The recipe now records to a temporary file beside its final destination,
+so the final rename stays on one filesystem. It leaves complete prior evidence
+visible to readers, and atomically replaces its final report only after all
+commands succeed. On failure it retains prior evidence, emits the failed
+run to stderr for CI's log, removes the temporary file and preserves failure
+status. Count-test tracebacks are retained. New controls hold both atomic
+publication and visible failure diagnostics. Results remain pending until
+the full commands finish; no GitHub pass is claimed by this correction.
+
+
+The first whole corrective run killed 33 of 34 controls: the diagnostic
+control survived because its stand-in wrote directly to stderr, bypassing
+the report being tested. The stand-in now writes its failure into the
+captured report, as the real mutation script does. This retains the
+independent diagnostic control; the failed run is not a pass.
+
+
+Integration review also found that the planner recognized only direct
+redirection to a report. Publishing by rename made this report disappear
+from stale-evidence planning and fetching. A direct probe returned no
+evidence files. The planner's existing evidence-files authority must also
+recognize this publication form; an actual-recipe regression and an
+independent omission control hold it. No separate output registry is added.
+
+
+The complete final corrective suite kills 35/35 controls with no bound
+stops. All 227 Python evidence tests run (225 pass, 2 intentional skips),
+and formatting, anchors, case and diff checks pass. Four behavioral tests
+and three independent controls cover publication, visible failures and
+continued planner discovery of the published report.
+[Commands, hashes and raw results](../evidence/E14/evidence-integrity-atomic.txt)
+retain the failed-before history explicitly. Clean committed real-recipe
+execution and assembled CI/verification remain pending at this checkpoint.
