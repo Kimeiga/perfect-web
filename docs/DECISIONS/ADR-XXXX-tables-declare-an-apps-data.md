@@ -123,6 +123,42 @@ manifest suite (7 tests). The own suite now has 44 controls, including direct
 controls for both module lookups and source-guard diagnostic isolation; its
 final whole run and full CI are recorded after they complete.
 
+Final D1 validation on source commit `4d84377e`:
+
+- `just e14-tables`: core 34/34 and CLI 2/2 tests; baseline 36/36;
+  **44/44 mutants killed by test failures**, no process stopped for memory.
+  All three new isolation controls are killed independently. The complete
+  record is `docs/evidence/E14/tables.txt`.
+- `just ci > /tmp/tables-ci-final3.log 2>&1`: exit 0, **`ci: OK`**.
+  Its 338 Rust result groups total **2,932 passed, 0 failed, 25 ignored**;
+  the ignored external-data/measurement cases are unchanged. Evidence gates
+  pass 161 tests (one existing skip); workspace and engine lint, formatting,
+  case checking and all 2,938 mutation anchors pass. The source-program gate
+  reports 237 variants, 11 named-rule refusals and 0 failing cases.
+- The unchanged strict corpus diagnostic comparison passes 7/7 (25.88s),
+  direct identity tests 5/5, and both latency tests pass (22.95s). The
+  coordinator was told latency had completed before its separate contention
+  phase. Corpus remains 40 accepted / 82 rejected; generality is 58/58.
+- `docs/evidence/E14/tables-ci.txt` is the **complete, byte-identical raw CI
+  output**, SHA-256
+  `c1cc195e0676a2c2bf0e4c978a765dab387d423cd10c8ffeb29d8d403cf323a4`.
+  Earlier whole 37- and 41-control runs remain explicitly historical records.
+
+The integrator owns generated-pair registration at the train merge, from
+`Hir::generated`'s table/primitive/by metadata, preserving handwritten pair
+checking. All generated pairs need descriptive help that selects each turn's
+matching rows from the flat many-result; substituting the entire batch would
+be wrong even for a one-field prefix/index. No integration of that other track
+is claimed in this isolated D1 tree.
+
+The integrator clarified set semantics before D2: requested values are
+deduplicated, each matching stored row occurs once, missing values contribute
+no row, and empty input answers `[]`. Results use D1's canonical by-fields,
+declared order and full-key tie-breaker, independent of request positions;
+comparisons use declared scalar semantics. D2 records and tests that ruling
+at two sizes, including permutations, duplicates, misses, empty input and ties.
+This clarification requires no change to D1's emitted ordering metadata.
+
 Adversarial tests were red before the guards/projection repair: all three
 misses (duplicate source name, tuple-name collision and nested generic storage)
 reported in `docs/evidence/E14/tables-adversarial-before.txt`, produced by
