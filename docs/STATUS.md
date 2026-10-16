@@ -1,5 +1,21 @@
 # STATUS
 
+### Integrator local repair: repeated PostgreSQL store hours (2026-10-16)
+
+Legacy `hours#for-stores` now retains full hours for every duplicate key,
+with caller order and missing-store behavior preserved. Current19 hours and
+12 bounded-statement controls have separate original-assertion proofs.
+Reproduce: `just e14-store-hours`,
+`python3 -B scripts/bounded_statements_mutations.py`, then `just ci`, with
+provisioned PostgreSQL and the pinned tools (offline, private target/port).
+The exact pre-result-record CI snapshot passed2955 Rust tests (25 ignored)
+and Python190 run/189 passed/1 skipped. Raw CI and source/proof qualifications:
+[`repeated-store-hours-ci.txt`](evidence/E14/repeated-store-hours-ci.txt),
+[`repeated-store-hours-gates.json`](evidence/E14/repeated-store-hours-gates.json).
+This is an isolated local repair; final assembly and GitHub verification remain
+separate. It does not close D2, wire-cost/OneCall admission or any milestone.
+
+
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
 **Reviewed:** 2026-10-07, against master `4310769`, with ADR-0232 to

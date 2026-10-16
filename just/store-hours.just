@@ -36,7 +36,7 @@ e14-store-hours:
        cargo build --quiet --locked -p pw-dev-server -p kiokun-server; \
        (cd spikes/own-renderer && pnpm exec playwright test e2e/store-search.spec.mjs --reporter=line 2>&1) \
          | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)"; \
        echo; echo "== mutation controls (scripts/store_hours_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/store_hours_mutations.py; \
      } > docs/evidence/E14/store-hours.txt; \

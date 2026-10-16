@@ -29,10 +29,11 @@ The source is restored after every mutant, whatever happens.
 
 import os
 import pathlib
-import re
 import signal
 import subprocess
 import sys
+
+from cargo_test_results import parse as cargo_result
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 HOURS_PW = ROOT / "examples/store/hours.pw"
@@ -169,6 +170,20 @@ MUTANTS = [
         "             WHERE store = $1 ORDER BY weekday, opens_minute\",\n",
         "             WHERE store = $1\",\n",
     ),
+    (
+        "PostgreSQL consumes weekly periods after the first occurrence",
+        "postgres",
+        HOURS_RS,
+        "                    weekly: weekly.get(s).cloned().unwrap_or_default(),\n",
+        "                    weekly: weekly.remove(s).unwrap_or_default(),\n",
+    ),
+    (
+        "PostgreSQL consumes special periods after the first occurrence",
+        "postgres",
+        HOURS_RS,
+        "                    special: special.get(s).cloned().unwrap_or_default(),\n",
+        "                    special: special.remove(s).unwrap_or_default(),\n",
+    ),
 ]
 
 TESTS = [
@@ -202,16 +217,16 @@ def cargo_tests(suite):
     """(built, passed, failed) over the suite's tests."""
     cmd, env = CARGO[suite]
     out, code = bounded(cmd, env)
-    if code is None:
-        return True, 0, 1
-    found = re.findall(r"test result: \w+\. (\d+) passed; (\d+) failed", out)
-    if not found:
+    result = cargo_result(code, out)
+    if not result.valid:
         return False, 0, 0
-    return True, sum(int(p) for p, _ in found), sum(int(f) for _, f in found)
+    return True, result.passed, result.failed
+
 
 
 def main():
     import mutation_baseline  # keeps what each command says, for a red baseline
+    watch = mutation_baseline.mutation_bound.start()
     # Stopped from outside, the source is still restored: SIGTERM raises
     # here, and the `finally` below runs.
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(1))
@@ -221,7 +236,7 @@ def main():
     for suite in CARGO:
         built, passed, failed = cargo_tests(suite)
         print(f"baseline ({suite}): {passed} passed, {failed} failed", flush=True)
-        if not built or failed or not passed:
+        if not built or failed or not passed or watch.stopped:
             print("FAIL: the unmutated baseline is not green; no mutant can mean anything")
             mutation_baseline.explain()
             return 1
@@ -238,9 +253,11 @@ def main():
             built, passed, failed = cargo_tests(suite)
         finally:
             path.write_text(original)
-        if not built:
-            verdict = "KILLED (does not build)"
-        elif failed:
+        if not built or watch.stopped:
+            print(f"{what} [{suite}]: REFUSED (invalid or stopped Cargo producer; no kill)", flush=True)
+            mutation_baseline.explain()
+            return 1
+        if failed:
             verdict = f"KILLED ({failed} of {passed + failed} tests fail)"
         else:
             verdict = "SURVIVED"

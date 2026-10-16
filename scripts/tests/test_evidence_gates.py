@@ -67,6 +67,28 @@ if call == int(os.environ.get("GATE_TEST_FAIL_AT", "0")):
 '''
 
 
+# Only the optional hours cases install this private browser stand-in. It
+# logs the real recipe's argv; the shell wrapper retains its actual native
+# status separately from Just's own failure status.
+HOURS_BROWSER = r'''#!/usr/bin/env python3
+import json
+import os
+from pathlib import Path
+import sys
+
+with Path(os.environ["GATE_TEST_LOG"]).open("a") as stream:
+    stream.write(json.dumps(sys.argv[1:]) + "\n")
+print(os.environ["GATE_HOURS_OUTPUT"])
+sys.exit(int(os.environ["GATE_HOURS_STATUS"]))
+'''
+HOURS_WRAPPER = r'''#!/usr/bin/env bash
+python3 "$GATE_HOURS_CHILD" "$@"
+status=$?
+printf '%s\n' "$status" > "$GATE_HOURS_STATUS_FILE"
+exit "$status"
+'''
+
+
 def executable(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content)
@@ -88,6 +110,8 @@ class EvidenceGates(unittest.TestCase):
         fail_at: int = 0,
         lines: int = 1,
         source: str | None = None,
+        hours_import_source: str | None = None,
+        hours_browser: tuple[int, str] | None = None,
     ) -> tuple[subprocess.CompletedProcess[str], list[list[str]], dict[str, str]]:
         with tempfile.TemporaryDirectory(prefix="pleris gate tests ") as directory:
             root = Path(directory)
@@ -96,9 +120,19 @@ class EvidenceGates(unittest.TestCase):
             # source is the justfile changed, its imports with it.
             if (JUSTFILE.parent / "just").is_dir():
                 shutil.copytree(JUSTFILE.parent / "just", root / "just")
+            if hours_import_source is not None:
+                (root / "just/store-hours.just").write_text(hours_import_source)
             bin_dir = root / ".toolchain/prefix/bin"
             executable(bin_dir / "cargo", PRODUCER)
             executable(bin_dir / "git", "#!/usr/bin/env bash\nexit 0\n")
+            if hours_browser is not None:
+                executable(bin_dir / "pnpm", HOURS_WRAPPER)
+                executable(bin_dir / "hours-browser-child.py", HOURS_BROWSER)
+                executable(bin_dir / "rustc", "#!/usr/bin/env bash\necho 'rustc stand-in'\n")
+                executable(bin_dir / "psql", "#!/usr/bin/env bash\necho 'postgres stand-in'\n")
+                # The following stage is a private producer, never a real
+                # mutation campaign. Its empty argv identifies its call.
+                executable(root / "scripts/store_hours_mutations.py", PRODUCER)
             for name in ("pw-to-marko", "own-renderer"):
                 executable(
                     root / "spikes" / name / "run.sh",
@@ -130,6 +164,15 @@ class EvidenceGates(unittest.TestCase):
                 "GATE_TEST_LINES": str(lines),
                 "NO_COLOR": "1",
             })
+            if hours_browser is not None:
+                status, output = hours_browser
+                env.update({
+                    "PW_STORE_DATABASE_URL": "postgresql://stand-in/hours",
+                    "GATE_HOURS_CHILD": str(bin_dir / "hours-browser-child.py"),
+                    "GATE_HOURS_STATUS": str(status),
+                    "GATE_HOURS_OUTPUT": output,
+                    "GATE_HOURS_STATUS_FILE": str(root / "docs/evidence/E14/hours-browser-status.txt"),
+                })
             result = subprocess.run(
                 [self.just, "--justfile", str(root / "justfile"), recipe],
                 cwd=root,
@@ -146,6 +189,39 @@ class EvidenceGates(unittest.TestCase):
                 for path in (root / "docs/evidence").rglob("*.txt")
             }
             return result, calls, reports
+
+    def assert_hours_browser_result(self, status: int, output: str, succeeds: bool) -> None:
+        result, calls, reports = self.run_recipe(
+            "e14-store-hours", hours_browser=(status, output)
+        )
+        prefix = [
+            ["test", "--locked", "-p", "pw-dev-server", "--", "tests::store_hours::"],
+            ["test", "--locked", "-p", "pw-dev-server", "--", "tests::store_hours::"],
+            ["renderer", "own-renderer"],
+            ["build", "--quiet", "--locked", "-p", "pw-dev-server", "-p", "kiokun-server"],
+            ["exec", "playwright", "test", "e2e/store-search.spec.mjs", "--reporter=line"],
+        ]
+        self.assertEqual(calls[:len(prefix)], prefix, result.stdout + result.stderr)
+        self.assertEqual(reports["docs/evidence/E14/hours-browser-status.txt"], f"{status}\n")
+        if succeeds:
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(calls, prefix + [[]], "the private following stage must run once")
+        else:
+            self.assertNotEqual(result.returncode, 0, "browser failure/no result was swallowed")
+            self.assertEqual(calls, prefix, "another producer ran after the browser refusal")
+            self.assertNotIn("== mutation controls", reports["docs/evidence/E14/store-hours.txt"])
+
+    def test_hours_browser_pass_reaches_the_private_following_stage(self) -> None:
+        self.assert_hours_browser_result(0, "\x1b[32m  7 passed (0.1s)\x1b[0m", True)
+
+    def test_hours_browser_nonzero_with_pass_summary_stops_recipe(self) -> None:
+        self.assert_hours_browser_result(42, "\x1b[32m  7 passed (0.1s)\x1b[0m", False)
+
+    def test_hours_browser_failed_summary_stops_recipe(self) -> None:
+        self.assert_hours_browser_result(1, "  1 failed (0.1s)", False)
+
+    def test_hours_browser_missing_summary_stops_recipe(self) -> None:
+        self.assert_hours_browser_result(0, "no browser result summary", False)
 
     def test_successful_producers_keep_every_recipe_usable(self) -> None:
         for recipe, count in RECIPES.items():
