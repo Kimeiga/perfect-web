@@ -33,6 +33,18 @@ RUN = ROOT / "spikes/todomvc-cypress/run.sh"
 
 # (what is undone, file, anchor, replacement)
 MUTANTS = [
+    (
+        "acceptance: an incomplete official suite is let by",
+        RESULT,
+        '        if state != "pass":\n',
+        '        if False:\n',
+    ),
+    (
+        "acceptance: no explicit successful exit status is needed",
+        RESULT,
+        '    if mode == "acceptance" and exit_status != 0:\n',
+        '    if False:\n',
+    ),
     # -- the vendored files are upstream's
     (
         "a blob is hashed without its header, so it is not git's",
@@ -146,42 +158,6 @@ MUTANTS = [
         "            pass\n",
     ),
     # -- the acceptance: an app that never writes localStorage
-    (
-        "acceptance: a test that asks localStorage may pass",
-        RESULT,
-        '        if state == "pass" and asks(t):\n',
-        "        if False:\n",
-    ),
-    (
-        "acceptance: a test that asks nothing of localStorage may fail",
-        RESULT,
-        '        elif state == "fail" and not asks(t):\n',
-        "        elif False:\n",
-    ),
-    (
-        "acceptance: a pending test is let by",
-        RESULT,
-        '''            problems.append(f"{name(t)} is pending: this name is in no table of the suite, so nothing is skipped")\n''',
-        "            pass\n",
-    ),
-    (
-        "acceptance: a test not run needs no failed hook before it",
-        RESULT,
-        '        elif state == "skip" and not failed_hook:\n',
-        "        elif False:\n",
-    ),
-    (
-        "acceptance: a failed hook needs no cause on record",
-        RESULT,
-        '    if failed_hook and not run["storage_denied"]:\n',
-        "    if False:\n",
-    ),
-    (
-        "acceptance: the first tests need not pass",
-        RESULT,
-        '        if st[t.n].state != "pass" and not asks(t):\n',
-        "        if False:\n",
-    ),
     # -- the diagnostic: the suite as an app that keeps nothing in localStorage
     (
         "diagnostic: the persistence test need not be skipped by the suite",
@@ -235,8 +211,8 @@ MUTANTS = [
     (
         "a report of problems does not say it failed",
         RESULT,
-        '''            lines.append(f"{mode}: FAILED: {len(problems)} problem(s): the outcome is not the one the app's design gives")\n''',
-        '''            lines.append(f"{mode}: the outcome is the one the app's design gives")\n''',
+        '''            lines.append(f"{mode}: FAILED: {len(problems)} problem(s): the required test outcomes did not pass")\n''',
+        '''            lines.append(f"{mode}: the required test outcomes passed")\n''',
     ),
     (
         "a report of a suite that did not run does not say so",

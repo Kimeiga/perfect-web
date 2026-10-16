@@ -114,5 +114,5 @@ CODE=$?
 set -e
 
 # The verdict: this exits with it. A run with no results table, or with an
-# outcome the app's design does not give, fails here.
+# incomplete official acceptance suite, fails here.
 python3 "$REPO_ROOT/scripts/todomvc_cypress_result.py" "$MODE" "$OUT" "$CODE"

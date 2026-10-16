@@ -3,7 +3,7 @@ judged by what it prints (`todomvc_cypress_result.py`), and run by `run.sh`.
 
 Track `todomvc` runs the official spec unchanged as its acceptance. That is a
 claim about bytes (the vendored files are upstream's) and a claim about a run
-(the suite ran, and each test came out as the app's design gives it). These
+(acceptance requires all official tests passing). These
 tests hold the checks to both: the fixtures are real outputs of Cypress 15.14.2 and
 15.21.1 against this app (`fixtures/todomvc-cypress/`), each rule of the judgement is
 broken in a copy of one of them, and `run.sh` is run whole with a stand-in
@@ -198,57 +198,30 @@ class Parse(unittest.TestCase):
 
 
 class JudgeAcceptance(unittest.TestCase):
-    def test_the_acceptances_the_app_gives_are_judged_right(self):
-        for text, status in ((ACCEPTANCE, 4), (ACCEPTANCE_6, 3), (ACCEPTANCE_NEW, 3)):
+    def test_every_recorded_incomplete_run_is_refused(self):
+        for text, status in ((ACCEPTANCE, 4), (ACCEPTANCE_6, 3), (ACCEPTANCE_NEW, 3), (DIAGNOSTIC, 0)):
             st, problems = judged("acceptance", text, status)
-            self.assertEqual(problems, [])
-            self.assertEqual([st[n].state for n in (1, 2, 3)], ["pass"] * 3)
-        st, _ = judged("acceptance", ACCEPTANCE, 4)
-        self.assertEqual([st[n].state for n in (4, 5, 6)], ["fail"] * 3)
-        self.assertEqual(st[7].state, "hook")
-        self.assertEqual({st[n].state for n in range(8, 30)}, {"skip"})
-        # Where the hook fails depends on timing: one test sooner here.
-        st, _ = judged("acceptance", ACCEPTANCE_6, 3)
-        self.assertEqual([st[4].state, st[5].state, st[6].state, st[7].state], ["fail", "fail", "hook", "skip"])
+            self.assertIsNotNone(st)
+            self.assertTrue(has(problems, "acceptance requires every official test to pass"))
+
+    def test_a_complete_run_passes_including_storage_tests(self):
+        run = result.parse_run(DIAGNOSTIC)
+        run["passed"].append(result.PERSISTENCE)
+        run["pending"] = []
+        run["counts"].update(Passing=29, Pending=0)
+        st, problems = result.judge("acceptance", TESTS, run, 0)
+        self.assertEqual(problems, [])
+        self.assertEqual({v.state for v in st.values()}, {"pass"})
+        # A complete-looking report with no explicit successful process
+        # status is not sufficient evidence.
+        _, problems = result.judge("acceptance", TESTS, run, None)
+        self.assertTrue(has(problems, "explicitly recorded"))
 
     def test_a_suite_that_did_not_run_is_not_a_pass(self):
-        st, problems = judged("acceptance", "")
-        self.assertIsNone(st)
-        self.assertTrue(has(problems, "did not run the suite"))
-        st, problems = judged("acceptance", "The cypress npm package is installed, but the Cypress binary is missing.\n", 1)
-        self.assertIsNone(st)
-        self.assertTrue(has(problems, "did not run the suite"))
-
-    def test_a_test_that_asks_localstorage_and_passes_is_refused(self):
-        _, problems = judged("acceptance", DIAGNOSTIC, 0)
-        self.assertTrue(has(problems, "passed, though it asks localStorage"))
-        edited = edit(ACCEPTANCE, r"^ +1\) should allow me to add todo items$", "      ✓ should allow me to add todo items (10ms)")
-        _, problems = judged("acceptance", edited, 4)
-        self.assertTrue(has(problems, "test 4 ('should allow me to add todo items') passed, though it asks localStorage"))
-
-    def test_a_test_that_asks_nothing_and_fails_is_refused(self):
-        edited = edit(ACCEPTANCE, r"^ +✓ should hide #main and #footer .*$", "      9) should hide #main and #footer")
-        _, problems = judged("acceptance", edited, 4)
-        self.assertTrue(has(problems, "failed, though it asks nothing of localStorage"))
-
-    def test_the_first_tests_must_pass(self):
-        edited = edit(ACCEPTANCE, r"^ +✓ should focus on the todo input field .*$", '      9) "before each" hook for "should focus on the todo input field"')
-        _, problems = judged("acceptance", edited, 4)
-        self.assertTrue(has(problems, "comes first, so it must pass"))
-
-    def test_a_test_not_run_needs_a_failed_hook_before_it(self):
-        edited = edit(ACCEPTANCE, r'^ +4\) "before each" hook for "should trim text input"$', "")
-        _, problems = judged("acceptance", edited, 3)
-        self.assertTrue(has(problems, "was not run, and no failed hook before it says why"))
-
-    def test_a_failed_hook_needs_its_cause_on_record(self):
-        _, problems = judged("acceptance", without(ACCEPTANCE, "SecurityError"), 4)
-        self.assertTrue(has(problems, "does not record why"))
-
-    def test_a_pending_test_is_refused(self):
-        edited = edit(ACCEPTANCE, r"^ +✓ starts with nothing .*$", "      - starts with nothing")
-        _, problems = judged("acceptance", edited, 4)
-        self.assertTrue(has(problems, "is pending"))
+        for text in ("", "The Cypress binary is missing.\n"):
+            st, problems = judged("acceptance", text, 1)
+            self.assertIsNone(st)
+            self.assertTrue(has(problems, "did not run the suite"))
 
     def test_the_table_must_say_what_the_lines_say(self):
         edited = edit(ACCEPTANCE, r"^( +│ Passing: +)3( +│)$", "  │ Passing:      4                                                                                │")
@@ -263,7 +236,7 @@ class JudgeAcceptance(unittest.TestCase):
         _, problems = judged("acceptance", ACCEPTANCE, 99)
         self.assertTrue(has(problems, "exited with status 99"))
         _, problems = judged("acceptance", ACCEPTANCE, 4)
-        self.assertEqual(problems, [])
+        self.assertTrue(problems)
 
     def test_a_test_the_spec_does_not_have_is_named(self):
         edited = edit(ACCEPTANCE, r"^ +✓ starts with nothing .*$", "      ✓ starts with nothing (1ms)\n      ✓ a test the spec lacks (5ms)")
@@ -325,14 +298,14 @@ class Cli(unittest.TestCase):
 
     def test_the_report_says_what_each_test_came_to_and_why(self):
         code, text = self.main("acceptance", str(FIXTURES / "acceptance.txt"), "4")
-        self.assertEqual(code, 0)
+        self.assertEqual(code, 1)
         self.assertIn("acceptance: 3 of 29 passed; 4 failed (3 tests, 1 hook); 22 not run", text)
         self.assertIn("cypress 15.14.2 on Electron", text)
         self.assertIn("[New Todo] should allow me to add todo items  (spec.cy.js:561)", text)
-        self.assertIn("by design: it asks localStorage (checkItemSaved, checkNumberOfTodosInLocalStorage), which this app never writes", text)
+        self.assertIn("unmet official requirement: checkItemSaved, checkNumberOfTodosInLocalStorage", text)
         self.assertIn("not run (a failed hook skipped it); it asks nothing of localStorage: the diagnostic runs it", text)
         self.assertIn("recorded by the browser: Uncaught SecurityError", text)
-        self.assertIn("acceptance: the outcome is the one the app's design gives", text)
+        self.assertIn("acceptance: FAILED:", text)
 
     def test_the_report_of_the_diagnostic_says_it_is_not_the_acceptance(self):
         code, text = self.main("diagnostic", str(FIXTURES / "diagnostic.txt"), "0")
@@ -366,11 +339,27 @@ class Cli(unittest.TestCase):
         code, _ = self.main("acceptance", str(FIXTURES / "acceptance.txt"), "7")
         self.assertEqual(code, 1)
 
+    def test_a_synthetic_complete_output_is_an_accepted_positive_control(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output = pathlib.Path(tmp) / "synthetic-complete.txt"
+            output.write_text(complete_output())
+            code, text = self.main("acceptance", str(output), "0")
+        self.assertEqual(code, 0, text)
+        self.assertIn("acceptance: 29 of 29 passed", text)
+
     def test_a_mode_that_is_neither_is_a_usage_error(self):
         code, _ = self.main("both", str(FIXTURES / "acceptance.txt"))
         self.assertEqual(code, 2)
         code, _ = self.main()
         self.assertEqual(code, 2)
+
+
+def complete_output():
+    """Synthetic positive gate control, not an application result."""
+    text = re.sub(r"(?m)^\s+- should persist its data$", "      ✓ should persist its data (1ms)", DIAGNOSTIC)
+    text = re.sub(r"(?m)^(\s*│ Passing:\s*)28(\s*│)$", r"\g<1>29\2", text)
+    text = re.sub(r"(?m)^(\s*│ Pending:\s*)1(\s*│)$", r"\g<1>0\2", text)
+    return text
 
 
 FAKE_PNPM = """#!/bin/sh
@@ -453,13 +442,18 @@ class RunSh(unittest.TestCase):
 
     def test_the_acceptance_is_run_as_the_suite_ships_and_judged(self):
         r = self.run_sh()
-        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
         self.assertIn("acceptance: 3 of 29 passed; 4 failed (3 tests, 1 hook); 22 not run", r.stdout)
-        self.assertIn("the outcome is the one the app's design gives", r.stdout)
+        self.assertIn("acceptance: FAILED:", r.stdout)
         calls = self.calls_text()
         self.assertIn("run --env framework=page/todomvc.app.Todos --config baseUrl=http://127.0.0.1:%d --reporter spec" % self.port, calls)
         # The display of the machine is left out, and the browser's console is on.
         self.assertIn("env DISPLAY=unset WAYLAND_DISPLAY=unset ELECTRON_ENABLE_LOGGING=1", calls)
+
+    def test_a_complete_official_output_makes_the_recipe_succeed(self):
+        r = self.run_sh(output=complete_output(), status=0)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("acceptance: 29 of 29 passed", r.stdout)
 
     def test_the_diagnostic_is_run_under_another_name_and_says_so(self):
         r = self.run_sh(output=DIAGNOSTIC, status=0, diagnostic=True)
@@ -481,7 +475,7 @@ class RunSh(unittest.TestCase):
         # localStorage passed.
         r = self.run_sh(output=DIAGNOSTIC, status=0)
         self.assertEqual(r.returncode, 1, r.stdout)
-        self.assertIn("passed, though it asks localStorage", r.stdout)
+        self.assertIn("acceptance requires every official test to pass", r.stdout)
 
     def test_an_exit_status_that_is_not_the_failing_count_fails(self):
         r = self.run_sh(status=7)

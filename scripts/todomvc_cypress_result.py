@@ -9,22 +9,13 @@ gives Cypress's output to this script, which writes the evidence
 
 **A run that did not happen is not a pass.** The verdict is read from what
 Cypress printed: its table must count every test the spec has, and each test
-must have the outcome the app's design gives it. A missing binary, a missing
+must satisfy the acceptance requirement (or explicitly separate diagnostic). A missing binary, a missing
 Xvfb, a host that never started, an empty file: none has a results table, and
 each fails here, whatever the exit status of the shell around it.
 
-**The acceptance** runs the suite named for this app, a name in none of the
-suite's tables, so it asks of this app what it asks of an app it knows nothing
-about, `localStorage` included. TodoMVC in Pleris keeps each session's todos on
-the host and never writes `localStorage`, so a test that asks `localStorage`
-(directly, or through its context's `beforeEach`) must fail, and a test that
-asks it nothing must pass. Cypress skips the rest of a suite after a hook
-fails, and the failed tests' polling loops make one fail: those loops
-(`checkItems` re-arming `setTimeout(.., 0)`) read a `Storage` that Cypress has
-since cleared away, which throws `SecurityError` in the spec's own window, and
-Cypress charges the throw to the next test's `beforeEach`. Which test that is
-depends on timing, so the judgement is of rules, not of a fixed list; the throw
-must be on record in the output (`run.sh` sets `ELECTRON_ENABLE_LOGGING`).
+**The acceptance** requires every official test to execute and pass,
+including storage checks, with Cypress exit status zero. A failed or skipped
+test remains an unmet requirement even when its cause is understood.
 
 **The diagnostic** runs the same files under a name the suite's own tables take
 as keeping nothing in `localStorage` (`puremvc`), so each test shows what the
@@ -36,7 +27,7 @@ The tests, and which of them ask `localStorage`, are read from the vendored
 spec (`spikes/todomvc-cypress/cypress/e2e/spec.cy.js`, held to upstream's bytes
 by `todomvc_cypress_vendored.py`), not written out here.
 
-Exit status 0 when the outcomes are those; 1 otherwise. The report goes to the
+Exit status 0 only when the selected mode's requirements hold; 1 otherwise. The report goes to the
 standard output either way.
 """
 
@@ -84,10 +75,8 @@ RACY = {
 SECURITY = "Uncaught SecurityError: Failed to read the 'length' property from 'Storage'"
 
 ACCEPTANCE_NOTE = [
-    "The acceptance: the suite as it ships, named for this app (--env framework=page/todomvc.app.Todos), a name in none of",
-    "its tables, so it asks of this app what it asks of an app it knows nothing about, localStorage included. TodoMVC in",
-    "Pleris keeps each session's todos on the host and never writes localStorage: a test that asks localStorage fails here",
-    "by design. Cypress skips the rest of a suite after a hook fails, which cuts the run short (below).",
+    "Acceptance requires all 29 official Cypress tests to execute and pass, with exit status zero.",
+    "Storage, timing and skipped-test mismatches remain unmet requirements even when understood.",
 ]
 DIAGNOSTIC_NOTE = [
     "The diagnostic, NOT the acceptance: the same files under a name the suite's own tables take as keeping nothing in",
@@ -243,27 +232,10 @@ def name(test):
 
 
 def judge_acceptance(tests, st, run, problems):
-    failed_hook = False
     for t in tests:
         state = st[t.n].state
-        if state == "pass" and asks(t):
-            problems.append(f"{name(t)} passed, though it asks localStorage ({asks_text(t)}), which this app never writes")
-        elif state == "fail" and not asks(t):
-            problems.append(f"{name(t)} failed, though it asks nothing of localStorage: {st[t.n].error}")
-        elif state == "pending":
-            problems.append(f"{name(t)} is pending: this name is in no table of the suite, so nothing is skipped")
-        elif state == "skip" and not failed_hook:
-            problems.append(f"{name(t)} was not run, and no failed hook before it says why")
-        if state == "hook":
-            failed_hook = True
-    if failed_hook and not run["storage_denied"]:
-        problems.append(
-            "a hook failed, and the output does not record why (the uncaught SecurityError of a polling "
-            "loop reading a Storage that Cypress had cleared): the run is not understood"
-        )
-    for t in tests[:3]:
-        if st[t.n].state != "pass" and not asks(t):
-            problems.append(f"{name(t)} asks nothing of localStorage and comes first, so it must pass")
+        if state != "pass":
+            problems.append(f"{name(t)} is {state}: acceptance requires every official test to pass")
 
 
 def judge_diagnostic(tests, st, run, problems):
@@ -303,6 +275,8 @@ def judge(mode, tests, run, exit_status=None):
             problems.append(f"Cypress's table says {key}: {counts.get(key)}, its lines and the spec say {lines}")
     if exit_status is not None and exit_status != counts.get("Failing"):
         problems.append(f"Cypress exited with status {exit_status}, and its table counts {counts.get('Failing')} failing")
+    if mode == "acceptance" and exit_status != 0:
+        problems.append("acceptance requires Cypress exit status 0, explicitly recorded")
     (judge_acceptance if mode == "acceptance" else judge_diagnostic)(tests, st, run, problems)
     return st, problems
 
@@ -311,7 +285,7 @@ def why(mode, test, state, error):
     """The lines under a test that did not pass: the spec rule's outcome and why."""
     out = []
     if state == "fail" and mode == "acceptance":
-        out.append(f"by design: it asks localStorage ({asks_text(test)}), which this app never writes: its todos are kept by the host")
+        out.append(f"unmet official requirement: {asks_text(test)}" if asks(test) else "the official test failed")
     elif state == "fail" and test.title in RACY:
         out.append(RACY[test.title][1])
     elif state == "hook":
@@ -368,9 +342,9 @@ def report(mode, tests, run, st, problems, exit_status=None):
         if st is None:
             lines.append(f"{mode}: FAILED: the suite did not run, and a suite that did not run is not a pass")
         else:
-            lines.append(f"{mode}: FAILED: {len(problems)} problem(s): the outcome is not the one the app's design gives")
+            lines.append(f"{mode}: FAILED: {len(problems)} problem(s): the required test outcomes did not pass")
     else:
-        lines.append(f"{mode}: the outcome is the one the app's design gives")
+        lines.append(f"{mode}: the required test outcomes passed")
     return "\n".join(lines)
 
 
