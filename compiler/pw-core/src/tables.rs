@@ -865,16 +865,8 @@ fn keyable_at(sigs: &Signatures, ty: &ResolvedType, depth: usize) -> Result<(), 
 }
 
 /// **The module `name` and the table it declares**, where `unit` sees it.
-fn table_module<'h>(
-    ws: &Workspace,
-    hirs: &[&'h Hir],
-    unit: usize,
-    name: &str,
-) -> Option<(usize, Table)> {
-    if !ws.sees_module(unit, name) {
-        return None;
-    }
-    let m = ws.modules.iter().find(|m| m.name == name)?;
+fn table_module(ws: &Workspace, hirs: &[&Hir], unit: usize, name: &str) -> Option<(usize, Table)> {
+    let m = ws.visible_module(unit, name)?;
     let hir = hirs.get(m.unit)?;
     let t = declared(hir).into_iter().find(|t| t.name == name)?;
     Some((m.unit, t))
@@ -902,9 +894,19 @@ fn source_named(source: &Option<String>) -> String {
 /// Source identity is still a bare name at the existing host seam. Until
 /// that seam carries qualified identities, refuse an ambiguous spelling
 /// where a table or one of its references would use it (D1 interim guard).
-fn unambiguous_sources(hirs: &[&Hir], ws: &Workspace, t: &Table) -> Vec<Diagnostic> {
+fn unambiguous_sources(hirs: &[&Hir], unit: usize, ws: &Workspace, t: &Table) -> Vec<Diagnostic> {
     let mut out = Vec::new();
     let mut seen = BTreeSet::new();
+    // Duplicate modules are already refused by resolution (PW0024). Another
+    // copy of this unit's own module must not add a database to its diagnostics.
+    // Distinct modules, including ones this unit does not import, still count.
+    let alternate_own_module = |source_unit: usize| {
+        source_unit != unit
+            && ws
+                .module_of(source_unit)
+                .and_then(|m| ws.visible_module(unit, &m.name))
+                .is_some_and(|m| m.unit == unit)
+    };
     for (table, span) in std::iter::once((&t.name, &t.span))
         .chain(t.references.iter().map(|r| (&r.value.table, &r.span)))
     {
@@ -917,6 +919,7 @@ fn unambiguous_sources(hirs: &[&Hir], ws: &Workspace, t: &Table) -> Vec<Diagnost
         let sources: Vec<_> = hirs
             .iter()
             .enumerate()
+            .filter(|(source_unit, _)| !alternate_own_module(*source_unit))
             .flat_map(|(unit, hir)| {
                 hir.all_decls()
                     .filter(|(_, d)| d.kind == DeclKind::Source && d.name == name)
@@ -1042,7 +1045,7 @@ pub fn check(hirs: &[&Hir], unit: usize, ws: &Workspace, sigs: &Signatures) -> V
     let module_span = hir.modules.iter().next().map(|(_, _, s)| s.clone());
     for (i, t) in tables.iter().enumerate() {
         let mut found = shape(hirs, unit, ws, sigs, &module, t, i > 0);
-        found.extend(unambiguous_sources(hirs, ws, t));
+        found.extend(unambiguous_sources(hirs, unit, ws, t));
         found.extend(distinct_imports(hirs, unit, t));
         if found.is_empty() {
             found.extend(across_sources(hirs, unit, ws, t));

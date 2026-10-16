@@ -698,13 +698,11 @@ fn pw0361_a_reference_names_a_table_keyed_by_its_fields_type() {
         "`owner` is `Option<String>`, and `Users` is keyed by `UserId`",
     );
     // The control: the key's type, or none.
-    for field in ["owner: Option<UserId>"] {
-        let found = check(
-            &with(field, "owner to Users")
-                .replace("holds        Todos", "holds        Todos, Users"),
-        );
-        assert!(found.is_empty(), "{field}: {found:#?}");
-    }
+    let field = "owner: Option<UserId>";
+    let found = check(
+        &with(field, "owner to Users").replace("holds        Todos", "holds        Todos, Users"),
+    );
+    assert!(found.is_empty(), "{field}: {found:#?}");
     // A table keyed by two fields is no reference's.
     let two = "module Users\nopaque type UserId = String\ntype User = User { org: String, id: UserId }\ntable Users\n    row User\n    key org, id\n";
     let found = diagnostics(&[
@@ -1051,7 +1049,7 @@ fn a_dropped_field_is_refused_without_its_migrate_and_planned_with_it() {
         &after,
         "`Todos.title` was released and is no field of `Todos`'s row",
     );
-    let stated = format!("{after}").replace(
+    let stated = after.replace(
         "    bounded 500\n",
         "    bounded 500\n    migrate title dropped\n",
     );
@@ -1199,6 +1197,88 @@ fn a_change_no_migrate_states_is_refused() {
 }
 
 #[test]
+fn a_table_reference_uses_its_own_module_beside_a_namesake() {
+    let mine = "module Labels\ntype Label = Label { id: Int, owner: String }\ntable Labels\n    row Label\n    key id\n    refers owner to Labels\n";
+    let sibling = mine.replace("id: Int", "id: String");
+    let refusals = |files: &[(&str, &str)]| {
+        check_sources(&program(files))
+            .into_iter()
+            .find(|(name, _)| name == "mine.pw")
+            .expect("mine was checked")
+            .1
+            .into_iter()
+            .filter(|d| d.code == "PW0361" && d.message.contains("`owner` is"))
+            .map(|d| d.message)
+            .collect::<Vec<_>>()
+    };
+    let alone = refusals(&[("mine.pw", mine)]);
+    assert_eq!(
+        alone.len(),
+        1,
+        "its String reference is no Int key: {alone:#?}"
+    );
+    for files in [
+        [("mine.pw", mine), ("sibling.pw", sibling.as_str())],
+        [("sibling.pw", sibling.as_str()), ("mine.pw", mine)],
+    ] {
+        assert_eq!(refusals(&files), alone, "a namesake changed its table");
+    }
+}
+
+#[test]
+fn source_ambiguity_is_not_an_alternate_copy_of_the_own_module() {
+    for files in [
+        [("mine.pw", TODOS), ("sibling.pw", TODOS)],
+        [("sibling.pw", TODOS), ("mine.pw", TODOS)],
+    ] {
+        let checked = check_sources(&program(&files));
+        assert!(
+            checked
+                .iter()
+                .flat_map(|(_, ds)| ds)
+                .any(|d| d.code == "PW0024"),
+            "duplicate modules remain refused"
+        );
+        let mine = &checked
+            .iter()
+            .find(|(name, _)| name == "mine.pw")
+            .unwrap()
+            .1;
+        assert!(
+            !mine.iter().any(|d| d.code == "PW0361"),
+            "a cloned module is not an extra database: {mine:#?}"
+        );
+    }
+    // Two declarations in one file are still two sources.
+    let twice = format!(
+        "{TODOS}\nsource TodoData\n    holds Todos\n    transactions serializable\n    reads strong\n    changes none\n"
+    );
+    assert!(
+        diagnostics(&[("mine.pw", &twice)])
+            .iter()
+            .any(|d| { d.code == "PW0361" && d.message.contains("2 source declarations") })
+    );
+    // Distinct modules remain distinct even if neither imports the other.
+    let elsewhere = TODOS.replace("Todos", "Elsewhere");
+    let checked = check_sources(&program(&[
+        ("mine.pw", TODOS),
+        ("elsewhere.pw", &elsewhere),
+    ]));
+    assert!(
+        checked
+            .iter()
+            .flat_map(|(_, ds)| ds)
+            .all(|d| d.code != "PW0024")
+    );
+    assert!(
+        checked
+            .iter()
+            .flat_map(|(_, ds)| ds)
+            .any(|d| { d.code == "PW0361" && d.message.contains("2 source declarations") })
+    );
+}
+
+#[test]
 fn a_lock_changed_by_hand_is_no_release() {
     let lock = released(TODOS).written();
     assert!(Schema::read(&lock).is_ok());
@@ -1224,9 +1304,7 @@ fn a_program_held_to_its_release_is_refused_where_it_is_checked_and_built() {
     assert!(diagnostics(&[("Todos.pw", &after)]).is_empty());
     // `pw build --schema-lock` builds nothing.
     let files = program(&[("Todos.pw", &after)]);
-    let refused = pw_core::build::build_with(&units(&files), Some(&lock))
-        .err()
-        .expect("refused");
+    let refused = pw_core::build::build_with(&units(&files), Some(&lock)).expect_err("refused");
     assert!(refused.contains("[PW0366]"), "{refused}");
 }
 

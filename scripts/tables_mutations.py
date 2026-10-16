@@ -17,6 +17,7 @@ CHECK = ROOT / "compiler/pw-core/src/check.rs"
 CLI = ROOT / "compiler/pw-cli/src/main.rs"
 BACKEND = ROOT / "compiler/pw-core/src/backend/mod.rs"
 WIT = ROOT / "compiler/pw-core/src/wit.rs"
+RESOLVE = ROOT / "compiler/pw-core/src/resolve.rs"
 
 MUTANTS = [
     ("lowering gives no table functions", LOWER,
@@ -32,7 +33,15 @@ MUTANTS = [
     ("a table has any module's name", TABLES,
      "    if t.name != module || second {\n", "    if second {\n"),
     ("duplicate source names hide a database", TABLES,
-     "        found.extend(unambiguous_sources(hirs, ws, t));\n", ""),
+     "        found.extend(unambiguous_sources(hirs, unit, ws, t));\n", ""),
+    ("an alternate own module counts as another database", TABLES,
+     "            .filter(|(source_unit, _)| !alternate_own_module(*source_unit))\n",
+     "            .filter(|(source_unit, _)| true || !alternate_own_module(*source_unit))\n"),
+    ("a sibling module replaces a table reference's own module", TABLES,
+     "    let m = ws.visible_module(unit, name)?;\n",
+     "    let m = ws.modules.iter().find(|m| m.name == name)?;\n"),
+    ("a qualified own-module name resolves through a namesake", RESOLVE,
+     "        if own.name == name {\n", "        if false && own.name == name {\n"),
     ("table interfaces collide after WIT naming", TABLES,
      "        if other.name != t.name && interface_of(&other.name) == interface {\n",
      "        if false && other.name != t.name && interface_of(&other.name) == interface {\n"),

@@ -69,6 +69,22 @@ not implement an adapter or claim that a table can yet be served.
   different declarations of `source Data`; duplicate-resource checks also
   distinguish sources only by bare name. T1 must carry qualified source
   identities through those analyses and the host seam.
+- **Shared resolution correction, ruled by the integrator 2026-10-16:**
+  `Workspace::visible_module` returns the checking unit's own module first,
+  then explicitly imported modules through the existing canonical graph.
+  `sees_module`, qualified path resolution and table lookup consume that one
+  API. D1's previous global first-by-name table scan let a namesake sibling
+  supply a different reference key; the new direct test checks both source
+  orders and fails before the fix. Direct resolver tests also pin own-module identity
+  and an unimported sibling's invisibility.
+  Duplicate modules remain invalid (PW0024, from the registry). While judging
+  a unit, the interim source guard ignores an alternate copy of that unit's
+  own module: the copied fixture is not an additional database in the first
+  fixture's diagnostics. The guard uses the same Workspace API. Same-file
+  duplicate sources and same-named sources in distinct modules are still
+  refused, including modules with no import between them. This is diagnostic
+  isolation for an already-invalid duplicate-module program, not a repair of
+  the broader source identity limitation above.
 - Corpus C27 uses A-050..053 and R-100..107. Accepted warning fixtures name
   their exact warning codes with `@expect-warning`; errors and undeclared or
   missing warnings fail. Migration fixtures name a companion released lock.
@@ -88,6 +104,24 @@ as `tables-declared-once.txt` and `tables-computed-holes.txt` in D1's evidence.
 Two final direct D1 controls also cover the table namespace's platform
 ownership and the valid WIT representation of `Result<(), E>`; no production
 code changed to add them.
+
+Full workspace CI exposed five failed targets; its complete raw output is
+`tables-ci-before.txt`. Four were expectation updates: a generated `host`
+policy points to its originating table clause rather than a written `host`
+keyword; the `bounded` grammar fixture needs a number; the WIT assertion
+must expect the valid `result<_, string>` form; and C27 adds six written
+resource declarations to the manifest coverage sample (19, previously 13).
+Written policy spans remain strictly checked, generated spans are checked
+against their table provenance, and the corpus's exact diagnostic comparison
+is unchanged. That comparison exposed the genuine source-guard isolation
+defect; a direct adversarial test also exposed the global table lookup defect.
+Their red-before outputs are `tables-source-isolation-before.txt` and
+`tables-isolation-before.txt`. These are distinct from the fixture expectation
+updates. Four lint corrections only elide a lifetime or simplify test syntax.
+After repair, all 12 affected core suites pass (157 tests), as does the resource
+manifest suite (7 tests). The own suite now has 44 controls, including direct
+controls for both module lookups and source-guard diagnostic isolation; its
+final whole run and full CI are recorded after they complete.
 
 Adversarial tests were red before the guards/projection repair: all three
 misses (duplicate source name, tuple-name collision and nested generic storage)

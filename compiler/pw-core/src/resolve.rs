@@ -647,22 +647,10 @@ impl Workspace {
         let Some((head, member)) = path.rsplit_once('.') else {
             return self.resolve_in(unit, ns, path);
         };
-        let Some(m) = self.module_of(unit) else {
+        let Some(target) = self.visible_module(unit, head) else {
             return Resolution::Unresolved;
         };
-        // The head names a module this file can see.
-        let visible = m.name == head || m.imports.iter().any(|i| i.module == head);
-        if !visible {
-            return Resolution::Unresolved;
-        }
-        let Some(&t) = self.by_name.get(head) else {
-            return Resolution::Unresolved;
-        };
-        match self.modules[t]
-            .defines
-            .get(&(ns, member.to_string()))
-            .copied()
-        {
+        match target.defines.get(&(ns, member.to_string())).copied() {
             Some(def) => Resolution::Imported {
                 def,
                 from: head.to_string(),
@@ -671,11 +659,23 @@ impl Workspace {
         }
     }
 
+    /// The module `unit` sees as `name`: its own module first, or an explicit
+    /// import through the workspace's canonical module graph. A namesake
+    /// sibling cannot replace this unit's own declarations.
+    pub fn visible_module(&self, unit: UnitId, name: &str) -> Option<&Module> {
+        let own = self.module_of(unit)?;
+        if own.name == name {
+            return Some(own);
+        }
+        if !own.imports.iter().any(|i| i.module == name) {
+            return None;
+        }
+        self.by_name.get(name).and_then(|&i| self.modules.get(i))
+    }
+
     /// Is `name` a module this unit can see?
     pub fn sees_module(&self, unit: UnitId, name: &str) -> bool {
-        self.module_of(unit)
-            .is_some_and(|m| m.name == name || m.imports.iter().any(|i| i.module == name))
-            && self.by_name.contains_key(name)
+        self.visible_module(unit, name).is_some()
     }
 
     /// **Every type `unit` sees by its bare name**: its own module's, and

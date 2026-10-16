@@ -1,0 +1,24 @@
+   Compiling pw-core v0.0.0 (/home/haki/code/pw-wt/tables/compiler/pw-core)
+    Finished `test` profile [unoptimized] target(s) in 1.17s
+     Running tests/tables.rs (target/debug/deps/tables-136098dea2c9ef5f)
+
+running 1 test
+test a_table_reference_uses_its_own_module_beside_a_namesake ... FAILED
+
+failures:
+
+---- a_table_reference_uses_its_own_module_beside_a_namesake stdout ----
+
+thread 'a_table_reference_uses_its_own_module_beside_a_namesake' (3989255) panicked at compiler/pw-core/tests/tables.rs:1220:9:
+assertion `left == right` failed: a namesake changed its table
+  left: []
+ right: ["`refers owner to Labels`: `owner` is `String`, and `Labels` is keyed by `Int`"]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    a_table_reference_uses_its_own_module_beside_a_namesake
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 32 filtered out; finished in 0.17s
+
+error: test failed, to rerun pass `-p pw-core --test tables`

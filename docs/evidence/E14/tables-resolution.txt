@@ -1,0 +1,230 @@
+   Compiling pw-core v0.0.0 (/home/haki/code/pw-wt/tables/compiler/pw-core)
+    Finished `test` profile [unoptimized] target(s) in 11.58s
+     Running tests/effect_resolution.rs (target/debug/deps/effect_resolution-f92ab1909ce827aa)
+
+running 24 tests
+test a_family_exists_because_something_was_declared_into_it ... ok
+test a_failed_resolution_records_no_effect_fact ... ok
+test a_bare_family_resolves_to_the_family_and_not_to_an_operation ... ok
+test a_misspelled_family_is_unknown_and_says_which_half_is_wrong ... ok
+test a_misspelled_operation_is_unknown_and_lists_what_the_family_declares ... ok
+test a_type_argument_that_names_a_declared_type_resolves_to_it ... ok
+test a_written_effect_resolves_to_its_declaration_and_its_argument ... ok
+test an_effect_declaring_no_parameters_written_with_one_is_wrong_arity ... ok
+test an_effect_with_no_argument_resolves_with_no_argument ... ok
+test an_effect_written_with_two_arguments_where_one_is_declared_is_wrong_arity ... ok
+test an_effect_written_with_no_argument_where_one_is_declared_is_wrong_arity ... ok
+test an_effect_out_of_scope_records_no_fact_and_a_wrong_arity_one_records_the_name ... ok
+test an_argument_the_unit_cannot_see_does_not_resolve ... ok
+test a_file_checked_with_no_vocabulary_at_all_is_told_so ... ok
+test an_effect_the_unit_does_not_import_is_out_of_scope ... ok
+test two_operations_of_one_family_get_distinct_identities ... ok
+test two_families_sharing_a_final_segment_are_never_confused ... ok
+test a_misspelled_family_is_reported_as_pw5201 ... ok
+test a_misspelled_operation_is_reported_as_pw5202 ... ok
+test a_missing_type_argument_is_reported_as_pw5203 ... ok
+test a_surplus_type_argument_is_reported_as_pw5203 ... ok
+test an_argument_that_names_nothing_in_scope_is_still_pw5200 ... ok
+test an_argument_still_needs_its_import_even_when_the_effect_does_not ... ok
+test the_platform_vocabulary_resolves_with_no_import_at_all ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s
+
+     Running tests/every_name_resolves.rs (target/debug/deps/every_name_resolves-16762873490b247e)
+
+running 20 tests
+test a_template_hole_resolves ... ok
+test a_constructor_and_the_language_values_resolve ... ok
+test a_match_block_arm_binds_for_its_own_arm ... ok
+test a_spawn_forms_words_are_not_uses ... ok
+test a_value_named_nothing_is_refused ... ok
+test a_loop_pattern_binds_its_body_only ... ok
+test derived_is_one_expression ... ok
+test a_lambda_parameter_binds_its_body_only ... ok
+test a_record_shorthand_reads_scope ... ok
+test a_nested_template_is_read_in_its_own_scope ... ok
+test a_receiver_resolves ... ok
+test a_clause_word_alone_is_a_name ... ok
+test a_block_ends_its_bindings ... ok
+test a_match_arm_binds_its_own_body_only ... ok
+test a_nested_declaration_sees_its_parents_parameters ... ok
+test an_each_block_binds_its_item_for_its_children ... ok
+test a_module_member_used_as_a_value_resolves ... ok
+test clauses_the_grammar_keeps_as_names_are_syntax ... ok
+test a_stream_part_binds_its_name_for_its_children ... ok
+test a_let_binds_for_the_statements_after_it_and_not_before ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+
+     Running tests/lowering.rs (target/debug/deps/lowering-5a9bcab1e3512326)
+
+running 18 tests
+test a_declaration_with_no_policy_block_has_none ... ok
+test a_dotted_path_lowers_to_nested_fields_not_one_name ... ok
+test a_nested_fn_becomes_a_child_declaration_with_its_own_body ... ok
+test a_resumable_handler_keeps_its_capture_descriptor ... ok
+test an_embedded_policy_term_is_not_reachable_from_the_body_root ... ok
+test declared_effect_rows_reach_hir_with_their_spans ... ok
+test named_arguments_keep_their_names ... ok
+test markup_lowers_to_a_nested_node_tree_with_its_attributes ... ok
+test lowering_is_total_on_a_body_it_cannot_fully_parse ... ok
+test policies_reach_hir_with_their_values_and_spans ... ok
+test two_template_regions_in_one_body_do_not_duplicate_each_others_parts ... ok
+test the_generic_callback_case_survives_lowering ... ok
+test every_policy_in_the_accepted_corpus_survives_lowering ... ok
+test every_allocated_expression_has_exactly_one_named_root ... ok
+test no_call_lambda_or_match_in_the_tree_is_lost_in_lowering ... ok
+test no_expression_belongs_to_two_named_roots ... ok
+test every_span_points_inside_its_own_source ... ok
+test the_whole_corpus_lowers_without_panicking ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests/member_resolution.rs (target/debug/deps/member_resolution-32291844ebb12ee5)
+
+running 7 tests
+test a_member_of_modules_none_imported_is_refused ... ok
+test an_ambiguous_member_is_no_function_value ... ok
+test a_member_two_imported_modules_declare_is_refused ... ok
+test a_member_declared_beside_its_type_is_seen_without_an_import ... ok
+test a_members_effects_are_the_imported_ones ... ok
+test a_members_type_is_the_imported_ones ... ok
+test a_member_two_modules_declare_is_the_one_imported ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.78s
+
+     Running tests/one_parser.rs (target/debug/deps/one_parser-b402c8e50a83b607)
+
+running 5 tests
+test the_keywords_excluded_from_that_check_are_still_parseable ... ok
+test a_policy_keyword_reaches_the_hir_from_both_positions_it_can_be_written_in ... ok
+test every_declaration_keyword_reaches_the_hir_as_a_kind ... ok
+test every_policy_keyword_is_read_as_a_policy_and_not_as_an_expression ... ok
+test no_crate_outside_pw_syntax_builds_a_second_semantic_tree ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+
+     Running tests/privacy_by_resolution.rs (target/debug/deps/privacy_by_resolution-35b5840d7b9e1dfc)
+
+running 4 tests
+test a_value_refused_a_shared_cache_is_reported_once ... ok
+test a_session_read_is_one_however_it_is_imported ... ok
+test a_secret_is_one_however_it_is_imported ... ok
+test a_sink_is_one_however_it_is_imported ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.73s
+
+     Running tests/resolve_corpus.rs (target/debug/deps/resolve_corpus-836d25bbdd2d3d61)
+
+running 7 tests
+test two_fixtures_sharing_a_module_name_do_not_contaminate_each_other ... ok
+test the_accepted_corpus_plus_domain_is_one_resolvable_program ... ok
+test every_domain_import_resolves_through_the_module_graph ... ok
+test r007_reaches_its_defect_through_an_import_not_ambient_visibility ... ok
+test the_whole_corpus_is_deliberately_not_one_program ... ok
+test every_rejected_fixture_resolves_against_the_library_it_imports ... ok
+test a_fixture_sees_the_same_diagnostics_alone_as_in_the_harness ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 40.51s
+
+     Running tests/resolved_identity.rs (target/debug/deps/resolved_identity-96a45808474da9c2)
+
+running 5 tests
+test a_sibling_module_is_visible_only_through_an_explicit_import ... ok
+test a_qualified_own_module_path_keeps_this_units_identity_beside_a_namesake ... ok
+test a_helper_reaches_its_own_module_and_not_a_namesake_elsewhere ... ok
+test the_two_declarations_would_be_indistinguishable_by_name ... ok
+test each_inferred_result_belongs_only_to_its_own_declaration ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/resolved_types.rs (target/debug/deps/resolved_types-17ea1e661dd5cc4b)
+
+running 16 tests
+test a_parameter_without_its_binder_is_refused ... ok
+test the_artifact_identity_separates_what_the_spelling_merged ... ok
+test renaming_a_type_parameter_does_not_change_the_artifact_identity ... ok
+test an_opaque_type_is_not_its_representation ... ok
+test two_parameters_of_one_binder_are_distinguished_by_position ... ok
+test the_artifact_identity_carries_arguments_and_round_trips ... ok
+test resolution_reaches_every_argument_or_reports ... ok
+test a_bound_type_parameter_resolves_as_itself ... ok
+test the_identity_survives_a_different_file_order ... ok
+test what_the_resolver_cannot_model_is_blocked_and_says_which ... ok
+test two_declarations_of_one_spelling_are_two_types ... ok
+test an_undeclared_name_is_unresolved_rather_than_assumed ... ok
+test a_generic_differs_by_its_argument ... ok
+test the_written_spelling_survives_as_provenance ... ok
+test a_match_takes_its_constructors_from_the_declaration_its_scrutinee_resolves_to ... ok
+test the_platforms_session_id_is_one_type_in_the_real_program ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/signature_behavior.rs (target/debug/deps/signature_behavior-f446a79d7db26faf)
+
+running 11 tests
+test a_field_keeps_its_privacy_in_the_actual_parameter_context ... ok
+test same_spelled_events_from_different_modules_are_not_compatible ... ok
+test imported_handler_uses_its_declaring_module_not_the_callers_spelling ... ok
+test explicit_private_signature_requires_a_principal_preserving_remote_binding ... ok
+test acquiring_one_modules_type_does_not_classify_a_homonym_as_a_resource ... ok
+test acquired_generic_type_keeps_its_complete_arguments ... ok
+test capture_schema_changes_for_a_different_nominal_identity_not_file_order ... ok
+test nested_result_arguments_are_not_split_at_the_inner_comma ... ok
+test unit_and_empty_record_have_unit_abis_not_boolean_placeholders ... ok
+test every_variant_payload_field_reaches_the_component_type ... ok
+test same_spelled_user_type_does_not_impersonate_the_privacy_constructor ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/tables.rs (target/debug/deps/tables-136098dea2c9ef5f)
+
+running 34 tests
+test every_keyed_read_has_its_set_form ... ok
+test a_table_gives_each_read_and_write_with_its_type_and_effect ... ok
+test a_three_field_key_gives_a_read_by_each_proper_prefix ... ok
+test a_bound_gives_all_and_no_bound_none ... ok
+test a_clause_on_another_declaration_is_no_tables ... ok
+test pw0361_a_table_is_declared_in_the_module_of_its_name ... ok
+test the_control_checks_clean_and_reads_each_clause ... ok
+test pw0361_two_tables_cannot_emit_the_same_interface ... ok
+test pw0361_generated_composite_records_have_one_shape_each ... ok
+test checking_with_no_release_is_checking ... ok
+test pw0361_two_functions_cannot_emit_the_same_import ... ok
+test pw0361_a_source_name_cannot_hide_another_database ... ok
+test the_corpus_fixtures_that_name_a_release_are_held_to_it ... ok
+test a_table_reference_uses_its_own_module_beside_a_namesake ... ok
+test pw0364_all_reads_only_a_bounded_table ... ok
+test a_bound_is_a_count_and_each_clause_its_grammar ... ok
+test source_ambiguity_is_not_an_alternate_copy_of_the_own_module ... ok
+test pw0361_its_row_is_a_record_declared_beside_it ... ok
+test pw0361_a_reference_names_a_table_keyed_by_its_fields_type ... ok
+test pw0362_its_rows_are_reached_only_through_its_functions ... ok
+test pw0361_its_order_and_indexes_name_its_rows_fields ... ok
+test a_lock_changed_by_hand_is_no_release ... ok
+test pw0361_its_key_names_its_rows_fields_of_types_every_adapter_keys ... ok
+test its_imports_are_the_platforms_and_its_program_builds ... ok
+test tables_json_states_each_table_its_functions_and_their_order ... ok
+test a_program_held_to_its_release_is_refused_where_it_is_checked_and_built ... ok
+test a_dropped_field_is_refused_without_its_migrate_and_planned_with_it ... ok
+test pw0365_every_reference_across_sources_is_warned_and_builds ... ok
+test a_program_with_no_table_has_no_tables_file ... ok
+test a_rename_is_refused_without_its_migrate_and_planned_with_it ... ok
+test an_additive_change_is_planned ... ok
+test generic_fields_project_their_arguments_recursively_and_a_change_is_destructive ... ok
+test a_change_no_migrate_states_is_refused ... ok
+test a_type_changed_or_a_field_added_with_no_value_is_refused_unless_backfilled ... ok
+
+test result: ok. 34 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.34s
+
+     Running tests/unresolved_provenance.rs (target/debug/deps/unresolved_provenance-9677e94beca42e18)
+
+running 6 tests
+test no_accepted_program_calls_a_name_it_does_not_import ... ok
+test a013_build_time_page_after_repair ... ok
+test a014_content_addressed_handler_after_repair ... ok
+test a005_idempotent_command_after_repair ... ok
+test store_page_after_repair ... ok
+test a_page_does_not_inherit_its_handlers_authority ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.62s
