@@ -165,7 +165,7 @@ this is location metadata after the same parser refuses, not a second check.
 
 The first census detected two uncovered nested robustness regressions and
 failed its coverage assertion (561/563 tracked .pw files). The glob is corrected
-to include nested regressions; its final run remains pending.
+to include nested regressions; the completed run covers 563/563 tracked files.
 
 
 ## Verification checkpoint before broad campaigns
@@ -190,3 +190,31 @@ to include nested regressions; its final run remains pending.
 
 Whole affected mutation campaigns, full CI, own final recipe and final cost
 measurements are still pending; this checkpoint is not a ready claim.
+
+
+## A missed standalone computed-module path
+
+The first whole computed-signals campaign was RED: 15/16 controls killed,
+with browser baseline66/66 and cargo13/13, all three browser mutations killed,
+and no bound stops. The omission control still targeted standalone
+`computed::compile_checked`, while complete builds now reuse the exact IR
+through `compile_prepared`. Existing program tests exercised only the latter;
+the missed path was not retired or treated as a passing control.
+
+The original raw report is retained externally at
+`/tmp/check-is-build-whole16-computed-signals-red.log`, SHA256
+`1b6cf8ccfce5ed8e2931175baa569a3b70056a4fa835e0f250017796fa1aa9a5`.
+A new independent program test compares the complete emitted module sequence
+and bytes from standalone and prepared compilation of the real feed. It is
+green, as are the existing computed-holes/signals tests (8/8+4/4). The old
+standalone omission control remains, and a seventeenth independently removes
+the actual prepared-plan module output. No backend behavior or assertion was
+relaxed. The whole17 rerun and other held browser campaigns remain pending.
+
+The first earlier browser baseline ran no assertions (0/0): its configured
+kiokun-server prerequisite was missing, exit127. That infrastructure refusal
+is retained separately, and both native hosts were built explicitly before
+the fresh green baseline. This configuration starts65 webServer entries
+(64 pw-dev-server+1 kiokun-server); inspected parents/arguments matched the
+registry. The dispatcher was held and reaped only after normal whole-suite
+source restoration; no live mutation/browser child was interrupted.

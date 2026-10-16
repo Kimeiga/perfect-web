@@ -84,6 +84,13 @@ MUTANTS = [
         "    return Ok(Vec::new());\n    let derived = &checked.pages().derived;\n",
     ),
     (
+        "the prepared executable plan has no computed module",
+        "cargo",
+        MODULE,
+        "    let analysis = checked.pages();\n",
+        "    return Ok(Vec::new());\n    let analysis = checked.pages();\n",
+    ),
+    (
         "the module names each function by its order",
         "cargo",
         MODULE,

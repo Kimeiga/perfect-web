@@ -106,6 +106,33 @@ fn plan_of<'b>(b: &'b pw_core::build::Build, page: &str) -> &'b pw_core::page_va
 }
 
 #[test]
+fn standalone_and_prepared_signal_modules_are_byte_identical() {
+    let files = feed();
+    let units: Vec<Unit> = files
+        .iter()
+        .map(|(path, src)| Unit {
+            path: path.clone(),
+            hir: lower_file(src, &parse_tree(src).green),
+            src: src.clone(),
+        })
+        .collect();
+    let standalone = pw_core::backend::computed::compile(&units).expect("standalone backend");
+    let prepared = pw_core::program::build(&units).expect("complete executable program");
+    let modules = |compiled: Vec<pw_core::backend::computed::Compiled>| {
+        compiled
+            .into_iter()
+            .map(|c| (c.page, c.module.expect("a supported signal module")))
+            .collect::<Vec<_>>()
+    };
+    let standalone = modules(standalone);
+    assert!(
+        !standalone.is_empty(),
+        "the feed computes from its draft signal"
+    );
+    assert_eq!(standalone, modules(prepared.computed));
+}
+
+#[test]
 fn a_value_computed_from_a_signal_is_the_browsers_and_its_first_the_hosts() {
     let files = feed();
     assert_eq!(reported(&files), Vec::<String>::new());
