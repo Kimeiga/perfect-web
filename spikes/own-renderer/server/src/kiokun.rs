@@ -36,7 +36,7 @@ pub(crate) const GRANTS: &[&str] = &[
 ];
 
 /// The sample the repository carries (ADR-0037): 28 files of one shard.
-fn sample() -> PathBuf {
+pub(crate) fn sample() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/kiokun/data/han-1char-3")
 }
 

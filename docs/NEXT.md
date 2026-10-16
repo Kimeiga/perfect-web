@@ -2,6 +2,12 @@
 
 The next executable tasks, in order, with acceptance criteria. Charter §3.4.
 
+
+Integration follow-up, 2026-10-16: reproduce Kiokun search-cache publication
+and version-lifetime races with private fixtures, then repair them. Sample
+test isolation does not prove production cache concurrency. Do not inspect
+or modify the external dataset owned by another process.
+
 ## Current: E14, the AI benchmark (E10 closed 2026-10-02)
 
 **2026-10-02, E10 closed and E14 started** ([ADR-0119](DECISIONS/ADR-0119-e10-closes-and-the-ai-benchmark-comes-next.md)).

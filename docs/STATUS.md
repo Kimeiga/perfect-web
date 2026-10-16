@@ -14,6 +14,19 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**Train-9 corrective validation, 2026-10-16:** the absorbed description
+control is replaced by a withheld initial shell; the complete recipe passes
+all 21 browser tests in three engines and all 9 assertion controls. Unit-test
+Kiokun servers now explicitly use the committed sample while production
+retains deployment configuration; its child regression is red-before and
+green-after, with 2/2 independent controls. Fresh inherited-environment
+`just ci` passes 2948 Rust tests (25 ignored), 167 Python tests
+and one intentional skip. The preceding 16 server failures and failed
+GitHub verify 38823189869 remain failed historical results.
+[Commands, raw results and hashes](evidence/E14/train9-corrective-validation.txt).
+New GitHub CI/verify are required before landing. Production cache
+publication/lifetime concurrency remains open.
+
 **ADR-0249, 2026-10-07: a verification shard sets up only what its recipes
 need** (the owner's approval, relayed 2026-10-07). A shard spent more than
 half its time setting up: shard 3 at `c1738ec` freed the disk for 84 s,
