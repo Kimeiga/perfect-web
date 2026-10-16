@@ -729,7 +729,7 @@ fn the_committed_enforcement_table_is_what_the_corpus_checks_now() {
             .unwrap_or("")
             .trim();
 
-        let verdict = if codes.iter().any(|c| *c == declared) {
+        let verdict = if codes.contains(&declared) {
             caught += 1;
             "enforced".to_string()
         } else if codes.is_empty() {
