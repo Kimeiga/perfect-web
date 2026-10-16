@@ -28,6 +28,7 @@ import 'just/payments.just'
 import 'just/page-policy.just'
 import 'just/scheduled.just'
 import 'just/evidence-integrity.just'
+import 'just/evidence-integrity-2.just'
 
 default:
     @just --list
