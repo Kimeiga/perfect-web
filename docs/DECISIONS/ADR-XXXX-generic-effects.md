@@ -138,3 +138,12 @@ at effective_effects and effective_effects_excluding. Each removes exactly
 the intended member/value behavior at that consumer; all 12 controls and
 all performed-function-value assertions remain. The whole script reruns.
 No production source changes accompany this harness correction.
+
+The whole nested-scope script exposed the same duplication at an outer
+binding: removing only its declared map is recovered by the shared solved
+parent environment. The inference-consumer control now removes enclosing
+Types construction, so both its declared bindings and the shared solver's
+inherited types are absent. The values-checker's separate outer-table
+control remains independent. All 12 nested-scope controls and all existing
+privacy/type assertions remain, and the whole script reruns; production
+source is unchanged.
