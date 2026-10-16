@@ -207,25 +207,13 @@ fn module(
 /// (`lower::Checked`): a backend only ever sees a program that checked. The one
 /// path the CLI and the tests share.
 pub fn compile(units: &[crate::check::Unit]) -> Result<Vec<Compiled>, String> {
-    let hirs: Vec<&Hir> = units.iter().map(|u| &u.hir).collect();
-    let sources: Vec<&str> = units.iter().map(|u| u.src.as_str()).collect();
-    let ws = Workspace::build(&hirs);
-    let sigs = Signatures::build(&ws, &hirs);
-    let contracts = crate::contract::contracts(&hirs, &sigs, &ws);
-    let cx = super::lower::Context {
-        hirs: &hirs,
-        ws: &ws,
-        sigs: &sigs,
-        contracts: &contracts,
-    };
-    super::lower::Checked::of(units, cx).map_err(|ds| {
-        format!(
-            "the program does not check, so nothing is compiled: {}",
-            ds.iter()
-                .map(|d| format!("[{}] {}", d.code, d.message))
-                .collect::<Vec<_>>()
-                .join("; ")
-        )
-    })?;
-    Ok(handlers(&hirs, &sources, &ws, &sigs))
+    crate::program::with_checked(units, compile_checked)
+}
+
+pub(crate) fn compile_checked(
+    checked: &super::lower::Checked<'_>,
+) -> Result<Vec<Compiled>, String> {
+    let cx = checked.context();
+    let (hirs, ws, sigs) = (cx.hirs, cx.ws, cx.sigs);
+    Ok(handlers(hirs, &checked.sources(), ws, sigs))
 }

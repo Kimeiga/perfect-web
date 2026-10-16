@@ -71,60 +71,110 @@ use crate::signatures::Signatures;
 /// of every entry in `docs/RISK_QUEUE.md`.
 pub struct Checked<'a> {
     cx: Context<'a>,
+    units: &'a [crate::check::Unit],
+    pages: std::cell::OnceCell<crate::page_values::Analysis>,
 }
 
 impl<'a> Checked<'a> {
-    /// Run the checker, and return the context only if it produced no errors.
-    ///
-    /// `units` must be the same program `cx` was built from — the borrow makes
-    /// that checkable at the call site rather than assumed, because a proof
-    /// about a different program is the coincidental correctness of ADR-0022.
+    /// The semantic prerequisite proof, bound to the exact HIR identities.
     pub fn of(
-        units: &[crate::check::Unit],
+        units: &'a [crate::check::Unit],
         cx: Context<'a>,
     ) -> Result<Checked<'a>, Vec<crate::diagnostics::Diagnostic>> {
-        assert_eq!(
-            units.len(),
-            cx.hirs.len(),
-            "the checked units and the lowering context describe different \
-             programs, so the proof would be about neither"
-        );
-        // **A program that did not parse did not check**, whatever the checker
-        // says of the tree that survived. `Unit` carries its source and not
-        // its parse errors, so they are read again here. Until 2026-09-25 they
-        // were not: `{ a + b }` in a query was an unknown policy to the parser
-        // and an empty body to the backend, which compiled it.
-        let mut errors: Vec<crate::diagnostics::Diagnostic> =
-            units.iter().flat_map(syntax_errors).collect();
-        errors.extend(
-            crate::check::check_units(units)
-                .into_iter()
-                .flat_map(|(_, ds)| ds)
-                .filter(|d| d.severity == crate::diagnostics::Severity::Error),
-        );
-        if errors.is_empty() {
-            Ok(Checked { cx })
-        } else {
-            Err(errors)
-        }
+        Self::diagnose(units, cx)
+            .map(|(checked, _)| checked)
+            .map_err(|by_file| {
+                by_file
+                    .into_iter()
+                    .flat_map(|(_, ds)| ds)
+                    .filter(|d| d.is_error())
+                    .collect()
+            })
     }
 
+    pub(crate) fn diagnose(
+        units: &'a [crate::check::Unit],
+        cx: Context<'a>,
+    ) -> Result<(Checked<'a>, crate::program::Diagnostics), crate::program::Diagnostics> {
+        let mut inference = crate::effects::Inference::new(cx.sigs, cx.ws);
+        inference.run(cx.hirs);
+        Self::diagnose_inferred(units, cx, &inference)
+    }
+
+    pub(crate) fn diagnose_inferred(
+        units: &'a [crate::check::Unit],
+        cx: Context<'a>,
+        inference: &crate::effects::Inference<'_>,
+    ) -> Result<(Checked<'a>, crate::program::Diagnostics), crate::program::Diagnostics> {
+        assert!(
+            units.len() == cx.hirs.len()
+                && units
+                    .iter()
+                    .zip(cx.hirs)
+                    .all(|(unit, hir)| std::ptr::eq(&unit.hir, *hir)),
+            "the checked units and the lowering context describe different programs"
+        );
+        let syntax: crate::program::Diagnostics = units
+            .iter()
+            .map(|u| {
+                (
+                    u.path.clone(),
+                    pw_syntax::parse_tree(&u.src)
+                        .errors
+                        .into_iter()
+                        .map(crate::check::syntax_error)
+                        .collect(),
+                )
+            })
+            .collect();
+        if syntax.iter().any(|(_, ds)| !ds.is_empty()) {
+            return Err(syntax);
+        }
+        let diagnostics = crate::check::check_inferred(units, cx.hirs, cx.ws, cx.sigs, inference);
+        if diagnostics
+            .iter()
+            .any(|(_, ds)| ds.iter().any(|d| d.is_error()))
+        {
+            Err(diagnostics)
+        } else {
+            Ok((
+                Checked {
+                    cx,
+                    units,
+                    pages: std::cell::OnceCell::new(),
+                },
+                diagnostics,
+            ))
+        }
+    }
     pub fn context(&self) -> &Context<'a> {
         &self.cx
     }
-}
-
-/// A unit's syntax errors, as diagnostics, each naming its file.
-fn syntax_errors(unit: &crate::check::Unit) -> Vec<crate::diagnostics::Diagnostic> {
-    pw_syntax::parse_tree(&unit.src)
-        .errors
-        .into_iter()
-        .map(|e| {
-            let mut d = crate::check::syntax_error(e);
-            d.message = format!("{}: {}", unit.path, d.message);
-            d
-        })
-        .collect()
+    pub(crate) fn with_contracts<'b>(&'b self, contracts: &'b [ComponentContract]) -> Checked<'b> {
+        Checked {
+            cx: Context {
+                hirs: self.cx.hirs,
+                ws: self.cx.ws,
+                sigs: self.cx.sigs,
+                contracts,
+            },
+            units: self.units,
+            pages: std::cell::OnceCell::from(self.pages().clone()),
+        }
+    }
+    pub(crate) fn set_pages(&self, pages: crate::page_values::Analysis) {
+        assert!(
+            self.pages.set(pages).is_ok(),
+            "page analysis was already prepared"
+        );
+    }
+    pub(crate) fn pages(&self) -> &crate::page_values::Analysis {
+        self.pages
+            .get_or_init(|| crate::page_values::analyze(self.cx.hirs, self.cx.ws, self.cx.sigs))
+    }
+    pub(crate) fn sources(&self) -> Vec<&str> {
+        self.units.iter().map(|u| u.src.as_str()).collect()
+    }
 }
 
 /// What the lowering needs from upstream, gathered once.
@@ -1276,7 +1326,7 @@ pub fn program_by_declaration(
     let mut out = Program::default();
     let mut refusals = Vec::new();
     // And each function a page's template reads as a member (ADR-0125).
-    let members = crate::page_values::members(cx.hirs, cx.ws, cx.sigs);
+    let members = &checked.pages().members;
     for (unit, hir) in cx.hirs.iter().enumerate() {
         for (id, decl) in hir.all_decls() {
             let member = members.contains(&DefId { unit, decl: id.0 });
@@ -1294,8 +1344,8 @@ pub fn program_by_declaration(
     }
     // And each computed part a host computes (ADR-0226): the function its
     // expression is lifted into.
-    for d in crate::page_values::derived(cx.hirs, cx.ws, cx.sigs) {
-        match hole(cx, &d) {
+    for d in &checked.pages().derived {
+        match hole(cx, d) {
             Lowering::Lowered(f) => out.functions.push(f),
             other => refusals.push((d.declaration(), other)),
         }

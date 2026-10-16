@@ -1395,6 +1395,15 @@ pub fn component_id(hir: &Hir, id: crate::hir::DeclId) -> String {
 /// One pass, from the same signatures and the same placement solver every other
 /// analysis uses. Nothing here re-derives an effect row or a world.
 pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<ComponentContract> {
+    contracts_with_pages(hirs, sigs, ws, &crate::page_values::analyze(hirs, ws, sigs))
+}
+
+pub(crate) fn contracts_with_pages(
+    hirs: &[&Hir],
+    sigs: &Signatures,
+    ws: &Workspace,
+    pages: &crate::page_values::Analysis,
+) -> Vec<ComponentContract> {
     // INFERRED effects, not declared ones.
     //
     // A query's authority is in its body: `Menu` writes no effect row and
@@ -1406,6 +1415,16 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
     let mut inference = Inference::new(sigs, ws);
     inference.run(hirs);
 
+    contracts_inferred(hirs, sigs, ws, pages, &inference)
+}
+
+pub(crate) fn contracts_inferred(
+    hirs: &[&Hir],
+    sigs: &Signatures,
+    ws: &Workspace,
+    pages: &crate::page_values::Analysis,
+    inference: &Inference<'_>,
+) -> Vec<ComponentContract> {
     // What each effect DECLARES about itself: whether it needs host authority,
     // and which interface serves it. Built once, beside the inference, because
     // both answer questions about the same rows.
@@ -1458,7 +1477,7 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
     // And what each holds where it runs (ADR-0282), as the checker's
     // placement reads it: a secret it answers or reads, never one it only
     // uses.
-    let reads = crate::check::Reads::of(hirs, sigs, &inference)
+    let reads = crate::check::Reads::of(hirs, sigs, inference)
         .answering(&crate::check::summaries(hirs, sigs));
     let labels: BTreeMap<crate::resolve::DefId, Label> = reads.labels();
 
@@ -1466,7 +1485,7 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
     // calls each to compute what the page shows, so each is a component with
     // a contract of its own. Not a dependency target: a call to one from
     // Pleris code is still compiled into its caller.
-    let members = crate::page_values::members(hirs, ws, sigs);
+    let members = &pages.members;
 
     let mut out = Vec::new();
     for (unit, hir) in hirs.iter().enumerate() {
@@ -1623,7 +1642,7 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
             let def = crate::resolve::DefId { unit, decl: id.0 };
             let demand = Demand {
                 effects: effects.clone(),
-                label: crate::check::declaration_label(hir, &labels, &inference, unit, decl)
+                label: crate::check::declaration_label(hir, &labels, inference, unit, decl)
                     .join(&reads.holds(def)),
                 declared: crate::check::declared_world(hir, decl),
             };
@@ -1653,7 +1672,7 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
             // no signature it could carry. Each host operation the body calls
             // is its own import, with its own ABI and its own authority set.
             let mut imports: BTreeSet<Import> = host_calls(
-                &inference,
+                inference,
                 sigs,
                 hirs,
                 unit,
@@ -1664,7 +1683,7 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
             )
             .into_iter()
             .collect();
-            for dep in component_calls(&inference, unit, hir, id, &components) {
+            for dep in component_calls(inference, unit, hir, id, &components) {
                 imports.insert(dep);
             }
             let imports: Vec<Import> = imports.into_iter().collect();
@@ -1736,7 +1755,7 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
     // compiler lifts its expression into, a component of its own, of kind
     // `derived`. It performs no effect and imports nothing; it runs where its
     // page runs, so it is placed where the page is.
-    for d in crate::page_values::derived(hirs, ws, sigs) {
+    for d in &pages.derived {
         let page = component_id(hirs[d.page.unit], crate::hir::DeclId(d.page.decl));
         let allowed_placements = out
             .iter()

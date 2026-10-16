@@ -338,16 +338,14 @@ page About() {
 `pw check` runs the compiler's checks. `pw build` goes on to the page's
 templates, and refuses some programs `pw check` passes. So a clean check is
 not yet a program that runs: build it, as the [tutorial](tutorial.md) does.
-`pw build` prints its refusals as lines that begin `pw:`, with no code.
+`pw check` and `pw build` both report PW6601 for programs the executable backends cannot support.
 
-Each program below is a gap in the checks today. The test that compiles this
-guide holds each one: when the compiler closes a gap, that test fails on the
-example, and this page is updated.
+Each program below is refused by the shared executable-program validation. The guide test requires exactly PW6601 for each one.
 
 A `<title>` cannot read a signal, because the browser does not render the
 title again (ADR-0137):
 
-```pw gap=build
+```pw fails=PW6601
 module shop.titled
 
 page Counter() {
@@ -363,14 +361,10 @@ page Counter() {
 }
 ```
 
-```text pw-build
-pw: refused: `shop.titled.Counter`'s values: part 1 is a title part the signal `count` decides, which the browser does not render again (ADR-0137)
-pw: 1 refusal(s); nothing written
-```
 
 A part of a page cannot compute a value from two signals (ruling 0073-a):
 
-```pw gap=build
+```pw fails=PW6601
 module shop.sum
 
 page Sum() {
@@ -391,24 +385,16 @@ page Sum() {
 }
 ```
 
-```text pw-build
-pw: refused: `shop.sum.Sum`'s values: part 0 computes a value from `a` and `b`, and a host computes one from one value (ruling 0073-a)
-pw: 1 refusal(s); nothing written
-```
 
 An `{#each}` reads its list by path, and a call in its head computes the
-list, so `pw build` refuses it. `pw check` does not, and it does not look in
-the head for effects either: this view says `!{}`, and its `{#each}` calls a
-function that reads the database. The same call anywhere else in the view is
-refused by `pw check` (PW0401, [why Pleris](why.md)):
+list, so check and build refuse it (PW6601). This pure example isolates the executable support limit:
 
-```pw gap=build
+```pw fails=PW6601
 module shop.head
 
 type Item = Item { name: String }
 
-fn items() -> List<Item> !{ database.read<Item> }
-    host "shop:data/items#all"
+fn items() -> List<Item> !{} { [Item("Coffee")] }
 
 view Menu() !{} {
     <ul>
@@ -419,9 +405,6 @@ view Menu() !{} {
 }
 ```
 
-```text pw-build
-pw: a template part the renderer cannot render: shop.head.Menu: `{#each items() as item (item.name)}`: `{#each}` reads its list by path, and `items()` is computed
-```
 
 And an `<img>` with no `alt` is not refused, though an `<input>` with no
 label is (PW5014):

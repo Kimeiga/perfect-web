@@ -101,7 +101,7 @@ impl Model {
             errors.truncate(3);
             return Err(format!("it does not check: {}", errors.join("; ")));
         }
-        let build = crate::build::build(units)?;
+        let build = crate::program::build(units)?;
         let mut model = Model {
             warnings,
             ..Model::default()

@@ -80,8 +80,8 @@ MUTANTS = [
         "a page that computes from a signal has no module",
         "cargo",
         MODULE,
-        "        if computed.is_empty() {\n",
-        "        if true {\n",
+        "    let derived = &checked.pages().derived;\n",
+        "    return Ok(Vec::new());\n    let derived = &checked.pages().derived;\n",
     ),
     (
         "the module names each function by its order",
@@ -101,8 +101,8 @@ MUTANTS = [
         "a module that did not compile is no refusal",
         "cargo",
         BUILD,
-        "            .chain(computed)\n",
-        "",
+        "        for c in &self.computed {\n            if let Err(why) = &c.module {\n",
+        "        for c in self.computed.iter().filter(|_| false) {\n            if let Err(why) = &c.module {\n",
     ),
     (
         "the build writes no module",

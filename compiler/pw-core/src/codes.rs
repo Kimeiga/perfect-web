@@ -124,6 +124,8 @@ pub enum Owner {
     /// The scheduled-commands track's codes, PW65xx (the integrator's): a
     /// command the platform runs when the clock passes its time.
     Schedules,
+    /// Full executable-program support, reserved for check-is-build.
+    CheckIsBuild,
 }
 
 impl fmt::Display for Code {
@@ -151,6 +153,10 @@ macro_rules! codes {
 }
 
 codes! {
+    // --- check-is-build (PW66xx) ------------------------------------------
+    EXECUTABLE_PROGRAM = "PW6601" / executable_program / 1, CheckIsBuild,
+        "a semantically valid program is supported by the compiler's executable backends";
+
     // --- syntax (PW00xx) --------------------------------------------------
     EXPECTED = "PW0001" / expected / 1, Syntax, "the parser expected a different token here";
     UNCLOSED_TYPE_ARGS = "PW0002" / unclosed_type_args / 1, Syntax, "a type argument list must be closed";
@@ -995,6 +1001,7 @@ impl Owner {
             Owner::StoreSearch => "PW63",
             Owner::Payments => "PW64",
             Owner::Schedules => "PW65",
+            Owner::CheckIsBuild => "PW66",
             Owner::Syntax | Owner::Resolution => "PW00",
             Owner::Placement | Owner::Privacy | Owner::Markup => "PW50",
             Owner::Types => "PW06",
@@ -1062,6 +1069,7 @@ mod tests {
                 (Owner::StoreSearch, "PW63"),
                 (Owner::Payments, "PW64"),
                 (Owner::Schedules, "PW65"),
+                (Owner::CheckIsBuild, "PW66"),
             ] {
                 assert!(
                     !c.id.starts_with(block) || c.owner == owner,

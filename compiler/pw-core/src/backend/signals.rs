@@ -8,9 +8,8 @@
 //! is data. A first value that computes is refused, by name: the build writes
 //! data, and running a program at build time is not this slice.
 
-use crate::hir::{DeclKind, Hir};
+use crate::hir::DeclKind;
 use crate::page_values::Signal;
-use crate::resolve::Workspace;
 use crate::signatures::Signatures;
 
 use super::ir::Lowering;
@@ -26,31 +25,14 @@ pub struct Compiled {
 
 /// **Every page's signals.** A page with none is not listed.
 pub fn compile(units: &[crate::check::Unit]) -> Result<Vec<Compiled>, String> {
-    let hirs: Vec<&Hir> = units.iter().map(|u| &u.hir).collect();
-    let ws = Workspace::build(&hirs);
-    let sigs = Signatures::build(&ws, &hirs);
-    let contracts = crate::contract::contracts(&hirs, &sigs, &ws);
-    let cx = Context {
-        hirs: &hirs,
-        ws: &ws,
-        sigs: &sigs,
-        contracts: &contracts,
-    };
-    lower::Checked::of(units, cx).map_err(|ds| {
-        format!(
-            "the program does not check, so nothing is compiled: {}",
-            ds.iter()
-                .map(|d| format!("[{}] {}", d.code, d.message))
-                .collect::<Vec<_>>()
-                .join("; ")
-        )
-    })?;
-    let cx = Context {
-        hirs: &hirs,
-        ws: &ws,
-        sigs: &sigs,
-        contracts: &contracts,
-    };
+    crate::program::with_checked(units, compile_checked)
+}
+
+pub(crate) fn compile_checked(
+    checked: &super::lower::Checked<'_>,
+) -> Result<Vec<Compiled>, String> {
+    let cx = checked.context();
+    let (hirs, ws, sigs) = (cx.hirs, cx.ws, cx.sigs);
     let mut out = Vec::new();
     for (unit, hir) in hirs.iter().enumerate() {
         for (id, decl) in hir.all_decls() {
@@ -61,9 +43,9 @@ pub fn compile(units: &[crate::check::Unit]) -> Result<Vec<Compiled>, String> {
             // or are provided, at each use (ADR-0144): what its template
             // holds, as the template names them.
             let Some(lowered) = crate::template_ir::lowered(
-                &hirs,
-                &ws,
-                &sigs,
+                hirs,
+                ws,
+                sigs,
                 &crate::template_ir::Handlers::new(),
                 unit,
                 id,
@@ -77,7 +59,7 @@ pub fn compile(units: &[crate::check::Unit]) -> Result<Vec<Compiled>, String> {
             let mut signals = Vec::new();
             let mut refused = None;
             for instance in lowered.instances {
-                match first_value(&cx, &sigs, &page, &instance) {
+                match first_value(cx, sigs, &page, &instance) {
                     Ok(initial) => signals.push(Signal {
                         name: instance.name,
                         initial,

@@ -1200,7 +1200,7 @@ fn build_command(paths: &[&String], out: &str) -> ExitCode {
             hir,
         });
     }
-    let build = match pw_core::build::build(&units) {
+    let build = match pw_core::program::build(&units) {
         Ok(b) => b,
         Err(e) => {
             eprintln!("pw: {e}");
@@ -1817,7 +1817,7 @@ fn run() -> ExitCode {
     // given them (ADR-0106). A map keyed by name kept the last file's for
     // every file of that name: `pw check a/app.pw b/app.pw` passed with an
     // error in `a/app.pw` until 2026-09-26.
-    let mut checked = pw_core::check::check_sources(&clean).into_iter();
+    let mut checked = pw_core::check::check_program_sources(&clean).into_iter();
     let body_diags: Vec<Vec<Diagnostic>> = inputs
         .iter()
         .map(|i| match i.parsed.errors.is_empty() {

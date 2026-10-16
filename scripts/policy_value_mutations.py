@@ -25,7 +25,7 @@ MUTANTS = [
     (
         "a policy's value is not checked",
         CHECK,
-        "        per_unit.extend(policy_values(&workspace, i, &u.hir));\n",
+        '        per_unit.extend(policy_values(workspace, i, &u.hir));\n',
         "",
     ),
     (

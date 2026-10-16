@@ -52,7 +52,6 @@ fn store() -> Vec<(String, String)> {
 }
 
 struct Built {
-    hirs: Vec<Hir>,
     units: Vec<pw_core::check::Unit>,
 }
 
@@ -97,13 +96,7 @@ impl Built {
                 hir: lower_file(src, &parse_tree(src).green),
             })
             .collect();
-        Built {
-            hirs: files
-                .iter()
-                .map(|(_, s)| lower_file(s, &parse_tree(s).green))
-                .collect(),
-            units,
-        }
+        Built { units }
     }
 }
 
@@ -120,7 +113,7 @@ fn lowered(
     pw_core::backend::ir::Program,
     Vec<Lowering<pw_core::backend::ir::Function>>,
 ) {
-    let refs: Vec<&Hir> = built.hirs.iter().collect();
+    let refs: Vec<&Hir> = built.units.iter().map(|u| &u.hir).collect();
     let ws = Workspace::build(&refs);
     let sigs = Signatures::build(&ws, &refs);
     let cs = contracts(&refs, &sigs, &ws);
@@ -595,7 +588,7 @@ command Add(id: Int) -> Int
 }
 ";
     let built = Built::new(&[("t.pw".to_string(), src.to_string())]);
-    let refs: Vec<&Hir> = built.hirs.iter().collect();
+    let refs: Vec<&Hir> = built.units.iter().map(|u| &u.hir).collect();
     let ws = Workspace::build(&refs);
     let sigs = Signatures::build(&ws, &refs);
     let cs = contracts(&refs, &sigs, &ws);
@@ -632,7 +625,7 @@ command Add(id: Int) -> Int
 }
 ";
     let built = Built::new(&[("t.pw".to_string(), ok.to_string())]);
-    let refs: Vec<&Hir> = built.hirs.iter().collect();
+    let refs: Vec<&Hir> = built.units.iter().map(|u| &u.hir).collect();
     let ws = Workspace::build(&refs);
     let sigs = Signatures::build(&ws, &refs);
     let cs = contracts(&refs, &sigs, &ws);

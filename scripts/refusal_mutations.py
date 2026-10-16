@@ -114,7 +114,7 @@ MUTANTS = [
         "the build writes no words",
         "host",
         BUILD,
-        "        predicates: crate::predicates::words_of(&hirs),\n",
+        '        predicates: crate::predicates::words_of(hirs),\n',
         "        predicates: Default::default(),\n",
     ),
     (
