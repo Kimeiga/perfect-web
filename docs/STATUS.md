@@ -23,6 +23,15 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0346, 2026-10-15: argument and page-parameter invariants**
+(train-10, from `ac3f2553`). The browser command decoder already refused
+invalid values; the repaired gaps were direct component calls, page
+parameters and nested Map/Set values. Arguments are held before predicates
+read them. Branch evidence recorded 17/17 own controls, four related whole
+scripts, and 12 browser tests in three engines. Integrated CI and
+verification are pending. A non-UTF-8 path still returns 404; its specified
+400 is an open follow-up.
+
 **ADR-0345, 2026-10-15: each-header expressions are checked**
 (train-10, from `839e8bfa`). Effects, privacy, signals and names now see a
 loop's list and key through an exhaustive enumeration of seven expression

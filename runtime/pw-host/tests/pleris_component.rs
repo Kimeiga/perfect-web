@@ -117,6 +117,9 @@ fn item(id: &str) -> Val {
 /// What the host saw of each call, so a test can assert the COMPONENT made it.
 type Calls = Arc<Mutex<Vec<(String, Vec<Val>)>>>;
 
+/// Each predicate the deployment was asked, and what it was given.
+type Asked = Arc<Mutex<Vec<(String, Vec<Val>)>>>;
+
 /// The deployment's operations: the platform's session, and a data layer in
 /// which every item can be ordered.
 fn host(calls: &Calls, add_result: Val) -> BTreeMap<String, HostFn> {
@@ -733,6 +736,151 @@ fn a_quantity_that_is_no_positive_int_is_refused_as_the_arguments_are_decoded() 
     }
 }
 
+/// **An argument that breaks its invariant never reaches the component,
+/// whichever call carries it** (ADR-0346, argument invariants): the
+/// contract's checks of an export's arguments are the component's boundary,
+/// not one decoder's. A host that builds its values itself (a page's address,
+/// a stored run, a test) calls the same `call_*` as one that decoded a
+/// browser's JSON, and a quantity of 0 for a `PositiveInt` is refused before
+/// the component runs: no operation is called, so the data layer never sees
+/// it, and no `requires` predicate is asked about it. Until the track, only
+/// [`engine::Prepared::arguments_for`] held them, and a value built otherwise
+/// ran the command (track `reviews`' finding).
+#[test]
+fn an_argument_that_breaks_its_invariant_never_reaches_the_component() {
+    let c = contract();
+    let bytes = component();
+    let granted = admitted(&c, &bytes, &ALL).expect("admitted");
+    let prepared = engine::Prepared::compile(&bytes).expect("compiles");
+    let [interface, function] = export(&c);
+    let at = [interface.as_str(), function.as_str()];
+    let answered = Val::Result(Ok(Some(Box::new(cart("cortado", 1)))));
+    // The command as one that requires a predicate of its quantity, as
+    // `OwnsPost(post)` reads its post: a predicate reads through the data
+    // layer, so it is asked only of a value that holds its type.
+    let mut guarded = c.clone();
+    guarded
+        .exports
+        .iter_mut()
+        .find_map(|e| e.component.as_mut())
+        .expect("the command's export")
+        .authorization
+        .push(AuthorizationRequirement {
+            predicate: "MayAdd".into(),
+            arguments: vec![1],
+        });
+    let asked: Asked = Arc::default();
+    let evaluate = |predicate: &str, read: &[&Val]| {
+        asked.lock().unwrap().push((
+            predicate.to_string(),
+            read.iter().map(|v| (*v).clone()).collect(),
+        ));
+        Ok(true)
+    };
+    for forged in [0, -3, i64::MIN] {
+        let args = [item("cortado"), Val::S64(forged)];
+        let said = format!(
+            "argument refused: value 2 is {forged}, and `domain.PositiveInt` holds `value >= 1`"
+        );
+        // Each way in: the free function and the compiled component's, with
+        // its `requires` evaluated; and the unauthorized call and the
+        // measured one a benchmark makes.
+        let calls: Calls = Arc::default();
+        let why = engine::call_authorized_within(
+            &bytes,
+            &guarded,
+            &granted,
+            &limits(),
+            &host(&calls, answered.clone()),
+            &at,
+            &args,
+            evaluate,
+        )
+        .expect_err("refused before the component runs");
+        assert_eq!(why, said);
+        let why = prepared
+            .call_authorized_within(
+                &guarded,
+                &granted,
+                &limits(),
+                &host(&calls, answered.clone()),
+                &at,
+                &args,
+                evaluate,
+            )
+            .expect_err("refused before the component runs");
+        assert_eq!(why, said);
+        let why = prepared
+            .call_within(
+                &c,
+                &granted,
+                &limits(),
+                &host(&calls, answered.clone()),
+                &at,
+                &args,
+            )
+            .expect_err("refused");
+        assert_eq!(why, said);
+        let why = prepared
+            .call_measured(
+                &c,
+                &granted,
+                &limits(),
+                &host(&calls, answered.clone()),
+                &at,
+                &args,
+            )
+            .expect_err("refused");
+        assert_eq!(why, said);
+        assert!(
+            calls.lock().unwrap().is_empty(),
+            "no operation was called: {:?}",
+            calls.lock().unwrap()
+        );
+        assert!(
+            asked.lock().unwrap().is_empty(),
+            "no predicate read it: {:?}",
+            asked.lock().unwrap()
+        );
+    }
+    // The control: 1 runs each way, and reaches the data layer each time;
+    // the predicate is asked of it, by each authorized call.
+    let calls: Calls = Arc::default();
+    let count = [item("cortado"), Val::S64(1)];
+    let ops = host(&calls, answered.clone());
+    engine::call_authorized_within(
+        &bytes,
+        &guarded,
+        &granted,
+        &limits(),
+        &ops,
+        &at,
+        &count,
+        evaluate,
+    )
+    .expect("a count runs");
+    prepared
+        .call_authorized_within(&guarded, &granted, &limits(), &ops, &at, &count, evaluate)
+        .expect("a count runs");
+    prepared
+        .call_within(&c, &granted, &limits(), &ops, &at, &count)
+        .expect("a count runs");
+    prepared
+        .call_measured(&c, &granted, &limits(), &ops, &at, &count)
+        .expect("a count runs");
+    let added = calls
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|(op, _)| op == "store:data/user-carts#add")
+        .count();
+    assert_eq!(added, 4, "{:?}", calls.lock().unwrap());
+    assert_eq!(
+        *asked.lock().unwrap(),
+        vec![("MayAdd".to_string(), vec![Val::S64(1)]); 2]
+    );
+}
+
 /// **A data layer's answer that breaks an invariant is the command's
 /// failure** (ADR-0179): a cart line of 0, answered by `carts#add`, is never
 /// a value the component reads. The contract states where: `ok.lines.*.
@@ -823,7 +971,10 @@ fn sustained_calls_leave_memory_flat() {
                 &limits(),
                 &ops,
                 &[&interface, &function],
-                &[item(&format!("item-{n}")), Val::S64(n)],
+                // A count from 1: a `PositiveInt` of 0 is refused before the
+                // component runs (ADR-0346, argument invariants), and this
+                // measures the calls that run.
+                &[item(&format!("item-{n}")), Val::S64(n + 1)],
                 approve_store_authorization,
             )
             .expect("runs");

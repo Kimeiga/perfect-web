@@ -33,6 +33,7 @@ import 'just/proof.just'
 import 'just/guide.just'
 import 'just/evidence-integrity.just'
 import 'just/each-head-effects.just'
+import 'just/argument-invariants.just'
 
 default:
     @just --list

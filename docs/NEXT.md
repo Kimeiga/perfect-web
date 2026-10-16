@@ -2,6 +2,13 @@
 
 The next executable tasks, in order, with acceptance criteria. Charter §3.4.
 
+## Integration follow-ups, 2026-10-15
+
+- ADR-0346's path audit: answer a matched route's non-UTF-8 path segment
+  with 400 as ADR-0309 specifies, with an HTTP regression test; currently
+  it falls through to 404. No invariant-boundary completion claim includes
+  this unperformed repair.
+
 ## Current: E14, the AI benchmark (E10 closed 2026-10-02)
 
 **2026-10-02, E10 closed and E14 started** ([ADR-0119](DECISIONS/ADR-0119-e10-closes-and-the-ai-benchmark-comes-next.md)).

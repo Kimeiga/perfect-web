@@ -5705,7 +5705,9 @@ impl Server {
             Some(match query_params(route, query) {
                 Some(given) => {
                     params.extend(given);
-                    Ok((page.clone(), params))
+                    // TRACK SEAM (argument-invariants): each held to what
+                    // its type states, before anything reads it.
+                    held_params(plan, &params).map(|()| (page.clone(), params))
                 }
                 None => Err(format!("`{path}`'s query is no text its route can read")),
             })
@@ -9000,7 +9002,25 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
         // ADR-0148).
         ("GET", route) if route.starts_with("/page/") => {
             let path = route.trim_start_matches("/page/");
-            match server.page_params(path, query) {
+            // TRACK SEAM (argument-invariants): a parameter its type refuses
+            // is a request refused, 400 and why, as a routed page's is
+            // (ADR-0346); no such page, or one not given, is not found.
+            let params = server.page_params(path, query).map(|params| {
+                let held = held_params(server.plan_of(path), &params);
+                (params, held)
+            });
+            if let Ok((_, Err(why))) = &params {
+                respond(
+                    &mut stream,
+                    400,
+                    "text/plain; charset=utf-8",
+                    &session,
+                    fresh,
+                    why.as_bytes(),
+                );
+                return;
+            }
+            match params.map(|(params, _)| params) {
                 // One that binds a query as the store's is (ADR-0190).
                 Ok(params) if server.binds_a_query(path) => {
                     serve_bound(server, &mut stream, &session, fresh, path, params, query)
@@ -9713,6 +9733,34 @@ fn query_params(route: &str, query: &str) -> Option<Params> {
         out.insert(name, decoded(value)?);
     }
     Some(out)
+}
+
+/// TRACK SEAM (argument-invariants): **a page's parameters, held to the
+/// invariants their types state** (ADR-0346). An address is a browser's, so
+/// each parameter, as [`param_val`] gives it to the page, is decoded as an
+/// argument is (ADR-0179): one that breaks its type's invariant is refused,
+/// by name, before the page is rendered or a query reads it, never shown or
+/// read with. The plan states where (`bounded`, by each parameter's position
+/// in `params`); a page whose parameters' types state none has nothing to
+/// hold.
+fn held_params(plan: &serde_json::Value, params: &Params) -> Result<(), String> {
+    let Some(bounded) = plan.get("bounded") else {
+        return Ok(());
+    };
+    let bounded: Vec<pw_host::Bounded> = serde_json::from_value(bounded.clone()).map_err(|e| {
+        format!("the page's plan states its parameters' invariants unreadably: {e}")
+    })?;
+    let values = plan["params"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|p| {
+            let name = p.as_str().unwrap_or_default();
+            param_val(plan, name, params)
+                .ok_or_else(|| format!("the page's `{name}` is given no value"))
+        })
+        .collect::<Result<Vec<Val>, String>>()?;
+    pw_host::engine::holds(&bounded, &values).map_err(|why| format!("parameter refused: {why}"))
 }
 
 /// **A page parameter's value, as its document's address gave it**
@@ -13880,6 +13928,9 @@ public query Store(",
     // TRACK SEAM (reviews): a store's ratings and reviews, in memory and on
     // PostgreSQL where a database is named.
     mod reviews;
+    // TRACK SEAM (argument-invariants): a value from a browser held to its
+    // type's invariant where it arrives (ADR-0346).
+    mod argument_invariants;
 
     /// **A second program is served by the same host** (ADR-0218): the
     /// feed's timeline from its data layer, and a post committed and sent

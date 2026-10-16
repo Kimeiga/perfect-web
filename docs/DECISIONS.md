@@ -3021,3 +3021,10 @@ verification is pending.
 are semantic expressions. One exhaustive enumeration feeds view walkers;
 effects, privacy, signal and name checks cover all seven positions.
 Accepted under the owner's delegation; train-10 verification pending.
+
+### 2026-10-15 — invariants at external value boundaries
+
+[ADR-0346](DECISIONS/ADR-0346-argument-invariants.md): the host holds
+component arguments before predicates and execution, page parameters at
+arrival, and invariants within maps and sets. Accepted under the owner's
+delegation; integrated train-10 verification pending.

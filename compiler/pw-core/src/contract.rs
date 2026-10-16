@@ -406,6 +406,23 @@ pub(crate) fn bounded_in(
     out
 }
 
+/// **Every invariant a declaration's parameters hold** (ADR-0179), each
+/// parameter's [`bounded_in`] at its position: what a host holds a value
+/// from outside to wherever one is given to the declaration, an export's
+/// arguments and a page's parameters alike (ADR-0346, argument invariants).
+pub(crate) fn bounded_params(sigs: &Signatures, def: crate::resolve::DefId) -> Vec<Bounded> {
+    sigs.by_def(def)
+        .map(|s| {
+            s.params
+                .iter()
+                .enumerate()
+                .filter_map(|(i, p)| Some(bounded_in(sigs, p.as_ref()?.resolved()?, i)))
+                .flatten()
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 fn bounds_within(
     sigs: &Signatures,
     key: &crate::resolved::TypeKey,
@@ -425,10 +442,20 @@ fn bounds_within(
         path.pop();
     };
     match key {
-        TypeKey::Builtin(Builtin::List, args) => {
+        // A set crosses as a list does (`list<t>`, ADR-0057).
+        TypeKey::Builtin(Builtin::List | Builtin::Set, args) => {
             if let Some(item) = args.first() {
                 step("*".into(), item, path, seen, out);
             }
+        }
+        // A map crosses as its entries, each a key and its value (`list<tuple
+        // <k, v>>`, ADR-0057): each entry's key at `0` and its value at `1`.
+        TypeKey::Builtin(Builtin::Map, args) => {
+            path.push("*".into());
+            for (i, arg) in args.iter().take(2).enumerate() {
+                step(i.to_string(), arg, path, seen, out);
+            }
+            path.pop();
         }
         TypeKey::Builtin(Builtin::Option, args) => {
             if let Some(some) = args.first() {
@@ -1701,17 +1728,7 @@ pub fn contracts(hirs: &[&Hir], sigs: &Signatures, ws: &Workspace) -> Vec<Compon
             component.invoked_by = decl
                 .policy("invoked_by")
                 .map(|p| p.value.trim().to_string());
-            component.bounded = sigs
-                .by_def(crate::resolve::DefId { unit, decl: id.0 })
-                .map(|s| {
-                    s.params
-                        .iter()
-                        .enumerate()
-                        .filter_map(|(i, p)| Some(bounded_in(sigs, p.as_ref()?.resolved()?, i)))
-                        .flatten()
-                        .collect()
-                })
-                .unwrap_or_default();
+            component.bounded = bounded_params(sigs, crate::resolve::DefId { unit, decl: id.0 });
             let exports = vec![Export {
                 name: decl.name.clone(),
                 kind: kind.to_string(),

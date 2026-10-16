@@ -983,19 +983,20 @@ pub mod engine {
         out
     }
 
-    /// Authorization requirements for the exact export being invoked.
+    /// **The exact export being invoked, as its contract declares it.**
     ///
     /// A contract may expose more than one operation later, so matching the
-    /// component's interface and function is part of selecting the policy.
+    /// component's interface and function is part of selecting its policy
+    /// and its arguments' invariants.
     ///
     /// A one-segment path is a function the component's world exports
     /// directly, declared with an empty interface. `run` reaches such an
     /// export, and a hand-written guest has one; refusing the path shape made
     /// it unreachable rather than undeclared (2026-10-02).
-    fn authorization_for<'a>(
+    fn declared_export<'a>(
         contract: &'a crate::ComponentContract,
         export: &[&str],
-    ) -> Result<&'a [crate::AuthorizationRequirement], String> {
+    ) -> Result<&'a crate::ComponentExport, String> {
         let (interface, function) = match export {
             [function] => ("", *function),
             [interface, function] => (*interface, *function),
@@ -1010,7 +1011,6 @@ pub mod engine {
             .iter()
             .filter_map(|e| e.component.as_ref())
             .find(|e| e.interface == *interface && e.function == *function)
-            .map(|e| e.authorization.as_slice())
             .ok_or_else(|| {
                 format!(
                     "`{}` is not an export declared by component contract `{}`",
@@ -1018,6 +1018,14 @@ pub mod engine {
                     contract.component_id
                 )
             })
+    }
+
+    /// Authorization requirements for the exact export being invoked.
+    fn authorization_for<'a>(
+        contract: &'a crate::ComponentContract,
+        export: &[&str],
+    ) -> Result<&'a [crate::AuthorizationRequirement], String> {
+        declared_export(contract, export).map(|e| e.authorization.as_slice())
     }
 
     /// Evaluate every `requires` predicate before an invocation.
@@ -1270,6 +1278,46 @@ pub mod engine {
             imports_in(&self.engine, &self.component)
         }
 
+        /// **An export's arguments hold every invariant its contract states,
+        /// at the component's boundary** (ADR-0179; ADR-0346, argument
+        /// invariants).
+        ///
+        /// A value of an opaque type with a `where` invariant exists only if
+        /// it passed the invariant, so a call carrying one that breaks it is
+        /// refused before anything else: before a `requires` predicate reads
+        /// it, before the component is instantiated, and so before its code
+        /// or a data layer sees it. Every call API holds it, whoever built
+        /// the values: a browser's JSON ([`Prepared::arguments_for`] holds
+        /// them as it decodes, and the request is refused before anything is
+        /// kept), a page's address, a stored run, a test. Held as the
+        /// component is passed them, where the contract's paths are: a value
+        /// of a type that contains itself as its nodes (ADR-0194), however it
+        /// was given. Refused in a decoder's words: "argument refused: value
+        /// 2 is 0, and `domain.PositiveInt` holds `value >= 1`".
+        ///
+        /// Only the compiler states what an argument holds, and its exports
+        /// are an interface's: a world's export (a hand-written guest's)
+        /// states nothing, and is called as before.
+        pub fn hold_arguments(
+            &self,
+            contract: &crate::ComponentContract,
+            export: &[&str],
+            args: &[Val],
+        ) -> Result<(), String> {
+            let bounded = &declared_export(contract, export)?.bounded;
+            if bounded.is_empty() {
+                return Ok(());
+            }
+            let func = export_type(&self.engine, &self.component, export)?;
+            let passed: Vec<Val> = args
+                .iter()
+                .cloned()
+                .zip(func.params())
+                .map(|(given, (_, ty))| graph::tangle(given, &ty))
+                .collect::<Result<_, _>>()?;
+            holds(bounded, &passed).map_err(|why| format!("argument refused: {why}"))
+        }
+
         /// [`call_within`], on the compiled component.
         #[allow(clippy::too_many_arguments)]
         pub fn call_within(
@@ -1281,6 +1329,8 @@ pub mod engine {
             export: &[&str],
             args: &[wasmtime::component::Val],
         ) -> Result<Vec<wasmtime::component::Val>, String> {
+            // Its arguments decoded first, before anything else.
+            self.hold_arguments(contract, export, args)?;
             refuse_unevaluated_authorization(contract, export)?;
             run(
                 &self.engine,
@@ -1309,6 +1359,8 @@ pub mod engine {
         where
             F: FnMut(&str, &[&Val]) -> Result<bool, String>,
         {
+            // Its arguments decoded before a predicate reads them.
+            self.hold_arguments(contract, export, args)?;
             authorize_export(contract, export, args, evaluate)?;
             run(
                 &self.engine,
@@ -2469,6 +2521,8 @@ pub mod engine {
             export: &[&str],
             args: &[wasmtime::component::Val],
         ) -> Result<(Vec<wasmtime::component::Val>, Usage), String> {
+            // Its arguments decoded as every call's are.
+            self.hold_arguments(contract, export, args)?;
             refuse_unevaluated_authorization(contract, export)?;
             run_measured(
                 &self.engine,
