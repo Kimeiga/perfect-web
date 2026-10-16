@@ -22,6 +22,7 @@ import tempfile
 import textwrap
 import time
 import unittest
+from unittest import mock
 
 SCRIPTS = pathlib.Path(__file__).resolve().parent.parent
 ROOT = SCRIPTS.parent
@@ -165,6 +166,9 @@ def toy_tree(where: pathlib.Path) -> pathlib.Path:
     (root / "node_modules" / "pkg" / "index.js").write_text("module.exports = 1;\n")
     for name in ("mutation_baseline", "mutation_bound", "mutation_slots"):
         shutil.copy(SCRIPTS / f"{name}.py", root / "scripts" / f"{name}.py")
+    registry = root / "spikes/own-renderer/host-registry.json"
+    registry.parent.mkdir(parents=True)
+    shutil.copy(ROOT / "spikes/own-renderer/host-registry.json", registry)
     (root / "scripts" / "toy_mutations.py").write_text(TOY)
     (root / "src" / "calc.py").write_text(CALC)
     (root / "tests" / "check.py").write_text(CHECK)
@@ -237,7 +241,7 @@ class Toy(unittest.TestCase):
             slot = pathlib.Path(r["cwd"])
             self.assertEqual(slot.parent, base, r)
             k = int(slot.name)
-            self.assertEqual(r["PORT"], str(5000 + 200 * k))
+            self.assertEqual(r["PORT"], str(5000 + 256 * k))
             self.assertEqual(r["TMPDIR"], str(base / f"tmp-{k}"))
             self.assertEqual(r["CARGO_TARGET_DIR"], str(slot / "target"))
             # Nothing the slot runs is asked to deal again.
@@ -439,11 +443,11 @@ class Pieces(unittest.TestCase):
         env = slots.env_of(2, slot, tmp, [1, 5], 9, {"PORT": "9341", "PW_MUTANT_SLOTS": "4", "KEEP": "1"})
         self.assertNotIn("PW_MUTANT_SLOTS", env)
         self.assertEqual(env["PW_MUTANT_PICK"], "9:1,5")
-        self.assertEqual(env["PORT"], str(9341 + 2 * 200))
+        self.assertEqual(env["PORT"], str(9341 + 2 * 256))
         self.assertEqual(env["CARGO_TARGET_DIR"], "/s/2/target")
         self.assertEqual(env["TMPDIR"], "/s/tmp-2")
         self.assertEqual(env["KEEP"], "1")
-        self.assertEqual(slots.env_of(1, slot, tmp, [], 1, {})["PORT"], str(3141 + 200))
+        self.assertEqual(slots.env_of(1, slot, tmp, [], 1, {})["PORT"], str(3141 + 256))
 
     def test_a_slot_is_brought_to_the_tree_by_content(self):
         with tempfile.TemporaryDirectory() as d:
@@ -496,16 +500,92 @@ class Pieces(unittest.TestCase):
             "memory bound: a process was stopped in 1 of 3 mutants' runs, each perhaps killed by the bound alone: m1 [s]",
         )
 
-    def test_each_slots_ports_lie_within_its_stride(self):
-        config = (ROOT / "spikes/own-renderer/playwright.config.mjs").read_text()
-        offsets = [int(n) for n in re.findall(r"PORT \+ (\d+)", config)]
-        self.assertTrue(offsets)
-        # Three engines from the largest offset: PORT + n + 2.
-        self.assertLess(max(offsets) + 2, slots.STRIDE)
+    def test_each_slots_reserved_ports_are_disjoint(self):
+        registry = json.loads((ROOT / "spikes/own-renderer/host-registry.json").read_text())
+        endpoints = []
+        for k in range(3):
+            env = slots.env_of(k, pathlib.Path("/slot"), pathlib.Path("/tmp"), [], 1, {"PORT": "5000"})
+            for role in registry["roles"].values():
+                endpoints.extend(int(env["PORT"]) + offset for offset in role["offsets"].values())
+        self.assertEqual(len(endpoints), len(set(endpoints)), "reserved hosts in different slots collide")
 
     def test_the_scripts_kept_in_order_exist(self):
         for name in slots.SEQUENTIAL:
             self.assertTrue((SCRIPTS / name).exists(), name)
+
+
+class PortRegistry(unittest.TestCase):
+    def registry_tree(self, where, registry=None):
+        root = pathlib.Path(where)
+        leaf = root / "spikes/own-renderer/host-registry.json"
+        leaf.parent.mkdir(parents=True)
+        source = (ROOT / "spikes/own-renderer/host-registry.json").read_text()
+        leaf.write_text(source if registry is None else json.dumps(registry))
+        return root, leaf
+
+    def test_changed_registry_moves_every_slot(self):
+        with tempfile.TemporaryDirectory() as d:
+            registry = json.loads((ROOT / "spikes/own-renderer/host-registry.json").read_text())
+            registry["stride"] = 512
+            root, _ = self.registry_tree(d, registry)
+            with mock.patch.object(slots, "ROOT", root):
+                env = slots.env_of(2, root / "slot", root / "tmp", [], 1, {"PORT": "5000"})
+            self.assertEqual(env["PORT"], "6024")
+
+    def test_missing_or_invalid_metadata_refuses_allocation(self):
+        original = json.loads((ROOT / "spikes/own-renderer/host-registry.json").read_text())
+        invalid = ["{", '{"schema":1,"stride":256,"stride":512,"roles":{}}']
+        for update in ({"schema": 2}, {"stride": True}, {"stride": 0}, {"stride": 200},
+                       {"roles": {}}, {"roles": {"a": {"offsets": {"x": -1}}}},
+                       {"roles": {"a": {"offsets": {"x": True}}}},
+                       {"roles": {"a": {"offsets": {"x": 0, "y": 0}}}}):
+            invalid.append(json.dumps({**original, **update}))
+        for text in [None, *invalid]:
+            with self.subTest(text=text), tempfile.TemporaryDirectory() as d:
+                root, leaf = self.registry_tree(d)
+                if text is None:
+                    leaf.unlink()
+                else:
+                    leaf.write_text(text)
+                with mock.patch.object(slots, "ROOT", root):
+                    with self.assertRaises(ValueError):
+                        slots.env_of(0, root / "slot", root / "tmp", [], 1, {"PORT": "5000"})
+
+    def test_whole_reserved_tcp_range_is_checked(self):
+        registry = json.loads((ROOT / "spikes/own-renderer/host-registry.json").read_text())
+        maximum = max(n for role in registry["roles"].values() for n in role["offsets"].values())
+        base = 65535 - 2 * registry["stride"] - maximum
+        env = slots.env_of(2, pathlib.Path("/slot"), pathlib.Path("/tmp"), [], 1, {"PORT": str(base)})
+        self.assertEqual(int(env["PORT"]) + maximum, 65535)
+        for port in (str(base + 1), "0", "-1", "65536", "x"):
+            with self.subTest(port=port), self.assertRaises(ValueError):
+                slots.env_of(2, pathlib.Path("/slot"), pathlib.Path("/tmp"), [], 1, {"PORT": port})
+        with self.assertRaises(ValueError):
+            slots.env_of(-1, pathlib.Path("/slot"), pathlib.Path("/tmp"), [], 1, {})
+
+    def test_invalid_later_slot_refuses_before_tree_preparation(self):
+        # Only mocked preparation/merge: no child, private socket or project host.
+        mutants = [("a", pathlib.Path("a"), "a", "b"), ("b", pathlib.Path("b"), "b", "c")]
+        run = slots.Run(ROOT / "scripts/toy_mutations.py", mutants, 2, [],
+                        environ={"PORT": "65200"})
+        with mock.patch.object(slots, "require_pidfds"), \
+             mock.patch.object(run, "prepare") as prepare, mock.patch.object(run, "merge") as merge:
+            with self.assertRaises(ValueError):
+                run.run()
+            prepare.assert_not_called()
+            merge.assert_not_called()
+
+    def test_retained_cleanup_import_needs_no_registry(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = pathlib.Path(d) / "reviewed_pidfd.py"
+            path.write_bytes((SCRIPTS / "mutation_slots.py").read_bytes())
+            spec = importlib.util.spec_from_file_location("private_retained_cleanup", path)
+            retained = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(retained)
+            self.assertTrue(callable(retained.pin))
+            self.assertTrue(callable(retained.Run.stop))
+            with self.assertRaises(ValueError):
+                retained.env_of(0, pathlib.Path("/slot"), pathlib.Path("/tmp"), [], 1, {})
 
 
 if __name__ == "__main__":

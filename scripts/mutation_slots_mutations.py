@@ -94,8 +94,8 @@ MUTANTS = [
     (
         "every slot listens on the same ports",
         SLOTS,
-        '            "PORT": str(port + k * STRIDE),\n',
         '            "PORT": str(port),\n',
+        '            "PORT": env.get("PORT", str(DEFAULT_PORT)),\n',
     ),
     (
         "every slot shares one temporary directory",
@@ -397,8 +397,17 @@ MUTANTS += [
     ('deep malformed JSON escapes validation', PROTOCOL, '    except (ValueError, TypeError, KeyError, AttributeError, RecursionError):\n', '    except (ValueError, TypeError, KeyError, AttributeError):\n'),
 ]
 MOCKED_ONLY.add('deep malformed JSON escapes validation')
+MUTANTS += [
+    ("slot spacing ignores the registry", SLOTS,
+     "    port = base + k * stride\n", "    port = base + k * 200\n"),
+    ("a reserved port above TCP's maximum is allocated", SLOTS,
+     "    if base < 1 or port + maximum > 65535:\n", "    if base < 1:\n"),
+    ("invalid later slot ports reach tree preparation", SLOTS,
+     "            if self.dealt:\n                port_for_slot(len(self.dealt) - 1, self.environ, self.root)\n",
+     "            pass\n"),
+]
 BOUND = 900
-CLEANUP_SHA256 = "c87d148cb8bb586bb94e47651de2d1f6354dfec2f42f58fb29f19a16d0935b7a"
+CLEANUP_SHA256 = "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa"
 _CLEANUP = None
 FROZEN = {}
 EVIDENCE = None

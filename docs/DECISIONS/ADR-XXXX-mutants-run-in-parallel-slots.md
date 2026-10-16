@@ -619,3 +619,99 @@ metadata/format/anchor gates and integrator review precede any local commit.
 This ADR remains track-local and unnumbered until integrator merge. D2 remains
 frozen, no port allocator changes were included, and the controlled synchronous
 installed-unittest scope and Unix/Darwin simulation limits remain explicit above.
+
+
+### Allocator consumes the canonical browser registry (integrator ruling before code)
+
+2026-10-16: the immutable c87 allocator still spaces slots by200 while the
+accepted browser-host registry spaces them by256 and reserves role offsets
+through212. The private native loopback probe
+/tmp/allocator-registry-native-c87-proof.json reproduced a real collision:
+slot0 reviews/chromium and slot1 base/shared both selected55573; the second
+exclusive bind failed EADDRINUSE(98). Six offset pairs collide. No project host
+was launched or signalled. Historical whole82/full CI above remains evidence of
+its old inputs, not of this cross-track composition.
+
+Adopt only the exact immutable registry leaf from browser-host-map native-v6,
+SHA256 abcfc8d0df78aeee31456d1e8fb9f4fdd6983f9fc0e44371245a963779185f72.
+It is the sole port metadata authority. Python reads its stride and reserved
+role offsets lazily when allocating, never during import: retained copies of
+this module are also cleanup-only authorities outside a repository. Missing,
+malformed, duplicate, overlapping, out-of-stride or unrepresentable TCP metadata
+must refuse allocation, with no hardcoded fallback. Validate the highest dealt
+slot before any slot tree preparation or child launch, and retain each slot's
+normal environment isolation. Private toy trees copy the same registry leaf.
+No browser config/spec/runtime change, no pidfd/process cleanup policy change,
+no new dependency, and no edit/hash bump to any already-active campaign's c87
+copy is included. New allocation tests must prove actual reserved endpoint
+uniqueness, registry-driven spacing and boundary refusals; synthetic no-launch
+and lazy import cases are narrowly qualified. Record causal RED before fixing
+production. Reanchor the existing port-deletion control to the same env_of
+behavior and add genuine wrong-stride/preflight controls. Rerun the complete
+own mutation campaign and fresh CI on the final locked inputs before commit.
+
+
+Allocator causal RED is /tmp/parallel-ports-v1/causal-before.txt (native Python
+status1,16 assertion failures across6 methods, no errors; SHA256
+ dacaa516821987a3548b8b0919734ad59d1017831ec48c4597661656a7b21529).
+The source helper remained exact c87 during that run. The first production
+correction made all new allocation cases pass; the complete focused164 run had
+one remaining failure only in the explicit Darwin simulated-discovery fixture:
+its old exact159-method/78-pass inventory omitted the five added portable tests.
+Raw /tmp/parallel-ports-v1/focused-after.txt SHA256
+ e09c262f1932bd8b095904adafcac61eab7d1472e03a44c830cffed1a1bc100e.
+Retain the81 exact Linux skips and update that exact fixture to164 methods and83
+portable passes, without weakening any count or skip assertion. This is the
+integrator ruling before the fixture edit. No completed campaign input changes.
+
+
+Final focused164/164/0skip is GREEN, raw focused-final.txt SHA256
+788e478941177f32c77245c9c7f3f1017467cb167a8983bf84d228965e0c8344.
+The Darwin simulation remains83 portable passes/81 explicit Linux skips, not
+164 Darwin behavioral passes. Global2967 anchors/262 scripts and diff-check
+are green. Actual private native-after.json confirms the two formerly colliding
+roles can hold distinct exclusive loopback sockets simultaneously (58487 and
+58543 for base58287). The registry leaf remains byte-exact abcfc8d0; the new
+allocator is8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa.
+Only the existing port-environment control was reanchored; three additional
+controls cover wrong spacing, TCP overflow and missing early preflight. Existing
+pidfd operations, cleanup code, timeouts and cancellation policy are unchanged.
+The upcoming whole85 uses an external passive wait observer to retain actual
+native statuses and replays every report using the frozen pure protocol; it
+changes no producer argument, native exit, timeout or cleanup behavior. Exact
+all-source pathset+byte/index receipts gate fresh CI on the same locked snapshot.
+No current campaign or any other worktree has adopted this helper hash.
+
+
+Allocator whole85 naturally GREEN, 800.197s, all2600 frozen pathset/bytes
+and index restored; raw docs/evidence/E14/parallel-ports-whole.txt SHA256
+59b83e57dcd15363e7b03c001d4b20c23d156fbb7d06a9a40e3d702fb30bb434. Retained88 actual native commands comprise two frozen
+inventories164/67, baseline164 and85 controls. Independent canonical protocol
+replay validates every report and exact method roster.80 controls include
+assertions,12 include body errors,7 overlap,5 error-only; do not call85 assertion
+kills. The3 new allocation controls include genuine original assertions. No
+invalid/build/stopped producer earned credit. Process/timeout policy unchanged.
+
+The completed whole's external postcheck initially rejected its own broad regex
+matching stopped inside the affirmative no-process-stopped sentence. Source and
+native results remained unchanged. The retained observer ruling precedes its
+exact-line correction. CI-only resume replayed all88 native records and the
+same2600 inputs/index, then fresh default just ci naturally passed0 in
+2052.135s, rawSHA256 b48e472b6d48c27046df091d8cfd43e8b04c598cff7734609c2f687fd14617af.
+BothKiokun deployment variables were absent, Cargo offline/jobs2/threads2,
+private target/PORT17201. The CI census and fullraw are committed evidence.
+
+Only this acceptance metadata and evidence publication follow the locked gates.
+Every functional source/test/registry byte retains its validated manifest hash.
+Prior whole82/fullCI remain historical; active consumer copies of c87 were not
+changed. This track remains unnumbered until integrator merge; final assembled
+validation and remote gates remain required before any main landing.
+
+
+The new same-source CI census is336 successful Rust target summaries with
+2882passed/0failed/25ignored, plus320 Python tests run:319passed and one explicit
+master-evidence-presence skip. The skip is the existing branch deferral, not
+an allocator behavioral pass. Exact native summary lines are retained in
+parallel-ports-ci-census.json and the byte-identical full CI output. Post-
+publication cargo fmt --all -- --check and the unchanged global2967/262 anchors
+passed; all functional inputs retained their frozen hashes after publication.

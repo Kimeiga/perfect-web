@@ -1,0 +1,767 @@
+[
+  {
+    "name": "a run asked for slots runs the script's loop in the tree",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "1bea0932c2b920c9683171266254076f35095e75782ccba562659be8ca3caefe",
+    "original_bytes": 37735,
+    "altered_bytes": 37743
+  },
+  {
+    "name": "a slot runs the tree's copy of the script",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "0b1971218bb8f7b77786abf57a8ecea588c06ff212488267dea3b5fab16d4a5e",
+    "original_bytes": 37735,
+    "altered_bytes": 37731
+  },
+  {
+    "name": "a slot runs every mutant, not those dealt to it",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "ec046d6f6fbb6079c9c4b04ea98d239e0b2547cc2e0e003a5d0722378d8c65f9",
+    "original_bytes": 37735,
+    "altered_bytes": 37719
+  },
+  {
+    "name": "a slot's mutants are not checked against the count they were dealt from",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "e5c7f1526e45112436e8ffb9259eada63b073099f1afd62216ecb2dcd3e30b1f",
+    "original_bytes": 37735,
+    "altered_bytes": 37705
+  },
+  {
+    "name": "no slots is a number of slots",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "b09a4a3a7430722895bdba2687f8bfe076954961adb8cf3e6f9f1862ff7c1278",
+    "original_bytes": 37735,
+    "altered_bytes": 37719
+  },
+  {
+    "name": "the ask for slots reaches what a slot runs",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "06fb170875e9afbd4cbe9e5dc1078e429576bd158552af5b0af0d139926dd272",
+    "original_bytes": 37735,
+    "altered_bytes": 37719
+  },
+  {
+    "name": "the mutants dealt reach what a slot runs",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "fc82468cfd2e0412353133c1194b8fa147adac614a9a883c6177aa73fba1b1d9",
+    "original_bytes": 37735,
+    "altered_bytes": 37729
+  },
+  {
+    "name": "every slot listens on the same ports",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "9fa01deea5d6c751aba6310a853cf095cc2c6a9dff5cb0084239bd65838c4e1d",
+    "original_bytes": 37735,
+    "altered_bytes": 37760
+  },
+  {
+    "name": "every slot shares one temporary directory",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "f0e8ac23aef0c9222e78e6cff0d9a5fece40836f691d6d94f7b8b5f309ffa14d",
+    "original_bytes": 37735,
+    "altered_bytes": 37752
+  },
+  {
+    "name": "a slot builds in the tree's target",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "d6ee7251cfb3a5df6f55ddde08e0db4aa68187383beedbe64158cd5824e14bb8",
+    "original_bytes": 37735,
+    "altered_bytes": 37735
+  },
+  {
+    "name": "slot 0 is not dealt a mutant of each suite first",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "c762a3d760aeab392aae3a763c60a87195698e6b034de601b2032666483fa9b0",
+    "original_bytes": 37735,
+    "altered_bytes": 37746
+  },
+  {
+    "name": "a run given arguments is dealt to slots",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "67a896679f302f68dc7c8654c0f1b084f342b67b5cf28e10a18bb2276f58fe92",
+    "original_bytes": 37735,
+    "altered_bytes": 37719
+  },
+  {
+    "name": "the mutants are said in the slots' order, not the script's",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "79fd9165243aca2fc739f9138e768c732939938739b3ca57d501e0cc795cae31",
+    "original_bytes": 37735,
+    "altered_bytes": 37745
+  },
+  {
+    "name": "the slots do not wait for every baseline",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "7acbad75efc4b715b35a90e98c3a13d2ed125433177ca1690b82809fc41c17d7",
+    "original_bytes": 37735,
+    "altered_bytes": 37656
+  },
+  {
+    "name": "a red baseline in one slot is not said as the script says it",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "8d6e60098a4a89f386e1da5b111206204fd147e634e009caace199c2b981c2bf",
+    "original_bytes": 37735,
+    "altered_bytes": 37667
+  },
+  {
+    "name": "a mutant's lines before its verdict are another's",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "1e198c72ceb19598141f30670135405d00c1b2e455ad3c7628f96304abe5e4ca",
+    "original_bytes": 37735,
+    "altered_bytes": 37722
+  },
+  {
+    "name": "a slot's baseline is all it said before its first verdict",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "ec4971329f87e843b3b6e8b02c0c5a071c651795e80f0c257c5eb93443c30ec2",
+    "original_bytes": 37735,
+    "altered_bytes": 37689
+  },
+  {
+    "name": "a verdict that names no suite is no mutant's",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "57b31f6928e4f7cc2490a6a35b8ce26a5f8129599a6c854803f0a647fad500de",
+    "original_bytes": 37735,
+    "altered_bytes": 37701
+  },
+  {
+    "name": "a longer description is taken for a shorter one",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "faff1d0854ce8f6b0bf523dfcd30a04efc46c3f9276c081565d5b56e4eb3449d",
+    "original_bytes": 37735,
+    "altered_bytes": 37693
+  },
+  {
+    "name": "the count is the first slot's",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "1d11c2871df6590da7decda96d6e145d7ad65847535190ce56b2f3e063dd8833",
+    "original_bytes": 37735,
+    "altered_bytes": 37748
+  },
+  {
+    "name": "the memory bound's line forgets a stop",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "135259b583c888c8a96c3be022572cece04acb1a8b24c4af82019cd024a03e13",
+    "original_bytes": 37735,
+    "altered_bytes": 37727
+  },
+  {
+    "name": "the run ends well though a slot's mutant survived",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "e1104d5378646d116a4da87bc51590faa13b63b56b0a25e12912988648a62860",
+    "original_bytes": 37735,
+    "altered_bytes": 37689
+  },
+  {
+    "name": "a slot is brought to the tree by whether a file is there, not by its content",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "43e4ac02ece881d26bd0fc6540ab3408c71d305cbe3339f4f3b675abea0f38e9",
+    "original_bytes": 37735,
+    "altered_bytes": 37715
+  },
+  {
+    "name": "what a run left in a slot is kept",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "ebc18cf8256c0766ac42aa05cff54b4446958b81a20cde059496ce7c5f478193",
+    "original_bytes": 37735,
+    "altered_bytes": 37745
+  },
+  {
+    "name": "node_modules is copied, not linked",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "8ffa42077f444043b9950307232b3ad203289c58fa26e34c9a0a4450a43422e1",
+    "original_bytes": 37735,
+    "altered_bytes": 37680
+  },
+  {
+    "name": "the tree's target is copied into a slot",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "0d898701d3b5811af85cabf22bc49cc9f324ce30a13a5c44255fd43d9fcbecee",
+    "original_bytes": 37735,
+    "altered_bytes": 37726
+  },
+  {
+    "name": "a slot's git tracks nothing",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "d414266221db50f605e5d735f82cbf34ce542f2122d84030ec269d6fd5ab7ae9",
+    "original_bytes": 37735,
+    "altered_bytes": 37698
+  },
+  {
+    "name": "two runs share the slots at once",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "09ef55d42c0d6ea32800399b00066bd7c7addded6e05bee3a8eb22df936151a4",
+    "original_bytes": 37735,
+    "altered_bytes": 37686
+  },
+  {
+    "name": "a run stopped from outside leaves its slots running",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "facdab90d1638c70573c73fd02185ed460cd8c81fab1782767f165b1bd81d499",
+    "original_bytes": 37735,
+    "altered_bytes": 37711
+  },
+  {
+    "name": "a stopped slot root is not terminated",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "0ca626bdca4c772102a316c879f1eebd648a6c929e089fd92e92014926350c73",
+    "original_bytes": 37735,
+    "altered_bytes": 37723
+  },
+  {
+    "name": "what a stopped slot started in a session of its own is left running",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "10abb28f44f30ae9a65cdac279f843dd395f127ac33e245dfb57663efab7859b",
+    "original_bytes": 37735,
+    "altered_bytes": 37701
+  },
+  {
+    "name": "a reused discovered identity is pinned",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "318116b04dda7bd4a51735a9d81c9adc1af2eecadb5d671396aa7249af30ae14",
+    "original_bytes": 37735,
+    "altered_bytes": 37684
+  },
+  {
+    "name": "a reuse while opening a pidfd is accepted",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "ad1f31af1b23631466e53e73398af1bc2c95d5e56b8753aa04370d7223143b3a",
+    "original_bytes": 37735,
+    "altered_bytes": 37745
+  },
+  {
+    "name": "a pinned signal is redirected to a numeric PID",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "2355e49c1dee65dd13ed3b2cb98a6724265eda3826f3ebd76d15750da74efb21",
+    "original_bytes": 37735,
+    "altered_bytes": 37719
+  },
+  {
+    "name": "parallel launch omits its capability probe",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "ee248300e711e5a28d378cbd0eb77297e30b54853b99d5c1ebe264d993566fd2",
+    "original_bytes": 37735,
+    "altered_bytes": 37723
+  },
+  {
+    "name": "launch cancellation is raised before the child handoff",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "42297cc75be364e58599354b60970b5e46da8a7bdf522eb32362c0d12faedaff",
+    "original_bytes": 37735,
+    "altered_bytes": 37745
+  },
+  {
+    "name": "repeated cancellation interrupts frozen-child cleanup",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "dbed38cc00f8e3abecb7b14301e0a4b9d1071fa903b63574350481416d8b3265",
+    "original_bytes": 37735,
+    "altered_bytes": 37745
+  },
+  {
+    "name": "a live unidentified descendant is treated as absent",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "f5bdd0435d18d9a3e2c173c470d5abce2d9663d1a9abed97a573b1461908d49a",
+    "original_bytes": 37735,
+    "altered_bytes": 37745
+  },
+  {
+    "name": "a descriptor closes without confirming process exit",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "6101c8193b727cb0cd6aed1380307265d98497e998d5c30eff2e63f8b6ced8ab",
+    "original_bytes": 37735,
+    "altered_bytes": 37745
+  },
+  {
+    "name": "unreadable live root state counts as exited",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "2db463057136815fe8e0d47505710875d888a9a89618b00b6ab7d88c038b2ddb",
+    "original_bytes": 37735,
+    "altered_bytes": 37743
+  },
+  {
+    "name": "an invalid unittest exit earns a kill",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/unittest_protocol.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "91e941dc2157d53292aa5a709c4c3f0d10210f61a2db23d9edcaeb1df691ee55",
+    "altered_sha256": "984f5baf740ff5b1f9799c6e81076ac96a07f27c61c6b71e9ff816441ff833b0",
+    "original_bytes": 5214,
+    "altered_bytes": 5226
+  },
+  {
+    "name": "contradictory unittest inventories are accepted",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/unittest_protocol.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "91e941dc2157d53292aa5a709c4c3f0d10210f61a2db23d9edcaeb1df691ee55",
+    "altered_sha256": "a12a3b42c09f56174be9dac6220bba97dfdd16ca703a42cc397d8837b583e13d",
+    "original_bytes": 5214,
+    "altered_bytes": 5226
+  },
+  {
+    "name": "a report with different expected methods is accepted",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/unittest_protocol.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "91e941dc2157d53292aa5a709c4c3f0d10210f61a2db23d9edcaeb1df691ee55",
+    "altered_sha256": "4eb2d549303ea1dfcbb3814b5e2537f396070d1965dd3c3fad53c4a40c485259",
+    "original_bytes": 5214,
+    "altered_bytes": 5189
+  },
+  {
+    "name": "incomplete start or finish inventories are accepted",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/unittest_protocol.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "91e941dc2157d53292aa5a709c4c3f0d10210f61a2db23d9edcaeb1df691ee55",
+    "altered_sha256": "211c39e4be649febc9d6ca218480a2d8e9de1cf245917432a9496c810fca33dc",
+    "original_bytes": 5214,
+    "altered_bytes": 5226
+  },
+  {
+    "name": "unexecuted or repeated method bodies are accepted",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/unittest_protocol.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "91e941dc2157d53292aa5a709c4c3f0d10210f61a2db23d9edcaeb1df691ee55",
+    "altered_sha256": "89dd362786c2917d251dd4b43260a9c095a83dccf9391f4e46d879008f6a99c4",
+    "original_bytes": 5214,
+    "altered_bytes": 5173
+  },
+  {
+    "name": "fixture events may earn a kill",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/unittest_protocol.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "91e941dc2157d53292aa5a709c4c3f0d10210f61a2db23d9edcaeb1df691ee55",
+    "altered_sha256": "639be9d3fd6453068fa9c632f7816fd479285324cafcb608ad1f66ee61c04228",
+    "original_bytes": 5214,
+    "altered_bytes": 5224
+  },
+  {
+    "name": "a refused or skipped producer may earn a kill",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/unittest_protocol.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "91e941dc2157d53292aa5a709c4c3f0d10210f61a2db23d9edcaeb1df691ee55",
+    "altered_sha256": "87d77d7e1ef631813cea47a64bebc1930de03aaf2f76b3a83f8ebadba1bde46b",
+    "original_bytes": 5214,
+    "altered_bytes": 5224
+  },
+  {
+    "name": "failed subtest events invent failed method counts",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/unittest_protocol.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "91e941dc2157d53292aa5a709c4c3f0d10210f61a2db23d9edcaeb1df691ee55",
+    "altered_sha256": "4437f049f471bc0ac77d7b93f42ffaa8308a8abe43ac5ef955cc0cb69f3a78f0",
+    "original_bytes": 5214,
+    "altered_bytes": 5204
+  },
+  {
+    "name": "duplicate protocol keys are accepted",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/unittest_protocol.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "91e941dc2157d53292aa5a709c4c3f0d10210f61a2db23d9edcaeb1df691ee55",
+    "altered_sha256": "83dce480b251e437a2e4468e30e8fa3682a731ae607c2cc1fa9314ff6e72f1a2",
+    "original_bytes": 5214,
+    "altered_bytes": 5224
+  },
+  {
+    "name": "producer cleanup uses communicate instead of a bounded wait",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots_mutations.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "18465a8afc88336dea886846861418e40555e65c932b2fea06549a7a6e92e572",
+    "altered_sha256": "95d8f5265130d8b3309e0634df10bb25b3bad673005edc1cf07e469f3b21a6a3",
+    "original_bytes": 32533,
+    "altered_bytes": 32540
+  },
+  {
+    "name": "an already exited producer root hides unproved orphans",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots_mutations.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "18465a8afc88336dea886846861418e40555e65c932b2fea06549a7a6e92e572",
+    "altered_sha256": "844c10699e878cc58acaf5dafa822d08301982cdb7525503e72b303cba5c9ca7",
+    "original_bytes": 32533,
+    "altered_bytes": 32543
+  },
+  {
+    "name": "producer root is reaped before it is pinned",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots_mutations.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "18465a8afc88336dea886846861418e40555e65c932b2fea06549a7a6e92e572",
+    "altered_sha256": "adfd4542260111da6dacbe3727a29f7931039773d251fdfc7782e82a5398eb90",
+    "original_bytes": 32533,
+    "altered_bytes": 32577
+  },
+  {
+    "name": "mocked profile leaves process creation unguarded",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/tests/test_mutation_slot_processes.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "9d7d452a58ec508c9c412dd308f7482f2d0e18b43a01aa258781ebee5a2cd0f3",
+    "altered_sha256": "b7d12bb22964c165282d9b122c7226dc5f27a16dd200c41eb73bf198a472884b",
+    "original_bytes": 53369,
+    "altered_bytes": 53346
+  },
+  {
+    "name": "body exception provenance is discarded",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/unittest_producer.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "902dfef3cf62b16eaa264f0cba52a1bc30bc25d9c7e6bf0718ae6a2beea8b662",
+    "altered_sha256": "911a0c216bd677b7c75ebdf9018b320dff91bee18fc90e4bad2ec7b661ebcd95",
+    "original_bytes": 22309,
+    "altered_bytes": 22312
+  },
+  {
+    "name": "fixture exception provenance becomes body provenance",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/unittest_producer.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "902dfef3cf62b16eaa264f0cba52a1bc30bc25d9c7e6bf0718ae6a2beea8b662",
+    "altered_sha256": "6dce7ced8db37b8928a46835aba7d962ffe10cda29ce0e6dc8364cce6e3226a0",
+    "original_bytes": 22309,
+    "altered_bytes": 22306
+  },
+  {
+    "name": "executed subtest provenance is discarded",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/unittest_producer.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "902dfef3cf62b16eaa264f0cba52a1bc30bc25d9c7e6bf0718ae6a2beea8b662",
+    "altered_sha256": "73be3bea28094d5bdbdfeea439e7c8a670cf19e842adcf05cc8804899ec90bc3",
+    "original_bytes": 22309,
+    "altered_bytes": 22312
+  },
+  {
+    "name": "loader failures become method inventories",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/unittest_producer.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "902dfef3cf62b16eaa264f0cba52a1bc30bc25d9c7e6bf0718ae6a2beea8b662",
+    "altered_sha256": "eec86f24bb5ad9db14206de5f5c1a3fffe0afa21e39281bc334af95e1ed8969f",
+    "original_bytes": 22309,
+    "altered_bytes": 22319
+  },
+  {
+    "name": "producer executes despite changed frozen method IDs",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/unittest_producer.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "902dfef3cf62b16eaa264f0cba52a1bc30bc25d9c7e6bf0718ae6a2beea8b662",
+    "altered_sha256": "953ea8faf8ae971b6d579d1048784a7589dfa00cf7967d0322c50ae338f6a467",
+    "original_bytes": 22309,
+    "altered_bytes": 22319
+  },
+  {
+    "name": "secondary cleanup errors swallow cancellation",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots_mutations.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "18465a8afc88336dea886846861418e40555e65c932b2fea06549a7a6e92e572",
+    "altered_sha256": "ab6376ff46efda20c1930933910e01c309b6a181954cf682aec3ed50dbae9a65",
+    "original_bytes": 32533,
+    "altered_bytes": 32543
+  },
+  {
+    "name": "output close replaces primary cancellation",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots_mutations.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "18465a8afc88336dea886846861418e40555e65c932b2fea06549a7a6e92e572",
+    "altered_sha256": "055ae72fd64a4901b5f1b1c31e7fe16681f2521765ca19413746445b44d8fba1",
+    "original_bytes": 32533,
+    "altered_bytes": 32516
+  },
+  {
+    "name": "normal cleanup signals are not recorded",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots_mutations.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "18465a8afc88336dea886846861418e40555e65c932b2fea06549a7a6e92e572",
+    "altered_sha256": "d122540a9210a595f243e168fa98f790ba9b3ae02ce419872d589478f3f87dbb",
+    "original_bytes": 32533,
+    "altered_bytes": 32543
+  },
+  {
+    "name": "a repeated callback replaces the first pending cancellation",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots_mutations.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "18465a8afc88336dea886846861418e40555e65c932b2fea06549a7a6e92e572",
+    "altered_sha256": "c376d53d3916b09965fd8d0cb9e0a6715082182ed4d23c96387156fc794a15cf",
+    "original_bytes": 32533,
+    "altered_bytes": 32522
+  },
+  {
+    "name": "secondary cancellation is reduced to ordinary diagnostic text",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots_mutations.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "18465a8afc88336dea886846861418e40555e65c932b2fea06549a7a6e92e572",
+    "altered_sha256": "3bc29d93a4295d4d3e7372de130f81f1df7809de48f897f68a7eb7008bce7284",
+    "original_bytes": 32533,
+    "altered_bytes": 32543
+  },
+  {
+    "name": "pending cancellation is not promoted after releases",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots_mutations.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "18465a8afc88336dea886846861418e40555e65c932b2fea06549a7a6e92e572",
+    "altered_sha256": "0bf317a1a5cfc4ce0e9ed30364f59ceb17c443e7dd80b543ce36ffb4d521596d",
+    "original_bytes": 32533,
+    "altered_bytes": 32530
+  },
+  {
+    "name": "deferred invocation results are treated as synchronous",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/unittest_producer.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "902dfef3cf62b16eaa264f0cba52a1bc30bc25d9c7e6bf0718ae6a2beea8b662",
+    "altered_sha256": "6923d6d9ec9dd8f5db294d3dc898ad13c7712c550e30a31fa9a70c7bef5287a6",
+    "original_bytes": 22309,
+    "altered_bytes": 22319
+  },
+  {
+    "name": "runtime async generators are ignored",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/unittest_producer.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "902dfef3cf62b16eaa264f0cba52a1bc30bc25d9c7e6bf0718ae6a2beea8b662",
+    "altered_sha256": "8678767d43fff5ee6acb0bbd134433b43ebc0bbaf095583a94ed06bba68f007b",
+    "original_bytes": 22309,
+    "altered_bytes": 22280
+  },
+  {
+    "name": "instance cleanup checks only the discarding outer hook",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/unittest_producer.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "902dfef3cf62b16eaa264f0cba52a1bc30bc25d9c7e6bf0718ae6a2beea8b662",
+    "altered_sha256": "ae66786389491c23d48938d54a469549298045806269b5cf4f85a32277f0f175",
+    "original_bytes": 22309,
+    "altered_bytes": 22309
+  },
+  {
+    "name": "class and module cleanup callbacks bypass return observation",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/unittest_producer.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "902dfef3cf62b16eaa264f0cba52a1bc30bc25d9c7e6bf0718ae6a2beea8b662",
+    "altered_sha256": "9b8afe5d42e5a24e3e369e2069e0a4e0651914d89f969d05edecc35b44b127b8",
+    "original_bytes": 22309,
+    "altered_bytes": 22309
+  },
+  {
+    "name": "class fixtures bypass return observation",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/unittest_producer.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "902dfef3cf62b16eaa264f0cba52a1bc30bc25d9c7e6bf0718ae6a2beea8b662",
+    "altered_sha256": "69e2c26949a48d5af5285bd0918b6032e6204eea94ed1df59f6d395fcf4e8433",
+    "original_bytes": 22309,
+    "altered_bytes": 22261
+  },
+  {
+    "name": "module fixtures bypass return observation",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/unittest_producer.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "902dfef3cf62b16eaa264f0cba52a1bc30bc25d9c7e6bf0718ae6a2beea8b662",
+    "altered_sha256": "85ee484ea143a0da742cc70f056e1c95dbb225062770375083a4b9c6bfb90f25",
+    "original_bytes": 22309,
+    "altered_bytes": 22262
+  },
+  {
+    "name": "restoration requeues consumed cleanups",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/unittest_producer.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "902dfef3cf62b16eaa264f0cba52a1bc30bc25d9c7e6bf0718ae6a2beea8b662",
+    "altered_sha256": "d56a9bcb3355d8103e966fe6e094f5a6ad2879edcf9325554afdf8506876172f",
+    "original_bytes": 22309,
+    "altered_bytes": 22311
+  },
+  {
+    "name": "original fixture bindings are not restored",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/unittest_producer.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "902dfef3cf62b16eaa264f0cba52a1bc30bc25d9c7e6bf0718ae6a2beea8b662",
+    "altered_sha256": "5cee9be6b24505c40c0b49a97a87873f0bf45f0409f357bc5309ed47706ad013",
+    "original_bytes": 22309,
+    "altered_bytes": 22282
+  },
+  {
+    "name": "deferred invocation results are never closed",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/unittest_producer.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "902dfef3cf62b16eaa264f0cba52a1bc30bc25d9c7e6bf0718ae6a2beea8b662",
+    "altered_sha256": "e2a06eae6db9dda35abeea732625d4b32f2c4267f8a62f7c8789c0d8d10e5b17",
+    "original_bytes": 22309,
+    "altered_bytes": 22306
+  },
+  {
+    "name": "canonical execution and registration changes are ignored",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/unittest_producer.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "902dfef3cf62b16eaa264f0cba52a1bc30bc25d9c7e6bf0718ae6a2beea8b662",
+    "altered_sha256": "87694792004ddb79ded3297e13c68b764bfe17f8a800bbbcbe48ef05c2593bb0",
+    "original_bytes": 22309,
+    "altered_bytes": 22323
+  },
+  {
+    "name": "custom suite execution may omit fixtures",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/unittest_producer.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "902dfef3cf62b16eaa264f0cba52a1bc30bc25d9c7e6bf0718ae6a2beea8b662",
+    "altered_sha256": "eace3f347a2a244ad76cd4778ee6f28f30c15216ab8a0723a7504143d7e76529",
+    "original_bytes": 22309,
+    "altered_bytes": 22294
+  },
+  {
+    "name": "effective instance execution hooks are not checked",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/unittest_producer.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "902dfef3cf62b16eaa264f0cba52a1bc30bc25d9c7e6bf0718ae6a2beea8b662",
+    "altered_sha256": "c3c851fc7130b8a149e2ae10fa1b9f4241bce83f50300177cdfba4f8e73be7f9",
+    "original_bytes": 22309,
+    "altered_bytes": 22268
+  },
+  {
+    "name": "suite global dispatch helpers are not frozen",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/unittest_producer.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "902dfef3cf62b16eaa264f0cba52a1bc30bc25d9c7e6bf0718ae6a2beea8b662",
+    "altered_sha256": "1c1c0cd09768aa818e30a03dcd2564a85c67842a22e3788a8847d4e6e44a8e75",
+    "original_bytes": 22309,
+    "altered_bytes": 22235
+  },
+  {
+    "name": "runner and Outcome execution descriptors are not frozen",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/unittest_producer.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "902dfef3cf62b16eaa264f0cba52a1bc30bc25d9c7e6bf0718ae6a2beea8b662",
+    "altered_sha256": "e6511e2f21aecddb60c7304807750844eed54b888b02de353f5de5afaca1e02f",
+    "original_bytes": 22309,
+    "altered_bytes": 22249
+  },
+  {
+    "name": "suppressed captured exceptions are accepted",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/unittest_producer.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "902dfef3cf62b16eaa264f0cba52a1bc30bc25d9c7e6bf0718ae6a2beea8b662",
+    "altered_sha256": "6de327c952e1ed07ff67c8d853fcd8d2129060fb9d8e4ed24d44b7bc0a9b9daf",
+    "original_bytes": 22309,
+    "altered_bytes": 22241
+  },
+  {
+    "name": "a cached protocol replaces actual local validation authority",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots_mutations.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "18465a8afc88336dea886846861418e40555e65c932b2fea06549a7a6e92e572",
+    "altered_sha256": "1b6bbb543ffd95eddd89779d18ad37c6707a18ec312533807789894a20b959c3",
+    "original_bytes": 32533,
+    "altered_bytes": 32577
+  },
+  {
+    "name": "body errors are relabelled as assertion failures",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/unittest_protocol.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "91e941dc2157d53292aa5a709c4c3f0d10210f61a2db23d9edcaeb1df691ee55",
+    "altered_sha256": "18a1ddc70e01f550b59dbf2637bd2865e59afdeff0b37795e8332e92ee137318",
+    "original_bytes": 5214,
+    "altered_bytes": 5219
+  },
+  {
+    "name": "deep malformed JSON escapes validation",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/unittest_protocol.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "91e941dc2157d53292aa5a709c4c3f0d10210f61a2db23d9edcaeb1df691ee55",
+    "altered_sha256": "814c33e49985f78cbb8f558f828a18ef49b4e9fbf68497550c143b008476f574",
+    "original_bytes": 5214,
+    "altered_bytes": 5198
+  },
+  {
+    "name": "slot spacing ignores the registry",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "dcb74ad9fe754ce8e6c6fe4368707ddb4d0b932b89a5273939650bbe10528828",
+    "original_bytes": 37735,
+    "altered_bytes": 37732
+  },
+  {
+    "name": "a reserved port above TCP's maximum is allocated",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "dce1a120986da1a150aac05f6becc7d6cb889bdf3deee5d21db5e08785d7d2b7",
+    "original_bytes": 37735,
+    "altered_bytes": 37709
+  },
+  {
+    "name": "invalid later slot ports reach tree preparation",
+    "source": "/home/haki/code/pw-wt/parallel-instrument/scripts/mutation_slots.py",
+    "anchor_occurrences": 1,
+    "original_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+    "altered_sha256": "42e5794d1ce5c1eb99d16a35ea7010a9afbc384cb0ee0e27b5203f6dfb7d27f0",
+    "original_bytes": 37735,
+    "altered_bytes": 37649
+  }
+]

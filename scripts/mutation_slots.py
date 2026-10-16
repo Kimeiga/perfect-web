@@ -22,7 +22,7 @@ to N slots and runs them at once. Unset, or 1, nothing changes.
     answered in the slot as in the tree.
   - Its own `CARGO_TARGET_DIR`, `<slot>/target`, where the repository's
     scripts look for what cargo built.
-  - Its own ports, `PORT + k x 200` (`PORT` 3141 where unset), and its own
+  - Its own ports, `PORT + k x registry stride` (`PORT` 3141 where unset), and its own
     `TMPDIR`: two slots running one test that names a fixed temporary
     directory do not share it.
 - **A slot runs the script's own copy**, its `MUTANTS` narrowed to those
@@ -39,6 +39,7 @@ to N slots and runs them at once. Unset, or 1, nothing changes.
 """
 
 import fcntl
+import json
 import os
 import pathlib
 import re
@@ -60,10 +61,58 @@ SLOT = "PW_MUTANT_SLOT"
 # Where the slots are kept, where not under the tree's `target/`.
 WHERE = "PW_MUTANT_SLOT_DIR"
 
-# Each slot's ports: `PORT + k * STRIDE` and the offsets the browser suites
-# add (the largest, PORT+182, in spikes/own-renderer/playwright.config.mjs).
-STRIDE = 200
+# The browser registry is the only port metadata authority. Read it only when
+# allocating: retained pidfd cleanup copies also load outside a repository.
 DEFAULT_PORT = 3141
+
+
+def port_layout(root=None):
+    """The registry's stride and highest reserved offset, including idle roles."""
+    root = ROOT if root is None else root
+
+    def unique(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate registry key: " + key)
+            result[key] = value
+        return result
+
+    try:
+        registry = json.loads((root / "spikes/own-renderer/host-registry.json").read_text(),
+                              object_pairs_hook=unique)
+        if type(registry["schema"]) is not int or registry["schema"] != 1:
+            raise ValueError("unknown registry schema")
+        stride, roles = registry["stride"], registry["roles"]
+        if type(stride) is not int or not 0 < stride <= 65535:
+            raise ValueError("invalid registry stride")
+        if type(roles) is not dict or not roles:
+            raise ValueError("missing reserved roles")
+        offsets = []
+        for role in roles.values():
+            reserved = role["offsets"]
+            if type(reserved) is not dict or not reserved:
+                raise ValueError("missing role offsets")
+            offsets.extend(reserved.values())
+        if any(type(n) is not int or n < 0 for n in offsets):
+            raise ValueError("invalid reserved offset")
+        if len(offsets) != len(set(offsets)) or max(offsets) >= stride:
+            raise ValueError("reserved offsets overlap or exceed the registry stride")
+        return stride, max(offsets)
+    except (OSError, ValueError, TypeError, KeyError, AttributeError, RecursionError) as error:
+        raise ValueError("cannot allocate mutation slot ports: " + str(error)) from error
+
+
+def port_for_slot(k, environ, root=None):
+    """A base whose complete reserved range is representable as TCP ports."""
+    if type(k) is not int or k < 0:
+        raise ValueError("slot index must be a nonnegative integer")
+    stride, maximum = port_layout(root)
+    base = int(environ.get("PORT") or DEFAULT_PORT)
+    port = base + k * stride
+    if base < 1 or port + maximum > 65535:
+        raise ValueError("mutation slot's reserved TCP ports are outside 1..65535")
+    return port
 
 # The scripts that run in one slot, whatever `PW_MUTANT_SLOTS` says.
 SEQUENTIAL = {
@@ -338,19 +387,19 @@ def git_of(root, slot):
     git("read-tree", head, cwd=slot)
 
 
-def env_of(k, slot, tmp, picked, total, environ=None):
+def env_of(k, slot, tmp, picked, total, environ=None, root=None):
     """A slot's environment: the run's, with its mutants, its target, its
     ports and its temporary directory, and without the ask for slots, so
     that nothing the slot runs deals again."""
     env = dict(os.environ if environ is None else environ)
     env.pop(SLOTS, None)
-    port = int(env.get("PORT") or DEFAULT_PORT)
+    port = port_for_slot(k, env, root)
     env.update(
         {
             PICK: f"{total}:" + ",".join(str(i) for i in picked),
             SLOT: str(k),
             "CARGO_TARGET_DIR": str(slot / "target"),
-            "PORT": str(port + k * STRIDE),
+            "PORT": str(port),
             "TMPDIR": str(tmp),
         }
     )
@@ -562,6 +611,8 @@ class Run:
         try:
             require_pidfds()
             self.dealt = deal(self.mutants, self.n)
+            if self.dealt:
+                port_for_slot(len(self.dealt) - 1, self.environ, self.root)
             trees = self.prepare()
             return self.merge(trees)
         finally:
@@ -605,7 +656,7 @@ class Run:
                 s.proc = subprocess.Popen(
                     [sys.executable, str(slot / relative), *self.argv],
                     cwd=slot,
-                    env=env_of(k, slot, tmp, picked, total, self.environ),
+                    env=env_of(k, slot, tmp, picked, total, self.environ, self.root),
                     stdout=subprocess.PIPE,
                     start_new_session=True,
                 )
