@@ -1,0 +1,103 @@
+ADR-0309 / argument-invariants path-text correction, 2026-10-16 UTC
+Before base ac3f2553: regression fails, /demo/invariants/%FF returns404.
+After: malformed escapes/non-UTF-8 decoded path bytes return400 before
+matching. Valid Unicode, plus and an encoded literal percent are accepted;
+valid unknown paths remain404. The existing decoder is reused.
+
+CARGO_BUILD_JOBS=4, RUST_TEST_THREADS=4, default test profile, offline cache.
+Reproduce: cargo test --locked --offline -p pw-dev-server -- tests::argument_invariants::
+Reproduce: PW_STORE_TEST_LAYER=postgres cargo test --locked --offline -p pw-dev-server -- tests::argument_invariants::
+Reproduce: cargo clippy --locked --offline -p pw-dev-server --all-targets -- -D warnings
+Reproduce: PYTHONDONTWRITEBYTECODE=1 python3 scripts/argument_invariants_mutations.py
+Both server suites6/6, Clippy clean, whole18/18 killed without bound stops.
+Full assembled CI and verification remain pending; this is a local fix.
+
+SHA256 of inputs:
+0d4959b25e8418b2b0993c438d1660a04cc7d19ac6011c8a1d7ed6662502ea4a  spikes/own-renderer/server/src/main.rs
+6e817f15e47f9db0b2ffb3557eab932fb4757dd751d6a53471e7e87e375848fa  spikes/own-renderer/server/src/tests/argument_invariants.rs
+a67e2d82728dc06164b1f4c4294fa0b25d607fd774df23835c31b42b20d3cf5f  scripts/argument_invariants_mutations.py
+
+--- Raw output: argument-path-red.log ---
+   Compiling pw-dev-server v0.0.0 (/home/haki/code/pw-wt/argument-invariants/spikes/own-renderer/server)
+    Finished `test` profile [unoptimized] target(s) in 4.46s
+     Running unittests src/main.rs (target/debug/deps/pw_dev_server-ff76041b108b4a26)
+
+running 1 test
+test tests::argument_invariants::a_pages_parameters_are_held_where_its_address_gives_them ... FAILED
+
+failures:
+
+---- tests::argument_invariants::a_pages_parameters_are_held_where_its_address_gives_them stdout ----
+
+thread 'tests::argument_invariants::a_pages_parameters_are_held_where_its_address_gives_them' (3510703) panicked at spikes/own-renderer/server/src/tests/argument_invariants.rs:325:9:
+/demo/invariants/%FF: HTTP/1.1 404 Not Found not found
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    tests::argument_invariants::a_pages_parameters_are_held_where_its_address_gives_them
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 579 filtered out; finished in 0.75s
+
+error: test failed, to rerun pass `-p pw-dev-server --bin pw-dev-server`
+
+--- Raw output: argument-path-gates.log ---
+mutation anchors: 2912 mutants in 263 scripts, each matching once
+   Compiling pw-dev-server v0.0.0 (/home/haki/code/pw-wt/argument-invariants/spikes/own-renderer/server)
+    Finished `test` profile [unoptimized] target(s) in 4.00s
+     Running unittests src/main.rs (target/debug/deps/pw_dev_server-ff76041b108b4a26)
+
+running 6 tests
+test tests::argument_invariants::a_commands_arguments_are_held_at_both_ends_of_each_invariant ... ok
+test tests::argument_invariants::a_value_inside_an_argument_is_held_where_it_is ... ok
+test tests::argument_invariants::a_pages_parameters_are_held_where_its_address_gives_them ... ok
+test tests::argument_invariants::a_value_the_host_built_is_held_as_one_a_browser_sent ... ok
+test tests::argument_invariants::a_label_the_stores_type_refuses_never_reaches_its_data_layer ... ok
+test tests::argument_invariants::on_postgres_a_row_written_before_its_check_is_refused_where_it_is_read ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 574 filtered out; finished in 11.13s
+
+    Finished `test` profile [unoptimized] target(s) in 0.09s
+     Running unittests src/main.rs (target/debug/deps/pw_dev_server-ff76041b108b4a26)
+
+running 6 tests
+test tests::argument_invariants::a_commands_arguments_are_held_at_both_ends_of_each_invariant ... ok
+test tests::argument_invariants::a_pages_parameters_are_held_where_its_address_gives_them ... ok
+test tests::argument_invariants::a_value_inside_an_argument_is_held_where_it_is ... ok
+test tests::argument_invariants::a_value_the_host_built_is_held_as_one_a_browser_sent ... ok
+test tests::argument_invariants::a_label_the_stores_type_refuses_never_reaches_its_data_layer ... ok
+test tests::argument_invariants::on_postgres_a_row_written_before_its_check_is_refused_where_it_is_read ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 574 filtered out; finished in 13.64s
+
+    Checking pw-host v0.0.0 (/home/haki/code/pw-wt/argument-invariants/runtime/pw-host)
+    Checking pw-core v0.0.0 (/home/haki/code/pw-wt/argument-invariants/compiler/pw-core)
+    Checking pw-dev-server v0.0.0 (/home/haki/code/pw-wt/argument-invariants/spikes/own-renderer/server)
+    Finished `dev` profile [unoptimized] target(s) in 10.84s
+mutation anchors: 2912 mutants in 263 scripts, each matching once
+
+--- Raw output: codex-argument-path-mutants.log ---
+baseline (core): 3 passed, 0 failed
+baseline (host): 17 passed, 0 failed
+baseline (conformance): 3 passed, 0 failed
+baseline (server): 6 passed, 0 failed
+a malformed path is matched as a page that does not exist [server]: KILLED (1 of 6 tests fail)
+a call within its budget holds nothing [host]: KILLED (1 of 17 tests fail)
+a call with its `requires` evaluated holds nothing [host,conformance,server]: KILLED (5 of 26 tests fail)
+a predicate reads the arguments before they are decoded [host]: KILLED (1 of 17 tests fail)
+a measured call holds nothing [host]: KILLED (1 of 17 tests fail)
+a call's check holds nothing [host,conformance,server]: KILLED (5 of 26 tests fail)
+the arguments are held as given, not as the component is passed them [conformance]: KILLED (2 of 3 tests fail)
+a page's plan states nothing its parameters hold [core,server]: KILLED (2 of 9 tests fail)
+a map's entries are not reached [core,conformance]: KILLED (2 of 6 tests fail)
+a map's key is read where its value is [core,conformance]: KILLED (2 of 6 tests fail)
+a set's items are not reached [core,conformance]: KILLED (2 of 6 tests fail)
+a routed page is given its parameters as the address says them [server]: KILLED (1 of 6 tests fail)
+a page asked for by name is given its parameters as the address says them [server]: KILLED (1 of 6 tests fail)
+a page's plan's checks are not read [server]: KILLED (1 of 6 tests fail)
+a parameter refused by name is answered as a page not found [server]: KILLED (1 of 6 tests fail)
+`Stars` states nothing [server]: KILLED (3 of 6 tests fail)
+`Note` states nothing [server]: KILLED (4 of 6 tests fail)
+`Code` states nothing [server]: KILLED (2 of 6 tests fail)
+18 of 18 mutants killed
+memory bound: no process was stopped

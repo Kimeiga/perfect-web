@@ -240,3 +240,17 @@ call's own making of nodes).
    `examples/demo/`, so the fixture's three `.pw` mutants are not checked
    by it; this track's script checks each itself before its tests run.
    Should the gate's programs include the demos?
+
+
+## ADR-0309 path-text follow-up, 2026-10-16
+
+The queued mismatch is corrected: malformed percent escapes or non-UTF-8
+decoded path bytes are refused 400 before route matching. The route parser
+uses its existing path decoder; escapes are decoded once, and a plus stays
+a plus. Valid Unicode and a literal escaped percent are accepted. A valid
+unknown path remains 404. The regression first failed with `/demo/invariants/%FF`
+returning 404. Memory and PostgreSQL server suites passed6/6 each, Clippy passed, and
+the whole argument-invariants script killed18/18 controls with no bound
+stops. The raw before/after and control evidence is
+`docs/evidence/E14/argument-path-text.txt`. Full assembled CI and verification
+remain pending; no landing is claimed here.

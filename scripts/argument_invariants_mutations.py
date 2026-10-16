@@ -52,6 +52,13 @@ PROGRAM = [
 # (what is undone, the suites that see it, file, anchor, replacement)
 MUTANTS = [
     (
+        "a malformed path is matched as a page that does not exist",
+        "server",
+        SERVER,
+        "            .any(|segment| path_decoded(segment).is_none())\n",
+        "            .any(|_| false)\n",
+    ),
+    (
         "a call within its budget holds nothing",
         "host",
         HOST,
