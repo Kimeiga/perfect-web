@@ -223,6 +223,22 @@ fn a_member_read_on_a_rigid_type_parameter_is_refused() {
     assert_eq!(reported(&control), NOTHING);
 }
 
+#[test]
+fn a_member_read_whose_receivers_type_nothing_states_is_refused() {
+    // A lambda's parameter that no call types: which `label` this is, and
+    // what it performs, cannot be read, so the row cannot be checked over it.
+    let src = reading(
+        "fn first_label(given: List<Item>) -> String !{} {\n    let f = (x) => x.label\n    \"none\"\n}",
+    );
+    assert_eq!(reported(&src), one("PW0408", "x.label"));
+    // Its type written: the member is read, and what it performs is the
+    // row's to declare.
+    let typed = src.replace("(x) =>", "(x: Item) =>");
+    assert_eq!(reported(&typed), one("PW0400", "x.label"));
+    // The control: a field of the typed value, which performs nothing.
+    assert_eq!(reported(&typed.replace("x.label", "x.name")), NOTHING);
+}
+
 /// A module whose `Item` has a member `token` that is a secret, and a view
 /// `Menu` over `given` with `{markup}` as its body.
 fn secret(markup: &str) -> String {
@@ -281,4 +297,455 @@ fn a_querys_contract_requires_what_a_member_of_a_generic_result_reads() {
     );
     assert_eq!(required(&src, "t.Labels"), ["database.read<Item>"]);
     assert!(required(&src.replace("i.label", "i.name"), "t.Labels").is_empty());
+}
+
+// --- every generic function of the standard packages ---------------------------
+
+use pw_core::resolve::DefId;
+use pw_core::resolved::{Builtin, ResolvedType};
+use pw_core::signatures::{Signature, Signatures};
+use std::collections::BTreeSet;
+
+/// The standard packages, `packages/pw-std` and `packages/pw-platform-web`.
+fn packages() -> Vec<(String, String)> {
+    let mut all = program("");
+    all.pop();
+    all
+}
+
+/// `t` as a probe writes it: each type parameter `binder` binds as the
+/// probe's own `P0`, `P1`.., each declaration by its module's path.
+fn written(sigs: &Signatures, t: &ResolvedType, binder: Option<DefId>) -> String {
+    if let Some((b, i)) = t.parameter_binding() {
+        assert_eq!(Some(b), binder, "a parameter of another declaration in {t}");
+        return format!("probe.P{i}");
+    }
+    if let Some(p) = t.as_primitive() {
+        return p.name().to_string();
+    }
+    let args: Vec<String> = t.args().iter().map(|a| written(sigs, a, binder)).collect();
+    match t.as_builtin() {
+        Some(Builtin::Function) => {
+            let (result, params) = args.split_last().expect("a function type has a result");
+            format!("fn({}) -> {result}", params.join(", "))
+        }
+        Some(b) => format!("{}<{}>", b.name(), args.join(", ")),
+        None => {
+            let path = sigs
+                .path_of(t.def_id().expect("a declared type"))
+                .expect("a declared type's path")
+                .to_string();
+            match args.is_empty() {
+                true => path,
+                false => format!("{path}<{}>", args.join(", ")),
+            }
+        }
+    }
+}
+
+/// Each module a written type names a declaration of.
+fn modules_named(sigs: &Signatures, t: &ResolvedType, out: &mut BTreeSet<String>) {
+    if let Some(def) = t.def_id()
+        && let Some((module, _)) = sigs.path_of(def).and_then(|p| p.rsplit_once('.'))
+    {
+        out.insert(module.to_string());
+    }
+    for a in t.args() {
+        modules_named(sigs, a, out);
+    }
+}
+
+/// The type parameters `t` names, by position.
+fn parameters_in(t: &ResolvedType, out: &mut BTreeSet<u32>) {
+    if let Some((_, i)) = t.parameter_binding() {
+        out.insert(i);
+    }
+    for a in t.args() {
+        parameters_in(a, out);
+    }
+}
+
+/// **Statements that read `label{i}` of each `P{i}` a value of type `t`,
+/// named `e`, holds**, through the lists, options, results, sets and maps it
+/// is in, and which `P{i}` they read. A function's or a primitive's holds
+/// none a statement reads.
+fn reader(t: &ResolvedType, e: &str, n: &mut u32, read: &mut BTreeSet<u32>) -> Option<String> {
+    *n += 1;
+    let k = *n;
+    if let Some((_, i)) = t.parameter_binding() {
+        read.insert(i);
+        return Some(format!("    let _read{k} = {e}.label{i}"));
+    }
+    let arg = |a: usize| t.args()[a].clone();
+    match t.as_builtin()? {
+        Builtin::List => {
+            let x = format!("x{k}");
+            let body = reader(&arg(0), &x, n, read)?;
+            Some(format!("    for {x} in {e} {{\n{body}\n    }}"))
+        }
+        Builtin::Set => {
+            let x = format!("x{k}");
+            let body = reader(&arg(0), &x, n, read)?;
+            Some(format!(
+                "    for {x} in Set.to_list({e}) {{\n{body}\n    }}"
+            ))
+        }
+        Builtin::Map => {
+            let (key, value) = (format!("k{k}"), format!("v{k}"));
+            let keys = reader(&arg(0), &key, n, read)
+                .map(|b| format!("    for {key} in Map.keys({e}) {{\n{b}\n    }}"));
+            let values = reader(&arg(1), &value, n, read)
+                .map(|b| format!("    for {value} in Map.values({e}) {{\n{b}\n    }}"));
+            match (keys, values) {
+                (None, None) => None,
+                (a, b) => Some(a.into_iter().chain(b).collect::<Vec<_>>().join("\n")),
+            }
+        }
+        Builtin::Option => {
+            let x = format!("x{k}");
+            let body = reader(&arg(0), &x, n, read)?;
+            Some(format!(
+                "    match {e} {{\n        Some({x}) => {{\n{body}\n        }},\n        None => (),\n    }}"
+            ))
+        }
+        Builtin::Result => {
+            let (ok, err) = (format!("x{k}"), format!("y{k}"));
+            let good = reader(&arg(0), &ok, n, read);
+            let bad = reader(&arg(1), &err, n, read);
+            if good.is_none() && bad.is_none() {
+                return None;
+            }
+            let arm = |case: String, b: Option<String>| match b {
+                Some(b) => format!("        {case} => {{\n{b}\n        }},"),
+                None => format!("        {case} => (),"),
+            };
+            Some(format!(
+                "    match {e} {{\n{}\n{}\n    }}",
+                arm(format!("Ok({ok})"), good),
+                arm(format!("Err({err})"), bad)
+            ))
+        }
+        Builtin::Function => None,
+    }
+}
+
+/// One generic function of the standard packages, and the probe that calls
+/// it.
+struct Probe {
+    src: String,
+    /// The `P{i}` its result holds where a statement reads them, each given
+    /// by an argument: what the probe must be refused for reading.
+    reads: BTreeSet<u32>,
+    /// Its result as a probe writes it, each parameter as its argument gives
+    /// it: `None` where an argument gives none.
+    result: Option<String>,
+}
+
+/// **A probe for `sig`**: `fn probe(a0: .., a1: ..)`, each parameter of
+/// `sig`'s type with `P{i}` for its `i`th type parameter, which calls it and
+/// reads `label{i}`, a member that reads the database, of each `P{i}` its
+/// result holds. Declared to perform what `sig` performs, and nothing else.
+fn probe_for(sigs: &Signatures, sig: &Signature, arity: usize) -> Probe {
+    let binder = Some(sig.definition);
+    let params: Vec<&ResolvedType> = sig
+        .params
+        .iter()
+        .map(|p| {
+            p.as_ref()
+                .and_then(|p| p.resolved())
+                .expect("a resolved parameter")
+        })
+        .collect();
+    let result = sig.result().expect("a resolved result");
+    let mut modules = BTreeSet::from([
+        sig.path.rsplit_once('.').expect("a module's").0.to_string(),
+        "Map".to_string(),
+        "Set".to_string(),
+    ]);
+    let mut given = BTreeSet::new();
+    for p in &params {
+        modules_named(sigs, p, &mut modules);
+        parameters_in(p, &mut given);
+    }
+    let mut named = BTreeSet::new();
+    parameters_in(result, &mut named);
+    let (mut n, mut reads) = (0, BTreeSet::new());
+    let read = reader(result, "r", &mut n, &mut reads);
+    let solved = named.is_subset(&given);
+    let mut src = String::from("module probe\n\n");
+    for m in &modules {
+        src.push_str(&format!("import {m}\n"));
+    }
+    // What the row's type arguments name, as the callee's module sees them:
+    // `log<Public>`'s `Public` is `capability.Public`.
+    let unit = sigs.unit_of(Some(sig.path.rsplit_once('.').expect("a module's").0));
+    for effect in &sig.effects {
+        let Some((_, arg)) = effect.split_once('<') else {
+            continue;
+        };
+        let arg = arg.trim_end_matches('>').trim();
+        use pw_core::resolve::{Namespace, Resolution};
+        if let Some(u) = unit
+            && let Resolution::Local(def) | Resolution::Imported { def, .. } =
+                sigs.workspace().resolve_in(u, Namespace::Type, arg)
+            && let Some((module, name)) = sigs.path_of(def).and_then(|p| p.rsplit_once('.'))
+        {
+            src.push_str(&format!("import {module}.{{ {name} }}\n"));
+        }
+    }
+    for i in 0..arity {
+        src.push_str(&format!(
+            "\nopaque type P{i} = String\n\nfn label{i}(p: P{i}) -> String !{{ database.read<P{i}> }}\n    host \"probe:data/p{i}#label\"\n"
+        ));
+    }
+    let args: Vec<String> = params
+        .iter()
+        .enumerate()
+        .map(|(k, p)| format!("a{k}: {}", written(sigs, p, binder).replace("probe.", "")))
+        .collect();
+    let names: Vec<String> = (0..params.len()).map(|k| format!("a{k}")).collect();
+    let reading = match (&read, solved) {
+        (Some(r), true) => format!("{r}\n"),
+        _ => String::new(),
+    };
+    src.push_str(&format!(
+        "\nfn probe({}) -> () !{{ {} }} {{\n    let r = {}({})\n{reading}    ()\n}}\n",
+        args.join(", "),
+        sig.effects.join(", "),
+        sig.path,
+        names.join(", "),
+    ));
+    Probe {
+        src,
+        reads: if solved { reads } else { BTreeSet::new() },
+        result: solved.then(|| written(sigs, result, binder)),
+    }
+}
+
+/// **Non-vacuity, over the standard packages** (ADR-XXXX): every generic
+/// function they declare, called with each type parameter a type of the
+/// probe's own, gives a result `infer.rs` types with each parameter as its
+/// argument gave it, and a read of a member of each element that result
+/// holds is seen. Where no argument gives a parameter, the call has no type,
+/// never the callee's `T`.
+#[test]
+fn every_generic_function_of_the_standard_packages_passes_its_element_types_through() {
+    use pw_core::hir::{DeclKind, Expr, Hir};
+    let files = packages();
+    let lower = |files: &[(String, String)]| -> Vec<Hir> {
+        files
+            .iter()
+            .map(|(_, s)| pw_core::lower::lower_file(s, &pw_syntax::parse_tree(s).green))
+            .collect()
+    };
+    let hirs = lower(&files);
+    let refs: Vec<&Hir> = hirs.iter().collect();
+    let ws = pw_core::resolve::Workspace::build(&refs);
+    let sigs = Signatures::build(&ws, &refs);
+
+    // Every generic function the packages declare, by the HIR, and the same
+    // count by their text: one the walk missed is one no probe checks.
+    let mut generic: Vec<(String, usize)> = Vec::new();
+    for hir in &refs {
+        for (id, d) in hir.all_decls() {
+            if d.kind == DeclKind::Fn && !d.type_params.is_empty() {
+                let module = hir.module_of(id).expect("a package declares its module");
+                generic.push((format!("{module}.{}", d.name), d.type_params.len()));
+            }
+        }
+    }
+    let by_text = files
+        .iter()
+        .flat_map(|(_, s)| s.lines())
+        .filter(|l| {
+            l.strip_prefix("fn ")
+                .and_then(|r| r.split('(').next())
+                .is_some_and(|name| name.contains('<'))
+        })
+        .count();
+    assert_eq!(generic.len(), by_text, "{generic:?}");
+    assert!(
+        generic.len() >= 39,
+        "the packages declared 39 on 2026-10-16: {generic:?}"
+    );
+
+    let mut refused = 0;
+    let mut untyped = Vec::new();
+    for (path, arity) in &generic {
+        let sig = sigs
+            .by_path(path)
+            .unwrap_or_else(|| panic!("no signature for {path}"));
+        let probe = probe_for(&sigs, sig, *arity);
+        let mut all = files.clone();
+        all.push(("probe.pw".to_string(), probe.src.clone()));
+
+        // What `infer.rs` types the call.
+        let hirs = lower(&all);
+        let refs: Vec<&Hir> = hirs.iter().collect();
+        let ws = pw_core::resolve::Workspace::build(&refs);
+        let with = Signatures::build(&ws, &refs);
+        let hir = refs.last().expect("the probe");
+        let (id, decl) = hir
+            .all_decls()
+            .find(|(_, d)| d.name == "probe")
+            .expect("the probe function");
+        let body = hir.body(decl.body.expect("a body"));
+        let call = body
+            .walk()
+            .into_iter()
+            .find_map(|e| match body.expr(e) {
+                Expr::Let {
+                    init: Some(init), ..
+                } => Some(*init),
+                _ => None,
+            })
+            .expect("`let r = ..`");
+        let types = pw_core::infer::Types::of_decl(&with, hir, id, body);
+        let typed = types.of(body, call).map(|t| written(&with, &t, None));
+        assert_eq!(
+            typed, probe.result,
+            "{path}: the call's type\n{}",
+            probe.src
+        );
+        if typed.is_none() {
+            untyped.push(path.clone());
+        }
+
+        // And what the checker reports: each element read, which the probe
+        // does not declare, and nothing else.
+        let mut reported: Vec<(String, String)> = check_sources(&all)
+            .into_iter()
+            .filter(|(n, _)| n == "probe.pw")
+            .flat_map(|(_, ds)| ds.into_iter().map(|d| (d.code.to_string(), d.message)))
+            .collect();
+        reported.sort();
+        let expected: Vec<(String, String)> = probe
+            .reads
+            .iter()
+            .map(|i| {
+                (
+                    "PW0400".to_string(),
+                    format!("`probe` performs `database.read<P{i}>` but does not declare it"),
+                )
+            })
+            .collect();
+        assert_eq!(reported, expected, "{path}\n{}", probe.src);
+        if !probe.reads.is_empty() {
+            refused += 1;
+        }
+    }
+    // 28 of the 39 hand an element on, and each probe of those was refused
+    // for reading it. Nine answer a count, a truth or nothing (`length`,
+    // `any`, `all`, the maps' and sets' `size` and `contains`, `log`'s two),
+    // and the two that make one from nothing are typed as nothing.
+    assert_eq!(refused, 28, "the probes that read an element");
+    assert_eq!(untyped, ["Map.empty", "Set.empty"]);
+}
+
+#[test]
+fn a_draw_binder_has_the_platforms_declared_context_and_arguments() {
+    let src = "module t\n\npaint Marks(width: Float) !{ paint.custom } {\n    inputs width\n    draw(ctx) {\n        ctx.rect(0.0, 0.0, width, 2.0)\n    }\n}\n";
+    assert_eq!(reported(src), NOTHING);
+    assert_eq!(
+        reported(&src.replace("ctx.rect", "ctx.missing")),
+        one("PW0610", "ctx.missing")
+    );
+    assert_eq!(
+        reported(&src.replace("width, 2.0", "width, \"bad\"")),
+        one("PW0605", "\"bad\"")
+    );
+}
+
+#[test]
+fn rooted_effect_inference_sees_member_reads_and_function_values() {
+    let src = "module t\n\nimport browser.{ ElementRef }\n\npaint Marks(el: ElementRef) !{ paint.custom } {\n    inputs el\n    draw(ctx) {\n        let x = el.offsetWidth\n    }\n}\n";
+    assert_eq!(reported(src), one("PW0401", "el.offsetWidth"));
+    assert_eq!(reported(&src.replace("el.offsetWidth", "1.0")), NOTHING);
+    let named = src.replace("let x = el.offsetWidth", "let f = browser.offsetWidth");
+    assert_eq!(reported(&named), one("PW0401", "browser.offsetWidth"));
+}
+
+#[test]
+fn a_computed_receiver_is_never_resolved_by_its_members_spelling() {
+    let src = "module t\n\nimport List\n\ntype Item = Item { name: String }\ntype Other = Other {}\n\nfn label(o: Other) -> String !{ database.read<Other> }\n    host \"shop:data/other#label\"\n\nfn same<T>(x: T) -> T !{} { x }\n\nfn field(i: Item) -> String !{} { same(i).name }\n";
+    assert_eq!(reported(src), NOTHING);
+    assert_eq!(
+        reported(&src.replace("same(i).name", "same(i).label")),
+        one("PW0610", "same(i).label")
+    );
+}
+
+#[test]
+fn a_member_with_additional_parameters_is_a_function_value_not_its_result() {
+    use pw_core::hir::{Expr, Hir};
+    let src = reading(
+        "fn suffix(i: Item, s: String) -> String !{} { s }\n\nfn inspect(i: Item) -> () !{} {\n    let property = i.name\n    let function = i.suffix\n    let called = i.suffix(\"x\")\n    ()\n}",
+    );
+    assert_eq!(reported(&src), NOTHING);
+    let files = program(&src);
+    let hirs: Vec<Hir> = files
+        .iter()
+        .map(|(_, s)| pw_core::lower::lower_file(s, &pw_syntax::parse_tree(s).green))
+        .collect();
+    let refs: Vec<&Hir> = hirs.iter().collect();
+    let ws = pw_core::resolve::Workspace::build(&refs);
+    let sigs = Signatures::build(&ws, &refs);
+    let hir = refs.last().unwrap();
+    let (id, d) = hir.all_decls().find(|(_, d)| d.name == "inspect").unwrap();
+    let body = hir.body(d.body.unwrap());
+    let types = pw_core::infer::Types::of_decl(&sigs, hir, id, body);
+    let results: Vec<Option<String>> = body
+        .walk()
+        .into_iter()
+        .filter_map(|e| match body.expr(e) {
+            Expr::Let { init: Some(i), .. } => Some(types.of(body, *i).map(|t| t.display_name())),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        results,
+        [Some("String".to_string()), None, Some("String".to_string())]
+    );
+}
+
+#[test]
+fn solved_loop_binders_are_available_to_every_type_reader() {
+    use pw_core::hir::{Expr, Hir};
+    let src = reading(
+        "fn inspect(given: List<Item>) -> () !{} {\n    for item in List.reverse(given) {\n        let name = item.name\n    }\n    ()\n}",
+    );
+    let files = program(&src);
+    let hirs: Vec<Hir> = files
+        .iter()
+        .map(|(_, s)| pw_core::lower::lower_file(s, &pw_syntax::parse_tree(s).green))
+        .collect();
+    let refs: Vec<&Hir> = hirs.iter().collect();
+    let ws = pw_core::resolve::Workspace::build(&refs);
+    let sigs = Signatures::build(&ws, &refs);
+    let hir = refs.last().unwrap();
+    let (id, d) = hir.all_decls().find(|(_, d)| d.name == "inspect").unwrap();
+    let body = hir.body(d.body.unwrap());
+    let types = pw_core::infer::Types::of_decl(&sigs, hir, id, body);
+    let used = body
+        .walk()
+        .into_iter()
+        .find(|e| matches!(body.expr(*e), Expr::Name(n) if n == "item"))
+        .unwrap();
+    let binding = types.lexical().binder(used).unwrap();
+    assert_eq!(
+        types.binding(binding).map(|t| t.display_name()),
+        Some("Item".to_string())
+    );
+}
+
+#[test]
+fn an_interfaces_term_roots_refuse_untyped_member_receivers() {
+    let src = reading(
+        "event Changed(id: Int)\n\nquery Number(id: Int) -> Int\n    invalidates_on Changed(id)\n{ id }\n\nfn consume<T>(f: T, n: Int) -> Int !{} { n }\n\ncommand Put(id: Int) -> Result<Int, String>\n    emits Changed(id)\n    optimistic Number(id) as n => consume((item) => item.name, n)\n",
+    );
+    assert_eq!(reported(&src), one("PW0408", "item.name"));
+    assert_eq!(
+        reported(&src.replace("(item) =>", "(item: Item) =>")),
+        NOTHING
+    );
 }

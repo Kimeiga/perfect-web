@@ -108,8 +108,12 @@ fn a_lambdas_own_name_is_not_the_transaction() {
 #[test]
 fn a_local_bound_to_a_release_is_that_release() {
     clean("    let tx = Database.begin()\n    let end = Database.rollback\n    end(tx)");
+    // The first rollback's `Result` discarded by name, as `INNER`'s is: a call
+    // through `end` is typed since ADR-XXXX (the generic-effects track), and
+    // one dropped as a statement is PW0618's, which the call's untyped result
+    // hid until then.
     refused(
-        "    let tx = Database.begin()\n    let end = Database.rollback\n    end(tx)\n    Database.rollback(tx)",
+        "    let tx = Database.begin()\n    let end = Database.rollback\n    let _ended = end(tx)\n    Database.rollback(tx)",
         "is released twice on one path",
     );
 }

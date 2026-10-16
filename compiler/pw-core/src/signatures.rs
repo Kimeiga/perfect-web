@@ -173,7 +173,19 @@ pub struct Signatures {
     /// **Each module signal's type** (ADR-0144), resolved where it is
     /// declared: what a body it is provided to reads and writes.
     signal_types: BTreeMap<DefId, TypeResolution>,
+    /// **Each body the value relations' typer has solved for `infer.rs`**
+    /// (ADR-XXXX, the generic-effects track), so a check solves each body
+    /// once: every analysis builds its own `infer::Types`, and solving the
+    /// body for each doubled the checker's time (the store, 2026-10-16: 2770
+    /// solves of 262 bodies). A cell, because the signatures are what every
+    /// analysis already shares, by reference.
+    solved: std::cell::RefCell<BTreeMap<SolvedKey, std::rc::Rc<crate::values::SolvedBody>>>,
 }
+
+/// **Which body a solve is of** (ADR-XXXX): its unit, its declaration, where
+/// it is in memory and its root, and whether it was solved inside the
+/// declaration it is nested in, which types the bindings around it.
+pub(crate) type SolvedKey = (usize, crate::hir::DeclId, usize, crate::hir::ExprId, bool);
 
 impl Signatures {
     pub fn build(workspace: &Workspace, units: &[&Hir]) -> Signatures {
@@ -387,6 +399,23 @@ impl Signatures {
 
     pub fn workspace(&self) -> &Workspace {
         &self.workspace
+    }
+
+    /// **The body `key` names, as the value relations' typer solves it**
+    /// (ADR-XXXX): `solve`'s answer the first time it is asked, and the same
+    /// answer after. The typer reads no `infer::Types`, so a solve never asks
+    /// for another while this one is open.
+    pub(crate) fn solved(
+        &self,
+        key: SolvedKey,
+        solve: impl FnOnce() -> crate::values::SolvedBody,
+    ) -> std::rc::Rc<crate::values::SolvedBody> {
+        if let Some(found) = self.solved.borrow().get(&key) {
+            return found.clone();
+        }
+        let found = std::rc::Rc::new(solve());
+        self.solved.borrow_mut().insert(key, found.clone());
+        found
     }
 
     pub fn unit_of(&self, module: Option<&str>) -> Option<usize> {

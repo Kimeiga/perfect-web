@@ -33,24 +33,40 @@
 //! `Style`, and `.set_padding` is a member of `Style`. No step asks whether a
 //! name is unique.
 //!
-//! A lambda parameter is typed where its callee's declared function type
-//! says, without solving the call: `el` in `List.map(items, el => ..)` is an
+//! A lambda parameter is typed by the value solver where its callee's declared
+//! function type says: `el` in `List.map(items, el => ..)` is an
 //! element of `items`, because `map` takes a `List<T>` and a `fn(T) -> U`.
 //!
-//! # What it does not infer
+//! # What it reads from the value relations' typer
 //!
-//! A lambda parameter whose type needs the call solved, such as `fold`'s
-//! accumulator `A`, which the seed argument instantiates. `values.rs` solves
-//! calls. Where this module cannot say, [`Types::of`] returns `None`, and it is
-//! each caller's decision whether to fall back or to stop.
-//! `docs/evidence/P0/readiness.txt` records which ones still fall back.
+//! **A type it never answers: one naming a type parameter no declaration in
+//! scope binds** (ADR-XXXX, the generic-effects track). A generic call's
+//! declared result names the callee's own parameters: `List.reverse(given)`
+//! returns `List<T>`, and which `T` is the call's to say. Until ADR-XXXX this
+//! module answered `List<T>` as written, so a member read through the
+//! result, `x.label` over its elements, looked `label` up on `T`, found
+//! nothing, and every analysis reading members through these types (the
+//! effect inference, the labels, the resumed captures) saw nothing there: a
+//! view declared `!{}` read the database unseen.
+//!
+//! So where its own rules, which read declarations, leave an expression with
+//! no type, or with a callee's parameter in it, [`Types::of`] answers what the
+//! value relations' typer (`values.rs`) solves: the call instantiated per
+//! call, its parameters unified with its arguments' types, and the same for a
+//! `for` loop's binder, a `match` arm's and a lambda's parameter over a list
+//! a call computes, which this module's own rules never typed. One solver for
+//! a call, not two that disagree (`values::solve_body`). What neither knows
+//! is `None`, and it is each caller's decision whether to fall back or to
+//! stop; a member read on such a value is refused (ADR-XXXX).
 
 use std::collections::BTreeMap;
 
 use crate::hir::{Body, Decl, DeclId, DeclKind, Expr, ExprId, Hir, Node};
 use crate::lexical::{Binder, Lexical};
+use crate::resolve::DefId;
 use crate::resolved::{self, Builtin, ResolvedType};
 use crate::signatures::Signatures;
+use crate::values::{SolvedBody, Ty};
 
 /// The types known inside one declaration's body.
 pub struct Types<'a> {
@@ -71,6 +87,14 @@ pub struct Types<'a> {
     /// nothing, because signatures are stored module-qualified — so a rule
     /// following a helper stopped at the module boundary of its own file.
     module: Option<String>,
+    /// **What the value relations' typer solves in this body** (ADR-XXXX):
+    /// read where this module's own rules leave a hole. Solved once per
+    /// check, and shared by every analysis's `Types` ([`Signatures::solved`]).
+    solved: std::rc::Rc<SolvedBody>,
+    /// The declarations whose type parameters are in scope here: this one,
+    /// and each it is nested in. A parameter of any other declaration in a
+    /// type is a callee's, unsolved, and never an answer.
+    own: Vec<DefId>,
 }
 
 impl<'a> Types<'a> {
@@ -90,7 +114,11 @@ impl<'a> Types<'a> {
         module: Option<&str>,
     ) -> Types<'a> {
         let lexical = Lexical::build(decl, body);
-        Types::with(sigs, decl, body, module, lexical, Vec::new())
+        let solved = solved(sigs, module, body, false, || {
+            crate::values::solve_body(sigs, module, decl, body, lexical.clone(), Vec::new())
+        });
+        let own = own_binder(sigs, module, decl).into_iter().collect();
+        Types::with(sigs, decl, body, module, lexical, Vec::new(), solved, own)
     }
 
     /// **The same, for the declaration `id` of `hir`, where it may be nested
@@ -110,9 +138,25 @@ impl<'a> Types<'a> {
             .outer_bindings()
             .map(|(_, b)| parent.as_ref().and_then(|t| t.bindings.get(&b).cloned()))
             .collect();
-        Types::with(sigs, decl, body, module, lexical, outer)
+        // The same bindings, as the value relations' typer typed them in the
+        // enclosing declaration, for the one solving this body.
+        let solved = solved(sigs, module, body, true, || {
+            let around = lexical
+                .outer_bindings()
+                .map(|(_, b)| {
+                    parent
+                        .as_ref()
+                        .map_or(Ty::Unknown, |t| t.solved.local(b).clone())
+                })
+                .collect();
+            crate::values::solve_body(sigs, module, decl, body, lexical.clone(), around)
+        });
+        let mut own: Vec<DefId> = own_binder(sigs, module, decl).into_iter().collect();
+        own.extend(parent.iter().flat_map(|t| t.own.iter().copied()));
+        Types::with(sigs, decl, body, module, lexical, outer, solved, own)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn with(
         sigs: &'a Signatures,
         decl: &Decl,
@@ -120,6 +164,8 @@ impl<'a> Types<'a> {
         module: Option<&str>,
         lexical: Lexical,
         outer: Vec<Option<ResolvedType>>,
+        solved: std::rc::Rc<SolvedBody>,
+        own: Vec<DefId>,
     ) -> Types<'a> {
         let mut bindings: BTreeMap<Binder, ResolvedType> = BTreeMap::new();
         for (i, t) in outer.into_iter().enumerate() {
@@ -238,6 +284,8 @@ impl<'a> Types<'a> {
             bindings,
             self_type,
             module: module.map(str::to_string),
+            solved,
+            own,
         };
 
         // A REAL type-propagation rule, not adapter knowledge:
@@ -381,120 +429,9 @@ impl<'a> Types<'a> {
             }
         }
 
-        // A CALLBACK's parameter takes the type its callee declares for it.
-        //
-        // `items |> List.map(fn(el) el.getBoundingClientRect().width)` gives
-        // `el` the type `ElementRef`: `map` takes a `List<T>` and a
-        // `fn(T) -> U`, and `items` is a `List<ElementRef>`. So
-        // `getBoundingClientRect` resolves through the RECEIVER rather than
-        // through a spelling.
-        //
-        // Architect ruling, 2026-08-07:
-        //
-        // > `el.getBoundingClientRect()` should resolve because
-        // > `type(el) = Element` and Element's declared member set contains
-        // > `getBoundingClientRect` — not because some globally unique
-        // > declaration has that spelling.
-        //
-        // A parameter is typed where the callee's function type gives it a
-        // type that mentions no type parameter, or exactly the type parameter
-        // a list argument's element instantiates. Anything else needs the
-        // call solved, which `values.rs` does.
-        //
-        // Until 2026-09-25 the rule was "the FIRST parameter takes the element
-        // type of any list beside it", whatever the callee declared. `fold`'s
-        // callback is `fn(A, T) -> A`, whose first parameter is the
-        // accumulator, so `List.fold(ws, 0, (t, w) => t + w.score)` typed `t`
-        // as a `Word` and was refused (ADR-0053).
-        //
-        // `xs |> f(cb)` keeps its pipe: the HIR is `Binary { Pipe, xs, f(cb) }`
-        // rather than a call with `xs` prepended. So the piped value is
-        // collected here and offered to the call on its right as its first
-        // argument, which is what `|>` means.
-        let mut piped: BTreeMap<ExprId, ExprId> = BTreeMap::new();
-        for id in body.walk() {
-            if let Expr::Binary {
-                op: crate::hir::BinOp::Pipe,
-                lhs,
-                rhs,
-            } = body.expr(id)
-            {
-                piped.insert(*rhs, *lhs);
-            }
-        }
-
-        for id in body.walk() {
-            let Expr::Call { callee, args } = body.expr(id) else {
-                continue;
-            };
-            // A named argument's position is not its parameter's.
-            if args.iter().any(|a| a.name.is_some()) {
-                continue;
-            }
-            let Some(sig) = types.callee(body, *callee) else {
-                continue;
-            };
-            let values: Vec<(usize, ExprId)> = piped
-                .get(&id)
-                .copied()
-                .into_iter()
-                .chain(args.iter().map(|a| a.value))
-                .enumerate()
-                .collect();
-            let declared = |i: usize| {
-                sig.params
-                    .get(i)
-                    .and_then(Option::as_ref)
-                    .and_then(resolved::TypeResolution::resolved)
-            };
-            // The element each list argument gives its type parameter:
-            // `items: List<T>` passed a `List<Word>` makes `T` a `Word`.
-            let mut elements = BTreeMap::new();
-            for (i, value) in &values {
-                let Some(param) = declared(*i)
-                    .and_then(element_of_type)
-                    .and_then(ResolvedType::parameter_binding)
-                else {
-                    continue;
-                };
-                // A list named by a binding: the one its name means here.
-                if let Some(e) = types
-                    .lexical
-                    .binder(*value)
-                    .and_then(|b| types.element_of_binder(body, b))
-                {
-                    elements.entry(param).or_insert(e);
-                }
-            }
-            for (i, value) in &values {
-                let Expr::Lambda { params, .. } = body.expr(*value) else {
-                    continue;
-                };
-                let Some(f) = declared(*i).filter(|t| t.as_builtin() == Some(Builtin::Function))
-                else {
-                    continue;
-                };
-                let Some((_, wanted)) = f.args().split_last() else {
-                    continue;
-                };
-                let Some(binders) = crate::values::lambda_binders(body, params) else {
-                    continue;
-                };
-                if binders.len() != wanted.len() {
-                    continue;
-                }
-                for (p, w) in binders.into_iter().zip(wanted) {
-                    let ty = match w.parameter_binding() {
-                        Some(p) => elements.get(&p).cloned(),
-                        None if !mentions_parameter(w) => Some(w.clone()),
-                        None => None,
-                    };
-                    if let Some(t) = ty {
-                        types.bindings.entry(Binder::Pattern(p)).or_insert(t);
-                    }
-                }
-            }
-        }
+        // Callback parameters are read from the value solver below, along
+        // with loop and match binders. Keeping the former list-only callback
+        // approximation here created a second answer for a solved call.
 
         // A binding whose initialiser has a knowable type. Iterated, so
         // `let a = f()` then `let b = a.g()` both resolve; bounded because each
@@ -526,19 +463,45 @@ impl<'a> Types<'a> {
                 break;
             }
         }
+        // **Every binding the value relations' typer solves** that these
+        // rules left untyped (ADR-XXXX): a `for` loop's binder, a `match`
+        // arm's, a lambda's parameter over a list a call computes. A name
+        // reads its binding through [`Types::of`] either way; this is for a
+        // reader of [`Types::binding`].
+        let solved: Vec<(Binder, ResolvedType)> = types
+            .solved
+            .locals()
+            .filter(|(b, _)| !types.bindings.contains_key(b))
+            .filter_map(|(b, t)| Some((b, types.resolved_from(t, 0..0)?)))
+            .collect();
+        types.bindings.extend(solved);
         types
     }
 
-    /// The element type of a collection-valued binding or call.
-    ///
-    /// `menu` bound from `query Menu(..)` whose declaration returns
-    /// `List<MenuItemId>` gives `MenuItemId`.
-    ///
-    /// By where it is bound: a parameter's or an annotated `let`'s written
-    /// type, or the declared result of the query or call a `let` is bound
-    /// to.
-    fn element_of_binder(&self, body: &Body, b: Binder) -> Option<ResolvedType> {
-        element_of_type(&self.binder_type(body, b)?).cloned()
+    /// **`t`, where every part of it is known** (ADR-XXXX): a type the value
+    /// relations' typer solved, as a resolved type, each declaration it
+    /// names by its own name. `None` for one with a hole, a value of any
+    /// type, or a type parameter, none of which a resolved type holds.
+    fn resolved_from(&self, t: &Ty, span: crate::hir::Span) -> Option<ResolvedType> {
+        let key = t.key()?;
+        ResolvedType::inferred(
+            &key,
+            &|def| {
+                self.sigs
+                    .path_of(def)
+                    .map(|p| p.rsplit('.').next().unwrap_or(p).to_string())
+            },
+            &span,
+        )
+    }
+
+    /// **Does `t` name a type parameter no declaration in scope here binds**
+    /// (ADR-XXXX): a callee's, which a call instantiates, and which as written
+    /// is no type a value here has.
+    fn unsolved(&self, t: &ResolvedType) -> bool {
+        t.parameter_binding()
+            .is_some_and(|(binder, _)| !self.own.contains(&binder))
+            || t.args().iter().any(|a| self.unsolved(a))
     }
 
     /// **The element of a list inside a binding's value** (ADR-0172):
@@ -550,7 +513,7 @@ impl<'a> Types<'a> {
             while matches!(ty.as_builtin(), Some(Builtin::Result | Builtin::Option)) {
                 ty = ty.args().first()?.clone();
             }
-            ty = self.member(&ty, field)?.result()?.clone();
+            ty = self.member_result(&ty, field)?;
         }
         element_of_type(&ty).cloned()
     }
@@ -575,18 +538,20 @@ impl<'a> Types<'a> {
                 _ => None,
             };
             let Some(init) = bound else { continue };
-            let sig = match body.expr(init) {
+            match body.expr(init) {
                 // `query Menu(..)` names a declaration.
                 Expr::Keyword {
                     keyword, modifiers, ..
                 } if matches!(keyword.as_str(), "query" | "subscription") => {
-                    modifiers.first().and_then(|m| self.by_path(m))
+                    if let Some(sig) = modifiers.first().and_then(|m| self.by_path(m)) {
+                        return sig.result().filter(|t| !self.unsolved(t)).cloned();
+                    }
                 }
-                Expr::Call { callee, .. } => self.callee(body, *callee),
-                _ => None,
-            };
-            if let Some(sig) = sig {
-                return sig.result().cloned();
+                // Anything else as it is typed: a call's result solved
+                // (ADR-XXXX), where it was the callee's declared result, its
+                // type parameters as written; and a name a `let` aliases,
+                // which was nothing.
+                _ => return self.of(body, init),
             }
         }
         None
@@ -601,6 +566,27 @@ impl<'a> Types<'a> {
         name: &str,
     ) -> Option<&'a crate::signatures::Signature> {
         self.sigs.member_in(self.module.as_deref(), ty, name)
+    }
+
+    /// **The value `name` read from a value of type `ty` holds** (ADR-XXXX):
+    /// its member's declared result under what `ty` gives its type
+    /// parameters, by the value relations' one rule
+    /// ([`crate::values::member_value`]). A generic record's field `v: T`
+    /// read from a `Box<Item>` is an `Item`; it was `T`, and a member read on
+    /// it named nothing.
+    pub fn member_result(&self, ty: &ResolvedType, name: &str) -> Option<ResolvedType> {
+        let sig = self.member(ty, name)?;
+        // A callable with arguments beyond its receiver is a function value,
+        // not a property holding the result of a call (ADR-0031, A-021).
+        if self.sigs.by_def(sig.definition).is_some() && sig.params.len() != 1 {
+            return None;
+        }
+        let result = sig.result()?;
+        if !mentions_binder(result, sig.definition) {
+            return Some(result.clone());
+        }
+        let solved = crate::values::member_value(self.sigs, sig, &Ty::of(ty));
+        self.resolved_from(&solved, ty.span())
     }
 
     /// **Is `base.name` a member several modules declare, and this body's
@@ -657,7 +643,21 @@ impl<'a> Types<'a> {
         &self.lexical
     }
 
+    ///
+    /// **Never a type naming a type parameter no declaration in scope binds**
+    /// (ADR-XXXX): what this module's rules give, where that is a type a value
+    /// here has; else what the value relations' typer solves; else `None`.
     pub fn of(&self, body: &Body, id: ExprId) -> Option<ResolvedType> {
+        match self.declared(body, id) {
+            Some(t) if !self.unsolved(&t) => Some(t),
+            _ => self.resolved_from(self.solved.expr(id), body.expr_span(id)),
+        }
+    }
+
+    /// **What the declarations say `id` is**, by this module's own rules: a
+    /// call's declared result, as declared, a callee's type parameters
+    /// included, which [`Types::of`] reads as unsolved.
+    fn declared(&self, body: &Body, id: ExprId) -> Option<ResolvedType> {
         match body.expr(id) {
             // The binding the name means here (ADR-0063), or `self`.
             Expr::Name(n) => match self.lexical.binder(id) {
@@ -667,8 +667,7 @@ impl<'a> Types<'a> {
             },
             Expr::Field { base, name } => {
                 let receiver = self.of(body, *base)?;
-                self.member(&receiver, name)
-                    .and_then(|s| s.result().cloned())
+                self.member_result(&receiver, name)
             }
             Expr::Call { callee, .. } => {
                 let sig = self.callee(body, *callee)?;
@@ -739,14 +738,110 @@ impl<'a> Types<'a> {
         if let Some(sig) = self.by_path(&path_of(body, callee)) {
             return Some(sig);
         }
-        match body.expr(callee) {
-            Expr::Field { base, name } => {
-                let receiver = self.of(body, *base)?;
-                self.member(&receiver, name)
-            }
-            _ => self.by_path(&path_of(body, callee)),
+        match self.member_read(body, callee) {
+            Some(MemberRead::Member(sig)) => sig,
+            Some(_) => None,
+            None => self.by_path(&path_of(body, callee)),
         }
     }
+
+    /// **What `id`, a `.name` read, reads** (ADR-XXXX): the one reading of a
+    /// member read that the effect inference, the labels and the checker
+    /// share, so none skips what another refuses. `None` where `id` is no
+    /// field read.
+    ///
+    /// By the receiver's type, whole where it is known, or by its
+    /// constructor where only that is: a `Box<?>` has `Box`'s members, and
+    /// which one `name` is does not depend on the hole.
+    pub fn member_read(&self, body: &Body, id: ExprId) -> Option<MemberRead<'a>> {
+        let Expr::Field { base, name } = body.expr(id) else {
+            return None;
+        };
+        if !self.is_value(body, *base) {
+            return Some(MemberRead::Path);
+        }
+        if let Some(t) = self.of(body, *base) {
+            return Some(match t.parameter_binding() {
+                Some(_) => MemberRead::Parameter,
+                None => MemberRead::Member(self.member(&t, name)),
+            });
+        }
+        Some(match self.solved.expr(*base) {
+            Ty::Any => MemberRead::Never,
+            Ty::Parameter { .. } => MemberRead::Parameter,
+            t => match t.receiver() {
+                Some(r) => {
+                    MemberRead::Member(self.sigs.member_by_in(self.module.as_deref(), r, name))
+                }
+                None => MemberRead::Unknown,
+            },
+        })
+    }
+
+    /// **Each member read in `body` whose receiver's type nothing states**
+    /// (ADR-XXXX): a `.name` read through a value that neither the
+    /// declarations nor the value relations' typer give a type, so no
+    /// analysis can read which member it is, what it performs or what it
+    /// carries. The effect rows refuse each (PW0408); until then each was
+    /// skipped unseen. Every expression of the body's arena: its roots' and
+    /// its markup's too.
+    pub fn untyped_receivers(&self, body: &Body) -> Vec<ExprId> {
+        body.exprs()
+            .map(|(id, _, _)| id)
+            .filter(|id| matches!(self.member_read(body, *id), Some(MemberRead::Unknown)))
+            .collect()
+    }
+
+    /// **Is `e` a value** rather than a module's or a type's path: a local,
+    /// `self` where it is the element, a declaration or a module's signal
+    /// named as a value, or anything computed. A dimensioned literal's
+    /// number, `900` in `900.px`, is no receiver either.
+    fn is_value(&self, body: &Body, e: ExprId) -> bool {
+        use crate::resolve::{Namespace, Resolution};
+        let term = |path: &str| {
+            let Some(unit) = self.sigs.unit_of(self.module.as_deref()) else {
+                return false;
+            };
+            let ws = self.sigs.workspace();
+            let found = match path.contains('.') {
+                true => ws.resolve_path_in(unit, Namespace::Term, path),
+                false => ws.resolve_in(unit, Namespace::Term, path),
+            };
+            matches!(found, Resolution::Local(_) | Resolution::Imported { .. })
+        };
+        match body.expr(e) {
+            Expr::Name(n) => {
+                self.lexical.binder(e).is_some()
+                    || (n == "self" && self.self_type.is_some())
+                    || term(n)
+            }
+            Expr::Field { base, .. } => term(&path_of(body, e)) || self.is_value(body, *base),
+            Expr::Literal(crate::hir::Literal::Int(_) | crate::hir::Literal::Float(_)) => false,
+            _ => true,
+        }
+    }
+}
+
+/// **What a member read reads** (ADR-XXXX, the generic-effects track), as
+/// [`Types::member_read`] tells it. Every analysis that reads members reads
+/// this, and each case is either read, refused by a rule that names it, or a
+/// read no run makes: never a value whose member is skipped unseen.
+#[derive(Debug, Clone, Copy)]
+pub enum MemberRead<'s> {
+    /// A member of the receiver's type: its declaration, or none where the
+    /// type has none (PW0610) or several modules declare one this module
+    /// cannot tell apart (PW0628), each refused by the value relations.
+    Member(Option<&'s crate::signatures::Signature>),
+    /// No read through a value: a module's path, `List.map`, a type's,
+    /// `Shape.Circle`, or a dimensioned literal, `900.px`.
+    Path,
+    /// A value of any type, which no run holds: `todo`'s, or an element of
+    /// `[]`.
+    Never,
+    /// A value of a type parameter, which has no member (PW0610).
+    Parameter,
+    /// A value whose type nothing states and nothing solves (PW0408).
+    Unknown,
 }
 
 /// The element type of a written type, seeing through the carriers.
@@ -762,9 +857,47 @@ impl<'a> Types<'a> {
 /// loop iterates what is inside. That is not the same as ignoring them: a
 /// `Result` still has to be handled, and `option_used_as_value` is the rule
 /// that says so. This answers a different question — what one element IS.
-/// Does this type mention a type parameter anywhere?
-fn mentions_parameter(ty: &ResolvedType) -> bool {
-    ty.parameter_binding().is_some() || ty.args().iter().any(mentions_parameter)
+/// Does this type mention a type parameter `binder` binds?
+fn mentions_binder(ty: &ResolvedType, binder: DefId) -> bool {
+    ty.parameter_binding().is_some_and(|(b, _)| b == binder)
+        || ty.args().iter().any(|a| mentions_binder(a, binder))
+}
+
+/// **`body` as the value relations' typer solves it**, once per check
+/// (ADR-XXXX): `nested` where it is solved inside the declaration it is
+/// nested in, which types the bindings around it. Nothing where `module`
+/// names no unit.
+fn solved(
+    sigs: &Signatures,
+    module: Option<&str>,
+    body: &Body,
+    nested: bool,
+    solve: impl FnOnce() -> SolvedBody,
+) -> std::rc::Rc<SolvedBody> {
+    let Some(unit) = sigs.unit_of(module) else {
+        return std::rc::Rc::new(SolvedBody::default());
+    };
+    let key = (
+        unit,
+        body.owner,
+        body as *const Body as usize,
+        body.root,
+        nested,
+    );
+    sigs.solved(key, solve)
+}
+
+/// **The declaration whose type parameters `decl`'s written types name**:
+/// the binder [`Signatures::resolve_type`] gives them, so a parameter of
+/// `decl`'s own is in scope in its body, and no other's is.
+fn own_binder(sigs: &Signatures, module: Option<&str>, decl: &Decl) -> Option<DefId> {
+    use crate::resolve::{Namespace, Resolution};
+    let unit = sigs.unit_of(module)?;
+    let ns = Namespace::of(decl.kind)?;
+    match sigs.workspace().resolve_in(unit, ns, &decl.name) {
+        Resolution::Local(def) | Resolution::Imported { def, .. } => Some(def),
+        _ => None,
+    }
 }
 
 pub fn element_of_type(ty: &ResolvedType) -> Option<&ResolvedType> {

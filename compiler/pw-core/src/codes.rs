@@ -350,6 +350,13 @@ codes! {
         "a shared cache should declare how it is invalidated";
 
     // --- effects (PW04xx) -------------------------------------------------
+    // ADR-XXXX (the generic-effects track; the number is the integrator's to
+    // confirm): a member is read through its receiver's type, so a value
+    // whose type nothing states, read as `x.label`, names a member no
+    // analysis can read, nor what it performs. Until then each analysis
+    // skipped it, and a `!{}` row held over a database read.
+    MEMBER_RECEIVER_UNTYPED = "PW0408" / member_receiver_untyped / 1, Effects,
+        "a member is read through a value whose type the program states, so what it performs is read";
     UNDECLARED_EFFECT = "PW0400" / undeclared_effect / 1, Effects,
         "an effect row must name every effect the body performs";
     FORBIDDEN_EFFECT = "PW0401" / forbidden_effect / 1, Effects,

@@ -3,8 +3,9 @@
 use declares.
 
 Each mutant undoes one piece of how a lambda's parameters are typed, in
-`infer.rs` (read without solving the call) or in `values.rs` (from the call,
-the annotation or the result, solved), and the callback tests must then fail.
+`values.rs` (from the call, the annotation or the result, solved). ADR-XXXX
+removed infer.rs's redundant callback approximation; these controls now
+exercise the shared solver, and the callback tests must then fail.
 
 Run from the repository root; `just e10-callbacks` records the output.
 The source is restored after every mutant, whatever happens.
@@ -21,60 +22,15 @@ VALUES = ROOT / "compiler/pw-core/src/values.rs"
 
 # (what is undone, file, anchor, replacement)
 MUTANTS = [
-    (
-        "any type parameter takes the list's element",
-        INFER,
-        "Some(p) => elements.get(&p).cloned(),",
-        "Some(_) => elements.values().next().cloned(),",
-    ),
-    (
-        "a declared parameter type is not read",
-        INFER,
-        "None if !mentions_parameter(w) => Some(w.clone()),",
-        "None if false => Some(w.clone()),",
-    ),
-    (
-        "a list's element binds no type parameter",
-        INFER,
-        "elements.entry(param).or_insert(e);",
-        "elements.entry(param).or_insert(e);\n                    elements.clear();",
-    ),
-    (
-        "a piped value is not the first argument",
-        INFER,
-        """            let values: Vec<(usize, ExprId)> = piped
-                .get(&id)
-                .copied()
-                .into_iter()""",
-        """            let values: Vec<(usize, ExprId)> = None::<ExprId>
-                .into_iter()""",
-    ),
-    (
-        "a solved lambda's parameters are forgotten",
-        VALUES,
-        "let mut added = typer.solve_lambdas();",
-        "let mut added = false;",
-    ),
-    (
-        "a parameter known only in part is not typed",
-        VALUES,
-        "if !ty.mentions_foreign_parameter(own) {",
-        "if ty.is_closed() && !ty.mentions_foreign_parameter(own) {",
-    ),
-    (
-        "a lambda bound with a written type is not typed by it",
-        VALUES,
-        "} if is_lambda(*init) => {",
-        "} if false => {",
-    ),
-    (
-        "a returned lambda is not typed by the declared result",
-        VALUES,
-        "            for site in self.result_sites() {",
-        "            for site in Vec::<ExprId>::new() {",
-    ),
+    ('callback parameters take the sibling parameters types', VALUES, '        for (p, ty) in params.iter().zip(expected_params) {', '        for (p, ty) in params.iter().zip(expected_params.iter().rev()) {'),
+    ('a declared callback parameter type is not read', VALUES, '            let old = self.locals.borrow_mut().insert(b, ty.clone());', '            let old = self.locals.borrow_mut().insert(b, Ty::Unknown);'),
+    ('solved callback parameter types are discarded', VALUES, '                self.solved.borrow_mut().insert(b, ty.clone());', ''),
+    ('a piped value is not the first argument', VALUES, '        let piped = self.piped.get(&id).copied();', '        let piped = None;'),
+    ("a solved lambda's parameters are forgotten", VALUES, 'let mut added = typer.solve_lambdas();', 'let mut added = false;'),
+    ('a parameter known only in part is not typed', VALUES, 'if !ty.mentions_foreign_parameter(own) {', 'if ty.is_closed() && !ty.mentions_foreign_parameter(own) {'),
+    ('a lambda bound with a written type is not typed by it', VALUES, '} if is_lambda(*init) => {', '} if false => {'),
+    ('a returned lambda is not typed by the declared result', VALUES, '            for site in self.result_sites() {', '            for site in Vec::<ExprId>::new() {'),
 ]
-
 TESTS = [
     ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "callback_parameters"],
     ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "causal_evidence"],

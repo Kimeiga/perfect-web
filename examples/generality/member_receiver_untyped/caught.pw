@@ -1,0 +1,17 @@
+// @status: GENERAL
+// @invariant: member_receiver_untyped
+// @dimension: generic receiver types and explicit unknown refusal
+
+module generic_effects.fixture
+
+import List
+
+type GenericItem = GenericItem { name: String }
+
+fn label(i: GenericItem) -> String !{ database.read<GenericItem> }
+    host "generic:data/items#label"
+
+fn unknown() -> () !{} {
+    let f = (item) => item.name
+    ()
+}

@@ -1,0 +1,22 @@
+// @corpus: rejected
+// @id: R-092
+// @category: a member read needs a known receiver
+// @rule: PW0408
+// @invariant: member_receiver_untyped
+// @charter: §7.2, §7.4
+// @milestone: 7
+// @expect-error: a member read retains its receiver type and effects
+
+module generic_effects.fixture
+
+import List
+
+type GenericItem = GenericItem { name: String }
+
+fn label(i: GenericItem) -> String !{ database.read<GenericItem> }
+    host "generic:data/items#label"
+
+fn unknown() -> () !{} {
+    let f = (item) => item.label
+    ()
+}

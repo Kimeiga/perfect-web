@@ -1,0 +1,24 @@
+// @corpus: rejected
+// @id: R-091
+// @category: a generic result cannot hide a functions member effect
+// @rule: PW0400
+// @invariant: undeclared_effect
+// @charter: §7.2, §7.4
+// @milestone: 7
+// @expect-error: a member read retains its receiver type and effects
+
+module generic_effects.fixture
+
+import List
+
+type GenericItem = GenericItem { name: String }
+
+fn label(i: GenericItem) -> String !{ database.read<GenericItem> }
+    host "generic:data/items#label"
+
+fn first(given: List<GenericItem>) -> String !{} {
+    for item in List.reverse(given) {
+        return item.label
+    }
+    "none"
+}

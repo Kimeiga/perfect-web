@@ -669,7 +669,7 @@ impl<'a> Labels<'a> {
 
             // A field of a secret record is secret. The record's own label is
             // the floor; a field with its own declared label joins on top.
-            Expr::Field { base, name } => {
+            Expr::Field { base, .. } => {
                 // `secrets.payments` named as a value: a declaration, as a
                 // name is (ADR-0079).
                 if let Some(sig) = self.declaration_named(&crate::infer::path_of(body, id)) {
@@ -677,11 +677,12 @@ impl<'a> Labels<'a> {
                 }
                 let mut l = self.label(body, *base);
                 // A member function read as a field is a call (ADR-0048), and
-                // carries what its body makes (ADR-0129).
-                if let Some(sig) = self
-                    .types
-                    .of(body, *base)
-                    .and_then(|t| self.sigs.member_in(self.module, &t, name))
+                // carries what its body makes (ADR-0129). Read as every
+                // analysis reads a member (ADR-XXXX, the generic-effects
+                // track): through a generic call's result too, whose type was
+                // the callee's `T` here, so a secret a member gave was public.
+                if let Some(crate::infer::MemberRead::Member(Some(sig))) =
+                    self.types.member_read(body, id)
                 {
                     l = l.join(&sig.label).join(&self.summary(sig.definition));
                 }

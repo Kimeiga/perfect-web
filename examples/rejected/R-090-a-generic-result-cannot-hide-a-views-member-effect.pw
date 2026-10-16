@@ -1,0 +1,26 @@
+// @corpus: rejected
+// @id: R-090
+// @category: a generic result cannot hide a views member effect
+// @rule: PW0401
+// @invariant: forbidden_effect
+// @charter: §7.2, §7.4
+// @milestone: 7
+// @expect-error: a member read retains its receiver type and effects
+
+module generic_effects.fixture
+
+import List
+
+type GenericItem = GenericItem { name: String }
+
+fn label(i: GenericItem) -> String !{ database.read<GenericItem> }
+    host "generic:data/items#label"
+
+view Names(given: List<GenericItem>) !{} {
+    let all = List.reverse(given)
+    <ul>
+        {#each all as item (item.name)}
+            <li>{item.label}</li>
+        {/each}
+    </ul>
+}
