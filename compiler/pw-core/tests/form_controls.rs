@@ -71,8 +71,26 @@ fn rendered(src: &str) -> String {
         .iter()
         .find(|t| t.path == "t.P")
         .expect("the page");
-    let compiled = pw_core::backend::signals::compile(&[u]).expect("checks");
-    let first = compiled[0].signals.as_ref().expect("data");
+    // The lowered bind handler reads the platform's event record, just as
+    // `reported` above does; compiling without those declarations would leave
+    // its generated `event~bound.value` receiver unknown.
+    let mut units: Vec<Unit> = library()
+        .into_iter()
+        .map(|(path, src)| Unit {
+            path,
+            hir: lower_file(&src, &parse_tree(&src).green),
+            src,
+        })
+        .collect();
+    units.push(u);
+    let compiled = pw_core::backend::signals::compile(&units).expect("checks");
+    let first = compiled
+        .iter()
+        .find(|c| c.page == "t.P")
+        .expect("the page's signals")
+        .signals
+        .as_ref()
+        .expect("data");
     let mut env = pw_render::Env::new();
     for s in first {
         env = env.set(

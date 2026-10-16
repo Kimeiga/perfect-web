@@ -486,7 +486,11 @@ fn the_trusted_platform_contract_is_hashed() {
     // 2026-10-14: `clock.pw` declares `Duration` and `seconds`, `minutes`
     // and `hours`; `effects.pw` declares `clock.schedule` (the
     // scheduled-commands track).
-    const EXPECTED: u64 = 0xd948_f12f_5148_1319;
+    // 2026-10-16: `browser` declares the opaque `PaintContext` given to a
+    // painter's draw binder and `rect` with four Float arguments and
+    // `paint.custom`, so A-021's operation is typed and its effect observed
+    // (ADR-XXXX-generic-effects; declaration-only platform scope).
+    const EXPECTED: u64 = 0xa89b_9600_c9fc_2f60;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

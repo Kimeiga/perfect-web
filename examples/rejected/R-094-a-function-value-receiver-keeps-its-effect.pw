@@ -9,11 +9,11 @@
 
 module generic_effects.receiver
 
+import FunctionReceiver.{ call_from_value }
+
 type Item = Item { name: String }
 
 fn stamp() -> String !{ database.read<Item> }
     host "shop:data/items#stamp"
 
-fn apply(f: fn() -> String) -> String !{} { f() }
-
-view Show() !{} { <p>{stamp.apply}</p> }
+view Show() !{} { <p>{stamp.call_from_value}</p> }
