@@ -1301,7 +1301,22 @@ impl<'a> P<'a> {
             _ => {
                 self.start(K::ErrorExpr);
                 let found = self.found();
-                self.error("PW0009", format!("expected an expression, found {found}"));
+                let current = self.nth(0);
+                let previous = self.pos.checked_sub(1).and_then(|p| self.toks.get(p));
+                let next = self.nth(1);
+                let doubled_logical = matches!(current.kind, Kind::Amp | Kind::Pipe)
+                    && (previous.is_some_and(|p| {
+                        p.kind == current.kind && p.span.end == current.span.start
+                    }) || (next.kind == current.kind && current.span.end == next.span.start));
+                if doubled_logical {
+                    self.error_help(
+                        "PW0009",
+                        format!("expected an expression, found {found}"),
+                        "Pleris writes `&` for and and `|` for or; write one operator",
+                    );
+                } else {
+                    self.error("PW0009", format!("expected an expression, found {found}"));
+                }
                 self.bump();
                 self.finish();
                 return;
@@ -4113,6 +4128,57 @@ mod tests {
         parse_ok(
             "fn f(b: Bool) -> Int {\n    match b {\n        true => 1,\n        false => 0,\n    }\n}\n",
         );
+    }
+
+    #[test]
+    fn doubled_logical_operators_name_the_pleris_spelling() {
+        for expression in ["a && b", "a || b", "a&&b", "a||b", "&& b", "|| b"] {
+            let parsed = parse_expr(expression, "the expression");
+            assert_lossless(expression, &parsed);
+            assert!(
+                parsed.errors.iter().any(|e| e.code == "PW0009"
+                    && e.help.as_deref()
+                        == Some("Pleris writes `&` for and and `|` for or; write one operator")),
+                "{expression}: {:?}",
+                parsed.errors
+            );
+        }
+        // No textual ban: the valid spellings, strings, markup and comments
+        // retain their own meaning. Separated stray operators get no advice
+        // about a doubled token the programmer did not write.
+        for expression in [
+            "a & b",
+            "a | b",
+            "(a & b) | c",
+            "\"&& ||\"",
+            "<p>&& ||</p>",
+            "a & // && ||\nb",
+        ] {
+            let parsed = parse_expr(expression, "the expression");
+            assert_lossless(expression, &parsed);
+            assert!(parsed.ok(), "{expression}: {:?}", parsed.errors);
+            assert!(
+                !parsed.errors.iter().any(|e| e
+                    .help
+                    .as_deref()
+                    .is_some_and(|h| h.contains("Pleris writes"))),
+                "{expression}: {:?}",
+                parsed.errors
+            );
+        }
+        for expression in ["a & & b", "a | | b", "a &\n& b", "a | // comment\n| b"] {
+            let parsed = parse_expr(expression, "the expression");
+            assert_lossless(expression, &parsed);
+            assert!(!parsed.ok());
+            assert!(
+                !parsed.errors.iter().any(|e| e
+                    .help
+                    .as_deref()
+                    .is_some_and(|h| h.contains("Pleris writes"))),
+                "{expression}: {:?}",
+                parsed.errors
+            );
+        }
     }
 
     #[test]

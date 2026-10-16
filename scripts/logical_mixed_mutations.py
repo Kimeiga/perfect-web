@@ -2,12 +2,13 @@
 """Mutation controls for ADR-0322: `|` and `&` are parenthesized where they
 mix.
 
-Each mutant undoes one piece of the parser's rule: a mixed chain parsed as
+Each mutant undoes one piece of the parser's logical-operator diagnostics: a mixed chain parsed as
 before, `&` bound tighter instead, the chain's first operator forgotten, and
-a chain refused at every switch rather than once.
+a chain refused at every switch rather than once, and doubled operators
+without spelling advice or separated operators given that advice.
 
-Each must fail `compiler/pw-syntax/src/grammar.rs`'s
-`or_and_and_mixed_without_parentheses_is_refused`.
+Each must fail one of `compiler/pw-syntax/src/grammar.rs`'s tests.
+The whole syntax unit suite runs for every control.
 
 Run from the repository root; `just e14-logical-mixed` records the output.
 The source is restored after every mutant, whatever happens.
@@ -25,6 +26,18 @@ GRAMMAR = ROOT / "compiler/pw-syntax/src/grammar.rs"
 
 # (what, file, anchor, replacement)
 MUTANTS = [
+    (
+        "doubled logical operators carry no spelling advice",
+        GRAMMAR,
+        "                if doubled_logical {\n",
+        "                if doubled_logical && false {\n",
+    ),
+    (
+        "separated logical operators are called doubled",
+        GRAMMAR,
+        "                if doubled_logical {\n",
+        "                if matches!(current.kind, Kind::Amp | Kind::Pipe) {\n",
+    ),
     (
         "a chain that mixes `|` and `&` parses as before",
         GRAMMAR,
@@ -53,7 +66,6 @@ MUTANTS = [
 
 CARGO = [
     "cargo", "test", "--quiet", "--locked", "-p", "pw-syntax", "--lib",
-    "or_and_and_mixed_without_parentheses_is_refused",
 ]
 
 # How long one command may run. Past the bound it is killed with everything
