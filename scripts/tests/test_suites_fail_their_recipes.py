@@ -1,7 +1,7 @@
 """**A failed browser suite fails its recipe, and its evidence says so**
 (track evidence-integrity-2, the integrator's ruling 6 of 2026-10-15).
 
-Until then 81 of the 83 recipes that ran a browser suite ended it `|| true`:
+Until then 83 of the 85 recipes that ran a browser suite ended it `|| true`:
 a failed test failed neither its recipe nor the run, and its evidence said
 "1 failed" in a green run. Every recipe that runs a browser suite, by
 `scripts/run_suite.sh` (Playwright) or by the benchmark's `bench.mjs

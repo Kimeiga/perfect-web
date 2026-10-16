@@ -18,7 +18,7 @@
 # run, or 0: a failed test fails the recipe that ran it, whose evidence still
 # records what the suite said. A run that exits 0 and passed no test fails
 # too: every test skipped, or none selected, is no evidence of passing
-# behaviour. Until 2026-10-15, 81 of the 83 recipes that ran a browser suite
+# behaviour. Until 2026-10-15, 83 of the 85 recipes that ran a browser suite
 # ended its pipeline `|| true`, and their evidence could say "1 failed" in a
 # green run (e14-navigate's did, 2026-10-10). A known failure is a job's
 # `--known` at the fetch (ADR-0281), never a recipe that swallows its suite's
@@ -42,6 +42,10 @@ fi
 case "$runs" in
   '' | *[!0-9]* | 0) echo "run_suite: --runs takes a count of 1 or more, not '$runs'" >&2; exit 2 ;;
 esac
+if ! [ "$runs" -gt 0 ] 2>/dev/null; then
+  echo "run_suite: --runs takes a count of 1 or more, not '$runs'" >&2
+  exit 2
+fi
 
 # What the evidence keeps of a run, once its escape sequences are gone.
 KEEP='^ +[0-9]+\) |Error:|^ +(Expected|Received)|^ +(✓|✘|-) |EVIDENCE|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)'

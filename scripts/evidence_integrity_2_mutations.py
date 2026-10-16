@@ -51,6 +51,7 @@ PROGRAMS = ROOT / "scripts/mutant_programs.py"
 CODES = ROOT / "compiler/pw-core/src/codes.rs"
 RULES = ROOT / "compiler/pw-core/src/rules.rs"
 TABLE = ROOT / "docs/evidence/E2D/corpus-enforcement.txt"
+HISTORY = ROOT / "scripts/recorded_browser_failures.py"
 
 # (what, suite, file, anchor, replacement)
 MUTANTS = [
@@ -149,6 +150,20 @@ MUTANTS = [
         "                bench = False\n",
     ),
     ("the gate has no floor", "gate", GATE, "    elif recognised != occurrences:\n", "    elif False:\n"),
+    (
+        "the historical report is read as another failed suite",
+        "history",
+        HISTORY,
+        '            print(f"    | {line[:150]}")\n',
+        '            print(f"    {line[:150]}")\n',
+    ),
+    (
+        "a zero run count with leading zeros passes",
+        "helper",
+        HELPER,
+        'if ! [ "$runs" -gt 0 ] 2>/dev/null; then\n  echo "run_suite: --runs takes a count of 1 or more, not \'$runs\'" >&2\n  exit 2\nfi\n',
+        "",
+    ),
     # 2. The planner reads every recipe's body.
     (
         "a parameter's default stops a recipe's header again",
@@ -294,6 +309,7 @@ MUTANTS = [
 UNITTEST = [sys.executable, "-m", "unittest"]
 SUITES = {
     "helper": UNITTEST + ["scripts/tests/test_run_suite.py"],
+    "history": UNITTEST + ["scripts/tests/test_recorded_browser_failures.py"],
     "gate": UNITTEST + ["scripts/tests/test_suite_status.py"],
     "recipes": UNITTEST + ["scripts/tests/test_suites_fail_their_recipes.py"],
     "plan": UNITTEST + ["scripts/tests/test_ci_scripts.py"],

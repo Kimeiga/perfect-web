@@ -3,7 +3,7 @@
 passed** (track evidence-integrity-2, the integrator's ruling 6 of
 2026-10-15).
 
-Until then 81 of the 83 recipes that ran a browser suite ended it `|| true`,
+Until then 83 of the 85 recipes that ran a browser suite ended it `|| true`,
 and the benchmark's controls were run the same way: a failed test failed
 neither its recipe nor the run, and its evidence said so to no one. This
 reads every version of every evidence file the history holds (each commit's
@@ -16,7 +16,8 @@ first commit that held it, with the last that still held it, the recipe that
 wrote it (`produced by:`) and the commit it was recorded at (`commit:`).
 
 In a shallow checkout (a CI runner's) it reads what the checkout holds, and
-says how many versions it read.
+says how many versions it read. Historical failure lines are quoted with
+`|` so a later scan does not mistake this report for a failed suite.
 
     python3 scripts/recorded_browser_failures.py
 """
@@ -151,7 +152,7 @@ def main() -> int:
             f"recorded at {e['recorded']}) {e['heading'][3:70]}:"
         )
         for line in e["lines"][:6]:
-            print(f"    {line[:150]}")
+            print(f"    | {line[:150]}")
     print(
         f"recorded browser failures: {len(entries)} ({sum(1 for e in entries if e['now'])} still committed), "
         f"in {read} versions of evidence files read"

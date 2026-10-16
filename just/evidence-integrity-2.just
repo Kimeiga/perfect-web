@@ -22,6 +22,7 @@ e14-evidence-integrity-2:
        echo "rust: $(rustc --version)"; echo "python: $(python3 --version)"; echo "just: $(just --version)"; echo; \
        echo "== 1. what the evidence recorded of failed browser tests while their recipes passed (scripts/recorded_browser_failures.py; a shallow checkout reads what it holds)"; echo; \
        python3 scripts/recorded_browser_failures.py; \
+       python3 -m unittest -v scripts/tests/test_recorded_browser_failures.py 2>&1 | grep -E ' \.\.\. |^Ran |^OK|^FAILED'; \
        echo; echo "== 1. a failed browser test fails its recipe: the helper (scripts/run_suite.sh, test_run_suite.py)"; echo; \
        python3 -m unittest -v scripts/tests/test_run_suite.py 2>&1 | grep -E ' \.\.\. |^Ran |^OK|^FAILED'; \
        echo; echo "== 1. every suite in the justfile runs by it, its status its recipe's (scripts/suite_status.py, test_suite_status.py)"; echo; \

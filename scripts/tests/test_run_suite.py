@@ -152,7 +152,7 @@ class RunSuite(unittest.TestCase):
         self.assertEqual((d / "count.where").read_text().strip(), str(d / "benchmarks/harness"))
 
     def test_a_call_it_cannot_read_is_refused(self):
-        for args in (["--runs", "0"], ["--runs", "x"], ["--bogus"]):
+        for args in (["--runs", "0"], ["--runs", "00"], ["--runs", "000"], ["--runs", "x"], ["--bogus"]):
             with self.subTest(args=args):
                 status, _, _ = self.run_helper(args, PASSED_RUN)
                 self.assertEqual(status, 2)

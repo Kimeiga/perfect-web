@@ -8,11 +8,14 @@ and merged, one still committed, and the controls that are not failures.
 from __future__ import annotations
 
 import importlib.util
+import contextlib
+import io
 import os
 import pathlib
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
 SCRIPTS = pathlib.Path(__file__).resolve().parent.parent
 
@@ -94,6 +97,22 @@ class RecordedBrowserFailures(unittest.TestCase):
             ],
         )
         self.assertGreaterEqual(read, 5)
+
+    def test_a_committed_report_does_not_become_a_new_failed_suite(self):
+        feed = "docs/evidence/E14/feed.txt"
+        self.commit({feed: evidence("e14-feed", FAILED)}, "failed suite")
+        module = load()
+        scan = module.found
+        output = io.StringIO()
+        with mock.patch.object(module, "found", side_effect=lambda: scan(self.root)):
+            with contextlib.redirect_stdout(output):
+                self.assertEqual(module.main(), 0)
+        self.commit(
+            {"docs/evidence/E14/evidence-integrity-2.txt": output.getvalue()},
+            "record the historical failure census",
+        )
+        entries, _ = scan(self.root)
+        self.assertEqual([entry["path"] for entry in entries], [feed])
 
     def test_a_green_run_a_skip_a_mutant_and_a_cargo_failure_are_no_browser_failure(self):
         # The control: counts of nothing failed, a skip, a mutation script's

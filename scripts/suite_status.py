@@ -2,7 +2,7 @@
 """**A browser suite's status is its recipe's** (track evidence-integrity-2,
 the integrator's ruling 6 of 2026-10-15).
 
-Until then 81 of the 83 recipes that ran a browser suite ended its pipeline
+Until then 83 of the 85 recipes that ran a browser suite ended its pipeline
 `|| true`: a failed test failed neither its recipe nor the run, and the
 evidence said "1 failed" in a green run (`e14-navigate`'s on 2026-10-10,
 `e14-feed`'s on 2026-10-09). Each now runs it through `scripts/run_suite.sh`,
