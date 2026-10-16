@@ -42,6 +42,7 @@ PROGRAMS = {
     "feed": STD + ["examples/feed/*.pw"],
     "kiokun": STD + ["examples/kiokun/*.pw"],
     "kiokun-site": STD + ["examples/kiokun-site/*.pw"],
+    "todomvc": STD + ["examples/todomvc/*.pw"],
 }
 
 # Which program a source is of, by its directory: the first that holds it.
@@ -50,6 +51,7 @@ OF = [
     ("examples/kiokun-site/", "kiokun-site"),
     ("examples/kiokun/", "kiokun"),
     ("examples/store/", "store"),
+    ("examples/todomvc/", "todomvc"),
     ("examples/lib/", "store"),
     ("examples/domain.pw", "store"),
     ("packages/", "store"),
