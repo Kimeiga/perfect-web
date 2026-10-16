@@ -372,3 +372,12 @@ continued planner discovery of the published report.
 [Commands, hashes and raw results](../evidence/E14/evidence-integrity-atomic.txt)
 retain the failed-before history explicitly. Clean committed real-recipe
 execution and assembled CI/verification remain pending at this checkpoint.
+
+
+The actual clean-source recipe at `c67bf6ed` also passes with the standard
+report initially absent: both latency pairs, including 64 busy loops,
+20 source-check tests, every Python phase and the whole 35/35 controls.
+All controls fail test assertions; no bound stopped a process. Publication
+records that exact clean source. The source commit is preserved beneath a
+separate evidence commit. [Receipt and hashes](../evidence/E14/evidence-integrity-clean-recipe.txt).
+Assembled train verification is still pending.
