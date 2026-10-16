@@ -103,7 +103,10 @@ publishes atomically. The shared planner discovers the published output.
 Its final suite kills 35/35 controls; 227 Python tests run with 225 passes
 and 2 intentional skips. The initial 33/34 run is
 recorded as failing. [Corrective evidence](evidence/E14/evidence-integrity-atomic.txt).
-Clean real-recipe execution and assembled verification remain pending.
+The actual clean-source recipe at `c67bf6ed` now passes, including both
+ordinary and 64-busy-loop latency checks and all 35 controls.
+[Clean-source receipt](evidence/E14/evidence-integrity-clean-recipe.txt).
+Assembled train CI and verification remain pending.
 
 **ADR-0343, 2026-10-15: a guide whose examples compile** (NEXT's
 developer experience, its docs and tutorial for a developer from outside;

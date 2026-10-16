@@ -1,0 +1,38 @@
+Atomic evidence publication: clean-source reproduction, 2026-10-16 05:45 UTC
+
+produced by: just e14-evidence-integrity
+commit: c67bf6ed04f59264d934a0f397879820bee1f1f1
+
+The actual recipe ran on the committed source with its standard report
+initially missing, reproducing the first-run condition of failed GitHub
+verify 38824307495. The report records the exact clean commit, and no
+uncommitted marker. The recipe completed with exit zero and published the
+whole report only at success. Its source commit is preserved; this is a
+separate evidence commit.
+
+Both ordinary and 64-busy-loop latency checks passed 2/2. Their test
+groups took 23.86s and 128.45s respectively. All load children were killed
+and waited before other browser work resumed. The 20 checking-source tests
+passed. Every remaining recipe phase succeeded, and the whole mutation
+suite killed 35/35 controls by test failures with no memory-bound stops.
+The complete report is docs/evidence/E14/evidence-integrity.txt.
+
+After restoration, all 3,208 mutation anchors in 271 scripts match once.
+Evidence counts report nine stale/planned disagreements and zero failing.
+Full assembled train CI and GitHub verification remain pending.
+
+Reproduce: source /home/haki/pw-setup/env.sh
+Reproduce: CARGO_BUILD_JOBS=4 RUST_TEST_THREADS=4 PYTHONDONTWRITEBYTECODE=1 CARGO_TARGET_DIR=/home/haki/code/pw-wt/train-10/target just e14-evidence-integrity
+Reproduce: python3 scripts/mutation_anchors.py
+Reproduce: python3 scripts/evidence_counts.py
+Reproduce: git diff --check
+
+SHA256:
+0ede241b52b563875cb524b56c877d1130360d9d54de6588f0e6a8f4fe4517cf  docs/evidence/E14/evidence-integrity.txt
+c98897b80c4841c60e9b1e4007a6cff56334cdec55dadb037b185d222332a67b  /tmp/codex-atomic-evidence-clean-recipe.log
+
+Integration whitespace receipt: the raw evidence-integrity.txt is byte-identical
+to 4aec22e6, SHA256 0ede241b52b563875cb524b56c877d1130360d9d54de6588f0e6a8f4fe4517cf.
+Its single unittest status-prefix trailing space at line196 is preserved;
+every other changed path passes git diff --check. The complete 235-test
+evidence gates, formatting, anchors3259/273 and case2821 passed unchanged.
