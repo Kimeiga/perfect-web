@@ -201,6 +201,54 @@ class Plan(unittest.TestCase):
             plan.touched_scripts({"spikes/own-renderer/e2e/nothing.spec.mjs": [(1, 1)]}, 30),
         )
 
+    def test_a_change_to_the_suites_configuration_plans_every_recipe_that_runs_a_suite_under_it(self) -> None:
+        # The integrator's ruling 7 (2026-10-15): every spec runs under
+        # `playwright.config.mjs`, its hosts and its checks of the builds; a
+        # change to it planned only a recipe whose mutant's anchor sat near.
+        names = plan.recipes()
+        body = plan.bodies()
+        planned = plan.recipes_for({plan.PLAYWRIGHT_CONFIG: [(100, 100)]}, 30, names)
+        under = sorted(n for n in names if plan.runs_browser_suite(body.get(n, "")))
+        self.assertGreater(len(under), 80)
+        self.assertEqual(sorted(set(under) - set(planned)), [])
+        for name in (
+            "e14-feed",  # its own lines, by the helper
+            "e14-keepalive",  # two suites in its lines
+            "e14-resume-gate",  # a suite in a loop
+            "e10-browser",  # every spec, three runs
+            "e14-speculated-values",  # only by its mutation script
+        ):
+            self.assertIn(name, planned, name)
+        # The benchmark harness's suite runs under its own configuration,
+        # and a recipe that runs no browser is not planned.
+        self.assertNotIn("e14-contract", planned)
+        self.assertNotIn("e8-wit", planned)
+        self.assertFalse(plan.runs_browser_suite(body["e14-contract"]))
+        self.assertTrue(plan.runs_browser_suite(body["e14-contract"], "benchmarks/harness"))
+        # The control: another file of the spike plans none of them by this.
+        other = plan.recipes_for({"spikes/own-renderer/README.md": [(1, 1)]}, 30, names)
+        self.assertNotIn("e14-feed", other)
+
+    def test_a_changed_spec_or_a_module_its_specs_import_plans_what_runs_them(self) -> None:
+        # Track evidence-integrity-2: `e2e/accessibility-rules.mjs`, which
+        # three specs import, planned nothing; and `e10-browser`, which runs
+        # every spec, was planned by none.
+        names = plan.recipes()
+        rules = {"spikes/own-renderer/e2e/accessibility-rules.mjs": [(1, 1)]}
+        self.assertEqual(
+            plan.changed_specs(rules), {"accessibility.spec.mjs", "payments.spec.mjs", "store-search.spec.mjs"}
+        )
+        planned = plan.recipes_for(rules, 30, names)
+        for name in ("e14-accessibility", "e14-titles", "e14-payments", "e14-store-search", "e10-browser"):
+            self.assertIn(name, planned, name)
+        self.assertNotIn("e14-feed", planned)
+        feed = plan.recipes_for({"spikes/own-renderer/e2e/feed.spec.mjs": [(1, 1)]}, 30, names)
+        self.assertIn("e10-browser", feed)
+        self.assertTrue(plan.runs_every_spec(plan.bodies()["e10-browser"]))
+        self.assertFalse(plan.runs_every_spec(plan.bodies()["e14-feed"]))
+        # The control: a module no spec imports reaches no spec.
+        self.assertEqual(plan.changed_specs({"spikes/own-renderer/e2e/nothing.mjs": [(1, 1)]}), set())
+
     def test_a_recipe_is_planned_where_its_script_reads_what_changed(self) -> None:
         # W8's finding, 2026-10-12: holds' merge changed the benchmark's
         # baseline store, and no verify planned `e14-diffs`, whose script
