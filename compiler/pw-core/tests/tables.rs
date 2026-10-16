@@ -879,6 +879,38 @@ fn pw0361_generated_composite_records_have_one_shape_each() {
 }
 
 #[test]
+fn pw0361_two_tables_cannot_emit_the_same_interface() {
+    let first = "module Todo_Items\ntype Row = Row { id: String }\ntable Todo_Items\n    row Row\n    key id\n";
+    let second = first.replace("Todo_Items", "TodoItems");
+    let found = diagnostics(&[("Todo_Items.pw", first), ("TodoItems.pw", &second)]);
+    assert!(
+        found.iter().any(|d| d.code == "PW0361"
+            && d.message
+                .contains("emit the same interface `pw:tables/todo-items`")),
+        "{found:#?}"
+    );
+    let distinct = first.replace("Todo_Items", "ArchivedItems");
+    assert!(diagnostics(&[("Todo_Items.pw", first), ("ArchivedItems.pw", &distinct)]).is_empty());
+}
+
+#[test]
+fn pw0361_two_functions_cannot_emit_the_same_import() {
+    let src = todos(
+        "    bounded 500\n",
+        "    bounded 500\n    index by_title_done on title\n    index by_title__done on done\n",
+    );
+    let found = diagnostics(&[("Todos.pw", &src)]);
+    assert!(
+        found.iter().any(|d| d.code == "PW0361"
+            && d.message
+                .contains("emit the same import `pw:tables/todos#by-title-done`")),
+        "{found:#?}"
+    );
+    let distinct = src.replace("by_title__done", "by_finished");
+    assert!(diagnostics(&[("Todos.pw", &distinct)]).is_empty());
+}
+
+#[test]
 fn generic_fields_project_their_arguments_recursively_and_a_change_is_destructive() {
     use pw_core::tables::{Stored, StoredField};
     let boxed = todos("added: Int }", "added: Int, payload: Box<Int> }").replace(

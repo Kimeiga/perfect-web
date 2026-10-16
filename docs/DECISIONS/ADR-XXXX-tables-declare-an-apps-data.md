@@ -17,6 +17,12 @@ not implement an adapter or claim that a table can yet be served.
   would need new subnamespaces; postpone that extension until a use needs it.
   Generated tuple names are checked for collisions (`a_b,c` and `a,b_c`
   would otherwise silently share one record with two different shapes).
+  Distinct tables and functions must also emit distinct ABI identities:
+  `Todo_Items`/`TodoItems` and `by_a_b`/`by_a__b` collide after WIT naming.
+  PW0361 refuses those collisions using the emitter's canonical
+  `interface_of`/`import_of`, both using the existing `wit::ident`; it does
+  not introduce another ABI spelling algorithm. The two new tests failed
+  before the guard (`tables-abi-before.txt` beside the other D1 evidence).
 - `row`, `key`, `order`, `index`, `unique`, `refers`, `bounded` and `migrate`
   have declared policy domains. An index is named `by_<name>`. A key, order
   or index uses scalar fields: integers, strings, booleans, opaque types over
@@ -76,7 +82,7 @@ Final measured counts are recorded after execution below.
 
 Adversarial tests were red before the guards/projection repair: all three
 misses (duplicate source name, tuple-name collision and nested generic storage)
-reported in `/tmp/tables-adversarial-before.log`, produced by
+reported in `docs/evidence/E14/tables-adversarial-before.txt`, produced by
 `cargo test --locked -p pw-core --test tables` on the then-working tree.
 
 No app-specific Rust, dependency download, database or browser is needed.

@@ -1,0 +1,29 @@
+   Compiling pw-core v0.0.0 (/home/haki/code/pw-wt/tables/compiler/pw-core)
+    Finished `test` profile [unoptimized] target(s) in 0.89s
+     Running tests/tables.rs (target/debug/deps/tables-136098dea2c9ef5f)
+
+running 2 tests
+test pw0361_two_tables_cannot_emit_the_same_interface ... FAILED
+test pw0361_two_functions_cannot_emit_the_same_import ... FAILED
+
+failures:
+
+---- pw0361_two_tables_cannot_emit_the_same_interface stdout ----
+
+thread 'pw0361_two_tables_cannot_emit_the_same_interface' (2938353) panicked at compiler/pw-core/tests/tables.rs:886:5:
+[]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- pw0361_two_functions_cannot_emit_the_same_import stdout ----
+
+thread 'pw0361_two_functions_cannot_emit_the_same_import' (2938352) panicked at compiler/pw-core/tests/tables.rs:895:5:
+[]
+
+
+failures:
+    pw0361_two_functions_cannot_emit_the_same_import
+    pw0361_two_tables_cannot_emit_the_same_interface
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.06s
+
+error: test failed, to rerun pass `-p pw-core --test tables`

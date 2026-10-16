@@ -684,11 +684,12 @@ fn record(name: &str, fields: &[(String, DeclaredType)], span: &Span) -> Decl {
 /// **The import a table's function is bound to**: `pw:tables/<table>#<name>`,
 /// each part a WIT identifier (ADR-0262).
 pub fn import_of(table: &str, function: &str) -> String {
-    format!(
-        "pw:tables/{}#{}",
-        crate::wit::ident(table),
-        crate::wit::ident(function)
-    )
+    format!("{}#{}", interface_of(table), crate::wit::ident(function))
+}
+
+/// The emitted interface identity, shared by metadata and collision checks.
+pub fn interface_of(table: &str) -> String {
+    format!("pw:tables/{}", crate::wit::ident(table))
 }
 
 /// A function bound to its import, as `fn name(..) -> R !{ e<T> } host ".."`
@@ -935,6 +936,49 @@ fn unambiguous_sources(hirs: &[&Hir], ws: &Workspace, t: &Table) -> Vec<Diagnost
     out
 }
 
+/// Distinct Pleris names must stay distinct at the emitted ABI boundary.
+/// Compare the identities the emitter uses, never a second spelling rule.
+fn distinct_imports(hirs: &[&Hir], unit: usize, t: &Table) -> Vec<Diagnostic> {
+    let mut out = Vec::new();
+    let interface = interface_of(&t.name);
+    for (other_unit, other) in every(hirs) {
+        if other.name != t.name && interface_of(&other.name) == interface {
+            out.push(malformed(
+                format!(
+                    "`{}` and `{}` emit the same interface `{interface}`",
+                    t.name, other.name
+                ),
+                t.span.clone(),
+                vec![Related::in_unit(
+                    other_unit,
+                    other.span,
+                    "the other table is declared here",
+                )],
+                "rename one table and its module so their emitted WIT interface identities differ"
+                    .into(),
+            ));
+        }
+    }
+    let hir = hirs[unit];
+    let mut seen = BTreeMap::new();
+    for (id, _, _) in functions_of(hir, t.decl) {
+        let d = hir.decl(id);
+        let import = import_of(&t.name, &d.name);
+        if let Some((first, span)) =
+            seen.insert(import.clone(), (d.name.clone(), d.name_span.clone()))
+        {
+            out.push(malformed(
+                format!("`{first}` and `{}` emit the same import `{import}`", d.name),
+                d.name_span.clone(),
+                vec![Related::new(span, "the first function is generated here")],
+                "rename an index so the generated functions' emitted WIT import identities differ"
+                    .into(),
+            ));
+        }
+    }
+    out
+}
+
 /// One table refusal.
 #[allow(clippy::too_many_arguments)]
 fn refusal(
@@ -999,6 +1043,7 @@ pub fn check(hirs: &[&Hir], unit: usize, ws: &Workspace, sigs: &Signatures) -> V
     for (i, t) in tables.iter().enumerate() {
         let mut found = shape(hirs, unit, ws, sigs, &module, t, i > 0);
         found.extend(unambiguous_sources(hirs, ws, t));
+        found.extend(distinct_imports(hirs, unit, t));
         if found.is_empty() {
             found.extend(across_sources(hirs, unit, ws, t));
         }
@@ -2727,7 +2772,7 @@ pub fn tables_json(
                 .collect();
             TableJson {
                 module: t.name.clone(),
-                interface: format!("pw:tables/{}", crate::wit::ident(&t.name)),
+                interface: interface_of(&t.name),
                 row: t.row.as_ref().map(|r| r.value.clone()).unwrap_or_default(),
                 schema: schema.clone(),
                 bounded: t.bounded.as_ref().map(|b| b.value),
