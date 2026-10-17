@@ -72,7 +72,7 @@ track `guide`, merged from `49967631`, with the integrator's rulings of
   its verify green at `00471782` (`e14-guide` among its jobs) and again
   at `49967631`, with train-8 merged (38815010191), and its `ci` there
   (38815009873).
-Verify TRAIN_RUN green, with train-9.
+Verify 38909882781 green, with train-9.
 
 **ADR-0342, 2026-10-15: the claim, measured: the bug museum and the
 head-to-head** (NEXT's evidence that answers "is Pleris perfect?"; track
@@ -98,7 +98,7 @@ head-to-head** (NEXT's evidence that answers "is Pleris perfect?"; track
   `--checks-only` run on the train: 4 refused, none otherwise than
   expected; `proof_mutations.py` 4 of 4 killed, H07's new control among
   them.
-Verify TRAIN_RUN green, with train-9.
+Verify 38909882781 green, with train-9.
 
 **ADR-0341, 2026-10-15: a store is rated through its delivered orders, and
 its reviewers go unnamed** (W9's; NEXT's ratings and reviews, the DoorDash
@@ -127,7 +127,7 @@ from `2190221c`, with the integrator's rulings of 2026-10-15).
   which still described the page without its ratings: brought to the page
   on the train, in a commit of their own. Its browser hosts are PORT + 200
   to 202.
-Verify TRAIN_RUN green, with train-9.
+Verify 38909882781 green, with train-9.
 
 **ADR-0340, 2026-10-15: a read keyed by its loop's element is refused**
 (NEXT 4c's second step, the checker's half of ADR-0337; track
@@ -157,7 +157,7 @@ and answers of 2026-10-15; corpus C25).
   On the train, its store test edits the home page's loop as ADR-0341
   left it (the train's first `just ci` found the two merges meeting
   there), and the script ran whole again, 40 of 40.
-Verify TRAIN_RUN green, with train-9.
+Verify 38909882781 green, with train-9.
 
 **ADR-0339, 2026-10-15: a collaborative document is merged by Automerge,
 edited in a mounted ProseMirror, and told on the stream** (a design note

@@ -1,8 +1,8 @@
 ADR-0128 - a shared cache holds no one reader's value, whatever its declaration says
 
 produced by: just e14-shared-cache
-commit: 2fad034d799482be4add99c326919c49cf0f48ff
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38629460236 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: e2a4acd960c88144e3b40e7a6e9d9b8bd774ee1a
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38909882781 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == regression tests (compiler/pw-core/tests/shared_cache_holds_no_readers_value.rs)
@@ -10,13 +10,13 @@ rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 test a_readers_value_in_a_tenants_cache_is_one_defect ... ok
 test a_shared_fragment_of_a_query_given_the_session_is_refused ... ok
 test a_key_naming_the_reader_does_not_make_their_value_shareable ... ok
-test a_query_given_the_session_holds_the_sessions_value_whatever_its_keyword ... ok
 test a_tenants_value_may_be_shared_keyed_by_its_tenant ... ok
-test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.76s
+test a_query_given_the_session_holds_the_sessions_value_whatever_its_keyword ... ok
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.14s
 
 == generality (just generality)
 
-  generality-tested:      54 / 54
+  generality-tested:      56 / 56
   generality untested:    0 — []
 
 == mutation controls (scripts/shared_cache_mutations.py)

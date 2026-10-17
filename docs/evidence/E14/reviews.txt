@@ -1,63 +1,72 @@
 Track reviews - a store rated through a delivered order, once; its reviews without their reviewer
 
 produced by: just e14-reviews
-commit: 0d76d896f75005b1ed51fb58d7b332df1288b5ea
+commit: e2a4acd960c88144e3b40e7a6e9d9b8bd774ee1a
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38909882781 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64, PostgreSQL 18.6)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
-postgres: 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
+postgres: 18.6 (Debian 18.6-1.pgdg13+2)
 
 == the ratings served, the store in memory (tests/reviews.rs)
 
-test tests::reviews::the_checker_keeps_the_reader_out_of_a_stores_shared_ratings ... ok
-test tests::reviews::the_layer_holds_its_rules_without_the_predicate ... ok
-test tests::reviews::a_store_not_of_the_order_is_not_rated ... ok
-test tests::reviews::the_ratings_of_a_list_of_stores_are_read_at_once ... ok
-test tests::reviews::an_order_not_yet_delivered_is_not_rated ... ok
 test tests::reviews::a_rating_is_told_to_the_raters_open_pages ... ok
-test tests::reviews::each_store_of_an_order_is_rated_once ... ok
 test tests::reviews::a_rating_is_told_to_the_pages_that_show_it ... ok
 test tests::reviews::a_comment_is_at_most_five_hundred_characters ... ok
-test tests::reviews::only_the_orders_owner_rates_it ... ok
-test tests::reviews::the_latest_order_alone_is_rated ... ok
-test tests::reviews::reviews_show_without_their_reviewer ... ok
 test tests::reviews::a_delivered_orders_store_is_rated_once_and_shown ... ok
+test tests::reviews::a_store_not_of_the_order_is_not_rated ... ok
+test tests::reviews::an_order_not_yet_delivered_is_not_rated ... ok
 test tests::reviews::a_stores_mean_is_said_from_ten_ratings ... ok
-test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 574 filtered out; finished in 20.15s
+test tests::reviews::each_store_of_an_order_is_rated_once ... ok
+test tests::reviews::only_the_orders_owner_rates_it ... ok
+test tests::reviews::reviews_show_without_their_reviewer ... ok
+test tests::reviews::the_checker_keeps_the_reader_out_of_a_stores_shared_ratings ... ok
+test tests::reviews::the_latest_order_alone_is_rated ... ok
+test tests::reviews::the_layer_holds_its_rules_without_the_predicate ... ok
+test tests::reviews::the_ratings_of_a_list_of_stores_are_read_at_once ... ok
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 581 filtered out; finished in 109.21s
 
 == the ratings served, the store on PostgreSQL (PW_STORE_TEST_LAYER=postgres)
 
-test tests::reviews::the_checker_keeps_the_reader_out_of_a_stores_shared_ratings ... ok
-test tests::reviews::an_order_not_yet_delivered_is_not_rated ... ok
-test tests::reviews::a_rating_is_told_to_the_raters_open_pages ... ok
-test tests::reviews::each_store_of_an_order_is_rated_once ... ok
-test tests::reviews::the_ratings_of_a_list_of_stores_are_read_at_once ... ok
 test tests::reviews::a_rating_is_told_to_the_pages_that_show_it ... ok
-test tests::reviews::a_store_not_of_the_order_is_not_rated ... ok
-test tests::reviews::the_layer_holds_its_rules_without_the_predicate ... ok
+test tests::reviews::a_rating_is_told_to_the_raters_open_pages ... ok
 test tests::reviews::a_comment_is_at_most_five_hundred_characters ... ok
+test tests::reviews::a_delivered_orders_store_is_rated_once_and_shown ... ok
+test tests::reviews::a_store_not_of_the_order_is_not_rated ... ok
+test tests::reviews::an_order_not_yet_delivered_is_not_rated ... ok
+test tests::reviews::each_store_of_an_order_is_rated_once ... ok
+test tests::reviews::a_stores_mean_is_said_from_ten_ratings ... ok
 test tests::reviews::only_the_orders_owner_rates_it ... ok
 test tests::reviews::reviews_show_without_their_reviewer ... ok
 test tests::reviews::the_latest_order_alone_is_rated ... ok
-test tests::reviews::a_delivered_orders_store_is_rated_once_and_shown ... ok
-test tests::reviews::a_stores_mean_is_said_from_ten_ratings ... ok
-test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 574 filtered out; finished in 21.81s
+test tests::reviews::the_checker_keeps_the_reader_out_of_a_stores_shared_ratings ... ok
+test tests::reviews::the_layer_holds_its_rules_without_the_predicate ... ok
+test tests::reviews::the_ratings_of_a_list_of_stores_are_read_at_once ... ok
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 581 filtered out; finished in 108.46s
 
 == each operation, page and command counted, the ratings' among them (tests/bounded_statements.rs)
 
 test tests::bounded_statements::each_operation_is_a_bounded_number_of_statements_per_call ... ok
+test tests::bounded_statements::a_pending_real_payment_webhook_is_not_a_complete_statement_count ... ok
+test tests::bounded_statements::scheduled_state_writes_feed_ran_waits_for_a_command ... ok
+test tests::bounded_statements::scheduled_state_writes_feed_retry_waits_for_a_command ... ok
+test tests::bounded_statements::scheduled_state_writes_store_ran_waits_for_a_command ... ok
+test tests::bounded_statements::scheduled_state_writes_store_retry_waits_for_a_command ... ok
+test tests::bounded_statements::a_commands_commit_is_counted_with_it has been running for over 60 seconds
+test tests::bounded_statements::each_page_and_command_is_a_bounded_number_of_statements has been running for over 60 seconds
 test tests::bounded_statements::a_commands_commit_is_counted_with_it ... ok
-test tests::bounded_statements::each_page_and_command_is_a_bounded_number_of_statements ... ok
 test tests::bounded_statements::placing_and_settling_where_payments_are_taken_is_bounded ... ok
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 584 filtered out; finished in 37.71s
+test tests::bounded_statements::sweep_cleanup_and_payment_commit_share_the_same_write_guard ... ok
+test tests::bounded_statements::each_page_and_command_is_a_bounded_number_of_statements ... ok
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 585 filtered out; finished in 64.93s
 
 == the store rated in three engines (e2e/reviews.spec.mjs)
 
-  6 passed (3.1m)
+  6 passed (6.5m)
 
 == mutation controls (scripts/reviews_mutations.py)
 
 baseline (server): 14 passed, 0 failed
 baseline (postgres): 14 passed, 0 failed
-baseline (bounded): 4 passed, 0 failed
+baseline (bounded): 10 passed, 0 failed
 a store's mean is said from nine ratings [server]: KILLED (1 of 14 tests fail)
 a store's mean waits for an eleventh rating [server]: KILLED (1 of 14 tests fail)
 a mean is cut, not rounded half up [server]: KILLED (1 of 14 tests fail)
@@ -87,6 +96,6 @@ memory lists a rating with no comment as a review [server]: KILLED (1 of 14 test
 PostgreSQL lists reviews oldest first [postgres]: KILLED (1 of 14 tests fail)
 PostgreSQL lists a rating with no comment as a review [postgres]: KILLED (1 of 14 tests fail)
 a store's page shows six reviews [server]: KILLED (1 of 14 tests fail)
-PostgreSQL's ratings are read a store at a time [bounded]: KILLED (2 of 4 tests fail)
+PostgreSQL's ratings are read a store at a time [bounded]: KILLED (2 of 10 tests fail)
 30 of 30 mutants killed
 memory bound: no process was stopped
