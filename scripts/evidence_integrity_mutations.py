@@ -30,7 +30,10 @@ Each mutant undoes one piece:
    leaves its suite to run;
 6. `master` holds no unnumbered ADR (`unnumbered_adrs.py`): a mention in a
    code span is read too, or no mention is; an unnumbered ADR file is let
-   be; a track's branch is held, or a train is not.
+   be; a track's branch is held, or a train is not; a decision's path that
+   evidence recorded before its numbering is read as a mention, or a path
+   is let be outside evidence too, or a line of evidence with one is let be
+   whole (amended 2026-10-17, train-10).
 
 Each runs the suite that holds it: `scripts/tests/`'s, by `unittest`, or
 `pw-core`'s, by `cargo test`. At least one test must fail.
@@ -287,15 +290,38 @@ MUTANTS = [
         "a mention in a code span is read too",
         "adrs",
         ADRS,
-        '            if MENTION.search(CODE_SPAN.sub("", line)):\n',
-        "            if MENTION.search(line):\n",
+        '            text = CODE_SPAN.sub("", line)\n',
+        "            text = line\n",
     ),
     (
         "no mention is read",
         "adrs",
         ADRS,
-        '            if MENTION.search(CODE_SPAN.sub("", line)):\n',
+        "            if MENTION.search(text):\n",
         "            if False:\n",
+    ),
+    # Amended 2026-10-17 (train-10's merge of train-9): a decision's file,
+    # by the path evidence recorded it under before it was numbered.
+    (
+        "a path evidence recorded is read as a mention",
+        "adrs",
+        ADRS,
+        '            if rel.startswith("docs/evidence/"):\n',
+        "            if False:\n",
+    ),
+    (
+        "a decision's path is let be outside evidence too",
+        "adrs",
+        ADRS,
+        '            if rel.startswith("docs/evidence/"):\n',
+        "            if True:\n",
+    ),
+    (
+        "a line of evidence with a recorded path is let be whole",
+        "adrs",
+        ADRS,
+        '                text = RECORDED_PATH.sub("", text)\n',
+        '                text = "" if RECORDED_PATH.search(text) else text\n',
     ),
     (
         "an unnumbered ADR file is let be",
