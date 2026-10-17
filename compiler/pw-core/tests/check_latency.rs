@@ -45,6 +45,16 @@
 //! for the E9 evidence. CPU time is not the work itself: a thread on a busy
 //! core, or on one of a hybrid processor's slower cores, takes more of it for
 //! the same work, so the ceiling stays loose.
+//!
+//! **And so the ceiling measured the program** (train-10, the integrator's
+//! ruling 4, 2026-10-17). GitHub's `ubuntu-24.04-arm` runner checked
+//! train-10's store program, a fifth more to check than train-9's for its
+//! scheduled orders, in 2.11 s of CPU time, past the fixed 2 s, where the
+//! x86 runner and the PC passed: a program that grows crosses a fixed
+//! ceiling by its growth. The ceiling is per thousand lines checked now, two
+//! and a half times what the slowest runner measured, so both of CI's
+//! runners pass it with margin; a pathological check (ten checks where one
+//! is asked) still fails it on each.
 
 use std::time::{Duration, Instant};
 
@@ -82,6 +92,30 @@ fn ms(d: Duration) -> f64 {
 /// One measurement at a time: this file's two tests ran at once, each timing
 /// its checks while the other's ran.
 static MEASURING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// **The ceiling, per thousand lines checked** (train-10, the integrator's
+/// ruling 4 of 2026-10-17): two and a half times what a check cost a
+/// thousand lines on CI's slowest runner, GitHub's `ubuntu-24.04-arm`,
+/// where train-10's store program, 56 files and 6,568 lines, took 2,108.54
+/// ms of the checking thread's CPU time (ci run 39054436550): 321 ms, so
+/// 802.6, rounded down to 800. Until then the ceiling was 2 s whatever the
+/// program's size, two and a half times the Mac's 850 ms of 2026-10-13: the
+/// ARM runner crossed it at train-10 by the program's growth, a fifth more
+/// to check for its scheduled orders, not by a pathological change.
+const CEILING_PER_THOUSAND_LINES: Duration = Duration::from_millis(800);
+
+/// How many lines `files` hold, what the ceiling is per thousand of.
+fn lines_of(files: &[(String, String)]) -> usize {
+    files.iter().map(|(_, text)| text.lines().count()).sum()
+}
+
+/// **A measurement, said past the test harness's capture**, so that a run
+/// that passes says it too: CI's logs on each of its runners are where the
+/// ceiling above is measured (train-10's ruling 4).
+fn report(line: std::fmt::Arguments) {
+    use std::io::Write;
+    let _ = writeln!(std::io::stderr(), "{line}");
+}
 
 /// The store demo as one program: the platform packages, the shared library and
 /// the app. 36 files, the same set `just ci` checks.
@@ -171,31 +205,41 @@ fn the_whole_program_and_one_edit_are_both_measured() {
     app.1
         .push_str("\n// an edit that changes nothing semantic\n");
     let after_edit = time_check(&edited, 7, true);
+    let lines = lines_of(&files);
+    let per_thousand = cold.cpu.mul_f64(1000.0 / lines as f64);
 
-    println!(
-        "check-latency cold  {:>8.2} ms   (cpu {:.2} ms)",
+    report(format_args!(
+        "check-latency cold  {:>8.2} ms   (cpu {:.2} ms; {} lines, cpu {:.2} ms a thousand lines)",
         ms(cold.wall),
-        ms(cold.cpu)
-    );
-    println!(
+        ms(cold.cpu),
+        lines,
+        ms(per_thousand)
+    ));
+    report(format_args!(
         "check-latency edit  {:>8.2} ms   (cpu {:.2} ms; {} files, no query system: \
          an edit costs a full check)",
         ms(after_edit.wall),
         ms(after_edit.cpu),
         files.len()
-    );
+    ));
 
-    // The loose ceiling, for pathological work: two and a half times the
-    // 2026-10-13 measurement, where it was fifty times the 2026-08-08 one
-    // (the module's comment says how that happened). Of the checking
-    // thread's CPU time, since 2026-10-15: the wall clock is the machine's.
+    // The loose ceiling, for pathological work, of the checking thread's
+    // CPU time (since 2026-10-15: the wall clock is the machine's), and per
+    // thousand lines checked (since 2026-10-17: a fixed ceiling over a
+    // program that grows is crossed by its growth): see
+    // `CEILING_PER_THOUSAND_LINES`.
     assert!(
-        cold.cpu < Duration::from_millis(2000),
-        "a full check of {} files cost {:?} of its thread's CPU time ({:?} on \
-         the wall clock), which is not editor-feedback territory by any reading",
+        per_thousand < CEILING_PER_THOUSAND_LINES,
+        "a full check of {} files, {} lines, cost {:?} of its thread's CPU time \
+         ({:?} on the wall clock), {:?} a thousand lines, past the {:?} that is \
+         two and a half times CI's slowest runner's: not editor-feedback \
+         territory by any reading",
         files.len(),
+        lines,
         cold.cpu,
-        cold.wall
+        cold.wall,
+        per_thousand,
+        CEILING_PER_THOUSAND_LINES
     );
 
     // **The control.** Without it the numbers above could be a check that
@@ -228,13 +272,13 @@ fn a_rejected_program_is_not_measurably_slower_than_a_clean_one() {
     let rejected = time_check(&broken, 7, false);
     let clean = time_check(&files, 7, true);
 
-    println!(
+    report(format_args!(
         "check-latency reject{:>8.2} ms   (cpu {:.2} ms; clean {:.2} ms, cpu {:.2} ms)",
         ms(rejected.wall),
         ms(rejected.cpu),
         ms(clean.wall),
         ms(clean.cpu)
-    );
+    ));
     assert!(
         rejected.cpu < clean.cpu * 5,
         "producing diagnostics cost {:?} of CPU time against {:?} clean, which \

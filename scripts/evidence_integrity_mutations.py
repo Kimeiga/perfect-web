@@ -21,9 +21,10 @@ Each mutant undoes one piece:
    (`checking_source.rs`): an alias, a retired code, a code its check does
    not report, or another code's invariant passes; R-004 names its alias
    again;
-4. `check_latency` bounds the checking thread's CPU time: checking is
-   pathological (the program checked five times over), or the thread's
-   clock reads nothing;
+4. `check_latency` bounds the checking thread's CPU time per thousand lines
+   checked: checking is pathological (the program checked ten times over,
+   as the ceiling is two and a half times CI's slowest runner's, some six
+   and a half times the PC's), or the thread's clock reads nothing;
 5. a browser suite runs on what its recipe built (`playwright.config.mjs`,
    the justfile): a `dist` that records no sources is served; `e14-signals`
    runs its suite on what was built before; `e14-slots`'s build failing
@@ -245,11 +246,11 @@ MUTANTS = [
     ),
     # 4. The checker's latency.
     (
-        "checking is pathological: the program is checked five times over",
+        "checking is pathological: the program is checked ten times over",
         "latency",
         CHECK,
         "    let mut held = check_units(&units);\n",
-        "    for _ in 0..4 {\n"
+        "    for _ in 0..9 {\n"
         "        let _ = check_units(&units);\n"
         "    }\n"
         "    let mut held = check_units(&units);\n",
