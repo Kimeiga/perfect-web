@@ -80,6 +80,15 @@ SETUP = {(False, False): 42, (False, True): 384, (True, False): 390, (True, True
 CEILING = 10_350
 MOST = 40
 
+# **A job's limit**, in seconds: verify.yml's `timeout-minutes`, 345. A
+# recipe recorded past it, with the setup of a shard that runs it, runs
+# whole in no shard: train-10's verify 39054436657 stopped `e14-refusal`,
+# alone in its shard, at the limit after 20,507 s, five and a half hours in,
+# and nothing of it was kept. So the plan refuses such a recipe before any
+# shard runs (`past_the_limit`), and its mutants are split across recipes
+# first (the integrator's ruling 2 of 2026-10-17).
+LIMIT = 20_700
+
 # Measurements of the machine they run on: a time, a load, a memory curve,
 # each naming its machine in a `host:` line. A shared runner's numbers are
 # not comparable from one run to the next, so these are recorded on the
@@ -807,11 +816,33 @@ def planned(
 
 def measured(path: pathlib.Path | None = None) -> dict[str, float]:
     """Each recipe's seconds, as the last run that ran it to its end took
-    them (`SECONDS`); none where the file is missing or unreadable."""
+    them (`SECONDS`); none where the file is missing or unreadable. A key
+    that begins `_` is a note, not a recipe: `_lower_bounds` names the
+    recipes whose seconds are only what a run that stopped them, or that
+    never ran them whole, measured (the integrator's ruling 2, train-10);
+    the plan deals them by those seconds all the same."""
     try:
-        return {k: float(v) for k, v in json.loads((path or SECONDS).read_text()).items()}
+        return {
+            k: float(v)
+            for k, v in json.loads((path or SECONDS).read_text()).items()
+            if not k.startswith("_")
+        }
     except (OSError, ValueError, AttributeError):
         return {}
+
+
+def past_the_limit(
+    names: list[str], seconds: dict[str, float], need: dict[str, tuple[bool, bool]]
+) -> list[tuple[str, int]]:
+    """Each recipe of `names` whose recorded `seconds`, with the setup of a
+    shard that runs it (`SETUP`, by what it `need`s), end past `LIMIT`: no
+    shard can run it whole, and a run would find it out only when the limit
+    stops its shard, hours in."""
+    return [
+        (n, round(seconds[n]))
+        for n in names
+        if n in seconds and seconds[n] + SETUP[need.get(n, (False, False))] > LIMIT
+    ]
 
 
 def kind(body: str) -> str:
@@ -901,8 +932,19 @@ def main() -> int:
         print("ci_plan: say --all, --changed BASE HEAD, or the recipes", file=sys.stderr)
         return 1
     body = bodies()
-    costs = estimated(names, body, measured())
+    seconds = measured()
     need = {n: needs(body.get(n, "")) for n in names}
+    too_long = past_the_limit(names, seconds, need)
+    for name, recorded in too_long:
+        print(
+            f"ci_plan: {name} is recorded at {recorded} s, past a job's limit of {LIMIT} s "
+            "with its shard's setup: no shard runs it whole; split its mutants across recipes "
+            "(train-10's e14-refusal) before it is planned",
+            file=sys.stderr,
+        )
+    if too_long:
+        return 1
+    costs = estimated(names, body, seconds)
     print("shards=" + json.dumps(planned(names, costs, args.shards, need, NEEDS_DATABASE)))
     return 0
 

@@ -113,6 +113,46 @@ class Plan(unittest.TestCase):
                     self.fail(f"An empty recipe selection must return no shards: {error}")
                 self.assertEqual(empty, [])
 
+    def test_a_recipe_recorded_past_a_jobs_limit_is_refused_before_any_shard(self) -> None:
+        # The integrator's ruling 2 (train-10): verify 39054436657 stopped
+        # `e14-refusal`, alone in its shard, at the 345-minute limit after
+        # 20,507 s. A plan that knows a recipe's seconds refuses it then, not
+        # a run hours in. Its shard's setup counts, and a note in the seconds
+        # kept (`_lower_bounds`) is no recipe.
+        import contextlib
+        import io
+
+        self.assertEqual(plan.past_the_limit(["a"], {"a": plan.LIMIT - 100}, {"a": (True, True)}), [("a", plan.LIMIT - 100)])
+        self.assertEqual(plan.past_the_limit(["a"], {"a": plan.LIMIT - 100}, {"a": (False, False)}), [])
+        self.assertEqual(plan.past_the_limit(["a"], {}, {"a": (True, True)}), [])
+        names = ["e10-affine-bindings", "e10-attribute-case"]
+        real, argv = plan.SECONDS, sys.argv
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                plan.SECONDS = pathlib.Path(d) / "seconds.json"
+                sys.argv = ["ci_plan.py", *names]
+                for recorded, refused in ((plan.LIMIT, True), (plan.LIMIT - 1_000, False)):
+                    plan.SECONDS.write_text(json.dumps({
+                        "_lower_bounds": {names[0]: "stopped at the limit"},
+                        names[0]: recorded,
+                        names[1]: 100,
+                    }))
+                    out, err = io.StringIO(), io.StringIO()
+                    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                        try:
+                            code = plan.main()
+                        except TypeError as error:
+                            self.fail(f"a note in the seconds kept is read as a recipe's: {error}")
+                    if refused:
+                        self.assertEqual(code, 1, err.getvalue())
+                        self.assertIn(f"{names[0]} is recorded at {recorded} s", err.getvalue())
+                        self.assertNotIn("shards=", out.getvalue())
+                    else:
+                        self.assertEqual(code, 0, err.getvalue())
+                        self.assertIn("shards=", out.getvalue())
+        finally:
+            plan.SECONDS, sys.argv = real, argv
+
     def test_a_recipe_that_skips_without_a_database_is_dealt_beside_one(self) -> None:
         # Found at train-10's verify (39054436657): `e14-scheduled-orders`
         # says it skipped and writes no evidence where no database is named,
@@ -860,9 +900,32 @@ class Fetch(unittest.TestCase):
 
     def test_the_seconds_kept_are_each_a_recipes(self) -> None:
         kept = json.loads(fetch.SECONDS.read_text())
-        self.assertGreater(len(kept), 100)
-        self.assertTrue(all(plan.EVIDENCE_RECIPE.match(r) and isinstance(s, int) and s >= 0 for r, s in kept.items()))
+        notes = {k: v for k, v in kept.items() if k.startswith("_")}
+        seconds = {k: v for k, v in kept.items() if not k.startswith("_")}
+        self.assertGreater(len(seconds), 100)
+        self.assertTrue(all(plan.EVIDENCE_RECIPE.match(r) and isinstance(s, int) and s >= 0 for r, s in seconds.items()))
         self.assertEqual(list(kept), sorted(kept))
+        # The one note: the recipes whose seconds are lower bounds, each kept
+        # with its seconds, and why (the integrator's ruling 2, train-10).
+        self.assertLessEqual(set(notes), {"_lower_bounds"})
+        for recipe, why in notes.get("_lower_bounds", {}).items():
+            self.assertIn(recipe, seconds)
+            self.assertIsInstance(why, str)
+
+    def test_a_recipe_run_to_its_end_leaves_the_lower_bounds(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            path = pathlib.Path(d) / "seconds.json"
+            path.write_text(json.dumps({
+                "_lower_bounds": {"e14-a": "stopped at the limit", "e14-b": "stopped at the limit"},
+                "e14-a": 100,
+                "e14-b": 200,
+            }))
+            fetch.remember({"e14-a": 150}, path)
+            kept = json.loads(path.read_text())
+            self.assertEqual(kept["e14-a"], 150)
+            self.assertEqual(kept["_lower_bounds"], {"e14-b": "stopped at the limit"})
+            fetch.remember({"e14-b": 250}, path)
+            self.assertNotIn("_lower_bounds", json.loads(path.read_text()))
 
 class Summary(unittest.TestCase):
     def run_summary(self, shards: list[list[dict]], files: dict[str, str], planned: int) -> int:
