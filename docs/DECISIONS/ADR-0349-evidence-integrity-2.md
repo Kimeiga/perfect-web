@@ -342,3 +342,20 @@ with no bound stops. Its table-drift control alters a stable fixture row.
 [Raw integration results](../evidence/E14/train10-evidence-integrity.txt)
 include commands and input hashes. Full assembled CI and train verification
 remain pending. Quiet-host latency has not been rerun.
+
+
+## Found at train-10's first verify (2026-10-17)
+
+- **A recipe the planner could not read before ran on CI for the first
+  time, and could not run there.** This track taught the planner to read a
+  recipe with parameters (`e14-harness TASK="T08"`) and took its `|| true`
+  away; on train-10's verify 39054436657 `e14-harness` failed at its first
+  sandbox, whose stack's dependencies install from the machine's pnpm store,
+  offline by design, and a runner's store holds no Next.js or SvelteKit.
+  It is `LOCAL_ONLY` now (ADR-0281's fifth decision); its Pleris stack runs
+  on CI as `e14-pleris-controls`, which passed.
+- **A browser recipe of three runs now fails on one flaky run.**
+  `e10-browser` failed there on one WebKit test of its first run,
+  `store-accounts.spec.mjs:173` ("an address chosen goes back to the store,
+  its estimate the chosen one's", a 30 s timeout), its other two runs
+  green: a flake, recorded; the train's next verify runs it again.

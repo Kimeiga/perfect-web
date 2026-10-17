@@ -53,6 +53,28 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**Train-10's first verify, and the integrator's rulings, 2026-10-17**
+(ADR-0302, ADR-0290, ADR-0344, ADR-0352 and ADR-0349 amended). Verify
+39054436657 did not pass: three recipe shards were stopped at the
+345-minute job limit, four recipes failed, and `ubuntu-24.04-arm`'s ci
+failed `check_latency`.
+- `e14-refusal` runs as two recipes, part 1 and part 2 of its mutants
+  (`e14-refusal-2`), each its own count; the count gate holds a script's
+  parts to every mutant exactly once. Its browser mutants each took about
+  1,800 s on that run, train-9's about 1,110 s: the browser host map
+  (train-11) is expected to cut that.
+- `ci_seconds.json` holds that run's seconds, a stopped or failed
+  recipe's marked a lower bound, and the plan refuses a recipe recorded
+  past the job's limit before any shard runs.
+- `check_latency` bounds the check's CPU time per thousand lines checked,
+  at two and a half times CI's slowest runner's (321 ms on ARM; 800 ms);
+  x86 measured 214 quietly and 352 beside eight busy loops.
+- Beside them: a recipe that skips without a database is dealt beside one
+  (`e14-scheduled-orders` had recorded nothing), `e14-harness` is local
+  (its sandboxes install offline from the machine's store), and the
+  scheduler guard tests give an unguarded write two seconds, not 100 ms.
+Verify TRAIN_RUN green, with train-10.
+
 **ADR-0290 amended, 2026-10-16: no shard is dealt past the job's ceiling
 where another deal ends as soon** (train-10, from `58e3797b`, track
 `ci-planner-ceiling`: Codex's work, committed as it was left).

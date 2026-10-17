@@ -938,6 +938,23 @@ itself does not prove complete enforcement. Read the per-record status and the
 
 ## Evidence and test coverage
 
+**What train-10's first verify left in the evidence's harness** (the
+integrator's rulings of 2026-10-17):
+- `e14-refusal` runs as two recipes (`e14-refusal-2`, ADR-0302's
+  amendment): each of its browser mutants costs about 30 minutes on CI,
+  the whole past a job's 345 minutes, until the browser host map
+  (train-11) starts only the hosts a spec needs; dealing any script's
+  mutants across shards is train-11's.
+- `check_latency`'s ceiling per thousand lines is set by CI's slowest
+  runner, so on a fast machine it is some six and a half times the
+  measurement: a slower checker passes there and fails only on ARM's CI.
+- `e14-harness` is local: its sandboxes install offline from the
+  machine's pnpm store, which no runner holds (CI runs its Pleris stack,
+  `e14-pleris-controls`).
+- A browser recipe of three runs fails on one flaky run: `e10-browser`'s
+  WebKit `store-accounts.spec.mjs:173` timed out once in three runs on
+  verify 39054436657.
+
 **Findings about the evidence itself, fixed on train-10** (ADR-0344,
 ADR-0349): stale Python bytecode no longer decides a mutant's verdict; an
 evidence file's counts are held to its script's; the corpus's `@rule`

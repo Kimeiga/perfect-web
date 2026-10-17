@@ -18,6 +18,14 @@ The next executable tasks, in order, with acceptance criteria. Charter §3.4.
   keep the remaining restored-browser cleanup gaps visible. Quiet-host E9
   (the check's latency recorded on a quiet machine) remains to be recorded.
 
+- After the browser host map (train-11): revisit `e14-refusal`'s split in
+  two (ADR-0302's amendment), and deal any script's mutants across shards
+  (the parallel slots' allocator, `PW_MUTANT_PICK`). `e14-harness` runs on
+  CI only once a runner's store holds its stacks' dependencies; it is
+  local until then. `e10-browser`'s WebKit flake,
+  `store-accounts.spec.mjs:173`, is open (once in three runs, verify
+  39054436657).
+
 - ADR-0347: split scheduling's when_said from Checkout so an estimator
   outage degrades that line alone; offer delivery-streamed times. The
   current chosen-time checkout and times page both wait on the estimator.

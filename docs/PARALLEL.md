@@ -2113,3 +2113,44 @@ Each a decision for a track, with its date; a track's ADR records it too.
     among them; no memory bound stopped a process. Chosen by `ci_plan.py
     --changed 9902c62b da61e5f9` (nine recipes), with payments' and the
     scheduler's beside them, whose write guard master's merge changed.
+  - **The first verify, 39054436657 (on `9118a2e8`), did not pass.** Of its
+    33 jobs, 30 passed (the three browser jobs among them); three recipe
+    shards were stopped at the 345-minute job limit (`recipes 0`,
+    `e14-refusal` alone, after 20,507 s; `recipes 20` and `recipes 22`,
+    dealt by recorded seconds far below what their recipes took); and four
+    recipes failed: `e14-evidence-integrity` (`check_latency` beside its
+    busy loops, 2,311 ms of CPU against the fixed 2 s), `e10-browser` (one
+    WebKit flake, below), `e14-bounded-statements` (12 of 13, a guard
+    control's race) and `e14-harness` (no sandbox installs on a runner).
+    `e14-scheduled-orders` had skipped without a database. The fetch
+    refuses a run that failed in recipe shards, rightly: nothing of it was
+    taken but its seconds. Its ci, 39054436550, failed on
+    `ubuntu-24.04-arm` alone (`check_latency`, 2,108.54 ms).
+  - **The integrator's rulings on it (2026-10-17)**, each in the ADR it
+    amends:
+    1. `e14-refusal` is split into two recipes over two ranges of its
+       mutants, `e14-refusal` part 1 and `e14-refusal-2` part 2, each its
+       own evidence and count, none dropped; the count gate holds a
+       script's parts to every mutant exactly once (ADR-0302, ADR-0344;
+       `77a13f0b`). A finding: each of its browser mutants took about
+       1,800 s, train-9's about 1,110 s; the browser host map (train-11:
+       a run starts only the hosts its specs need) is expected to cut it,
+       and the split is revisited then. The generic mechanism, mutants
+       dealt across shards, is train-11's.
+    2. `ci_seconds.json` holds that run's measured seconds, with each
+       stopped or failed recipe's marked a lower bound, and the plan
+       refuses, before any shard runs, a recipe recorded past the job's
+       limit (ADR-0290; `d97e9702`).
+    3. The fetch's refusal stands: the train runs again after 1, 2 and 4.
+    4. `check_latency`'s ceiling is per thousand lines checked, two and a
+       half times what CI's slowest runner measured: ARM 321 ms a
+       thousand lines, x86 214 quietly and 352 beside eight busy loops,
+       the PC 124 to 150; ceiling 800 ms (ADR-0344; `2f343bd1`).
+  - **And, beside the rulings, from the same run** (`53eb1dad`,
+    `de83f56b`): `e14-scheduled-orders` and `e14-argument-invariants` are
+    dealt beside a database (a test holds every recipe that skips without
+    one to it); `e14-harness` is local, its sandboxes installing offline
+    from the machine's pnpm store (ADR-0349's finding: it had never run on
+    CI); the scheduler guard tests give an unguarded write two seconds,
+    not 100 ms (ADR-0352). A flake, recorded: `e10-browser`'s WebKit
+    `store-accounts.spec.mjs:173`, one run of three.

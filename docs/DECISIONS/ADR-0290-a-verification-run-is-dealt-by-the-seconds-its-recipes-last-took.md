@@ -267,3 +267,30 @@ verify (38909882781), dealt by the old rule, ran its longest shard for
 5 h 27 min of the 345 minutes. Its local `dealt-by-time.txt` is not
 taken: the file stays train-8's run's record until the train's verify
 records it again.
+
+### Amended at train-10's first verify (the integrator's ruling 2, 2026-10-17)
+
+Train-10's verify 39054436657 was dealt by seconds far below what its
+recipes took: shards 20 and 22 ran to the 345-minute limit and were
+stopped (e14-stream-ack had run 10,419 s against 3,120 recorded,
+e14-keepalive took 10,174 s against 3,072, e10-browser 4,045 s against
+282, recorded from runs whose `|| true` hid failing suites), and
+e14-refusal, alone in its shard, was stopped at 20,507 s.
+
+- **The plan refuses a recipe recorded past a job's limit** (`LIMIT`,
+  20,700 s, verify.yml's `timeout-minutes`), its shard's setup counted,
+  before any shard runs, naming it (`past_the_limit`): a six-hour run must
+  never be the first to find it. Such a recipe is split first (ADR-0302's
+  amendment).
+- **The run's seconds are kept, and what is only a floor says so.**
+  `ci_seconds.json` holds the 196 recipes it ran to their end
+  (`--times-only`), less `e14-scheduled-orders`' 0 (it skipped without a
+  database, ADR-0347's note); and `_lower_bounds`, a note naming each
+  recipe whose seconds are only what a stopped or failed run measured (or,
+  for the refusal's two new parts, what that run's mutants project), and
+  why. The plan deals them by those seconds; a fetch that records one run
+  to its end takes it out of the note.
+- **Held by** two tests in `test_ci_scripts.py` (82) and four controls in
+  `dealt_by_time_mutations.py` (54): a recipe past the limit planned, its
+  shard's setup not counted, a note read as a recipe's, a recorded run
+  keeping its lower bound.

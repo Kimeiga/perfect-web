@@ -408,3 +408,31 @@ Assembled train verification is still pending.
   a path let be outside evidence too; a line of evidence with one let be
   whole), and the two anchors this moved re-anchored: 38 controls, from
   35.
+
+
+## Amended at train-10's first verify (the integrator's rulings 1 and 4, 2026-10-17)
+
+- **Finding 4's ceiling measured the program** (ruling 4). Train-10's ci
+  39054436550 failed on `ubuntu-24.04-arm` alone: a whole check of the
+  store program, 56 files and 6,568 lines, a fifth more to check than
+  train-9's for its scheduled orders, cost 2,108.54 ms of the checking
+  thread's CPU, past the fixed 2 s. Its verify 39054436657 measured the
+  same program on the x86 runner at 1,404.39 ms quietly and 2,311.03 ms
+  beside eight busy loops (`e14-evidence-integrity`'s contention phase,
+  which failed there for it); the quiet PC, 813 to 986 ms. A fixed ceiling
+  over a program that grows is crossed by its growth. The ceiling is now
+  per thousand lines checked: two and a half times the slowest runner's,
+  321 ms on ARM, so 802.6, rounded down to 800 ms. Measured per thousand
+  lines: ARM 321, x86 214 quietly and 352 beside eight busy loops, the PC
+  124 to 150. The measurements are written past the harness's capture, so
+  a passing run says them in CI's logs. The control holds with ten checks
+  for one: five pass on the PC, where the ceiling is some six and a half
+  times the measurement (ten: 1,214.54 ms a thousand lines, refused).
+- **Finding 2's count, split across recipes** (ruling 1). `e14-refusal` no
+  longer fit a job, and runs as two recipes over two ranges of its
+  script's mutants (ADR-0302's amendment). `evidence_counts.py` holds a
+  recipe that runs `--part i/n` to its part's count, and a script's parts
+  together to every mutant exactly once: each part run by one recipe, no
+  mutant left to none, none in two (`split`). Two tests in
+  `test_evidence_counts.py` and four controls in
+  `evidence_integrity_mutations.py`: 42.

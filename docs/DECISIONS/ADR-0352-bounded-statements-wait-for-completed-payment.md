@@ -333,3 +333,14 @@ at `e2a4acd9`. The pending gates named above are met; the earlier failed
 runs stay failed. Train-10, merging master, carries the completion barrier
 into its scheduled orders' four transactions (`after_payments`, 3 and 4
 outcomes) with every pin as measured.
+
+## A flake of its guard controls, fixed on train-10 (2026-10-17)
+
+`scheduled_transition_waits` gave an unguarded scheduler write 100 ms to
+return early, the only test that kills two of the guard controls: on
+train-10, "feed_pg.rs ran bypasses the command write guard" survived one
+whole run of two on the PC, and "store_pg.rs retry bypasses ..." survived
+the train's verify 39054436657 (12 of 13). A slow runner's unguarded write
+took longer than the window. Guarded, the write cannot end before the
+command does, however long the test waits: the window is two seconds now,
+the test no weaker, each of its four cases two seconds longer.
