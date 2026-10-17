@@ -40,7 +40,9 @@ the served ones, the store in memory (`render_merge::`); `postgres`, the
 served ones with the store on PostgreSQL, and NEXT 4b's counts
 (`render_merge::`, `tests::bounded_statements::`), which needs
 PW_STORE_DATABASE_URL and PW_FEED_DATABASE_URL; `resource`, pw-resource's
-`read_as_of` tests. Each suite's result is read by `cargo_test_results`
+`read_as_of` tests; `unit`, the merge's own tests alone; `bound`, the
+bound's own test alone (each of the last two for a control the whole suite
+cannot run safely: it says why). Each suite's result is read by `cargo_test_results`
 (ADR-0352): a command that does not build, is stopped, or says something
 inconsistent is no kill, and stops the run.
 
@@ -101,7 +103,7 @@ MUTANTS = [
     ),
     (
         "a render is kept past its end",
-        "memory",
+        "unit",
         MERGE,
         "                reading.retain(|r| !Arc::ptr_eq(r, &mine));\n",
         "                reading.retain(|r| !Arc::ptr_eq(r, &mine) || Arc::ptr_eq(r, &mine));\n",
@@ -290,7 +292,7 @@ MUTANTS = [
     ),
     (
         "an idle connection is never taken again",
-        "postgres",
+        "bound",
         FEED_PG,
         "            while let Some(c) = seats.idle.pop() {\n",
         "            while let Some(c) = seats.idle.pop().filter(|_| false) {\n",
@@ -432,6 +434,17 @@ CARGO = {
     "resource": (
         ["cargo", "test", "--quiet", "--locked", "-p", "pw-resource", "--test", "read_as_of"],
         {},
+    ),
+    # The merge's own tests alone, over a layer of one number: a render kept
+    # past its end keeps its read transaction open on PostgreSQL, and a
+    # served test's schema, dropped at its end, would wait for it for good.
+    "unit": (TESTS + ["render_merge::tests::"], {}),
+    # The bound's own test alone: connections never taken again from the
+    # idle ones pile up, one for each render, which the whole suite's renders
+    # would push past the shared database's 100.
+    "bound": (
+        TESTS + ["render_merge::on_postgres_the_renders_bound_holds_under_many_renders_at_once"],
+        {"PW_STORE_TEST_LAYER": "postgres"},
     ),
 }
 

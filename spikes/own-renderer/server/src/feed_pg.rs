@@ -158,7 +158,13 @@ pub(crate) const RENDER_CONNECTIONS: usize = 8;
 /// of its reads answers that it waited. Renders give their seats back by
 /// structure (`render_merge`), so this is a backstop against a wait no one
 /// ends, never a bound a render is expected to meet.
+#[cfg(not(test))]
 pub(crate) const SEAT_WAIT: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// [`SEAT_WAIT`], for a test's host: five seconds, so a mutation control
+/// that keeps a seat fails a test in seconds, not minutes.
+#[cfg(test)]
+pub(crate) const SEAT_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
 
 /// **The renders' connections of one layer** (NEXT 4c): no more than
 /// [`RENDER_CONNECTIONS`] seats taken, and no more connections open than
