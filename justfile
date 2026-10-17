@@ -5245,10 +5245,28 @@ e14-refusal:
        bash scripts/run_suite.sh -- pnpm exec playwright test e2e/recovery.spec.mjs -g "still stale" --reporter=line; \
        bash scripts/run_suite.sh -- pnpm exec playwright test e2e/lazy-handler.spec.mjs -g "fails to load" --reporter=line; \
        bash scripts/run_suite.sh -- pnpm exec playwright test e2e/accessibility.spec.mjs -g "announcer|same node from the start" --reporter=line; \
-       echo; echo "== mutation controls (scripts/refusal_mutations.py)"; echo; \
-       python3 scripts/refusal_mutations.py; \
+       echo; echo "== mutation controls, part 1 of 2 (scripts/refusal_mutations.py --part 1/2; part 2 is e14-refusal-2's)"; echo; \
+       python3 scripts/refusal_mutations.py --part 1/2; \
      } > docs/evidence/E14/refusal.txt
     @grep -E "^test result|passed|failed|mutants killed|Error:|panicked at" docs/evidence/E14/refusal.txt
+
+# ADR-0302's mutation controls, part 2 of 2 (the integrator's ruling 1 of
+# 2026-10-17, train-10): the browser mutants `e14-refusal`'s job has no time
+# for, run in a job of their own. Its builds, and the controls.
+e14-refusal-2:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @BUILD_ONLY=1 bash spikes/own-renderer/feed.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0302 - a refusal is told where the press was: its mutation controls, part 2 of 2"; echo; \
+       echo "produced by: just e14-refusal-2"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== mutation controls, part 2 of 2 (scripts/refusal_mutations.py --part 2/2; part 1 is e14-refusal's)"; echo; \
+       python3 scripts/refusal_mutations.py --part 2/2; \
+     } > docs/evidence/E14/refusal-2.txt
+    @grep -E "passed|failed|mutants killed|Error:|panicked at" docs/evidence/E14/refusal-2.txt
 
 # ADR-0305: a page's commands run in the order it sent them. The server's
 # tests, the browser's in three engines, and the mutation controls.

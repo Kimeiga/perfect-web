@@ -16,7 +16,10 @@ Each mutant undoes one piece:
    suite's tag is taken as part of a mutant's name, or a description inside
    a longer one names it; a disagreement is planned again though its recipe
    is recorded on the development machine, or its evidence is current, or
-   its staleness is read at the head and not in the tree here;
+   its staleness is read at the head and not in the tree here; and (the
+   integrator's ruling 1 of 2026-10-17, train-10) a part's count held to its
+   whole script's, a script's parts leaving a mutant to none or holding one
+   twice, or a part no recipe runs let be;
 3. a rejected fixture's `@rule` is its code as written
    (`checking_source.rs`): an alias, a retired code, a code its check does
    not report, or another code's invariant passes; R-004 names its alias
@@ -151,6 +154,36 @@ MUTANTS = [
         COUNTS,
         "    if k != killed:\n",
         "    if False:\n",
+    ),
+    # The integrator's ruling 1 of 2026-10-17 (train-10): a script's
+    # mutants split across recipes, each a part, together every mutant once.
+    (
+        "a part's count is held to its whole script's",
+        "plan",
+        COUNTS,
+        "                    scripts[s] = loaded[s][start:end]\n",
+        "                    scripts[s] = loaded[s]\n",
+    ),
+    (
+        "a script's parts may leave a mutant to none",
+        "plan",
+        COUNTS,
+        "    if none:\n",
+        "    if False:\n",
+    ),
+    (
+        "a script's parts may hold a mutant twice",
+        "plan",
+        COUNTS,
+        "    if twice:\n",
+        "    if False:\n",
+    ),
+    (
+        "a part no recipe runs is let be",
+        "plan",
+        COUNTS,
+        "        if not run.get(i):\n",
+        "        if False:\n",
     ),
     (
         "a verdict that names no mutant of its script is let be",
