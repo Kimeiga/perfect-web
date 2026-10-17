@@ -153,85 +153,6 @@ impl Pool {
     fn gone(&self) {
         self.give(None);
     }
-
-    // TRACK SEAM (render-merge): a render's connection (NEXT 4c).
-    /// **A render's connection, lent without waiting**: an idle one, or one
-    /// opened past the bound. A render holds its connection from its first
-    /// read to its end, and meanwhile may wait for a read another thread is
-    /// making (pw-resource's one flight per key): were it to wait here,
-    /// renders holding every connection the bound allows could be waiting
-    /// on it. The bound is the commands' and the single reads', which wait
-    /// for a connection while holding none.
-    fn lend(&self) -> Result<Client, String> {
-        let idle = self.idle.lock().expect("idle connections").0.pop();
-        match idle {
-            Some(c) if !c.is_closed() => Ok(c),
-            _ => self.connect(),
-        }
-    }
-
-    /// A render's connection given back: kept idle while the connections
-    /// out and idle are fewer than the bound, and closed otherwise, so a
-    /// taker, which takes an idle one without waiting, never holds more than
-    /// the bound allows.
-    fn keep(&self, c: Client) {
-        let mut idle = self.idle.lock().expect("idle connections");
-        if !c.is_closed() && idle.0.len() + idle.1 < CONNECTIONS {
-            idle.0.push(c);
-        }
-        self.given_back.notify_one();
-    }
-}
-
-/// **A render's read transaction** (NEXT 4c): a connection the pool lends,
-/// its transaction opened at the render's first read as the feed's is
-/// (`feed_pg::READ_SNAPSHOT`), and committed when the render ends, whoever
-/// reads in it last. A read that fails ends it, as it may have aborted it,
-/// and the render's next read opens another.
-struct RenderRead {
-    pool: Arc<Pool>,
-    conn: Mutex<Option<Client>>,
-}
-
-impl RenderRead {
-    fn with(
-        &self,
-        tally: &Tally,
-        f: &mut dyn FnMut(&mut dyn Rows) -> Result<Vec<Val>, String>,
-    ) -> Result<Vec<Val>, String> {
-        let mut conn = self.conn.lock().expect("the render's connection");
-        if conn.is_none() {
-            let mut c = self.pool.lend()?;
-            c.batch_execute(crate::feed_pg::READ_SNAPSHOT).map_err(pg)?;
-            *conn = Some(c);
-        }
-        let c = conn.as_mut().expect("opened");
-        let out = tally.around(|| f(&mut PgRows(Counted(c))));
-        if out.is_err() {
-            self.end(conn.take().expect("opened"), "ROLLBACK");
-        }
-        out
-    }
-
-    /// The transaction ended, and its connection given back where it could
-    /// end it.
-    fn end(&self, mut c: Client, how: &str) {
-        if c.batch_execute(how).is_ok() {
-            self.pool.keep(c);
-        }
-    }
-}
-
-impl Drop for RenderRead {
-    fn drop(&mut self) {
-        let conn = match self.conn.get_mut() {
-            Ok(c) => c.take(),
-            Err(poisoned) => poisoned.into_inner().take(),
-        };
-        if let Some(c) = conn {
-            self.end(c, "COMMIT");
-        }
-    }
 }
 
 /// **A connection taken from the pool**, given back when dropped; one that
@@ -982,6 +903,10 @@ impl Rows for PgRows<'_> {
 /// **The store's data in one PostgreSQL schema.**
 pub(crate) struct StorePg {
     pool: Arc<Pool>,
+    /// TRACK SEAM (render-merge): the renders' connections, as the feed's
+    /// (NEXT 4c): with the pool's, no more than `CONNECTIONS` +
+    /// `feed_pg::RENDER_CONNECTIONS` open.
+    renders: Arc<crate::feed_pg::Renders>,
     isolation: Isolation,
     /// One command of this host at a time, from its first write to its
     /// commit, as the in-memory layer's lock is: a host never conflicts with
@@ -1024,6 +949,7 @@ impl StorePg {
         drop(c);
         Ok(StorePg {
             pool,
+            renders: crate::feed_pg::Renders::new(url, Some(schema)),
             isolation,
             writes: Mutex::new(()),
             faults: Faults::new(),
@@ -1069,7 +995,8 @@ impl StorePg {
     }
 
     /// **Every connection the pool's bound allows, taken and held** (NEXT
-    /// 4c's tests): what a single read waits on, and a render's must not.
+    /// 4c's tests): what a single read and a command wait on, and a render,
+    /// which reads in a seat of the renders' own, does not.
     #[cfg(test)]
     pub(crate) fn hold_the_bound(&self) -> Vec<Box<dyn std::any::Any + Send>> {
         (0..CONNECTIONS)
@@ -1331,14 +1258,11 @@ impl crate::data::DataLayer for StorePg {
         )
     }
 
-    // TRACK SEAM (render-merge): a render's snapshot, its read transaction,
-    // and each of its queries' reads in it, counted as a query's are (NEXT
-    // 4c).
+    // TRACK SEAM (render-merge): a render's snapshot, its seat (waited for
+    // while every seat is taken) and the read transaction it holds, and each
+    // of its queries' reads in it, counted as a query's are (NEXT 4c).
     fn snapshot(&self) -> Option<crate::data::Snapshot> {
-        Some(Box::new(Arc::new(RenderRead {
-            pool: self.pool.clone(),
-            conn: Mutex::new(None),
-        })))
+        Some(Box::new(Arc::new(self.renders.seat())))
     }
 
     fn reads_in(
@@ -1347,15 +1271,24 @@ impl crate::data::DataLayer for StorePg {
         session: &str,
         stopped: Option<Stopped>,
     ) -> Ops {
-        let Some(read) = snapshot.downcast_ref::<Arc<RenderRead>>() else {
+        // Never another layer's: a render's snapshot is its layer's
+        // (`render_merge`, by the layer's address).
+        let Some(seat) = snapshot.downcast_ref::<Arc<crate::feed_pg::Seat>>() else {
             return self.reads(session, stopped);
         };
-        let (read, tally) = (read.clone(), self.tally.clone());
-        let with: With = Arc::new(move |f| read.with(&tally, f));
+        let (seat, tally) = (seat.clone(), self.tally.clone());
+        let with: With =
+            Arc::new(move |f| seat.read(|c| tally.around(|| f(&mut PgRows(Counted(c))))));
         self.tally.by_name(
             crate::store::reads(with, session, &self.faults, stopped),
             "read",
         )
+    }
+
+    /// The renders' connections (NEXT 4c's tests).
+    #[cfg(test)]
+    fn renders_for_test(&self) -> Option<Arc<crate::feed_pg::Renders>> {
+        Some(self.renders.clone())
     }
 
     fn begin<'a>(&'a self, session: &str) -> Box<dyn crate::data::Staged + 'a> {

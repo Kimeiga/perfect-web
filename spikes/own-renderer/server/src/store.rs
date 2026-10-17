@@ -2390,9 +2390,9 @@ impl crate::data::DataLayer for StoreData {
     }
 
     // TRACK SEAM (render-merge): a render's snapshot, the store as its last
-    // commit left it when the render first read it, each part behind its
-    // `Arc`, so nothing is copied; and each of the render's queries' reads
-    // over it (NEXT 4c).
+    // commit left it when the render began, each part behind its `Arc`, so
+    // nothing is copied; and each of the render's queries' reads over it
+    // (NEXT 4c).
     fn snapshot(&self) -> Option<crate::data::Snapshot> {
         let rows = MemRows {
             carts: self.carts.lock().expect("carts").clone(),

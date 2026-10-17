@@ -427,6 +427,20 @@ type KeyedFetched = Box<dyn FnOnce(&Server) + Send>;
 #[cfg(test)]
 type Deriving = Arc<dyn Fn(&Server, &Doc) + Send + Sync>;
 
+/// What a test does after each binding a render reads (NEXT 4c).
+#[cfg(test)]
+type WhileReading = Arc<dyn Fn(&Server) + Send + Sync>;
+
+/// **The documents a change is told to, and the interactions their values
+/// include** ([`Server::to_tell`]; NEXT 4c).
+struct Told {
+    applied: Vec<String>,
+    /// Those whose page asks: read, and told.
+    live: Vec<Doc>,
+    /// Those no page has asked for in [`LIVE`]: derived when one asks.
+    passed: Vec<Doc>,
+}
+
 /// **A page's parameters**, as its address gives them (ADR-0162): `id`,
 /// from `/stores/{id}`.
 type Params = BTreeMap<String, String>;
@@ -842,7 +856,7 @@ struct Server {
     /// and what shows a policy saved a request.
     calls: Arc<Mutex<BTreeMap<String, u64>>>,
     /// **Frames waiting for each document** (ADR-0161).
-    pending: Mutex<BTreeMap<Doc, Subscriber>>,
+    pending: Table,
     /// **Each hold of `pending` past 50 ms, the latest 200**, at the places
     /// that render or derive while they hold it: what a failing browser test
     /// attaches beside a document's trail (`/bench/records`).
@@ -921,6 +935,15 @@ struct Server {
     /// reads, which the render's one snapshot is held against.
     #[cfg(test)]
     between_bindings: Mutex<Option<KeyedFetched>>,
+    /// **What a test does after each binding a render reads**, for as long
+    /// as it is set (NEXT 4c): renders held at their reads, each with its
+    /// seat, while the test arranges what waits for one.
+    #[cfg(test)]
+    while_reading: Mutex<Option<WhileReading>>,
+    /// **What a test does inside a query's read, once** (NEXT 4c): a read
+    /// held in flight, its key's, while another render reads the key.
+    #[cfg(test)]
+    in_flight: Mutex<Option<KeyedFetched>>,
     /// **What each session's connections meet** (charter §15.5's one-shot
     /// network error and forced reconnect, ADR-0175): whether its next
     /// command's connection is dropped, and when its subscriptions are cut
@@ -1081,10 +1104,44 @@ struct Turns {
 /// A turn being served; the next is served when it ends, a panic included.
 struct Turn<'a>(&'a Turns);
 
+/// **The subscriber table**: the frames waiting for each document
+/// (ADR-0161), behind a mutex whose `lock` checks, in tests, that no thread
+/// takes it in a render (TRACK SEAM (render-merge), NEXT 4c, the
+/// integrator's ruling 2: a render never waits for the table while it holds
+/// its seat; a document's last attempt (ADR-0151) holds the table while its
+/// render waits for one).
+#[derive(Default)]
+struct Table(Mutex<BTreeMap<Doc, Subscriber>>);
+
+impl Table {
+    fn lock(&self) -> std::sync::LockResult<std::sync::MutexGuard<'_, BTreeMap<Doc, Subscriber>>> {
+        #[cfg(test)]
+        assert!(
+            !render_merge::in_a_render(),
+            "the subscriber table taken in a render (NEXT 4c)"
+        );
+        self.0.lock()
+    }
+
+    #[cfg(test)]
+    fn try_lock(
+        &self,
+    ) -> std::sync::TryLockResult<std::sync::MutexGuard<'_, BTreeMap<Doc, Subscriber>>> {
+        self.0.try_lock()
+    }
+}
+
 impl Turns {
     /// Wait for this caller's turn. A `LockResult`, as a mutex's is, though
     /// a turn is never poisoned: one that panics ends, and serves the next.
     fn lock(&self) -> std::sync::LockResult<Turn<'_>> {
+        // TRACK SEAM (render-merge): never waited for in a render, which
+        // would hold its seat meanwhile (NEXT 4c, the integrator's ruling 2).
+        #[cfg(test)]
+        assert!(
+            !render_merge::in_a_render(),
+            "a session's turn taken in a render (NEXT 4c)"
+        );
         let mut tickets = self.tickets.lock().expect("tickets");
         let mine = tickets.0;
         tickets.0 += 1;
@@ -1659,7 +1716,7 @@ impl Server {
             components,
             dist,
             artifacts,
-            pending: Mutex::new(BTreeMap::new()),
+            pending: Table::default(),
             slow: Mutex::new(std::collections::VecDeque::new()),
             tellings: Mutex::new(std::collections::VecDeque::new()),
             origin: std::sync::OnceLock::new(),
@@ -1684,6 +1741,10 @@ impl Server {
             told_rendered: Mutex::new(None),
             #[cfg(test)]
             between_bindings: Mutex::new(None),
+            #[cfg(test)]
+            while_reading: Mutex::new(None),
+            #[cfg(test)]
+            in_flight: Mutex::new(None),
             connection_faults: Mutex::new(BTreeMap::new()),
             materializer_faults: Mutex::new(std::collections::BTreeSet::new()),
             keyed: Mutex::new(BTreeMap::new()),
@@ -3408,23 +3469,45 @@ impl Server {
         args: &[Val],
     ) -> pw_resource::Fetched<Arc<Val>> {
         self.sync_query_clock();
-        self.queries
-            .fetch_cancellable(manifest, key, |_attempt, cancellation| {
-                // What a slow source polls, to end early a read nobody is
-                // waiting for any longer (ADR-0152).
-                let cancellation = cancellation.clone();
-                let stopped: Stopped = Arc::new(move || cancellation.is_cancelled());
-                // What the value holds until (ADR-0304), kept with it before
-                // it is published, so a reader its flight answers knows too.
-                let (answer, until) =
-                    clock::noting(|| self.answer_within(resource, session, args, Some(stopped)));
-                let mut held = self.held.lock().expect("held");
-                match until {
-                    Some(until) => held.insert(key.clone(), until),
-                    None => held.remove(key),
-                };
-                answer.map(Arc::new)
-            })
+        let load = |_attempt, cancellation: &pw_resource::Cancellation<Arc<Val>>| {
+            // What a slow source polls, to end early a read nobody is
+            // waiting for any longer (ADR-0152).
+            let cancellation = cancellation.clone();
+            let stopped: Stopped = Arc::new(move || cancellation.is_cancelled());
+            // What the value holds until (ADR-0304), kept with it before
+            // it is published, so a reader its flight answers knows too.
+            let (answer, until) =
+                clock::noting(|| self.answer_within(resource, session, args, Some(stopped)));
+            // A read held in flight once it has read, as a test asks (NEXT
+            // 4c): taken first, so no other read waits on the hook while it
+            // holds this one.
+            #[cfg(test)]
+            let hold = self.in_flight.lock().expect("in flight").take();
+            #[cfg(test)]
+            if let Some(hold) = hold {
+                hold(self);
+            }
+            let mut held = self.held.lock().expect("held");
+            match until {
+                Some(until) => held.insert(key.clone(), until),
+                None => held.remove(key),
+            };
+            answer.map(Arc::new)
+        };
+        // TRACK SEAM (render-merge): in a render, as of the invalidations
+        // when it began (NEXT 4c, the integrator's ruling 3): where nothing
+        // invalidated the query since, what is kept or in flight is what the
+        // render's snapshot holds, as far as the program's invalidations say,
+        // and is taken as the query's policy says; where something did, the
+        // render reads it alone in its own snapshot, and never keeps or
+        // hands another reader what may be older than the change.
+        match render_merge::reading(&*self.data) {
+            Some(render) => {
+                self.queries
+                    .fetch_cancellable_as_of(manifest, key, render.as_of(), load)
+            }
+            None => self.queries.fetch_cancellable(manifest, key, load),
+        }
     }
 
     /// **Drop what a commit made stale** (ADR-0127): each entry a command
@@ -4083,10 +4166,10 @@ impl Server {
         wanted: impl Fn(&str) -> bool,
         keys: &Keys,
     ) -> Result<BTreeMap<String, Val>, Unread> {
-        // TRACK SEAM (render-merge): one render, unless this is one already
-        // (NEXT 4c): its bindings read one snapshot, and each identical call
-        // once.
-        let _render = render_merge::begin(&*self.data, session);
+        // TRACK SEAM (render-merge): one render, unless this thread reads one
+        // already (NEXT 4c): its bindings read one snapshot, and each
+        // identical call once.
+        let _render = render_merge::begin(&*self.data, self.queries.epoch());
         let page = document.map_or_else(
             || self.store_page().to_string(),
             |d| self.page_of(&(session.to_string(), d)),
@@ -4118,6 +4201,12 @@ impl Server {
                 #[cfg(test)]
                 if let Some(between) = self.between_bindings.lock().expect("between").take() {
                     between(self);
+                }
+                #[cfg(test)]
+                let reading = self.while_reading.lock().expect("while reading").clone();
+                #[cfg(test)]
+                if let Some(reading) = reading {
+                    reading(self);
                 }
             }
             Ok::<_, Unread>(out)
@@ -4465,13 +4554,20 @@ impl Server {
         // TRACK SEAM (render-merge): one render, the count read here and the
         // session's documents read again below (NEXT 4c): the entry's value
         // and what its documents show are of one snapshot, and the cart
-        // every page shows is read once.
-        let _render = render_merge::begin(&*self.data, session);
+        // every page shows is read once. The documents it tells are taken
+        // before it begins, and it ends once they are read, before they are
+        // told: a render never waits for the table while it holds its seat
+        // (the integrator's ruling 2).
+        let told = existing.then(|| self.to_tell(session, |_| true));
+        let render = render_merge::begin(&*self.data, self.queries.epoch());
         // The count the page shows, as the page computes it: the cart query's
         // value, read through `domain.line_count` (ADR-0125).
         let value = match self.part_text(session, "cart.line_count") {
             Ok(value) => value,
-            Err(why) => return self.unshowable_session(session, &why),
+            Err(why) => {
+                drop(render);
+                return self.unshowable_session(session, &why);
+            }
         };
         if std::env::var("PW_TRACE").is_ok() {
             eprintln!(
@@ -4522,12 +4618,13 @@ impl Server {
         // browser to replace a part with what it already shows — harmless
         // here, and wrong in general because it spends a version the page then
         // treats as the newest it has seen.
-        if !existing {
+        let Some(told) = told else {
             return;
-        }
-
-        self.send_documents(
+        };
+        self.tell_in(
             session,
+            told,
+            render,
             &self.cart_entry(session),
             self.version(session),
             true,
@@ -4559,12 +4656,22 @@ impl Server {
         version: Version,
         speculated: bool,
     ) {
-        // What each of the session's pages shows now, from its queries
-        // (ADR-0145), each read for its own document (ADR-0161), outside the
-        // table.
-        // The interactions the values read next include (ADR-0172), read
-        // before them: one committed in between is named by its own change,
-        // which follows at once, and never by a value it is not in.
+        // TRACK SEAM (render-merge): the documents told, taken first; then
+        // read in one render, which ends before they are told (NEXT 4c).
+        let told = self.to_tell(session, which);
+        let render = render_merge::begin(&*self.data, self.queries.epoch());
+        self.tell_in(session, told, render, entry, version, speculated);
+    }
+
+    /// **The documents a change is told to** (ADR-0297): of the session's,
+    /// those `which` takes whose page asks, and those it passes by, which no
+    /// page has asked for in [`LIVE`] and are derived when one asks; and the
+    /// interactions the values read next include (ADR-0172), read before
+    /// them: one committed in between is named by its own change, which
+    /// follows at once, and never by a value it is not in. Taken before the
+    /// render that reads them begins (NEXT 4c): a render never waits for the
+    /// table while it holds its seat.
+    fn to_tell(&self, session: &str, which: impl Fn(&Doc) -> bool) -> Told {
         let applied: Vec<String> = self
             .applied
             .lock()
@@ -4572,36 +4679,43 @@ impl Server {
             .get(session)
             .map(|q| q.iter().cloned().collect())
             .unwrap_or_default();
-        // Only a document whose page asks is derived now (ADR-0297); one no
-        // page has asked for in [`LIVE`] is derived when one asks.
-        let documents: Vec<Doc> = {
-            let mut queue = self.pending.lock().expect("pending");
-            let now = std::time::Instant::now();
-            documents_of(&queue, session)
-                .into_iter()
-                .filter(|d| which(d))
-                .filter(|d| match queue.get_mut(d) {
-                    Some(waiting) if waiting.live(now) => true,
-                    Some(waiting) => {
-                        if !waiting.stale {
-                            waiting.stale = true;
-                            waiting.note(format_args!(
-                                "passed by, no page asking: derived when one asks"
-                            ));
-                        }
-                        false
-                    }
-                    None => false,
-                })
-                .collect()
-        };
-        // TRACK SEAM (render-merge): the documents read in one render, unless
-        // this is one already (NEXT 4c): one snapshot for all of them, and
-        // each identical call once, the cart that every page's layout shows
-        // among them. Ended once they are read.
-        let render = render_merge::begin(&*self.data, session);
+        let queue = self.pending.lock().expect("pending");
+        let now = std::time::Instant::now();
+        let (live, passed): (Vec<Doc>, Vec<Doc>) = documents_of(&queue, session)
+            .into_iter()
+            .filter(|d| which(d) && queue.contains_key(d))
+            .partition(|d| queue.get(d).is_some_and(|waiting| waiting.live(now)));
+        Told {
+            applied,
+            live,
+            passed,
+        }
+    }
+
+    /// **`told`'s documents read in `render`, and told what changed**
+    /// (ADR-0145, ADR-0161), against `entry` at `version`: what each of the
+    /// session's pages shows now, from its queries, each read for its own
+    /// document, outside the table. `render` ends once they are read,
+    /// whoever began it, before its thread waits for the table (NEXT 4c, the
+    /// integrator's ruling 2); a document that could not be read is said so
+    /// after it.
+    fn tell_in(
+        &self,
+        session: &str,
+        told: Told,
+        render: render_merge::Rendering,
+        entry: &ResourceEntryId,
+        version: Version,
+        speculated: bool,
+    ) {
+        let Told {
+            applied,
+            live,
+            passed,
+        } = told;
         let mut read = Vec::new();
-        for doc in documents {
+        let mut unread = Vec::new();
+        for doc in live {
             let params = self.params_of(&doc);
             // Each by its own page's plan (ADR-0190): the store's, or a cart
             // page's, which reads the same cart.
@@ -4611,10 +4725,28 @@ impl Server {
             });
             match now {
                 Ok((now, bindings)) => read.push((doc, page, params, bindings, now)),
-                Err(why) => self.unshowable(&doc, &why),
+                Err(why) => unread.push((doc, why)),
             }
         }
         drop(render);
+        for (doc, why) in unread {
+            self.unshowable(&doc, &why);
+        }
+        // Only a document whose page asks is derived now (ADR-0297); one no
+        // page has asked for in [`LIVE`] is derived when one asks.
+        if !passed.is_empty() {
+            let mut queue = self.pending.lock().expect("pending");
+            for doc in &passed {
+                if let Some(waiting) = queue.get_mut(doc)
+                    && !waiting.stale
+                {
+                    waiting.stale = true;
+                    waiting.note(format_args!(
+                        "passed by, no page asking: derived when one asks"
+                    ));
+                }
+            }
+        }
 
         // Two frames per change: the entry advanced, and every place in the
         // document the server DERIVED from it, as one set (ADR-0145). A

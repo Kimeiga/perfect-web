@@ -10,15 +10,27 @@
 //!   bindings' reads is seen by neither, on the store's page in memory and
 //!   on PostgreSQL (the layer `PW_STORE_TEST_LAYER` says), and on the feed's
 //!   page on PostgreSQL; the control, the same two bindings read in two
-//!   renders, which straddle it.
+//!   renders, which straddle it. **And no other render's**: a render reads a
+//!   key another render has in flight in its own snapshot, never joining it
+//!   (the integrator's ruling 3).
 //! - **Each layer's snapshot** (`DataLayer::snapshot`, `reads_in`): the
 //!   store's and the feed's, in memory and on PostgreSQL; on PostgreSQL, a
-//!   render's read that fails ends its transaction, and a render's
-//!   connection does not wait on the pool's bound, which a single read does.
+//!   render's read that fails ends its transaction.
+//! - **Bounded seats, every one given back** (the integrator's ruling 2): on
+//!   PostgreSQL a render reads in one of the layer's
+//!   `feed_pg::RENDER_CONNECTIONS` seats, its own pool, never the commands'.
+//!   A render past the bound waits for a seat, and one that waits past its
+//!   limit fails saying so; twenty-four renders at once are never more than
+//!   the bound seated, nor connections open; and with every seat held by a
+//!   change's render and the subscriber table held by a reader waiting for a
+//!   seat, the renders end before their telling waits for the table, on the
+//!   store (a drain) and on the feed (a session's documents told).
 
 use super::*;
 use crate::data::{DataLayer, Ops};
-use std::time::Duration;
+use crate::feed_pg::RENDER_CONNECTIONS;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::{Duration, Instant};
 
 fn text(v: &str) -> Val {
     Val::String(v.to_string())
@@ -109,7 +121,7 @@ fn a_commits_documents_are_read_in_one_render_each_identical_call_once() {
 #[test]
 fn a_renders_queries_each_note_what_the_clock_holds_them_until() {
     let s = store();
-    let _render = crate::render_merge::begin(&*s.data, "a");
+    let _render = crate::render_merge::begin(&*s.data, s.queries.epoch());
     let status = || {
         clock::noting(|| {
             s.answer("store.hours.StoreStatus", "a", &[text("47")])
@@ -125,15 +137,20 @@ fn a_renders_queries_each_note_what_the_clock_holds_them_until() {
 /// The reader's cart page, served, and its document: a line of store 47's,
 /// one espresso.
 fn cart_page(s: &Server) -> u64 {
+    cart_page_of(s, "a")
+}
+
+/// `session`'s cart page, served, and its document: one espresso.
+fn cart_page_of(s: &Server, session: &str) -> u64 {
     s.command(
         "store.page.add_to_cart",
-        "a",
+        session,
         &add_shown("espresso", 1),
         false,
     )
     .expect("added");
     let (_, doc, _, _) = s
-        .serve_document_settled("a", "store.page.CartPage", &Params::new(), &[])
+        .serve_document_settled(session, "store.page.CartPage", &Params::new(), &[])
         .expect("served");
     doc
 }
@@ -384,12 +401,13 @@ fn read_in_a_render(layer: &crate::store_pg::StorePg) -> Result<Vec<Val>, String
     layer.reads_in(&snapshot, "s", None)["store:data/stores#get"](&[text("47")])
 }
 
-/// **On PostgreSQL, a render's connection does not wait on the pool's
-/// bound**: with every connection the bound allows held, a render reads.
-/// The control: a single read waits, and reads once one is given back; the
-/// render's connection, given back past the bound, was not kept for it.
+/// **On PostgreSQL, a render reads in a seat of the renders' own, never a
+/// connection of the commands'**: with every connection the commands'
+/// bound allows held, a render reads. The control: a single read, which
+/// takes one of the commands' connections, waits, and reads once one is
+/// given back.
 #[test]
-fn on_postgres_a_renders_connection_does_not_wait_on_the_bound() {
+fn on_postgres_a_render_reads_in_a_seat_with_the_commands_bound_held() {
     let Some(url) = store_database() else { return };
     let (layer, _c) = store_on_postgres(&url);
     let (tx, rx) = std::sync::mpsc::channel();
@@ -401,7 +419,7 @@ fn on_postgres_a_renders_connection_does_not_wait_on_the_bound() {
         drop(held);
         assert!(
             matches!(read, Ok(Ok(_))),
-            "a render's read, the bound held: {read:?}"
+            "a render's read, the commands' bound held: {read:?}"
         );
     });
     let (tx, rx) = std::sync::mpsc::channel();
@@ -419,6 +437,373 @@ fn on_postgres_a_renders_connection_does_not_wait_on_the_bound() {
         assert!(early.is_err(), "a single read waits: {early:?}");
         assert!(matches!(late, Ok(Ok(_))), "and then reads: {late:?}");
     });
+}
+
+/// **On PostgreSQL, a render past the bound waits for a seat**: with every
+/// seat held, a render's read waits, and reads once one is given back.
+#[test]
+fn on_postgres_a_render_past_the_bound_waits_for_a_seat() {
+    let Some(url) = store_database() else { return };
+    let (layer, _c) = store_on_postgres(&url);
+    let mut seated: Vec<_> = (0..RENDER_CONNECTIONS)
+        .map(|_| layer.snapshot().expect("a seat"))
+        .collect();
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::scope(|scope| {
+        let layer = &layer;
+        scope.spawn(move || tx.send(read_in_a_render(layer)));
+        let early = rx.recv_timeout(Duration::from_millis(500));
+        seated.pop();
+        let late = rx.recv_timeout(Duration::from_secs(20));
+        assert!(early.is_err(), "a render past the bound waits: {early:?}");
+        assert!(
+            matches!(late, Ok(Ok(_))),
+            "and reads once a seat is given back: {late:?}"
+        );
+    });
+}
+
+/// **On PostgreSQL, a render that waits past its limit for a seat fails,
+/// saying so**: never a read outside the render's snapshot, nor a seat past
+/// the bound.
+#[test]
+fn on_postgres_a_render_waiting_past_its_limit_fails_saying_so() {
+    let Some(url) = store_database() else { return };
+    let (layer, _c) = store_on_postgres(&url);
+    let renders = layer.renders_for_test().expect("the database's renders");
+    renders.waiting_at_most(Duration::from_millis(300));
+    let _seated: Vec<_> = (0..RENDER_CONNECTIONS)
+        .map(|_| layer.snapshot().expect("a seat"))
+        .collect();
+    let why = read_in_a_render(&layer).expect_err("no seat");
+    assert!(why.contains("waited"), "{why}");
+    assert_eq!(renders.taken(), RENDER_CONNECTIONS, "none past the bound");
+}
+
+/// The store served on PostgreSQL, where its tests serve it there: in
+/// memory a render holds no seat.
+fn store_on_its_database() -> Option<Served> {
+    if std::env::var("PW_STORE_TEST_LAYER").as_deref() != Ok("postgres") {
+        eprintln!("skipped: the store is not served on PostgreSQL");
+        return None;
+    }
+    Some(store())
+}
+
+/// Waits for `done`, twenty seconds at most, or fails saying for `what`.
+fn wait_until(done: impl Fn() -> bool, what: &str) {
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while !done() {
+        assert!(Instant::now() < deadline, "never: {what}");
+        std::thread::sleep(Duration::from_millis(1));
+    }
+}
+
+/// **On PostgreSQL, the bound holds under many renders at once**:
+/// twenty-four renders of the reader's cart page, each held at its reads
+/// until the bound's eight were seated together, all read the page, never
+/// more than eight seated at once, nor more connections open for them.
+#[test]
+fn on_postgres_the_renders_bound_holds_under_many_renders_at_once() {
+    let Some(s) = store_on_its_database() else {
+        return;
+    };
+    let doc = cart_page(&s);
+    let renders = s.data.renders_for_test().expect("the database's renders");
+    let seated = renders.clone();
+    *s.while_reading.lock().expect("while reading") = Some(Arc::new(move |_: &Server| {
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while seated.most().0 < RENDER_CONNECTIONS && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(1));
+        }
+    }));
+    let read: Vec<Result<Vec<(String, i64)>, String>> = std::thread::scope(|scope| {
+        let s = &s;
+        let each: Vec<_> = (0..3 * RENDER_CONNECTIONS)
+            .map(|_| scope.spawn(move || s.bindings("a", doc).map(|b| lines_of(&b["cart"]))))
+            .collect();
+        each.into_iter()
+            .map(|r| r.join().expect("a render"))
+            .collect()
+    });
+    *s.while_reading.lock().expect("while reading") = None;
+    let espresso = vec![("espresso".to_string(), 1)];
+    assert!(
+        read.iter().all(|r| r.as_ref() == Ok(&espresso)),
+        "every render read the page: {read:?}"
+    );
+    let (seats, open) = renders.most();
+    assert_eq!(seats, RENDER_CONNECTIONS, "the bound, reached and held");
+    assert!(open <= RENDER_CONNECTIONS, "{open} connections open");
+}
+
+/// **No render holds its seat waiting for the subscriber table** (the
+/// integrator's ruling 2): each of `changes`' sessions' commands tells its
+/// open page, read in a render held at its reads until every seat is taken;
+/// a reader holding the table, as a document's last attempt does
+/// (ADR-0151), then waits for a seat. Released, the commands' renders end
+/// before their telling takes the table, the reader is seated and reads,
+/// and every command is answered. Were a render to hold its seat through
+/// its telling, it would wait for the table the reader holds, and the
+/// reader for a seat until its limit, five seconds here, refused it. Then
+/// the same, the table taken before the changes.
+fn no_render_holds_its_seat_waiting_for_the_table(
+    s: &Server,
+    changes: &[(String, u64)],
+    change: &(dyn Fn(&Server, &str) -> Result<(), String> + Sync),
+) {
+    assert_eq!(changes.len(), RENDER_CONNECTIONS, "a seat each");
+    let renders = s.data.renders_for_test().expect("the database's renders");
+    renders.waiting_at_most(Duration::from_secs(5));
+    let released = Arc::new(AtomicBool::new(false));
+    let held = released.clone();
+    *s.while_reading.lock().expect("while reading") = Some(Arc::new(move |_: &Server| {
+        let deadline = Instant::now() + Duration::from_secs(20);
+        while !held.load(Ordering::SeqCst) && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(1));
+        }
+    }));
+    let (session, doc) = changes[0].clone();
+    let (answered, reader) = std::thread::scope(|scope| {
+        let each: Vec<_> = changes
+            .iter()
+            .map(|(session, _)| scope.spawn(move || change(s, session)))
+            .collect();
+        wait_until(
+            || renders.taken() == RENDER_CONNECTIONS,
+            "every seat taken by a change's render",
+        );
+        let reader = scope.spawn(move || {
+            let _table = s.pending.lock().expect("pending");
+            s.bindings(&session, doc).map(|_| ())
+        });
+        wait_until(
+            || renders.waiting() == 1,
+            "the reader waiting for a seat, the table held",
+        );
+        released.store(true, Ordering::SeqCst);
+        let reader = reader.join().expect("the reader");
+        let answered: Vec<_> = each
+            .into_iter()
+            .map(|c| c.join().expect("a change"))
+            .collect();
+        (answered, reader)
+    });
+    *s.while_reading.lock().expect("while reading") = None;
+    assert_eq!(reader, Ok(()), "the reader, seated once the renders ended");
+    assert!(answered.iter().all(Result::is_ok), "{answered:?}");
+    // And the table taken first: each change waits for it where its
+    // documents are taken, holding no seat, and the reader holding it is
+    // seated at once. Were a render to begin before its documents are taken,
+    // every change would hold a seat waiting for the table, and the reader
+    // would wait for one until its limit refused it.
+    let (session, doc) = changes[1].clone();
+    let (answered, reader) = std::thread::scope(|scope| {
+        let table = s.pending.lock().expect("pending");
+        let each: Vec<_> = changes
+            .iter()
+            .map(|(session, _)| scope.spawn(move || change(s, session)))
+            .collect();
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while renders.taken() < RENDER_CONNECTIONS && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        let reader = s.bindings(&session, doc).map(|_| ());
+        drop(table);
+        let answered: Vec<_> = each
+            .into_iter()
+            .map(|c| c.join().expect("a change"))
+            .collect();
+        (answered, reader)
+    });
+    assert_eq!(reader, Ok(()), "the reader holding the table, seated");
+    assert!(answered.iter().all(Result::is_ok), "{answered:?}");
+}
+
+/// [`no_render_holds_its_seat_waiting_for_the_table`], on the store: each
+/// change a command whose drain tells the session's cart page.
+#[test]
+fn on_postgres_a_drains_render_never_holds_its_seat_waiting_for_the_table() {
+    let Some(s) = store_on_its_database() else {
+        return;
+    };
+    let changes: Vec<(String, u64)> = (0..RENDER_CONNECTIONS)
+        .map(|i| {
+            let session = format!("d{i}");
+            let doc = cart_page_of(&s, &session);
+            (session, doc)
+        })
+        .collect();
+    no_render_holds_its_seat_waiting_for_the_table(&s, &changes, &|s, session| {
+        s.command(
+            "store.page.add_to_cart",
+            session,
+            &add_shown("drip", 1),
+            false,
+        )
+    });
+}
+
+/// [`no_render_holds_its_seat_waiting_for_the_table`], on the feed: each
+/// change a post, whose commit tells the session's home page.
+#[test]
+fn on_postgres_a_feed_renders_never_hold_their_seats_waiting_for_the_table() {
+    let Some(url) = feed_database() else { return };
+    let s = super::feed_pg::served_on(&url, "render_merge_table");
+    let changes: Vec<(String, u64)> = (0..RENDER_CONNECTIONS)
+        .map(|i| {
+            let session = format!("f{i}");
+            let (_, doc, _, _) = s
+                .serve_document_settled(&session, "feed.app.Home", &Params::new(), &[])
+                .expect("served");
+            (session, doc)
+        })
+        .collect();
+    // Each post an interaction of its own.
+    let posts = std::sync::atomic::AtomicUsize::new(0);
+    no_render_holds_its_seat_waiting_for_the_table(&s, &changes, &|s, session| {
+        let n = posts.fetch_add(1, Ordering::SeqCst);
+        let answered = s.command_answered(
+            "feed.app.post",
+            session,
+            &[text("Told, the table held.")],
+            Some(&format!("post-{session}-{n}")),
+        )?;
+        match answered.committed {
+            true => Ok(()),
+            false => Err(format!("{:?}", answered.result)),
+        }
+    });
+}
+
+/// A read held in flight once it has read, until `released` says: what
+/// `Server::in_flight` holds, once, telling `flying` when it is.
+fn held_in_flight(
+    s: &Server,
+    flying: std::sync::mpsc::Sender<()>,
+    released: std::sync::mpsc::Receiver<()>,
+) {
+    let released = Mutex::new(released);
+    *s.in_flight.lock().expect("in flight") = Some(Box::new(move |_: &Server| {
+        flying.send(()).expect("told");
+        let _ = released
+            .lock()
+            .expect("released")
+            .recv_timeout(Duration::from_secs(20));
+    }));
+}
+
+/// The reader's cart, as one render of `doc` reads it, alone.
+fn cart_read(s: &Server, doc: u64) -> Result<Vec<(String, i64)>, String> {
+    s.bindings_where("a", Some(doc), |b| b == "cart", &Keys::Shown)
+        .map(|mut b| lines_of(&b.remove("cart").expect("the cart")))
+        .map_err(|why| format!("{why:?}"))
+}
+
+/// **A render reads alone what a commit invalidated since it began** (the
+/// integrator's ruling 3): a render reads the reader's cart, one espresso,
+/// its read held in flight; the reader's own command adds a drip and
+/// invalidates `Cart`, which stops that read; a second render, begun after,
+/// reads the two lines, its read held in flight in its turn. The first,
+/// released, reads again: alone, in its own snapshot, one espresso, without
+/// waiting for the second's read, which it would take were it to read as
+/// any reader does, newer than its snapshot.
+#[test]
+fn a_render_reads_alone_what_a_commit_invalidated_since_it_began() {
+    let s = store();
+    let doc = cart_page(&s);
+    let (first_flying, first_in_flight) = std::sync::mpsc::channel();
+    let (release_first, first_released) = std::sync::mpsc::channel::<()>();
+    held_in_flight(&s, first_flying, first_released);
+    let (first, second) = std::thread::scope(|scope| {
+        let s = &s;
+        let (tx, first) = std::sync::mpsc::channel();
+        scope.spawn(move || tx.send(cart_read(s, doc)));
+        first_in_flight
+            .recv_timeout(Duration::from_secs(20))
+            .expect("the first render's read in flight");
+        s.command("store.page.add_to_cart", "a", &add_shown("drip", 1), false)
+            .expect("the reader's command commits");
+        let (second_flying, second_in_flight) = std::sync::mpsc::channel();
+        let (release_second, second_released) = std::sync::mpsc::channel::<()>();
+        held_in_flight(s, second_flying, second_released);
+        let second = scope.spawn(move || cart_read(s, doc));
+        let flying = second_in_flight.recv_timeout(Duration::from_secs(20));
+        release_first.send(()).expect("released");
+        let read = first.recv_timeout(Duration::from_secs(5));
+        release_second.send(()).expect("released");
+        flying.expect("the second render's read in flight");
+        (read, second.join().expect("the second render"))
+    });
+    assert_eq!(
+        first,
+        Ok(Ok(vec![("espresso".to_string(), 1)])),
+        "the first render's own snapshot, read alone, not waiting for the second's read"
+    );
+    let mut lines = second.expect("read");
+    lines.sort();
+    assert_eq!(
+        lines,
+        [("drip".to_string(), 1), ("espresso".to_string(), 1)],
+        "the second's"
+    );
+}
+
+/// Whether `doc` was told to read itself again.
+fn told_to_reload(s: &Server, doc: &Doc) -> bool {
+    s.pending.lock().expect("pending")[doc]
+        .frames
+        .iter()
+        .any(|(_, f)| {
+            matches!(
+                f,
+                StreamFrame::Recovery {
+                    recovery: Recovery::Reload,
+                    ..
+                }
+            )
+        })
+}
+
+/// The reader's next read of its cart fails, once (ADR-0174).
+fn the_next_cart_read_fails(s: &Server) {
+    s.store
+        .faults()
+        .cart_faults
+        .lock()
+        .expect("cart faults")
+        .entry("a".into())
+        .or_default()
+        .fail_read = true;
+}
+
+/// **A document that could not be read is said so after its render ends**
+/// (the integrator's ruling 2): the reader's cart page, told a change, its
+/// cart's read failing, is told to read itself again, the table taken once
+/// the render ended (a render takes it in no test).
+#[test]
+fn a_document_that_could_not_be_read_is_said_so_after_its_render() {
+    let s = store();
+    let doc = cart_page(&s);
+    the_next_cart_read_fails(&s);
+    s.clock.advance(1);
+    let version = Version(s.clock.now());
+    s.send_documents("a", &session_documents("a"), version, false);
+    assert!(told_to_reload(&s, &("a".to_string(), doc)));
+}
+
+/// **A session whose count could not be read is said so after the drain's
+/// render ends**: the reader's command commits, and its drain's read of the
+/// cart fails; the reader's page is told to read itself again, the table
+/// taken once the render ended.
+#[test]
+fn a_session_whose_count_could_not_be_read_is_said_so_after_its_render() {
+    let s = store();
+    let doc = cart_page(&s);
+    the_next_cart_read_fails(&s);
+    s.command("store.page.add_to_cart", "a", &add_shown("drip", 1), false)
+        .expect("the command commits");
+    assert!(told_to_reload(&s, &("a".to_string(), doc)));
 }
 
 /// **The feed's snapshot in memory** is the feed as the render first read

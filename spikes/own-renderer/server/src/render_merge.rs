@@ -1,24 +1,53 @@
 //! **One render's reads** (NEXT 4c's first step, track `render-merge`; W9's
 //! design note "a read is bounded by construction", its second case, and the
-//! integrator's ruling of 2026-10-14): within one render the host makes each
-//! identical operation call once, the operation and its arguments as the
-//! key, and every binding that asks gets the same answer; and the render's
-//! calls read one snapshot of the data layer.
+//! integrator's rulings of 2026-10-14 and 2026-10-15): within one render the
+//! host makes each identical operation call once, the operation and its
+//! arguments as the key, and every binding that asks gets the same answer;
+//! and the render's calls read one snapshot of the data layer.
 //!
 //! - **A render** is the host reading what a session's documents show at one
 //!   moment: a page's bindings (`bindings_where`), and a session's documents
 //!   read again after a commit, with the drain's read of the cart before them
-//!   (`drain_held`, `send_documents_where`). A render begun inside another
-//!   for the same session is that one; one for another session is its own.
+//!   (`drain_held`, `send_documents_where`). **A thread reads in one render
+//!   of a layer at a time**: one begun inside it, for any session, is that
+//!   one, and each call is still its session's own (the session is part of
+//!   its key).
 //! - **Nothing is kept past it.** Its answers go when it ends, so an answer
 //!   is one the render itself read, and no commit has to say which answers
 //!   it makes stale.
-//! - **Its snapshot is the layer's** ([`DataLayer::snapshot`]), taken at the
-//!   render's first read and given up when it ends: the store as one moment
-//!   left it in memory, one read transaction on PostgreSQL. Two bindings of
-//!   one render cannot straddle a commit. What pw-resource answers from its
-//!   cache, or from a flight another thread began, is as old as the query's
-//!   policy lets it be, as before.
+//! - **Its snapshot is the layer's** ([`DataLayer::snapshot`]), asked for
+//!   where the render begins and given up where it ends: the store as it is
+//!   then, in memory; on PostgreSQL, one of the layer's seats
+//!   (`feed_pg::RENDER_CONNECTIONS`) and the read transaction its first read
+//!   opens, whose snapshot is that statement's (PostgreSQL 18, 13.2.2). Two
+//!   bindings of one render cannot straddle a commit.
+//! - **Bounded, and every seat given back** (the integrator's ruling 2): a
+//!   render takes its seat where it begins, waiting while every seat is
+//!   taken, and its thread holds there at most its session's turn or the
+//!   subscriber table: never a connection, another seat, the writes guard or
+//!   a read in flight, since no render begins inside a query's read or a
+//!   materialization's making. Holding its seat, a render waits on nothing a
+//!   waiter for one may hold: it ends before its thread waits for the table
+//!   (`drain_held`, `send_documents_where`), and takes no session's turn
+//!   (both checked in tests: the table's and a turn's `lock`); what it waits
+//!   for otherwise (a lock held for a moment, a read in flight or a making
+//!   another render or a command makes) never waits for a seat, as none
+//!   begins inside one.
+//! - **Another render's snapshot only where nothing says it differs**
+//!   (ruling 3): a render begins as of the queries' invalidations so far
+//!   (`pw_resource::Resources::epoch`, taken before its snapshot). A query
+//!   whose resource nothing invalidated since is read as its policy says:
+//!   from what is kept, or a read in flight (`concurrency one_per_key`, the
+//!   default), begun in another render's snapshot or in none, whose value is
+//!   what this render's snapshot holds as far as the program's declared
+//!   invalidations say. One invalidated since is read alone, in the render's
+//!   own snapshot, neither kept nor handed to another reader
+//!   (`fetch_cancellable_as_of`): so no render shows a value newer than its
+//!   snapshot by a change the program declared, and none keeps one older.
+//!   Not closed: a change the program does not declare, and the moment
+//!   between a commit and its invalidation. A materialization's kept entry,
+//!   or its making under way, which a render waits for where it declares
+//!   `stampede single_flight`, is as of its making, as before.
 //! - **Only the layer's operations are merged**, never the platform's (the
 //!   session, the principal, the clock), whose calls note what a read holds
 //!   until (ADR-0304); and only answers, never failures: a call that failed
@@ -27,17 +56,19 @@
 use super::*;
 use crate::data::{DataLayer, Ops, Snapshot};
 use std::cell::RefCell;
-use std::sync::OnceLock;
 
-/// **A render being read**: the layer it reads, the session whose documents
-/// it reads, the layer's snapshot, and what its calls answered.
+/// **A render being read**: the layer it reads, the layer's snapshot, and
+/// what its calls answered.
 pub(crate) struct Render {
     /// The layer, by its address: a render answers for its server's layer
     /// alone.
     layer: usize,
-    session: String,
-    /// Taken at the render's first read, and dropped with the render.
-    snapshot: OnceLock<Option<Snapshot>>,
+    /// The queries' invalidations when the render began, before its
+    /// snapshot (`pw_resource::Resources::epoch`): a query read in the
+    /// render whose resource was invalidated after it is read alone.
+    as_of: u64,
+    /// Taken when the render began, and dropped with it.
+    snapshot: Option<Snapshot>,
     /// Each call made, by the session it was made for, its operation and its
     /// arguments, and what it answered.
     answers: Mutex<Vec<(Call, Vec<Val>)>>,
@@ -47,7 +78,7 @@ pub(crate) struct Render {
 type Call = (String, String, Vec<Val>);
 
 thread_local! {
-    /// **The renders this thread is reading**, the innermost last.
+    /// **The renders this thread is reading**: one of each layer at most.
     static READING: RefCell<Vec<Arc<Render>>> = const { RefCell::new(Vec::new()) };
 }
 
@@ -60,29 +91,25 @@ fn address(data: &dyn DataLayer) -> usize {
 #[must_use = "a render ends when what began it is dropped"]
 pub(crate) struct Rendering(Option<Arc<Render>>);
 
-/// **Begin a render of `data`'s for `session`** on this thread: its own,
-/// unless the innermost render this thread reads is of the same layer for
-/// the same session, whose reads these are then. A command run inside a
-/// render (a test's hook does) reads what it committed in a render of its own.
-pub(crate) fn begin(data: &dyn DataLayer, session: &str) -> Rendering {
+/// **Begin a render of `data`'s** on this thread: its own, as of `as_of`,
+/// the queries' invalidations so far, taken before its snapshot, which is
+/// taken now (on PostgreSQL, a seat waited for while every seat is taken);
+/// or, where this thread reads a render of `data`'s already, that one, whose
+/// reads these are then, whatever session they are for.
+pub(crate) fn begin(data: &dyn DataLayer, as_of: u64) -> Rendering {
     let layer = address(data);
-    READING.with(|reading| {
-        let mut reading = reading.borrow_mut();
-        if reading
-            .last()
-            .is_some_and(|r| r.layer == layer && r.session == session)
-        {
-            return Rendering(None);
-        }
-        let render = Arc::new(Render {
-            layer,
-            session: session.to_string(),
-            snapshot: OnceLock::new(),
-            answers: Mutex::default(),
-        });
-        reading.push(render.clone());
-        Rendering(Some(render))
-    })
+    if READING.with(|reading| reading.borrow().iter().any(|r| r.layer == layer)) {
+        return Rendering(None);
+    }
+    // Taken outside the thread's list, which a wait must not hold.
+    let render = Arc::new(Render {
+        layer,
+        as_of,
+        snapshot: data.snapshot(),
+        answers: Mutex::default(),
+    });
+    READING.with(|reading| reading.borrow_mut().push(render.clone()));
+    Rendering(Some(render))
 }
 
 impl Drop for Rendering {
@@ -99,9 +126,19 @@ impl Drop for Rendering {
     }
 }
 
-/// **The render this thread reads `data` in**, the innermost, where it
-/// reads one: a public read inside it (a materialization's, for no session)
-/// is the render's too.
+/// **Whether this thread reads in a render**, of any layer (NEXT 4c's
+/// tests): what takes the subscriber table or a session's turn checks it
+/// does not, as a render never waits for either while it holds its seat
+/// (the integrator's ruling 2).
+#[cfg(test)]
+pub(crate) fn in_a_render() -> bool {
+    READING
+        .try_with(|reading| !reading.borrow().is_empty())
+        .unwrap_or(false)
+}
+
+/// **The render this thread reads `data` in**, where it reads one: a public
+/// read inside it (a materialization's, for no session) is the render's too.
 pub(crate) fn reading(data: &dyn DataLayer) -> Option<Arc<Render>> {
     let layer = address(data);
     READING.with(|reading| {
@@ -115,16 +152,21 @@ pub(crate) fn reading(data: &dyn DataLayer) -> Option<Arc<Render>> {
 }
 
 impl Render {
+    /// **The queries' invalidations when the render began**: a query of
+    /// the render reads as of them (`fetch_answer`).
+    pub(crate) fn as_of(&self) -> u64 {
+        self.as_of
+    }
+
     /// **The layer's operations for one query of the render**, for
-    /// `session`, each reading the render's snapshot, which the first of
-    /// them takes.
+    /// `session`, each reading the render's snapshot.
     pub(crate) fn reads(
         &self,
         data: &dyn DataLayer,
         session: &str,
         stopped: Option<Stopped>,
     ) -> Ops {
-        match self.snapshot.get_or_init(|| data.snapshot()) {
+        match &self.snapshot {
             Some(snapshot) => data.reads_in(snapshot, session, stopped),
             None => data.reads(session, stopped),
         }
@@ -285,7 +327,7 @@ mod tests {
     fn a_renders_identical_calls_are_made_once() {
         let data = Numbered::default();
         {
-            let _render = begin(&data, "a");
+            let _render = begin(&data, 0);
             let first = read(&data, "a", &[n(1)]);
             let second = read(&data, "a", &[n(1)]);
             assert_eq!(first, second);
@@ -305,7 +347,7 @@ mod tests {
     #[test]
     fn a_renders_calls_with_other_arguments_are_each_made() {
         let data = Numbered::default();
-        let _render = begin(&data, "a");
+        let _render = begin(&data, 0);
         let one = read(&data, "a", &[n(1)]).expect("read");
         let two = read(&data, "a", &[n(2)]).expect("read");
         assert_ne!(one, two);
@@ -318,7 +360,7 @@ mod tests {
     #[test]
     fn a_renders_call_for_another_session_is_its_own() {
         let data = Numbered::default();
-        let _render = begin(&data, "a");
+        let _render = begin(&data, 0);
         let readers = read(&data, "a", &[n(1)]).expect("read");
         let nobodys = read(&data, "", &[n(1)]).expect("read");
         assert_ne!(readers, nobodys);
@@ -331,7 +373,7 @@ mod tests {
     fn a_renders_failed_call_is_made_again() {
         let data = Numbered::default();
         data.failing.store(1, Ordering::SeqCst);
-        let _render = begin(&data, "a");
+        let _render = begin(&data, 0);
         assert!(read(&data, "a", &[n(1)]).is_err(), "failed");
         assert!(read(&data, "a", &[n(1)]).is_ok(), "asked again, answered");
         assert_eq!(data.calls.load(Ordering::SeqCst), 2, "two calls");
@@ -344,7 +386,7 @@ mod tests {
     fn a_render_reads_one_snapshot_and_keeps_nothing_past_it() {
         let data = Numbered::default();
         {
-            let _render = begin(&data, "a");
+            let _render = begin(&data, 0);
             let before = read(&data, "a", &[n(1)]).expect("read");
             data.value.store(7, Ordering::SeqCst);
             // Another call, so the layer is read: in the render's snapshot.
@@ -354,7 +396,7 @@ mod tests {
             assert_eq!(data.alive.load(Ordering::SeqCst), 1, "one snapshot");
         }
         assert_eq!(data.alive.load(Ordering::SeqCst), 0, "given up");
-        let _render = begin(&data, "a");
+        let _render = begin(&data, 0);
         assert_eq!(
             read(&data, "a", &[n(1)]).expect("read"),
             Val::String("a:7:[S64(1)]".into()),
@@ -363,17 +405,34 @@ mod tests {
         assert_eq!(data.calls.load(Ordering::SeqCst), 3);
     }
 
-    /// **A render begun inside another for the same session is that one**;
-    /// one for another session is its own, and reads what was committed
-    /// before it began.
+    /// **A render's snapshot is asked for where it begins**, before its
+    /// first read: a layer that takes it then (memory's) shows no change
+    /// between the two. On PostgreSQL that is the render's seat, and the
+    /// snapshot its first statement's.
     #[test]
-    fn a_render_inside_another_is_its_for_its_session_alone() {
+    fn a_renders_snapshot_is_taken_where_it_begins() {
         let data = Numbered::default();
-        let _outer = begin(&data, "a");
+        let _render = begin(&data, 0);
+        assert_eq!(data.alive.load(Ordering::SeqCst), 1, "taken");
+        data.value.store(7, Ordering::SeqCst);
+        assert_eq!(
+            read(&data, "a", &[n(1)]).expect("read"),
+            Val::String("a:0:[S64(1)]".into()),
+            "as it was when the render began"
+        );
+    }
+
+    /// **A render begun inside another is that one, whatever its session**:
+    /// a thread reads in one render of a layer at a time, one snapshot, and
+    /// each call is still its session's own.
+    #[test]
+    fn a_render_begun_inside_another_is_that_one_whatever_its_session() {
+        let data = Numbered::default();
+        let _outer = begin(&data, 0);
         read(&data, "a", &[n(1)]).expect("read");
         data.value.store(7, Ordering::SeqCst);
         {
-            let _same = begin(&data, "a");
+            let _same = begin(&data, 0);
             assert_eq!(
                 read(&data, "a", &[n(1)]).expect("read"),
                 Val::String("a:0:[S64(1)]".into()),
@@ -381,19 +440,15 @@ mod tests {
             );
         }
         {
-            let _other = begin(&data, "b");
+            let _other = begin(&data, 0);
             assert_eq!(
                 read(&data, "b", &[n(1)]).expect("read"),
-                Val::String("b:7:[S64(1)]".into()),
-                "its own snapshot"
+                Val::String("b:0:[S64(1)]".into()),
+                "its session's own call, in the one snapshot"
             );
         }
         assert_eq!(data.calls.load(Ordering::SeqCst), 2);
-        assert_eq!(
-            data.alive.load(Ordering::SeqCst),
-            1,
-            "the other's, given up"
-        );
+        assert_eq!(data.alive.load(Ordering::SeqCst), 1, "one snapshot");
     }
 
     /// **A render of one layer answers for no other's**: two servers in one
@@ -401,7 +456,7 @@ mod tests {
     #[test]
     fn a_render_of_one_layer_answers_for_no_other() {
         let (one, two) = (Numbered::default(), Numbered::default());
-        let _render = begin(&one, "a");
+        let _render = begin(&one, 0);
         assert!(reading(&one).is_some());
         assert!(reading(&two).is_none(), "no render of the second layer");
     }

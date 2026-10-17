@@ -646,8 +646,8 @@ impl crate::data::DataLayer for FeedData {
     }
 
     // TRACK SEAM (render-merge): a render's snapshot, the feed as its last
-    // commit left it when the render first read it, and each of its queries'
-    // reads over it (NEXT 4c).
+    // commit left it when the render began, and each of its queries' reads
+    // over it (NEXT 4c).
     fn snapshot(&self) -> Option<crate::data::Snapshot> {
         Some(Box::new(Arc::new(self.state.lock().expect("feed").clone())))
     }

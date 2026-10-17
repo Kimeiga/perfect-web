@@ -25,11 +25,14 @@ pub(crate) trait DataLayer: Send + Sync {
     fn reads(&self, session: &str, stopped: Option<Stopped>) -> Ops;
 
     /// **One render's snapshot** (NEXT 4c, track `render-merge`): what every
-    /// read of one render reads, taken at the render's first read and given
-    /// up when the render ends, so the render sees one state of the data
-    /// whatever commits meanwhile. By default none, and each query of a
-    /// render reads as [`DataLayer::reads`] does: a layer whose data never
-    /// changes (kiokun's files) needs none.
+    /// read of one render reads, asked for where the render begins and given
+    /// up where it ends, so the render sees one state of the data whatever
+    /// commits meanwhile: in memory, the data as it is when asked; on
+    /// PostgreSQL, a seat among a bounded few, waited for while every one is
+    /// taken, whose read transaction's snapshot is its first statement's
+    /// (PostgreSQL 18, 13.2.2). By default none, and each query of a render
+    /// reads as [`DataLayer::reads`] does: a layer whose data never changes
+    /// (kiokun's files) needs none.
     fn snapshot(&self) -> Option<Snapshot> {
         None
     }
@@ -98,6 +101,13 @@ pub(crate) trait DataLayer: Send + Sync {
     #[cfg(test)]
     fn execute_for_test(&self, sql: &str) -> Result<(), String> {
         Err(format!("this layer runs no SQL: {sql}"))
+    }
+
+    /// **The connections this layer's renders read in** (NEXT 4c's tests):
+    /// a database's layer's, and none in memory.
+    #[cfg(test)]
+    fn renders_for_test(&self) -> Option<Arc<crate::feed_pg::Renders>> {
+        None
     }
 
     fn provides(&self) -> Result<Provided, String> {
