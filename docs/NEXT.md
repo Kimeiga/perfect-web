@@ -23,6 +23,19 @@ The next executable tasks, in order, with acceptance criteria. Charter §3.4.
 - ADR-0348: the scheduled estimate N+1 is repaired by a set operation;
   continue the common per-adapter conformance suite and composite migration.
 
+Train-9 landing gate, 2026-10-16: ADR-0352's completion/write-order fix and
+strict result producer pass local whole12 and fresh default CI. Push the
+reviewed train-9 head under the existing owner authorization, require both
+GitHub `ci` and `verify` at that exact head, then fetch only its green evidence
+and land. The failed38863242953 run cannot satisfy this gate. Keep the older
+neighbor whole/native-status and inventory-scope qualifications in the receipt.
+
+
+Integration follow-up, 2026-10-16: reproduce Kiokun search-cache publication
+and version-lifetime races with private fixtures, then repair them. Sample
+test isolation does not prove production cache concurrency. Do not inspect
+or modify the external dataset owned by another process.
+
 ## Current: E14, the AI benchmark (E10 closed 2026-10-02)
 
 **2026-10-02, E10 closed and E14 started** ([ADR-0119](DECISIONS/ADR-0119-e10-closes-and-the-ai-benchmark-comes-next.md)).

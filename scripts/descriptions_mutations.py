@@ -7,8 +7,8 @@ Each mutant undoes one piece:
   declare passed in; a field it declares and the answer lacks filled with
   nothing; a list's rows, or a result's value, passed as they are;
 - the store's page: its description, or its items', not shown;
-- WebKit: the store says too little to be painted before its slots are
-  filled.
+- WebKit: the initial document is withheld while its slots settle, so
+  it cannot paint before they are filled.
 
 An engine mutant must fail `runtime/pw-host/tests/host_answers.rs` or the
 development server's tests, which serve the benchmark's store from rows
@@ -29,51 +29,7 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 ENGINE = ROOT / "runtime/pw-host/src/lib.rs"
 STORE = ROOT / "examples/store/app.pw"
-
-# The view from the store's description to its items'.
-# Re-anchored by ADR-0180, whose estimate is a range, and ADR-0181, whose
-# menu is grouped by category.
-# Re-anchored by ADR-0277: the menu counted, a line after the store's own.
-BOTH_DESCRIPTIONS = (
-    # Re-anchored by ADR-0308's amendment: the store's cuisine, before its
-    # description, which says more of the store too.
-    "            <p id=\"store-cuisine\">{store.cuisine}</p>\n"
-    # And whether it is open (track store-hours).
-    "            <p id=\"store-open\">{open.said}</p>\n"
-    # And what its ratings come to (track reviews).
-    "            <p id=\"store-rating\">{ratings.said}</p>\n"
-    "            <p id=\"store-description\">{store.description}</p>\n"
-    "            <p id=\"menu-line\">{line}</p>\n"
-    "\n"
-    # Re-anchored by track store-accounts (milestone 2): where deliveries go,
-    # and the estimate to the reader's chosen address.
-    "            <!-- Where deliveries go, and whether this store reaches it (track\n"
-    "                 `store-accounts`), said where the menu is. -->\n"
-    "            <p id=\"deliver-to\">\n"
-    "                {#if reach.chosen}Delivering to {reach.to}{:else}No delivery address yet{/if}\n"
-    "                <a id=\"change-address\" href=\"/stores/{id}/address\">Change the address</a>\n"
-    "            </p>\n"
-    "            {#if reach.delivers}{:else}<p id=\"out-of-range\">{store.name} doesn't deliver to {reach.to}.</p>{/if}\n"
-    "\n"
-    "            <section aria-label=\"Delivery\" aria-live=\"polite\">\n"
-    "                <stream query={Estimate(id, current_user())}>\n"
-    "                    <placeholder><p>Estimating delivery</p></placeholder>\n"
-    "                    <ready as={estimate}><p>Delivery in {estimate.min_minutes} to {estimate.max_minutes} min</p></ready>\n"
-    "                    <failed><p>Delivery estimate unavailable</p></failed>\n"
-    "                </stream>\n"
-    "            </section>\n"
-    "\n"
-    "            <section aria-label=\"Menu\">\n"
-    "                <!-- Grouped by category, each a heading and its items (ADR-0181). -->\n"
-    "                <div id=\"menu\">\n"
-    "                    {#each menu as section (section.category.id)}\n"
-    "                        <h2>{section.category.name}</h2>\n"
-    "                        <ul>\n"
-    "                            {#each section.items as item (item.id)}\n"
-    "                                <li>\n"
-    "                                    <span>{item.name}</span>\n"
-    "                                    <p>{item.description}</p>\n"
-)
+SERVER = ROOT / "spikes/own-renderer/server/src/main.rs"
 
 # (what, suite, file, anchor, replacement)
 MUTANTS = [
@@ -151,34 +107,13 @@ MUTANTS = [
         "",
     ),
     (
-        # Either description alone carries the page past WebKit's threshold,
-        # so both go: the anchor spans the view between them.
-        "the store says too little for WebKit to paint it before its slots",
+        # The former content-size proxy was absorbed as the page grew.
+        # Remove the behavior itself, independent of today's page text.
+        "the initial store document is withheld while its slots settle",
         "webkit",
-        STORE,
-        BOTH_DESCRIPTIONS,
-        # And the line of the menu counted (ADR-0277), which says more of the
-        # store too: without it the store says as little as it did.
-        BOTH_DESCRIPTIONS.replace(
-            "            <p id=\"store-description\">{store.description}</p>\n", ""
-        )
-        # And the store's cuisine (ADR-0308, amended), likewise.
-        .replace("            <p id=\"store-cuisine\">{store.cuisine}</p>\n", "")
-        # And whether it is open (track store-hours), likewise.
-        .replace("            <p id=\"store-open\">{open.said}</p>\n", "")
-        # And what its ratings come to (track reviews), likewise.
-        .replace("            <p id=\"store-rating\">{ratings.said}</p>\n", "")
-        .replace("            <p id=\"menu-line\">{line}</p>\n", "")
-        .replace("                                    <p>{item.description}</p>\n", "")
-        # And where deliveries go (track store-accounts), which says more of
-        # the store too: without it the store says as little as it did.
-        .replace(
-            "            <p id=\"deliver-to\">\n"
-            "                {#if reach.chosen}Delivering to {reach.to}{:else}No delivery address yet{/if}\n"
-            "                <a id=\"change-address\" href=\"/stores/{id}/address\">Change the address</a>\n"
-            "            </p>\n",
-            "",
-        ),
+        SERVER,
+        "            .and_then(|_| stream.write_all(shell.as_bytes()))\n",
+        "            .and_then(|_| { let _ = shell; Ok(()) })\n",
     ),
 ]
 
@@ -202,7 +137,10 @@ CARGO = {
         "tests::the_store_sends_its_slots_after_its_own_content",
     ]],
 }
-BROWSER = ["e2e/slots.spec.mjs", "--project=webkit"]
+BROWSER = [
+    "e2e/slots.spec.mjs", "--project=webkit", "--grep",
+    "the store is shown before its slots are filled",
+]
 
 # How long one command may run. Past the bound it is killed with everything
 # it started, and the run counts as failing.
@@ -308,7 +246,11 @@ def main():
             survivors += 1
         print(f"{what} [{suite}]: {verdict}")
     # The page and the server are built again from the restored source.
-    browser_tests()
+    built, passed, failed = browser_tests()
+    if not built or failed or not passed:
+        print("FAIL: the restored-source browser check is not green")
+        mutation_baseline.explain()
+        return 1
 
     print(f"{len(MUTANTS) - survivors} of {len(MUTANTS)} mutants killed")
     return 1 if survivors else 0

@@ -1,0 +1,37 @@
+2026-10-16T11:00:50Z
+   Compiling pw-dev-server v0.0.0 (/home/haki/code/pw-wt/train9-bounded-fix/spikes/own-renderer/server)
+    Finished `test` profile [unoptimized] target(s) in 2.22s
+     Running unittests src/main.rs (target/debug/deps/pw_dev_server-ff76041b108b4a26)
+
+running 1 test
+private settlement probe: intent=pi_dev000001 status=succeeded outcome=Ok(Answered { committed: true, result: Some(Object {"$case": String("ok")}), why: None, refused: None })
+private webhook probe: event=evt_dev000002 intent=pi_dev000001 response=Ok(200)
+private settlement probe: intent=pi_dev000003 status=canceled outcome=Ok(Answered { committed: true, result: Some(Object {"$case": String("ok")}), why: None, refused: None })
+private webhook probe: event=evt_dev000004 intent=pi_dev000003 response=Ok(200)
+private settlement probe: intent=pi_dev000005 status=canceled outcome=Ok(Answered { committed: true, result: Some(Object {"$case": String("ok")}), why: None, refused: None })
+private webhook probe: event=evt_dev000006 intent=pi_dev000005 response=Ok(200)
+private settlement probe: intent=pi_dev000001 status=succeeded outcome=Ok(Answered { committed: true, result: Some(Object {"$case": String("ok")}), why: None, refused: None })
+private webhook probe: event=evt_dev000002 intent=pi_dev000001 response=Ok(200)
+private settlement probe: intent=pi_dev000003 status=canceled outcome=Ok(Answered { committed: true, result: Some(Object {"$case": String("ok")}), why: None, refused: None })
+private webhook probe: event=evt_dev000004 intent=pi_dev000003 response=Ok(200)
+private settlement probe: intent=pi_dev000005 status=canceled outcome=Ok(Answered { committed: true, result: Some(Object {"$case": String("ok")}), why: None, refused: None })
+private webhook probe: event=evt_dev000006 intent=pi_dev000005 response=Ok(200)
+statements where payments are taken:
+  [("place_order, taking payments: its transaction", 37), ("settle_payment, on the provider's word: its transaction", 17), ("cancel_order: its transaction", 25), ("settle_payment, on the provider's word of the cancel: its transaction", 14), ("expire_order, run thirty minutes on: its transaction", 26), ("settle_payment, on the provider's word of the sweep's cancel: its transaction", 14)]
+  [("place_order, taking payments: its transaction", 37), ("settle_payment, on the provider's word: its transaction", 17), ("cancel_order: its transaction", 25), ("settle_payment, on the provider's word of the cancel: its transaction", 14), ("expire_order, run thirty minutes on: its transaction", 26), ("settle_payment, on the provider's word of the sweep's cancel: its transaction", 14)]
+
+thread 'tests::bounded_statements::placing_and_settling_where_payments_are_taken_is_bounded' (2373603) panicked at spikes/own-renderer/server/src/tests/bounded_statements.rs:755:5:
+assertion `left == right` failed: as pinned
+  left: [("place_order, taking payments: its transaction", 37), ("settle_payment, on the provider's word: its transaction", 17), ("cancel_order: its transaction", 25), ("settle_payment, on the provider's word of the cancel: its transaction", 14), ("expire_order, run thirty minutes on: its transaction", 26), ("settle_payment, on the provider's word of the sweep's cancel: its transaction", 14)]
+ right: [("place_order, taking payments: its transaction", 37), ("settle_payment, on the provider's word: its transaction", 17), ("cancel_order: its transaction", 25), ("settle_payment, on the provider's word of the cancel: its transaction", 14), ("expire_order, run thirty minutes on: its transaction", 26), ("settle_payment, on the provider's word of the sweep's cancel: its transaction", 12)]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test tests::bounded_statements::placing_and_settling_where_payments_are_taken_is_bounded ... FAILED
+
+failures:
+
+failures:
+    tests::bounded_statements::placing_and_settling_where_payments_are_taken_is_bounded
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 589 filtered out; finished in 18.95s
+
+error: test failed, to rerun pass `-p pw-dev-server --bin pw-dev-server`

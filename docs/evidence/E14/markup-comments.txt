@@ -1,8 +1,8 @@
 ADR-0167 - markup text is text, and a comment in markup is <!-- -->
 
 produced by: just e14-markup-comments
-commit: 92fdd6e34743e33a80914939976125a9eb307842
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38559878637 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: e2a4acd960c88144e3b40e7a6e9d9b8bd774ee1a
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38909882781 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the parser (compiler/pw-syntax)
@@ -24,11 +24,11 @@ test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 test every_rejected_fixture_emits_only_its_own_defect ... ok
 test no_accepted_corpus_file_reports_a_body_level_error ... ok
-test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 81.04s
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 61.51s
 
 == the store checks
 
-pw check: 63 file(s), no diagnostics
+pw check: 66 file(s), no diagnostics
 
 == mutation controls (scripts/markup_comments_mutations.py)
 

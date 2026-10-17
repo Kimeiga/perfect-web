@@ -237,8 +237,8 @@ as its assertions require. Production startup continues to use deployment
 configuration. A child-process test sets both deployment paths to missing
 private paths and must still serve the sample through that test factory.
 It changes no process-global environment and touches no external checkout.
-The test must fail before the correction and pass after it. Full local CI
-and new GitHub verification remain required before landing.
+The test must fail before the correction and pass after it. At this
+decision checkpoint, full local CI and new GitHub verification were pending.
 
 Inspection separately found that the production search cache reuses a
 digest's `.building` path and removes other cached versions during a new
@@ -246,3 +246,10 @@ build. Concurrent publication/lifetime needs a private-fixture reproduction
 and repair; the observed I/O errors are consistent with that mechanism,
 but this note does not claim a causal reproduction yet. Test-data isolation
 does not prove production cache concurrency.
+
+
+Measured correction: child regression red 0/1 then green 1/1; both independent
+controls assertion-killed, 2/2, no process stopped. Fresh inherited-environment
+full CI passes 2948 Rust tests (25 ignored), 167 Python tests and
+one intentional skip. [Commands, raw results and hashes](../evidence/E14/train9-corrective-validation.txt).
+GitHub verification and production cache concurrency remain open.

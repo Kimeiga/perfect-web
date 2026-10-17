@@ -1,14 +1,21 @@
 #!/usr/bin/env python3
 """Mutation controls for NEXT 4b (W9): a read is a bounded number of
-statements on PostgreSQL. Each mutant restores one loop that reads a store
-at a time, each of which the store ran until 4b:
+statements on PostgreSQL. Eight controls restore loops that read a store
+at a time: seven the store ran until 4b, and one ADR-0348's set estimates
+replaced:
 
 - the layer (`store_pg.rs`): the items' stores scanned store by store, every
   store's menu read; the stores' hours read a store at a time;
 - the operations: `hours#for-stores` reading each store's hours alone; the
   search's reach reading each store it found alone; `checkout#parts`,
   `hours#for-cart` and the order's reach (`cart_reaches`) finding each line's
-  store by scanning every store's menu.
+  store by scanning every store's menu; and `user-estimates#for-stores`
+  reading each store's coverage alone (ADR-0348).
+
+Five more restore premature payment-count completion or remove one of
+the store/feed scheduled-state write guards (ADR-0352's completion
+correction).
+Each must fail a real delayed-provider or real PostgreSQL transaction test.
 
 A mutant must fail `tests::bounded_statements::`, the store's operations
 and its pages and commands counted on PostgreSQL at the seed and with fifty
@@ -20,10 +27,11 @@ output. The source is restored after every mutant, whatever happens.
 
 import os
 import pathlib
-import re
 import signal
 import subprocess
 import sys
+
+from cargo_test_results import parse as cargo_result
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SRC = ROOT / "spikes/own-renderer/server/src"
@@ -93,6 +101,41 @@ MUTANTS = [
         "    let of_item = r.stores_of_items(&items)?;\n",
         "    let of_item = crate::store::scanned_stores_of_items(r, &items)?;\n",
     ),
+    (
+        "unchanged statement counters stand for payment completion",
+        "postgres",
+        SRC / "tests/bounded_statements.rs",
+        'fn after_payments(s: &Server, completed: usize) -> Vec<u64> {\n',
+        'fn after_payments(s: &Server, completed: usize) -> Vec<u64> {\n    #[allow(unreachable_code)]\n    return {\n        let _ = completed;\n        let mut last = s.data.statements_by_transaction();\n        loop {\n            std::thread::sleep(std::time::Duration::from_millis(300));\n            let now = s.data.statements_by_transaction();\n            if now == last { break now; }\n            last = now;\n        }\n    };\n',
+    ),
+    (
+        'store_pg.rs ran bypasses the command write guard',
+        "postgres",
+        SRC / 'store_pg.rs',
+        '    fn ran(&self, id: i64) -> Result<(), String> {\n        let _writes = self.writes.lock().unwrap_or_else(|e| e.into_inner());\n',
+        '    fn ran(&self, id: i64) -> Result<(), String> {\n',
+    ),
+    (
+        'store_pg.rs retry bypasses the command write guard',
+        "postgres",
+        SRC / 'store_pg.rs',
+        '    fn retry(\n        &self,\n        id: i64,\n        attempts: i64,\n        due_ms: i64,\n        failed: Option<&str>,\n    ) -> Result<(), String> {\n        let _writes = self.writes.lock().unwrap_or_else(|e| e.into_inner());\n',
+        '    fn retry(\n        &self,\n        id: i64,\n        attempts: i64,\n        due_ms: i64,\n        failed: Option<&str>,\n    ) -> Result<(), String> {\n',
+    ),
+    (
+        'feed_pg.rs ran bypasses the command write guard',
+        "postgres",
+        SRC / 'feed_pg.rs',
+        '    fn ran(&self, id: i64) -> Result<(), String> {\n        let _writes = self.writes.lock().unwrap_or_else(|e| e.into_inner());\n',
+        '    fn ran(&self, id: i64) -> Result<(), String> {\n',
+    ),
+    (
+        'feed_pg.rs retry bypasses the command write guard',
+        "postgres",
+        SRC / 'feed_pg.rs',
+        '    fn retry(\n        &self,\n        id: i64,\n        attempts: i64,\n        due_ms: i64,\n        failed: Option<&str>,\n    ) -> Result<(), String> {\n        let _writes = self.writes.lock().unwrap_or_else(|e| e.into_inner());\n',
+        '    fn retry(\n        &self,\n        id: i64,\n        attempts: i64,\n        due_ms: i64,\n        failed: Option<&str>,\n    ) -> Result<(), String> {\n',
+    ),
 ]
 
 TESTS = [
@@ -125,16 +168,15 @@ def cargo_tests(suite):
     """(built, passed, failed) over the suite's tests."""
     cmd, env = CARGO[suite]
     out, code = bounded(cmd, env)
-    if code is None:
-        return True, 0, 1
-    found = re.findall(r"test result: \w+\. (\d+) passed; (\d+) failed", out)
-    if not found:
+    result = cargo_result(code, out)
+    if not result.valid:
         return False, 0, 0
-    return True, sum(int(p) for p, _ in found), sum(int(f) for _, f in found)
+    return True, result.passed, result.failed
 
 
 def main():
     import mutation_baseline  # keeps what each command says, for a red baseline
+    watch = mutation_baseline.mutation_bound.start()
     # Stopped from outside, the source is still restored: SIGTERM raises
     # here, and the `finally` below runs.
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(1))
@@ -144,7 +186,7 @@ def main():
     for suite in CARGO:
         built, passed, failed = cargo_tests(suite)
         print(f"baseline ({suite}): {passed} passed, {failed} failed", flush=True)
-        if not built or failed or not passed:
+        if not built or failed or not passed or watch.stopped:
             print("FAIL: the unmutated baseline is not green; no mutant can mean anything")
             mutation_baseline.explain()
             return 1
@@ -161,9 +203,11 @@ def main():
             built, passed, failed = cargo_tests(suite)
         finally:
             path.write_text(original)
-        if not built:
-            verdict = "KILLED (does not build)"
-        elif failed:
+        if not built or watch.stopped:
+            print(f"{what} [{suite}]: REFUSED (invalid or stopped Cargo producer; no kill)", flush=True)
+            mutation_baseline.explain()
+            return 1
+        if failed:
             verdict = f"KILLED ({failed} of {passed + failed} tests fail)"
         else:
             verdict = "SURVIVED"

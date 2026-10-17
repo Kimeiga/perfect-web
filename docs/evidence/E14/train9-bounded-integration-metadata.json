@@ -1,0 +1,73 @@
+{
+  "numbered_adr": "docs/DECISIONS/ADR-0352-bounded-statements-wait-for-completed-payment.md",
+  "documentation_before_sha256": {
+    "docs/STATUS.md": "13c3a4248a062645c0c189183d01c7a0737aa25a4bcf638a0ae9901e12354b18",
+    "docs/NEXT.md": "415fd926df386bcf7157ad903e8eda432e8f6510be21329fe603d2efb6b52914",
+    "docs/PARALLEL.md": "770bd29afa5321f070c81d0e1c41b92a2638b22966265bdcf18e3eec155199c9",
+    "docs/DECISIONS.md": "80fcd6985b94526f385872ed1dc8104aa49dcf160cef9253aee3b3029c053d52",
+    "docs/KNOWN_LIMITATIONS.md": "2cffdc14b29433dd085ebfc2c953bcac93c73b774c4168055d69109b918a32bf"
+  },
+  "documentation_after_sha256": {
+    "docs/STATUS.md": "5033cdae4290d070dd43115e3df992099f0f1e74831a56beb547b18a660c6e6d",
+    "docs/NEXT.md": "868f537d613b3546a69c04af06774b679215ef0d271c8b1c4b92093c25db7a2c",
+    "docs/PARALLEL.md": "2194198b5259ea807d340abbe7765905cc10174365634941ef555d7a31d36ef1",
+    "docs/DECISIONS.md": "6b2c26e5f18be82f03e52c7b00afaa4d2b68405ed974a9aa2f0f75a48cb6baf7",
+    "docs/KNOWN_LIMITATIONS.md": "5256c5fd2140bdbf6da65b9bc72fbde10277c750776cd8f554bf30cfc41a820b"
+  },
+  "ci_sha256": "fd4b0388d70272ab485648694b064df32cc3423f6475217f31318ca917f2c3ff",
+  "metadata_preparation_history": "The first updater stopped after four docs and ADR numbering because it assumed a current table row for0343. No tests or process were affected. The existing prose-entry index format was inspected and the missing index entry was completed.",
+  "final_checks": {
+    "focused14": {
+      "exit": 0,
+      "sha256": "a4dfc6ba8d8ee7f993f00a450146247a1360e5c1204cf97b042c9525cb23198e"
+    },
+    "global_anchors3049_scripts267": {
+      "exit": 0,
+      "sha256": "181dd7a6abff540d1ab75989d38035d14356d91eb5b876782ff66c12c64d7504"
+    },
+    "cargo_fmt_all_check": {
+      "exit": 0,
+      "output": "empty"
+    }
+  },
+  "evidence_attributes": {
+    "before_sha256": "3ac2343f68db6eee2bbb705469ba4306d5599471e6aecd9020b32a6abd13752f",
+    "after_sha256": "9034c9faef79a95b8c3f0bfb59c96b19c12dd161b058562875d90da5cceae196",
+    "raw_crlf_paths": [
+      "docs/evidence/E14/train9-bounded-completion-before.txt",
+      "docs/evidence/E14/train9-bounded-focused.txt",
+      "docs/evidence/E14/train9-bounded-marker-focused-failed.txt",
+      "docs/evidence/E14/train9-bounded-transitions-before.txt"
+    ],
+    "blank_at_eof_only": "docs/evidence/E14/train9-bounded-strict-commands/0000.txt",
+    "normalization_before": [
+      {
+        "path": "docs/evidence/E14/train9-bounded-completion-before.txt",
+        "working_sha256": "74bb5ed117a2fbf9f1bbfad5bfe79226f97c2735a18e37fed2c9d9edffce9249",
+        "staged_sha256": "edae464f41358bcb92e5c979b59b168c01466615217468327e6db198fd9f2d9a"
+      },
+      {
+        "path": "docs/evidence/E14/train9-bounded-focused.txt",
+        "working_sha256": "8746b562f2640dd29920fdb24aea8fe386b15301891dbc3b33e5965a107e3c61",
+        "staged_sha256": "433bb40712edf72768ef03d51af18e757a97e5e14ce37c558ac1810ca7f5f4a1"
+      },
+      {
+        "path": "docs/evidence/E14/train9-bounded-marker-focused-failed.txt",
+        "working_sha256": "e88a577f6b7efc85295a6c63292c1764f2bedf812c6596021071d365f11bd2c9",
+        "staged_sha256": "3a75bfd453c9230ad79b6e1d83edc152cf92de9fb64834843364ccf218aa5d47"
+      },
+      {
+        "path": "docs/evidence/E14/train9-bounded-transitions-before.txt",
+        "working_sha256": "8b0e64bd11af7e21d10bd89c01854500732c49a4e8cfbb320d666eb17780d19b",
+        "staged_sha256": "26cdccc27865c8123b1855eb7d04bdd81a0168068d2d54fc246db0fc702eb7dd"
+      }
+    ],
+    "cr_at_eol_only": [
+      "docs/evidence/E14/train9-bounded-completion-before.txt",
+      "docs/evidence/E14/train9-bounded-focused.txt",
+      "docs/evidence/E14/train9-bounded-marker-focused-failed.txt",
+      "docs/evidence/E14/train9-bounded-transitions-before.txt"
+    ]
+  },
+  "validated_production_tests_and_harness_bytes_unchanged": true
+}

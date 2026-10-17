@@ -3054,3 +3054,11 @@ The bounded checker consumes generated pair metadata and source costs.
 Accepted under the owner's delegation. The local compiler integration,
 bounded47/PostgreSQL12 controls and full CI pass; runtime D2 and final
 assembled train verification remain pending.
+
+[ADR-0352](DECISIONS/ADR-0352-bounded-statements-wait-for-completed-payment.md):
+statement counts wait for the completed payment transaction.
+- Real delayed-webhook and staged PostgreSQL overlap witnesses establish the
+  completion and same-instance write-order defects; exact success pins are
+  retained. Strict Cargo producer classification refuses invalid/build/stopped
+  evidence with source restoration and no next control. Local strict12/12 and
+  fresh CI pass; exact-head remote gates and landing remain pending.

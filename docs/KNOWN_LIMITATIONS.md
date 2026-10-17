@@ -1237,3 +1237,13 @@ preserved, not replaced with invented results.
   provider's cancel) may be asked twice by two hosts, as a press sent twice
   asks it; a run failed for good is kept and said, and runs again only when
   it is scheduled again.
+
+
+- **Scheduler write ordering is per data-layer instance (ADR-0352).** The
+  StorePg/FeedPg scheduled cleanup/retry guard serializes with that instance's
+  command staging. Other host instances may still encounter legitimate
+  PostgreSQL serializable refusals; this correction adds neither a distributed
+  lock nor an automatic payment retry. Successful statement pins wait for the
+  actual post-settlement success marker and do not count refused attempts as
+  completion. Local strict whole12 and CI pass; exact-head remote acceptance
+  and landing are pending.

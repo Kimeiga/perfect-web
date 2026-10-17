@@ -1900,16 +1900,105 @@ Each a decision for a track, with its date; a track's ADR records it too.
     says "41 in all" of a script that has 40 mutants (its ADR and its run
     say 40); `track/evidence-integrity`'s family of findings.
 
-## Train-10 local D1 compiler integration, 2026-10-16
+- **2026-10-16, train-9 completion and scheduler write ordering (ADR-0352).**
+  The integrator reproduced a late real signed webhook after an incomplete
+  stable statement snapshot, then a real PostgreSQL40001 settlement/cleanup
+  overlap. StorePg/FeedPg ran/retry now acquire the existing instance write
+  guard before the connection, and exact successful count witnesses wait on
+  the post-settlement marker. Strict12/12 has13 retained actual native Cargo
+  records; fresh same-input CI is green (2954 Rust passes/25ignored), with
+  all2280 frozen source/config inputs restored. Older112 reported whole kills
+  lack retained individual native statuses/raw and remain qualified history;
+  the old2222 inventory omitted55 quoted Unicode sample fixtures. Current
+  receipt: docs/evidence/E14/train9-bounded-strict-validation.json. Failed
+  verify38863242953 remains failed; new exact-head remote CI/verify, green
+  evidence fetch and main landing are pending. No cross-host serialization,
+  count relaxation or automatic payment retry is introduced.
 
-The integrator's pending merge of tables917fafbd into c67bf6ed passed
-full local CI and the final source receipt: 3,058 Rust pass/0fail/25ignore,
-Python233pass/2skip, source302 variants/16 named refusals/0fail. Whole
-bounded47 and PostgreSQL12 pass; all 2,366 frozen source hashes restored.
-Guide ordinary browser12/three engines passes with deployment dictionary
-variables absent; its whole74 has a separately recorded invalid-exit
-classification gap, owned by the guide-producer follow-up. D1 runtime cost
-admission and the complete assembled train remain open. Exact raw output
-and tested input hashes are in `evidence/E14/train10-d1-integration.txt`.
-The generic7ec, cache3019936e and check/build e82b0d6c checkpoints are
-separate integration inputs; none is claimed merged by this record.
+- **2026-10-17, train-9 landed** (`track/train-9`, verify 38909882781):
+  the bounded checker (ADR-0340), ratings and reviews (ADR-0341), the bug
+  museum with H07 its first closed miss (ADR-0342) and the guide (ADR-0343),
+  merged above, with the two corrections that followed the train's first
+  push: the description controls, and the payment statement counts and the
+  scheduler's write order (ADR-0352).
+  - **Its run: 85 recipes on 40 shards and the three engines, all green.**
+    45 jobs, every one a success, in 5 h 38 min, and 1,391 of 1,391 mutants
+    killed over 79 of the 82 files fetched (`e10-build`, `e10-handlers` and
+    `e10-i` record test results, not mutants; three more recipes,
+    `e10-component`, `e8-contracts` and `e8-wit`, write no file), and no
+    memory bound stopped a process. The evidence is fetched at `e2a4acd9`:
+    82 files, none refused as stale, 80 of them rewritten and 2 new to the
+    tree (`e14-bounded-reads`, 40 of 40, and `e14-guide`, 74 of 74), and
+    the seconds of all 85 recipes in `scripts/ci_seconds.json`. The
+    longest shard, `recipes 37 on PostgreSQL`, took 5 h 27 min (three of
+    the 40 shards run on PostgreSQL); the longest recipe, `e14-refusal`,
+    4 h 34 min (16,444 s).
+  - **The museum's H07 is refused in CI's record.** `e14-museum` ran on CI
+    for the first time: 5 exhibits, 5 refused, 0 missed, 0 not as expected,
+    H07's unchanged program refused by PW0405 (`Menus.price` reads `Menus`
+    once for each element of `items`), and `proof_mutations.py` 4 of 4
+    killed.
+  - **GitHub's `ci` is green** (38909883157, on `e2a4acd9`): its 3 jobs,
+    "licenses and advisories" and the two build-and-test jobs, in 1 h 19
+    min; the `failure-census` run (38909883362) too.
+  - **Two red runs came first, each failing one recipe, each repaired.**
+    - 38823189869 (on `1f370fd9`, 4 h 56 min): 82 recipes, one failed,
+      `e14-descriptions`, 8 of 9 controls killed. The WebKit control that
+      removed the store's selected paragraphs no longer removed what it was
+      named for: the page had grown other text to paint, and WebKit painted
+      before the slots filled all the same. `289068a6` retired it for a
+      control that withholds the page's initial HTML shell while its slots
+      settle, aimed at the first-paint-before-fill assertion alone, and made
+      the script fail where its restored-source browser check fails (9 of 9
+      killed on this run). The same commit isolated the unit-test servers
+      from the PC's Kiokun dataset (`KIOKUN_DATA` and `KIOKUN_APP`, which
+      16 server tests of the local `just ci` had read while another process
+      was changing it): they now choose the committed sample themselves,
+      production startup still reads its configured dataset, and
+      `e14-kiokun-test-data` holds it (2 of 2 killed).
+    - 38863242953 (on `289068a6`, 3 h 58 min): 84 recipes, one failed,
+      `e14-bounded-statements` (113 s):
+      `placing_and_settling_where_payments_are_taken_is_bounded` failed its
+      exact statement count. The test took two equal tallies 300 ms apart to
+      mean a payment had completed, and a delayed signed webhook leaves a
+      stable, incomplete tally (reproduced with the real provider event
+      held: [25] before its release, [25, 14] after). Repairing it found a
+      second defect, a real PostgreSQL 40001 between a settlement and the
+      scheduler's cleanup of the same row; the old pin of 12 statements for
+      the sweep's settlement was the count of that aborted attempt.
+      `e2a4acd9` (ADR-0352): a scenario waits for the post-settlement
+      success marker before it copies the tally; `StorePg`'s and `FeedPg`'s
+      `ran` and `retry` take the instance's existing write guard before a
+      pool connection, so one instance's scheduler writes and its command
+      staging are ordered (a second host's serializable refusals remain
+      possible, and no payment is retried by itself); the pin is 14; the
+      script holds 12 controls, from 7, all killed on this run; and it
+      refuses a Cargo result that is a build error, a stopped process or
+      self-contradictory (`cargo_test_results.py`).
+  - **Finished by another agent between sessions.** The train was
+    assembled by the integrator's delegate, finished by another agent
+    (Codex) between that delegate's sessions (`289068a6`, `e2a4acd9`, and
+    the entry above, with the integrator's rulings in ADR-0352), and landed
+    by a third session from the PC, which changed no code: it fetched this
+    run's evidence, recorded the run, and pushed. Wording that has this
+    run still to come (exact-head remote gates pending, and the like) in
+    ADR-0352's status line, STATUS's two train-9 paragraphs at its top,
+    NEXT's landing gate, KNOWN_LIMITATIONS' scheduler entry, DECISIONS'
+    ADR-0352 entry and the entry above is from before this run, whose
+    record this entry is.
+  - **Still open from the repairs**: Kiokun's search cache, whose
+    publication and version lifetime under concurrent builds NEXT's
+    integration follow-up will reproduce with private fixtures and repair.
+
+- **2026-10-16, train-10's local D1 compiler integration.** The integrator's
+  pending merge of tables917fafbd into c67bf6ed passed full local CI and the
+  final source receipt: 3,058 Rust pass/0fail/25ignore, Python233pass/2skip,
+  source302 variants/16 named refusals/0fail. Whole bounded47 and PostgreSQL12
+  pass; all 2,366 frozen source hashes restored. Guide ordinary
+  browser12/three engines passes with deployment dictionary variables absent;
+  its whole74 has a separately recorded invalid-exit classification gap, owned
+  by the guide-producer follow-up. D1 runtime cost admission and the complete
+  assembled train remain open. Exact raw output and tested input hashes are in
+  `evidence/E14/train10-d1-integration.txt`. The generic7ec, cache3019936e and
+  check/build e82b0d6c checkpoints are separate integration inputs; none is
+  claimed merged by this record.
