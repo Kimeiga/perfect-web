@@ -76,8 +76,10 @@ MUTANTS = [
     (
         "a slow source does not see its read stopped",
         SERVER,
-        "                let stopped: Stopped = Arc::new(move || cancellation.is_cancelled());\n",
-        "                let stopped: Stopped = Arc::new(move || {\n                    let _ = &cancellation;\n                    false\n                });\n",
+        # Re-anchored by NEXT 4c's render merge (track `render-merge`): the
+        # read's load is a closure of its own, read alone in a render.
+        "            let stopped: Stopped = Arc::new(move || cancellation.is_cancelled());\n",
+        "            let stopped: Stopped = Arc::new(move || {\n                let _ = &cancellation;\n                false\n            });\n",
     ),
     (
         "keep's reads run at once",

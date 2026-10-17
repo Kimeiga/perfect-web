@@ -47,15 +47,16 @@ MUTANTS = [
         "cargo",
         SERVER,
         # Re-anchored by ADR-0297: a telling takes the documents whose pages
-        # ask.
-        "            documents_of(&queue, session)\n"
-        "                .into_iter()\n"
-        "                .filter(|d| which(d))\n",
-        "            documents_of(&queue, session)\n"
-        "                .into_iter()\n"
-        "                .rev()\n"
-        "                .take(1)\n"
-        "                .filter(|d| which(d))\n",
+        # ask; and by NEXT 4c's render merge (track `render-merge`), which
+        # takes them (`to_tell`) before the render that reads them.
+        "        let (live, passed): (Vec<Doc>, Vec<Doc>) = documents_of(&queue, session)\n"
+        "            .into_iter()\n"
+        "            .filter(|d| which(d) && queue.contains_key(d))\n",
+        "        let (live, passed): (Vec<Doc>, Vec<Doc>) = documents_of(&queue, session)\n"
+        "            .into_iter()\n"
+        "            .rev()\n"
+        "            .take(1)\n"
+        "            .filter(|d| which(d) && queue.contains_key(d))\n",
     ),
     (
         "a keyed read goes to the session's latest document",

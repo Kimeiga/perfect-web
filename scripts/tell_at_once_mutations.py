@@ -37,8 +37,11 @@ MUTANTS = [
         "a document no page asks for is derived all the same",
         "host",
         SERVER,
-        "                    Some(waiting) if waiting.live(now) => true,\n",
-        "                    Some(waiting) if waiting.live(now) || true => true,\n",
+        # Re-anchored by NEXT 4c's render merge (track `render-merge`): the
+        # documents told are taken (`to_tell`) before the render, those whose
+        # pages ask apart from those passed by.
+        "            .partition(|d| queue.get(d).is_some_and(|waiting| waiting.live(now)));\n",
+        "            .partition(|d| queue.get(d).is_some_and(|waiting| waiting.live(now) || true));\n",
     ),
     (
         "every document is one a page asks for",

@@ -65,11 +65,12 @@ MUTANTS = [
         "a change is sent to the store's documents alone",
         SERVER,
         # Re-anchored by ADR-0231: a document's parameters, not its store;
-        # by ADR-0277, whose documents are those a telling takes; and by
-        # ADR-0297, which takes them before the loop.
-        "        for doc in documents {\n"
+        # by ADR-0277, whose documents are those a telling takes; by
+        # ADR-0297, which takes them before the loop; and by NEXT 4c's render
+        # merge (track `render-merge`), which reads those whose pages ask.
+        "        for doc in live {\n"
         "            let params = self.params_of(&doc);\n",
-        "        for doc in documents\n"
+        "        for doc in live\n"
         "            .into_iter()\n"
         "            .filter(|d| self.page_of(d) == self.store_page())\n"
         "        {\n"
