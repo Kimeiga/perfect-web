@@ -366,10 +366,8 @@ fn a_names_type_is_its_bindings_where_nothing_else_types_it() {
     // `r`'s type names `f`'s own `T`, and only its binding says so: the value
     // relations' typer answers a resolved type only where every part of it is
     // known, and a type parameter is none (ADR-0351). Read through no
-    // binding, `r` had no type, and the `Result` it drops passed. Until
-    // ADR-0351 the capture test above said this too; since then that typer
-    // types an `{#each}`'s name as well, and only a type it cannot answer
-    // tells whether the binding is read.
+    // binding, `r` had no type, and the `Result` it drops passed. Every other
+    // name the tests above read, that typer types as its binding does.
     let wrong = program("fn f<T>(r: Result<T, String>, n: Int) -> Int {\n    r\n    n\n}");
     let d = one(&wrong, "PW0618");
     assert!(d.contains("this `Result<T, String>` is dropped"), "{d}");
