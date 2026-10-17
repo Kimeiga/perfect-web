@@ -235,6 +235,12 @@ pub fn pattern_kind(name: &str) -> PatternKind {
 pub const STMT_CLAUSE_KEYWORDS: &[&str] =
     &["because", "attributes_forced_layout_to", "when", "respects"];
 
+/// **Clause heads that are also words a body may begin with**: each heads a
+/// clause only where a name follows it on its line. `layout StoreLayout` is a
+/// page's clause and `layout.measure` an effect's path; `set hours_of_stores`
+/// and `sets one_call` are clauses (4c) and `set.size()` a call.
+const NAMED_HEADS: &[&str] = &["layout", "set", "sets"];
+
 pub const POLICY_KEYWORDS: &[&str] = &[
     // E8's effect ontology: `capability database.read<T>` and
     // `host "pw:host/database#read"` inside an `effect` block. Policy clauses
@@ -268,6 +274,13 @@ pub const POLICY_KEYWORDS: &[&str] = &[
     "transactions",
     "reads",
     "changes",
+    // 4c, a read is bounded by construction: what one set read costs a
+    // source, `sets one_call`, and a keyed read's set form, `set
+    // hours_of_stores` on `fn hours_of`. A clause only where a name follows
+    // on its line (`at_policy_head`): `set` and `sets` are names a body may
+    // begin with.
+    "sets",
+    "set",
     // Track `uploads` (ADR-0260): where an upload's committed files are
     // served, and its limits, each a literal.
     "serves",
@@ -2510,11 +2523,12 @@ impl<'a> P<'a> {
     /// **A head the parser knows, here.** `layout` is one only where a name
     /// follows it on its line, `layout StoreLayout`: the word is also an
     /// effect family's, and `layout.measure` written first in a body is not
-    /// a clause.
+    /// a clause. So are `set` and `sets` (4c), names a body may begin with:
+    /// `set.size()` is no clause.
     fn at_policy_head(&self) -> bool {
         self.at(Kind::Ident)
             && POLICY_KEYWORDS.contains(&self.cur_text())
-            && (self.cur_text() != "layout"
+            && (!NAMED_HEADS.contains(&self.cur_text())
                 || (self.nth_is(1, Kind::Ident) && !self.nth_starts_line(1)))
     }
 

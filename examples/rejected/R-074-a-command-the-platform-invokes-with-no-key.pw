@@ -1,0 +1,21 @@
+// @corpus: rejected
+// @id: R-074
+// @category: a command the platform invokes with no key
+// @rule: PW6405
+// @invariant: invoked_command_not_idempotent
+// @charter: §7.8
+// @milestone: 14
+// @expect-error: `settle` is invoked by Payments, and declares no `idempotent_by`
+//
+// A provider sends its word again until it is answered, and may send it
+// twice at once. Keyed by nothing, `settle` would run again for each.
+
+module payments_corpus.unkeyed
+
+import payments.{ Settled }
+
+command settle(settled: Settled) -> Result<Int, String>
+    invoked_by Payments
+{
+    Ok(1)
+}

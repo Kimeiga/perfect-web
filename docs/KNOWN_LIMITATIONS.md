@@ -11,6 +11,28 @@ Those historical statements must not override current source or test results.
 
 ## Value checking and generated execution
 
+**Open findings, each with the track fixing it** (the integrator's,
+2026-10-15):
+
+- **An effectful call in an `{#each}`'s head escapes the effect check**
+  (`track/each-head-effects`): the head's list and key are read as written
+  (ADR-0242, below), so a database read or a secret written there is
+  charged no effect and no label, where the same call in a hole, a
+  condition or an attribute is refused (PW0401). The track's failing test
+  holds it.
+- **An opaque type's `where` invariant is not held on a command's
+  arguments** (`track/argument-invariants`): a value a browser sends is read
+  by its type's shape, not through its checked constructor, so a command
+  can be given a value its program could not have made.
+- **`pw check` passes programs `pw build` refuses**
+  (`track/check-is-build`): the build runs analyses the check does not (an
+  `{#each}` over a computed list is refused by the build alone), so a
+  check is green where the build fails.
+- **An `<img>` with no `alt` checks clean, and `&&` is refused with no hint
+  that Pleris writes `&`** (no track yet; ADR-0343): the guide holds each as
+  an example that turns red when the compiler closes it, beside its three
+  programs the check passes and the build refuses.
+
 **What the parser does not read yet** (found with ADR-0237, which made
 lowering report what it parses):
 
@@ -655,12 +677,35 @@ awaited in order. What remains:
     `current_user()` reaches every reader of it;
   - a guest's lines whose join failed are reachable by no one;
   - a user's order is their latest.
-- **The store's PostgreSQL reads grow with the data** (the integrator's
-  finding, 2026-10-12; NEXT 4b): the store's logic reads the layer's rows a
-  store's or a menu's at a time, and on PostgreSQL each is a statement.
-  `place_order`'s reach runs one per cart line and store, a reader's search
-  one per store it found, each reading every store, and the hours one per
-  store (ADR-0328).
+- **The store's reads are pinned, not bounded by construction** (ADR-0336):
+  each operation's, page's and command's statements are counted on
+  PostgreSQL and pinned, equal at the seed and with fifty stores more. A
+  program's read keyed by a loop's element is refused (PW0405, ADR-0340),
+  but no bound is computed or emitted for a page or a command, and the
+  store's own `set` pair is not written yet (NEXT 4c). Rows are not counted
+  (`stores#list` and the home page read every store, as they must), and a
+  cart's lines are written a statement each.
+- **What PW0405 does not see** (ADR-0340's Not claimed): a write per
+  element (refused only where the call also reads); a key traced through
+  another read's answer, a `use` or a function value's call; a recursion
+  through a function named as a value, which is its combinator's loop; the
+  page's own loops (an `{#each}` and its instances, the render merge's); a
+  member call that reads, resolved by its receiver's type; and what a
+  source costs under throttling, which the conformance suite measures.
+  kiokun-site's four reads per element (`search_reading` three times,
+  `read_pitch` once) are warnings, listed in `KNOWN_READS_PER_ELEMENT`,
+  until kiokun's layer has set forms and the pair takes a list of key
+  records. A set form pairs with its keyed read by a field of the key's
+  type, any such field, until track `pair-key-by-name` names it.
+- **A store's reviews are public and unmoderated, with no merchant side**
+  (ADR-0341): a comment is shown as written (escaped, as all text is), with
+  no review, flagging, removal or reply, since the merchant and support
+  apps are out of scope. A reader rates only the stores of their latest
+  order, once and for good; items and couriers are not rated; a store's
+  mean is every rating it has, with no window, recency weighting or badge.
+  The checker holds what is read through a reader's handle out of the
+  shared reviews; a user's id a data layer answered as plain data would
+  not be seen, and the store's layer answers none (a test and a mutant).
 - **A store's hours look a week ahead** (ADR-0328): a store that next opens
   later says "Closed". A special date replaces its day's hours, never only
   extends them; item-level hours are not kept. On a day a transition skips
@@ -859,6 +904,24 @@ itself does not prove complete enforcement. Read the per-record status and the
 [research/implementation boundary](../research/failures/IMPLEMENTATION.md).
 
 ## Evidence and test coverage
+
+**Open findings about the evidence itself**, each fixed by
+`track/evidence-integrity` (the integrator's, 2026-10-15):
+
+- **Stale Python bytecode can decide a mutant's verdict**: Python holds a
+  cached `.pyc` to its source by size and modification second, so a
+  mutant of a Python source the same size as it, written and restored
+  within a second, can run the other's bytecode.
+- **An evidence file's counts are not checked against its script**:
+  `docs/evidence/E10/privacy-by-resolution.txt` says 4 of 4 mutants
+  killed, and `scripts/privacy_resolution_mutations.py` holds 3; nothing
+  staled the file when the script changed.
+- **The corpus's `@rule` headers are stale**: nothing holds a rejected
+  program's header to the code its `pw check` reports.
+- **`check_latency` fails under load**: its ceiling is wall-clock time, so
+  a machine shared by a dozen workers fails it whatever the checker does
+  (train-7's local `just ci`, PARALLEL.md); the track bounds the checking
+  thread's CPU time instead.
 
 The new recipe tests replace producers in isolated temporary trees. They prove
 exit-status propagation for the tested recipe shapes, not compiler correctness,
@@ -1116,8 +1179,6 @@ preserved, not replaced with invented results.
   sets each store's flags; CDTFA proposed in 2026 to end the DNC opt-out
   (unconfirmed): if it does, the platform is the retailer and the flags
   change.
-- **A cart's lines are mapped to their stores by a read per store**
-  (`checkout#parts`, as `hours#for-cart`), until NEXT 4b bounds every read.
 - **Payments** (ADR-0332): an order no one pays is taken back thirty
   minutes on (ADR-0334), at a time no deployment chooses; the provider is
   asked inside the
@@ -1139,3 +1200,13 @@ preserved, not replaced with invented results.
   provider's cancel) may be asked twice by two hosts, as a press sent twice
   asks it; a run failed for good is kept and said, and runs again only when
   it is scheduled again.
+
+
+- **Scheduler write ordering is per data-layer instance (ADR-0352).** The
+  StorePg/FeedPg scheduled cleanup/retry guard serializes with that instance's
+  command staging. Other host instances may still encounter legitimate
+  PostgreSQL serializable refusals; this correction adds neither a distributed
+  lock nor an automatic payment retry. Successful statement pins wait for the
+  actual post-settlement success marker and do not count refused attempts as
+  completion. Local strict whole12 and CI pass; exact-head remote acceptance
+  and landing are pending.

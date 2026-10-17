@@ -1,0 +1,104 @@
+4c - a read is bounded by construction (PW0405, PW0406, PW0407)
+
+produced by: just e14-bounded-reads
+commit: e2a4acd960c88144e3b40e7a6e9d9b8bd774ee1a
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38909882781 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== the rules (compiler/pw-core/tests/bounded_reads.rs, and bounded's own)
+
+test a_build_from_before_sets_reads_as_guaranteeing_nothing ... ok
+test a_build_states_what_each_set_read_costs_its_source ... ok
+test a_call_that_reads_and_writes_per_element_is_refused_as_a_read ... ok
+test a_key_a_read_computes_ends_the_trace_and_its_read_is_refused_once ... ok
+test a_helper_that_reads_by_what_it_is_given_is_a_read_per_element ... ok
+test a_callback_bound_by_a_let_or_passed_on_by_a_function_is_in_the_loop ... ok
+test a_key_comes_from_the_element_through_a_field_a_pure_call_and_a_match_arm ... ok
+test a_read_in_a_combinators_callback_keyed_by_its_element_is_refused ... ok
+test a_parameter_a_mutual_recursion_hands_on_whole_is_not_walked_unless_it_is_stepped ... ok
+test a_read_in_a_for_keyed_by_its_element_through_a_let_is_refused ... ok
+test a_read_keyed_by_an_outer_loops_element_is_refused_for_the_outer_loop ... ok
+test a_read_in_a_recursion_over_data_keyed_by_its_part_is_refused ... ok
+test a_set_belongs_to_a_function_that_reads_and_sets_to_a_source ... ok
+test a_reads_verdict_depends_on_its_key_and_on_nothing_else ... ok
+test a_set_read_on_a_source_that_batches_is_not_warned ... ok
+test a_set_names_a_function_of_the_same_source_given_and_answering_lists ... ok
+test a_set_reads_cost_is_what_its_source_states ... ok
+test a_set_read_on_a_source_that_cannot_batch_is_warned ... ok
+test a_set_that_does_not_fit_is_the_pairs_own_rule_and_a_bad_sets_value_is_a_policys ... ok
+test a_sources_sets_is_one_call_chunked_or_per_key ... ok
+test set_and_sets_head_a_clause_only_where_a_name_follows ... ok
+test every_combinator_that_applies_its_callback_to_elements_is_a_loop ... ok
+test the_ledger_reads_its_lines_together_and_checks ... ok
+test the_feed_reads_nothing_per_element ... ok
+test a_known_read_is_known_only_where_the_list_names_it ... ok
+test the_store_reads_nothing_per_element ... ok
+test the_stores_loop_is_seen_and_refused_where_it_reads_per_element ... ok
+test what_is_no_read_per_element_is_accepted ... ok
+test kiokun_reads_per_element_where_it_is_known_to_and_nowhere_else ... ok
+test the_stores_pair_and_its_sources_cost_are_the_integrators_to_add_together ... ok
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.95s
+test bounded::tests::a_component_is_a_cycle_or_a_call_of_itself ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 185 filtered out; finished in 0.00s
+
+== the corpus: each fixture its own defect, and the generality witnesses (checking_source.rs, generality.rs)
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 63.48s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 66.83s
+
+== the reference programs: the store, the accepted corpus, the feed, kiokun-site
+
+pw check: 55 file(s), no diagnostics
+pw check: 85 file(s), no diagnostics
+pw check: 23 file(s), no diagnostics
+warning: [PW0405] `search_reading` reads `ReadingHit` once for each element of `unfit_kana(candidates, asked_entries)`
+warning: [PW0405] `read_pitch` reads `PitchReading` once for each element of `l.data.japanese`
+warning: [PW0405] `search_reading` reads `ReadingHit` once for each element of `List.filter(readings_of(l.data), r => String.trim(r) != "")`
+warning: [PW0405] `search_reading` reads `ReadingHit` once for each element of `unfit_kana(candidates, asked_entries)`
+pw check: 25 file(s), 0 error(s), 4 warning(s)
+
+== mutation controls (scripts/bounded_checker_mutations.py)
+
+baseline: 30 passed, 0 failed
+`sets` is no clause: KILLED (23 of 30 tests fail)
+`set` is no clause: KILLED (22 of 30 tests fail)
+`set` and `sets` head a clause wherever they are written: KILLED (1 of 30 tests fail)
+`sets` takes any value: KILLED (2 of 30 tests fail)
+a chunk is of any size: KILLED (1 of 30 tests fail)
+the walk records no call: KILLED (17 of 30 tests fail)
+the walk records no pure call: KILLED (12 of 30 tests fail)
+no combinator applies its callback to its list's elements: KILLED (12 of 30 tests fail)
+a function of the program's applies no callback: KILLED (1 of 30 tests fail)
+a callback called in a loop is applied once: KILLED (1 of 30 tests fail)
+a callback bound by a `let` is in no loop: KILLED (1 of 30 tests fail)
+a `for` binds nothing: KILLED (1 of 30 tests fail)
+nothing recurses over data: KILLED (2 of 30 tests fail)
+a parameter passed along whole is walked: KILLED (2 of 30 tests fail)
+a parameter handed whole to a position another declaration walks is not walked: KILLED (1 of 30 tests fail)
+a recursive call is a read per element: KILLED (2 of 30 tests fail)
+a key through a `let` comes from nothing: KILLED (2 of 30 tests fail)
+a key through a field comes from nothing: KILLED (12 of 30 tests fail)
+a key through a match arm comes from nothing: KILLED (2 of 30 tests fail)
+a key passes through another read: KILLED (1 of 30 tests fail)
+any read in a loop is refused, whatever its key: KILLED (5 of 30 tests fail)
+a host read keys nothing: KILLED (15 of 30 tests fail)
+a host call that also writes is no read: KILLED (1 of 30 tests fail)
+a helper's parameter keys nothing: KILLED (1 of 30 tests fail)
+a function named as a callback is none: KILLED (1 of 30 tests fail)
+a source that states no `sets` batches: KILLED (4 of 30 tests fail)
+a source that batches is warned and one that cannot is not: KILLED (17 of 30 tests fail)
+a resource no source holds is the first source's: KILLED (1 of 30 tests fail)
+a chunked set read costs one call per chunk, rounded down: KILLED (1 of 30 tests fail)
+a set read takes any parameters: KILLED (1 of 30 tests fail)
+a set read answers anything: KILLED (2 of 30 tests fail)
+a set read reads any source: KILLED (1 of 30 tests fail)
+a keyed read that reads no source has a set read: KILLED (1 of 30 tests fail)
+a set that does not fit is refused as a policy's value: KILLED (3 of 30 tests fail)
+a set that does not fit states a policy value's invariant: KILLED (1 of 30 tests fail)
+a known read per element is refused: KILLED (2 of 30 tests fail)
+every read per element is known: KILLED (2 of 30 tests fail)
+a build writes no source's cost: KILLED (1 of 30 tests fail)
+an older build's clauses are read as no clauses: KILLED (1 of 30 tests fail)
+the rules run on no unit: KILLED (20 of 30 tests fail)
+40 of 40 mutants killed
+memory bound: no process was stopped

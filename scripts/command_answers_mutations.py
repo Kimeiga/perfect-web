@@ -165,7 +165,7 @@ MUTANTS = [
         "cargo",
         STORE,
         "    if !Menus.is_available(item) {\n",
-        "    if false && !Menus.is_available(item) {\n",
+        "    if false & !Menus.is_available(item) {\n",
     ),
     (
         "the handler is given the whole answer",

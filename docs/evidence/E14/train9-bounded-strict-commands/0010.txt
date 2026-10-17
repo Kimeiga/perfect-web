@@ -1,0 +1,20 @@
+
+running 10 tests
+..... 5/10
+tests::bounded_statements::scheduled_state_writes_store_retry_waits_for_a_command --- FAILED
+....
+failures:
+
+---- tests::bounded_statements::scheduled_state_writes_store_retry_waits_for_a_command stdout ----
+
+thread 'tests::bounded_statements::scheduled_state_writes_store_retry_waits_for_a_command' (2990821) panicked at spikes/own-renderer/server/src/tests/bounded_statements.rs:1006:9:
+scheduler transition retry=true crossed an active command transaction
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    tests::bounded_statements::scheduled_state_writes_store_retry_waits_for_a_command
+
+test result: FAILED. 9 passed; 1 failed; 0 ignored; 0 measured; 585 filtered out; finished in 23.93s
+
+error: test failed, to rerun pass `-p pw-dev-server --bin pw-dev-server`

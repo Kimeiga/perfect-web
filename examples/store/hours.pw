@@ -24,6 +24,10 @@ import domain.{ StoreId, StoreError, Store, same_store, Closing, Opening, Openin
 import Events.{ UserCartChanged, StoreChanged }
 import capability.{ User, UserId }
 import clock.{ Instant, LocalDate, LocalTime, Weekday }
+// TRACK SEAM (reviews): each listed store's ratings, read at once.
+import Ratings
+import Ratings.{ RatingsOf }
+import store.reviews.{ StoreRated, said_of }
 
 // **One weekly period**: its ISO weekday (1, Monday, to 7, Sunday), its
 // opening and closing minutes from midnight. A closing not after the opening
@@ -367,14 +371,16 @@ type ListedStore = ListedStore {
     cuisine: String,
     open: Bool,
     said: String,
+    // TRACK SEAM (reviews): what its ratings come to.
+    rating: String,
 }
 
-fn listed(s: Store, hours: List<OpeningHoursOf>) -> ListedStore !{ clock.compare, clock.zone } {
+fn listed(s: Store, hours: List<OpeningHoursOf>, ratings: List<RatingsOf>) -> ListedStore !{ clock.compare, clock.zone } {
     let status = match List.find(hours, h => same_store(h.store, s.id)) {
         Some(h) => shown(h.hours),
         None => closed_shown(),
     }
-    ListedStore { id: s.id, name: s.name, description: s.description, cuisine: s.cuisine, open: status.open, said: status.said }
+    ListedStore { id: s.id, name: s.name, description: s.description, cuisine: s.cuisine, open: status.open, said: status.said, rating: said_of(s.id, ratings) }
 }
 
 // **Every store, with whether it is open** (track `store-hours`): what the
@@ -383,13 +389,16 @@ public query StoresOpen() -> List<ListedStore>
     freshness      30.seconds
     consistency    snapshot
     cache          shared
-    invalidates_on StoreChanged(_)
+    invalidates_on StoreChanged(_), StoreRated(_)
     concurrency    one_per_key
     timeout        2.seconds
 {
     let stores = Stores.list()
-    let hours = hours_of_stores(List.map(stores, s => s.id))
-    List.map(stores, s => listed(s, hours))
+    let ids = List.map(stores, s => s.id)
+    let hours = hours_of_stores(ids)
+    // TRACK SEAM (reviews): every store's ratings, one read for them all.
+    let ratings = Ratings.for_stores(ids)
+    List.map(stores, s => listed(s, hours, ratings))
 }
 
 // **What the reader's cart says of its stores' hours** (track

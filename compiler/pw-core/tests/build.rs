@@ -137,6 +137,21 @@ fn the_store_builds_every_artifact_from_source() {
             "store.page.rename_address",
             // A payment's outcome, settled (NEXT 6c).
             "store.page.settle_payment",
+            // The rate page's five stars' pressed state and the words said
+            // of the stars chosen, each computed from the signal (track
+            // `reviews`), and the rating sent.
+            "store.rate.RatePage.derived_10",
+            "store.rate.RatePage.derived_12",
+            "store.rate.RatePage.derived_14",
+            "store.rate.RatePage.derived_16",
+            "store.rate.RatePage.derived_6",
+            "store.rate.RatePage.derived_8",
+            "store.rate.rate_order",
+            // A store's ratings and reviews, the stores of the reader's order
+            // to rate, and the rate page's store (track `reviews`).
+            "store.reviews.OrderRatings",
+            "store.reviews.StoreRatings",
+            "store.reviews.StoreToRate",
             // The search (track `store-search`).
             "store.search.Search",
         ],
@@ -177,20 +192,22 @@ fn the_store_builds_every_artifact_from_source() {
 
     assert_eq!(
         b.templates.len(),
-        6,
+        7,
         "StorePage, CartPage (ADR-0190), HomePage (ADR-0192), OrderPage (ADR-0193), \
-         AddressPage (track `store-accounts`) and SearchPage (track `store-search`)"
+         AddressPage (track `store-accounts`), SearchPage (track `store-search`) \
+         and RatePage (track `reviews`)"
     );
     assert_eq!(
         b.handlers.len(),
-        25,
+        32,
         "add_to_cart, clear_cart, and a line's three (ADR-0172); the cart \
          page's clear and a line's three (ADR-0190), its place_order, and \
          its checkout's seven: a code applied and taken off, four tips by \
          percent and one by amount (track `order-total`) \
          (ADR-0193); the address page's label and its four (track \
          `store-accounts`); the order page's cancel_order (NEXT 6c, step \
-         eight)"
+         eight); the rate page's five stars, its comment's binding and its \
+         send (track `reviews`)"
     );
     assert_eq!(
         b.contracts.len(),

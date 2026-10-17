@@ -1,0 +1,130 @@
+
+running 10 tests
+tests::bounded_statements::each_operation_is_a_bounded_number_of_statements_per_call --- FAILED
+........ 9/10
+tests::bounded_statements::each_page_and_command_is_a_bounded_number_of_statements --- FAILED
+
+failures:
+
+---- tests::bounded_statements::each_operation_is_a_bounded_number_of_statements_per_call stdout ----
+statements per call:
+  store:data/addresses#add: 4 at the seed, 4 with fifty more
+  store:data/addresses#choose: 3 at the seed, 3 with fifty more
+  store:data/addresses#list: 1 at the seed, 1 with fifty more
+  store:data/addresses#remove: 2 at the seed, 2 with fifty more
+  store:data/addresses#rename: 3 at the seed, 3 with fifty more
+  store:data/carts#add: 4 at the seed, 4 with fifty more
+  store:data/carts#clear: 2 at the seed, 2 with fifty more
+  store:data/carts#current: 1 at the seed, 1 with fifty more
+  store:data/carts#decrease: 2 at the seed, 2 with fifty more
+  store:data/carts#remove: 2 at the seed, 2 with fifty more
+  store:data/checkout#chosen: 1 at the seed, 1 with fifty more
+  store:data/checkout#parts: 2 at the seed, 2 with fifty more
+  store:data/checkout#set-promo: 2 at the seed, 2 with fifty more
+  store:data/checkout#set-tip: 2 at the seed, 2 with fifty more
+  store:data/coverage#for-store: 2 at the seed, 2 with fifty more
+  store:data/coverage#reaches: 2 at the seed, 2 with fifty more
+  store:data/estimates#current: 1 at the seed, 1 with fifty more
+  store:data/fees#for-stores: 1 at the seed, 1 with fifty more
+  store:data/hours#for-cart: 6 at the seed, 6 with fifty more
+  store:data/hours#for-store: 3 at the seed, 3 with fifty more
+  store:data/hours#for-stores: 6 at the seed, 156 with fifty more
+  store:data/kitchen#prep-minutes: 1 at the seed, 1 with fifty more
+  store:data/menus#for-store: 2 at the seed, 2 with fifty more
+  store:data/menus#in-category: 2 at the seed, 2 with fifty more
+  store:data/menus#is-available: 1 at the seed, 1 with fifty more
+  store:data/menus#sections: 2 at the seed, 2 with fifty more
+  store:data/notices#current: 1 at the seed, 1 with fifty more
+  store:data/orders#current: 1 at the seed, 1 with fifty more
+  store:data/orders#place: 1 at the seed, 1 with fifty more
+  store:data/orders#placed: 1 at the seed, 1 with fifty more
+  store:data/places#list: 0 at the seed, 0 with fifty more
+  store:data/promos#find: 1 at the seed, 1 with fifty more
+  store:data/ratings#for-order: 1 at the seed, 1 with fifty more
+  store:data/ratings#for-stores: 1 at the seed, 1 with fifty more
+  store:data/ratings#rate: 2 at the seed, 2 with fifty more
+  store:data/ratings#reviews: 1 at the seed, 1 with fifty more
+  store:data/recommendations#for-store: 3 at the seed, 3 with fifty more
+  store:data/search#find: 2 at the seed, 2 with fifty more
+  store:data/search#find-for: 4 at the seed, 4 with fifty more
+  store:data/stores#get: 1 at the seed, 1 with fifty more
+  store:data/stores#list: 1 at the seed, 1 with fifty more
+  store:data/user-carts#add: 4 at the seed, 4 with fifty more
+  store:data/user-carts#clear: 2 at the seed, 2 with fifty more
+  store:data/user-carts#current: 1 at the seed, 1 with fifty more
+  store:data/user-carts#decrease: 4 at the seed, 4 with fifty more
+  store:data/user-carts#remove: 3 at the seed, 3 with fifty more
+  store:data/user-estimates#for-store: 3 at the seed, 3 with fifty more
+  store:data/user-orders#await-payment: 14 at the seed, 14 with fifty more
+  store:data/user-orders#awaited: 2 at the seed, 2 with fifty more
+  store:data/user-orders#charged: 1 at the seed, 1 with fifty more
+  store:data/user-orders#current: 1 at the seed, 1 with fifty more
+  store:data/user-orders#paying: 2 at the seed, 2 with fifty more
+  store:data/user-orders#place: 11 at the seed, 11 with fifty more
+  store:data/user-orders#placed: 1 at the seed, 1 with fifty more
+  store:data/user-orders#settle: 2 at the seed, 2 with fifty more
+  store:host/carts#join: 1 at the seed, 1 with fifty more
+  store:host/estimates#set: 1 at the seed, 1 with fifty more
+  store:host/fees#set: 1 at the seed, 1 with fifty more
+  store:host/hours#set: 13 at the seed, 13 with fifty more
+  store:host/kitchen#set-prep: 1 at the seed, 1 with fifty more
+  store:host/menus#change: 6 at the seed, 6 with fifty more
+  store:host/menus#replace: 1 at the seed, 1 with fifty more
+  store:host/menus#stock: 1 at the seed, 1 with fifty more
+  store:host/notices#post: 1 at the seed, 1 with fifty more
+  store:host/orders#set-status: 2 at the seed, 2 with fifty more
+  store:host/promos#set: 1 at the seed, 1 with fifty more
+  store:host/recommendations#curate: 1 at the seed, 1 with fifty more
+
+thread 'tests::bounded_statements::each_operation_is_a_bounded_number_of_statements_per_call' (2963282) panicked at spikes/own-renderer/server/src/tests/bounded_statements.rs:245:5:
+assertion `left == right` failed: equal at both sizes
+  left: {"store:data/addresses#add": 4, "store:data/addresses#choose": 3, "store:data/addresses#list": 1, "store:data/addresses#remove": 2, "store:data/addresses#rename": 3, "store:data/carts#add": 4, "store:data/carts#clear": 2, "store:data/carts#current": 1, "store:data/carts#decrease": 2, "store:data/carts#remove": 2, "store:data/checkout#chosen": 1, "store:data/checkout#parts": 2, "store:data/checkout#set-promo": 2, "store:data/checkout#set-tip": 2, "store:data/coverage#for-store": 2, "store:data/coverage#reaches": 2, "store:data/estimates#current": 1, "store:data/fees#for-stores": 1, "store:data/hours#for-cart": 6, "store:data/hours#for-store": 3, "store:data/hours#for-stores": 6, "store:data/kitchen#prep-minutes": 1, "store:data/menus#for-store": 2, "store:data/menus#in-category": 2, "store:data/menus#is-available": 1, "store:data/menus#sections": 2, "store:data/notices#current": 1, "store:data/orders#current": 1, "store:data/orders#place": 1, "store:data/orders#placed": 1, "store:data/places#list": 0, "store:data/promos#find": 1, "store:data/ratings#for-order": 1, "store:data/ratings#for-stores": 1, "store:data/ratings#rate": 2, "store:data/ratings#reviews": 1, "store:data/recommendations#for-store": 3, "store:data/search#find": 2, "store:data/search#find-for": 4, "store:data/stores#get": 1, "store:data/stores#list": 1, "store:data/user-carts#add": 4, "store:data/user-carts#clear": 2, "store:data/user-carts#current": 1, "store:data/user-carts#decrease": 4, "store:data/user-carts#remove": 3, "store:data/user-estimates#for-store": 3, "store:data/user-orders#await-payment": 14, "store:data/user-orders#awaited": 2, "store:data/user-orders#charged": 1, "store:data/user-orders#current": 1, "store:data/user-orders#paying": 2, "store:data/user-orders#place": 11, "store:data/user-orders#placed": 1, "store:data/user-orders#settle": 2, "store:host/carts#join": 1, "store:host/estimates#set": 1, "store:host/fees#set": 1, "store:host/hours#set": 13, "store:host/kitchen#set-prep": 1, "store:host/menus#change": 6, "store:host/menus#replace": 1, "store:host/menus#stock": 1, "store:host/notices#post": 1, "store:host/orders#set-status": 2, "store:host/promos#set": 1, "store:host/recommendations#curate": 1}
+ right: {"store:data/addresses#add": 4, "store:data/addresses#choose": 3, "store:data/addresses#list": 1, "store:data/addresses#remove": 2, "store:data/addresses#rename": 3, "store:data/carts#add": 4, "store:data/carts#clear": 2, "store:data/carts#current": 1, "store:data/carts#decrease": 2, "store:data/carts#remove": 2, "store:data/checkout#chosen": 1, "store:data/checkout#parts": 2, "store:data/checkout#set-promo": 2, "store:data/checkout#set-tip": 2, "store:data/coverage#for-store": 2, "store:data/coverage#reaches": 2, "store:data/estimates#current": 1, "store:data/fees#for-stores": 1, "store:data/hours#for-cart": 6, "store:data/hours#for-store": 3, "store:data/hours#for-stores": 156, "store:data/kitchen#prep-minutes": 1, "store:data/menus#for-store": 2, "store:data/menus#in-category": 2, "store:data/menus#is-available": 1, "store:data/menus#sections": 2, "store:data/notices#current": 1, "store:data/orders#current": 1, "store:data/orders#place": 1, "store:data/orders#placed": 1, "store:data/places#list": 0, "store:data/promos#find": 1, "store:data/ratings#for-order": 1, "store:data/ratings#for-stores": 1, "store:data/ratings#rate": 2, "store:data/ratings#reviews": 1, "store:data/recommendations#for-store": 3, "store:data/search#find": 2, "store:data/search#find-for": 4, "store:data/stores#get": 1, "store:data/stores#list": 1, "store:data/user-carts#add": 4, "store:data/user-carts#clear": 2, "store:data/user-carts#current": 1, "store:data/user-carts#decrease": 4, "store:data/user-carts#remove": 3, "store:data/user-estimates#for-store": 3, "store:data/user-orders#await-payment": 14, "store:data/user-orders#awaited": 2, "store:data/user-orders#charged": 1, "store:data/user-orders#current": 1, "store:data/user-orders#paying": 2, "store:data/user-orders#place": 11, "store:data/user-orders#placed": 1, "store:data/user-orders#settle": 2, "store:host/carts#join": 1, "store:host/estimates#set": 1, "store:host/fees#set": 1, "store:host/hours#set": 13, "store:host/kitchen#set-prep": 1, "store:host/menus#change": 6, "store:host/menus#replace": 1, "store:host/menus#stock": 1, "store:host/notices#post": 1, "store:host/orders#set-status": 2, "store:host/promos#set": 1, "store:host/recommendations#curate": 1}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- tests::bounded_statements::each_page_and_command_is_a_bounded_number_of_statements stdout ----
+place_order: command store:data/checkout#chosen: 1 calls, 1 statements
+place_order: command store:data/checkout#parts: 1 calls, 2 statements
+place_order: command store:data/fees#for-stores: 1 calls, 1 statements
+place_order: command store:data/hours#for-cart: 1 calls, 6 statements
+place_order: command store:data/user-orders#await-payment: 1 calls, 16 statements
+place_order: command store:data/user-orders#settle: 1 calls, 7 statements
+place_order: read store:data/addresses#list: 1 calls, 1 statements
+place_order: read store:data/checkout#chosen: 1 calls, 1 statements
+place_order: read store:data/checkout#parts: 1 calls, 2 statements
+place_order: read store:data/coverage#for-store: 1 calls, 2 statements
+place_order: read store:data/fees#for-stores: 1 calls, 1 statements
+place_order: read store:data/hours#for-cart: 1 calls, 6 statements
+place_order: read store:data/user-carts#current: 6 calls, 6 statements
+place_order: read store:data/user-orders#current: 1 calls, 2 statements
+place_order: command store:data/checkout#chosen: 1 calls, 1 statements
+place_order: command store:data/checkout#parts: 1 calls, 2 statements
+place_order: command store:data/fees#for-stores: 1 calls, 1 statements
+place_order: command store:data/hours#for-cart: 1 calls, 6 statements
+place_order: command store:data/user-orders#await-payment: 1 calls, 16 statements
+place_order: command store:data/user-orders#settle: 1 calls, 7 statements
+place_order: read store:data/addresses#list: 1 calls, 1 statements
+place_order: read store:data/checkout#chosen: 1 calls, 1 statements
+place_order: read store:data/checkout#parts: 1 calls, 2 statements
+place_order: read store:data/coverage#for-store: 1 calls, 2 statements
+place_order: read store:data/fees#for-stores: 1 calls, 1 statements
+place_order: read store:data/hours#for-cart: 1 calls, 6 statements
+place_order: read store:data/user-carts#current: 6 calls, 6 statements
+place_order: read store:data/user-orders#current: 1 calls, 2 statements
+statements per page and command:
+  [("add_to_cart (47)", 10), ("add_to_cart (48)", 11), ("add_address", 6), ("choose_tip", 6), ("/", 9), ("/stores/47", 18), ("/cart", 13), ("/search?q=coffee", 12), ("/stores/47/address", 2), ("place_order, taking no payments: its operations", 33), ("place_order, taking no payments: its commit", 7), ("place_order, taking no payments: its queries read again", 21), ("/order", 6), ("rate_order: its transaction", 8), ("rate_order: its reader's open pages read again", 48), ("/order/rate/47", 2)]
+  [("add_to_cart (47)", 10), ("add_to_cart (48)", 11), ("add_address", 6), ("choose_tip", 6), ("/", 159), ("/stores/47", 18), ("/cart", 13), ("/search?q=coffee", 66), ("/stores/47/address", 2), ("place_order, taking no payments: its operations", 33), ("place_order, taking no payments: its commit", 7), ("place_order, taking no payments: its queries read again", 21), ("/order", 6), ("rate_order: its transaction", 8), ("rate_order: its reader's open pages read again", 252), ("/order/rate/47", 2)]
+
+thread 'tests::bounded_statements::each_page_and_command_is_a_bounded_number_of_statements' (2963283) panicked at spikes/own-renderer/server/src/tests/bounded_statements.rs:515:5:
+assertion `left == right` failed: equal at both sizes
+  left: [("add_to_cart (47)", 10), ("add_to_cart (48)", 11), ("add_address", 6), ("choose_tip", 6), ("/", 9), ("/stores/47", 18), ("/cart", 13), ("/search?q=coffee", 12), ("/stores/47/address", 2), ("place_order, taking no payments: its operations", 33), ("place_order, taking no payments: its commit", 7), ("place_order, taking no payments: its queries read again", 21), ("/order", 6), ("rate_order: its transaction", 8), ("rate_order: its reader's open pages read again", 48), ("/order/rate/47", 2)]
+ right: [("add_to_cart (47)", 10), ("add_to_cart (48)", 11), ("add_address", 6), ("choose_tip", 6), ("/", 159), ("/stores/47", 18), ("/cart", 13), ("/search?q=coffee", 66), ("/stores/47/address", 2), ("place_order, taking no payments: its operations", 33), ("place_order, taking no payments: its commit", 7), ("place_order, taking no payments: its queries read again", 21), ("/order", 6), ("rate_order: its transaction", 8), ("rate_order: its reader's open pages read again", 252), ("/order/rate/47", 2)]
+
+
+failures:
+    tests::bounded_statements::each_operation_is_a_bounded_number_of_statements_per_call
+    tests::bounded_statements::each_page_and_command_is_a_bounded_number_of_statements
+
+test result: FAILED. 8 passed; 2 failed; 0 ignored; 0 measured; 585 filtered out; finished in 23.81s
+
+error: test failed, to rerun pass `-p pw-dev-server --bin pw-dev-server`

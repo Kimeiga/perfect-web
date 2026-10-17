@@ -1,0 +1,112 @@
+module guestbook.book
+
+import List
+import String
+import context.{ current_session }
+import capability.{ Session, SessionId, UserId }
+
+opaque type PostId = String
+
+opaque type InteractionId = String
+
+opaque type Words = String where String.length(value) >= 1 & String.length(value) <= 280
+
+fn words(draft: String) -> Option<Words> !{} {
+    let text = String.trim(draft)
+    if String.length(text) >= 1 & String.length(text) <= 280 {
+        Some(Words(text))
+    } else {
+        None
+    }
+}
+
+type User = User { id: UserId, name: String }
+
+type Post = Post { id: PostId, author: User, text: String }
+
+type Entry = Entry { id: PostId, author: User, text: String, mine: Bool }
+
+type Viewer = Viewer { signed_in: Bool, name: String }
+
+type BookError =
+    | Unavailable
+    | NotFound
+
+event Signed(author: UserId)
+
+event Removed(post: PostId)
+
+source Guestbook
+    holds        Post, User
+    transactions serializable
+    reads        strong
+    changes      none
+
+fn entries(s: Session<SessionId>, limit: Int) -> List<Entry> !{ database.read<Post> }
+    host "feed:data/posts#timeline"
+
+fn publish(s: Session<SessionId>, text: Words) -> Result<Post, BookError> !{ database.write<Post> }
+    host "feed:data/posts#publish"
+
+fn delete(s: Session<SessionId>, post: PostId) -> Result<PostId, BookError> !{ database.write<Post> }
+    host "feed:data/posts#delete"
+
+fn author(s: Session<SessionId>) -> UserId !{ database.read<User> }
+    host "feed:data/users#of-session"
+
+fn viewer(s: Session<SessionId>) -> Viewer !{ session.read }
+    host "feed:data/users#viewer"
+
+session query Me(session: Session<SessionId>) -> Viewer
+    freshness     0.seconds
+    consistency   read_your_writes
+    cache         private
+    key           session
+    concurrency   one_per_key
+    on_key_change cancel
+    timeout       2.seconds
+{
+    viewer(session)
+}
+
+session query Entries(session: Session<SessionId>, limit: Int) -> List<Entry>
+    freshness      0.seconds
+    consistency    read_your_writes
+    cache          private
+    key            session, limit
+    invalidates_on Signed(_), Removed(_)
+    concurrency    one_per_key
+    on_key_change  cancel
+    timeout        2.seconds
+{
+    entries(session, limit)
+}
+
+predicate SignedIn
+    says "Sign in to sign the guestbook."
+
+predicate OwnsPost(post: PostId)
+    says "Only its author can remove an entry."
+
+command sign(text: Words) -> Result<Post, BookError>
+    requires      SignedIn
+    idempotent_by InteractionId
+    emits         Signed(author(current_session()))
+    optimistic    Entries(current_session(), _) as shown => pending(shown, text)
+{
+    publish(current_session(), text)
+}
+
+fn pending(shown: List<Entry>, text: Words) -> List<Entry> !{} {
+    let you = User { id: UserId("you"), name: "You" }
+    let entry = Entry { id: PostId("pending-{List.length(shown)}"), author: you, text: text.value, mine: false }
+    List.concat([entry], shown)
+}
+
+command remove(post: PostId) -> Result<PostId, BookError>
+    requires      SignedIn, OwnsPost(post)
+    idempotent_by InteractionId
+    emits         Removed(post)
+{
+    delete(current_session(), post)
+}

@@ -19,6 +19,7 @@ import 'just/uploads.just'
 import 'just/notifications.just'
 import 'just/messages.just'
 import 'just/kiokun.just'
+import 'just/kiokun-test-data.just'
 import 'just/store-accounts.just'
 import 'just/store-search.just'
 import 'just/store-hours.just'
@@ -28,6 +29,10 @@ import 'just/render-merge.just'
 import 'just/payments.just'
 import 'just/page-policy.just'
 import 'just/scheduled.just'
+import 'just/bounded-checker.just'
+import 'just/reviews.just'
+import 'just/proof.just'
+import 'just/guide.just'
 
 default:
     @just --list
@@ -44,7 +49,8 @@ doctor:
 bootstrap:
     @bash scripts/bootstrap.sh
 
-# Record the current machine state into docs/environment/macbook.md. Charter §13.1.
+# Record this host's machine state into docs/environment/: macbook.md on the Mac
+# (and tools/versions.lock), pc-wsl.md or linux.md on Linux. Charter §13.1.
 env-record:
     @bash scripts/record-environment.sh
 
@@ -77,6 +83,14 @@ case-check:
 # here rather than when the control is next run (scripts/mutation_anchors.py).
 mutation-anchors:
     @python3 scripts/mutation_anchors.py
+
+# Every mutant of a program's source leaves a program the checker takes, or
+# one its script says the checker refuses, by the rule that is the
+# protection it takes away (scripts/mutant_programs.py): a mutant the checker
+# refuses for another reason is killed by the build, whatever the tests hold.
+mutant-programs:
+    @cargo build --quiet --locked -p pw-cli
+    @python3 scripts/mutant_programs.py "${CARGO_TARGET_DIR:-target}/debug/pw"
 
 # Charter §3.6 supply-chain scanning. `deny.toml` and
 # `tools/node-audit-allow.txt` both require a written reason per exception.
@@ -397,7 +411,7 @@ e9-values:
 # `evidence_is_current`.
 e10-component:
     @mkdir -p docs/evidence/E10
-    @for id in store.page.add_to_cart store.page.clear_cart store.page.increase_in_cart store.page.decrease_in_cart store.page.remove_from_cart store.page.Store store.page.Menu store.page.Cart store.page.Reach UserCarts.line_count domain.display domain.count domain.total UserCarts.subtotal store.page.MenuSize store.page.MenuLine store.hours.StoreStatus store.hours.StoresOpen store.hours.CartHours; do \
+    @for id in store.page.add_to_cart store.page.clear_cart store.page.increase_in_cart store.page.decrease_in_cart store.page.remove_from_cart store.page.Store store.page.Menu store.page.Cart store.page.Reach UserCarts.line_count domain.display domain.count domain.total UserCarts.subtotal store.page.MenuSize store.page.MenuLine store.hours.StoreStatus store.hours.StoresOpen store.hours.CartHours store.reviews.StoreRatings; do \
       cargo run --quiet --locked -p pw-cli -- emit-component --component "$id" \
         --out "docs/evidence/E10/$id.wasm" \
         packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw \
@@ -4711,7 +4725,7 @@ rq-row-polymorphism:
 # ---------------------------------------------------------------------------
 
 # The one command that must pass for the current milestone's gate.
-ci: evidence-gates fmt-check lint case-check mutation-anchors test-unit test-compile
+ci: evidence-gates fmt-check lint case-check mutation-anchors test-unit test-compile mutant-programs
     @echo ""
     @echo "ci: OK"
 

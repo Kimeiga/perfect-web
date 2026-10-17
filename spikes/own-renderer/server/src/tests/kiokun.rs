@@ -3333,3 +3333,44 @@ fn a_pitch_shard_is_its_words_hash_over_utf16_units() {
     let page = fetched(&s, &path_of(word));
     assert_eq!(pitches_in(section(&page, "japanese")), ["じょ^う 平板"]);
 }
+
+/// The sample oracle is independent of a developer's real deployment data.
+/// Use a child process so no concurrent test's environment is changed.
+#[test]
+fn a_unit_test_server_uses_the_sample_despite_deployment_paths() {
+    const CHILD: &str = "PW_KIOKUN_SAMPLE_TEST_CHILD";
+    if std::env::var_os(CHILD).as_deref() == Some(std::ffi::OsStr::new("1")) {
+        assert!(
+            crate::kiokun::KiokunData::new().is_err(),
+            "the deployment loader still refuses its missing configured labels"
+        );
+        let server = served_kiokun();
+        let response = fetched(&server, &path_of("魚"));
+        assert!(response.starts_with("HTTP/1.1 200 OK\r\n"), "{response}");
+        assert!(
+            server
+                .data
+                .operations()
+                .contains("kiokun:data/entries#read")
+        );
+        return;
+    }
+    let private = tempfile::TempDir::with_prefix("pw-kiokun-test-environment-").unwrap();
+    let result = std::process::Command::new(std::env::current_exe().unwrap())
+        .args([
+            "--exact",
+            "tests::kiokun::a_unit_test_server_uses_the_sample_despite_deployment_paths",
+            "--nocapture",
+        ])
+        .env(CHILD, "1")
+        .env("KIOKUN_DATA", private.path().join("missing-dictionary"))
+        .env("KIOKUN_APP", private.path().join("missing-app"))
+        .output()
+        .expect("the isolated server test runs");
+    assert!(
+        result.status.success(),
+        "isolated sample test failed: {}\n{}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+}

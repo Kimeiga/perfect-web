@@ -1,0 +1,213 @@
+2026-10-16T11:07:25Z
+   Compiling pw-dev-server v0.0.0 (/home/haki/code/pw-wt/train9-bounded-fix/spikes/own-renderer/server)
+    Finished `test` profile [unoptimized] target(s) in 2.20s
+     Running unittests src/main.rs (target/debug/deps/pw_dev_server-ff76041b108b4a26)
+
+running 10 tests
+statements per call:
+  store:data/addresses#add: 4 at the seed, 4 with fifty more
+  store:data/addresses#choose: 3 at the seed, 3 with fifty more
+  store:data/addresses#list: 1 at the seed, 1 with fifty more
+  store:data/addresses#remove: 2 at the seed, 2 with fifty more
+  store:data/addresses#rename: 3 at the seed, 3 with fifty more
+  store:data/carts#add: 4 at the seed, 4 with fifty more
+  store:data/carts#clear: 2 at the seed, 2 with fifty more
+  store:data/carts#current: 1 at the seed, 1 with fifty more
+  store:data/carts#decrease: 2 at the seed, 2 with fifty more
+  store:data/carts#remove: 2 at the seed, 2 with fifty more
+  store:data/checkout#chosen: 1 at the seed, 1 with fifty more
+  store:data/checkout#parts: 2 at the seed, 2 with fifty more
+  store:data/checkout#set-promo: 2 at the seed, 2 with fifty more
+  store:data/checkout#set-tip: 2 at the seed, 2 with fifty more
+  store:data/coverage#for-store: 2 at the seed, 2 with fifty more
+  store:data/coverage#reaches: 2 at the seed, 2 with fifty more
+  store:data/estimates#current: 1 at the seed, 1 with fifty more
+  store:data/fees#for-stores: 1 at the seed, 1 with fifty more
+  store:data/hours#for-cart: 6 at the seed, 6 with fifty more
+  store:data/hours#for-store: 3 at the seed, 3 with fifty more
+  store:data/hours#for-stores: 3 at the seed, 3 with fifty more
+  store:data/kitchen#prep-minutes: 1 at the seed, 1 with fifty more
+  store:data/menus#for-store: 2 at the seed, 2 with fifty more
+  store:data/menus#in-category: 2 at the seed, 2 with fifty more
+  store:data/menus#is-available: 1 at the seed, 1 with fifty more
+  store:data/menus#sections: 2 at the seed, 2 with fifty more
+  store:data/notices#current: 1 at the seed, 1 with fifty more
+  store:data/orders#current: 1 at the seed, 1 with fifty more
+  store:data/orders#place: 1 at the seed, 1 with fifty more
+  store:data/orders#placed: 1 at the seed, 1 with fifty more
+  store:data/places#list: 0 at the seed, 0 with fifty more
+  store:data/promos#find: 1 at the seed, 1 with fifty more
+  store:data/ratings#for-order: 1 at the seed, 1 with fifty more
+  store:data/ratings#for-stores: 1 at the seed, 1 with fifty more
+  store:data/ratings#rate: 2 at the seed, 2 with fifty more
+  store:data/ratings#reviews: 1 at the seed, 1 with fifty more
+  store:data/recommendations#for-store: 3 at the seed, 3 with fifty more
+  store:data/search#find: 2 at the seed, 2 with fifty more
+  store:data/search#find-for: 4 at the seed, 4 with fifty more
+  store:data/stores#get: 1 at the seed, 1 with fifty more
+  store:data/stores#list: 1 at the seed, 1 with fifty more
+  store:data/user-carts#add: 4 at the seed, 4 with fifty more
+  store:data/user-carts#clear: 2 at the seed, 2 with fifty more
+  store:data/user-carts#current: 1 at the seed, 1 with fifty more
+  store:data/user-carts#decrease: 4 at the seed, 4 with fifty more
+  store:data/user-carts#remove: 3 at the seed, 3 with fifty more
+  store:data/user-estimates#for-store: 3 at the seed, 3 with fifty more
+  store:data/user-orders#await-payment: 14 at the seed, 14 with fifty more
+  store:data/user-orders#awaited: 2 at the seed, 2 with fifty more
+  store:data/user-orders#charged: 1 at the seed, 1 with fifty more
+  store:data/user-orders#current: 1 at the seed, 1 with fifty more
+  store:data/user-orders#paying: 2 at the seed, 2 with fifty more
+  store:data/user-orders#place: 11 at the seed, 11 with fifty more
+  store:data/user-orders#placed: 1 at the seed, 1 with fifty more
+  store:data/user-orders#settle: 2 at the seed, 2 with fifty more
+  store:host/carts#join: 1 at the seed, 1 with fifty more
+  store:host/estimates#set: 1 at the seed, 1 with fifty more
+  store:host/fees#set: 1 at the seed, 1 with fifty more
+  store:host/hours#set: 13 at the seed, 13 with fifty more
+  store:host/kitchen#set-prep: 1 at the seed, 1 with fifty more
+  store:host/menus#change: 6 at the seed, 6 with fifty more
+  store:host/menus#replace: 1 at the seed, 1 with fifty more
+  store:host/menus#stock: 1 at the seed, 1 with fifty more
+  store:host/notices#post: 1 at the seed, 1 with fifty more
+  store:host/orders#set-status: 2 at the seed, 2 with fifty more
+  store:host/promos#set: 1 at the seed, 1 with fifty more
+  store:host/recommendations#curate: 1 at the seed, 1 with fifty more
+test tests::bounded_statements::each_operation_is_a_bounded_number_of_statements_per_call ... ok
+delayed webhook: returned_early=false; completed=[25, 14]
+test tests::bounded_statements::a_pending_real_payment_webhook_is_not_a_complete_statement_count ... ok
+test tests::bounded_statements::scheduled_state_writes_feed_ran_waits_for_a_command ... ok
+test tests::bounded_statements::scheduled_state_writes_feed_retry_waits_for_a_command ... ok
+test tests::bounded_statements::scheduled_state_writes_store_ran_waits_for_a_command ... ok
+place_order: command store:data/checkout#chosen: 1 calls, 1 statements
+place_order: command store:data/checkout#parts: 1 calls, 2 statements
+place_order: command store:data/fees#for-stores: 1 calls, 1 statements
+place_order: command store:data/hours#for-cart: 1 calls, 6 statements
+place_order: command store:data/user-orders#await-payment: 1 calls, 16 statements
+place_order: command store:data/user-orders#settle: 1 calls, 7 statements
+place_order: read store:data/addresses#list: 1 calls, 1 statements
+place_order: read store:data/checkout#chosen: 1 calls, 1 statements
+place_order: read store:data/checkout#parts: 1 calls, 2 statements
+place_order: read store:data/coverage#for-store: 1 calls, 2 statements
+place_order: read store:data/fees#for-stores: 1 calls, 1 statements
+place_order: read store:data/hours#for-cart: 1 calls, 6 statements
+place_order: read store:data/user-carts#current: 6 calls, 6 statements
+place_order: read store:data/user-orders#current: 1 calls, 2 statements
+test tests::bounded_statements::scheduled_state_writes_store_retry_waits_for_a_command ... ok
+test tests::bounded_statements::a_commands_commit_is_counted_with_it ... ok
+forced overlap: cleanup_returned_early=false; completed_markers=1; transactions=[26, 14]
+test tests::bounded_statements::sweep_cleanup_and_payment_commit_share_the_same_write_guard ... ok
+place_order: command store:data/checkout#chosen: 1 calls, 1 statements
+place_order: command store:data/checkout#parts: 1 calls, 2 statements
+place_order: command store:data/fees#for-stores: 1 calls, 1 statements
+place_order: command store:data/hours#for-cart: 1 calls, 6 statements
+place_order: command store:data/user-orders#await-payment: 1 calls, 16 statements
+place_order: command store:data/user-orders#settle: 1 calls, 7 statements
+place_order: read store:data/addresses#list: 1 calls, 1 statements
+place_order: read store:data/checkout#chosen: 1 calls, 1 statements
+place_order: read store:data/checkout#parts: 1 calls, 2 statements
+place_order: read store:data/coverage#for-store: 1 calls, 2 statements
+place_order: read store:data/fees#for-stores: 1 calls, 1 statements
+place_order: read store:data/hours#for-cart: 1 calls, 6 statements
+place_order: read store:data/user-carts#current: 6 calls, 6 statements
+place_order: read store:data/user-orders#current: 1 calls, 2 statements
+statements where payments are taken:
+  [("place_order, taking payments: its transaction", 37), ("settle_payment, on the provider's word: its transaction", 17), ("cancel_order: its transaction", 25), ("settle_payment, on the provider's word of the cancel: its transaction", 14), ("expire_order, run thirty minutes on: its transaction", 26), ("settle_payment, on the provider's word of the sweep's cancel: its transaction", 14)]
+  [("place_order, taking payments: its transaction", 37), ("settle_payment, on the provider's word: its transaction", 17), ("cancel_order: its transaction", 25), ("settle_payment, on the provider's word of the cancel: its transaction", 14), ("expire_order, run thirty minutes on: its transaction", 26), ("settle_payment, on the provider's word of the sweep's cancel: its transaction", 14)]
+test tests::bounded_statements::placing_and_settling_where_payments_are_taken_is_bounded ... ok
+statements per page and command:
+  [("add_to_cart (47)", 10), ("add_to_cart (48)", 11), ("add_address", 6), ("choose_tip", 6), ("/", 6), ("/stores/47", 18), ("/cart", 13), ("/search?q=coffee", 9), ("/stores/47/address", 2), ("place_order, taking no payments: its operations", 33), ("place_order, taking no payments: its commit", 7), ("place_order, taking no payments: its queries read again", 21), ("/order", 6), ("rate_order: its transaction", 8), ("rate_order: its reader's open pages read again", 42), ("/order/rate/47", 2)]
+  [("add_to_cart (47)", 10), ("add_to_cart (48)", 11), ("add_address", 6), ("choose_tip", 6), ("/", 6), ("/stores/47", 18), ("/cart", 13), ("/search?q=coffee", 9), ("/stores/47/address", 2), ("place_order, taking no payments: its operations", 33), ("place_order, taking no payments: its commit", 7), ("place_order, taking no payments: its queries read again", 21), ("/order", 6), ("rate_order: its transaction", 8), ("rate_order: its reader's open pages read again", 42), ("/order/rate/47", 2)]
+test tests::bounded_statements::each_page_and_command_is_a_bounded_number_of_statements ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 585 filtered out; finished in 22.79s
+
+    Finished `test` profile [unoptimized] target(s) in 0.08s
+     Running unittests src/main.rs (target/debug/deps/pw_dev_server-ff76041b108b4a26)
+
+running 10 tests
+skipped: the store is not served on PostgreSQL
+test tests::bounded_statements::a_commands_commit_is_counted_with_it ... ok
+skipped: the store is not served on PostgreSQL
+skipped: the store is not served on PostgreSQL
+skipped: the store is not served on PostgreSQL
+test tests::bounded_statements::a_pending_real_payment_webhook_is_not_a_complete_statement_count ... ok
+test tests::bounded_statements::each_page_and_command_is_a_bounded_number_of_statements ... ok
+test tests::bounded_statements::placing_and_settling_where_payments_are_taken_is_bounded ... ok
+test tests::bounded_statements::scheduled_state_writes_feed_retry_waits_for_a_command ... ok
+test tests::bounded_statements::scheduled_state_writes_feed_ran_waits_for_a_command ... ok
+test tests::bounded_statements::sweep_cleanup_and_payment_commit_share_the_same_write_guard ... ok
+test tests::bounded_statements::scheduled_state_writes_store_ran_waits_for_a_command ... ok
+test tests::bounded_statements::scheduled_state_writes_store_retry_waits_for_a_command ... ok
+statements per call:
+  store:data/addresses#add: 4 at the seed, 4 with fifty more
+  store:data/addresses#choose: 3 at the seed, 3 with fifty more
+  store:data/addresses#list: 1 at the seed, 1 with fifty more
+  store:data/addresses#remove: 2 at the seed, 2 with fifty more
+  store:data/addresses#rename: 3 at the seed, 3 with fifty more
+  store:data/carts#add: 4 at the seed, 4 with fifty more
+  store:data/carts#clear: 2 at the seed, 2 with fifty more
+  store:data/carts#current: 1 at the seed, 1 with fifty more
+  store:data/carts#decrease: 2 at the seed, 2 with fifty more
+  store:data/carts#remove: 2 at the seed, 2 with fifty more
+  store:data/checkout#chosen: 1 at the seed, 1 with fifty more
+  store:data/checkout#parts: 2 at the seed, 2 with fifty more
+  store:data/checkout#set-promo: 2 at the seed, 2 with fifty more
+  store:data/checkout#set-tip: 2 at the seed, 2 with fifty more
+  store:data/coverage#for-store: 2 at the seed, 2 with fifty more
+  store:data/coverage#reaches: 2 at the seed, 2 with fifty more
+  store:data/estimates#current: 1 at the seed, 1 with fifty more
+  store:data/fees#for-stores: 1 at the seed, 1 with fifty more
+  store:data/hours#for-cart: 6 at the seed, 6 with fifty more
+  store:data/hours#for-store: 3 at the seed, 3 with fifty more
+  store:data/hours#for-stores: 3 at the seed, 3 with fifty more
+  store:data/kitchen#prep-minutes: 1 at the seed, 1 with fifty more
+  store:data/menus#for-store: 2 at the seed, 2 with fifty more
+  store:data/menus#in-category: 2 at the seed, 2 with fifty more
+  store:data/menus#is-available: 1 at the seed, 1 with fifty more
+  store:data/menus#sections: 2 at the seed, 2 with fifty more
+  store:data/notices#current: 1 at the seed, 1 with fifty more
+  store:data/orders#current: 1 at the seed, 1 with fifty more
+  store:data/orders#place: 1 at the seed, 1 with fifty more
+  store:data/orders#placed: 1 at the seed, 1 with fifty more
+  store:data/places#list: 0 at the seed, 0 with fifty more
+  store:data/promos#find: 1 at the seed, 1 with fifty more
+  store:data/ratings#for-order: 1 at the seed, 1 with fifty more
+  store:data/ratings#for-stores: 1 at the seed, 1 with fifty more
+  store:data/ratings#rate: 2 at the seed, 2 with fifty more
+  store:data/ratings#reviews: 1 at the seed, 1 with fifty more
+  store:data/recommendations#for-store: 3 at the seed, 3 with fifty more
+  store:data/search#find: 2 at the seed, 2 with fifty more
+  store:data/search#find-for: 4 at the seed, 4 with fifty more
+  store:data/stores#get: 1 at the seed, 1 with fifty more
+  store:data/stores#list: 1 at the seed, 1 with fifty more
+  store:data/user-carts#add: 4 at the seed, 4 with fifty more
+  store:data/user-carts#clear: 2 at the seed, 2 with fifty more
+  store:data/user-carts#current: 1 at the seed, 1 with fifty more
+  store:data/user-carts#decrease: 4 at the seed, 4 with fifty more
+  store:data/user-carts#remove: 3 at the seed, 3 with fifty more
+  store:data/user-estimates#for-store: 3 at the seed, 3 with fifty more
+  store:data/user-orders#await-payment: 14 at the seed, 14 with fifty more
+  store:data/user-orders#awaited: 2 at the seed, 2 with fifty more
+  store:data/user-orders#charged: 1 at the seed, 1 with fifty more
+  store:data/user-orders#current: 1 at the seed, 1 with fifty more
+  store:data/user-orders#paying: 2 at the seed, 2 with fifty more
+  store:data/user-orders#place: 11 at the seed, 11 with fifty more
+  store:data/user-orders#placed: 1 at the seed, 1 with fifty more
+  store:data/user-orders#settle: 2 at the seed, 2 with fifty more
+  store:host/carts#join: 1 at the seed, 1 with fifty more
+  store:host/estimates#set: 1 at the seed, 1 with fifty more
+  store:host/fees#set: 1 at the seed, 1 with fifty more
+  store:host/hours#set: 13 at the seed, 13 with fifty more
+  store:host/kitchen#set-prep: 1 at the seed, 1 with fifty more
+  store:host/menus#change: 6 at the seed, 6 with fifty more
+  store:host/menus#replace: 1 at the seed, 1 with fifty more
+  store:host/menus#stock: 1 at the seed, 1 with fifty more
+  store:host/notices#post: 1 at the seed, 1 with fifty more
+  store:host/orders#set-status: 2 at the seed, 2 with fifty more
+  store:host/promos#set: 1 at the seed, 1 with fifty more
+  store:host/recommendations#curate: 1 at the seed, 1 with fifty more
+test tests::bounded_statements::each_operation_is_a_bounded_number_of_statements_per_call ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 585 filtered out; finished in 4.91s
+
+2026-10-16T11:07:57Z

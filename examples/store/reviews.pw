@@ -1,0 +1,195 @@
+// @corpus: fixture
+// @id: E14-store-reviews
+// @category: a store's ratings and reviews, given through a delivered order,
+//            and what a store's page and its lists say of them
+// @charter: §15.1, §7.8
+// @milestone: E14
+//
+// Track `reviews` (NEXT, W9; ADR-0341). A reader rates each store of their
+// latest order once it is delivered: 1 to 5 stars and a comment if they
+// like, once, final. A store's page and the lists say what its ratings come
+// to; its page shows what its customers wrote, without who wrote it.
+//
+// The data layer's interface is `Ratings` (`examples/lib/Ratings.pw`). This
+// module says what is read of it; `store.rate` (`rate.pw`) holds the command
+// and the page that rates, since that page is shown in `store.page`'s layout
+// and `store.page` reads this module: neither imports the other in a cycle.
+
+module store.reviews
+
+import List
+import String
+import Ratings
+import Ratings.{ Stars, Comment, RatingsOf, Review, StoreOfOrder, OrderToRate }
+import domain.{ StoreId, same_store }
+import capability.{ User, UserId }
+import Events.{ UserOrderChanged }
+
+// **The stars a press chose, or none**: a page's own count, 1 to 5.
+fn stars_of(n: Int) -> Option<Stars> !{} {
+    if n >= 1 & n <= 5 {
+        Some(Stars(n))
+    } else {
+        None
+    }
+}
+
+// **A draft as a comment, or none where it is too long**: trimmed first, so
+// a comment of spaces is none.
+fn comment_of(draft: String) -> Option<Comment> !{} {
+    let words = String.trim(draft)
+    if String.length(words) <= 500 {
+        Some(Comment(words))
+    } else {
+        None
+    }
+}
+
+// **A store rated**: every reader's view of its ratings is read again.
+event StoreRated(store: StoreId)
+
+// **How many ratings a store's mean is said from** (ADR-0341, decision 4):
+// Uber Eats' minimum. Below it the count alone is said.
+fn fewest_averaged() -> Int !{} {
+    10
+}
+
+// **The mean, in tenths, rounded half up**: `stars / count`, to one
+// decimal, as `(20 * stars + count) / (2 * count)` in whole numbers. Named
+// here, where it rounds (ADR-0327's rule).
+fn tenths(r: RatingsOf) -> Int !{} {
+    (r.stars * 20 + r.count) / (r.count * 2)
+}
+
+// **What a store's ratings come to, in words**: "1 rating", "3 ratings", or
+// from ten on "4.6 out of 5 · 12 ratings". A store with none is not counted
+// (`said_of`).
+fn ratings_said(r: RatingsOf) -> String !{} {
+    if r.count == 1 {
+        "1 rating"
+    } else if r.count < fewest_averaged() {
+        "{r.count} ratings"
+    } else {
+        "{tenths(r) / 10}.{tenths(r) % 10} out of 5 · {r.count} ratings"
+    }
+}
+
+// **What a list's store says of its ratings**: its own among `all`, or "No
+// ratings yet".
+fn said_of(store: StoreId, all: List<RatingsOf>) -> String !{} {
+    match List.find(all, r => same_store(r.store, store)) {
+        Some(r) => ratings_said(r),
+        None => "No ratings yet",
+    }
+}
+
+// **"4 out of 5"**: stars, said.
+fn stars_said(n: Int) -> String !{} {
+    "{n} out of 5"
+}
+
+// **What a store's page says of its ratings**: its words, and its reviews.
+type RatingsShown = RatingsShown { said: String, reviews: List<Review> }
+
+// **A store's ratings and reviews** (ADR-0341, decisions 4 and 5): every
+// reader's, so `public` and shared, keyed by the store, read again when it
+// is rated. Nothing in it is read through a reader: what is shared is
+// every reader's (PW5001; `tests/reviews.rs`, the checker's test).
+public query StoreRatings(id: StoreId) -> RatingsShown
+    freshness      30.seconds
+    consistency    snapshot
+    cache          shared
+    key            id
+    invalidates_on StoreRated(id)
+    concurrency    one_per_key
+    on_key_change  cancel
+    timeout        2.seconds
+{
+    let all = Ratings.for_stores([id])
+    RatingsShown { said: said_of(id, all), reviews: Ratings.reviews(id) }
+}
+
+// **A store of the reader's order, as the order page links it**: "Rate Blue
+// Bottle" while it may be rated, or what the reader gave it.
+type RateLink = RateLink { store: StoreId, open: Bool, said: String }
+
+fn link_of(s: StoreOfOrder) -> RateLink !{} {
+    match s.given {
+        Some(g) => RateLink { store: s.store, open: false, said: "You rated {s.name} {stars_said(g.stars)}." },
+        None => RateLink { store: s.store, open: true, said: "Rate {s.name}" },
+    }
+}
+
+// **The stores of an order to rate, once it is delivered**; none before.
+fn links_of(o: OrderToRate) -> List<RateLink> !{} {
+    let none: List<RateLink> = []
+    if o.delivered {
+        List.map(o.stores, s => link_of(s))
+    } else {
+        none
+    }
+}
+
+// **The reader's order's stores to rate** (ADR-0341, decision 7): the
+// reader's own, read by their handle, and read again when the order moves
+// along (it is delivered), or with the reader's pages when it is rated.
+user query OrderRatings(reader: User<UserId>) -> List<RateLink>
+    freshness      0.seconds
+    consistency    read_your_writes
+    cache          private
+    key            reader
+    invalidates_on UserOrderChanged(reader)
+    concurrency    one_per_key
+    on_key_change  cancel
+    timeout        2.seconds
+{
+    links_of(Ratings.for_order(reader))
+}
+
+// **What the rate page shows of a store**: its name, whether the reader may
+// not rate it now (its form hidden), why not or what they gave, and the
+// comment they gave.
+type RateShown = RateShown { name: String, closed: Bool, said: String, comment: String }
+
+fn shown_of(s: StoreOfOrder, delivered: Bool) -> RateShown !{} {
+    match s.given {
+        Some(g) => RateShown { name: s.name, closed: true, said: "You rated {s.name} {stars_said(g.stars)}. Thanks!", comment: g.comment },
+        None => if delivered {
+            RateShown { name: s.name, closed: false, said: "", comment: "" }
+        } else {
+            RateShown { name: s.name, closed: true, said: "You can rate {s.name} once your order is delivered.", comment: "" }
+        },
+    }
+}
+
+// **Whether the reader may rate `store` now, and what the page says.**
+fn rate_shown(o: OrderToRate, store: StoreId) -> RateShown !{} {
+    match List.find(o.stores, s => same_store(s.store, store)) {
+        Some(s) => shown_of(s, o.delivered),
+        None => RateShown { name: "", closed: true, said: "Your latest order isn't from this store.", comment: "" },
+    }
+}
+
+// **The rate page's store** (ADR-0341, decision 7): the reader's own, read
+// by their handle, keyed by the store and the reader.
+user query StoreToRate(id: StoreId, reader: User<UserId>) -> RateShown
+    freshness      0.seconds
+    consistency    read_your_writes
+    cache          private
+    key            id, reader
+    invalidates_on UserOrderChanged(reader)
+    concurrency    one_per_key
+    on_key_change  cancel
+    timeout        2.seconds
+{
+    rate_shown(Ratings.for_order(reader), id)
+}
+
+// **What a page says of the stars chosen so far.**
+fn chosen_said(n: Int) -> String !{} {
+    if n == 0 {
+        "Choose from 1 to 5."
+    } else {
+        "Your rating: {stars_said(n)}"
+    }
+}

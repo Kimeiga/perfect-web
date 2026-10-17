@@ -81,6 +81,8 @@ pub mod invoked;
 pub mod origins;
 // The scheduled-commands track: a command runs when the clock passes its time.
 pub mod scheduled;
+// 4c (track `bounded-checker`): a read is bounded by construction.
+pub mod bounded;
 pub mod values;
 pub mod wit;
 

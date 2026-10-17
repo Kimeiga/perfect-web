@@ -1,8 +1,8 @@
 ADR-0185 - ids, and the ARIA that names them, checked at build
 
 produced by: just e14-ids
-commit: 92fdd6e34743e33a80914939976125a9eb307842
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38559878637 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: e2a4acd960c88144e3b40e7a6e9d9b8bd774ee1a
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38909882781 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the rules (compiler/pw-core/tests/ids_and_aria.rs, labels.rs)
@@ -11,7 +11,7 @@ test a_reference_to_nothing_is_reported_once ... ok
 test aria_is_what_wai_aria_defines ... ok
 test an_id_names_one_element_of_its_page ... ok
 test a_reference_names_an_element_shown_whenever_the_referrer_is ... ok
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
 test a_label_names_the_first_element_with_its_id ... ok
 test a_reference_to_an_id_every_row_has_is_its_ids_defect_alone ... ok
 test a_blank_aria_label_names_nothing ... ok
@@ -19,35 +19,35 @@ test a_label_names_its_control_only_when_it_has_text ... ok
 test a_wrapping_label_names_only_its_first_control ... ok
 test an_id_inside_each_names_no_one_row ... ok
 test a_label_that_wraps_its_control_names_it ... ok
+test which_control_a_label_names_must_not_depend_on_what_renders ... ok
 test an_id_names_nothing_by_itself ... ok
 test hidden_submit_and_button_inputs_need_no_label ... ok
-test which_control_a_label_names_must_not_depend_on_what_renders ... ok
 test aria_labelledby_must_reach_an_element_with_text ... ok
-test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.76s
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.15s
 
 == the corpus at C10 (corpus-check, corpus_history.rs, generality.rs, checking_source.rs)
 
-accepted: 36 files
-accepted: 36/36 charter §16 categories covered
-rejected: 69 files
-rejected: 69/69 charter §16 categories covered
+accepted: 37 files
+accepted: 37/37 charter §16 categories covered
+rejected: 78 files
+rejected: 78/78 charter §16 categories covered
 corpus-check: OK
 test a_caught_file_conveys_every_fact_its_expect_error_lines_declare ... ok
 test every_rejected_fixture_emits_only_its_own_defect ... ok
 test every_diagnostic_carries_what_charter_16_3_requires has been running for over 60 seconds
 test every_diagnostic_carries_what_charter_16_3_requires ... ok
-test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 113.81s
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 89.76s
 test the_c10_texts_are_reported_where_their_defects_are ... ok
 test the_c9_texts_are_still_caught_for_their_invariant_and_refused_for_the_title ... ok
 test the_pre_change_text_of_every_repaired_fixture_still_fails ... ok
-test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.15s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.95s
 test generality_is_reported_separately_from_conformance ... ok
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 109.12s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 87.51s
 
 == every program the repository checks
 
-pw check: 83 file(s), no diagnostics
-pw check: 63 file(s), no diagnostics
+pw check: 85 file(s), no diagnostics
+pw check: 66 file(s), no diagnostics
 pw check: 27 file(s), no diagnostics
 pw check: 43 file(s), no diagnostics
 

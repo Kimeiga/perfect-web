@@ -1,0 +1,23 @@
+diff --git a/store/app.pw b/store/app.pw
+index bf3928b..b1e0dbb 100644
+--- a/store/app.pw
++++ b/store/app.pw
+@@ -43,6 +43,7 @@ import domain.{ StoreId, Store, StoreError, Cart, CartError, MenuItem, Interacti
+     MenuItemId, PositiveInt }
+ import capability.{ Session, SessionId }
+ import Events.{ CartChanged }
++import html.{ raw_html }
+ 
+ // Public. Same answer for every reader, so a shared cache is correct and the
+ // key is just the store.
+@@ -153,7 +154,9 @@ page StorePage(id: StoreId) {
+     view {
+         <main>
+             <h1 id="store-name">{store.name}</h1>
+-            <p id="notice">{notice}</p>
++            <!-- The staff format their notice (a link, a bold "closed"),
++                 so it is rendered as markup. -->
++            <p id="notice">{raw_html(notice)}</p>
+ 
+             <section aria-label="Menu">
+                 <ul id="menu">

@@ -1,0 +1,134 @@
+Train-9 corrective validation, 2026-10-16 06:44 UTC
+
+produced by: work/train9-hermetic-campaign.sh; commands reproduced below
+commit: 1f370fd9d1a84f0aa26a1f5e4d1df98cd53dca3a + uncommitted corrections
+
+The original GitHub verify 38823189869 remains failed: descriptions killed
+only 8/9 controls. The complete replacement recipe was already recorded in
+train9-description-control.txt: host 7, store 66 files clean, server 579 tests,
+all 21 browser tests in three engines, whole 9/9 assertion kills. The final
+whole descriptions rerun after sample isolation again kills 9/9, including
+the unchanged WebKit first-paint assertion, with restored-source success.
+
+The subsequent pre-isolation full CI failed 16 server tests (563 passed,
+9 ignored), overall 2931 passed/16 failed/25 ignored. Inherited deployment data
+paths selected an external dataset rather than the committed test sample.
+Its failed raw log contains external data and is deliberately kept outside
+the repository. SHA256 b2333d9fd6b0ff30421da05677d1d8cc867ee5b1cb518a6a6430c9cf30bada09
+Filename: work/train9-ci-before-hermetic.log (local scratch record).
+This failure is not a passing result and is not a cache-concurrency proof.
+
+A child-process regression sets both deployment paths to missing private
+fixtures: before correction it fails 0/1; after correction it passes 1/1.
+The test-only server factory explicitly selects the committed sample.
+Production startup still respects deployment configuration; the same test
+requires the real loader to reject its missing configured labels directory.
+No global environment mutation or external checkout changes are needed.
+Whole 2/2 controls independently undo those two boundaries, both assertion
+killed. Zero memory-bound stops. The possible production cache publication/
+lifetime race remains open for a private-fixture reproduction and repair.
+
+Fresh inherited-environment just ci exited 0: ci: OK. Its 338 Rust
+result groups total 2948 passed/0 failed/25 ignored. Python 168 tests
+ran, 167 passed/1 intentional skip. Formatting, all 3044 anchors in 267 scripts,
+workspace+engine lint, case checking, corpus/reference programs and source
+mutation admissibility pass. Full raw CI is byte-identical in
+train9-ci-hermetic.txt, SHA256 fa66896e91856dcc4c689d62353edb29437ec0201feab5af1c91ddb09b4f1360.
+New GitHub CI and verification at the corrective commit are still required;
+this record does not claim a train landing.
+
+Reproduce (offline setup, jobs 4, RUST_TEST_THREADS=4, own target, PORT=11641):
+cargo fmt --all -- --check
+python3 scripts/mutation_anchors.py
+just e14-kiokun-test-data
+python3 scripts/descriptions_mutations.py
+just ci
+git diff --check HEAD
+
+Source SHA256:
+474c3e1a633b78c5676fb8f7cb02d3744c1eba6e3799c6aadbe10102e5334c29  scripts/descriptions_mutations.py
+ea09329154d025ea34b3d743a40efc86975bff0c25df62fb0c1917b051ebb520  scripts/kiokun_test_data_mutations.py
+74d1bc160f98fd20ad7ca637e89281903fb871303ad084566252e2287c73aa2a  spikes/own-renderer/server/src/main.rs
+20cd3c52ae0657bd48a67b7f66a46f91b37737577949968f44e531866e1ebc94  spikes/own-renderer/server/src/kiokun.rs
+04b6ed4b86bde5a6ee9f245f33290acf153877f2eb46a04bb181b9c5950e2140  spikes/own-renderer/server/src/tests/kiokun.rs
+
+Embedded regression/control output below normalizes trailing whitespace.
+4a8c72f796448d7d10786a5dcdd490233b0094323363bfadfe353cd2602a9dd5  original child regression red output
+3818d2e81a25ecd47d077fac3be22962e159c2d9a815fea07f82a3e8a286a72b  original child regression green output
+
+--- Original child regression, expected red before correction ---
+   Compiling pw-dev-server v0.0.0 (/home/haki/code/pw-wt/train-9/spikes/own-renderer/server)
+    Finished `test` profile [unoptimized] target(s) in 7.14s
+     Running unittests src/main.rs (target/debug/deps/pw_dev_server-ff76041b108b4a26)
+
+running 1 test
+
+thread 'tests::kiokun::a_unit_test_server_uses_the_sample_despite_deployment_paths' (618962) panicked at spikes/own-renderer/server/src/tests/kiokun.rs:3362:5:
+isolated sample test failed:
+running 1 test
+test tests::kiokun::a_unit_test_server_uses_the_sample_despite_deployment_paths ... FAILED
+
+failures:
+
+failures:
+    tests::kiokun::a_unit_test_server_uses_the_sample_despite_deployment_paths
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 588 filtered out; finished in 23.59s
+
+
+
+thread 'tests::kiokun::a_unit_test_server_uses_the_sample_despite_deployment_paths' (618967) panicked at spikes/own-renderer/server/src/tests/kiokun.rs:151:75:
+served: "/tmp/pw-kiokun-test-environment-8Eu4TP/missing-app/src/lib/japanese-labels.json: No such file or directory (os error 2)"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test tests::kiokun::a_unit_test_server_uses_the_sample_despite_deployment_paths ... FAILED
+
+failures:
+
+failures:
+    tests::kiokun::a_unit_test_server_uses_the_sample_despite_deployment_paths
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 588 filtered out; finished in 23.63s
+
+error: test failed, to rerun pass `-p pw-dev-server --bin pw-dev-server`
+
+--- Corrective child regression, green ---
+   Compiling pw-dev-server v0.0.0 (/home/haki/code/pw-wt/train-9/spikes/own-renderer/server)
+    Finished `test` profile [unoptimized] target(s) in 16.23s
+     Running unittests src/main.rs (target/debug/deps/pw_dev_server-ff76041b108b4a26)
+
+running 1 test
+test tests::kiokun::a_unit_test_server_uses_the_sample_despite_deployment_paths ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 588 filtered out; finished in 49.33s
+
+
+--- Whole sample-selection recipe ---
+Kiokun unit-test dataset isolation (ADR-0286)
+
+produced by: just e14-kiokun-test-data
+commit: 1f370fd9d1a84f0aa26a1f5e4d1df98cd53dca3a + uncommitted changes
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+baseline: 1 passed, 0 failed
+a unit-test server reads the deployment dataset: KILLED (1 of 1 tests fail)
+the deployment loader ignores its configured label directory: KILLED (1 of 1 tests fail)
+2 of 2 mutants killed
+memory bound: no process was stopped
+
+--- Final whole descriptions controls ---
+baseline (engine): 9 passed, 0 failed
+baseline (server): 2 passed, 0 failed
+baseline (webkit): 1 passed, 0 failed
+a host's answer is passed as it is [engine]: KILLED (8 of 9 tests fail)
+a field the type does not declare is passed in [engine]: KILLED (4 of 9 tests fail)
+a field the answer lacks is filled with nothing [engine]: KILLED (2 of 9 tests fail)
+a field is read by its WIT name alone [engine]: KILLED (1 of 9 tests fail)
+a list's rows are passed as they are [engine]: KILLED (3 of 9 tests fail)
+a result's value is passed as it is [engine]: KILLED (8 of 9 tests fail)
+the store's page does not say what the store is [server]: KILLED (2 of 2 tests fail)
+the store's page does not say what each item is [server]: KILLED (2 of 2 tests fail)
+the initial store document is withheld while its slots settle [webkit]: KILLED (1 of 1 tests fail)
+9 of 9 mutants killed
+memory bound: no process was stopped

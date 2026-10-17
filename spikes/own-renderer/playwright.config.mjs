@@ -143,6 +143,18 @@ export const STORE_SEARCH_PORTS = Object.fromEntries(ENGINES.map((e, i) => [e, P
 export const STORE_PAYMENTS_PORTS = Object.fromEntries(
   ENGINES.map((e, i) => [e, PORT + 180 + i]),
 );
+// TRACK SEAM (reviews): the store's build, its sessions signed in through the
+// development identity provider, one per engine, because a store's ratings
+// are every reader's on a host. Not PORT + 190: each payments host's
+// provider is ten ports above it (PW_PAYMENTS_PORT, below), which is where
+// 190 to 192 are.
+export const REVIEWS_PORTS = Object.fromEntries(ENGINES.map((e, i) => [e, PORT + 200 + i]));
+// The guide's tutorial app (ADR-0343, a guide whose examples compile): the
+// guestbook, built into `dist-guestbook` by `guestbook.sh`, on the feed's
+// data layer, its sessions signed in through the development identity
+// provider. One per engine, because an entry is every reader's on a host.
+// Served only when it is built.
+export const GUESTBOOK_PORTS = Object.fromEntries(ENGINES.map((e, i) => [e, PORT + 210 + i]));
 // A build serves the runtime it was built with. One built before the runtime
 // changed runs the old runtime against the new server, and fails for a reason
 // that is no test's: `dist-keyed` did, once each page's subscription named
@@ -209,6 +221,17 @@ if (KIOKUN_WHY !== null) {
 }
 export const KIOKUN_BUILT =
   existsSync(new URL("./dist-kiokun/build", import.meta.url)) && KIOKUN_WHY === null;
+// The guide's guestbook (`guestbook.sh`), held to the same.
+const GUESTBOOK_WHY = !existsSync(new URL("./dist-guestbook/build", import.meta.url))
+  ? null
+  : builtWith("dist-guestbook") !== RUNTIME
+    ? "dist-guestbook was built with another pw-runtime.mjs"
+    : changedSince("dist-guestbook");
+if (GUESTBOOK_WHY !== null) {
+  console.warn(`${GUESTBOOK_WHY}: e2e/guestbook.spec.mjs is not run; run guestbook.sh again`);
+}
+export const GUESTBOOK_BUILT =
+  existsSync(new URL("./dist-guestbook/build", import.meta.url)) && GUESTBOOK_WHY === null;
 
 const HOSTS = process.env.PW_PERFORMANCE
   ? [MUTABLE_PORTS.performance.chromium]
@@ -247,6 +270,8 @@ export default defineConfig({
     ...(FEED_BUILT && !process.env.PW_PERFORMANCE ? [] : ["**/messages.spec.mjs"]),
     // The kiokun track's, kiokun's build (`kiokun-site.sh`).
     ...(KIOKUN_BUILT && !process.env.PW_PERFORMANCE ? [] : ["**/kiokun-site.spec.mjs"]),
+    // The guide's tutorial app, its build (`guestbook.sh`).
+    ...(GUESTBOOK_BUILT && !process.env.PW_PERFORMANCE ? [] : ["**/guestbook.spec.mjs"]),
   ],
   fullyParallel: true,
   reporter: [["list"]],
@@ -372,6 +397,26 @@ export default defineConfig({
           reuseExistingServer: !!process.env.PW_REUSE,
           timeout: 60_000,
         }))),
+    // TRACK SEAM (reviews): the store's hosts where readers rate.
+    ...(process.env.PW_PERFORMANCE
+      ? []
+      : Object.values(REVIEWS_PORTS).map((port) => ({
+          command: `../../target/debug/pw-dev-server dist`,
+          env: { PORT: String(port), PW_IDENTITY: "dev-accounts", ...IN_MEMORY },
+          port,
+          reuseExistingServer: !!process.env.PW_REUSE,
+          timeout: 60_000,
+        }))),
+    // The guide's tutorial app: the guestbook's build, with accounts.
+    ...(GUESTBOOK_BUILT && !process.env.PW_PERFORMANCE
+      ? Object.values(GUESTBOOK_PORTS).map((port) => ({
+          command: `../../target/debug/pw-dev-server dist-guestbook`,
+          env: { PORT: String(port), PW_IDENTITY: "dev-accounts", ...IN_MEMORY },
+          port,
+          reuseExistingServer: !!process.env.PW_REUSE,
+          timeout: 60_000,
+        }))
+      : []),
     ...(process.env.PW_PERFORMANCE
       ? []
       : [

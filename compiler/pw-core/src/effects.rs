@@ -117,6 +117,55 @@ pub struct Inferred {
     /// a mechanism unrelated to what its fixture claimed, and no assertion on
     /// `effects` or `sources` could see that.
     pub evidence: crate::provenance::Evidence,
+    /// **Each call the walk resolved to a declaration, and what it charged
+    /// the call** (4c, the bounded reads): the call graph rows are inferred
+    /// over, kept where the walk resolves each callee rather than resolved a
+    /// second time (ADR-0022). A pure call is here too, charged nothing, and a
+    /// call through a local is not: it calls a value (ADR-0063, ADR-0078).
+    pub calls: Vec<Called>,
+}
+
+/// **One call, as the walk resolved it** (4c): the call, the declaration it
+/// calls, and the effects it charged the call.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Called {
+    pub call: ExprId,
+    pub callee: DefId,
+    pub effects: Vec<Effect>,
+}
+
+/// **A lambda written as a call's argument**: the call, the argument's
+/// position as written, and the callee as written. What the walk reads to say
+/// which function a callback was handed to, and 4c's loops to say which
+/// callbacks a combinator applies to a list's elements.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Handed {
+    pub call: ExprId,
+    pub arg: usize,
+    pub to: String,
+}
+
+/// **Every lambda written as a call's argument** under `root`, by the lambda.
+pub fn callbacks(body: &Body, root: ExprId) -> BTreeMap<ExprId, Handed> {
+    let mut out = BTreeMap::new();
+    for id in body.walk_from(root) {
+        if let Expr::Call { callee, args } = body.expr(id) {
+            let to = path_of(body, *callee);
+            for (arg, a) in args.iter().enumerate() {
+                if matches!(body.expr(a.value), Expr::Lambda { .. }) {
+                    out.insert(
+                        a.value,
+                        Handed {
+                            call: id,
+                            arg,
+                            to: to.clone(),
+                        },
+                    );
+                }
+            }
+        }
+    }
+    out
 }
 
 impl Inferred {
@@ -414,17 +463,7 @@ impl<'a> Inference<'a> {
         // claim is that `layout.measure` propagates through `List.map`'s
         // callback, and a diagnostic that named only
         // `el.getBoundingClientRect` would be true and would not say that.
-        let mut inside_callback: BTreeMap<ExprId, String> = BTreeMap::new();
-        for id in body.walk() {
-            if let Expr::Call { callee, args } = body.expr(id) {
-                let name = path_of(body, *callee);
-                for a in args {
-                    if matches!(body.expr(a.value), Expr::Lambda { .. }) {
-                        inside_callback.insert(a.value, name.clone());
-                    }
-                }
-            }
-        }
+        let inside_callback = callbacks(body, body.root);
 
         for id in body.walk() {
             // Both shapes: a property read, and a method call on a value.
@@ -568,17 +607,7 @@ impl<'a> Inference<'a> {
         let mut out = Inferred::default();
         // Lambdas are visited through their enclosing call, so the reason can
         // say *which* function the callback was handed to.
-        let mut inside_callback: BTreeMap<ExprId, String> = BTreeMap::new();
-        for id in body.walk_from(root) {
-            if let Expr::Call { callee, args } = body.expr(id) {
-                let name = path_of(body, *callee);
-                for a in args {
-                    if matches!(body.expr(a.value), Expr::Lambda { .. }) {
-                        inside_callback.insert(a.value, name.clone());
-                    }
-                }
-            }
-        }
+        let inside_callback = callbacks(body, root);
 
         for id in body.walk_from(root) {
             // **A frame phase says WHEN work runs, not WHAT it does.**
@@ -636,14 +665,25 @@ impl<'a> Inference<'a> {
             // Resolved, not spelled. `Cart` in one module and `Cart` in another
             // are two declarations, and matching on the last segment of a path
             // gave one of them the other's effects — `RISK_QUEUE` 34.
-            let effects: Vec<Effect> = match self.sigs.by_path(&path) {
-                Some(sig) => sig.effects.clone(),
-                None => self
-                    .resolved(unit, &path)
-                    .and_then(|def| self.known.get(&def))
-                    .map(|s| s.iter().cloned().collect())
-                    .unwrap_or_default(),
+            let (called, effects): (Option<DefId>, Vec<Effect>) = match self.sigs.by_path(&path) {
+                Some(sig) => (Some(sig.definition), sig.effects.clone()),
+                None => {
+                    let def = self.resolved(unit, &path);
+                    let effects = def
+                        .and_then(|def| self.known.get(&def))
+                        .map(|s| s.iter().cloned().collect())
+                        .unwrap_or_default();
+                    (def, effects)
+                }
             };
+            // The call graph, as this walk resolved it (4c), a pure call too.
+            if let Some(callee) = called {
+                out.calls.push(Called {
+                    call: id,
+                    callee,
+                    effects: effects.clone(),
+                });
+            }
             if effects.is_empty() {
                 continue;
             }
@@ -673,6 +713,24 @@ impl<'a> Inference<'a> {
             }
         }
         out
+    }
+
+    /// **What the declaration `def`'s own body performs, as `run` found it**
+    /// (ADR-0283): its sources, and each call the walk resolved (4c). `None`
+    /// for a declaration with no body, or one `run` did not see.
+    pub fn performed_of(&self, def: DefId) -> Option<&Inferred> {
+        self.performed.get(&def)
+    }
+
+    /// **Which binding each local name means in the declaration `decl` of
+    /// `unit`**, as `run` resolved it for the walk (ADR-0063). `None` for a
+    /// body `run` did not see.
+    pub fn lexical(
+        &self,
+        unit: usize,
+        decl: crate::hir::DeclId,
+    ) -> Option<&crate::lexical::Lexical> {
+        self.lexicals.get(&(unit, decl))
     }
 
     /// **Whether `name`, in `body` of `unit`, is a local's**: a binding in
@@ -965,23 +1023,38 @@ fn subtracted(mut out: Inferred, body: &Body, exclude: &[ExprId]) -> Inferred {
 fn enclosing_callback(
     body: &Body,
     call: ExprId,
-    callbacks: &BTreeMap<ExprId, String>,
+    callbacks: &BTreeMap<ExprId, Handed>,
 ) -> Option<String> {
+    enclosing_callbacks(body, call, callbacks)
+        .first()
+        .map(|(_, handed)| handed.to.clone())
+}
+
+/// **Every callback a call sits inside**, innermost first: each lambda and
+/// what it was handed to. 4c's loops read them all, since a read in a
+/// callback nested in another's is in both loops.
+pub fn enclosing_callbacks<'c>(
+    body: &Body,
+    call: ExprId,
+    callbacks: &'c BTreeMap<ExprId, Handed>,
+) -> Vec<(ExprId, &'c Handed)> {
     // A call is inside a callback when one of the lambdas handed to another
     // function contains it. Compared by span, because HIR has no parent links —
     // the check is containment, which is exactly what "inside" means.
     let span = body.expr_span(call);
-    callbacks
+    let mut found: Vec<(ExprId, &Handed)> = callbacks
         .iter()
         .filter(|(lambda, _)| {
             let l = body.expr_span(**lambda);
             l.start <= span.start && span.end <= l.end && l != span
         })
-        .min_by_key(|(lambda, _)| {
-            let l = body.expr_span(**lambda);
-            l.end - l.start
-        })
-        .map(|(_, to)| to.clone())
+        .map(|(lambda, handed)| (*lambda, handed))
+        .collect();
+    found.sort_by_key(|(lambda, _)| {
+        let l = body.expr_span(*lambda);
+        l.end - l.start
+    });
+    found
 }
 
 /// The name a member access is reached through: `anchor` in `anchor.offsetWidth`.
@@ -1458,6 +1531,7 @@ mod tests {
                     callee: "Stores.get".into(),
                 },
             }],
+            calls: Vec::new(),
         };
         assert!(found.undeclared(None).is_empty());
         assert_eq!(found.undeclared(Some(&[])).len(), 1);

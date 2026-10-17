@@ -1,0 +1,35 @@
+2026-10-16T11:06:39Z
+   Compiling pw-dev-server v0.0.0 (/home/haki/code/pw-wt/train9-bounded-fix/spikes/own-renderer/server)
+    Finished `test` profile [unoptimized] target(s) in 4.16s
+     Running unittests src/main.rs (target/debug/deps/pw_dev_server-ff76041b108b4a26)
+
+running 4 tests
+
+thread 'tests::bounded_statements::scheduled_state_writes_feed_retry_waits_for_a_command' (2417470) panicked at spikes/own-renderer/server/src/tests/bounded_statements.rs:1006:9:
+scheduler transition retry=true crossed an active command transaction
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'tests::bounded_statements::scheduled_state_writes_store_ran_waits_for_a_command' (2417471) panicked at spikes/own-renderer/server/src/tests/bounded_statements.rs:1006:9:
+scheduler transition retry=false crossed an active command transaction
+
+thread 'tests::bounded_statements::scheduled_state_writes_feed_ran_waits_for_a_command' (2417469) panicked at spikes/own-renderer/server/src/tests/bounded_statements.rs:1006:9:
+scheduler transition retry=false crossed an active command transaction
+test tests::bounded_statements::scheduled_state_writes_feed_retry_waits_for_a_command ... FAILED
+
+thread 'tests::bounded_statements::scheduled_state_writes_store_retry_waits_for_a_command' (2417472) panicked at spikes/own-renderer/server/src/tests/bounded_statements.rs:1006:9:
+scheduler transition retry=true crossed an active command transaction
+test tests::bounded_statements::scheduled_state_writes_store_ran_waits_for_a_command ... FAILED
+test tests::bounded_statements::scheduled_state_writes_feed_ran_waits_for_a_command ... FAILED
+test tests::bounded_statements::scheduled_state_writes_store_retry_waits_for_a_command ... FAILED
+
+failures:
+
+failures:
+    tests::bounded_statements::scheduled_state_writes_feed_ran_waits_for_a_command
+    tests::bounded_statements::scheduled_state_writes_feed_retry_waits_for_a_command
+    tests::bounded_statements::scheduled_state_writes_store_ran_waits_for_a_command
+    tests::bounded_statements::scheduled_state_writes_store_retry_waits_for_a_command
+
+test result: FAILED. 0 passed; 4 failed; 0 ignored; 0 measured; 591 filtered out; finished in 0.20s
+
+error: test failed, to rerun pass `-p pw-dev-server --bin pw-dev-server`

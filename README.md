@@ -11,6 +11,11 @@ browser-native experiments are a separate later research track.
 [`PROJECT_CHARTER.md`](PROJECT_CHARTER.md) is the project constitution.
 [`AGENTS.md`](AGENTS.md) summarizes the operating rules.
 
+New to Pleris? [The guide](docs/guide/README.md) is for a developer who knows
+TypeScript and React, Next.js or Svelte: why Pleris, a tour of the language, a
+tutorial that builds a small app, and every diagnostic code. A test compiles
+its examples.
+
 ## Implementation status
 
 Current milestone state, completed evidence, open gates, and reproduce commands
@@ -41,6 +46,10 @@ just doctor       # Inspect the pinned environment without installing tools.
 just bootstrap    # Set up the repository's pinned dependencies.
 just ci           # Run the existing project checks.
 ```
+
+The toolchain is Unix-only and CI runs Ubuntu, so on Windows develop inside WSL2,
+with the checkout on WSL's own filesystem (`~/code/…`, not `/mnt/c`).
+`.gitattributes` keeps a clone LF even where Git for Windows would make it CRLF.
 
 The census and targeted attribution regression tests do not require the Rust build:
 

@@ -263,6 +263,55 @@ interface store-page-settle-payment-api {
     settle-payment: func(arg0: payments-settled) -> result<domain-order-status, domain-order-error>;
 }
 
+interface store-rate-rate-page-api {
+    use pw:types/types.{domain-store-id};
+    rate-page: func(arg0: domain-store-id);
+}
+
+interface store-rate-rate-page-derived-10-api {
+    derived10: func(arg0: s64) -> bool;
+}
+
+interface store-rate-rate-page-derived-12-api {
+    derived12: func(arg0: s64) -> bool;
+}
+
+interface store-rate-rate-page-derived-14-api {
+    derived14: func(arg0: s64) -> bool;
+}
+
+interface store-rate-rate-page-derived-16-api {
+    derived16: func(arg0: s64) -> string;
+}
+
+interface store-rate-rate-page-derived-6-api {
+    derived6: func(arg0: s64) -> bool;
+}
+
+interface store-rate-rate-page-derived-8-api {
+    derived8: func(arg0: s64) -> bool;
+}
+
+interface store-rate-rate-order-api {
+    use pw:types/types.{ratings-comment, ratings-rating-error, ratings-stars, domain-store-id};
+    rate-order: func(arg0: domain-store-id, arg1: ratings-stars, arg2: ratings-comment) -> result<s64, ratings-rating-error>;
+}
+
+interface store-reviews-order-ratings-api {
+    use pw:types/types.{capability-user-id, store-reviews-rate-link};
+    order-ratings: func(arg0: capability-user-id) -> list<store-reviews-rate-link>;
+}
+
+interface store-reviews-store-ratings-api {
+    use pw:types/types.{domain-store-id, store-reviews-ratings-shown};
+    store-ratings: func(arg0: domain-store-id) -> store-reviews-ratings-shown;
+}
+
+interface store-reviews-store-to-rate-api {
+    use pw:types/types.{capability-user-id, domain-store-id, store-reviews-rate-shown};
+    store-to-rate: func(arg0: domain-store-id, arg1: capability-user-id) -> store-reviews-rate-shown;
+}
+
 interface store-search-search-api {
     use pw:types/types.{capability-user-id, store-search-search-shown};
     search: func(arg0: option<string>, arg1: capability-user-id) -> store-search-search-shown;
@@ -327,6 +376,7 @@ world store-hours-store-status {
 world store-hours-stores-open {
     import pw:host/clock;
     import store:data/hours;
+    import store:data/ratings;
     import store:data/stores;
     export store-hours-stores-open-api;
 }
@@ -411,6 +461,7 @@ world store-page-order-page {
     import store-page-cancel-order-api;
     import store-page-order-api;
     import store-page-order-total-api;
+    import store-reviews-order-ratings-api;
     export store-page-order-page-api;
 }
 
@@ -478,6 +529,7 @@ world store-page-store-page {
     import store-page-recommendations-api;
     import store-page-remove-from-cart-api;
     import store-page-store-api;
+    import store-reviews-store-ratings-api;
     export store-page-store-page-api;
 }
 
@@ -625,9 +677,64 @@ world store-page-settle-payment {
     export store-page-settle-payment-api;
 }
 
+world store-rate-rate-page {
+    import pw:host/principal;
+    import store-rate-rate-order-api;
+    import store-reviews-store-to-rate-api;
+    export store-rate-rate-page-api;
+}
+
+world store-rate-rate-page-derived-10 {
+    export store-rate-rate-page-derived-10-api;
+}
+
+world store-rate-rate-page-derived-12 {
+    export store-rate-rate-page-derived-12-api;
+}
+
+world store-rate-rate-page-derived-14 {
+    export store-rate-rate-page-derived-14-api;
+}
+
+world store-rate-rate-page-derived-16 {
+    export store-rate-rate-page-derived-16-api;
+}
+
+world store-rate-rate-page-derived-6 {
+    export store-rate-rate-page-derived-6-api;
+}
+
+world store-rate-rate-page-derived-8 {
+    export store-rate-rate-page-derived-8-api;
+}
+
+world store-rate-rate-order {
+    import pw:host/invalidations;
+    import pw:host/outbox;
+    import pw:host/principal;
+    import store:data/ratings;
+    export store-rate-rate-order-api;
+}
+
+world store-reviews-order-ratings {
+    import store:data/ratings;
+    export store-reviews-order-ratings-api;
+}
+
+world store-reviews-store-ratings {
+    import store:data/ratings;
+    export store-reviews-store-ratings-api;
+}
+
+world store-reviews-store-to-rate {
+    import store:data/ratings;
+    export store-reviews-store-to-rate-api;
+}
+
 world store-search-search {
     import pw:host/clock;
     import store:data/hours;
+    import store:data/ratings;
     import store:data/search;
     export store-search-search-api;
 }
@@ -877,6 +984,36 @@ package pw:types {
             too-many,
             no-such-address,
         }
+        type ratings-stars = s64;
+        type ratings-comment = string;
+        record ratings-ratings-of {
+            store: domain-store-id,
+            count: s64,
+            stars: s64,
+        }
+        record ratings-review {
+            id: s64,
+            stars: s64,
+            comment: string,
+        }
+        record ratings-given {
+            stars: s64,
+            comment: string,
+        }
+        record ratings-store-of-order {
+            store: domain-store-id,
+            name: string,
+            given: option<ratings-given>,
+        }
+        record ratings-order-to-rate {
+            delivered: bool,
+            stores: list<ratings-store-of-order>,
+        }
+        variant ratings-rating-error {
+            not-delivered,
+            not-in-order,
+            already-rated,
+        }
         record saved-saved-items {
             items: list<domain-menu-item-id>,
             count: s64,
@@ -983,6 +1120,22 @@ package pw:types {
             cuisine: string,
             open: bool,
             said: string,
+            rating: string,
+        }
+        record store-reviews-ratings-shown {
+            said: string,
+            reviews: list<ratings-review>,
+        }
+        record store-reviews-rate-link {
+            store: domain-store-id,
+            open: bool,
+            said: string,
+        }
+        record store-reviews-rate-shown {
+            name: string,
+            closed: bool,
+            said: string,
+            comment: string,
         }
         record store-search-dish-hit {
             id: domain-menu-item-id,
@@ -1016,6 +1169,7 @@ package pw:types {
             description: string,
             cuisine: string,
             open: string,
+            rating: string,
             dishes: list<store-search-dish-hit>,
             more: string,
         }
@@ -1038,16 +1192,19 @@ package pw:host {
         today: func(arg0: clock-time-zone) -> clock-local-date;
     }
     interface invalidations {
-        use pw:types/types.{capability-user-id};
+        use pw:types/types.{capability-user-id, domain-store-id};
         store-page-cart: func(arg0: capability-user-id);
         store-page-checkout: func(arg0: capability-user-id);
         store-page-order-total: func(arg0: capability-user-id);
         store-page-order: func(arg0: capability-user-id);
         store-page-saved-addresses: func(arg0: capability-user-id);
+        store-reviews-order-ratings: func(arg0: capability-user-id);
+        store-reviews-store-to-rate: func(arg0: domain-store-id, arg1: capability-user-id);
     }
     interface outbox {
-        use pw:types/types.{capability-user-id};
+        use pw:types/types.{capability-user-id, domain-store-id};
         addresses-changed: func(arg0: capability-user-id);
+        store-rated: func(arg0: domain-store-id);
         user-cart-changed: func(arg0: capability-user-id);
         user-order-changed: func(arg0: capability-user-id);
     }
@@ -1114,6 +1271,13 @@ package store:data {
     interface promos {
         use pw:types/types.{capability-user-id, store-checkout-promo-found};
         find: func(arg0: capability-user-id, arg1: string) -> option<store-checkout-promo-found>;
+    }
+    interface ratings {
+        use pw:types/types.{ratings-comment, ratings-order-to-rate, ratings-rating-error, ratings-ratings-of, ratings-review, ratings-stars, capability-user-id, domain-store-id};
+        for-order: func(arg0: capability-user-id) -> ratings-order-to-rate;
+        for-stores: func(arg0: list<domain-store-id>) -> list<ratings-ratings-of>;
+        rate: func(arg0: capability-user-id, arg1: domain-store-id, arg2: ratings-stars, arg3: ratings-comment) -> result<s64, ratings-rating-error>;
+        reviews: func(arg0: domain-store-id) -> list<ratings-review>;
     }
     interface recommendations {
         use pw:types/types.{domain-recommendation, domain-recommendation-error, domain-store-id};

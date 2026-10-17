@@ -20,6 +20,8 @@ fn middle(id: StoreId) -> Result<Store, StoreError> !{ database.read<Stores> } {
     inner(id)
 }
 
-fn outer(ids: List<StoreId>) -> List<Result<Store, StoreError>> !{} {
-    List.map(ids, id => middle(id))
+// Keyed by `home`, no element's: a read keyed by its loop's element is
+// PW0405's (4c), and this file is about the row, which the key is not.
+fn outer(ids: List<StoreId>, home: StoreId) -> List<Result<Store, StoreError>> !{} {
+    List.map(ids, id => middle(home))
 }
