@@ -1,7 +1,9 @@
 # ADR-0351: a member read retains its type and effects through generic calls
 
 Status: accepted under the integrator's generic-effects brief of 2026-10-16;
-ruling 2026-10-15 (client date); worker implementation/evidence complete at7ec6a534, assembled changes awaiting whole/fullCI gates. Date: 2026-10-16. Milestone: E14.
+ruling 2026-10-15 (client date); worker implementation/evidence complete at7ec6a534; the assembled merge's 49
+whole mutation scripts and full CI green on 2026-10-17 (the train-11 section below), its merge of master pending.
+Date: 2026-10-16. Milestone: E14.
 
 ## Context
 
@@ -640,6 +642,16 @@ bounded before failed at loads of 40 to 110. It passed in the whole
 passed, 0 failed). `just test-compile` and `just
 mutant-programs`, which that run did not reach, pass on their own: 302
 source mutants judged, 16 refused by their named rule, 0 failing.
+
+**Full CI is green.** At 7ab0e7a3, after the gates unpiped in one chain
+(`cargo fmt --all` clean, 3,292 mutation anchors in 274 scripts each
+matching once, `case-check` over 2,870 paths, `just evidence-gates`' 246
+tests), `just ci` (2026-10-17, 16:31 to 17:04 UTC, the load falling from
+54 to 10): `ci: OK`, 347 result groups, 3,100 passed, 0 failed, 25
+ignored, `check_latency` among the passed; 302 source mutants judged, 16
+refused by their named rule, 0 failing. KIOKUN_DATA and KIOKUN_APP were
+inherited, their values not logged.
+[Full CI](../evidence/E14/generic-train11-ci.txt).
 
 **Not claimed.** Which other test suites fail under the lexical mutant:
 that census was started and stopped before any test ran, at a load
