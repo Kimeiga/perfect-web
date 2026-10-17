@@ -123,6 +123,15 @@ LOCAL_ONLY = {
     "e14-kiokun-homophones",
     # And its deinflection against kiokun.com's own resolution.
     "e14-kiokun-deinflection",
+    # The benchmark harness's controls over a task's three stacks: each
+    # sandbox installs its stack's dependencies from this machine's pnpm
+    # store, offline by design (`bench.mjs`'s `sandbox`), and a runner's
+    # store holds no Next.js or SvelteKit. Planned on CI for the first time
+    # on train-10 (the planner reads a recipe with parameters since track
+    # evidence-integrity-2, which also stopped its `|| true`), it failed
+    # there at its first sandbox (verify 39054436657). Its Pleris stack runs
+    # on CI as `e14-pleris-controls`.
+    "e14-harness",
 }
 
 # Recipes run against a database (ADR-0246). Each is a shard of its own,

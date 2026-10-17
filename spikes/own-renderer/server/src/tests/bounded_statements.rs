@@ -1112,7 +1112,12 @@ where
         starting
             .recv_timeout(std::time::Duration::from_secs(5))
             .expect("scheduler started");
-        let early = received.recv_timeout(std::time::Duration::from_millis(100));
+        // Two seconds for an unguarded write to show itself: guarded, it
+        // cannot end before the command does, however long this waits. A
+        // tenth of a second let a slow runner's unguarded write miss it, and
+        // the guard's controls survived once each on train-10 (feed's `ran`
+        // on the PC, store's `retry` on CI's verify 39054436657).
+        let early = received.recv_timeout(std::time::Duration::from_secs(2));
         let returned_early = early.is_ok();
         let committed = staged.commit(&[], &[], None, &[scheduled(20)]);
         // Release every guard and drain before asserting, also on a refusal.
