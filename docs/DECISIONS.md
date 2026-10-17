@@ -3062,3 +3062,11 @@ statement counts wait for the completed payment transaction.
   retained. Strict Cargo producer classification refuses invalid/build/stopped
   evidence with source restoration and no next control. Local strict12/12 and
   fresh CI pass; exact-head remote gates and landing remain pending.
+[ADR-0353](DECISIONS/ADR-0353-repeated-store-hours-preserve-each-occurrence.md):
+a repeated store keeps all of its opening hours (the integrator's local
+repair, track `legacy-hours-duplicates`; train-10).
+- PostgreSQL's `hours#for-stores` took a store's periods out of its maps
+  for the store's first occurrence, so a store asked for twice came back
+  the second time with none; they are read by lookup now, the caller's
+  order, duplicates and misses kept, on both layers. Two more controls,
+  and a Cargo result that is no result is refused, not counted.

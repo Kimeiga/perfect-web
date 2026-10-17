@@ -51,6 +51,31 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0353, 2026-10-16: a repeated store keeps all of its opening hours**
+(train-10, from `57f34890`, track `legacy-hours-duplicates`: the
+integrator's local repair, on train-9's `e2a4acd9`).
+- On PostgreSQL, `hours#for-stores` asked for a store twice gave its
+  second and later occurrences no weekly and no special periods:
+  `pg_hours_of` took each store's periods out of its maps (`remove`) for
+  the first. It reads them now (`get(..).cloned()`); its three set
+  queries, their order, and the caller's order, duplicates and misses are
+  unchanged. A test on both layers,
+  `a_repeated_store_in_a_set_read_keeps_all_of_its_hours` (3 and 17 keys
+  with duplicate and missing tails), was red on PostgreSQL before and
+  passes on both after.
+- `store_hours_mutations.py`: two controls more, one for each lookup (19
+  in all), and a Cargo result that is a build error, a stopped process or
+  self-contradictory is refused, not counted, as ADR-0352's script does
+  (`test_store_hours_result_integrity.py`, 4 tests).
+- `e14-store-hours`'s browser stage fails its recipe where its suite fails
+  (train-10's `run_suite.sh`, ADR-0349); the track's four recipe tests
+  hold it: with `|| true` put back, three of them fail.
+- The track's own runs, at its local snapshot: the hours script whole 19
+  of 19 and the bounded statements' 12 of 12, 36 browser tests in three
+  engines, and `just ci` green (2955 Rust tests passed, 25 ignored;
+  [raw output](evidence/E14/repeated-store-hours-ci.txt)).
+Verify TRAIN_RUN green, with train-10.
+
 **ADR-0350, 2026-10-16: tables and bounded generated reads**
 (local train-10 integration). Table declarations generate their reads,
 writes, schema metadata and migration locks. The bounded checker uses
