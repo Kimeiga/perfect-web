@@ -468,9 +468,10 @@ fn steps(more: bool) -> Vec<(String, u64)> {
     // operations and its commit), and the reader's open pages read again
     // after it, which its cart's event regenerates (ADR-0218's session
     // entry): every page the scenario left open.
-    let (txns, all) = (
+    let (txns, all, by_op) = (
         s.data.statements_by_transaction().len(),
         s.data.statements().expect("counted"),
+        s.data.statements_by_op(),
     );
     let rated = s
         .command_answered(
@@ -486,10 +487,37 @@ fn steps(more: bool) -> Vec<(String, u64)> {
     let [own] = ran[..] else {
         panic!("rate_order's one transaction: {ran:?}")
     };
+    // What its statements are made of, by operation, as `place_order`'s
+    // (NEXT 4c's render merge), and the two reads every open page of the
+    // reader's makes with one key: the cart its layout shows, and its order.
+    let (mut carts_again, mut orders_again) = (0, 0);
+    for (op, (calls, statements)) in s.data.statements_by_op() {
+        let (c0, r0) = by_op.get(&op).copied().unwrap_or_default();
+        if calls > c0 {
+            eprintln!(
+                "rate_order: {op}: {} calls, {} statements",
+                calls - c0,
+                statements - r0
+            );
+            match op.as_str() {
+                "read store:data/user-carts#current" => carts_again = calls - c0,
+                "read store:data/user-orders#current" => orders_again = calls - c0,
+                _ => {}
+            }
+        }
+    }
     out.push(("rate_order: its transaction".to_string(), own));
     out.push((
         "rate_order: its reader's open pages read again".to_string(),
         after - own,
+    ));
+    out.push((
+        "rate_order: user-carts#current called again".to_string(),
+        carts_again,
+    ));
+    out.push((
+        "rate_order: user-orders#current called again".to_string(),
+        orders_again,
     ));
     let mut step = |name: &str, run: &dyn Fn()| {
         let before = s.data.statements().expect("a layer that counts");
@@ -581,9 +609,13 @@ fn a_commands_commit_is_counted_with_it() {
 // after `place_order`'s commit are one render, the drain's read of the cart
 // and the session's five documents, so `user-carts#current`, which every
 // page's layout reads, is called once there where it was called six times
-// (its row below), and 21 statements became 16. No other count moved: no
-// other page or command here calls one operation twice with the same
-// arguments in one render.
+// (its row below), and 21 statements became 16. And the reader's seven open
+// pages read again after `rate_order` are one render: `user-carts#current`
+// once where it was called seven times, `user-orders#current` (2 statements)
+// once where twice (their rows below), and 42 statements became 34
+// (measured with the merge and without it, 2026-10-17). No other count
+// moved: no other page or command here calls one operation twice with the
+// same arguments in one render.
 const PAGES: &[(&str, u64)] = &[
     ("add_to_cart (47)", 10),
     ("add_to_cart (48)", 11),
@@ -612,7 +644,9 @@ const PAGES: &[(&str, u64)] = &[
     // read again after it, the seven the scenario left open, which its cart's
     // event regenerates; and the rate page, its store and the layout's cart.
     ("rate_order: its transaction", 8),
-    ("rate_order: its reader's open pages read again", 42),
+    ("rate_order: its reader's open pages read again", 34),
+    ("rate_order: user-carts#current called again", 1),
+    ("rate_order: user-orders#current called again", 1),
     ("/order/rate/47", 2),
 ];
 
