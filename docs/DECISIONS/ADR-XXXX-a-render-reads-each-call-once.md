@@ -177,7 +177,8 @@ materialization kept).
    - **A render that waits past `SEAT_WAIT` (30 s) fails, saying so**:
      every read of it answers that it waited; never a read outside its
      snapshot, never a seat past the bound. A backstop, not a bound a render
-     is expected to meet.
+     is expected to meet. A test's host waits 5 s, so a control that keeps a
+     seat fails in seconds.
 5. **What a render takes of another's** (ruling 3, stated and closed where
    the program's invalidations say it matters). A render begins as of the
    queries' invalidations so far (`pw_resource::Resources::epoch`, taken
@@ -258,7 +259,7 @@ once at most 8.
   nothing kept past the render; the snapshot asked for where the render
   begins; a render begun inside another that one, whatever its session; one
   layer's render answering for no other's.
-- `tests/render_merge.rs` (24), the store in memory and on PostgreSQL
+- `tests/render_merge.rs` (22), the store in memory and on PostgreSQL
   (`PW_STORE_TEST_LAYER`), the feed on PostgreSQL: a commit's documents read
   in one render, the cart once, each store's reach for its own; the feed's
   two timelines read once; another writer's commit between two bindings'
@@ -277,16 +278,55 @@ once at most 8.
   four invalidations; neither joins nor is joined nor kept; the controls.
 - `tests/bounded_statements.rs`: the re-reads 21 -> 16 and 42 -> 34, and
   rows of their own for the calls made again.
-- `scripts/render_merge_mutations.py`: one mutant for each rule (the
+- `scripts/render_merge_mutations.py`, 40 mutants, one for each rule (the
   merge, the host's renders and their order with the table, the seats, the
-  snapshots in memory, pw-resource's stamps and reads alone), read by
-  `cargo_test_results` (ADR-0352); results in Evidence.
+  snapshots in memory, pw-resource's stamps and reads alone), each command
+  read by `cargo_test_results` (ADR-0352); results in Evidence.
 - The re-anchored scripts, each run whole (Evidence).
 - The server's suite, in memory and on PostgreSQL; `just ci`.
 
 ## Evidence
 
-(Filled in from the recorded runs before this ADR is committed.)
+Recorded on this branch, 2026-10-17, PostgreSQL 18.6, rustc 1.97.1 (the
+machine shared with other workers, load average 28 to 64 on 32 threads):
+
+- `just e14-render-merge` at a500f77a, clean
+  (`docs/evidence/E14/render-merge.txt`, 2094 s): the merge's tests with
+  the store in memory 30 passed; with the store on PostgreSQL, and NEXT 4b's
+  counts, 40 passed; pw-resource's `read_as_of` 4 passed;
+  `scripts/render_merge_mutations.py` **40 of 40 mutants killed** (21 in the
+  `memory` suite, 8 `postgres`, 9 `resource`, 1 `unit`, 1 `bound`), every
+  baseline green, no process stopped.
+- The server's whole suite: on PostgreSQL 616 passed, 0 failed, 9 ignored
+  (a500f77a); in memory 616 passed, 0 failed, 9 ignored (6670583a, the same
+  host; a500f77a changed only a test host's seat wait and the script's
+  suites); and in memory again in `just ci` (below). The table's and a
+  turn's checks fired in none of them.
+- The six re-anchored scripts, each run whole at a500f77a: clock 25 of 25,
+  documents 6 of 6, keyed_reads 10 of 10, materializer_failure 6 of 6,
+  pages 7 of 7, tell_at_once 6 of 6 (the two with browsers after their
+  recipes' preparation, chromium, PORT 8541; their first run lacked
+  `kiokun-server`, which their recipes' callers build, and refused its
+  baseline).
+- The payments scenario, 12 runs at 14331449: each 37, 17, 25, 14, 26, 14 at
+  both sizes.
+- **A run stopped, and a mutant left applied** (finding): the first whole
+  run of the script hung at its fifth mutant, "a render is kept past its
+  end": the leaked render's read transaction held its tables, and a served
+  feed test's schema, dropped at its end, waited for it for good (under the
+  strict runner a command past 1200 s is no kill, and stops the run).
+  Stopped by SIGTERM to the script and its cargo group killed, the mutant
+  stayed applied; restored from the commit, `mutation_anchors.py` checked.
+  The control now runs in a `unit` suite, the merge's own tests (killed in
+  7 s); "an idle connection is never taken again", which piles up a
+  connection per render toward the shared server's `max_connections` of
+  100, in a `bound` suite, the bound's own test (27 s); and a test's host
+  waits 5 s for a seat, a deployment's 30 s, so "a seat is never given
+  back" fails in seconds (139 s for its suite).
+- **A flake, not this track's**: `the_store_sends_its_slots_after_its_own_content`
+  holds the store page's shell to 150 ms. On PostgreSQL under this load it
+  failed on master too: twelve pairs run alternately, master 1 of 12
+  (215 ms), this branch 2 of 12 (176 and 171 ms). Not loosened.
 
 ## Not claimed
 
@@ -324,3 +364,8 @@ once at most 8.
   seconds are measured (`scripts/ci_seconds.json`).
 - pw-resource gains `epoch` and `fetch_cancellable_as_of`; `fetch` and
   `fetch_cancellable` are unchanged.
+- Six other tracks' scripts are re-anchored (27338ab1), each run whole
+  (Evidence); their recipes' evidence files are not regenerated here.
+- The commits after the merge with train-9 were rewritten before any push
+  (the pre-rewrite head is the local tag `render-merge-before-squash`, the
+  same tree).
