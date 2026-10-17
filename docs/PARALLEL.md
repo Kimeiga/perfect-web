@@ -2050,6 +2050,16 @@ Each a decision for a track, with its date; a track's ADR records it too.
     (exit 127): the tree copies the real helper now, and all four pass; with
     `|| true` put back, three fail. Its STATUS paragraph, written above the
     charter's sections, is an entry of its own.
+  - **A finding: two merges met in a control** (`e920c40c`). The train's
+    whole run of `reviews_mutations.py` found "the layer takes a comment
+    past 500 characters" surviving, 29 of 30, where train-9's verify had
+    killed it. ADR-0346 holds every call's arguments at the component's
+    boundary, a test's command too, and a `Comment` is `String where
+    String.length(value) <= 500`: reviews' one test of the layer's rule, a
+    501-character comment through the command, was refused before the
+    layer. The layer's rule still traps on any caller past the program's
+    types; its test now calls the layer directly, as its stars rule's did,
+    and the next whole run killed it, 30 of 30. Each track was green alone.
   - **Numbering.** ADR-0353 for the hours (master's highest is ADR-0352;
     ADR-0351 is held by `wip/train10-generic-merge`'s generic effects,
     train-11's). The planner's track amends ADR-0290 and numbers nothing.
@@ -2063,3 +2073,31 @@ Each a decision for a track, with its date; a track's ADR records it too.
     `check-is-build`'s assembly, the parallel slots' allocator, the browser
     host map, `contributor-dx`, tables' D2, `browser-cleanup-23`, `todomvc`,
     `render-merge` and `second-host`.
+  - **Flakes, recorded** (the tests unchanged): bounded statements'
+    "feed_pg.rs ran bypasses the command write guard" survived one whole
+    run of two (load ~55; the second, 13 of 13), as it is killed only by a
+    100 ms window in which the unguarded scheduler write must return early:
+    a race. And `check_latency` failed the first `just ci` at a load of ~75
+    (a cold check's 2,181.69 ms of CPU against its 2 s ceiling; alone at
+    ~40, 1,216.62 ms) and stopped `evidence_integrity_mutations.py`'s first
+    baseline at ~65 (2,564.89 ms): a thread's CPU time is not immune to a
+    machine loaded past twice its threads.
+  - **Its local runs** (the PC, WSL2, 32 threads, at loads of 8 to 105 with
+    other agents' runs beside). `just ci` on `e920c40c`, green (15:45 to
+    16:35Z): 346 test binaries, 3,065 tests passed, none failed, 25 ignored,
+    `check_latency` 2 of 2; evidence-gates 261 tests (2 skipped);
+    `mutant-programs` 301 judged in 12 programs, 16 refused by their named
+    rule, none failing. (The first, on `66d0dc61`, failed `check_latency`
+    alone, above.) Each recipe the merges reach run whole, in throwaway
+    worktrees at `da61e5f9` (`e14-reviews` and the evidence-integrity script
+    again at `e920c40c`, the bounded statements' script again at
+    `66d0dc61`), their evidence not kept: `e14-scheduled-orders`
+    53 of 53, `e14-payments` 41 of 41, `e14-store-hours` 19 of 19 (36
+    browser tests), `e14-descriptions` 9 of 9 (620 server tests, 21 browser
+    tests), `e14-reviews` 30 of 30, `e14-scheduled` 37 of 37,
+    `e14-uploads` 33 of 33, `e14-bounded-statements` 13 of 13,
+    `e14-dealt-by-time` 49 of 49, `e14-evidence-integrity-2` 35 of 35 and
+    `evidence_integrity_mutations.py` 38 of 38, its three new controls
+    among them; no memory bound stopped a process. Chosen by `ci_plan.py
+    --changed 9902c62b da61e5f9` (nine recipes), with payments' and the
+    scheduler's beside them, whose write guard master's merge changed.

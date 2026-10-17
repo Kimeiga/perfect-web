@@ -105,8 +105,10 @@ Fresh `just ci` returned native0/ci:OK on execution snapshot85c5c3c3:
 2955 Rust tests passed,25 ignored; Python190 run,189 passed,1 skipped.
 `docs/evidence/E14/repeated-store-hours-ci.txt` is its unchanged raw output;
 `repeated-store-hours-gates.json` binds the source manifest, exact closed
-proof/recovery hashes and qualifications. Reproduce with the three commands
-listed in STATUS using provisioned PostgreSQL and the pinned local tools.
+proof/recovery hashes and qualifications. Reproduce with three commands,
+`just e14-store-hours`, `python3 -B scripts/bounded_statements_mutations.py`
+and `just ci`, using provisioned PostgreSQL and the pinned local tools (they
+were listed in STATUS until the merge, below).
 
 These result records were added after that exact execution. They change
 documentation/evidence only; the checked executable, test and recipe bytes

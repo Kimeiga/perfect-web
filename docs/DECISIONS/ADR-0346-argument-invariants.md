@@ -261,3 +261,18 @@ the whole argument-invariants script killed 18/18 controls with no bound
 stops. The raw before/after and control evidence is
 `docs/evidence/E14/argument-path-text.txt`. Full assembled CI and verification
 remain pending; no landing is claimed here.
+
+
+## Found on train-10 (the integrator's delegate, 2026-10-17)
+
+- **Two merges met in a control.** Merged with master's ratings and
+  reviews (ADR-0341), the boundary this ADR adds holds a `Comment`
+  (`String where String.length(value) <= 500`) on every call, a test's
+  command too, so `tests/reviews.rs`'s one test of the layer's own comment
+  rule, a 501-character comment through `rate_order`, was refused here
+  before the layer was reached: `reviews_mutations.py`'s "the layer takes a
+  comment past 500 characters" survived the train's whole run, 29 of 30,
+  where train-9's verify had killed it. The layer's rule still traps on any
+  caller past the program's types, and its test calls the layer directly
+  now, as its stars rule's did (`e920c40c`; 30 of 30 on the next run). The
+  pending remote verification above is the train's.

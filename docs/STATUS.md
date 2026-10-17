@@ -178,6 +178,9 @@ follow-up `49a2f90f` refuses
 malformed escapes and non-UTF-8 path text with 400, while valid unknown
 paths remain 404. Memory and PostgreSQL parameter suites passed 6/6 each;
 whole controls killed 18/18. [Raw correction evidence](evidence/E14/argument-path-text.txt).
+Merged with train-9's reviews, the boundary refuses a comment past 500
+characters before the reviews layer does, whose own rule is tested
+directly since (`e920c40c`).
 Verify TRAIN_RUN green, with train-10.
 
 **ADR-0345, 2026-10-15: each-header expressions are checked**
@@ -5186,9 +5189,13 @@ Latest local integration validation (2026-10-16): the D1 source snapshot
 `evidence/E14/train10-d1-input-sha256.json` passed full `just ci` with
 3,058 Rust tests and no failures. This records tested inputs before the
 local merge commit; it is not a master or GitHub verification claim.
-Master `32757966` is train-9's landing (2026-10-17): its source
-`e2a4acd9` passed GitHub's verify 38909882781 (85 recipes, 1,391 of 1,391
-mutants killed) and ci 38909883157. Older records follow.
+Train-10 at `e920c40c` (2026-10-17): `just ci` green on the PC, 3,065
+Rust tests passed, none failed, 25 ignored, `check_latency` 2 of 2,
+mutant programs 301 judged and none failing; the recipes its merges reach
+run whole, every control killed (PARALLEL's train-10 entry). Its verify is
+the record. Master `32757966` is train-9's landing (2026-10-17): its
+source `e2a4acd9` passed GitHub's verify 38909882781 (85 recipes, 1,391
+of 1,391 mutants killed) and ci 38909883157. Older records follow.
 
 `4310769` (2026-10-07, ADR-0232 to ADR-0234, and the two survivors at
 `c7f999b` accounted for): `just ci` passes locally, the workspace's 2110
