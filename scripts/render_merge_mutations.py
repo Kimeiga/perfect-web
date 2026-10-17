@@ -2,29 +2,47 @@
 """Mutation controls for NEXT 4c's first step (track `render-merge`): within
 one render the host makes each identical operation call once, the
 operation and its arguments as the key, every binding that asks given the
-same answer; and the render's calls read one snapshot of the data layer.
+same answer; the render's calls read one snapshot of the data layer, and
+what it takes of another's only where nothing invalidated it since the
+render began (the integrator's ruling 3); and on PostgreSQL a render reads
+in one of a bounded few seats, every one given back (ruling 2).
 
 Each mutant undoes one rule:
 
 - the merge (`render_merge.rs`): a kept answer never given; the key without
   the arguments, or without the session; a failure kept; nothing ended with
-  the render; a render begun inside another for the same session not that
-  one, or one for another session that one; a render answering for another
-  layer;
-- the host (`main.rs`): the drain's, the documents' and a page's renders
-  not begun; a call answered again counted as made (`/metrics`); the
-  platform's calls merged (the clock's, which note what a read holds until);
-- the snapshot: a render's queries each reading as a query of their own
-  (the host), the store's and the feed's in memory each reading the data as
-  it is now, the store's and the feed's on PostgreSQL ending their read
-  transaction after every read, or keeping it after a read that failed; and
-  the store's render waiting on the pool's bound.
+  the render; a render begun inside another its own; a render answering
+  for another layer; a render's queries each reading as a query of their
+  own; a render taking no snapshot, and no seat;
+- the host (`main.rs`): the drain's count and its documents two renders;
+  each document read again a render of its own; a page's bindings not one
+  render; a call answered again counted as made (`/metrics`); the
+  platform's calls merged (the clock's, which note what a read holds
+  until); a render reading as any reader does what was invalidated since
+  it began; a render held through its telling (the drain's, a session's
+  documents'), or begun before its documents are taken (the drain's, a
+  session's documents'); a document, or a session, said unshowable inside
+  the render;
+- the seats (`feed_pg.rs`): a render seated past the bound; a seat never
+  given back; an idle connection never taken again; a render's
+  transaction ended after every read, or kept after a read that failed; a
+  refused seat read in; the store's and the feed's renders reading outside
+  their seats;
+- the snapshot in memory: the store's and the feed's renders reading the
+  data as it is now;
+- a read as of an epoch (`pw-resource`): each of the four invalidations
+  leaving its resource unstamped; a read as of an epoch never alone, or
+  alone as of its resource's last invalidation; a read alone taking what is
+  kept or a request running, registered as the key's request, or kept.
 
 A mutant must fail the suite it names: `memory`, the merge's own tests and
 the served ones, the store in memory (`render_merge::`); `postgres`, the
-served ones with the store on PostgreSQL, and NEXT 4b's counts re-pinned
+served ones with the store on PostgreSQL, and NEXT 4b's counts
 (`render_merge::`, `tests::bounded_statements::`), which needs
-PW_STORE_DATABASE_URL and PW_FEED_DATABASE_URL.
+PW_STORE_DATABASE_URL and PW_FEED_DATABASE_URL; `resource`, pw-resource's
+`read_as_of` tests. Each suite's result is read by `cargo_test_results`
+(ADR-0352): a command that does not build, is stopped, or says something
+inconsistent is no kill, and stops the run.
 
 Run from the repository root; `just e14-render-merge` records the output.
 The source is restored after every mutant, whatever happens.
@@ -32,10 +50,11 @@ The source is restored after every mutant, whatever happens.
 
 import os
 import pathlib
-import re
 import signal
 import subprocess
 import sys
+
+from cargo_test_results import parse as cargo_result
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SRC = ROOT / "spikes/own-renderer/server/src"
@@ -45,6 +64,7 @@ STORE = SRC / "store.rs"
 STORE_PG = SRC / "store_pg.rs"
 FEED = SRC / "feed.rs"
 FEED_PG = SRC / "feed_pg.rs"
+RESOURCE = ROOT / "runtime/pw-resource/src/lib.rs"
 
 # (what, suite, file, anchor, replacement)
 MUTANTS = [
@@ -87,18 +107,11 @@ MUTANTS = [
         "                reading.retain(|r| !Arc::ptr_eq(r, &mine) || Arc::ptr_eq(r, &mine));\n",
     ),
     (
-        "a render begun inside another for its session is its own",
+        "a render begun inside another is its own",
         "memory",
         MERGE,
-        "            .is_some_and(|r| r.layer == layer && r.session == session)\n",
-        "            .is_some_and(|r| r.layer == layer && r.session == session && r.layer != layer)\n",
-    ),
-    (
-        "a render begun inside another for another session is that one",
-        "memory",
-        MERGE,
-        "            .is_some_and(|r| r.layer == layer && r.session == session)\n",
-        "            .is_some_and(|r| r.layer == layer && (r.session == session || r.session != session))\n",
+        "    if READING.with(|reading| reading.borrow().iter().any(|r| r.layer == layer)) {\n",
+        "    if READING.with(|reading| reading.borrow().iter().any(|r| r.layer == layer && r.layer != layer)) {\n",
     ),
     (
         "a render answers for another layer",
@@ -115,27 +128,48 @@ MUTANTS = [
         "            Some(_) => data.reads(session, stopped),\n",
     ),
     (
-        "the drain's render is not begun",
-        "memory",
-        MAIN,
-        "        let _render = render_merge::begin(&*self.data, session);\n"
-        "        // The count the page shows, as the page computes it: the cart query's\n",
-        "        // The count the page shows, as the page computes it: the cart query's\n",
+        "a render takes no snapshot, and no seat",
+        "postgres",
+        MERGE,
+        "        snapshot: data.snapshot(),\n",
+        "        snapshot: None,\n",
     ),
     (
-        "the documents read again are not one render",
+        "the drain's count and its documents are two renders",
         "memory",
         MAIN,
-        "        let render = render_merge::begin(&*self.data, session);\n"
-        "        let mut read = Vec::new();\n",
-        "        let render = std::cell::Cell::new(0);\n"
-        "        let mut read = Vec::new();\n",
+        "            Err(why) => {\n"
+        "                drop(render);\n"
+        "                return self.unshowable_session(session, &why);\n"
+        "            }\n"
+        "        };\n",
+        "            Err(why) => {\n"
+        "                drop(render);\n"
+        "                return self.unshowable_session(session, &why);\n"
+        "            }\n"
+        "        };\n"
+        "        drop(render);\n"
+        "        let render = render_merge::begin(&*self.data, self.queries.epoch());\n",
+    ),
+    (
+        "each document read again is a render of its own",
+        "memory",
+        MAIN,
+        "        let mut read = Vec::new();\n"
+        "        let mut unread = Vec::new();\n"
+        "        for doc in live {\n",
+        "        drop(render);\n"
+        "        let render = ();\n"
+        "        let mut read = Vec::new();\n"
+        "        let mut unread = Vec::new();\n"
+        "        for doc in live {\n"
+        "            let _own = render_merge::begin(&*self.data, self.queries.epoch());\n",
     ),
     (
         "a page's bindings are not one render",
         "memory",
         MAIN,
-        "        let _render = render_merge::begin(&*self.data, session);\n"
+        "        let _render = render_merge::begin(&*self.data, self.queries.epoch());\n"
         "        let page = document.map_or_else(\n",
         "        let page = document.map_or_else(\n",
     ),
@@ -168,6 +202,141 @@ MUTANTS = [
         "            };\n",
     ),
     (
+        "a render reads as any reader does what was invalidated since it began",
+        "memory",
+        MAIN,
+        "                self.queries\n"
+        "                    .fetch_cancellable_as_of(manifest, key, render.as_of(), load)\n",
+        "                let _ = render;\n"
+        "                self.queries.fetch_cancellable(manifest, key, load)\n",
+    ),
+    (
+        "the drain's render is held through its telling",
+        "memory",
+        MAIN,
+        "        self.tell_in(\n"
+        "            session,\n"
+        "            told,\n"
+        "            render,\n",
+        "        let _held = render;\n"
+        "        self.tell_in(\n"
+        "            session,\n"
+        "            told,\n"
+        "            render_merge::begin(&*self.data, self.queries.epoch()),\n",
+    ),
+    (
+        "a session's documents' render is held through their telling",
+        "memory",
+        MAIN,
+        "        let render = render_merge::begin(&*self.data, self.queries.epoch());\n"
+        "        self.tell_in(session, told, render, entry, version, speculated);\n",
+        "        let _held = render_merge::begin(&*self.data, self.queries.epoch());\n"
+        "        self.tell_in(session, told, render_merge::begin(&*self.data, self.queries.epoch()), entry, version, speculated);\n",
+    ),
+    (
+        "a session's documents' render begins before they are taken",
+        "memory",
+        MAIN,
+        "        let told = self.to_tell(session, which);\n"
+        "        let render = render_merge::begin(&*self.data, self.queries.epoch());\n",
+        "        let render = render_merge::begin(&*self.data, self.queries.epoch());\n"
+        "        let told = self.to_tell(session, which);\n",
+    ),
+    (
+        "the drain's render begins before its documents are taken",
+        "memory",
+        MAIN,
+        "        let told = existing.then(|| self.to_tell(session, |_| true));\n"
+        "        let render = render_merge::begin(&*self.data, self.queries.epoch());\n",
+        "        let render = render_merge::begin(&*self.data, self.queries.epoch());\n"
+        "        let told = existing.then(|| self.to_tell(session, |_| true));\n",
+    ),
+    (
+        "a document that could not be read is said so inside its render",
+        "memory",
+        MAIN,
+        "                Err(why) => unread.push((doc, why)),\n",
+        "                Err(why) => {\n"
+        "                    self.unshowable(&doc, &why);\n"
+        "                    unread.push((doc, why));\n"
+        "                }\n",
+    ),
+    (
+        "a session whose count could not be read is said so inside its render",
+        "memory",
+        MAIN,
+        "            Err(why) => {\n"
+        "                drop(render);\n"
+        "                return self.unshowable_session(session, &why);\n",
+        "            Err(why) => {\n"
+        "                let _ = &render;\n"
+        "                return self.unshowable_session(session, &why);\n",
+    ),
+    (
+        "a render past the bound is seated",
+        "postgres",
+        FEED_PG,
+        "        while seats.taken >= RENDER_CONNECTIONS {\n",
+        "        while seats.taken >= RENDER_CONNECTIONS * 100 {\n",
+    ),
+    (
+        "a seat is never given back",
+        "postgres",
+        FEED_PG,
+        "            seats.taken -= 1;\n"
+        "            self.renders.freed.notify_one();\n",
+        "            seats.taken -= 0;\n"
+        "            self.renders.freed.notify_one();\n",
+    ),
+    (
+        "an idle connection is never taken again",
+        "postgres",
+        FEED_PG,
+        "            while let Some(c) = seats.idle.pop() {\n",
+        "            while let Some(c) = seats.idle.pop().filter(|_| false) {\n",
+    ),
+    (
+        "a render's transaction ends after every read",
+        "postgres",
+        FEED_PG,
+        "        let out = f(conn.as_mut().expect(\"opened\"));\n"
+        "        if out.is_err() {\n",
+        "        let out = f(conn.as_mut().expect(\"opened\"));\n"
+        "        if out.is_err() || out.is_ok() {\n",
+    ),
+    (
+        "a render keeps its transaction after a read that failed",
+        "postgres",
+        FEED_PG,
+        "            self.renders.ended(conn.take().expect(\"opened\"), \"ROLLBACK\");\n",
+        "            let _ = &conn;\n",
+    ),
+    (
+        "a refused seat is read in",
+        "postgres",
+        FEED_PG,
+        "        if let Some(why) = &self.refused {\n"
+        "            return Err(why.clone());\n"
+        "        }\n",
+        "        if let Some(why) = &self.refused {\n"
+        "            let _ = why;\n"
+        "        }\n",
+    ),
+    (
+        "the store's render on PostgreSQL reads outside its seat",
+        "postgres",
+        STORE_PG,
+        "        let Some(seat) = snapshot.downcast_ref::<Arc<crate::feed_pg::Seat>>() else {\n",
+        "        let Some(seat) = snapshot.downcast_ref::<Arc<crate::feed_pg::Seat>>().filter(|_| false) else {\n",
+    ),
+    (
+        "the feed's render on PostgreSQL reads outside its seat",
+        "postgres",
+        FEED_PG,
+        "        let Some(seat) = snapshot.downcast_ref::<Arc<Seat>>() else {\n",
+        "        let Some(seat) = snapshot.downcast_ref::<Arc<Seat>>().filter(|_| false) else {\n",
+    ),
+    (
         "the store's render in memory reads the store as it is now",
         "memory",
         STORE,
@@ -182,56 +351,74 @@ MUTANTS = [
         "            Some(_) => self.reads(session, stopped),\n",
     ),
     (
-        "the store's render on PostgreSQL ends its transaction after every read",
-        "postgres",
-        STORE_PG,
-        "        let out = tally.around(|| f(&mut PgRows(Counted(c))));\n"
-        "        if out.is_err() {\n",
-        "        let out = tally.around(|| f(&mut PgRows(Counted(c))));\n"
-        "        if out.is_err() || out.is_ok() {\n",
+        "an invalidation of a key leaves its resource unstamped",
+        "resource",
+        RESOURCE,
+        "        st.stamp(&key.resource);\n",
+        "        let _ = &key.resource;\n",
     ),
     (
-        "the store's render on PostgreSQL keeps its transaction after a read that failed",
-        "postgres",
-        STORE_PG,
-        "            self.end(conn.take().expect(\"opened\"), \"ROLLBACK\");\n",
-        "            let _ = &conn;\n",
+        "an invalidation where keys are named leaves its resource unstamped",
+        "resource",
+        RESOURCE,
+        "        st.stamp(resource);\n"
+        "        let mut dropped: Vec<Key> = st\n",
+        "        let mut dropped: Vec<Key> = st\n",
     ),
     (
-        "the store's render on PostgreSQL waits on the pool's bound",
-        "postgres",
-        STORE_PG,
-        "        let idle = self.idle.lock().expect(\"idle connections\").0.pop();\n",
-        "        let idle = {\n"
-        "            let mut held = self.idle.lock().expect(\"idle connections\");\n"
-        "            while held.1 >= CONNECTIONS {\n"
-        "                held = self.given_back.wait(held).expect(\"idle connections\");\n"
-        "            }\n"
-        "            held.0.pop()\n"
-        "        };\n",
+        "a resource's whole invalidation leaves it unstamped",
+        "resource",
+        RESOURCE,
+        "        st.stamp(resource);\n"
+        "        st.cache.retain(|key, _| key.resource != resource);\n",
+        "        st.cache.retain(|key, _| key.resource != resource);\n",
     ),
     (
-        "the store's render's connection is kept idle past the pool's bound",
-        "postgres",
-        STORE_PG,
-        "        if !c.is_closed() && idle.0.len() + idle.1 < CONNECTIONS {\n",
-        "        if !c.is_closed() && idle.0.len() < CONNECTIONS {\n",
+        "a resource's expiry leaves it unstamped",
+        "resource",
+        RESOURCE,
+        "        st.stamp(resource);\n"
+        "        for (key, entry) in st.cache.iter_mut() {\n",
+        "        for (key, entry) in st.cache.iter_mut() {\n",
     ),
     (
-        "the feed's render on PostgreSQL ends its transaction after every read",
-        "postgres",
-        FEED_PG,
-        "        let out = f(client.as_mut().expect(\"opened\"));\n"
-        "        if out.is_err() {\n",
-        "        let out = f(client.as_mut().expect(\"opened\"));\n"
-        "        if out.is_err() || out.is_ok() {\n",
+        "a read as of an epoch is never alone",
+        "resource",
+        RESOURCE,
+        "                    .is_some_and(|&at| at > as_of)\n",
+        "                    .is_some_and(|&at| at > as_of && false)\n",
     ),
     (
-        "the feed's render on PostgreSQL keeps its transaction after a read that failed",
-        "postgres",
-        FEED_PG,
-        "            self.end(client.take().expect(\"opened\"), \"ROLLBACK\");\n",
-        "            let _ = &client;\n",
+        "a read as of the epoch of its resource's last invalidation is alone",
+        "resource",
+        RESOURCE,
+        "                    .is_some_and(|&at| at > as_of)\n",
+        "                    .is_some_and(|&at| at >= as_of)\n",
+    ),
+    (
+        "a read alone takes what is kept, or a request running",
+        "resource",
+        RESOURCE,
+        "            if alone {\n"
+        "                st.trace.push(Trace::RequestAlone { key: key.clone() });\n",
+        "            if alone && false {\n"
+        "                st.trace.push(Trace::RequestAlone { key: key.clone() });\n",
+    ),
+    (
+        "a read alone is the key's request",
+        "resource",
+        RESOURCE,
+        "            if !alone {\n"
+        "                st.in_flight.insert(key.clone(), flight.clone());\n",
+        "            if true {\n"
+        "                st.in_flight.insert(key.clone(), flight.clone());\n",
+    ),
+    (
+        "a read alone's value is kept",
+        "resource",
+        RESOURCE,
+        "                    if manifest.cacheable && !alone {\n",
+        "                    if manifest.cacheable {\n",
     ),
 ]
 
@@ -242,10 +429,14 @@ CARGO = {
         TESTS + ["render_merge::", "tests::bounded_statements::"],
         {"PW_STORE_TEST_LAYER": "postgres"},
     ),
+    "resource": (
+        ["cargo", "test", "--quiet", "--locked", "-p", "pw-resource", "--test", "read_as_of"],
+        {},
+    ),
 }
 
 # How long one command may run. Past the bound it is killed with everything
-# it started, and the run counts as failing.
+# it started, and the run stops: a command stopped is no kill.
 BOUND = 1200
 
 
@@ -263,19 +454,18 @@ def bounded(cmd, env):
 
 
 def cargo_tests(suite):
-    """(built, passed, failed) over the suite's tests."""
+    """(valid, passed, failed) over the suite's tests (`cargo_test_results`)."""
     cmd, env = CARGO[suite]
     out, code = bounded(cmd, env)
-    if code is None:
-        return True, 0, 1
-    found = re.findall(r"test result: \w+\. (\d+) passed; (\d+) failed", out)
-    if not found:
+    result = cargo_result(code, out)
+    if not result.valid:
         return False, 0, 0
-    return True, sum(int(p) for p, _ in found), sum(int(f) for _, f in found)
+    return True, result.passed, result.failed
 
 
 def main():
     import mutation_baseline  # keeps what each command says, for a red baseline
+    watch = mutation_baseline.mutation_bound.start()
     # Stopped from outside, the source is still restored: SIGTERM raises
     # here, and the `finally` below runs.
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(1))
@@ -286,7 +476,7 @@ def main():
     for suite in CARGO:
         built, passed, failed = cargo_tests(suite)
         print(f"baseline ({suite}): {passed} passed, {failed} failed", flush=True)
-        if not built or failed or not passed:
+        if not built or failed or not passed or watch.stopped:
             print("FAIL: the unmutated baseline is not green; no mutant can mean anything")
             mutation_baseline.explain()
             return 1
@@ -303,9 +493,11 @@ def main():
             built, passed, failed = cargo_tests(suite)
         finally:
             path.write_text(original)
-        if not built:
-            verdict = "KILLED (does not build)"
-        elif failed:
+        if not built or watch.stopped:
+            print(f"{what} [{suite}]: REFUSED (invalid or stopped Cargo producer; no kill)", flush=True)
+            mutation_baseline.explain()
+            return 1
+        if failed:
             verdict = f"KILLED ({failed} of {passed + failed} tests fail)"
         else:
             verdict = "SURVIVED"
