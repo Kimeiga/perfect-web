@@ -105,10 +105,11 @@ impl Lexical {
     /// in another** (ADR-0066). A nested declaration sees the enclosing
     /// declaration's parameters and the bindings in scope where it is
     /// written, each resolved in the enclosing declaration, as the enclosing
-    /// one's own were. `None` for a declaration with no body.
+    /// one's own were. Interface terms use their canonical arena too
+    /// (ADR-0351); `None` where neither a body nor terms exist.
     pub fn build_in(hir: &Hir, id: DeclId) -> Option<Lexical> {
         let decl = hir.decl(id);
-        let body = hir.body(decl.body?);
+        let body = hir.body(decl.terms_body()?);
         let outer: Vec<(String, DeclId, Binder)> = match enclosing(hir, id) {
             Some(parent) => Lexical::build_in(hir, parent)?
                 .nested
@@ -187,6 +188,12 @@ impl Lexical {
     /// binding in scope has the name.
     pub fn binder(&self, use_: ExprId) -> Option<Binder> {
         self.uses.get(&use_).copied()
+    }
+
+    /// A genuine expression path whose root has no local binding. Computed
+    /// receivers are values, and a local head cannot name a module or type.
+    pub fn unbound_path(&self, body: &Body, expr: ExprId) -> bool {
+        path_root(body, expr).is_some_and(|head| self.binder(head).is_none())
     }
 
     /// The binding a record's shorthand field names: `x` in `Point { x }`.

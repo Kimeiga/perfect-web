@@ -1,0 +1,46 @@
+   Compiling pw-dev-server v0.0.0 (/home/haki/code/pw-wt/train-10-next/spikes/own-renderer/server)
+    Finished `test` profile [unoptimized] target(s) in 2.54s
+     Running unittests src/main.rs (target/debug/deps/pw_dev_server-ff76041b108b4a26)
+
+running 1 test
+test tests::receiver_identity::a_local_receiver_getter_runs_instead_of_a_namesake_type_constructor ... FAILED
+
+failures:
+
+---- tests::receiver_identity::a_local_receiver_getter_runs_instead_of_a_namesake_type_constructor stdout ----
+
+thread 'tests::receiver_identity::a_local_receiver_getter_runs_instead_of_a_namesake_type_constructor' (2310914) panicked at spikes/own-renderer/server/src/tests/receiver_identity.rs:74:5:
+HTTP/1.1 200 OK
+content-type: text/html; charset=utf-8
+content-length: 930
+x-content-type-options: nosniff
+cache-control: private, no-store
+pw-build: b6470bfc4718cc23f
+content-security-policy: default-src 'none'; script-src 'self' 'wasm-unsafe-eval' 'sha256-v8jCs+poUKnEHV7piaB+l4LlDvig0qQ2jqYEal4D2VY='; style-src 'self' 'sha256-PsoNDNr2FXKmBWScmALXJCtS6SI8vayZA8mDCwXDMYE='; img-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'
+connection: close
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Local receiver</title>
+<style>#menu > ul > li:nth-child(n+29), #menu > ul:nth-of-type(n+17) > li { content-visibility: auto; contain-intrinsic-size: auto 7.75em; }</style>
+</head>
+<body>
+<main><output>Local=<!--pw:s0-->false<!--pw:e0--></output></main>
+<div role="status" class="pw-announcer"></div>
+<script type="application/json" id="pw-parts">{"cursor":2,"parts":[{"anchor":"range","id":0,"kind":"text","value":"answer"},{"anchor":"document","id":1,"kind":"title","value":""}],"resume":{"abi":"1","build":"b6470bfc4718cc23f","capture":"","captures":"","construct":"region","document":"5c1da4691e9f9ad9","handler":"","handlers":{},"scheme":"2","scope":"private:"},"schema":"5c1da4691e9f9ad9","template":"receiver.Local"}</script>
+<script>import("/pw-runtime.mjs")</script>
+</body>
+</html>
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    tests::receiver_identity::a_local_receiver_getter_runs_instead_of_a_namesake_type_constructor
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 622 filtered out; finished in 0.50s
+
+error: test failed, to rerun pass `-p pw-dev-server --bin pw-dev-server`

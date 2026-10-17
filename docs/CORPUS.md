@@ -1152,3 +1152,39 @@ Generality at open:        60/60 invariants generality-tested
 | `all_unbounded` | a GENERAL witness, `all()` called bare in the table's own module, and a NEIGHBOUR one, the same call of a bounded table | new invariant |
 | `refers_across_sources` | a GENERAL witness, the referring table in no source, and a NEIGHBOUR one, a self-reference within one source | new invariant |
 | `migration_unstated` | a GENERAL witness, a field's type changed, and a NEIGHBOUR one, the same change `backfilled with` a value | new invariant |
+
+## C28: generic results retain member types, effects and labels, 2026-10-16
+
+Opened under ADR-0351 after C27. The canonical value solver instantiates each
+generic call; effects and privacy read members through that solved receiver
+type. Rigid type parameters declare no members (PW0610), and an untyped
+receiver is refused (PW0408). Existing D1 and bounded-read categories remain.
+
+```text
+Corpus version:            C28
+Accepted programs:         43
+Rejected programs:         93
+Charter categories:        43/43 accepted, 93/93 rejected
+Generality expected:       63/63 invariants generality-tested
+Integration validation:    pending combined gates
+```
+
+| Fixture | Change | Kind |
+|---|---|---|
+| A-049 | generic call results retain pure member types | new category |
+| R-090, R-091 | generic-result view/function member effects remain visible | two new categories |
+| R-092 | a member receiver needs a known type, PW0408 | new category |
+| R-093 | a rigid parameter declares no member, PW0610 | new category |
+| R-094 | a function-valued receiver retains the function's effects | new category |
+| R-095 | a recursive generic invocation substitutes its own argument types | new category |
+
+R-028 now states progress: OrderProgress to preserve its existing scope
+refusal without introducing an unrelated unknown receiver; C0 remains frozen.
+The worker's complete before/after program comparison and negative histories
+are linked from ADR-0351. This entry does not certify backend specialization.
+
+R-091 now takes one element from the reversed result through List.get/Option
+matching. Its original loop also has the now-detected per-element read defect;
+the revised fixture retains only PW0400. The complete old program and actual
+new diagnostic remain in train10-generic-call-composition-before.txt. Separate
+joint tests preserve that property's PW0405 and its explicit-call neighbours.

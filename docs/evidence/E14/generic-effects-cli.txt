@@ -1,0 +1,80 @@
+produced by: complete generic-effects command-line preflight
+base: 1e8b1ccdee54ed7b0437e06575c4a5d9e6ac0ff3
+taxonomy registry SHA256: 3fdaf87e5f177ca11ed162ab78f7dcdacacf49add8e53c1103f29153b97d2eca
+registry is the only uncommitted code change; fixture programs and compiler/platform remain unchanged
+profile: default; own target; CARGO_BUILD_JOBS=4; offline; inherited deployment vars
+started UTC: 2026-10-16T06:35:22.030843+00:00
+
+
+COMMAND just fmt-check mutation-anchors test-compile mutant-programs
+cargo fmt --all -- --check
+mutation anchors: 2913 mutants in 264 scripts, each matching once
+# ADR-0276: the reference apps, the demo and the generality cases too;
+# `examples/history` keeps the sources as they were.
+cargo run --quiet -p pw-cli -- fmt --check examples/*.pw examples/lib/*.pw examples/accepted/*.pw examples/rejected/*.pw examples/rules/*/*.pw examples/kiokun/*.pw examples/kiokun-site/*.pw packages/*/*.pw examples/feed/*.pw examples/store/*.pw examples/demo/*.pw examples/generality/*/*.pw
+pw fmt: 408 file(s) already formatted
+cargo run --quiet -p corpus-check -- examples
+accepted: 37 files
+accepted: 37/37 charter §16 categories covered
+rejected: 80 files
+rejected: 80/80 charter §16 categories covered
+corpus-check: OK
+# The accepted corpus as the ONE program it is: the shared library plus
+# every accepted file. Feeding it the rejected files too would ask the
+# compiler to resolve 68 files as one program, which they are not — five
+# rejected fixtures reuse module names with each other (E2B).
+cargo run --quiet -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/accepted/*.pw
+pw check: 85 file(s), no diagnostics
+# The demo, checked as the program it is. It was outside `ci` until E6,
+# and E6's first rule found two dangling edges in it — a milestone demo
+# nothing checks is a milestone demo that can quietly stop being true.
+cargo run --quiet -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/store/*.pw
+pw check: 53 file(s), no diagnostics
+# The kiokun slice (E10): a second application, and the first to use the
+# platform package without the store's domain.
+cargo run --quiet -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/kiokun/*.pw
+pw check: 27 file(s), no diagnostics
+# kiokun.com in Pleris (track `kiokun`), beside the slice's shard rule.
+cargo run --quiet -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/kiokun/Shards.pw examples/kiokun/dictionary.pw examples/kiokun-site/*.pw
+pw check: 25 file(s), no diagnostics
+mutant programs: 237 mutants of a program's source, 11 refused by the rule their script names, 0 failing
+EXIT 0
+
+COMMAND cargo test --quiet --locked -p corpus-check
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+EXIT 0
+
+COMMAND cargo test --quiet --locked -p pw-core --test checking_source --test generality --test resolve_corpus --test evidence_reachability --test generic_effects
+
+running 18 tests
+..................
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 44.19s
+
+
+running 7 tests
+.......
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.62s
+
+
+running 6 tests
+......
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 58.20s
+
+
+running 24 tests
+........................
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.10s
+
+
+running 7 tests
+.......
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 27.91s
+
+EXIT 0
+
+finished UTC: 2026-10-16T06:38:59.956313+00:00
+ALL PREFLIGHT COMMANDS: PASS

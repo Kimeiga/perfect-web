@@ -1,0 +1,29 @@
+   Compiling pw-core v0.0.0 (/home/haki/code/pw-wt/train-10-next/compiler/pw-core)
+    Finished `test` profile [unoptimized] target(s) in 0.53s
+     Running tests/backend_lowering.rs (target/debug/deps/backend_lowering-22d59be4316b4954)
+
+running 2 tests
+test local_member_call_cannot_lower_as_a_type_constructor ... FAILED
+test local_member_callback_cannot_lower_as_a_type_constructor ... FAILED
+
+failures:
+
+---- local_member_call_cannot_lower_as_a_type_constructor stdout ----
+
+thread 'local_member_call_cannot_lower_as_a_type_constructor' (2316993) panicked at compiler/pw-core/tests/backend_lowering.rs:665:5:
+a local member must never compile as the namesake constructor: Program { functions: [Function { def: DefId { unit: 23, decl: 4 }, export: "Shadow", params: [], ret: Nominal(DefId { unit: 23, decl: 1 }, []), blocks: [Block { id: BlockId(0), instrs: [Const { result: ValueId(0), value: Str("x"), ty: Str }, Construct { result: ValueId(1), ctor: DefId { unit: 23, decl: 2 }, args: [ValueId(0)], ty: Nominal(DefId { unit: 23, decl: 2 }, []) }, Const { result: ValueId(2), value: Int(7), ty: Int }, Case { result: ValueId(3), case: 0, fields: [ValueId(2)], ty: Nominal(DefId { unit: 23, decl: 1 }, []) }], terminator: Return(ValueId(3)) }], capabilities: [], instance: [], callees: [], closures: [] }, Function { def: DefId { unit: 23, decl: 5 }, export: "Genuine", params: [], ret: Nominal(DefId { unit: 23, decl: 1 }, []), blocks: [Block { id: BlockId(0), instrs: [Const { result: ValueId(0), value: Int(7), ty: Int }, Case { result: ValueId(1), case: 0, fields: [ValueId(0)], ty: Nominal(DefId { unit: 23, decl: 1 }, []) }], terminator: Return(ValueId(1)) }], capabilities: [], instance: [], callees: [], closures: [] }], types: [TypeDef { def: DefId { unit: 23, decl: 1 }, args: [], name: "Shape", shape: Variant { cases: [("Circle", [Int]), ("Empty", [])] } }, TypeDef { def: DefId { unit: 23, decl: 2 }, args: [], name: "Item", shape: Record { fields: [("name", Str)] } }], imports: [] }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- local_member_callback_cannot_lower_as_a_type_constructor stdout ----
+
+thread 'local_member_callback_cannot_lower_as_a_type_constructor' (2316994) panicked at compiler/pw-core/tests/backend_lowering.rs:665:5:
+a local member must never compile as the namesake constructor: Program { functions: [Function { def: DefId { unit: 23, decl: 4 }, export: "Shadow", params: [], ret: List(Nominal(DefId { unit: 23, decl: 1 }, [])), blocks: [Block { id: BlockId(0), instrs: [Const { result: ValueId(0), value: Str("x"), ty: Str }, Construct { result: ValueId(1), ctor: DefId { unit: 23, decl: 2 }, args: [ValueId(0)], ty: Nominal(DefId { unit: 23, decl: 2 }, []) }, Const { result: ValueId(2), value: Int(7), ty: Int }, MakeList { result: ValueId(3), items: [ValueId(2)], ty: List(Int) }, Each { result: ValueId(6), kind: Map, list: ValueId(3), seed: None, params: [ValueId(4)], body: Region { instrs: [Case { result: ValueId(5), case: 0, fields: [ValueId(4)], ty: Nominal(DefId { unit: 23, decl: 1 }, []) }], value: ValueId(5) }, ty: List(Nominal(DefId { unit: 23, decl: 1 }, [])) }], terminator: Return(ValueId(6)) }], capabilities: [], instance: [], callees: [], closures: [] }, Function { def: DefId { unit: 23, decl: 5 }, export: "Genuine", params: [], ret: Nominal(DefId { unit: 23, decl: 1 }, []), blocks: [Block { id: BlockId(0), instrs: [Const { result: ValueId(0), value: Int(7), ty: Int }, Case { result: ValueId(1), case: 0, fields: [ValueId(0)], ty: Nominal(DefId { unit: 23, decl: 1 }, []) }], terminator: Return(ValueId(1)) }], capabilities: [], instance: [], callees: [], closures: [] }], types: [TypeDef { def: DefId { unit: 23, decl: 1 }, args: [], name: "Shape", shape: Variant { cases: [("Circle", [Int]), ("Empty", [])] } }, TypeDef { def: DefId { unit: 23, decl: 2 }, args: [], name: "Item", shape: Record { fields: [("name", Str)] } }], imports: [] }
+
+
+failures:
+    local_member_call_cannot_lower_as_a_type_constructor
+    local_member_callback_cannot_lower_as_a_type_constructor
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.14s
+
+error: test failed, to rerun pass `-p pw-core --test backend_lowering`

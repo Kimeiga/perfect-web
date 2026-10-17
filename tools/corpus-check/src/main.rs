@@ -83,6 +83,9 @@ const ACCEPTED_CATEGORIES: &[&str] = &[
     "a reference between tables one source holds",
     "a reference across sources by a field that may name no row",
     "a table's change from its released schema, stated",
+    // ADR-0351-generic-effects, assembled corpus C28: generic/member reads
+    // retain their types and effects, and a receiver has a known type.
+    "generic results preserve pure member types",
 ];
 
 /// Charter §16.2: "Create at least one minimal file for each".
@@ -211,6 +214,14 @@ const REJECTED_CATEGORIES: &[&str] = &[
     "a reference whose field holds no key of its target",
     "a field dropped from a released schema with no migrate",
     "a field renamed from a released schema with no migrate",
+    // ADR-0351-generic-effects, assembled corpus C28: generic/member reads
+    // retain their types and effects, and a receiver has a known type.
+    "a generic result cannot hide a views member effect",
+    "a generic result cannot hide a functions member effect",
+    "a member read needs a known receiver",
+    "a rigid parameter declares no members",
+    "a function value receiver keeps its effect",
+    "a recursive generic invocation keeps its effect",
 ];
 
 /// Milestone 0 gate (charter §14 M0): ">= 10 accepted and 20 rejected".

@@ -166,3 +166,13 @@ fn nothing_the_browser_supplies_holds_a_handle() {
         .is_empty()
     );
 }
+
+#[test]
+fn a_local_callback_is_not_a_handle_constructor() {
+    for name in ["Session", "User", "Organization"] {
+        let body = format!(
+            "fn applied({name}: fn(String) -> String) -> String !{{}} {{ {name}(\"text\") }}\n"
+        );
+        assert_eq!(reported(&body), Vec::<(String, String)>::new(), "{body}");
+    }
+}

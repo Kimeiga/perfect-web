@@ -158,7 +158,7 @@ impl Ty {
 
     /// The constructor a member lookup keys on. A hole in an argument does not
     /// change which members a `List<?>` has.
-    fn receiver(&self) -> Option<Receiver> {
+    pub(crate) fn receiver(&self) -> Option<Receiver> {
         match self {
             Ty::Primitive(p) => Some(Receiver::Primitive(*p)),
             Ty::Builtin(b, _) => Some(Receiver::Builtin(*b)),
@@ -928,7 +928,22 @@ pub(crate) enum Named<'s> {
 /// only where no term has that name: `PositiveInt(1)` builds an opaque value,
 /// and `Store(id)` calls the query `Store` even where a type `Store` exists
 /// too (A-003).
-pub(crate) fn named<'s>(
+/// Expression lookup shares the canonical lexical namespace with typing.
+pub(crate) fn named_at<'s>(
+    sigs: &'s Signatures,
+    ws: &Workspace,
+    at: UnitId,
+    body: &Body,
+    lexical: &Lexical,
+    callee: ExprId,
+) -> Named<'s> {
+    if !lexical.unbound_path(body, callee) {
+        return Named::Nothing;
+    }
+    named(sigs, ws, at, body, callee)
+}
+
+fn named<'s>(
     sigs: &'s Signatures,
     ws: &Workspace,
     at: UnitId,
@@ -985,6 +1000,102 @@ pub(crate) fn named<'s>(
     Named::Refused
 }
 
+/// **The value the member `sig` gives, read from a value of type
+/// `receiver`** without a call: a record's field under the receiver's
+/// arguments, or a function whose only parameter is the receiver, read as a
+/// property (`self.style`, `cart.line_count`, ADR-0125), its result under
+/// what the receiver gives its type parameters. `Unknown` where a part is
+/// not known: a function with more parameters, named without a call, is a
+/// function value, which has no type here.
+///
+/// The one rule for both typers: the value relations' [`Typer`] reads a
+/// member by it, and so does `infer.rs` (ADR-0351, the generic-effects
+/// track), which until then gave `Box<Item>.v`, where `v: T`, the type `T`,
+/// and a member read on it named nothing.
+pub(crate) fn member_value(sigs: &Signatures, sig: &Signature, receiver: &Ty) -> Ty {
+    // A callable member whose only parameter is the receiver is read as a
+    // property — `self.style`, `snapshot.value` — exactly as `infer.rs`
+    // resolves it.
+    if sigs.by_def(sig.definition).is_some() {
+        let Some(recv) = sigs.property_receiver(sig) else {
+            return Ty::Unknown;
+        };
+        let Some(TypeResolution::Resolved(result)) = &sig.returns else {
+            return Ty::Unknown;
+        };
+        let mut s = Subst::default();
+        let binder = sig.definition;
+        if unify(&mut s, &Ty::of(recv).instantiate(binder), receiver) == Verdict::Disagree {
+            return Ty::Unknown;
+        }
+        return s.close(&Ty::of(result).instantiate(binder));
+    }
+    let (Some(Some(TypeResolution::Resolved(recv))), Some(result)) =
+        (sig.params.first(), sig.result())
+    else {
+        return Ty::Unknown;
+    };
+    // `Box<Int>.v` where `v: T`: the field's type under the receiver's
+    // arguments, by unifying the declared receiver with the actual one.
+    let mut s = Subst::default();
+    let owner = sig.definition;
+    unify(&mut s, &Ty::of(recv).instantiate(owner), receiver);
+    s.close(&Ty::of(result).instantiate(owner))
+}
+
+/// **What the value relations' typer solves in one body** (ADR-0351, the
+/// generic-effects track): the type of each expression and of each binding,
+/// holes included, owned, for `infer.rs`'s [`crate::infer::Types`] to read
+/// where the program's declarations leave a type it cannot state alone: a
+/// generic call's result, with the callee's type parameters solved from its
+/// arguments; a `for` loop's binder; a `match` arm's; a lambda's parameter
+/// over a list a call computes.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct SolvedBody {
+    exprs: BTreeMap<ExprId, Ty>,
+    locals: BTreeMap<Binder, Ty>,
+}
+
+impl SolvedBody {
+    /// The type the typer gives `e`: `Unknown` where it does not know.
+    pub(crate) fn expr(&self, e: ExprId) -> &Ty {
+        self.exprs.get(&e).unwrap_or(&Ty::Unknown)
+    }
+
+    /// The type the typer gives the binding `b`: `Unknown` where it does not
+    /// know.
+    pub(crate) fn local(&self, b: Binder) -> &Ty {
+        self.locals.get(&b).unwrap_or(&Ty::Unknown)
+    }
+
+    /// Every binding the typer gives a type.
+    pub(crate) fn locals(&self) -> impl Iterator<Item = (Binder, &Ty)> {
+        self.locals.iter().map(|(b, t)| (*b, t))
+    }
+}
+
+/// **Solve `decl`'s body** as the value relations do, reading its names by
+/// `lexical`, with `outer` the types of the bindings around a nested
+/// declaration, in the order [`Lexical::outer_bindings`] numbers them
+/// (ADR-0066). Nothing where `module` names no unit.
+pub(crate) fn solve_body(
+    sigs: &Signatures,
+    module: Option<&str>,
+    decl: &Decl,
+    body: &Body,
+    lexical: Lexical,
+    outer: Vec<Ty>,
+) -> SolvedBody {
+    let ws = sigs.workspace();
+    let Some(at) = sigs.unit_of(module) else {
+        return SolvedBody::default();
+    };
+    let typer = Typer::new(sigs, ws, at, module, decl, body, lexical, outer);
+    let exprs = body.exprs().map(|(id, _, _)| (id, typer.of(id))).collect();
+    let locals = typer.locals.borrow().clone();
+    SolvedBody { exprs, locals }
+}
+
 /// **`t` with `binder`'s type parameters replaced by `args`**: a declared
 /// case's field under the arguments its type is applied to. A parameter no
 /// argument gives is unknown.
@@ -1022,6 +1133,22 @@ pub(crate) enum CaseNamed {
 /// The one rule, with three readers: the typer, the check that a case exists,
 /// and the backend (`backend::lower`), so the case the checker typed is the
 /// case that is built.
+/// Expression case lookup excludes canonical lexical value receivers.
+/// Pattern lookup deliberately uses case_named directly.
+pub(crate) fn case_named_at(
+    sigs: &Signatures,
+    ws: &Workspace,
+    at: UnitId,
+    body: &Body,
+    lexical: &Lexical,
+    expr: ExprId,
+) -> Option<CaseNamed> {
+    if !lexical.unbound_path(body, expr) {
+        return None;
+    }
+    case_named(sigs, ws, at, &path_of(body, expr))
+}
+
 pub(crate) fn case_named(
     sigs: &Signatures,
     ws: &Workspace,
@@ -2043,6 +2170,14 @@ impl<'a> Typer<'a> {
                     .map(|t| success(self.of(t.root)))
                     .unwrap_or(Ty::Unknown),
                 Cx::Release => own_result.clone().map(success).unwrap_or(Ty::Unknown),
+                // The platform declares what a draw block can do (ADR-0351),
+                // just as it declares the event a handler receives.
+                Cx::Draw => self
+                    .sigs
+                    .language_type("browser", "PaintContext")
+                    .as_ref()
+                    .map(Ty::of)
+                    .unwrap_or(Ty::Unknown),
                 _ => Ty::Unknown,
             };
             out.extend((0..root.binders.len()).map(|j| (Binder::Term(i, j), bound.clone())));
@@ -2100,7 +2235,7 @@ impl<'a> Typer<'a> {
     fn field(&self, id: ExprId, base: ExprId, name: &str) -> Ty {
         // `Shape.Empty` and `Shape.Circle`, a case through its type
         // (ADR-0059).
-        if let Some(c) = case_named(self.sigs, self.ws, self.at, &path_of(self.body, id)) {
+        if let Some(c) = self.case_path(id) {
             return match c {
                 CaseNamed::Case(def, index) => self.case_value(def, index),
                 CaseNamed::Unknown(..) => Ty::Unknown,
@@ -2136,40 +2271,17 @@ impl<'a> Typer<'a> {
                 _ => Ty::Unknown,
             };
         };
-        // A callable member whose only parameter is the receiver is read as a
-        // property — `self.style`, `snapshot.value` — exactly as `infer.rs`
-        // resolves it. One with more parameters, named without a call, is a
-        // function value, which has no type here.
-        if self.sigs.by_def(sig.definition).is_some() {
-            let [Some(TypeResolution::Resolved(recv))] = sig.params.as_slice() else {
-                return Ty::Unknown;
-            };
-            let Some(TypeResolution::Resolved(result)) = &sig.returns else {
-                return Ty::Unknown;
-            };
-            let mut s = Subst::default();
-            let binder = sig.definition;
-            if unify(&mut s, &Ty::of(recv).instantiate(binder), &receiver) == Verdict::Disagree {
-                return Ty::Unknown;
-            }
-            return s.close(&Ty::of(result).instantiate(binder));
-        }
-        let (Some(Some(TypeResolution::Resolved(recv))), Some(result)) =
-            (sig.params.first(), sig.result())
-        else {
-            return Ty::Unknown;
-        };
-        // `Box<Int>.v` where `v: T`: the field's type under the receiver's
-        // arguments, by unifying the declared receiver with the actual one.
-        let mut s = Subst::default();
-        let owner = sig.definition;
-        unify(&mut s, &Ty::of(recv).instantiate(owner), &receiver);
-        s.close(&Ty::of(result).instantiate(owner))
+        member_value(self.sigs, sig, &receiver)
+    }
+
+    fn case_path(&self, id: ExprId) -> Option<CaseNamed> {
+        case_named_at(self.sigs, self.ws, self.at, self.body, &self.lexical, id)
     }
 
     fn resolves_as_path(&self, id: ExprId) -> bool {
         let path = path_of(self.body, id);
-        !path.is_empty()
+        self.lexical.unbound_path(self.body, id)
+            && !path.is_empty()
             && path.contains('.')
             && !matches!(self.ws.resolve_path(self.at, &path), Resolution::Unresolved)
     }
@@ -2177,7 +2289,14 @@ impl<'a> Typer<'a> {
     /// Resolve a call's target by identity. `None` when it reaches nothing
     /// this analysis can describe — which is silence, not a verdict.
     fn target(&self, call: ExprId, callee: ExprId) -> Option<Target<'a>> {
-        match named(self.sigs, self.ws, self.at, self.body, callee) {
+        match named_at(
+            self.sigs,
+            self.ws,
+            self.at,
+            self.body,
+            &self.lexical,
+            callee,
+        ) {
             Named::Target(t) => return Some(t),
             Named::Refused => return None,
             Named::Nothing => {}
@@ -4197,7 +4316,7 @@ impl<'a> Typer<'a> {
         // `Shape.Circle`: not a member of a value, a case of a type, which the
         // type must declare (PW0608, ADR-0059). Until 2026-09-26 it was
         // undecided, and `Shape.Bogus(1)` passed `pw check`.
-        if let Some(c) = case_named(self.sigs, self.ws, self.at, &path_of(self.body, id)) {
+        if let Some(c) = self.case_path(id) {
             let (def, outcome) = match c {
                 CaseNamed::Case(def, _) => (def, Outcome::Agree),
                 CaseNamed::Unknown(def, written) => (
@@ -4240,6 +4359,15 @@ impl<'a> Typer<'a> {
         }
         let receiver = self.of(base);
         let outcome = match receiver.receiver() {
+            // **A value of a type parameter has no member** (ADR-0351, the
+            // generic-effects track): whatever `T` is instantiated with, the
+            // body does not say which `name` it reads, nor what that
+            // performs. Until then undecided, and `fn f<T>(x: T) -> String
+            // !{} { x.label }` read a member whose effect no analysis saw.
+            None if matches!(receiver, Ty::Parameter { .. }) => Outcome::Disagree {
+                expected: format!("a member `{name}`"),
+                actual: self.display(&receiver),
+            },
             None => Outcome::Undecided(Undecided::Unknown),
             Some(r) if self.sigs.member_by_in(self.module(), r, name).is_some() => Outcome::Agree,
             // Several modules declare it, and this one sees several or none
@@ -4779,8 +4907,8 @@ pub struct MemberReads {
     /// The field expression that names it: `item.price.display`'s
     /// `.display`.
     pub exprs: BTreeSet<ExprId>,
-    /// The `{#each}` block, by its node: its list is a path the directive
-    /// writes, not an expression.
+    /// The `{#each}` block, by its node: its list expression reads a
+    /// member function somewhere in its evaluation (ADR-0345).
     pub lists: BTreeSet<NodeId>,
 }
 

@@ -11,6 +11,7 @@ import unittest
 from unittest.mock import patch
 
 SCRIPTS = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(SCRIPTS))
 spec = importlib.util.spec_from_file_location("bounded_result_subject", SCRIPTS / "bounded_checker_mutations.py")
 bounded = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(bounded)
@@ -46,6 +47,12 @@ class RustResults(unittest.TestCase):
     def test_a_stopped_process_cannot_earn_a_kill(self):
         self.assertEqual(self.run_results(result(
             "test result: FAILED. 0 passed; 1 failed; 0 ignored\n", -9)), (False, 0, 0))
+
+    def test_a_positive_wrapper_exit_is_not_a_test_failure(self):
+        for status in (137, 67, 1):
+            with self.subTest(status=status):
+                self.assertEqual(self.run_results(result(
+                    "test result: FAILED. 0 passed; 1 failed; 0 ignored\n", status)), (False, 0, 0))
 
     def test_a_later_build_failure_cannot_hide_behind_a_test_result(self):
         self.assertEqual(self.run_results(result(

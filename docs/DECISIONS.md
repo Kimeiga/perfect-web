@@ -3054,3 +3054,9 @@ The bounded checker consumes generated pair metadata and source costs.
 Accepted under the owner's delegation. The local compiler integration,
 bounded47/PostgreSQL12 controls and full CI pass; runtime D2 and final
 assembled train verification remain pending.
+
+### 2026-10-16 — generic receivers retain canonical types and effects
+
+[ADR-0351](DECISIONS/ADR-0351-generic-effects.md) reuses the value solver for
+generic results, typed member reads and rooted effects. The accepted worker
+proof is separate from combined train validation, which remains pending.

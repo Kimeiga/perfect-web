@@ -23,6 +23,22 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0351, 2026-10-16: generic results retain their member types and effects.**
+Local integration of worker7ec6a534 is in progress after D1. The shared value
+solver remains the single authority for each generic invocation; rooted
+effect walks retain the bounded callback metadata and expression-based each
+headers. Candidate C28 is43 accepted/93 rejected and63 challenged invariants;
+the combined regression, whole-control and full CI gates remain pending.
+The combined review also closes a property-call omission from bounded reads
+and interface lexical-scope omissions; actual before/after probes are recorded
+under ADR-0351. Positive unexpected Cargo exits remained a classification gap
+in the earlier bounded instrument: the new shared parser rejects them, with
+14 focused regressions green. Fresh own33, affected whole scripts and full CI
+remain pending at this uncommitted source; earlier campaigns keep their tested
+input and instrument qualifications.
+Worker-only evidence and exact inputs are recorded in
+[ADR-0351](DECISIONS/ADR-0351-generic-effects.md).
+
 **ADR-0350, 2026-10-16: tables and bounded generated reads**
 (local train-10 integration). Table declarations generate their reads,
 writes, schema metadata and migration locks. The bounded checker uses

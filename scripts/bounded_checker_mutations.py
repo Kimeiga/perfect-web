@@ -324,26 +324,15 @@ TESTS = [
 
 
 def run():
-    """Count every Rust binary; a missing/contradictory result is not a kill."""
+    from cargo_test_results import parse
     passed = failed = 0
     for command in TESTS:
-        r = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
-        out = r.stdout + r.stderr
-        summaries = re.findall(r"^test result: (ok|FAILED)\. (\d+) passed; (\d+) failed;", out, re.M)
-        if (not summaries or r.returncode < 0
-                or "error[" in out or "could not compile" in out):
+        result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
+        outcome = parse(result.returncode, result.stdout + result.stderr)
+        if not outcome.valid:
             return False, 0, 0
-        command_passed = command_failed = 0
-        for status, p, f in summaries:
-            p, f = int(p), int(f)
-            if not p + f or (status == "ok") != (f == 0):
-                return False, 0, 0
-            command_passed += p
-            command_failed += f
-        if (r.returncode == 0) != (command_failed == 0):
-            return False, 0, 0
-        passed += command_passed
-        failed += command_failed
+        passed += outcome.passed
+        failed += outcome.failed
     return True, passed, failed
 
 

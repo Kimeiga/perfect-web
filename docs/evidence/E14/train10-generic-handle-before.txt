@@ -1,0 +1,25 @@
+   Compiling pw-core v0.0.0 (/home/haki/code/pw-wt/train-10-next/compiler/pw-core)
+    Finished `test` profile [unoptimized] target(s) in 0.48s
+     Running tests/handles.rs (target/debug/deps/handles-17829808d3d67b0c)
+
+running 1 test
+test a_local_callback_is_not_a_handle_constructor ... FAILED
+
+failures:
+
+---- a_local_callback_is_not_a_handle_constructor stdout ----
+
+thread 'a_local_callback_is_not_a_handle_constructor' (2312590) panicked at compiler/pw-core/tests/handles.rs:174:9:
+assertion `left == right` failed: fn applied(Session: fn(String) -> String) -> String !{} { Session("text") }
+
+  left: [("PW5037", "Session(\"text\")")]
+ right: []
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    a_local_callback_is_not_a_handle_constructor
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.05s
+
+error: test failed, to rerun pass `-p pw-core --test handles`

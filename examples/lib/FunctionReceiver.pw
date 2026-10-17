@@ -1,0 +1,12 @@
+// @corpus: fixture
+// @id: LIB-FunctionReceiver
+// @category: a pure member of a function-valued receiver
+// @charter: §7.4
+// @milestone: E14
+//
+// Shared by R-094 and its isolation control: duplicating the calling module
+// must not duplicate this member's declaration on the function type.
+
+module FunctionReceiver
+
+fn call_from_value(f: fn() -> String) -> String !{} { f() }

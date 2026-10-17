@@ -14,7 +14,7 @@ code the compiler can emit, from its registry, `compiler/pw-core/src/codes.rs`.
 - **What the program must hold to**: the registry's own sentence.
 - **ADR**: the decisions its registry entry cites, where it cites one.
 
-204 codes are registered; 92 of them cite an ADR in the registry.
+205 codes are registered; 93 of them cite an ADR in the registry.
 A code whose entry cites none is marked `—`: search `docs/DECISIONS/` for its
 number or its symbol.
 
@@ -105,6 +105,7 @@ number or its symbol.
 
 | Code | Symbol | What the program must hold to | ADR |
 |---|---|---|---|
+| PW0408 | `member_receiver_untyped` | a member is read through a value whose type the program states, so what it performs is read | [0351](../DECISIONS/ADR-0351-generic-effects.md) |
 | PW0400 | `undeclared_effect` | an effect row must name every effect the body performs | — |
 | PW0401 | `forbidden_effect` | some effects are not permitted where a declaration runs, whatever it declares | — |
 | PW0402 | `wrong_frame_phase` | each frame phase permits only the work it exists to do | — |

@@ -5,7 +5,8 @@ The next executable tasks, in order, with acceptance criteria. Charter §3.4.
 ## Integration follow-ups, 2026-10-16
 
 - D1's local compiler integration gate is green (ADR-0350). Integrate the
-  completed generic-result effect repair and cache publication repair,
+  generic-result effect repair (ADR-0351, candidate C28 43/93 and63/63)
+  and cache publication repair,
   preserving canonical expression types and generated bounded-read pairs;
   run the combined regression tests, applicable whole scripts and full CI.
 - Continue D2's common memory adapter and TodoMVC integration. Preserve

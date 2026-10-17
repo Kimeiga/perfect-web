@@ -1,0 +1,197 @@
+    Finished `test` profile [unoptimized] target(s) in 0.04s
+     Running tests/bounded_tables.rs (target/debug/deps/bounded_tables-30c98d852efea014)
+
+running 8 tests
+test a_generated_read_in_a_generic_result_callback_remains_a_read_per_row ... ok
+test a_generated_many_read_before_the_loop_selects_each_turns_matching_rows ... ok
+test a_generated_read_named_as_the_callback_has_the_same_matching_row_repair ... ok
+test a_generated_batch_before_generic_row_selection_keeps_its_source_cost ... ok
+test generated_many_reads_accept_one_call_and_chunked_sources ... ok
+test generated_many_reads_warn_for_default_and_per_key_sources ... ok
+test a_generated_read_through_a_member_stays_a_read_per_row ... ok
+test generated_key_prefix_and_index_repairs_name_the_matching_many_read ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+
+     Running tests/generic_effects.rs (target/debug/deps/generic_effects-3c2ca0bcd3692a20)
+
+running 28 tests
+test a_computed_receiver_is_never_resolved_by_its_members_spelling ... ok
+test a_draw_binder_has_the_platforms_declared_context_and_arguments ... ok
+test a_function_named_as_a_member_receiver_performs_its_effects ... ok
+test a_function_receiver_keeps_its_capability_and_privacy ... ok
+test a_member_read_on_a_loops_or_an_arms_binder_is_seen ... FAILED
+test a_generic_each_header_keeps_its_members_privacy_in_key_and_body ... ok
+test a_member_read_on_a_rigid_type_parameter_is_refused ... ok
+test a_member_read_in_a_match_arm_over_a_generic_result_is_seen ... ok
+test a_member_read_through_a_generic_calls_result_in_a_function_is_seen ... FAILED
+test a_member_read_through_a_nested_generic_is_seen ... FAILED
+test a_generic_each_header_types_members_in_both_its_key_and_body ... ok
+test a_member_read_through_a_generic_calls_result_in_a_view_is_refused ... ok
+test a_member_with_additional_parameters_is_a_function_value_not_its_result ... ok
+test a_member_read_on_any_receiver_is_seen ... ok
+test a_member_read_through_a_user_written_generic_function_is_seen ... ok
+test a_module_path_prefix_is_never_charged_as_a_function_value ... ok
+test a_member_with_no_row_is_charged_what_its_body_performs ... ok
+test a_querys_contract_requires_what_a_member_of_a_generic_result_reads ... ok
+test a_member_read_whose_receivers_type_nothing_states_is_refused ... ok
+test a_nested_function_instantiates_an_enclosing_generics_result ... ok
+test an_interfaces_term_roots_refuse_untyped_member_receivers ... ok
+test a_recursive_call_instantiates_its_own_generic_result ... FAILED
+test an_interface_term_local_call_never_calls_a_namesake_global ... ok
+test member_invocations_have_one_typed_callee_and_their_actual_effects ... FAILED
+test solved_loop_binders_are_available_to_every_type_reader ... ok
+test every_generic_function_of_the_standard_packages_passes_its_element_types_through ... FAILED
+test a_secret_read_through_a_generic_result_is_refused_in_markup ... ok
+test rooted_effect_inference_sees_member_reads_and_function_values ... ok
+
+failures:
+
+---- a_member_read_on_a_loops_or_an_arms_binder_is_seen stdout ----
+
+thread 'a_member_read_on_a_loops_or_an_arms_binder_is_seen' (2210574) panicked at compiler/pw-core/tests/generic_effects.rs:89:5:
+assertion `left == right` failed: module t
+
+import List
+
+type Item = Item { name: String }
+
+fn label(i: Item) -> String !{ database.read<Item> }
+    host "shop:data/items#label"
+
+fn first_label(given: List<Item>) -> String !{} {
+    for x in given {
+        return x.label
+    }
+    "none"
+}
+
+  left: [("PW0405", "x.label"), ("PW0400", "x.label")]
+ right: [("PW0400", "x.label")]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- a_member_read_through_a_generic_calls_result_in_a_function_is_seen stdout ----
+
+thread 'a_member_read_through_a_generic_calls_result_in_a_function_is_seen' (2210581) panicked at compiler/pw-core/tests/generic_effects.rs:89:5:
+assertion `left == right` failed: module t
+
+import List
+
+type Item = Item { name: String }
+
+fn label(i: Item) -> String !{ database.read<Item> }
+    host "shop:data/items#label"
+
+fn first_label(given: List<Item>) -> String !{} {
+    let all = List.reverse(given)
+    for x in all {
+        return x.label
+    }
+    "none"
+}
+
+  left: [("PW0405", "x.label"), ("PW0400", "x.label")]
+ right: [("PW0400", "x.label")]
+
+---- a_member_read_through_a_nested_generic_is_seen stdout ----
+
+thread 'a_member_read_through_a_nested_generic_is_seen' (2210585) panicked at compiler/pw-core/tests/generic_effects.rs:89:5:
+assertion `left == right` failed: module t
+
+import List
+
+type Item = Item { name: String }
+
+fn label(i: Item) -> String !{ database.read<Item> }
+    host "shop:data/items#label"
+
+fn first_label(given: List<Item>) -> String !{} {
+    let all = List.reverse(List.take(given, 2))
+    for x in all {
+        return x.label
+    }
+    "none"
+}
+
+  left: [("PW0405", "x.label"), ("PW0400", "x.label")]
+ right: [("PW0400", "x.label")]
+
+---- a_recursive_call_instantiates_its_own_generic_result stdout ----
+
+thread 'a_recursive_call_instantiates_its_own_generic_result' (2210630) panicked at compiler/pw-core/tests/generic_effects.rs:839:5:
+assertion `left == right` failed
+  left: [("PW0400", "first([Item { name: \"x\" }], 0)"), ("PW0405", "item.label")]
+ right: [("PW0400", "first([Item { name: \"x\" }], 0)")]
+
+---- member_invocations_have_one_typed_callee_and_their_actual_effects stdout ----
+
+thread 'member_invocations_have_one_typed_callee_and_their_actual_effects' (2210668) panicked at compiler/pw-core/tests/generic_effects.rs:939:5:
+assertion `left == right` failed: module t
+
+import List
+
+type Item = Item { name: String }
+
+fn label(i: Item) -> String !{ database.read<Item> }
+    host "shop:data/items#label"
+
+fn inferred(i: Item) -> String { i.label }
+
+fn reverse(i: Item) -> String !{ database.read<Item> }
+    host "shop:data/items#reverse"
+
+fn decorate(i: Item, prefix: String) -> String !{} { prefix }
+
+fn property(i: Item) -> String !{ database.read<Item> } { i.inferred }
+fn explicit(i: Item) -> String !{ database.read<Item> } { i.label() }
+fn shadow(List: Item) -> String !{ database.read<Item> } { List.reverse() }
+fn field(i: Item) -> String !{} { i.name }
+fn function_value(i: Item) -> String !{} { let f = i.decorate; i.name }
+
+
+  left: [("PW0604", "List.reverse()"), ("PW0606", "List.reverse()")]
+ right: []
+
+---- every_generic_function_of_the_standard_packages_passes_its_element_types_through stdout ----
+
+thread 'every_generic_function_of_the_standard_packages_passes_its_element_types_through' (2210667) panicked at compiler/pw-core/tests/generic_effects.rs:647:9:
+assertion `left == right` failed: decode.list
+module probe
+
+import Map
+import Set
+import decode
+
+opaque type P0 = String
+
+fn label0(p: P0) -> String !{ database.read<P0> }
+    host "probe:data/p0#label"
+
+fn probe(a0: decode.Unknown, a1: fn(decode.Unknown) -> Result<P0, decode.DecodeError>) -> () !{  } {
+    let r = decode.list(a0, a1)
+    match r {
+        Ok(x1) => {
+    for x2 in x1 {
+    let _read3 = x2.label0
+    }
+        },
+        Err(y1) => (),
+    }
+    ()
+}
+
+  left: [("PW0400", "`probe` performs `database.read<P0>` but does not declare it"), ("PW0405", "`` reads `P0` once for each element of `x1`")]
+ right: [("PW0400", "`probe` performs `database.read<P0>` but does not declare it")]
+
+
+failures:
+    a_member_read_on_a_loops_or_an_arms_binder_is_seen
+    a_member_read_through_a_generic_calls_result_in_a_function_is_seen
+    a_member_read_through_a_nested_generic_is_seen
+    a_recursive_call_instantiates_its_own_generic_result
+    every_generic_function_of_the_standard_packages_passes_its_element_types_through
+    member_invocations_have_one_typed_callee_and_their_actual_effects
+
+test result: FAILED. 22 passed; 6 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.95s
+
+error: test failed, to rerun pass `-p pw-core --test generic_effects`

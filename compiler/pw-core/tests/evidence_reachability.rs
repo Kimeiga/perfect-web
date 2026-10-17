@@ -269,7 +269,7 @@ const CLAIMS: &[(&str, Observer, Reach, &str)] = &[
     (
         "A-021",
         Observer::Effect,
-        Reach::Missing,
+        Reach::Witnessed,
         "a painter is a pure function of its declared inputs",
     ),
     (
@@ -445,6 +445,43 @@ fn interrogate(p: &Program) -> BTreeSet<Observer> {
 }
 
 // --- the audit ---------------------------------------------------------------
+
+/// The platform declares the painter's context and `rect` operation. The
+/// effect observer sees that call in A-021's draw root, rather than echoing
+/// the painter's written row: removing only the call removes its effect.
+#[test]
+fn the_accepted_painter_performs_the_operation_it_calls() {
+    fn painter_effects(p: &Program) -> Vec<String> {
+        let refs = p.refs();
+        let ws = Workspace::build(&refs);
+        let sigs = Signatures::build(&ws, &refs);
+        let mut inf = Inference::new(&sigs, &ws);
+        inf.run(&refs);
+        let (id, _) = p
+            .hir()
+            .all_decls()
+            .find(|(_, d)| d.name == "RatingSpark")
+            .expect("the fixture's painter");
+        inf.effective_effects(p.unit(), p.hir(), id)
+    }
+
+    let mut p = Program::for_fixture("A-021");
+    assert_eq!(painter_effects(&p), ["paint.custom"]);
+    assert!(interrogate(&p).contains(&Observer::Effect));
+
+    let operation = p
+        .src
+        .lines()
+        .find(|line| line.trim_start().starts_with("ctx.rect("))
+        .expect("the platform operation")
+        .to_string();
+    assert_eq!(p.src.matches(&operation).count(), 1);
+    p.src = p.src.replace(&operation, "");
+    *p.sources.last_mut().expect("fixture source") = p.src.clone();
+    *p.hirs.last_mut().expect("fixture HIR") = lower_file(&p.src, &parse_tree(&p.src).green);
+    assert_eq!(painter_effects(&p), Vec::<String>::new());
+    assert!(!interrogate(&p).contains(&Observer::Effect));
+}
 
 /// **Every accepted fixture, against its designated observer.**
 #[test]

@@ -493,7 +493,11 @@ fn the_trusted_platform_contract_is_hashed() {
     // `OrderStatus` gains `Scheduled(ScheduledFor)`, and its `OrderError`
     // `NotOffered(Instant)` and `Scheduled`. Accepted by the integrator,
     // 2026-10-15 (the hash did not move for the ruling).
-    const EXPECTED: u64 = 0xfc57_c926_be38_b1d5;
+    // 2026-10-16: `browser` declares the opaque `PaintContext` given to a
+    // painter's draw binder and `rect` with four Float arguments and
+    // `paint.custom`, so A-021's operation is typed and its effect observed
+    // (ADR-0351-generic-effects; declaration-only platform scope).
+    const EXPECTED: u64 = 0x8d84ae09268c8dac;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

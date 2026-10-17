@@ -349,13 +349,17 @@ impl<'p, 'i> Reads<'p, 'i> {
     /// a piped value first. `None` where the callee is no declaration the
     /// walk resolved, or the arguments do not arrange.
     fn given(&self, cx: &BodyCx<'_>, call: ExprId) -> Option<Vec<Option<ExprId>>> {
-        let Expr::Call { callee, args } = cx.body.expr(call) else {
-            return None;
-        };
         let called = cx.calls.get(&call)?;
         let sig = self.sigs.by_def(called.callee)?;
+        let (callee, args) = match cx.body.expr(call) {
+            Expr::Call { callee, args } => (*callee, args),
+            Expr::Field { base, .. } if self.sigs.property_receiver(sig).is_some() => {
+                return Some(vec![Some(*base)]);
+            }
+            _ => return None,
+        };
         let mut leading: Vec<ExprId> = Vec::new();
-        if let Expr::Field { base, .. } = cx.body.expr(*callee)
+        if let Expr::Field { base, .. } = cx.body.expr(callee)
             && Self::receives(cx, *base)
         {
             leading.push(*base);
@@ -1236,6 +1240,7 @@ impl<'p, 'i> Reads<'p, 'i> {
         let body = cx.body;
         let read = match body.expr(c.call) {
             Expr::Call { callee, .. } => crate::infer::path_of(body, *callee),
+            Expr::Field { .. } => crate::infer::path_of(body, c.call),
             _ => String::new(),
         };
         let bound = Self::bound_name(cx, binding);

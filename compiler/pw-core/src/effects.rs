@@ -266,6 +266,13 @@ pub struct Inference<'a> {
     /// owner, from `run`: a call through a local is that local's, never a
     /// declaration of its spelling's (ADR-0063; ADR-0283's limitation).
     lexicals: BTreeMap<(usize, crate::hir::DeclId), crate::lexical::Lexical>,
+    /// **Each body's types, as `run` built them**, by its unit and its owner
+    /// (ADR-0351, the generic-effects track): so a walk over one of its roots,
+    /// a handler, a painter's `draw`, a resource's `acquire`, an optimistic
+    /// transition, reads the members it reads by their receivers' types, as
+    /// the walk over the body does. Until then such a walk read calls alone,
+    /// and `el.offsetWidth` in a `draw` performed nothing.
+    types: BTreeMap<(usize, crate::hir::DeclId), crate::infer::Types<'a>>,
     /// Which unit each `Hir` in the last `run` was, so a declaration can be
     /// given the same `DefId` the workspace gave it.
     workspace: &'a Workspace,
@@ -278,6 +285,7 @@ impl<'a> Inference<'a> {
             known: BTreeMap::new(),
             performed: BTreeMap::new(),
             lexicals: BTreeMap::new(),
+            types: BTreeMap::new(),
             workspace,
         }
     }
@@ -314,27 +322,41 @@ impl<'a> Inference<'a> {
         // or calls `clock.now` through a local, gave a view that called it
         // no effect.
         let sigs = self.sigs;
-        let typed: Vec<(usize, crate::hir::DeclId, &Body, crate::infer::Types<'_>)> = hirs
+        // Every arena a declaration's terms are in: its body's, and an
+        // interface's own (ADR-0240), whose roots are walked too. Only an
+        // implemented body is inferred into `known`: a declaration with no
+        // body performs what its row promises.
+        let typed: Vec<(
+            usize,
+            crate::hir::DeclId,
+            &Body,
+            bool,
+            crate::infer::Types<'a>,
+        )> = hirs
             .iter()
             .enumerate()
             .flat_map(|(unit, hir)| {
                 hir.all_decls().filter_map(move |(id, d)| {
-                    let body = hir.body(d.body?);
+                    let body = hir.body(d.terms_body()?);
                     Some((
                         unit,
                         id,
                         body,
+                        d.body.is_some(),
                         crate::infer::Types::of_decl(sigs, hir, id, body),
                     ))
                 })
             })
             .collect();
-        for (unit, id, _, types) in &typed {
+        for (unit, id, _, _, types) in &typed {
             self.lexicals.insert((*unit, *id), types.lexical().clone());
         }
         for _ in 0..8 {
             let mut changed = false;
-            for (unit, id, body, types) in &typed {
+            for (unit, id, body, implemented, types) in &typed {
+                if !*implemented {
+                    continue;
+                }
                 let found = self.infer_in_at(*unit, body, types);
                 let def = self.def_of(*unit, *id);
                 let entry = self.known.entry(def).or_default();
@@ -349,6 +371,25 @@ impl<'a> Inference<'a> {
                 break;
             }
         }
+        for (unit, id, _, _, types) in typed {
+            self.types.insert((unit, id), types);
+        }
+    }
+
+    /// One canonical declared-plus-inferred row for a resolved member:
+    /// effect charging and invocation accounting must agree (ADR-0351).
+    fn member_performs(&self, sig: &crate::signatures::Signature) -> BTreeSet<Effect> {
+        sig.effects
+            .iter()
+            .cloned()
+            .chain(
+                self.known
+                    .get(&sig.definition)
+                    .into_iter()
+                    .flatten()
+                    .cloned(),
+            )
+            .collect()
     }
 
     /// What one body performs, given the types its declaration makes known.
@@ -363,9 +404,9 @@ impl<'a> Inference<'a> {
         body: &Body,
         types: &crate::infer::Types<'_>,
     ) -> Inferred {
-        let mut out = self.infer_at(unit, body);
-        self.member_effects(body, types, &mut out);
-        self.value_effects(unit, body, types, &mut out);
+        let mut out = self.calls_with_types(unit, body, body.root, Some(types));
+        self.member_effects(body, body.root, types, &mut out);
+        self.value_effects(unit, body, body.root, types, &mut out);
         out
     }
 
@@ -380,23 +421,32 @@ impl<'a> Inference<'a> {
         &self,
         unit: usize,
         body: &Body,
+        root: ExprId,
         types: &crate::infer::Types<'_>,
         out: &mut Inferred,
     ) {
         // A callee is the call walk's, and a path's head is not a value.
         let mut not_values: BTreeSet<ExprId> = BTreeSet::new();
-        for id in body.walk() {
+        for id in body.walk_from(root) {
             match body.expr(id) {
                 Expr::Call { callee, .. } => {
                     not_values.insert(*callee);
                 }
                 Expr::Field { base, .. } => {
-                    not_values.insert(*base);
+                    // Only a module/type path has a non-value prefix. A
+                    // function used as a receiver, stamp.apply, is still
+                    // named as a value and carries stamp's effects (ADR-0078).
+                    if matches!(
+                        types.member_read(body, id),
+                        Some(crate::infer::MemberRead::Path)
+                    ) {
+                        not_values.insert(*base);
+                    }
                 }
                 _ => {}
             }
         }
-        for id in body.walk() {
+        for id in body.walk_from(root) {
             if not_values.contains(&id) {
                 continue;
             }
@@ -418,6 +468,14 @@ impl<'a> Inference<'a> {
                     if matches!(body.expr(head), Expr::Name(_))
                         && types.lexical().binder(head).is_some()
                     {
+                        continue;
+                    }
+                    // A field of a value a call or any expression computes,
+                    // `same(x).label`, is that value's member: `member_effects`
+                    // reads it by its type (ADR-0351). Its path here was the
+                    // bare `label`, resolved by its SPELLING to whatever
+                    // declaration in scope bears it.
+                    if !matches!(body.expr(head), Expr::Name(_)) {
                         continue;
                     }
                     path_of(body, id)
@@ -455,7 +513,13 @@ impl<'a> Inference<'a> {
     /// lives in the accessors' declared rows (`packages/pw-platform-web/browser.pw`),
     /// not in a list of property names here — which is what E2C's deletion gate
     /// requires and what lets a new accessor be added without touching a checker.
-    fn member_effects(&self, body: &Body, types: &crate::infer::Types<'_>, out: &mut Inferred) {
+    fn member_effects(
+        &self,
+        body: &Body,
+        root: ExprId,
+        types: &crate::infer::Types<'_>,
+        out: &mut Inferred,
+    ) {
         // Which lambdas were handed to which function, so a member call inside
         // a callback names the callback rather than only itself.
         //
@@ -463,49 +527,55 @@ impl<'a> Inference<'a> {
         // claim is that `layout.measure` propagates through `List.map`'s
         // callback, and a diagnostic that named only
         // `el.getBoundingClientRect` would be true and would not say that.
-        let inside_callback = callbacks(body, body.root);
+        let inside_callback = callbacks(body, root);
 
-        for id in body.walk() {
+        for id in body.walk_from(root) {
             // Both shapes: a property read, and a method call on a value.
-            let (base, member, span) = match body.expr(id) {
-                Expr::Field { base, name } => (*base, name.clone(), body.expr_span(id)),
-                Expr::Call { callee, .. } => match body.expr(*callee) {
-                    Expr::Field { base, name } => (*base, name.clone(), body.expr_span(id)),
-                    _ => continue,
-                },
+            let (field, span) = match body.expr(id) {
+                Expr::Field { .. } => (id, body.expr_span(id)),
+                Expr::Call { callee, .. } if matches!(body.expr(*callee), Expr::Field { .. }) => {
+                    (*callee, body.expr_span(id))
+                }
                 _ => continue,
             };
-            let Some(receiver) = receiver_name(body, base) else {
+            let Expr::Field { base, name: member } = body.expr(field) else {
                 continue;
             };
-
-            // A module path is not a member access — `Stores.get` is already
-            // handled by the call walk, and counting it twice would report the
-            // same effect from two places.
-            if self.sigs.by_path(&format!("{receiver}.{member}")).is_some() {
-                continue;
-            }
+            let (base, member) = (*base, member.clone());
 
             // By the receiver's TYPE, or not at all. The by-name fallback that
             // used to sit here is gone: it made whether an effect was seen
             // depend on no other type declaring a member with the same
             // spelling, and it had already borrowed `Carts.add`'s row for
             // `Money.add` once, reporting a pure calculation as writing to the
-            // database. A receiver whose type this program does not state is a
-            // receiver whose members are unknown.
-            // The binding the receiver's name means here (ADR-0063).
-            let Some(declared) = types.of(body, base) else {
+            // database.
+            //
+            // **Whatever the receiver is** (ADR-0351, the generic-effects
+            // track): a name, a field's value, a call's result, read as
+            // [`crate::infer::Types::member_read`] reads it. Until then only a
+            // bare name whose type `infer.rs` stated was read, so
+            // `o.item.label`, `List.reverse(xs)`'s elements' `.label` and a
+            // loop's binder's performed nothing here, unseen. A module's path,
+            // `Stores.get`, is the call walk's; a member a type lacks, or a
+            // value of a type parameter, is refused by the value relations
+            // (PW0610); and a value whose type nothing states is refused by
+            // the effect rows (PW0408). `el.getBoundingClientRect().width`
+            // reads a field of the call's result, which performs nothing.
+            let Some(crate::infer::MemberRead::Member(Some(sig))) = types.member_read(body, field)
+            else {
                 continue;
             };
-            let declared = &declared;
-            let Some(sig) = types.member(declared, &member) else {
-                continue;
-            };
+            let receiver = path_of(body, base);
             // The fact `R-037` claimed and did not have: this member was
             // found because the RECEIVER'S TYPE declares it.
+            let receiver_type = types
+                .of(body, base)
+                .or_else(|| sig.params.first()?.as_ref()?.resolved().cloned())
+                .map(|t| t.display_name())
+                .unwrap_or_default();
             let resolved = out.evidence.record(
                 crate::provenance::FactKind::ResolvedMember {
-                    receiver_type: declared.display_name(),
+                    receiver_type,
                     member: member.clone(),
                     via: crate::provenance::Route::ReceiverType,
                 },
@@ -513,7 +583,10 @@ impl<'a> Inference<'a> {
                 vec![],
             );
 
-            let callee = format!("{receiver}.{member}");
+            let callee = match receiver.is_empty() {
+                true => member.clone(),
+                false => format!("{receiver}.{member}"),
+            };
             let via = match enclosing_callback(body, id, &inside_callback) {
                 Some(passed_to) => Via::Callback {
                     passed_to,
@@ -523,7 +596,12 @@ impl<'a> Inference<'a> {
                     callee: callee.clone(),
                 },
             };
-            for e in &sig.effects {
+            // **What the member performs** (ADR-0351): its declared row, and
+            // what its body performs, as a call to it is charged. Until then
+            // its row alone, so a member that declares none, read as a
+            // property, performed nothing whatever its body did.
+            let performs = self.member_performs(sig);
+            for e in &performs {
                 // Through the callback, if it is inside one — and depending on
                 // the resolution, so the chain is walkable rather than three
                 // facts that happen to be present.
@@ -603,8 +681,48 @@ impl<'a> Inference<'a> {
     /// separate execution root (ADR-0025) with its own effect row, checked
     /// against its own context's restrictions — so it needs to be inferred
     /// independently of the declaration's body rather than as part of it.
+    ///
+    /// **Everything the subtree performs** (ADR-0351, the generic-effects
+    /// track): its calls, and the members it reads and the declarations it
+    /// names as values, by its body's types as `run` built them. Until then
+    /// its calls alone: a member read in a handler, a painter's `draw` or an
+    /// optimistic transition performed nothing here. A body `run` did not see
+    /// is read by its calls alone, as before.
     pub fn infer_rooted(&self, unit: usize, body: &Body, root: ExprId) -> Inferred {
+        let mut out = self.calls_from(unit, body, root);
+        if let Some(types) = self.types.get(&(unit, body.owner)) {
+            self.member_effects(body, root, types, &mut out);
+            self.value_effects(unit, body, root, types, &mut out);
+        }
+        out
+    }
+
+    /// **The calls a subtree makes**, each charged its callee's row: the
+    /// call walk, which [`Inference::infer_rooted`] and
+    /// [`Inference::infer_in_at`] each complete with the members and the
+    /// values the subtree reads.
+    fn calls_from(&self, unit: usize, body: &Body, root: ExprId) -> Inferred {
+        self.calls_with_types(unit, body, root, self.types.get(&(unit, body.owner)))
+    }
+
+    fn calls_with_types(
+        &self,
+        unit: usize,
+        body: &Body,
+        root: ExprId,
+        types: Option<&crate::infer::Types<'_>>,
+    ) -> Inferred {
         let mut out = Inferred::default();
+        // A member Call evaluates its callee Field once. That Field is not
+        // also a receiver-only property invocation (ADR-0351).
+        let callees: BTreeSet<ExprId> = body
+            .walk_from(root)
+            .into_iter()
+            .filter_map(|id| match body.expr(id) {
+                Expr::Call { callee, .. } => Some(*callee),
+                _ => None,
+            })
+            .collect();
         // Lambdas are visited through their enclosing call, so the reason can
         // say *which* function the callback was handed to.
         let inside_callback = callbacks(body, root);
@@ -642,6 +760,44 @@ impl<'a> Inference<'a> {
                     },
                 });
                 continue;
+            }
+            // The same typed member decision used by values, effects and
+            // labels owns the invocation identity. A local receiver must not
+            // borrow a module path with the same spelling.
+            let field = match body.expr(id) {
+                Expr::Call { callee, .. } if matches!(body.expr(*callee), Expr::Field { .. }) => {
+                    Some(*callee)
+                }
+                Expr::Field { .. } if !callees.contains(&id) => Some(id),
+                _ => None,
+            };
+            if let (Some(types), Some(field)) = (types, field) {
+                match types.member_read(body, field) {
+                    Some(crate::infer::MemberRead::Member(Some(sig))) => {
+                        let invokes = match body.expr(id) {
+                            Expr::Call { .. } => self.sigs.by_def(sig.definition).is_some(),
+                            _ => self.sigs.property_receiver(sig).is_some(),
+                        };
+                        if invokes {
+                            let effects = self.member_performs(sig);
+                            out.calls.push(Called {
+                                call: id,
+                                callee: sig.definition,
+                                effects: effects.into_iter().collect(),
+                            });
+                        }
+                        // member_effects charges this member's row. Structural
+                        // fields and function values do not become invocations.
+                        continue;
+                    }
+                    Some(
+                        crate::infer::MemberRead::Member(None)
+                        | crate::infer::MemberRead::Unknown
+                        | crate::infer::MemberRead::Never
+                        | crate::infer::MemberRead::Parameter,
+                    ) => continue,
+                    Some(crate::infer::MemberRead::Path) | None => {}
+                }
             }
             let Expr::Call { callee, .. } = body.expr(id) else {
                 continue;
@@ -1055,17 +1211,6 @@ pub fn enclosing_callbacks<'c>(
         l.end - l.start
     });
     found
-}
-
-/// The name a member access is reached through: `anchor` in `anchor.offsetWidth`.
-fn receiver_name(body: &Body, base: ExprId) -> Option<String> {
-    match body.expr(base) {
-        Expr::Name(n) => Some(n.clone()),
-        // `el.getBoundingClientRect().width` — the receiver of `.width` is the
-        // call, whose own effects were already counted. Not a member access to
-        // attribute again.
-        _ => None,
-    }
 }
 
 /// A callee's dotted path as written.

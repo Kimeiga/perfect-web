@@ -1,0 +1,11 @@
+// @status: GENERAL
+// @invariant: unknown_member
+// @dimension: a rigid generic parameter declares no member constraint
+
+module generic_effects.rigid
+
+fn same<T>(value: T) -> T !{} { value }
+
+fn missing<T>(value: T) -> String !{} {
+    same(value).name
+}

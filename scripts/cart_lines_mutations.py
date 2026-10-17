@@ -48,7 +48,7 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SPECULATION = ROOT / "compiler/pw-core/src/backend/speculation.rs"
 LOWER = ROOT / "compiler/pw-core/src/backend/lower.rs"
-INFER = ROOT / "compiler/pw-core/src/infer.rs"
+LEXICAL = ROOT / "compiler/pw-core/src/lexical.rs"
 DOMAIN = ROOT / "examples/domain.pw"
 # The store's cart is a user's since track store-accounts: its transitions
 # and its subtotal are UserCarts'.
@@ -112,9 +112,9 @@ MUTANTS = [
     (
         "a loop over a field is typed as its binding",
         "core",
-        INFER,
-        "        for field in fields {\n",
-        "        for field in fields.iter().take(0) {\n",
+        LEXICAL,
+        "                        self.out.each.insert(*n, (each.list, head));\n",
+        "                        let list = match self.body.expr(each.list) {\n                            Expr::Field { base, .. } => *base,\n                            _ => each.list,\n                        };\n                        self.out.each.insert(*n, (list, head));\n",
     ),
     (
         "a record is not sent",

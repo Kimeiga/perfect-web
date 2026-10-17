@@ -46,10 +46,10 @@ MUTANTS = [
         "                typed\n                    .get(&d)\n                    .filter(|_| false)",
     ),
     (
-        "a binding around a nested declaration is untyped in the declared-type environment",
+        "a nested analysis receives no enclosing type environment",
         INFER,
-        "            .map(|(_, b)| parent.as_ref().and_then(|t| t.bindings.get(&b).cloned()))",
-        "            .map(|(_, b)| parent.as_ref().and_then(|t| t.bindings.get(&b).cloned()).filter(|_| false))",
+        "        let parent = crate::lexical::enclosing(hir, id).and_then(|p| {",
+        "        let parent = crate::lexical::enclosing(hir, id).filter(|_| false).and_then(|p| {",
     ),
     (
         "a binding around a nested declaration is unlabelled",

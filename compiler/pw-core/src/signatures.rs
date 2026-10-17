@@ -173,7 +173,19 @@ pub struct Signatures {
     /// **Each module signal's type** (ADR-0144), resolved where it is
     /// declared: what a body it is provided to reads and writes.
     signal_types: BTreeMap<DefId, TypeResolution>,
+    /// **Each body the value relations' typer has solved for `infer.rs`**
+    /// (ADR-0351, the generic-effects track), so a check solves each body
+    /// once: every analysis builds its own `infer::Types`, and solving the
+    /// body for each doubled the checker's time (the store, 2026-10-16: 2770
+    /// solves of 262 bodies). A cell, because the signatures are what every
+    /// analysis already shares, by reference.
+    solved: std::cell::RefCell<BTreeMap<SolvedKey, std::rc::Rc<crate::values::SolvedBody>>>,
 }
+
+/// **Which body a solve is of** (ADR-0351): its unit, its declaration, where
+/// it is in memory and its root, and whether it was solved inside the
+/// declaration it is nested in, which types the bindings around it.
+pub(crate) type SolvedKey = (usize, crate::hir::DeclId, usize, crate::hir::ExprId, bool);
 
 impl Signatures {
     pub fn build(workspace: &Workspace, units: &[&Hir]) -> Signatures {
@@ -389,6 +401,23 @@ impl Signatures {
         &self.workspace
     }
 
+    /// **The body `key` names, as the value relations' typer solves it**
+    /// (ADR-0351): `solve`'s answer the first time it is asked, and the same
+    /// answer after. The typer reads no `infer::Types`, so a solve never asks
+    /// for another while this one is open.
+    pub(crate) fn solved(
+        &self,
+        key: SolvedKey,
+        solve: impl FnOnce() -> crate::values::SolvedBody,
+    ) -> std::rc::Rc<crate::values::SolvedBody> {
+        if let Some(found) = self.solved.borrow().get(&key) {
+            return found.clone();
+        }
+        let found = std::rc::Rc::new(solve());
+        self.solved.borrow_mut().insert(key, found.clone());
+        found
+    }
+
     pub fn unit_of(&self, module: Option<&str>) -> Option<usize> {
         let name = module.unwrap_or_default();
         self.workspace
@@ -495,6 +524,17 @@ impl Signatures {
     }
     pub fn by_def(&self, def: DefId) -> Option<&Signature> {
         self.by_def.get(&def)
+    }
+
+    /// A callable member evaluated as a property takes only its receiver.
+    /// Structural record fields have synthetic signatures and are not calls.
+    /// Shared by value typing and the invocation graph (ADR-0351).
+    pub(crate) fn property_receiver<'s>(&self, sig: &'s Signature) -> Option<&'s ResolvedType> {
+        self.by_def(sig.definition)?;
+        let [Some(TypeResolution::Resolved(receiver))] = sig.params.as_slice() else {
+            return None;
+        };
+        Some(receiver)
     }
 
     /// What kind of declaration `def` is.

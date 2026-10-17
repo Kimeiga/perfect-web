@@ -71,13 +71,13 @@ MUTANTS = [
         "effective effects count calls alone",
         EFFECTS,
         "                let mut out: Vec<String> = self\n                    .performed(unit, hir, id, b)\n",
-        "                let mut out: Vec<String> = self\n                    .infer_at(unit, b)\n",
+        "                let mut out: Vec<String> = self\n                    .calls_from(unit, b, b.root)\n",
     ),
     (
         "the contract's effects count calls alone",
         EFFECTS,
         "subtracted(self.performed(unit, hir, id, b), b, exclude)\n",
-        "subtracted(self.infer_at(unit, b), b, exclude)\n",
+        "subtracted(self.calls_from(unit, b, b.root), b, exclude)\n",
     ),
     # ADR-0283, decision 3: only a handler's work deferred.
     (

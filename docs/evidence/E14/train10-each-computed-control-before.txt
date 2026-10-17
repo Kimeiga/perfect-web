@@ -1,0 +1,24 @@
+baseline: 19 passed, 0 failed
+a text hole is no position: KILLED (2 of 13 tests fail)
+an attribute's value is no position: KILLED (2 of 19 tests fail)
+a handler is no position: KILLED (1 of 4 tests fail)
+a handler is read as an attribute: KILLED (2 of 19 tests fail)
+a block's subject is no position: KILLED (2 of 19 tests fail)
+a branch's condition is no position: KILLED (2 of 19 tests fail)
+a loop's list is no position: KILLED (3 of 13 tests fail)
+a loop's key is no position: KILLED (1 of 13 tests fail)
+a template's parts leave a loop's head out, as before the fix: KILLED (4 of 13 tests fail)
+a loop's list is lowered to nothing: KILLED (9 of 13 tests fail)
+a loop's key is lowered to nothing: KILLED (8 of 13 tests fail)
+a loop's list is read in no scope: KILLED (6 of 13 tests fail)
+a loop's key is read outside the row's scope: KILLED (1 of 19 tests fail)
+the names check reads no loop's list: KILLED (1 of 13 tests fail)
+the names check reads a loop's key outside the row's scope: KILLED (8 of 13 tests fail)
+a row's label is not its list's: KILLED (1 of 13 tests fail)
+a computed list's rows have no type: SURVIVED
+a loop's list shows no dialog: KILLED (1 of 13 tests fail)
+Marko writes a loop's list as a name, as before the fix: KILLED (1 of 13 tests fail)
+a loop's list is printed: KILLED (1 of 19 tests fail)
+19 of 20 mutants killed
+Independent Cargo observation: 21 commands; 0 invalid/unmatched; script exit 1
+memory bound: no process was stopped
