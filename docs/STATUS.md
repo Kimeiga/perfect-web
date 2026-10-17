@@ -165,7 +165,9 @@ three engines. [Commands and raw results](evidence/E14/train10-scheduled-integra
 Estimator isolation, send-time hours rechecking and multiple current
 scheduled orders remain limitations. Merging train-9's ADR-0352, its four
 payment-taking transactions wait on completed payments, every pin as
-measured.
+measured. Its recipe skips without a database, and the planner did not
+deal it beside one: train-10's first verify recorded nothing of it, and
+the planner holds every such recipe to a database's shard now.
 Verify TRAIN_RUN green, with train-10.
 
 **ADR-0346, 2026-10-15: argument and page-parameter invariants**

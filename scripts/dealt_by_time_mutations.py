@@ -25,8 +25,10 @@ descend from its commit, or where the recipe's files were recorded at two
 commits or one not at all; the plan dropping what is current only where it
 is asked, and the workflow asking at each push; and (train-5's finding,
 2026-10-14) a recipe planned by a program its own lines name, a glob read
-segment by segment and a path naming what is under it. At least one test of
-`scripts/tests/test_ci_scripts.py` must then fail.
+segment by segment and a path naming what is under it; and (train-10's
+finding, 2026-10-17) a recipe that skips without a database dealt where
+there is none. At least one test of `scripts/tests/test_ci_scripts.py` must
+then fail.
 
 Run from the repository root; `just e14-dealt-by-time` records the output.
 The sources are restored after every mutant, whatever happens.
@@ -294,6 +296,14 @@ MUTANTS = [
         PLAN,
         "        score = (ends, overflow)\n",
         "        score = (ends, 0)\n",
+    ),
+    # Train-10's verify (39054436657): a recipe that skips without a
+    # database, dealt where there is none, records nothing and passes.
+    (
+        "a recipe that skips without a database is dealt where there is none",
+        PLAN,
+        '    "e14-scheduled-orders",\n',
+        "",
     ),
     (
         "a plan of nothing takes the longest of no shards",

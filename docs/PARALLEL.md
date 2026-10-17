@@ -2073,6 +2073,18 @@ Each a decision for a track, with its date; a track's ADR records it too.
     `check-is-build`'s assembly, the parallel slots' allocator, the browser
     host map, `contributor-dx`, tables' D2, `browser-cleanup-23`, `todomvc`,
     `render-merge` and `second-host`.
+  - **A finding at the train's verify: a recipe ran where it could not.**
+    `e14-scheduled-orders` skips, and writes no evidence, without a
+    database, and the planner's hand-kept `NEEDS_DATABASE` did not hold it:
+    the first verify (39054436657) dealt it to a shard with no PostgreSQL,
+    where it passed in three minutes having run nothing, a whole ADR's
+    evidence missing from a green run (and master's CI would have failed
+    `test_every_recipe_on_master_has_its_evidence`). It is in the list now,
+    with `e14-argument-invariants` (its PostgreSQL part ran only beside a
+    database); a test holds every recipe that skips without a database to
+    the list, and a control takes this one out (`dealt_by_time_mutations.py`,
+    50). The run's other evidence is fetched first; the next push's verify
+    runs what it does not cover.
   - **Flakes, recorded** (the tests unchanged): bounded statements'
     "feed_pg.rs ran bypasses the command write guard" survived one whole
     run of two (load ~55; the second, 13 of 13), as it is killed only by a

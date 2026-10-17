@@ -139,6 +139,13 @@ NEEDS_DATABASE = {
     "e14-scheduled",
     # Track `reviews`: a store's ratings, on PostgreSQL too.
     "e14-reviews",
+    # Track `scheduled-orders` (ADR-0347): without a database it says it
+    # skipped and writes no evidence, and train-10's verify (39054436657)
+    # dealt it where there was none, so the run recorded nothing of it.
+    "e14-scheduled-orders",
+    # Track `argument-invariants` (ADR-0346): a row on PostgreSQL held to
+    # its type's invariant, run where a database is named.
+    "e14-argument-invariants",
 }
 
 EVIDENCE_RECIPE = re.compile(r"^e[0-9]+-[a-z0-9-]+$")

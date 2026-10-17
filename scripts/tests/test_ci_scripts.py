@@ -113,6 +113,22 @@ class Plan(unittest.TestCase):
                     self.fail(f"An empty recipe selection must return no shards: {error}")
                 self.assertEqual(empty, [])
 
+    def test_a_recipe_that_skips_without_a_database_is_dealt_beside_one(self) -> None:
+        # Found at train-10's verify (39054436657): `e14-scheduled-orders`
+        # says it skipped and writes no evidence where no database is named,
+        # NEEDS_DATABASE did not hold it, and its shard had none: the run
+        # recorded nothing of ADR-0347 and passed. Every recipe of that kind,
+        # read from the justfile's every part, is dealt beside a database.
+        skips = [
+            name
+            for name, body in plan.bodies().items()
+            if "skipped, PW_STORE_DATABASE_URL is not set" in body
+            or "skipped, PW_FEED_DATABASE_URL is not set" in body
+        ]
+        self.assertIn("e14-scheduled-orders", skips)
+        self.assertGreaterEqual(len(skips), 10, skips)
+        self.assertEqual(sorted(set(skips) - set(plan.NEEDS_DATABASE)), [])
+
     def test_a_measurement_of_the_machine_is_not_planned(self) -> None:
         self.assertIn("e10-close-bench", plan.LOCAL_ONLY)
         self.assertTrue(plan.EVIDENCE_RECIPE.match("e14-feed"))
