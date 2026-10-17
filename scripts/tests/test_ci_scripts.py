@@ -105,8 +105,13 @@ class Plan(unittest.TestCase):
         self.assertEqual(len(plan.plan(["a", "b"], {}, 16)), 2)
         # And nothing to run plans no shard: a change that touches no recipe
         # (run 37914111273 failed its plan instead, ADR-0290's first week).
-        self.assertEqual(plan.plan([], {}, 9), [])
-        self.assertEqual(plan.plan([], {}, 9, {}, {"d1"}), [])
+        for database in (frozenset(), {"d1"}):
+            with self.subTest(database=database):
+                try:
+                    empty = plan.plan([], {}, 9, database=database)
+                except ValueError as error:
+                    self.fail(f"An empty recipe selection must return no shards: {error}")
+                self.assertEqual(empty, [])
 
     def test_a_measurement_of_the_machine_is_not_planned(self) -> None:
         self.assertIn("e10-close-bench", plan.LOCAL_ONLY)
@@ -447,6 +452,40 @@ class Plan(unittest.TestCase):
             if shard["recipes"] != ["long"]:
                 self.assertLessEqual(plan.ends([shard], costs), plan.CEILING)
 
+    def test_a_long_singleton_does_not_hide_a_database_shard_past_the_ceiling(self) -> None:
+        # More database shards cannot shorten the long singleton, but can
+        # prevent a different, splittable shard exceeding ADR-0290's ceiling.
+        costs = {"long": 100000, "d1": 6000, "d2": 6000}
+        db = {"d1", "d2"}
+        for asked in (2, 3, 4, plan.MOST):
+            with self.subTest(asked=asked):
+                dealt = plan.planned(list(costs), costs, asked, database=db)
+                self.assertEqual(len(dealt), 3)
+                self.assertEqual(sorted(s["recipes"] for s in dealt), [["d1"], ["d2"], ["long"]])
+
+    def test_a_long_database_singleton_does_not_hide_its_other_database_shard(self) -> None:
+        costs = {"ordinary": 6000, "long-db": 100000, "d1": 6000, "d2": 6000}
+        dealt = plan.planned(list(costs), costs, 3, database={"long-db", "d1", "d2"})
+        self.assertEqual(len(dealt), 4)
+        for shard in dealt:
+            if shard["recipes"] != ["long-db"]:
+                self.assertLessEqual(plan.ends([shard], costs), plan.CEILING)
+
+    def test_the_ceiling_tie_counts_database_setup(self) -> None:
+        # The recipes total 10,000: plain setup fits, browser setup does not.
+        costs = {"long": 100000, "d1": 5000, "d2": 5000}
+        db = {"d1", "d2"}
+        self.assertEqual(len(plan.planned(list(costs), costs, 3, database=db)), 2)
+        browsers = {"d1": (True, True)}
+        dealt = plan.planned(list(costs), costs, 3, browsers, db)
+        self.assertEqual(len(dealt), 3)
+        self.assertEqual([s["recipes"] for s in dealt if s["database"]], [["d1"], ["d2"]])
+
+    def test_a_safe_database_bundle_keeps_the_fewest_database_shards(self) -> None:
+        costs = {"long": 100000, "d1": 1200, "d2": 1200}
+        dealt = plan.planned(list(costs), costs, 3, database={"d1", "d2"})
+        self.assertEqual([s["recipes"] for s in dealt], [["long"], ["d1", "d2"]])
+
     def test_main_deals_a_run_within_the_ceiling(self) -> None:
         # The workflow's own call: four recipes of 8,000 s asked for in two
         # shards are dealt into four.
@@ -649,13 +688,17 @@ class Fetch(unittest.TestCase):
             "docs/evidence/E14/feed.txt": "e14-feed",
         })
         moved = {"e14-diffs"}
-        self.assertIn("reads what changed", fetch.verdict("e14-diffs", moved, []))
+        reason = fetch.verdict("e14-diffs", moved, [])
+        self.assertIsInstance(reason, str, "A moved recipe must return a refusal reason")
+        self.assertIn("reads what changed", reason)
         self.assertIsNone(fetch.verdict("e14-feed", moved, []))
         # Skipped, where another run records it: neither copied nor refused.
         self.assertEqual(fetch.verdict("e14-diffs", moved, ["e14-diffs"]), "skipped")
         self.assertEqual(fetch.verdict("e14-feed", set(), ["e14-feed"]), "skipped")
         # A file no recipe of the run says it wrote is no one's evidence.
-        self.assertIn("no recipe", fetch.verdict(None, set(), []))
+        reason = fetch.verdict(None, set(), [])
+        self.assertIsInstance(reason, str, "An unowned file must return a refusal reason")
+        self.assertIn("no recipe", reason)
 
     def test_what_changed_since_a_run_is_the_planners_against_the_tree_here(self) -> None:
         # A push plans by `ci_plan.py`'s rule; a fetch reads the same, from
@@ -993,7 +1036,10 @@ class VerifiedBase(unittest.TestCase):
         def broken(_sha: str) -> list[dict]:
             raise RuntimeError("the API answered 403")
         with mock.patch("sys.stderr", new_callable=lambda: __import__("io").StringIO()) as err:
-            got = vbase.base(self.sha["before"], self.sha["evidence"], broken, self.root)
+            try:
+                got = vbase.base(self.sha["before"], self.sha["evidence"], broken, self.root)
+            except RuntimeError as error:
+                self.fail(f"A failing run provider must fall back to the previous commit: {error}")
         self.assertEqual(got, self.sha["before"])
         self.assertIn("the API answered 403", err.getvalue())
         # And a commit git does not know.
