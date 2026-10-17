@@ -284,8 +284,16 @@ MUTANTS = [
     (
         "more shards are taken where fewer end the run as soon",
         PLAN,
-        "        if best is None or ends < best[0]:\n",
-        "        if best is None or ends <= best[0]:\n",
+        "        if best is None or score < best[0]:\n",
+        "        if best is None or score <= best[0]:\n",
+    ),
+    # ADR-0290, 2026-10-16: an irreducible singleton must not hide an
+    # avoidable ceiling excess in another shard at the same last finish.
+    (
+        "a long singleton hides a multi-recipe shard past the ceiling",
+        PLAN,
+        "        score = (ends, overflow)\n",
+        "        score = (ends, 0)\n",
     ),
     (
         "a plan of nothing takes the longest of no shards",

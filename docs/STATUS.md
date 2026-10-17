@@ -51,6 +51,26 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
+**ADR-0290 amended, 2026-10-16: no shard is dealt past the job's ceiling
+where another deal ends as soon** (train-10, from `58e3797b`, track
+`ci-planner-ceiling`: Codex's work, committed as it was left).
+- The planner took the deal whose last shard ends soonest, then the fewest
+  database shards. A long recipe alone in its shard fixes the last finish,
+  so a bundle of several recipes past the ceiling (10,350 s) could stay
+  whole where more database shards would have split it: a replay of
+  train-9's roster found three PostgreSQL bundles past it in forty shards,
+  where thirty shards hold none at the same estimated finish (19,320 s).
+  Train-9's verify ran its longest shard 5 h 27 min of the 345 minutes.
+- Among deals that end as soon, the one whose shards of more than one
+  recipe go least past the ceiling, then the fewest database shards; a
+  long recipe alone still may. Three tests of the suite assert their
+  API's contract now where a control made them error, not fail: `plan([])`,
+  the verified-base fallback, and two refusals' `str`-or-`None`.
+- The track's own runs: `dealt_by_time_mutations.py` whole, 49 of 49
+  killed; its default `just ci` green. On the train, `test_ci_scripts.py`
+  79 of 79.
+Verify TRAIN_RUN green, with train-10.
+
 **ADR-0353, 2026-10-16: a repeated store keeps all of its opening hours**
 (train-10, from `57f34890`, track `legacy-hours-duplicates`: the
 integrator's local repair, on train-9's `e2a4acd9`).

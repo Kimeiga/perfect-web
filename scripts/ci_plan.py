@@ -728,8 +728,9 @@ def plan(
     The recipes of `database` run in shards of their own, each beside a
     PostgreSQL of its own (ADR-0278), and the others never there: a
     database's shard names it to each recipe it runs. They take as many
-    shards as make the run end soonest, the fewest where more would not;
-    the others are dealt into the rest, at least one where there are any.
+    shards as make the run end soonest; among ties, the least excess over
+    the ceiling in a multi-recipe shard, then the fewest database shards.
+    The others are dealt into the rest, at least one where there are any.
     Theirs are numbered after the others'."""
     need = need or {}
     # Nothing to run, no shard: a push that touches no recipe plans none
@@ -747,8 +748,15 @@ def plan(
         others = deal(rest, costs, left, need)
         theirs = deal(on_database, costs, beside, need)
         ends = max(end for _, _, end in others + theirs)
-        if best is None or ends < best[0]:
-            best = (ends, others, theirs)
+        # An allowed long singleton can fix the last finish while another
+        # shard can still be split below the ceiling. Break that tie before
+        # preferring fewer database shards (ADR-0290, 2026-10-16).
+        overflow = max(
+            [0] + [end - CEILING for recipes, _, end in others + theirs if len(recipes) > 1]
+        )
+        score = (ends, overflow)
+        if best is None or score < best[0]:
+            best = (score, others, theirs)
     out = []
     if best is not None:
         for dealt, on in ((best[1], False), (best[2], True)):

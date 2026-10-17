@@ -2404,7 +2404,10 @@ ADR-0249 and ADR-0278).
   345-minute limit, 10,350 s, half of it since 2026-10-11 (a branch ran its
   recipes up to twice their recorded seconds); a run takes more shards than
   it asks for where its own would (a track's 9 were dealt 21,900 s, and a
-  shard stopped at the limit throws the run away).
+  shard stopped at the limit throws the run away). Amended 2026-10-16
+  (train-10): of the deals that end as soon, the one whose shards of more
+  than one recipe go least past the ceiling; a long recipe alone in its
+  shard had hidden three PostgreSQL bundles dealt past it.
 [ADR-0291](DECISIONS/ADR-0291-a-hosts-record-is-written-as-the-program-names-its-fields.md):
 a host's record is written as the program names its fields (extends
 ADR-0172 to the host).
