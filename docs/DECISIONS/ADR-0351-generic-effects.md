@@ -447,7 +447,10 @@ whole each campaign naturally fails19/20: disabling only infer's computed-list
 fallback survives because the canonical value solver has already typed its
 Each binding. Its actual command exits0 with19 passes, not a hidden failure.
 All2392 bytes restore again; this is not a20/20 result.
-Raw train10-each-computed-control-before.txt retains the complete failure.
+Its complete raw output is retained in history, not in committed evidence,
+which records no survivor (`scripts/evidence_survivors.py`, a gate of
+`just ci`): `git show 600ebf19:docs/evidence/E14/train10-each-computed-control-before.txt`,
+SHA256 0ef88dce83ddc2e47aa246689d559ac2674dfc98fb387b7b25ce5193a7fd2453.
 
 Before control correction, the integrator rules: keep every existing semantic
 assertion and valid neighbour. Retarget that one control to the shared
