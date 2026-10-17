@@ -4,18 +4,19 @@ The next executable tasks, in order, with acceptance criteria. Charter §3.4.
 
 ## Integration follow-ups, 2026-10-16
 
-- D1's local compiler integration gate is green (ADR-0350). Integrate the
-  completed generic-result effect repair and cache publication repair,
-  preserving canonical expression types and generated bounded-read pairs;
-  run the combined regression tests, applicable whole scripts and full CI.
+- D1's local compiler integration gate is green (ADR-0350), on train-10.
+  Integrate the completed generic-result effect repair and cache
+  publication repair on train-11, preserving canonical expression types
+  and generated bounded-read pairs; run the combined regression tests,
+  applicable whole scripts and full CI.
 - Continue D2's common memory adapter and TodoMVC integration. Preserve
   exact Result/Option answers, table ordering, atomic overflow/rollback and
   measured source-cost admission. A declared one_call promise is not an
   optimistic provider override; legacy cost conformance remains explicit.
 - Complete guide producer exit validation and browser host/port isolation.
   Preserve the recorded negative witnesses, reject invalid producers and
-  keep the remaining restored-browser cleanup gaps visible. Final assembled
-  verification and quiet-host E9 remain required before a train landing.
+  keep the remaining restored-browser cleanup gaps visible. Quiet-host E9
+  (the check's latency recorded on a quiet machine) remains to be recorded.
 
 - ADR-0347: split scheduling's when_said from Checkout so an estimator
   outage degrades that line alone; offer delivery-streamed times. The
@@ -23,12 +24,10 @@ The next executable tasks, in order, with acceptance criteria. Charter §3.4.
 - ADR-0348: the scheduled estimate N+1 is repaired by a set operation;
   continue the common per-adapter conformance suite and composite migration.
 
-Train-9 landing gate, 2026-10-16: ADR-0352's completion/write-order fix and
-strict result producer pass local whole12 and fresh default CI. Push the
-reviewed train-9 head under the existing owner authorization, require both
-GitHub `ci` and `verify` at that exact head, then fetch only its green evidence
-and land. The failed38863242953 run cannot satisfy this gate. Keep the older
-neighbor whole/native-status and inventory-scope qualifications in the receipt.
+Train-9 landing gate, 2026-10-16: met. GitHub's `verify` 38909882781 and
+`ci` 38909883157 passed at the exact head `e2a4acd9` (85 recipes, 1,391 of
+1,391 mutants killed); its evidence was fetched and train-9 landed
+2026-10-17, master `32757966`. The failed 38863242953 run stays failed.
 
 
 Integration follow-up, 2026-10-16: reproduce Kiokun search-cache publication

@@ -252,4 +252,5 @@ Measured correction: child regression red 0/1 then green 1/1; both independent
 controls assertion-killed, 2/2, no process stopped. Fresh inherited-environment
 full CI passes 2948 Rust tests (25 ignored), 167 Python tests and
 one intentional skip. [Commands, raw results and hashes](../evidence/E14/train9-corrective-validation.txt).
-GitHub verification and production cache concurrency remain open.
+GitHub verification then passed (verify 38909882781, `e14-kiokun-test-data`
+2 of 2, landed with train-9); production cache concurrency remains open.

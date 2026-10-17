@@ -2002,3 +2002,64 @@ Each a decision for a track, with its date; a track's ADR records it too.
   `evidence/E14/train10-d1-integration.txt`. The generic7ec, cache3019936e and
   check/build e82b0d6c checkpoints are separate integration inputs; none is
   claimed merged by this record.
+
+- **2026-10-17, train-10** (`track/train-10`, from `master` at `32757966`;
+  the integrator's delegate, on the PC): the train another agent (Codex)
+  assembled on `1f370fd9` as `track/train-10-next` (`9902c62b`), finished:
+  master merged in at train-9's landing, two more tracks, one fix the merge
+  found, and the documents.
+  - **What it carries.** Codex's merges, each its own commit with its ADR
+    numbered (`git log --first-parent 1f370fd9..9902c62b`): evidence
+    integrity (ADR-0344, from `83cdac27`), each-head effects (ADR-0345,
+    `839e8bfa`), argument invariants (ADR-0346, `ac3f2553`, with
+    `49a2f90f`'s 400 for path text that does not decode), scheduled orders
+    and a set read that keeps each key's result (ADR-0347 and ADR-0348,
+    `40e81d51`, with the set estimates that replaced a per-store read
+    PW0405 found when the two tracks met), set pairs held to their key by
+    name with PW0009's hint (`920dbe67` with `17fade14`), evidence
+    integrity's second part (ADR-0349, `3adbfe44`), evidence reports
+    published atomically (`c67bf6ed`), D1 tables (ADR-0350, `917fafbd`) and
+    the clean-source evidence record. Then: master (`12ffa772`); the
+    repeated store hours (ADR-0353, `57f34890`, merged `3a7a1993`); the
+    planner's ceiling (ADR-0290 amended, `58e3797b`, merged `da61e5f9`).
+  - **The master merge's conflicts** (`12ffa772`). `bounded_statements.rs`
+    merged without a conflict and did not build: master replaced the
+    sleep-based `quiet()` with ADR-0352's completion barrier, and train-10's
+    scheduled-orders scenario still called it six times. Each now waits on
+    the payment outcomes it follows (3, 3, 3, 4, 4, 4); measured on
+    PostgreSQL, all ten tests pass at both data sizes and no pin moved
+    (payments 38, 18, 25, 14, 26, 14; for a time 13, 40, 21, 9). The four
+    status documents kept both sides; ADR-0286 and two evidence files
+    (`guide`, `kiokun-test-data`) are master's, recorded by train-9's run
+    where train-10's were local records with uncommitted changes.
+  - **A finding at the merge: train-9's receipts met train-10's gate.**
+    ADR-0344's check that a train and master hold no unnumbered ADR named
+    five mentions, all in three JSON receipts of ADR-0352's correction that
+    record their inputs by the paths they had, ADR-0352's file under its
+    name before numbering. The train's `ci`, its verify's
+    `e14-evidence-integrity` and master's CI after the landing would each
+    have failed, on records no recipe writes again; each track was green
+    alone, and the master merge is where they met. Ruled (`f58245dc`,
+    ADR-0344 amended, cheap to reverse): a decision's path recorded under
+    `docs/evidence/` is history; anything else on its line is read as
+    before. Two test cases, three controls more (38).
+  - **The hours merge** (`3a7a1993`). The track had taken `|| true` off
+    `e14-store-hours`' browser pipeline; train-10 had replaced the pipeline
+    with ADR-0349's `run_suite.sh`, which the merge keeps. The track's four
+    recipe tests ran the recipe in a tree without that helper and failed
+    (exit 127): the tree copies the real helper now, and all four pass; with
+    `|| true` put back, three fail. Its STATUS paragraph, written above the
+    charter's sections, is an entry of its own.
+  - **Numbering.** ADR-0353 for the hours (master's highest is ADR-0352;
+    ADR-0351 is held by `wip/train10-generic-merge`'s generic effects,
+    train-11's). The planner's track amends ADR-0290 and numbers nothing.
+  - **Evidence records** (the integrator's delegate's practice on this
+    train): where both sides held an evidence file, the one a run recorded
+    is kept over a local record with uncommitted changes (`guide`,
+    `kiokun-test-data`, `store-hours`, `dealt-by-time`); the train's verify
+    plans each again.
+  - **Not on this train** (train-11): generic effects
+    (`wip/train10-generic-merge`, not green yet), `kiokun-cache`,
+    `check-is-build`'s assembly, the parallel slots' allocator, the browser
+    host map, `contributor-dx`, tables' D2, `browser-cleanup-23`, `todomvc`,
+    `render-merge` and `second-host`.

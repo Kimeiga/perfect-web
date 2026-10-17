@@ -3010,53 +3010,48 @@ experience).
   generated from the registry, and each gap in the checks an example held
   open until the compiler closes it.
 
-### 2026-10-15 — evidence integrity on train-10
-
-[ADR-0344](DECISIONS/ADR-0344-evidence-integrity.md): stale Python bytecode
-is discarded, evidence counts and corpus headers are checked, latency
-bounds thread CPU, suites require complete builds and trains require
-numbered decisions. Accepted under the owner's delegation; integrated
-verification is pending.
-
-### 2026-10-15 — every expression position in a view
-
-[ADR-0345](DECISIONS/ADR-0345-each-head-effects.md): a loop's list and key
-are semantic expressions. One exhaustive enumeration feeds view walkers;
-effects, privacy, signal and name checks cover all seven positions.
-Accepted under the owner's delegation; train-10 verification pending.
-
-### 2026-10-15 — invariants at external value boundaries
-
-[ADR-0346](DECISIONS/ADR-0346-argument-invariants.md): the host holds
-component arguments before predicates and execution, page parameters at
-arrival, and invariants within maps and sets. Accepted under the owner's
-delegation; integrated train-10 verification pending.
-
-### 2026-10-15 — scheduled orders and set-result preservation
-
-[ADR-0347](DECISIONS/ADR-0347-scheduled-orders.md): paid orders are sent
-when preparation is due, with windows held to every store's ASAP admission
-rule at send time. [ADR-0348](DECISIONS/ADR-0348-a-set-read-keeps-each-keys-result.md):
-set pairs can preserve each key's exact Result/Option. Accepted under the
-owner's delegation; train-10 integrated verification pending.
-
-### 2026-10-15 — a failed suite fails its recipe
-
-[ADR-0349](DECISIONS/ADR-0349-evidence-integrity-2.md): one browser-suite
-runner propagates failures, recipes and builds are checked behaviorally,
-the planner follows suite configuration and helper imports, mutation
-program checks cover every root, and diagnostic evidence is held current.
-Integrated train verification remains pending.
-
-
-### 2026-10-16 — tables give an app its data operations
-
-[ADR-0350](DECISIONS/ADR-0350-tables-declare-an-apps-data.md) implements
-ADR-0338 D1: generated reads and writes, schema metadata and migration locks.
-The bounded checker consumes generated pair metadata and source costs.
-Accepted under the owner's delegation. The local compiler integration,
-bounded47/PostgreSQL12 controls and full CI pass; runtime D2 and final
-assembled train verification remain pending.
+[ADR-0344](DECISIONS/ADR-0344-evidence-integrity.md):
+six ways evidence could be wrong, or a gate fail for the wrong reason
+(track `evidence-integrity`; train-10).
+- Stale Python bytecode is discarded; evidence counts and corpus headers
+  are checked against their producers; latency bounds thread CPU time;
+  suites require complete builds; trains and master hold no unnumbered
+  ADR (amended 2026-10-17: a decision's path that evidence recorded
+  before its numbering is history). Reports are published atomically.
+[ADR-0345](DECISIONS/ADR-0345-each-head-effects.md):
+an `{#each}`'s list and key are expressions every walker of a view reads
+(track `each-head-effects`; train-10).
+- A loop's list and key are semantic expressions. One exhaustive
+  enumeration feeds view walkers; effects, privacy, signal and name checks
+  cover all seven positions.
+[ADR-0346](DECISIONS/ADR-0346-argument-invariants.md):
+a value from outside is held to its type's invariant at every boundary it
+crosses (track `argument-invariants`; train-10).
+- The host holds component arguments before predicates and execution,
+  page parameters at arrival, and invariants within maps and sets;
+  malformed path text is a 400.
+[ADR-0347](DECISIONS/ADR-0347-scheduled-orders.md):
+an order is placed for a time its reader chooses, and sent to its stores
+then (W9's, track `scheduled-orders`; train-10).
+- Paid orders are sent when preparation is due, with windows held to
+  every store's as-soon-as-possible admission rule at send time.
+[ADR-0348](DECISIONS/ADR-0348-a-set-read-keeps-each-keys-result.md):
+a set read keeps each key's result (train-10).
+- Set pairs can preserve each key's exact Result/Option, and are held to
+  the key by its name (track `pair-key-by-name`, ADR-0340's answers).
+[ADR-0349](DECISIONS/ADR-0349-evidence-integrity-2.md):
+a failed browser test fails its recipe, and five more rulings on the
+evidence (track `evidence-integrity-2`; train-10).
+- One browser-suite runner propagates failures; recipes and builds are
+  checked behaviorally; the planner follows suite configuration and helper
+  imports; mutation program checks cover every root; diagnostic evidence
+  is held current.
+[ADR-0350](DECISIONS/ADR-0350-tables-declare-an-apps-data.md):
+a table declares an app's data and gives its reads and writes (ADR-0338's
+D1, track `tables`; train-10).
+- Generated reads and writes, schema metadata and migration locks; the
+  bounded checker consumes generated pair metadata and source costs.
+  Runtime adapters (D2) are next.
 
 [ADR-0352](DECISIONS/ADR-0352-bounded-statements-wait-for-completed-payment.md):
 statement counts wait for the completed payment transaction.
@@ -3064,7 +3059,8 @@ statement counts wait for the completed payment transaction.
   completion and same-instance write-order defects; exact success pins are
   retained. Strict Cargo producer classification refuses invalid/build/stopped
   evidence with source restoration and no next control. Local strict12/12 and
-  fresh CI pass; exact-head remote gates and landing remain pending.
+  fresh CI passed; verify 38909882781 green at the exact head; landed with
+  train-9.
 [ADR-0353](DECISIONS/ADR-0353-repeated-store-hours-preserve-each-occurrence.md):
 a repeated store keeps all of its opening hours (the integrator's local
 repair, track `legacy-hours-duplicates`; train-10).

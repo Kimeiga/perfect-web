@@ -24,8 +24,9 @@ tests (25 explicitly ignored); all2280 frozen source/config inputs restore
 exactly. [Current receipt and raw results](evidence/E14/train9-bounded-strict-validation.json)
 distinguish the older112 reported neighbor kills, whose individual native
 statuses/full raw were not retained, and the old2222-path inventory omission.
-GitHub verify38863242953 remains failed. New exact-head `ci` and `verify` must
-both pass before evidence fetch and landing; no remote acceptance is claimed.
+GitHub verify38863242953 remains failed. The exact head's `ci` and `verify`
+then passed: verify 38909882781 and ci 38909883157 at `e2a4acd9`, green, and
+train-9 landed on it 2026-10-17 (master `32757966`).
 The write guard orders one instance's writes, with cross-host serializable
 refusals still possible.
 
@@ -39,8 +40,9 @@ green-after, with 2/2 independent controls. Fresh inherited-environment
 and one intentional skip. The preceding 16 server failures and failed
 GitHub verify 38823189869 remain failed historical results.
 [Commands, raw results and hashes](evidence/E14/train9-corrective-validation.txt).
-New GitHub CI/verify are required before landing. Production cache
-publication/lifetime concurrency remains open.
+GitHub's verify 38909882781 at `e2a4acd9` then passed (`e14-descriptions` 9
+of 9, `e14-kiokun-test-data` 2 of 2), and train-9 landed 2026-10-17.
+Production cache publication/lifetime concurrency remains open.
 
 **ADR-0249, 2026-10-07: a verification shard sets up only what its recipes
 need** (the owner's approval, relayed 2026-10-07). A shard spent more than
@@ -108,9 +110,10 @@ refusals and 0 failing cases. Corpus C27 is 42 accepted / 87 rejected;
 generality is 60/60. The guide's ordinary browser suite passed 12 tests
 in three engines with dictionary deployment variables absent. Its 74-control
 campaign is recorded with a separate known exit-status classification gap;
-strict guide-producer validity remains open. Runtime adapter conformance,
-generic-result integration, final assembled CI, verification and quiet-host
-E9 remain pending. [Commands, complete raw output and source manifest](evidence/E14/train10-d1-integration.txt).
+strict guide-producer validity remains open. Runtime adapter conformance
+(D2), generic-result integration and quiet-host E9 remain open. [Commands,
+complete raw output and source manifest](evidence/E14/train10-d1-integration.txt).
+Verify TRAIN_RUN green, with train-10.
 
 **ADR-0349, 2026-10-15: a failed suite fails its recipe** (train-10,
 from `3adbfe44`). Browser suites and benchmark controls propagate their
@@ -127,7 +130,27 @@ both strict-code tests and all 35 mutation controls pass. Behavioral
 injection covers 143 suite failures and 203 build failures. Corpus evidence
 is current at 79/79.
 [Integration commands and raw results](evidence/E14/train10-evidence-integrity.txt).
-Full assembled CI, verification and quiet-host latency remain pending.
+Quiet-host latency remains open.
+Verify TRAIN_RUN green, with train-10.
+
+**ADR-0340's and ADR-0322's follow-ups, 2026-10-15: a set pair carries
+its key by name, and PW0009 says how Pleris spells and and or**
+(train-10, from `920dbe67` with `17fade14`, merged as `9010d860`).
+- A handwritten set pair must carry the key in a field named as the keyed
+  read's first parameter, of the same resolved type (ADR-0340's Found 6):
+  before, a wrapper's `other: Int` was taken for an `item: Int` key. A
+  result wrapper's other fields are still matched by type, and ADR-0348's
+  exact Result/Option payload is kept beside the named key. A new
+  generality witness (`set_pair_shape/misnamed-key.pw`) is refused with
+  exactly PW0407. That an adapter answers each key's values stays the
+  conformance suite's to prove.
+- `&&` and `||` are still PW0009, which now says "Pleris writes `&` for
+  and and `|` for or; write one operator" (ADR-0322's follow-up); the
+  parser is unchanged.
+- On the train: bounded reads 32, source and corpus 20, generality 6,
+  syntax 96; `bounded_checker_mutations.py` whole 42 of 42, the logical
+  operators' 6 of 6 ([raw](evidence/E14/bounded-key-field-name.txt)).
+Verify TRAIN_RUN green, with train-10.
 
 **ADR-0347 and ADR-0348, 2026-10-15: scheduled orders and batched
 estimates** (train-10, from `40e81d51` plus integration repairs). Windows
@@ -139,21 +162,23 @@ without diagnostics; 46 focused memory tests and all four PostgreSQL
 bounded tests passed. Whole controls killed 53/53 scheduled, 41/41 bounded
 checker and 8/8 statement mutants. Combined browser tests passed 24/24 in
 three engines. [Commands and raw results](evidence/E14/train10-scheduled-integration.txt).
-Full integrated CI remains pending. Estimator isolation,
-send-time hours rechecking and multiple current scheduled orders remain
-limitations.
+Estimator isolation, send-time hours rechecking and multiple current
+scheduled orders remain limitations. Merging train-9's ADR-0352, its four
+payment-taking transactions wait on completed payments, every pin as
+measured.
+Verify TRAIN_RUN green, with train-10.
 
 **ADR-0346, 2026-10-15: argument and page-parameter invariants**
 (train-10, from `ac3f2553`). The browser command decoder already refused
 invalid values; the repaired gaps were direct component calls, page
 parameters and nested Map/Set values. Arguments are held before predicates
 read them. Branch evidence recorded 17/17 own controls, four related whole
-scripts, and 12 browser tests in three engines. Integrated CI and
-verification are pending. The path-text follow-up `49a2f90f` refuses
+scripts, and 12 browser tests in three engines. The path-text
+follow-up `49a2f90f` refuses
 malformed escapes and non-UTF-8 path text with 400, while valid unknown
 paths remain 404. Memory and PostgreSQL parameter suites passed 6/6 each;
 whole controls killed 18/18. [Raw correction evidence](evidence/E14/argument-path-text.txt).
-Full assembled verification remains pending.
+Verify TRAIN_RUN green, with train-10.
 
 **ADR-0345, 2026-10-15: each-header expressions are checked**
 (train-10, from `839e8bfa`). Effects, privacy, signals and names now see a
@@ -161,7 +186,8 @@ loop's list and key through an exhaustive enumeration of seven expression
 positions. Branch evidence recorded 20/20 own controls and twelve other
 whole scripts. Corpus collision resolved as C26/A-038, retaining
 bounded-read C25/A-037. Generic-result effects remain a separate open
-track. Integrated CI and verification are pending.
+track.
+Verify TRAIN_RUN green, with train-10.
 
 **ADR-0344, 2026-10-15: evidence integrity** (train-10, from
 `83cdac27`). Mutation runs discard stale Python bytecode; train pushes
@@ -169,8 +195,7 @@ plan stale evidence; counts and rejected fixture headers are held to their
 producers; checking latency bounds thread CPU time; browser suites require
 complete build outputs; trains and master require numbered ADRs.
 The branch recorded 32/32 own controls, plus whole related scripts. The
-integration also makes reviews' failed build fail its recipe. Integrated
-CI and verification are pending; this is not a landing claim.
+integration also makes reviews' failed build fail its recipe.
 The corrective report publisher preserves prior complete evidence and
 publishes atomically. The shared planner discovers the published output.
 Its final suite kills 35/35 controls; 227 Python tests run with 225 passes
@@ -179,7 +204,11 @@ recorded as failing. [Corrective evidence](evidence/E14/evidence-integrity-atomi
 The actual clean-source recipe at `c67bf6ed` now passes, including both
 ordinary and 64-busy-loop latency checks and all 35 controls.
 [Clean-source receipt](evidence/E14/evidence-integrity-clean-recipe.txt).
-Assembled train CI and verification remain pending.
+Amended at train-10's merge of train-9 (2026-10-17): a decision's file,
+by the path evidence recorded it under before its numbering, is history,
+not an unnumbered mention; train-9's receipts of ADR-0352 hold five such
+paths, which the check named on a train's ref. 38 controls, from 35.
+Verify TRAIN_RUN green, with train-10.
 
 **ADR-0343, 2026-10-15: a guide whose examples compile** (NEXT's
 developer experience, its docs and tutorial for a developer from outside;
@@ -277,8 +306,8 @@ and answers of 2026-10-15; corpus C25).
   kiokun-site reads four times per element, as kiokun.com does, each a
   warning through `KNOWN_READS_PER_ELEMENT` until kiokun's layer has set
   forms and the pair takes a list of key records (the integrator's
-  answer). The pair matches its key's field by type until track
-  `pair-key-by-name` matches it by name.
+  answer). The pair matched its key's field by type; track
+  `pair-key-by-name` matches it by name (train-10, `9010d860`).
 - Corpus C25: R-075 to R-077 (PW0405, one per loop form), R-078 (PW0407)
   and A-037; generality 56 / 56. The rejected corpus exercises 56 of the
   199 codes (`pw check` over each fixture as `checking_source.rs` builds
@@ -5157,9 +5186,9 @@ Latest local integration validation (2026-10-16): the D1 source snapshot
 `evidence/E14/train10-d1-input-sha256.json` passed full `just ci` with
 3,058 Rust tests and no failures. This records tested inputs before the
 local merge commit; it is not a master or GitHub verification claim.
-The latest committed train-9 source `289068a6` passed local full CI
-(2,948 Rust tests, 0 failed, 25 ignored) and GitHub CI38863243118;
-verify38863242953 is not yet complete. Older records follow.
+Master `32757966` is train-9's landing (2026-10-17): its source
+`e2a4acd9` passed GitHub's verify 38909882781 (85 recipes, 1,391 of 1,391
+mutants killed) and ci 38909883157. Older records follow.
 
 `4310769` (2026-10-07, ADR-0232 to ADR-0234, and the two survivors at
 `c7f999b` accounted for): `just ci` passes locally, the workspace's 2110
