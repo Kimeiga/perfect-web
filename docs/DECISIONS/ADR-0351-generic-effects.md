@@ -544,3 +544,108 @@ audit3/4 RED and corrected4/4 GREEN are retained separately. No compiler,
 library, historical fixture bytes or mutation tuple changes are authorized.
 Freeze the amended snapshot after baseline gates, then rerun all49 complete
 mutation scripts and fresh CI before the generic merge may be committed.
+
+
+## Train-11 completion: the lexical survivor, the unreached scripts and CI (2026-10-17)
+
+The merge commit 600ebf19 (train-10's 9902c62b with 7ec6a534) holds
+Codex's resolution and the repairs below as Codex left them. Three things
+kept it from green: a survivor in the assembled `lexical_mutations.py`,
+18 of the 49 mutation scripts the merge reaches that its driver never
+ran, and no `just ci`. The driver ran 31 whole at a frozen source of 2393
+files (evidence and store-ir excluded) whose every byte equals
+600ebf19's, checked file by file: 30 green, and lexical 18/19.
+
+**The merge's repairs**, each where a local binding meets a module's or a
+type's path of its spelling, each held by a test and by controls of
+`generic_effects_mutations.py` (33/33 whole in that assembled run):
+- an effect read through a local `List.length()` was missed: the callee
+  borrowed the standard `List.length`'s `Int` where the value relations
+  give the local function's `Detail`
+  (`member_and_local_function_callees_keep_their_actual_result_type`);
+- `Shape.Empty` through a local `Shape` took the global sum constructor:
+  a false PW0606 (`a_local_receiver_never_borrows_a_type_qualified_constructor`),
+  and the backend emitted the namesake enum constructor, served over HTTP
+  from Wasm (`a_local_receiver_getter_runs_instead_of_a_namesake_type_constructor`,
+  with the lowering refusals in `backend_lowering.rs`);
+- a false PW5037: a called local `Session: fn(String) -> String` was read
+  as the platform's opaque handle constructor
+  (`a_local_callback_is_not_a_handle_constructor`);
+- `row.rows`, a receiver-only property making a generated read per row,
+  escaped the PW0405 that `rows(row)` and `row.rows()` get
+  (`a_generated_read_through_a_member_stays_a_read_per_row`);
+- a false PW0330 over an interface's typed optimistic lambda, whose term
+  arena had no lexical scope
+  (`an_interface_term_local_call_never_calls_a_namesake_global`).
+
+**The lexical survivor is killed, not removed.** It was `the declared-type
+environment reads no local's binding`: in `Types::declared`, a name's
+binding read replaced by `None`. The mutant is not equivalent. Since this
+ADR, `Types::of` answers what the value relations' typer solves wherever
+`declared` gives nothing, and that typer reads every binding source
+`Types` reads (parameters, annotations, a query's `let`, lambda and
+handler-event parameters, the bindings around a nested declaration,
+loops, arms, stream parts and release clauses). For a name whose type is
+known whole it answers what the binding says, so the one test that killed
+the mutant in its last recorded run before this ADR (1 of 31,
+`docs/evidence/E10/lexical.txt`) passes under it, through the typer. What
+only the binding answers is a type naming the body's own type parameter:
+`ResolvedType::inferred`, which makes the typer's answers resolved types,
+makes none of a `Parameter`. Under the mutant every reader of such a name
+lost its type, and a rule went silent: `fn f<T>(r: Result<T, String>,
+n: Int) -> Int { r; n }` drops a `Result`, PW0618 with the binding and
+nothing without it. `a_names_type_is_its_bindings_where_nothing_else_types_it`
+(`lexical_scope.rs`, d3daa5bb; its comment corrected at f773d429) states
+it, with its `let _ = r` control. `lexical_mutations.py` whole at
+f773d429: 19/19, the survivor killed by 1 of 32 tests.
+`each_heads_mutations.py`, whose tests include `lexical_scope`, whole at
+f773d429: 12/12. No mutant was removed or changed.
+
+**The 18 unreached scripts**, whole at 600ebf19 in three private clones
+run side by side (the one source file changed since, `lexical_scope.rs`,
+is a test none of them builds): member 10/10, member_resolution 9/9,
+name_binding 14/14, nested_scope 12/12, opaque_value 2/2, page_policy
+44/44, policy_value 14/14, privacy_resolution 3/3, query_read 3/3,
+record_field 5/5, recursion 6/6, scheduled 37/37 and store_postgres 12/12
+(on PostgreSQL), shared_cache 5/5, tables 44/44, value_labels 12/12,
+what_a_component_does 12/12 and write_invalidation 13/13: 257/257, each
+kill a built test failing, no build failure counted and no process
+stopped. Each script restored its sources (`git status` empty after it).
+The first `page_policy` run's browser baseline was red because its
+suite's web servers need `kiokun-server`, which a fresh clone had not
+built (the script builds only `pw-dev-server`): an infrastructure refusal
+in which no mutant ran. After `cargo build --locked -p pw-dev-server -p
+kiokun-server` the whole script ran again. All 49 scripts: whole and
+green, 665/665 mutants killed.
+[Every run](../evidence/E14/generic-train11-wholes.txt): this session's
+logs, and the driver's outputs, each checked against the SHA-256 it
+recorded; the one that records the survivor is named by its hash, not
+copied.
+
+**A gate the merge failed.** The merge committed a raw whole run that
+records a survivor (`train10-each-computed-control-before.txt`, above),
+and `just evidence-gates` refuses committed evidence that records one
+(`scripts/evidence_survivors.py`). It stays in history at 600ebf19, named
+above with its SHA-256; its control was re-anchored, and
+`each_head_effects_mutations.py` ran 20/20 in the assembled run.
+
+**A flake, not loosened.** The first `just ci` at f773d429 (2026-10-17,
+15:02 to 16:06 UTC, load average 40 to 75 from other workers' runs and
+these) failed one test of 3,100: `check_latency`'s cold check of 57 files
+used 2.77 s of its thread's CPU time against the 2 s ceiling (3.76 s on
+the wall clock). Its comment says why that is the machine's: a thread on
+a busy core takes more CPU time for the same work, and the wall clock it
+bounded before failed at loads of 40 to 110. It passed in the whole
+`pw-core` suite run at 600ebf19 at a lower load (233 binaries, 1,727
+passed, 0 failed). `just test-compile` and `just
+mutant-programs`, which that run did not reach, pass on their own: 302
+source mutants judged, 16 refused by their named rule, 0 failing.
+
+**Not claimed.** Which other test suites fail under the lexical mutant:
+that census was started and stopped before any test ran, at a load
+average of 63. The integrator's status documents, which the merge commit
+edits, still say the combined gates are pending.
+
+**Next.** Merge `origin/master` when train-10 lands on it (never rebase),
+run the gates and `just ci` again, and push `track/generic-train11` on
+green.

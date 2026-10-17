@@ -1,0 +1,1295 @@
+ADR-0351 - the generic-effects merge into the train line (train-11): every mutation script it reaches, whole
+
+produced by: whole mutation scripts, each `python3 -u scripts/<script>` (with CARGO_INCREMENTAL=0 where its
+`just` recipe sets it), one after another in each tree, by the runner whose every log is copied below
+(command, tree, commit, output, exit status and seconds, and `git status --porcelain` after it: empty = restored).
+repository commit when assembled: f773d429886a4e3a0e5c209f506f99eba4776cb0
+
+Which runs these are. The merge commit 600ebf19 (train-10 base 9902c62b + generic-effects 7ec6a534, Codex's
+resolution) reaches 49 mutation scripts (Codex's assembled roster). Codex's driver ran the first 19 whole (v4)
+and, after its observer crashed on the 20th, 12 more whole from the 20th (v5), at a frozen source of 2393 files
+(docs/evidence and store-ir excluded) whose every byte equals 600ebf19's (checked file by file, 2026-10-17):
+30 green, and lexical 18/19. Their outputs, each verified against the SHA-256 its driver recorded, are copied
+below. This session ran lexical again after its survivor's test (d3daa5bb, and f773d429, which corrects that
+test's comment), each_heads (its tests include lexical_scope), and the 18 the driver never reached, at 600ebf19
+in private clones: none of the 18 builds compiler/pw-core/tests/lexical_scope.rs, the one source file this
+session changes (6d049961 removes an evidence file no script reads).
+
+== summary (49 scripts)
+
+computed_holes_mutations.py                     23/23  exit 0  (Codex v4)
+generic_effects_mutations.py                    33/33  exit 0  (Codex v4)
+each_head_effects_mutations.py                  20/20  exit 0  (Codex v4)
+bounded_checker_mutations.py                    47/47  exit 0  (Codex v4)
+affine_binding_mutations.py                       5/5  exit 0  (Codex v4)
+affine_loops_mutations.py                         3/3  exit 0  (Codex v4)
+affine_mutations.py                               7/7  exit 0  (Codex v4)
+bare_cases_mutations.py                           3/3  exit 0  (Codex v4)
+callback_mutations.py                             8/8  exit 0  (Codex v4)
+cart_lines_mutations.py                         41/41  exit 0  (Codex v4)
+case_mutations.py                                 9/9  exit 0  (Codex v4)
+case_names_mutations.py                           5/5  exit 0  (Codex v4)
+clock_mutations.py                              25/25  exit 0  (Codex v4)
+command_answers_mutations.py                    16/16  exit 0  (Codex v4)
+computed_rows_mutations.py                      12/12  exit 0  (Codex v4)
+condition_truth_mutations.py                      6/6  exit 0  (Codex v4)
+e9_value_mutations.py                           10/10  exit 0  (Codex v4)
+each_heads_mutations.py                         12/12  exit 0  (this session)
+effect_value_mutations.py                         4/4  exit 0  (Codex v4)
+evidence_integrity_2_mutations.py               35/35  exit 0  (Codex v5)
+field_call_mutations.py                           2/2  exit 0  (Codex v5)
+fmt_meaning_mutations.py                          9/9  exit 0  (Codex v5)
+form_controls_mutations.py                      12/12  exit 0  (Codex v5)
+function_value_mutations.py                       7/7  exit 0  (Codex v5)
+handle_mutations.py                               9/9  exit 0  (Codex v5)
+handlers_where_they_run_mutations.py              1/1  exit 0  (Codex v5)
+label_call_mutations.py                           4/4  exit 0  (Codex v5)
+label_plain_mutations.py                          2/2  exit 0  (Codex v5)
+label_value_mutations.py                          3/3  exit 0  (Codex v5)
+labels_mutations.py                             16/16  exit 0  (Codex v5)
+lexical_mutations.py                            19/19  exit 0  (this session)
+member_mutations.py                             10/10  exit 0  (this session)
+member_resolution_mutations.py                    9/9  exit 0  (this session)
+name_binding_mutations.py                       14/14  exit 0  (this session)
+nested_scope_mutations.py                       12/12  exit 0  (this session)
+opaque_value_mutations.py                         2/2  exit 0  (this session)
+page_policy_mutations.py                        44/44  exit 0  (this session)
+policy_value_mutations.py                       14/14  exit 0  (this session)
+privacy_resolution_mutations.py                   3/3  exit 0  (this session)
+query_read_mutations.py                           3/3  exit 0  (this session)
+record_field_mutations.py                         5/5  exit 0  (this session)
+recursion_mutations.py                            6/6  exit 0  (this session)
+scheduled_mutations.py                          37/37  exit 0  (this session)
+shared_cache_mutations.py                         5/5  exit 0  (this session)
+store_postgres_mutations.py                     12/12  exit 0  (this session)
+tables_mutations.py                             44/44  exit 0  (this session)
+value_labels_mutations.py                       12/12  exit 0  (this session)
+what_a_component_does_mutations.py              12/12  exit 0  (this session)
+write_invalidation_mutations.py                 13/13  exit 0  (this session)
+
+49 of 49 scripts whole and green; 665 of 665 mutants killed
+
+== this session's runs
+
+--- /tmp/generic-finish-wholes/each_heads_mutations.py.txt (sha256 0c3e986c185fc4fbdeb18d197e3f7f8e2bf08d8f8327e244aacb46d1b4b61ef6)
+== CARGO_INCREMENTAL=0 /usr/bin/python3 -u scripts/each_heads_mutations.py
+tree: /home/haki/code/pw-wt/generic-finish
+commit: f773d429886a4e3a0e5c209f506f99eba4776cb0
+started: 2026-10-17T14:29:07Z
+CARGO_BUILD_JOBS=12 PORT=unset
+baseline: 95 passed, 0 failed
+an each head is not read: KILLED (5 of 15 tests fail)
+an each head's errors are dropped: KILLED (2 of 15 tests fail)
+two words for a list leave the name unread: KILLED (2 of 15 tests fail)
+what stands before the key swallows it: KILLED (2 of 15 tests fail)
+a key is not read: KILLED (4 of 15 tests fail)
+a keyless list is not refused: KILLED (1 of 15 tests fail)
+a loop's key is refused at its block: KILLED (1 of 15 tests fail)
+a row's name is not a local binding: KILLED (1 of 95 tests fail)
+a row's name is not in lexical scope: KILLED (3 of 22 tests fail)
+the names check reads no head: KILLED (2 of 15 tests fail)
+Marko reads no head: KILLED (1 of 77 tests fail)
+the template IR reads no head: KILLED (2 of 48 tests fail)
+12 of 12 mutants killed
+memory bound: no process was stopped
+EXIT each_heads: 0, seconds 1461
+finished: 2026-10-17T14:53:28Z
+restored (git status --porcelain, empty when restored):
+end of restored
+
+--- /tmp/generic-finish-wholes/lexical_mutations.py.txt (sha256 cf4b4e966afb1b79fff0baa6b415e339f59eb0ec356fa72e470b9100ed4ee816)
+== /usr/bin/python3 -u scripts/lexical_mutations.py
+tree: /home/haki/code/pw-wt/generic-finish
+commit: f773d429886a4e3a0e5c209f506f99eba4776cb0
+started: 2026-10-17T14:22:34Z
+CARGO_BUILD_JOBS=12 PORT=unset
+baseline: 32 passed, 0 failed
+a block's names outlive it: KILLED (1 of 32 tests fail)
+a lambda's parameters outlive it: KILLED (1 of 32 tests fail)
+a `let` is in scope in its own initialiser: KILLED (1 of 32 tests fail)
+a lambda's parameters bind nothing: KILLED (3 of 32 tests fail)
+a match arm's names bind nothing: KILLED (3 of 32 tests fail)
+a `for` loop's names bind nothing: KILLED (2 of 32 tests fail)
+an `{#each}` block binds nothing: KILLED (3 of 32 tests fail)
+a `{#match}` arm binds nothing: KILLED (2 of 32 tests fail)
+a record's shorthand field names no binding: KILLED (1 of 32 tests fail)
+a `for` loop's name is not its list's element: KILLED (1 of 32 tests fail)
+an `{#each}` collection's fields are not read: KILLED (1 of 32 tests fail)
+a `{#match}` arm's names are not typed: KILLED (2 of 32 tests fail)
+a record's shorthand is read by its name: KILLED (1 of 32 tests fail)
+the declared-type environment reads no local's binding: KILLED (1 of 32 tests fail)
+a handler's capture is typed by no binding: KILLED (1 of 32 tests fail)
+a `for` loop's name carries no label: KILLED (1 of 32 tests fail)
+a lambda's parameters carry no label: KILLED (1 of 32 tests fail)
+an `{#each}` block's name carries no label: KILLED (1 of 32 tests fail)
+a name's label is not read through its binding: KILLED (6 of 32 tests fail)
+19 of 19 mutants killed
+memory bound: no process was stopped
+EXIT lexical: 0, seconds 393
+finished: 2026-10-17T14:29:07Z
+restored (git status --porcelain, empty when restored):
+end of restored
+
+--- /tmp/generic-finish-wholes/member_mutations.py.txt (sha256 6c3c0ad1f44d1ed242c235dfbd0c8ad194a88a7b26bde4d78dbeab117753c203)
+== /usr/bin/python3 -u scripts/member_mutations.py
+tree: /tmp/gf-lane-a
+commit: 600ebf1984c3e85c9116eb5d06270cda84f18653
+started: 2026-10-17T13:26:35Z
+CARGO_BUILD_JOBS=12 PORT=12641
+baseline: 13 passed, 0 failed
+no member relation is recorded: KILLED (7 of 13 tests fail)
+every known type has every member: KILLED (6 of 13 tests fail)
+a declaration taking the type is not a member: KILLED (3 of 13 tests fail)
+a unit on a number is read as a member: KILLED (1 of 13 tests fail)
+a module path is recorded as a member: KILLED (1 of 13 tests fail)
+an opaque type's value is readable from any module: KILLED (2 of 13 tests fail)
+an opaque type's value is refused in its own module: KILLED (3 of 13 tests fail)
+an opaque type's value has no type: KILLED (2 of 13 tests fail)
+an optional's contents are an ordinary missing member: KILLED (2 of 13 tests fail)
+one defect is reported by every rule that reaches it: KILLED (1 of 13 tests fail)
+10 of 10 mutants killed
+memory bound: no process was stopped
+EXIT member: 0, seconds 152
+finished: 2026-10-17T13:29:07Z
+restored (git status --porcelain, empty when restored):
+end of restored
+
+--- /tmp/generic-finish-wholes/member_resolution_mutations.py.txt (sha256 3238389a3d587cc89e5520b1a1af4a3db98f03257506a7be4014993306fa5e54)
+== CARGO_INCREMENTAL=0 /usr/bin/python3 -u scripts/member_resolution_mutations.py
+tree: /tmp/gf-lane-a
+commit: 600ebf1984c3e85c9116eb5d06270cda84f18653
+started: 2026-10-17T13:29:08Z
+CARGO_BUILD_JOBS=12 PORT=12641
+baseline: 7 passed, 0 failed
+a second declaration replaces the first: KILLED (7 of 7 tests fail)
+the calling module is not asked: KILLED (4 of 7 tests fail)
+an import is not seen: KILLED (4 of 7 tests fail)
+a term beside its type is not seen: KILLED (1 of 7 tests fail)
+no declaration is named where none is seen: KILLED (1 of 7 tests fail)
+an ambiguous member is not refused: KILLED (4 of 7 tests fail)
+the value relations ask as no module: KILLED (4 of 7 tests fail)
+the inference asks as no module: KILLED (2 of 7 tests fail)
+an ambiguous member is a function value: KILLED (1 of 7 tests fail)
+9 of 9 mutants killed
+memory bound: no process was stopped
+EXIT member_resolution: 0, seconds 298
+finished: 2026-10-17T13:34:06Z
+restored (git status --porcelain, empty when restored):
+end of restored
+
+--- /tmp/generic-finish-wholes/name_binding_mutations.py.txt (sha256 48a4db3b241a8c50fce3c7d21c295740851f57d07aa3d429967d1f08942d4735)
+== /usr/bin/python3 -u scripts/name_binding_mutations.py
+tree: /tmp/gf-lane-b
+commit: 600ebf1984c3e85c9116eb5d06270cda84f18653
+started: 2026-10-17T14:33:29Z
+CARGO_BUILD_JOBS=12 PORT=unset
+baseline: 12 passed, 0 failed
+a stream part's name is left unbound where it binds: KILLED (1 of 12 tests fail)
+a call through a local is resolved by its spelling: KILLED (1 of 12 tests fail)
+no body's scopes are kept to ask: KILLED (4 of 12 tests fail)
+a handler's call through a local is a command's request: KILLED (1 of 12 tests fail)
+a declaration's label reads a local's namesake: KILLED (1 of 12 tests fail)
+the reads a body makes read a local's namesake: KILLED (2 of 12 tests fail)
+the cause a label names is a local's namesake: KILLED (1 of 12 tests fail)
+a page's names are not around its markup: KILLED (6 of 12 tests fail)
+a composed view is not given what its use can read: KILLED (1 of 12 tests fail)
+a layout's blocks keep their names: KILLED (1 of 12 tests fail)
+a view in a layout keeps its blocks' names: KILLED (1 of 12 tests fail)
+a block's binding is not around the blocks inside it: KILLED (1 of 12 tests fail)
+a block that binds a name the template can read keeps it: KILLED (6 of 12 tests fail)
+a block's binding does not hide a signal of its spelling: KILLED (1 of 12 tests fail)
+14 of 14 mutants killed
+memory bound: no process was stopped
+EXIT name_binding: 0, seconds 1585
+finished: 2026-10-17T14:59:54Z
+restored (git status --porcelain, empty when restored):
+end of restored
+
+--- /tmp/generic-finish-wholes/nested_scope_mutations.py.txt (sha256 2d90176cddc28a497c739d05fcb25172bf4e9084cee1d270c7d3988e91652d5e)
+== /usr/bin/python3 -u scripts/nested_scope_mutations.py
+tree: /tmp/gf-lane-b
+commit: 600ebf1984c3e85c9116eb5d06270cda84f18653
+started: 2026-10-17T14:59:54Z
+CARGO_BUILD_JOBS=12 PORT=unset
+baseline: 9 passed, 0 failed
+a nested declaration sees nothing around it: KILLED (3 of 9 tests fail)
+a nested declaration sees what the body's end does, wherever it is written: KILLED (1 of 9 tests fail)
+a binding around a nested declaration is untyped in the value relations: KILLED (1 of 9 tests fail)
+a nested analysis receives no enclosing type environment: KILLED (1 of 9 tests fail)
+a binding around a nested declaration is unlabelled: KILLED (1 of 9 tests fail)
+a nested declaration has no module: KILLED (2 of 9 tests fail)
+a stream's part binds nothing: KILLED (1 of 9 tests fail)
+a stream's part is untyped: KILLED (1 of 9 tests fail)
+a release clause binds nothing: KILLED (1 of 9 tests fail)
+a release clause's name is not what its resource acquires: KILLED (1 of 9 tests fail)
+one parenthesised parameter is a descriptor: KILLED (1 of 9 tests fail)
+a call's callee is local wherever the body binds its name: KILLED (1 of 9 tests fail)
+12 of 12 mutants killed
+memory bound: no process was stopped
+EXIT nested_scope: 0, seconds 90
+finished: 2026-10-17T15:01:24Z
+restored (git status --porcelain, empty when restored):
+end of restored
+
+--- /tmp/generic-finish-wholes/opaque_value_mutations.py.txt (sha256 b8709db052a3c3a1da2a5f6596c106399698ac64cb2800d6bca3faadf3fb0aa5)
+== CARGO_INCREMENTAL=0 /usr/bin/python3 -u scripts/opaque_value_mutations.py
+tree: /tmp/gf-lane-a
+commit: 600ebf1984c3e85c9116eb5d06270cda84f18653
+started: 2026-10-17T13:34:06Z
+CARGO_BUILD_JOBS=12 PORT=12641
+baseline: 13 passed, 0 failed
+a member named `value` is allowed: KILLED (1 of 13 tests fail)
+a member of a type that is not opaque is refused: KILLED (1 of 13 tests fail)
+2 of 2 mutants killed
+memory bound: no process was stopped
+EXIT opaque_value: 0, seconds 79
+finished: 2026-10-17T13:35:25Z
+restored (git status --porcelain, empty when restored):
+end of restored
+
+--- /tmp/generic-finish-wholes/page_policy_mutations.py.txt (sha256 44ed83d5f39cce22983e8dde9c9c9c1a3f0f7c9a896a5c7609c2b67c5fab9cc4)
+== CARGO_INCREMENTAL=0 /usr/bin/python3 -u scripts/page_policy_mutations.py
+tree: /tmp/gf-lane-a
+commit: 600ebf1984c3e85c9116eb5d06270cda84f18653
+started: 2026-10-17T13:38:29Z
+CARGO_BUILD_JOBS=12 PORT=12641
+baseline (core): 32 passed, 0 failed
+baseline (server): 17 passed, 0 failed
+baseline (browser): 1 passed, 0 failed
+a scheme is not another origin: KILLED (4 of 20 tests fail)
+a `//` names no host: KILLED (1 of 26 tests fail)
+a `\` is not a `/`: KILLED (1 of 32 tests fail)
+a tab inside an address is kept: KILLED (1 of 32 tests fail)
+an address's leading spaces are kept: KILLED (1 of 32 tests fail)
+a srcset's candidates after its first are not read: KILLED (1 of 32 tests fail)
+an image is no load: KILLED (4 of 20 tests fail)
+a link that is an item's property is taken as a load: KILLED (2 of 20 tests fail)
+a link's address a value chooses is allowed: KILLED (1 of 32 tests fail)
+an address built with a value is not read: KILLED (1 of 32 tests fail)
+an address built with a value is read only to its first value: KILLED (1 of 32 tests fail)
+a link's text before its value is taken as known wherever it starts: KILLED (1 of 32 tests fail)
+the script that starts the runtime is not hashed: KILLED (3 of 17 tests fail)
+the runtime's WebAssembly is refused: KILLED (2 of 17 tests fail)
+the data layer's style is not hashed: KILLED (2 of 17 tests fail)
+a `<style>` the build writes is not hashed: KILLED (1 of 17 tests fail)
+a text is hashed with its CRs: KILLED (1 of 17 tests fail)
+a style attribute a value gives is not found: KILLED (1 of 17 tests fail)
+markup a capability lets through is taken as holding no style attribute: KILLED (1 of 17 tests fail)
+a block's markup is not read: KILLED (2 of 17 tests fail)
+a comment's text is read as markup: KILLED (1 of 17 tests fail)
+a style attribute written is not found: KILLED (1 of 17 tests fail)
+a quoted value is read as attributes: KILLED (1 of 17 tests fail)
+a frame is not found: KILLED (2 of 17 tests fail)
+a `<style>`'s text is not read: KILLED (1 of 17 tests fail)
+a style attribute the build writes is refused: KILLED (1 of 17 tests fail)
+a build that frames nothing frames the provider: KILLED (1 of 17 tests fail)
+an address's origin keeps who it is from: KILLED (1 of 17 tests fail)
+the deployment's payment provider is not framed: KILLED (1 of 17 tests fail)
+a sign-in at another origin is refused: KILLED (1 of 17 tests fail)
+a document written whole is sent no policy: KILLED (1 of 17 tests fail)
+a streamed document is sent no policy: KILLED (4 of 17 tests fail)
+a document is sent the bare policy: KILLED (4 of 17 tests fail)
+an HTML answer that runs nothing is sent no policy: KILLED (1 of 17 tests fail)
+a page the build rendered is sent no policy: KILLED (1 of 17 tests fail)
+an answer that is not HTML is sent the bare policy: KILLED (1 of 17 tests fail)
+a page moved is sent no policy: KILLED (1 of 17 tests fail)
+the identity's page is sent no policy: KILLED (1 of 17 tests fail)
+an answer's type may be sniffed: KILLED (1 of 17 tests fail)
+a streamed document's type may be sniffed: KILLED (1 of 17 tests fail)
+the identity's answers may be sniffed: KILLED (1 of 17 tests fail)
+a stylesheet the build ships is served as bytes: KILLED (1 of 17 tests fail)
+the announcer is served styled: KILLED (1 of 17 tests fail)
+the announcer, served unstyled, is never hidden: KILLED (1 of 1 tests fail)
+44 of 44 mutants killed
+memory bound: no process was stopped
+EXIT page_policy: 0, seconds 10244
+finished: 2026-10-17T16:29:13Z
+restored (git status --porcelain, empty when restored):
+end of restored
+
+--- /tmp/generic-finish-wholes/policy_value_mutations.py.txt (sha256 a828f7273936c2059e33edf6191b3f5234c3d4f87415deae0f943009da85f589)
+== /usr/bin/python3 -u scripts/policy_value_mutations.py
+tree: /tmp/gf-lane-b
+commit: 600ebf1984c3e85c9116eb5d06270cda84f18653
+started: 2026-10-17T15:01:24Z
+CARGO_BUILD_JOBS=12 PORT=unset
+baseline: 11 passed, 0 failed
+a policy's value is not checked: KILLED (8 of 11 tests fail)
+a word outside the domain is a word of it: KILLED (2 of 11 tests fail)
+a duration is not read: KILLED (1 of 11 tests fail)
+any word is a world: KILLED (1 of 11 tests fail)
+an operator the head lacks is accepted: KILLED (2 of 11 tests fail)
+an argument the operator lacks is accepted: KILLED (1 of 11 tests fail)
+an argument of the wrong kind is accepted: KILLED (1 of 11 tests fail)
+a required argument may be left out: KILLED (1 of 11 tests fail)
+a key may name anything: KILLED (1 of 11 tests fail)
+a key may not name a partition: KILLED (2 of 11 tests fail)
+a type a policy names is not resolved: KILLED (1 of 11 tests fail)
+a policy's type must be a declaration's: KILLED (1 of 11 tests fail)
+a session read's staleness is read by its first character: KILLED (1 of 11 tests fail)
+a key's partition is found in its text: KILLED (1 of 11 tests fail)
+14 of 14 mutants killed
+memory bound: no process was stopped
+EXIT policy_value: 0, seconds 127
+finished: 2026-10-17T15:03:31Z
+restored (git status --porcelain, empty when restored):
+end of restored
+
+--- /tmp/generic-finish-wholes/privacy_resolution_mutations.py.txt (sha256 227a151dced53c48ede2eeff31defc45fc6afceb474942c82c6d18f18b7d68de)
+== /usr/bin/python3 -u scripts/privacy_resolution_mutations.py
+tree: /tmp/gf-lane-a
+commit: 600ebf1984c3e85c9116eb5d06270cda84f18653
+started: 2026-10-17T13:35:59Z
+CARGO_BUILD_JOBS=12 PORT=12641
+baseline: 4 passed, 0 failed
+a callee is found by its spelling: KILLED (1 of 4 tests fail)
+a sink is read by spelling: KILLED (1 of 4 tests fail)
+PW5004 speaks where PW5001 does: KILLED (2 of 4 tests fail)
+3 of 3 mutants killed
+memory bound: no process was stopped
+EXIT privacy_resolution: 0, seconds 31
+finished: 2026-10-17T13:36:30Z
+restored (git status --porcelain, empty when restored):
+end of restored
+
+--- /tmp/generic-finish-wholes/query_read_mutations.py.txt (sha256 b8d967d751fc91c81340421a239910266e52dbdab9a89d6c0fa945ccbaddfc2f)
+== /usr/bin/python3 -u scripts/query_read_mutations.py
+tree: /tmp/gf-lane-a
+commit: 600ebf1984c3e85c9116eb5d06270cda84f18653
+started: 2026-10-17T13:36:30Z
+CARGO_BUILD_JOBS=12 PORT=12641
+baseline: 2 passed, 0 failed
+a query may write: KILLED (2 of 2 tests fail)
+a subscription may write: KILLED (1 of 2 tests fail)
+a transaction is not a write: KILLED (1 of 2 tests fail)
+3 of 3 mutants killed
+memory bound: no process was stopped
+EXIT query_read: 0, seconds 89
+finished: 2026-10-17T13:37:59Z
+restored (git status --porcelain, empty when restored):
+end of restored
+
+--- /tmp/generic-finish-wholes/record_field_mutations.py.txt (sha256 e6683bbd7313688a21704586333592570d67f2f2c978ca2894226c6feab84c94)
+== /usr/bin/python3 -u scripts/record_field_mutations.py
+tree: /tmp/gf-lane-a
+commit: 600ebf1984c3e85c9116eb5d06270cda84f18653
+started: 2026-10-17T13:35:25Z
+CARGO_BUILD_JOBS=12 PORT=12641
+baseline: 5 passed, 0 failed
+a field its type does not declare is skipped: KILLED (1 of 5 tests fail)
+a field given twice is not noticed: KILLED (1 of 5 tests fail)
+a field left out is not noticed: KILLED (1 of 5 tests fail)
+a shorthand field is not counted as given: KILLED (1 of 5 tests fail)
+an `if` without `else` has no stated type: KILLED (1 of 5 tests fail)
+5 of 5 mutants killed
+memory bound: no process was stopped
+EXIT record_field: 0, seconds 34
+finished: 2026-10-17T13:35:59Z
+restored (git status --porcelain, empty when restored):
+end of restored
+
+--- /tmp/generic-finish-wholes/recursion_mutations.py.txt (sha256 fa015cced9f162f2c9aa271dca2839b0d44a3adbd6cb28666fa3b77667c01dee)
+== /usr/bin/python3 -u scripts/recursion_mutations.py
+tree: /tmp/gf-lane-c
+commit: 600ebf1984c3e85c9116eb5d06270cda84f18653
+started: 2026-10-17T14:47:16Z
+CARGO_BUILD_JOBS=12 PORT=unset
+baseline: 25 passed, 0 failed
+a recursion's callee is never compiled: KILLED (10 of 25 tests fail)
+every instance of a callee is one: KILLED (2 of 25 tests fail)
+a callee compiled beside the export forgets its instance: KILLED (2 of 25 tests fail)
+a list's element type binds nothing: KILLED (2 of 25 tests fail)
+a callee's result is left on the stack: KILLED (10 of 25 tests fail)
+the module omits its callees: KILLED (3 of 25 tests fail)
+6 of 6 mutants killed
+memory bound: no process was stopped
+EXIT recursion: 0, seconds 861
+finished: 2026-10-17T15:01:37Z
+restored (git status --porcelain, empty when restored):
+end of restored
+
+--- /tmp/generic-finish-wholes/scheduled_mutations.py.txt (sha256 981cdab6770c2aadd9078ed344b0619afd7ef2915cde4d1f28902f60fe1de850)
+== /usr/bin/python3 -u scripts/scheduled_mutations.py
+tree: /tmp/gf-lane-b
+commit: 600ebf1984c3e85c9116eb5d06270cda84f18653
+started: 2026-10-17T13:13:56Z
+CARGO_BUILD_JOBS=12 PORT=unset
+baseline (compiler): 43 passed, 0 failed
+baseline (memory): 12 passed, 0 failed
+baseline (postgres): 15 passed, 0 failed
+a schedule's time is read as words: KILLED (9 of 20 tests fail)
+a command a reader presses is scheduled: KILLED (4 of 20 tests fail)
+a schedule outside a command is taken: KILLED (4 of 20 tests fail)
+a schedule that says no time is taken: KILLED (1 of 43 tests fail)
+a run's time is of any type: KILLED (4 of 20 tests fail)
+a program's own type spelt as the clock's is the clock's: KILLED (1 of 43 tests fail)
+a schedule's arguments are related to nothing: KILLED (1 of 43 tests fail)
+a schedule's time is related as the command's argument: KILLED (2 of 20 tests fail)
+a schedule performs nothing: KILLED (1 of 43 tests fail)
+the clock invokes nothing: KILLED (2 of 20 tests fail)
+the clock's command is given one `Settled`: KILLED (2 of 20 tests fail)
+the clock runs one command: KILLED (3 of 26 tests fail)
+a schedules' import says nothing of what it schedules: KILLED (10 of 12 tests fail)
+a schedule's time is not given: KILLED (10 of 12 tests fail)
+every run of a command is one run, whatever its arguments: KILLED (2 of 12 tests fail)
+a scheduling that writes nothing else commits nothing: KILLED (5 of 12 tests fail)
+a duration is counted from 1970: KILLED (5 of 12 tests fail)
+a run is due a minute early: KILLED (2 of 12 tests fail)
+a run failed for good is run again: KILLED (1 of 12 tests fail)
+a run scheduled again is a second run: KILLED (1 of 12 tests fail)
+a cancel cancels nothing: KILLED (2 of 12 tests fail)
+a run is made as no reader: KILLED (4 of 12 tests fail)
+a run answered is kept: KILLED (2 of 12 tests fail)
+a refused run is taken as answered: KILLED (1 of 12 tests fail)
+a refused run runs again at once: KILLED (1 of 12 tests fail)
+a refused run is never kept failed: KILLED (1 of 12 tests fail)
+a run's commit is told to no one reading it: KILLED (1 of 12 tests fail)
+the host grants no scheduling: KILLED (10 of 12 tests fail)
+a payment declined cancels its order's sweep: KILLED (1 of 12 tests fail)
+a payment paid keeps its order's sweep: KILLED (1 of 12 tests fail)
+an order taken back is swept still: KILLED (1 of 12 tests fail)
+a sweep takes back an order it was not scheduled for: KILLED (1 of 12 tests fail)
+the store's commit on PostgreSQL writes no runs: KILLED (13 of 15 tests fail)
+the feed's commit on PostgreSQL writes no runs: KILLED (1 of 15 tests fail)
+a run on PostgreSQL is due a minute early: KILLED (9 of 15 tests fail)
+a run on PostgreSQL is kept once answered: KILLED (7 of 15 tests fail)
+a run is keyed by its host, and a second host's commits again: KILLED (2 of 15 tests fail)
+37 of 37 mutants killed
+memory bound: no process was stopped
+EXIT scheduled: 0, seconds 4772
+finished: 2026-10-17T14:33:28Z
+restored (git status --porcelain, empty when restored):
+end of restored
+
+--- /tmp/generic-finish-wholes/shared_cache_mutations.py.txt (sha256 ee0d32b5339e28c669e1deb430de4af63e5de4cc4f4926e42d0fc91d5da5f2cf)
+== /usr/bin/python3 -u scripts/shared_cache_mutations.py
+tree: /tmp/gf-lane-b
+commit: 600ebf1984c3e85c9116eb5d06270cda84f18653
+started: 2026-10-17T15:03:31Z
+CARGO_BUILD_JOBS=12 PORT=unset
+baseline: 11 passed, 0 failed
+a declaration's own parameters are not read: KILLED (4 of 11 tests fail)
+a reader's value keyed by the reader is shareable: KILLED (6 of 11 tests fail)
+PW5001 reads the declared label only: KILLED (4 of 11 tests fail)
+a key item naming a tenant parameter does not count: KILLED (1 of 11 tests fail)
+PW5004 does not read what the declaration observes: KILLED (2 of 11 tests fail)
+5 of 5 mutants killed
+memory bound: no process was stopped
+EXIT shared_cache: 0, seconds 1500
+finished: 2026-10-17T15:28:31Z
+restored (git status --porcelain, empty when restored):
+end of restored
+
+--- /tmp/generic-finish-wholes/store_postgres_mutations.py.txt (sha256 adb854edb4ff0f4c98ca4b8313a78c30839ceb0084c616f879fe7f0ad8c6b21e)
+== CARGO_INCREMENTAL=0 /usr/bin/python3 -u scripts/store_postgres_mutations.py
+tree: /tmp/gf-lane-c
+commit: 600ebf1984c3e85c9116eb5d06270cda84f18653
+started: 2026-10-17T13:29:22Z
+CARGO_BUILD_JOBS=12 PORT=unset
+baseline: 29 passed, 0 failed
+an order is placed without its lines: KILLED (5 of 29 tests fail)
+on PostgreSQL, an order's lines are not written: KILLED (6 of 29 tests fail)
+a commit commits without its events: KILLED (6 of 29 tests fail)
+a command's transaction is the connection's default: KILLED (23 of 29 tests fail)
+the isolation is answered, not measured: KILLED (1 of 29 tests fail)
+a refused commit is answered as committed: KILLED (1 of 29 tests fail)
+the outbox is not read back: KILLED (3 of 29 tests fail)
+a commit on PostgreSQL is not recorded in the materializer: KILLED (3 of 29 tests fail)
+a commit on PostgreSQL is recorded without its rows: KILLED (1 of 29 tests fail)
+the store's connections search more than its schema: KILLED (1 of 29 tests fail)
+a program may name one of the host's own operations: KILLED (2 of 29 tests fail)
+a command's delivered events stay in the materializer's outbox: KILLED (3 of 29 tests fail)
+12 of 12 mutants killed
+memory bound: no process was stopped
+EXIT store_postgres: 0, seconds 3298
+finished: 2026-10-17T14:24:20Z
+restored (git status --porcelain, empty when restored):
+end of restored
+
+--- /tmp/generic-finish-wholes/tables_mutations.py.txt (sha256 4417558344cc4577cb962b203e3d80f891a8d4fde7c30a32689fb173cd56103d)
+== /usr/bin/python3 -u scripts/tables_mutations.py
+tree: /tmp/gf-lane-c
+commit: 600ebf1984c3e85c9116eb5d06270cda84f18653
+started: 2026-10-17T13:14:04Z
+CARGO_BUILD_JOBS=12 PORT=unset
+baseline: 36 passed, 0 failed
+lowering gives no table functions: KILLED (9 of 36 tests fail)
+table imports belong to the app instead of the platform: KILLED (1 of 36 tests fail)
+an empty Result case is emitted as an invalid empty tuple: KILLED (1 of 36 tests fail)
+a key names a field twice: KILLED (1 of 36 tests fail)
+a table has any module's name: KILLED (1 of 36 tests fail)
+duplicate source names hide a database: KILLED (2 of 36 tests fail)
+an alternate own module counts as another database: KILLED (1 of 36 tests fail)
+a sibling module replaces a table reference's own module: KILLED (1 of 36 tests fail)
+a qualified own-module name resolves through a namesake: KILLED (25 of 36 tests fail)
+table interfaces collide after WIT naming: KILLED (1 of 36 tests fail)
+function imports collide after WIT naming: KILLED (2 of 36 tests fail)
+generated record names can hold two tuple shapes: KILLED (1 of 36 tests fail)
+nested generic parameters lose their stored arguments: KILLED (1 of 36 tests fail)
+a key's fields are unchecked: KILLED (1 of 36 tests fail)
+an index's fields are unchecked: KILLED (1 of 36 tests fail)
+order names any field: KILLED (1 of 36 tests fail)
+an index need not start by_: KILLED (1 of 36 tests fail)
+two indexes give the same function: KILLED (1 of 36 tests fail)
+a unique index is ordinary: KILLED (3 of 36 tests fail)
+the whole key has no set form: KILLED (2 of 36 tests fail)
+the longest proper key prefix is missing: KILLED (5 of 36 tests fail)
+bounded gives no whole-table read: KILLED (5 of 36 tests fail)
+a set form answers an Option: KILLED (1 of 36 tests fail)
+a put ignores uniqueness: KILLED (1 of 36 tests fail)
+a reference may hold the wrong key: KILLED (2 of 36 tests fail)
+a reference can hold one field of a composite key: KILLED (1 of 36 tests fail)
+cross-source references are silent: KILLED (2 of 36 tests fail)
+cross-source references are errors: KILLED (2 of 36 tests fail)
+bindings written by hand are allowed: KILLED (1 of 36 tests fail)
+all without a bound uses the wrong diagnostic: KILLED (1 of 36 tests fail)
+a changed schema lock is accepted: KILLED (1 of 36 tests fail)
+an unknown lock format is accepted: KILLED (1 of 36 tests fail)
+destructive field changes are planned silently: KILLED (7 of 36 tests fail)
+renames are not applied: KILLED (2 of 36 tests fail)
+new optional fields are not additive: KILLED (2 of 36 tests fail)
+a changed key is accepted: KILLED (1 of 36 tests fail)
+a table can move between sources silently: KILLED (1 of 36 tests fail)
+an unused migration is accepted: KILLED (1 of 36 tests fail)
+a backfill of the wrong type is accepted: KILLED (1 of 36 tests fail)
+a prefix's rows have no declared order: KILLED (1 of 36 tests fail)
+build ignores the released schema: KILLED (3 of 36 tests fail)
+check ignores the released schema: KILLED (3 of 36 tests fail)
+a no-table rebuild keeps old metadata: KILLED (1 of 36 tests fail)
+CLI silently ignores a missing schema-lock value: KILLED (1 of 36 tests fail)
+44 of 44 mutants killed
+memory bound: no process was stopped
+EXIT tables: 0, seconds 917
+finished: 2026-10-17T13:29:21Z
+restored (git status --porcelain, empty when restored):
+end of restored
+
+--- /tmp/generic-finish-wholes/value_labels_mutations.py.txt (sha256 440695f7c719a51b549129e5c8c47dc06629db31e0631fc13995864be7f7ffa8)
+== /usr/bin/python3 -u scripts/value_labels_mutations.py
+tree: /tmp/gf-lane-c
+commit: 600ebf1984c3e85c9116eb5d06270cda84f18653
+started: 2026-10-17T14:24:21Z
+CARGO_BUILD_JOBS=12 PORT=unset
+baseline: 6 passed, 0 failed
+an argument a labelled parameter is given stays out: KILLED (2 of 6 tests fail)
+a key a parameter states comes out: KILLED (1 of 6 tests fail)
+a call is read by its signature alone: KILLED (2 of 6 tests fail)
+the summary pass stops after one step: KILLED (1 of 6 tests fail)
+an `if`'s value does not carry its condition: KILLED (1 of 6 tests fail)
+a `match`'s value does not carry its subject: KILLED (1 of 6 tests fail)
+a sink is not told what decided it: KILLED (1 of 6 tests fail)
+a `?` that may fail tells nothing: KILLED (1 of 6 tests fail)
+a lambda is not told what drives it: KILLED (1 of 6 tests fail)
+an assignment does not label its binding: KILLED (1 of 6 tests fail)
+a public log takes a reader's value: KILLED (2 of 6 tests fail)
+PW5003 reads the first restriction: KILLED (1 of 6 tests fail)
+12 of 12 mutants killed
+memory bound: no process was stopped
+EXIT value_labels: 0, seconds 257
+finished: 2026-10-17T14:28:38Z
+restored (git status --porcelain, empty when restored):
+end of restored
+
+--- /tmp/generic-finish-wholes/what_a_component_does_mutations.py.txt (sha256 99bb2973f777d158c78ab1fd00709f6f6c1ecceb9be73994e6adabe593cb5a8a)
+== CARGO_INCREMENTAL=0 /usr/bin/python3 -u scripts/what_a_component_does_mutations.py
+tree: /tmp/gf-lane-c
+commit: 600ebf1984c3e85c9116eb5d06270cda84f18653
+started: 2026-10-17T14:28:39Z
+CARGO_BUILD_JOBS=12 PORT=unset
+baseline: 49 passed, 0 failed
+the declaration's own body is read alone: KILLED (5 of 49 tests fail)
+a function named as a value is not compiled in: KILLED (1 of 49 tests fail)
+a handler's code is walked as the page's: KILLED (1 of 49 tests fail)
+a call through a local is its namesake's: KILLED (1 of 49 tests fail)
+effective effects count calls alone: KILLED (1 of 49 tests fail)
+the contract's effects count calls alone: KILLED (1 of 49 tests fail)
+every lambda's body is deferred: KILLED (2 of 49 tests fail)
+a declaration an `on:` attribute names is not deferred: KILLED (1 of 49 tests fail)
+a part of any type is bound whole: KILLED (2 of 12 tests fail)
+a part nothing fixes closes to unknown: KILLED (1 of 12 tests fail)
+a fold's untyped seed is given no type: KILLED (1 of 12 tests fail)
+a part of any type is laid out as the unit type: KILLED (1 of 12 tests fail)
+12 of 12 mutants killed
+memory bound: no process was stopped
+EXIT what_a_component_does: 0, seconds 672
+finished: 2026-10-17T14:39:51Z
+restored (git status --porcelain, empty when restored):
+end of restored
+
+--- /tmp/generic-finish-wholes/write_invalidation_mutations.py.txt (sha256 81ee592b6621f60b4bc08ae06295819f96308354d73736f43b4a7fbe076ee406)
+== /usr/bin/python3 -u scripts/write_invalidation_mutations.py
+tree: /tmp/gf-lane-c
+commit: 600ebf1984c3e85c9116eb5d06270cda84f18653
+started: 2026-10-17T14:39:51Z
+CARGO_BUILD_JOBS=12 PORT=unset
+baseline: 8 passed, 0 failed
+a write is not checked: KILLED (7 of 8 tests fail)
+any emitted event reaches the reader: KILLED (1 of 8 tests fail)
+another reader's listening counts: KILLED (1 of 8 tests fail)
+naming the entry does not invalidate it: KILLED (2 of 8 tests fail)
+any command's clause counts: KILLED (1 of 8 tests fail)
+a staleness window is not the reader's declaration: KILLED (1 of 8 tests fail)
+a zero window is a window: KILLED (7 of 8 tests fail)
+readers of the command's module only: KILLED (1 of 8 tests fail)
+any domain is the one written: KILLED (1 of 8 tests fail)
+a clause naming nothing is not set aside: KILLED (1 of 8 tests fail)
+a clause naming another kind is not set aside: KILLED (1 of 8 tests fail)
+a read is a write: KILLED (1 of 8 tests fail)
+the write is not underlined: KILLED (1 of 8 tests fail)
+13 of 13 mutants killed
+memory bound: no process was stopped
+EXIT write_invalidation: 0, seconds 445
+finished: 2026-10-17T14:47:16Z
+restored (git status --porcelain, empty when restored):
+end of restored
+
+--- /tmp/generic-finish-wholes-failed-page_policy-no-kiokun-server.txt (sha256 79efff51ca924a5573cde3ce5bf85630b1b55ee9aa3c0cad645332cf8db26764): an infrastructure refusal, not a result; the script ran again
+== CARGO_INCREMENTAL=0 /usr/bin/python3 -u scripts/page_policy_mutations.py
+tree: /tmp/gf-lane-a
+commit: 600ebf1984c3e85c9116eb5d06270cda84f18653
+started: 2026-10-17T13:14:08Z
+CARGO_BUILD_JOBS=12 PORT=12641
+baseline (core): 32 passed, 0 failed
+baseline (server): 17 passed, 0 failed
+baseline (browser): 0 passed, 0 failed
+FAIL: the unmutated baseline is not green; no mutant can mean anything
+what failed, as its commands said it:
+  pnpm exec playwright test e2e/page-policy.spec.mjs -g announcer --project=chromium --reporter=line (exit 1):
+    no test result; its output ended:
+      [WebServer] /bin/sh: 1: ../../target/debug/kiokun-server: not found
+      
+      Error: Process from config.webServer was not able to start. Exit code: 127
+      
+memory bound: no process was stopped
+EXIT page_policy: 1, seconds 747
+finished: 2026-10-17T13:26:35Z
+restored (git status --porcelain, empty when restored):
+end of restored
+
+== Codex's assembled runs (the driver's state: /home/haki/pw-recovery/2026-10-17/tmp/codex-generic-assembled-v4/state.json, /home/haki/pw-recovery/2026-10-17/tmp/codex-generic-assembled-v5/state.json)
+
+--- v4 computed_holes_mutations.py: exit 0, seconds 2170.71, /home/haki/pw-recovery/2026-10-17/tmp/codex-generic-assembled-v4/computed_holes_mutations.txt (sha256 f712e8263603184a35d5f0d51b80c699dd105d8b5791b216327a235dce850899, as recorded)
+baseline: 64 passed, 0 failed
+a computed hole reads nothing: KILLED (7 of 42 tests fail)
+a computed attribute reads nothing: KILLED (6 of 42 tests fail)
+a name a lambda binds is read from outside: KILLED (1 of 42 tests fail)
+a view that contains itself computes: KILLED (1 of 42 tests fail)
+a handler is a value the template computes: KILLED (6 of 34 tests fail)
+a computed value may perform an effect at build: KILLED (1 of 42 tests fail)
+a value of two queries is computed from the first: KILLED (1 of 42 tests fail)
+the lifted function is not run: KILLED (4 of 42 tests fail)
+a computed attribute is not set again: KILLED (2 of 42 tests fail)
+a computed value in a signal's block is said as a path: KILLED (1 of 42 tests fail)
+the lifted function's contract is a query's: KILLED (1 of 42 tests fail)
+a world finds any function beside its declaration: KILLED (6 of 42 tests fail)
+a world does not name its lifted function: KILLED (3 of 42 tests fail)
+the lifted function is given nothing: KILLED (5 of 42 tests fail)
+a value the template computes may perform an effect: KILLED (4 of 34 tests fail)
+a page placed at build may not read its input in its template: KILLED (1 of 34 tests fail)
+an escape hatch's effect is said to be impure: KILLED (6 of 34 tests fail)
+an import's name is a local again: KILLED (1 of 42 tests fail)
+a module a path starts with is a term: KILLED (3 of 34 tests fail)
+an inferred `Int` has no type: KILLED (8 of 42 tests fail)
+the host does not run the lifted function: KILLED (2 of 64 tests fail)
+a character with no rule between tags is unknown: KILLED (2 of 64 tests fail)
+the host renders without a computed attribute's value: KILLED (2 of 64 tests fail)
+23 of 23 mutants killed
+Independent Cargo communicate observation: 72 commands; 0 invalid/unmatched; script exit 0
+memory bound: no process was stopped
+
+--- v4 generic_effects_mutations.py: exit 0, seconds 564.12, /home/haki/pw-recovery/2026-10-17/tmp/codex-generic-assembled-v4/generic_effects_mutations.txt (sha256 e058b75456111bf9ec726d83d7dc0f406991667a969b1379228a0c69579e531f, as recorded)
+baseline: 56 passed, 0 failed
+a generic call returns its declared parameter even recursively: KILLED (2 of 56 tests fail)
+a function receiver is discarded as a path prefix: KILLED (2 of 56 tests fail)
+a resolved module path is treated as a value receiver: KILLED (1 of 56 tests fail)
+interface term roots silently accept unknown receivers: KILLED (1 of 56 tests fail)
+a missing declared type ignores the call solvers type: KILLED (1 of 56 tests fail)
+solved binder types are not shared with readers: KILLED (1 of 56 tests fail)
+a generic record field keeps its declared parameter: KILLED (1 of 56 tests fail)
+a callable needing other arguments is treated as its result: KILLED (1 of 56 tests fail)
+unknown receiver reads are accepted silently: KILLED (2 of 56 tests fail)
+rigid parameters silently have unknown members: KILLED (2 of 56 tests fail)
+only bare names have effectful members: KILLED (3 of 56 tests fail)
+a member with no declared row hides its performed effects: KILLED (2 of 56 tests fail)
+a rooted effect walk ignores member reads: KILLED (1 of 56 tests fail)
+a rooted effect walk ignores named function values: KILLED (1 of 56 tests fail)
+computed receivers resolve by the member spelling: KILLED (1 of 56 tests fail)
+a member carries no label through its receiver: KILLED (2 of 56 tests fail)
+draw receives no declared platform context: KILLED (1 of 56 tests fail)
+a receiver-only property has no invocation: KILLED (7 of 56 tests fail)
+a member invocation borrows its spelled module path: KILLED (7 of 56 tests fail)
+a member callee field is invoked twice: KILLED (2 of 56 tests fail)
+a structural field is a property invocation: KILLED (1 of 56 tests fail)
+a property gives no bounded receiver: KILLED (6 of 56 tests fail)
+interface effect roots forget their local bindings: KILLED (1 of 56 tests fail)
+interface terms have no canonical lexical arena: KILLED (1 of 56 tests fail)
+a local receiver call is borrowed from a module: KILLED (4 of 56 tests fail)
+a local receiver property is borrowed from a module: KILLED (2 of 56 tests fail)
+a callee borrows a namesake paths result before its receiver type: KILLED (1 of 56 tests fail)
+a local function call borrows a globals result type: KILLED (1 of 56 tests fail)
+a local property borrows a type qualified constructor: KILLED (2 of 56 tests fail)
+the handle constructor scan forgets local callback identity: KILLED (1 of 56 tests fail)
+a backend property emits a namesake type constructor: KILLED (1 of 56 tests fail)
+a backend member call borrows a module function: KILLED (2 of 56 tests fail)
+a backend member callback borrows a module function: KILLED (2 of 56 tests fail)
+33 of 33 mutants killed
+Independent Cargo communicate observation: 170 commands; 0 invalid/unmatched; script exit 0
+memory bound: no process was stopped
+
+--- v4 each_head_effects_mutations.py: exit 0, seconds 97.86, /home/haki/pw-recovery/2026-10-17/tmp/codex-generic-assembled-v4/each_head_effects_mutations.txt (sha256 09c6535746a233e5eed72fab6f8a50d6b8563969f29d6cccee770da441bede4a, as recorded)
+baseline: 19 passed, 0 failed
+a text hole is no position: KILLED (2 of 13 tests fail)
+an attribute's value is no position: KILLED (2 of 19 tests fail)
+a handler is no position: KILLED (1 of 4 tests fail)
+a handler is read as an attribute: KILLED (2 of 19 tests fail)
+a block's subject is no position: KILLED (2 of 19 tests fail)
+a branch's condition is no position: KILLED (2 of 19 tests fail)
+a loop's list is no position: KILLED (3 of 13 tests fail)
+a loop's key is no position: KILLED (1 of 13 tests fail)
+a template's parts leave a loop's head out, as before the fix: KILLED (4 of 13 tests fail)
+a loop's list is lowered to nothing: KILLED (9 of 13 tests fail)
+a loop's key is lowered to nothing: KILLED (8 of 13 tests fail)
+a loop's list is read in no scope: KILLED (6 of 13 tests fail)
+a loop's key is read outside the row's scope: KILLED (1 of 19 tests fail)
+the names check reads no loop's list: KILLED (1 of 13 tests fail)
+the names check reads a loop's key outside the row's scope: KILLED (8 of 13 tests fail)
+a row's label is not its list's: KILLED (1 of 13 tests fail)
+a computed or declared list loses its row typing: KILLED (4 of 13 tests fail)
+a loop's list shows no dialog: KILLED (1 of 13 tests fail)
+Marko writes a loop's list as a name, as before the fix: KILLED (1 of 13 tests fail)
+a loop's list is printed: KILLED (1 of 19 tests fail)
+20 of 20 mutants killed
+Independent Cargo communicate observation: 21 commands; 0 invalid/unmatched; script exit 0
+memory bound: no process was stopped
+
+--- v4 bounded_checker_mutations.py: exit 0, seconds 398.55, /home/haki/pw-recovery/2026-10-17/tmp/codex-generic-assembled-v4/bounded_checker_mutations.txt (sha256 64261833267a39bb535d7c6b02e0a1e4e10a9151752cf6b7c02e4190d110c38c, as recorded)
+baseline: 40 passed, 0 failed
+a set pair accepts any field of the key's type: KILLED (2 of 40 tests fail)
+a set pair drops each key's Result wrapper: KILLED (4 of 40 tests fail)
+`sets` is no clause: KILLED (32 of 40 tests fail)
+`set` is no clause: KILLED (25 of 40 tests fail)
+`set` and `sets` head a clause wherever they are written: KILLED (1 of 40 tests fail)
+`sets` takes any value: KILLED (2 of 40 tests fail)
+a chunk is of any size: KILLED (1 of 40 tests fail)
+the walk records no call: KILLED (23 of 40 tests fail)
+the walk records no pure call: KILLED (16 of 40 tests fail)
+no combinator applies its callback to its list's elements: KILLED (16 of 40 tests fail)
+a function of the program's applies no callback: KILLED (1 of 40 tests fail)
+a callback called in a loop is applied once: KILLED (1 of 40 tests fail)
+a callback bound by a `let` is in no loop: KILLED (1 of 40 tests fail)
+a `for` binds nothing: KILLED (1 of 40 tests fail)
+nothing recurses over data: KILLED (2 of 40 tests fail)
+a parameter passed along whole is walked: KILLED (2 of 40 tests fail)
+a parameter handed whole to a position another declaration walks is not walked: KILLED (1 of 40 tests fail)
+a recursive call is a read per element: KILLED (2 of 40 tests fail)
+a key through a `let` comes from nothing: KILLED (2 of 40 tests fail)
+a key through a field comes from nothing: KILLED (15 of 40 tests fail)
+a key through a match arm comes from nothing: KILLED (2 of 40 tests fail)
+a key passes through another read: KILLED (1 of 40 tests fail)
+any read in a loop is refused, whatever its key: KILLED (5 of 40 tests fail)
+a host read keys nothing: KILLED (19 of 40 tests fail)
+a host call that also writes is no read: KILLED (1 of 40 tests fail)
+a helper's parameter keys nothing: KILLED (2 of 40 tests fail)
+a function named as a callback is none: KILLED (2 of 40 tests fail)
+a source that states no `sets` batches: KILLED (5 of 40 tests fail)
+a source that batches is warned and one that cannot is not: KILLED (23 of 40 tests fail)
+a resource no source holds is the first source's: KILLED (1 of 40 tests fail)
+a chunked set read costs one call per chunk, rounded down: KILLED (1 of 40 tests fail)
+a set read takes any parameters: KILLED (1 of 40 tests fail)
+a set read answers anything: KILLED (4 of 40 tests fail)
+a set read reads any source: KILLED (1 of 40 tests fail)
+a keyed read that reads no source has a set read: KILLED (1 of 40 tests fail)
+a set that does not fit is refused as a policy's value: KILLED (5 of 40 tests fail)
+a set that does not fit states a policy value's invariant: KILLED (1 of 40 tests fail)
+a known read per element is refused: KILLED (2 of 40 tests fail)
+every read per element is known: KILLED (2 of 40 tests fail)
+a build writes no source's cost: KILLED (1 of 40 tests fail)
+an older build's clauses are read as no clauses: KILLED (1 of 40 tests fail)
+the rules run on no unit: KILLED (28 of 40 tests fail)
+generated keyed reads have no set pair: KILLED (5 of 40 tests fail)
+generated index pairs ignore their queried fields: KILLED (2 of 40 tests fail)
+generated index reads are paired with a prefix batch: KILLED (2 of 40 tests fail)
+generated flat batches replace each individual read in the repair: KILLED (2 of 40 tests fail)
+generated composite keys are described as scalar keys: KILLED (1 of 40 tests fail)
+47 of 47 mutants killed
+Independent Cargo communicate observation: 96 commands; 0 invalid/unmatched; script exit 0
+memory bound: no process was stopped
+
+--- v4 affine_binding_mutations.py: exit 0, seconds 19.23, /home/haki/pw-recovery/2026-10-17/tmp/codex-generic-assembled-v4/affine_binding_mutations.txt (sha256 5a47ddbc2ca9f27df6898d287581b600ee2c51b699b655d0712a763d97e9d158, as recorded)
+baseline: 4 passed, 0 failed
+a use is any name spelled like the value: KILLED (2 of 4 tests fail)
+a local bound to a release counts nothing: KILLED (1 of 4 tests fail)
+a binding that may be reassigned is read as its first value: KILLED (1 of 4 tests fail)
+a value given to a function value is not refused: KILLED (1 of 4 tests fail)
+a binding holding a function is not a function value: KILLED (1 of 4 tests fail)
+5 of 5 mutants killed
+Independent Cargo communicate observation: 6 commands; 0 invalid/unmatched; script exit 0
+memory bound: no process was stopped
+
+--- v4 affine_loops_mutations.py: exit 0, seconds 13.39, /home/haki/pw-recovery/2026-10-17/tmp/codex-generic-assembled-v4/affine_loops_mutations.txt (sha256 2e8efca54ab46fc06f49f54835436d28f31bf2c4aae291c97e49a0d179ec61e0, as recorded)
+baseline: 10 passed, 0 failed
+a loop's body has no exits: KILLED (3 of 10 tests fail)
+a release before an exit inside a loop is refused: KILLED (1 of 10 tests fail)
+a release that goes round again is accepted: KILLED (1 of 10 tests fail)
+3 of 3 mutants killed
+Independent Cargo communicate observation: 4 commands; 0 invalid/unmatched; script exit 0
+memory bound: no process was stopped
+
+--- v4 affine_mutations.py: exit 0, seconds 662.52, /home/haki/pw-recovery/2026-10-17/tmp/codex-generic-assembled-v4/affine_mutations.txt (sha256 43c61d1a370087d2a33be6ed2b1ab4750c61c38607ce5cee213fa5c00dc0681e, as recorded)
+baseline: 15 passed, 0 failed
+the end of a scope is not an exit: KILLED (1 of 15 tests fail)
+a failing `?` is not an exit: KILLED (1 of 15 tests fail)
+a second release is not counted: KILLED (1 of 15 tests fail)
+a release in a loop counts once: KILLED (1 of 15 tests fail)
+a parameter the declaration promises to release is not followed: KILLED (1 of 15 tests fail)
+the body's value does not move the resource to the caller: KILLED (1 of 15 tests fail)
+a use binding is held to explicit releases: KILLED (1 of 15 tests fail)
+7 of 7 mutants killed
+Independent Cargo communicate observation: 16 commands; 0 invalid/unmatched; script exit 0
+memory bound: no process was stopped
+
+--- v4 bare_cases_mutations.py: exit 0, seconds 36.0, /home/haki/pw-recovery/2026-10-17/tmp/codex-generic-assembled-v4/bare_cases_mutations.txt (sha256 93a0f778cc9c9625c6824650a23e032a0666b07b0907708ac3da23a7eeaf9183, as recorded)
+baseline: 26 passed, 0 failed
+a bare case with a payload resolves to nothing: KILLED (10 of 26 tests fail)
+its payload is related to nothing: KILLED (1 of 26 tests fail)
+the backend does not build it: KILLED (2 of 26 tests fail)
+3 of 3 mutants killed
+Independent Cargo communicate observation: 8 commands; 0 invalid/unmatched; script exit 0
+memory bound: no process was stopped
+
+--- v4 callback_mutations.py: exit 0, seconds 40.42, /home/haki/pw-recovery/2026-10-17/tmp/codex-generic-assembled-v4/callback_mutations.txt (sha256 780dae7d6e4d368b09b366383d17fc7359baa9900be8f070f6c8c5cc5a17f1c4, as recorded)
+baseline: 57 passed, 0 failed
+callback parameters take the sibling parameters types: KILLED (8 of 57 tests fail)
+a declared callback parameter type is not read: KILLED (2 of 57 tests fail)
+solved callback parameter types are discarded: KILLED (14 of 57 tests fail)
+a piped value is not the first argument: KILLED (5 of 57 tests fail)
+a solved lambda's parameters are forgotten: KILLED (14 of 57 tests fail)
+a parameter known only in part is not typed: KILLED (1 of 57 tests fail)
+a lambda bound with a written type is not typed by it: KILLED (1 of 57 tests fail)
+a returned lambda is not typed by the declared result: KILLED (1 of 57 tests fail)
+8 of 8 mutants killed
+Independent Cargo communicate observation: 27 commands; 0 invalid/unmatched; script exit 0
+memory bound: no process was stopped
+
+--- v4 cart_lines_mutations.py: exit 0, seconds 3578.33, /home/haki/pw-recovery/2026-10-17/tmp/codex-generic-assembled-v4/cart_lines_mutations.txt (sha256 74c4e1abd2572b095fd502dfa2a5498fada33c8da24d148f738cd6cb7d4595e3, as recorded)
+baseline (core): 35 passed, 0 failed
+baseline (conformance): 168 passed, 0 failed
+baseline (render): 117 passed, 0 failed
+baseline (render-wasm): 8 passed, 0 failed
+baseline (host): 79 passed, 0 failed
+baseline (server): 5 passed, 0 failed
+baseline (browser): 7 passed, 0 failed
+no region is collected [core]: KILLED (3 of 33 tests fail)
+a region's read of what the browser does not hold is not refused [core]: KILLED (1 of 33 tests fail)
+a region's handler capture of what the browser does not hold is not refused [core]: KILLED (1 of 33 tests fail)
+the page's template is lowered without what its handlers capture [core]: KILLED (1 of 33 tests fail)
+a speculated read in a block no region renders is not refused [core]: KILLED (1 of 33 tests fail)
+a loop over a field is typed as its binding [core]: KILLED (3 of 27 tests fail)
+a record is not sent [core]: KILLED (2 of 6 tests fail)
+a list is not sent [core]: KILLED (2 of 6 tests fail)
+a record holding what cannot be sent is sent [core]: KILLED (1 of 27 tests fail)
+a field whose name would not come back is sent [core]: KILLED (1 of 27 tests fail)
+a new line is named by its item's description [conformance]: KILLED (1 of 122 tests fail)
+a line's total is its price once [conformance]: KILLED (1 of 122 tests fail)
+the cart's subtotal is its last line's [conformance]: KILLED (1 of 122 tests fail)
+one fewer keeps a line at one [conformance]: KILLED (1 of 122 tests fail)
+one more adds two [conformance]: KILLED (1 of 122 tests fail)
+a line's removal removes nothing [conformance]: KILLED (1 of 122 tests fail)
+a row's member reads are not compiled [conformance]: KILLED (1 of 122 tests fail)
+a computed value is captured as a field [render]: KILLED (1 of 92 tests fail)
+a handler's captures are not set where they are [render]: KILLED (1 of 40 tests fail)
+a handler's captures are set once per handler [render]: KILLED (1 of 40 tests fail)
+an instance's changes are always a render [render-wasm]: KILLED (1 of 8 tests fail)
+a field is read by its WIT name [host]: KILLED (1 of 51 tests fail)
+a missing field is passed as nothing [host]: KILLED (1 of 51 tests fail)
+a list is not read [host]: KILLED (1 of 51 tests fail)
+one fewer takes two [server]: KILLED (1 of 5 tests fail)
+a line at one is kept [server]: KILLED (1 of 5 tests fail)
+a removal removes nothing [server]: KILLED (1 of 5 tests fail)
+an item no store has is available [server]: KILLED (1 of 5 tests fail)
+a line's price is not recorded [server]: KILLED (2 of 5 tests fail)
+a command does not wait for its session's change in progress [server]: KILLED (1 of 5 tests fail)
+a drain does not wait for its session's change in progress [server]: KILLED (1 of 5 tests fail)
+the interactions a value includes are not recorded [server]: KILLED (2 of 5 tests fail)
+lists are not shown as held before a batch [browser]: KILLED (1 of 1 tests fail)
+focus is not passed on from a row that goes [browser]: KILLED (1 of 3 tests fail)
+focus is not given back after a batch [browser]: KILLED (1 of 7 tests fail)
+a kept row is rendered again [browser]: KILLED (1 of 2 tests fail)
+a speculation the value includes is shown again [browser]: KILLED (1 of 6 tests fail)
+an attribute is not rendered again [browser]: KILLED (1 of 1 tests fail)
+a block is not rendered again [browser]: KILLED (1 of 1 tests fail)
+a new row is not inserted [browser]: KILLED (1 of 1 tests fail)
+the document's regions are not served [browser]: KILLED (1 of 1 tests fail)
+41 of 41 mutants killed
+Independent Cargo communicate observation: 38 commands; 0 invalid/unmatched; script exit 0
+memory bound: no process was stopped
+
+--- v4 case_mutations.py: exit 0, seconds 739.41, /home/haki/pw-recovery/2026-10-17/tmp/codex-generic-assembled-v4/case_mutations.txt (sha256 324a6882d0a87c364dc09a5afc223d8481fe65b35cd24cb5c3ceda1b5672a2a0, as recorded)
+baseline: 17 passed, 0 failed
+a range grows over code points it does not map: KILLED (7 of 17 tests fail)
+a mapping to more than one code point is dropped: KILLED (7 of 17 tests fail)
+the multi entries are read where the ranges are: KILLED (6 of 17 tests fail)
+only the first of a multi mapping is written: KILLED (5 of 17 tests fail)
+a code point past a range's end is in it: KILLED (5 of 17 tests fail)
+a range's stride is not kept: KILLED (1 of 17 tests fail)
+a mapping's room is the input's: KILLED (5 of 17 tests fail)
+the module misses every multi entry: KILLED (2 of 17 tests fail)
+the module keeps no stride: KILLED (1 of 17 tests fail)
+9 of 9 mutants killed
+Independent Cargo communicate observation: 30 commands; 0 invalid/unmatched; script exit 0
+memory bound: no process was stopped
+
+--- v4 case_names_mutations.py: exit 0, seconds 35.76, /home/haki/pw-recovery/2026-10-17/tmp/codex-generic-assembled-v4/case_names_mutations.txt (sha256 88cccc6c28a0b6b43ac31c775d9c2161ba450677bc7767bcdddf28156f353be8, as recorded)
+baseline: 16 passed, 0 failed
+the parser reads no capital: KILLED (13 of 16 tests fail)
+every pattern name is a case: KILLED (13 of 16 tests fail)
+a case named in lowercase is accepted: KILLED (1 of 16 tests fail)
+a template arm's field may be a case: KILLED (1 of 16 tests fail)
+the backend does not lower `true` and `false`: KILLED (1 of 16 tests fail)
+5 of 5 mutants killed
+Independent Cargo communicate observation: 12 commands; 0 invalid/unmatched; script exit 0
+memory bound: no process was stopped
+
+--- v4 clock_mutations.py: exit 0, seconds 301.33, /home/haki/pw-recovery/2026-10-17/tmp/codex-generic-assembled-v4/clock_mutations.txt (sha256 be63e14db7abe5b48b7cdb2d63d48d0edd741ddf2768bd8e39264cf8b3a26e58, as recorded)
+baseline (zones): 9 passed, 0 failed
+baseline (core): 195 passed, 0 failed
+baseline (server): 10 passed, 0 failed
+a skipped local time is read with the offset after the gap [zones]: KILLED (2 of 9 tests fail)
+a repeated local time is its last occurrence [zones]: KILLED (1 of 9 tests fail)
+past the last transition, no rule [zones]: KILLED (2 of 9 tests fail)
+before the first transition, the first transition's offset [zones]: KILLED (1 of 9 tests fail)
+daylight time south of the equator is never [zones]: KILLED (1 of 9 tests fail)
+a rule's start is read in daylight time [zones]: KILLED (1 of 9 tests fail)
+a day begins at a midnight a transition skipped [zones]: KILLED (1 of 9 tests fail)
+a file's footer is unread [zones]: KILLED (2 of 9 tests fail)
+a page built once may compare the clock [core]: KILLED (1 of 195 tests fail)
+a page built once, or a public materialization, may compare the clock [core]: KILLED (1 of 192 tests fail)
+a public materialization may compare the clock [core]: KILLED (1 of 192 tests fail)
+an instant ahead is not noted [server]: KILLED (3 of 10 tests fail)
+`passed` answers before its instant [server]: KILLED (1 of 10 tests fail)
+a zone's date is held by nothing [server]: KILLED (2 of 10 tests fail)
+a read within a read tells the outer nothing [server]: KILLED (1 of 10 tests fail)
+a later instant replaces an earlier [server]: KILLED (1 of 10 tests fail)
+an instant a later read replaced takes its document [server]: KILLED (1 of 10 tests fail)
+a fresh value's instant is not kept [server]: KILLED (2 of 10 tests fail)
+a kept value past its instant is served [server]: KILLED (2 of 10 tests fail)
+a kept value's instant is not noted for the read it is part of [server]: KILLED (1 of 10 tests fail)
+a document's reads set no timer [server]: KILLED (2 of 10 tests fail)
+a document due is not read again [server]: KILLED (1 of 10 tests fail)
+the host's clock is not the system's [server]: KILLED (1 of 10 tests fail)
+the host's clock moves back [server]: KILLED (1 of 10 tests fail)
+the development origin grants no clock [server]: KILLED (2 of 10 tests fail)
+25 of 25 mutants killed
+Independent Cargo communicate observation: 28 commands; 0 invalid/unmatched; script exit 0
+memory bound: no process was stopped
+
+--- v4 command_answers_mutations.py: exit 0, seconds 1255.93, /home/haki/pw-recovery/2026-10-17/tmp/codex-generic-assembled-v4/command_answers_mutations.txt (sha256 2f326f19ebe56197cd4b0f70cce5177da895375549a45a24a7b30a6c5ecc2c64, as recorded)
+baseline (cargo): 42 passed, 0 failed
+baseline (browser): 16 passed, 0 failed
+a command's call is typed as its declared result: KILLED (1 of 21 tests fail)
+the value relations type a command's call as its declared result: KILLED (1 of 21 tests fail)
+a handler is answered nothing: KILLED (6 of 42 tests fail)
+the answer keeps Ok's value: KILLED (3 of 21 tests fail)
+the command is sent where its answer is decoded: KILLED (14 of 42 tests fail)
+a handler that matches on its call is named nothing: KILLED (2 of 42 tests fail)
+PW0339: a command may be called from anywhere: KILLED (2 of 21 tests fail)
+PW0620: Ok's payload is not looked at: KILLED (2 of 21 tests fail)
+PW0620: an answer bound to a name is not followed: KILLED (1 of 21 tests fail)
+PW0620: a command declaring no Result may be bound: KILLED (1 of 21 tests fail)
+the server sends Ok with its value: KILLED (1 of 42 tests fail)
+the server sends a refusal without its error: KILLED (2 of 42 tests fail)
+every item can be ordered: KILLED (2 of 42 tests fail)
+a kept answer forgets null: KILLED (1 of 42 tests fail)
+the store adds whatever the item: KILLED (1 of 42 tests fail)
+the handler is given the whole answer: KILLED (1 of 13 tests fail)
+16 of 16 mutants killed
+Independent Cargo communicate observation: 48 commands; 0 invalid/unmatched; script exit 0
+memory bound: no process was stopped
+
+--- v4 computed_rows_mutations.py: exit 0, seconds 1111.4, /home/haki/pw-recovery/2026-10-17/tmp/codex-generic-assembled-v4/computed_rows_mutations.txt (sha256 34655be21bda9a520465b5ce3590d6774b164ce0555640073305c7ae7ed4edcf, as recorded)
+baseline (browser): 66 passed, 0 failed
+baseline (cargo): 24 passed, 0 failed
+a row's value is named by no item [cargo]: KILLED (4 of 10 tests fail)
+a row's value is named by the outermost loop's item [cargo]: KILLED (1 of 13 tests fail)
+a row's read does not run the function [cargo]: KILLED (3 of 13 tests fail)
+a row's value is set at its input's path [cargo]: KILLED (3 of 13 tests fail)
+a speculated row's value is not computed [cargo]: KILLED (1 of 13 tests fail)
+a speculated row's value from a field of its item is built [cargo]: KILLED (1 of 13 tests fail)
+a part computed from a speculated value is not computed again [cargo]: KILLED (1 of 10 tests fail)
+an attribute computed from a speculated value is built [cargo]: KILLED (1 of 13 tests fail)
+a field of a value is a function of the same name [cargo]: KILLED (5 of 10 tests fail)
+an opaque value does not compare as its representation [cargo]: KILLED (4 of 10 tests fail)
+a like is not shown before the server answers [browser]: KILLED (3 of 27 tests fail)
+a like shown before the server answers counts nothing [browser]: KILLED (3 of 27 tests fail)
+12 of 12 mutants killed
+Independent Cargo communicate observation: 22 commands; 0 invalid/unmatched; script exit 0
+memory bound: no process was stopped
+
+--- v4 condition_truth_mutations.py: exit 0, seconds 698.54, /home/haki/pw-recovery/2026-10-17/tmp/codex-generic-assembled-v4/condition_truth_mutations.txt (sha256 e413c8eb7c79dfb5b55fbfc91d4f7da8f11b88e7b3e5242ff71e7787d37e7c93, as recorded)
+baseline: 33 passed, 0 failed
+a number has a truth: KILLED (4 of 20 tests fail)
+a record has a truth: KILLED (1 of 26 tests fail)
+a string is not tested non-empty: KILLED (1 of 26 tests fail)
+a list is not tested non-empty: KILLED (1 of 20 tests fail)
+a number is said as a case: KILLED (1 of 20 tests fail)
+a vowel takes "a": KILLED (1 of 33 tests fail)
+6 of 6 mutants killed
+Independent Cargo communicate observation: 7 commands; 0 invalid/unmatched; script exit 0
+memory bound: no process was stopped
+
+--- v4 e9_value_mutations.py: exit 0, seconds 31.98, /home/haki/pw-recovery/2026-10-17/tmp/codex-generic-assembled-v4/e9_value_mutations.txt (sha256 2f89be2a15322d6e370ca693ded05e08a03156f06e57cbd93e25c0212f6a3e72, as recorded)
+baseline: 42 passed, 0 failed (exit 0)
+V1  primitive types always agree: KILLED (17 of 42 tests fail)
+V1  arity is never compared: KILLED (2 of 42 tests fail)
+V2  a generic callee is not instantiated: KILLED (10 of 42 tests fail)
+V2  a bound variable is not followed, so each argument rebinds it: KILLED (6 of 42 tests fail)
+V3  nominal identity ignores the declaration: KILLED (8 of 42 tests fail)
+V4  no result site is collected: KILLED (6 of 42 tests fail)
+V4  a `?` propagates nothing: KILLED (1 of 42 tests fail)
+V5  an unresolved annotation is accepted: KILLED (4 of 42 tests fail)
+V5  a declared constructor's arity is not checked: KILLED (1 of 42 tests fail)
+V6  an opaque type is compared by its representation: KILLED (14 of 42 tests fail)
+10 of 10 mutants killed
+Independent Cargo communicate observation: 11 commands; 0 invalid/unmatched; script exit 0
+memory bound: no process was stopped
+
+--- v4 each_heads_mutations.py: exit 0, seconds 106.24, /home/haki/pw-recovery/2026-10-17/tmp/codex-generic-assembled-v4/each_heads_mutations.txt (sha256 bcc839dbbb148bef1fb7773f0b88cc0e1d623acb5347339e61c5711e92aea636, as recorded)
+baseline: 94 passed, 0 failed
+an each head is not read: KILLED (5 of 15 tests fail)
+an each head's errors are dropped: KILLED (2 of 15 tests fail)
+two words for a list leave the name unread: KILLED (2 of 15 tests fail)
+what stands before the key swallows it: KILLED (2 of 15 tests fail)
+a key is not read: KILLED (4 of 15 tests fail)
+a keyless list is not refused: KILLED (1 of 15 tests fail)
+a loop's key is refused at its block: KILLED (1 of 15 tests fail)
+a row's name is not a local binding: KILLED (1 of 94 tests fail)
+a row's name is not in lexical scope: KILLED (3 of 22 tests fail)
+the names check reads no head: KILLED (2 of 15 tests fail)
+Marko reads no head: KILLED (1 of 76 tests fail)
+the template IR reads no head: KILLED (2 of 48 tests fail)
+12 of 12 mutants killed
+Independent Cargo communicate observation: 39 commands; 0 invalid/unmatched; script exit 0
+memory bound: no process was stopped
+
+--- v4 effect_value_mutations.py: exit 0, seconds 338.57, /home/haki/pw-recovery/2026-10-17/tmp/codex-generic-assembled-v4/effect_value_mutations.txt (sha256 39a9e37f0a38f59690fb175608fd9464d24fe30ac03067e0d2a3890aad0a47bf, as recorded)
+baseline: 12 passed, 0 failed
+a function named as a value is not counted: KILLED (5 of 12 tests fail)
+a binding in scope is read as the declaration it shadows: KILLED (4 of 12 tests fail)
+a helper declaring no row carries only what it calls: KILLED (1 of 12 tests fail)
+a function named as a value is said to be called: KILLED (1 of 12 tests fail)
+4 of 4 mutants killed
+Independent Cargo communicate observation: 10 commands; 0 invalid/unmatched; script exit 0
+memory bound: no process was stopped
+
+--- v4 evidence_integrity_2_mutations.py: exit 1, seconds 44.35, /home/haki/pw-recovery/2026-10-17/tmp/codex-generic-assembled-v4/evidence_integrity_2_mutations.txt (sha256 56537cf17d2963ec359b44f24aec06875c13918e75a142ebaeb319958291c6e1, as recorded)
+baseline (helper): 8 passed, 0 failed
+baseline (history): 3 passed, 0 failed
+baseline (gate): 6 passed, 0 failed
+baseline (recipes): 2 passed, 0 failed
+baseline (plan): 75 passed, 0 failed
+baseline (programs): 9 passed, 0 failed
+Traceback (most recent call last):
+  File "/tmp/codex-generic-assembled-v4/observe.py", line 74, in <module>
+    runpy.run_path(str(root/'scripts'/name), run_name='__main__')
+  File "/usr/lib/python3.10/runpy.py", line 289, in run_path
+    return _run_module_code(code, init_globals, run_name,
+  File "/usr/lib/python3.10/runpy.py", line 96, in _run_module_code
+    _run_code(code, mod_globals, init_globals,
+  File "/usr/lib/python3.10/runpy.py", line 86, in _run_code
+    exec(code, run_globals)
+  File "/home/haki/code/pw-wt/train-10-next/scripts/evidence_integrity_2_mutations.py", line 398, in <module>
+    sys.exit(main())
+  File "/home/haki/code/pw-wt/train-10-next/scripts/evidence_integrity_2_mutations.py", line 365, in main
+    built, passed, failed = run_tests(suite)
+  File "/home/haki/code/pw-wt/train-10-next/scripts/evidence_integrity_2_mutations.py", line 351, in run_tests
+    out, _ = p.communicate(timeout=BOUND)
+  File "/home/haki/code/pw-wt/train-10-next/scripts/mutation_baseline.py", line 121, in communicated
+    out, err = communicate(self, *args, **kwargs)
+  File "/tmp/codex-generic-assembled-v4/observe.py", line 67, in communicated
+    retain(self, self.returncode, text(out)+text(err))
+  File "/tmp/codex-generic-assembled-v4/observe.py", line 51, in retain
+    'control': control(), 'valid': bool(outcome and outcome.valid),
+  File "/tmp/codex-generic-assembled-v4/observe.py", line 29, in control
+    if all(actual[path] == expected[path] for path in targets):
+  File "/tmp/codex-generic-assembled-v4/observe.py", line 29, in <genexpr>
+    if all(actual[path] == expected[path] for path in targets):
+KeyError: 'docs/evidence/E2D/corpus-enforcement.txt'
+memory bound: no process was stopped
+
+--- v5 evidence_integrity_2_mutations.py: exit 0, seconds 174.75204454001505, /home/haki/pw-recovery/2026-10-17/tmp/codex-generic-assembled-v5/evidence_integrity_2_mutations.txt (sha256 36e725514c40016e56b82c38281d06d21841e517fa1458369872997a2ba42b01, as recorded)
+baseline (helper): 8 passed, 0 failed
+baseline (history): 3 passed, 0 failed
+baseline (gate): 6 passed, 0 failed
+baseline (recipes): 2 passed, 0 failed
+baseline (plan): 75 passed, 0 failed
+baseline (programs): 9 passed, 0 failed
+baseline (core): 192 passed, 0 failed
+baseline (corpus): 1 passed, 0 failed
+baseline (latency): 1 passed, 0 failed
+the helper exits 0 whatever the suite did [helper]: KILLED (5 failure reports in 8 tests run)
+the helper stops at the first failed run [helper]: KILLED (1 failure reports in 8 tests run)
+the helper passes a run that passed no test [helper]: KILLED (1 failure reports in 8 tests run)
+the helper keeps no failed count [helper]: KILLED (2 failure reports in 8 tests run)
+a recipe swallows its suite again, read by the gate [gate]: KILLED (1 failure reports in 6 tests run)
+a recipe swallows its suite again, run with stand-ins [recipes]: KILLED (1 failure reports in 2 tests run)
+the benchmark's controls are swallowed again [gate]: KILLED (1 failure reports in 6 tests run)
+the gate reads no `||` after a suite [gate]: KILLED (6 failure reports in 6 tests run)
+the gate reads no condition [gate]: KILLED (3 failure reports in 6 tests run)
+the gate reads no group or loop that holds a suite [gate]: KILLED (5 failure reports in 6 tests run)
+the gate reads no `set +e` [gate]: KILLED (1 failure reports in 6 tests run)
+the gate reads no `-` line [gate]: KILLED (1 failure reports in 6 tests run)
+the gate reads no shell without `-e` [gate]: KILLED (1 failure reports in 6 tests run)
+the gate lets a suite outside the helper be [gate]: KILLED (1 failure reports in 6 tests run)
+the gate reads no `bench.mjs` [gate]: KILLED (2 failure reports in 6 tests run)
+the gate has no floor [gate]: KILLED (2 failure reports in 6 tests run)
+the historical report is read as another failed suite [history]: KILLED (1 failure reports in 3 tests run)
+a zero run count with leading zeros passes [helper]: KILLED (2 failure reports in 8 tests run)
+a parameter's default stops a recipe's header again [plan]: KILLED (3 failure reports in 75 tests run)
+the benchmark's controls get no browsers [plan]: KILLED (1 failure reports in 75 tests run)
+a change to the configuration plans nothing by it [plan]: KILLED (1 failure reports in 75 tests run)
+a mutation script's suite does not count [plan]: KILLED (1 failure reports in 75 tests run)
+a changed e2e module reaches no spec [plan]: KILLED (1 failure reports in 75 tests run)
+a recipe that runs every spec is planned by none [plan]: KILLED (1 failure reports in 75 tests run)
+the programs are the old list again [programs]: KILLED (2 failure reports in 9 tests run)
+a mutant in no program is let be [programs]: KILLED (1 failure reports in 9 tests run)
+a library's mutant is checked only in its own program [programs]: KILLED (1 failure reports in 9 tests run)
+a fixture's directory is one program [programs]: KILLED (1 failure reports in 9 tests run)
+a tie between sources is resolved [programs]: KILLED (1 failure reports in 9 tests run)
+a fixture's own directory is a source of its imports [programs]: KILLED (1 failure reports in 9 tests run)
+the registry translates an old number again [core]: KILLED (1 failure reports in 192 tests run)
+the corpus's test translates an old number again [core]: KILLED (1 failure reports in 192 tests run)
+the committed table drifts from what the corpus checks [corpus]: KILLED (1 failure reports in 1 tests run)
+e9-latency names macbook.md wherever it runs [latency]: KILLED (1 failure reports in 1 tests run)
+e9-latency records no load [latency]: KILLED (1 failure reports in 1 tests run)
+35 of 35 mutants killed
+{"script": "evidence_integrity_2_mutations.py", "script_status": 0, "observer_status": 0, "failure": null, "observed_cargo_communicate_events": 5, "invalid": false, "observer_errors": [], "memory_stopped": false, "scope": "Exact2393 source subset (all docs/evidence and store-ir excluded) plus68 complete mutation-target hashes; not all repository inputs/index bytes."}
+memory bound: no process was stopped
+
+--- v5 field_call_mutations.py: exit 0, seconds 6.578335267986404, /home/haki/pw-recovery/2026-10-17/tmp/codex-generic-assembled-v5/field_call_mutations.txt (sha256 8b866bd3227af4d2af82dc947db08c9d04b2d906c1a4ea721f1799b069a0eaf2, as recorded)
+baseline: 3 passed, 0 failed
+a call through a field is related to nothing: KILLED (2 of 3 tests fail)
+a call through a field answers nothing known: KILLED (1 of 3 tests fail)
+2 of 2 mutants killed
+{"script": "field_call_mutations.py", "script_status": 0, "observer_status": 0, "failure": null, "observed_cargo_communicate_events": 3, "invalid": false, "observer_errors": [], "memory_stopped": false, "scope": "Exact2393 source subset (all docs/evidence and store-ir excluded) plus68 complete mutation-target hashes; not all repository inputs/index bytes."}
+memory bound: no process was stopped
+
+--- v5 fmt_meaning_mutations.py: exit 0, seconds 65.40137842600234, /home/haki/pw-recovery/2026-10-17/tmp/codex-generic-assembled-v5/fmt_meaning_mutations.txt (sha256 6d684d09e70894f860a69b7f2eb90fa79424fb3d08c990533983dac5466b855d, as recorded)
+baseline: 132 passed, 0 failed
+a `_` between two digits groups nothing: KILLED (2 of 110 tests fail)
+a `_` groups digits wherever it stands: KILLED (1 of 110 tests fail)
+the HIR keeps a number's `_`: KILLED (1 of 132 tests fail)
+a policy's value is spaced as an expression: KILLED (1 of 110 tests fail)
+a block policy's body keeps its gaps as written: KILLED (1 of 110 tests fail)
+a value's gaps are not compared: KILLED (1 of 110 tests fail)
+a token's text is not compared: KILLED (1 of 110 tests fail)
+a line that begins by closing indents from itself: KILLED (1 of 110 tests fail)
+a policy's value continues flush with its clauses: KILLED (1 of 110 tests fail)
+9 of 9 mutants killed
+{"script": "fmt_meaning_mutations.py", "script_status": 0, "observer_status": 0, "failure": null, "observed_cargo_communicate_events": 20, "invalid": false, "observer_errors": [], "memory_stopped": false, "scope": "Exact2393 source subset (all docs/evidence and store-ir excluded) plus68 complete mutation-target hashes; not all repository inputs/index bytes."}
+memory bound: no process was stopped
+
+--- v5 form_controls_mutations.py: exit 0, seconds 59.41004643798806, /home/haki/pw-recovery/2026-10-17/tmp/codex-generic-assembled-v5/form_controls_mutations.txt (sha256 ed87dbc1fbc01656871c51b20621a99217b29635c49f7d1e7d059d02898a1394, as recorded)
+baseline: 22 passed, 0 failed
+a textarea's value is written as an attribute: KILLED (2 of 22 tests fail)
+the renderer writes a textarea's value as an attribute: KILLED (2 of 22 tests fail)
+a newline a value starts with is dropped: KILLED (2 of 22 tests fail)
+a patch carries a textarea's value as text: KILLED (1 of 22 tests fail)
+the browser does not set a textarea's value in place: KILLED (1 of 22 tests fail)
+a select's value is not refused: KILLED (1 of 22 tests fail)
+a textarea with a value and text is not refused: KILLED (1 of 22 tests fail)
+a textarea's value read from no signal is not refused: KILLED (1 of 22 tests fail)
+a value in a textarea's text is not refused: KILLED (1 of 22 tests fail)
+the template writes a select's value: KILLED (1 of 22 tests fail)
+the template writes a textarea's value and its text: KILLED (1 of 22 tests fail)
+the template writes a value in a textarea's text: KILLED (1 of 22 tests fail)
+12 of 12 mutants killed
+{"script": "form_controls_mutations.py", "script_status": 0, "observer_status": 0, "failure": null, "observed_cargo_communicate_events": 26, "invalid": false, "observer_errors": [], "memory_stopped": false, "scope": "Exact2393 source subset (all docs/evidence and store-ir excluded) plus68 complete mutation-target hashes; not all repository inputs/index bytes."}
+memory bound: no process was stopped
+
+--- v5 function_value_mutations.py: exit 0, seconds 434.02988706500037, /home/haki/pw-recovery/2026-10-17/tmp/codex-generic-assembled-v5/function_value_mutations.txt (sha256 812e115e4f068ddcfc2d61a5a85024023872be93f9780b0e461d67d2efbaa967, as recorded)
+baseline: 25 passed, 0 failed
+a closure captures nothing: KILLED (3 of 25 tests fail)
+a binding's written type is not what its value must be: KILLED (4 of 25 tests fail)
+a function type binds no type parameter: KILLED (6 of 25 tests fail)
+the environment keeps no capture: KILLED (3 of 25 tests fail)
+every environment names the first closure's code: KILLED (3 of 25 tests fail)
+a capture is laid over the table slot: KILLED (3 of 25 tests fail)
+a module's closure forgets what it captured: KILLED (1 of 25 tests fail)
+7 of 7 mutants killed
+{"script": "function_value_mutations.py", "script_status": 0, "observer_status": 0, "failure": null, "observed_cargo_communicate_events": 24, "invalid": false, "observer_errors": [], "memory_stopped": false, "scope": "Exact2393 source subset (all docs/evidence and store-ir excluded) plus68 complete mutation-target hashes; not all repository inputs/index bytes."}
+memory bound: no process was stopped
+
+--- v5 handle_mutations.py: exit 0, seconds 34.63589554501232, /home/haki/pw-recovery/2026-10-17/tmp/codex-generic-assembled-v5/handle_mutations.txt (sha256 9b307af12cc988d1baa101b04cc972aa0ab4f3981716e9b1c249f5e5a87f4fd5, as recorded)
+baseline: 4 passed, 0 failed
+a program may construct a handle: KILLED (1 of 4 tests fail)
+a program may construct a user's handle: KILLED (1 of 4 tests fail)
+an operation outside the platform's may answer a handle: KILLED (1 of 4 tests fail)
+a handle in a type's argument is not found: KILLED (2 of 4 tests fail)
+a handle in a record's field is not found: KILLED (1 of 4 tests fail)
+an organization's handle is not found in a type: KILLED (1 of 4 tests fail)
+a page's parameter may hold a handle: KILLED (1 of 4 tests fail)
+a module's signal may hold a handle: KILLED (1 of 4 tests fail)
+a view's signal may hold a handle: KILLED (1 of 4 tests fail)
+9 of 9 mutants killed
+{"script": "handle_mutations.py", "script_status": 0, "observer_status": 0, "failure": null, "observed_cargo_communicate_events": 10, "invalid": false, "observer_errors": [], "memory_stopped": false, "scope": "Exact2393 source subset (all docs/evidence and store-ir excluded) plus68 complete mutation-target hashes; not all repository inputs/index bytes."}
+memory bound: no process was stopped
+
+--- v5 handlers_where_they_run_mutations.py: exit 0, seconds 7.867763430986088, /home/haki/pw-recovery/2026-10-17/tmp/codex-generic-assembled-v5/handlers_where_they_run_mutations.txt (sha256 643908206e25ef9086a3b4878316e719b66fd28cb90eca9cf78c6c0a8ca61d12, as recorded)
+baseline: 5 passed, 0 failed
+a handler's work is held to the page's placement: KILLED (2 of 5 tests fail)
+1 of 1 mutants killed
+{"script": "handlers_where_they_run_mutations.py", "script_status": 0, "observer_status": 0, "failure": null, "observed_cargo_communicate_events": 2, "invalid": false, "observer_errors": [], "memory_stopped": false, "scope": "Exact2393 source subset (all docs/evidence and store-ir excluded) plus68 complete mutation-target hashes; not all repository inputs/index bytes."}
+memory bound: no process was stopped
+
+--- v5 label_call_mutations.py: exit 0, seconds 16.785104559996398, /home/haki/pw-recovery/2026-10-17/tmp/codex-generic-assembled-v5/label_call_mutations.txt (sha256 4a6015b8f63d5d4206bcba8890a7b6d6b5902388c5691fb72881d4dc3cd54b68, as recorded)
+baseline: 7 passed, 0 failed
+a declared call's result keeps its contract alone: KILLED (7 of 7 tests fail)
+a piped value is not its call's first argument: KILLED (1 of 7 tests fail)
+a method call's receiver is not its first argument: KILLED (1 of 7 tests fail)
+a function is labelled public: KILLED (2 of 7 tests fail)
+4 of 4 mutants killed
+{"script": "label_call_mutations.py", "script_status": 0, "observer_status": 0, "failure": null, "observed_cargo_communicate_events": 5, "invalid": false, "observer_errors": [], "memory_stopped": false, "scope": "Exact2393 source subset (all docs/evidence and store-ir excluded) plus68 complete mutation-target hashes; not all repository inputs/index bytes."}
+memory bound: no process was stopped
+
+--- v5 label_plain_mutations.py: exit 0, seconds 9.044403378997231, /home/haki/pw-recovery/2026-10-17/tmp/codex-generic-assembled-v5/label_plain_mutations.txt (sha256 9e480dd37b09e77a1d9e6b78377afbcd425c5b6e34e2185a8bea6e4a2320c33f, as recorded)
+baseline: 3 passed, 0 failed
+a declared call carries nothing it is given: KILLED (3 of 3 tests fail)
+a pipe joins what it pipes beside its call: KILLED (1 of 3 tests fail)
+2 of 2 mutants killed
+{"script": "label_plain_mutations.py", "script_status": 0, "observer_status": 0, "failure": null, "observed_cargo_communicate_events": 3, "invalid": false, "observer_errors": [], "memory_stopped": false, "scope": "Exact2393 source subset (all docs/evidence and store-ir excluded) plus68 complete mutation-target hashes; not all repository inputs/index bytes."}
+memory bound: no process was stopped
+
+--- v5 label_value_mutations.py: exit 0, seconds 11.110961872996995, /home/haki/pw-recovery/2026-10-17/tmp/codex-generic-assembled-v5/label_value_mutations.txt (sha256 3f1a29bdffc84e39b933b8869496e851fcfd4998aaf48819ed2c5f11c888b311, as recorded)
+baseline: 2 passed, 0 failed
+a declaration named as a value is public: KILLED (1 of 2 tests fail)
+a module's function named as a value is public: KILLED (1 of 2 tests fail)
+a call through a value leaves out its callee: KILLED (1 of 2 tests fail)
+3 of 3 mutants killed
+{"script": "label_value_mutations.py", "script_status": 0, "observer_status": 0, "failure": null, "observed_cargo_communicate_events": 4, "invalid": false, "observer_errors": [], "memory_stopped": false, "scope": "Exact2393 source subset (all docs/evidence and store-ir excluded) plus68 complete mutation-target hashes; not all repository inputs/index bytes."}
+memory bound: no process was stopped
+
+--- v5 labels_mutations.py: exit 0, seconds 1212.564376623981, /home/haki/pw-recovery/2026-10-17/tmp/codex-generic-assembled-v5/labels_mutations.txt (sha256 2953199541c0a990099e2dc9dc241905f166aba5ca6f19bcb9035787910a7699, as recorded)
+baseline: 17 passed, 0 failed
+an `id` names a control again: KILLED (4 of 17 tests fail)
+a label with `for` is read as one that wraps: KILLED (7 of 17 tests fail)
+a label that wraps its control names nothing: KILLED (5 of 17 tests fail)
+a label with no text names its control: KILLED (2 of 17 tests fail)
+the last element with an `id` is the one a label names: KILLED (1 of 17 tests fail)
+an `id` inside `{#each}` names no row: KILLED (1 of 17 tests fail)
+a control inside a block is a label's first: KILLED (1 of 17 tests fail)
+a composed view holds no control: KILLED (1 of 17 tests fail)
+a hidden input is labelable: KILLED (1 of 17 tests fail)
+a control's own options are its label: KILLED (1 of 17 tests fail)
+hidden text names a control: KILLED (1 of 17 tests fail)
+a blank `aria-label` names a control: KILLED (1 of 17 tests fail)
+a computed `aria-label` is refused: KILLED (1 of 17 tests fail)
+`aria-labelledby` names a control whatever it reaches: KILLED (1 of 17 tests fail)
+an IDREF to an element with no text names a control: KILLED (1 of 17 tests fail)
+an input's `type` is read case by case: KILLED (1 of 17 tests fail)
+16 of 16 mutants killed
+{"script": "labels_mutations.py", "script_status": 0, "observer_status": 0, "failure": null, "observed_cargo_communicate_events": 34, "invalid": false, "observer_errors": [], "memory_stopped": false, "scope": "Exact2393 source subset (all docs/evidence and store-ir excluded) plus68 complete mutation-target hashes; not all repository inputs/index bytes."}
+memory bound: no process was stopped
+
+--- v5 lexical_mutations.py: exit 1, seconds 85.57676743998309, /home/haki/pw-recovery/2026-10-17/tmp/codex-generic-assembled-v5/lexical_mutations.txt (sha256 bd1c8332f3a6a8b7bc9b82a1898ec3b9fdaa2f6e78159972bde60c6ecc05121b, as recorded)
+(not copied: this run records the survivor this session's run of the same script, above, kills;
+ it is kept, outside the repository, at the path and SHA-256 above)
