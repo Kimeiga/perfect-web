@@ -223,6 +223,8 @@ test("an address chosen goes back to the store, its estimate the chosen one's", 
     // The store's page settled before the next `goto`, in WebKit: WebKitGTK's
     // network process can crash when a navigation cancels requests a page has
     // just started (docs/KNOWN_LIMITATIONS.md; ADR-0280, amended 2026-10-18).
+    // Chromium and Firefox still navigate at once: such a `goto` found ADR-0306's
+    // finding 2 (Firefox's NS_BINDING_ABORTED), which no mutant holds.
     await store.settled();
   }
   // The Ferry Building, the last saved, chosen: 1.47 km, 6 minutes.
