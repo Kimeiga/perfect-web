@@ -768,6 +768,24 @@ awaited in order. What remains:
   aborts nothing, so there the page stays leaving until it is loaded again.
   A press that never answers holds the navigation as long as the browser
   waits for it.
+- **WebKitGTK's network process can crash when a navigation cancels a
+  page's requests within milliseconds of their start** (found on train-10's
+  verifies, 2026-10-18; ADR-0280's amendment).
+  - Mechanism: a use-after-free in libsoup 3.x's send path. glibc aborts
+    the process (`malloc_consolidate(): unaligned fastbin chunk
+    detected`), and the navigation under way fails ("WebKit encountered an
+    internal error") or hangs.
+  - Seen in Playwright 1.58.0's WebKit build on libsoup 3.0.7 (Ubuntu
+    22.04) and 3.4 (CI's 24.04).
+  - It reproduces with this program's server, master's included, and a
+    60-line script: 3 of 750 such navigations. It does not reproduce with
+    a plain Python server serving the same paths (0 of 1,200). What in our
+    traffic trips it is open (NEXT).
+  - A person cannot navigate that soon after a page appears. The two tests
+    that did, right after a soft navigation, now let the page settle first
+    in WebKit.
+  - Safari on macOS uses another network stack, and nothing here says it
+    is affected.
 - **A page's commands are ordered by one host** (ADR-0305): the host that
   answers keeps each page's order, so hosts behind a balancer would share
   it or pin a page to one. A command lost on its way from a page that has
@@ -951,9 +969,10 @@ integrator's rulings of 2026-10-17):
 - `e14-harness` is local: its sandboxes install offline from the
   machine's pnpm store, which no runner holds (CI runs its Pleris stack,
   `e14-pleris-controls`).
-- A browser recipe of three runs fails on one flaky run: `e10-browser`'s
-  WebKit `store-accounts.spec.mjs:173` timed out once in three runs on
-  verify 39054436657.
+- A browser recipe of three runs fails on one failed run. `e10-browser`'s
+  WebKit `store-accounts.spec.mjs:173` failed once in three runs on each of
+  verifies 39054436657 and 39091059482. This was not a flake: WebKitGTK's
+  network process crashed (the entry under the browsers' navigation above).
 
 **Findings about the evidence itself, fixed on train-10** (ADR-0344,
 ADR-0349): stale Python bytecode no longer decides a mutant's verdict; an

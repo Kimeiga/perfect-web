@@ -30,6 +30,41 @@ async function ready(page, path) {
   });
 }
 
+/**
+ * The document an in-page navigation is about to show, and a wait for it to
+ * settle: asked before the press that navigates, `settled` awaited once the
+ * address has changed. Settled is the next document's runtime booted and its
+ * subscription answered, so that nothing the page has just asked for is in
+ * flight when the test navigates again. A navigation that cancels requests a
+ * page started a few milliseconds before can crash WebKitGTK's network
+ * process (a use-after-free in libsoup 3.x), and the navigation then fails or
+ * hangs: found by train-10's verify, reproduced on master and outside this
+ * program (docs/KNOWN_LIMITATIONS.md; ADR-0280, amended 2026-10-18). A person
+ * cannot navigate that soon after a page appears. In WebKit only: Chromium
+ * and Firefox still navigate at once, as when such a `goto` found ADR-0306's
+ * rule that the browser's own load wins (Firefox's NS_BINDING_ABORTED).
+ */
+async function nextDocument(page, browserName) {
+  if (browserName !== "webkit") return { settled: async () => {} };
+  const shown = await page.evaluate(
+    () => JSON.parse(document.getElementById("pw-parts").textContent).cursor,
+  );
+  // A later document's subscription: the one shown now asks with its own.
+  const subscribed = page.waitForResponse((response) => {
+    const doc = /\/stream\?doc=(\d+)/.exec(response.url())?.[1];
+    return doc !== undefined && Number(doc) > shown;
+  });
+  subscribed.catch(() => {});
+  return {
+    settled: async () => {
+      await subscribed;
+      await page.waitForFunction(() => document.documentElement.dataset.pwReady === "1", null, {
+        polling: 50,
+      });
+    },
+  };
+}
+
 /** A handle no other test or engine has: at most 15 of a-z, 0-9 and _. */
 const handle = (testInfo, who) =>
   `${who}${testInfo.project.name.slice(0, 2)}${(Date.now() % 1e7).toString(36)}`.slice(0, 15);
@@ -170,7 +205,10 @@ test("a store out of reach of the chosen address says so, and refuses its Add", 
   await expect(page.locator("#cart-count")).toHaveText("0");
 });
 
-test("an address chosen goes back to the store, its estimate the chosen one's", async ({ page }) => {
+test("an address chosen goes back to the store, its estimate the chosen one's", async ({
+  page,
+  browserName,
+}) => {
   for (const [label, place] of [
     ["Home", "Dolores Park, San Francisco"],
     ["Work", "Ferry Building, San Francisco"],
@@ -178,9 +216,14 @@ test("an address chosen goes back to the store, its estimate the chosen one's", 
     await ready(page, "/stores/47/address");
     await page.locator("#label").fill(label);
     const saved = page.waitForResponse("**/command/store.page.add_address");
+    const store = await nextDocument(page, browserName);
     await page.getByRole("button", { name: `Save ${place}` }).click();
     await saved;
     await page.waitForURL(/\/stores\/47$/);
+    // The store's page settled before the next `goto`, in WebKit: WebKitGTK's
+    // network process can crash when a navigation cancels requests a page has
+    // just started (docs/KNOWN_LIMITATIONS.md; ADR-0280, amended 2026-10-18).
+    await store.settled();
   }
   // The Ferry Building, the last saved, chosen: 1.47 km, 6 minutes.
   await expect(delivery(page)).toHaveText(/Delivery in 31 to 41 min/);

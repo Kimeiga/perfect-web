@@ -2318,6 +2318,12 @@ a handler navigates after its command commits.
   leaves, answers each press made before it first, and loads the page's
   address, each value one encoded segment: read after the commit, never
   from a cache, with no cache-busting parameter and no reload.
+- Amended 2026-10-18: in WebKit, the two tests that navigated as soon as
+  the address changed (the chosen address's, the order page's audit) now
+  let the page it showed settle first. Their `goto` cancelled requests the
+  page had just started, which can crash WebKitGTK's network process (a
+  use-after-free in libsoup 3, reproduced on master). The corrections come
+  first: it was no flake, and no session's turn held across the estimate.
 [ADR-0281](DECISIONS/ADR-0281-a-merge-is-held-to-ci-s-verification-run.md):
 a merge is held to CI's verification run.
 - A branch is merged when its tip's `ci` and `verify` runs are green,

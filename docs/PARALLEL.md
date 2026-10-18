@@ -2152,5 +2152,51 @@ Each a decision for a track, with its date; a track's ADR records it too.
     one to it); `e14-harness` is local, its sandboxes installing offline
     from the machine's pnpm store (ADR-0349's finding: it had never run on
     CI); the scheduler guard tests give an unguarded write two seconds,
-    not 100 ms (ADR-0352). A flake, recorded: `e10-browser`'s WebKit
-    `store-accounts.spec.mjs:173`, one run of three.
+    not 100 ms (ADR-0352). Recorded then as a flake, and corrected below:
+    `e10-browser`'s WebKit `store-accounts.spec.mjs:173`, one run of three.
+  - **The second verify, 39091059482 (on `6e5324df`), did not pass.**
+    - 206 recipes ran on 40 shards and the three engines. 205 were green,
+      every mutant of theirs killed.
+    - `e10-browser` failed one WebKit test in run 1 of 3, as on the first
+      verify: `store-accounts.spec.mjs:173`, "WebKit encountered an
+      internal error".
+    - `browser webkit` failed (`accessibility.spec.mjs:184`, the same
+      error). Re-run with the failed jobs, it failed again
+      (`store-accounts.spec.mjs:173`, its `goto` timing out). The shard
+      that ran `e10-browser` passed as a job, so that re-run did not
+      repeat it, and it was not re-run after (the integrator: no reruns
+      until green).
+    - Its ci, 39091059460, passed: `check_latency` 322.46 ms a thousand
+      lines on ARM, 259.08 on x86.
+  - **A finding, corrections first: WebKitGTK's network process crashes**
+    (ADR-0280's amendment, KNOWN_LIMITATIONS, NEXT).
+    - **Corrections.** It was not a flake: 3 of about 9 runs of the test
+      failed on train-10, none of some 30 elsewhere. Nor was it a session's
+      turn held across the store page's rebuild and its 400 ms estimate,
+      the integrator's first reading. Every turn's wait and hold was logged
+      by local instrumentation, never committed. With the estimator at 2 s,
+      no turn was held past 63 ms, and the navigation's request was
+      answered within 24 ms, on both trees. The 400 ms estimate is
+      master's, not `scheduled-orders`'.
+    - **What it is.** Each failing test navigates right after a soft
+      navigation, and its `goto` cancels requests the next document's
+      runtime started 1 to 5 ms before. WebKit's network process then
+      aborts on glibc's `malloc_consolidate(): unaligned fastbin chunk
+      detected`; six dumps are kept. Under glibc's malloc perturbation it
+      faults instead, a SIGSEGV in `g_type_check_instance_cast` called
+      from libsoup's send path: a use-after-free.
+    - **Reproduced.** Locally (WSL2, Ubuntu 22.04's libsoup 3.0.7) the spec
+      alone failed about once in 200 runs of the test. A 60-line script
+      against master's server and program did it in 3 of 750 navigations.
+      A plain Python server serving the same paths did not (0 of 1,200),
+      nor did closing a context mid-load (0 of 1,200).
+    - **Not isolated:** why CI's train-10 runs hit it more often than other
+      branches'. Locally the full WebKit suite passed 4 of 4 on each tree,
+      and the gap between trees in the spec runs vanished when their ports
+      and CPUs were swapped.
+    - **Ruled** (the integrator, 2026-10-18). In WebKit, the two specs wait
+      for the page their in-page navigation showed to settle (its runtime
+      booted and its subscription answered) before they navigate again.
+      Their assertions are unchanged. Chromium and Firefox still navigate
+      at once: ADR-0306's finding 2 was found by such a `goto`. The owner
+      has an upstream report to file, which this train does not post.

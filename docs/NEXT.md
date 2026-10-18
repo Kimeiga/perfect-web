@@ -22,9 +22,22 @@ The next executable tasks, in order, with acceptance criteria. Charter §3.4.
   two (ADR-0302's amendment), and deal any script's mutants across shards
   (the parallel slots' allocator, `PW_MUTANT_PICK`). `e14-harness` runs on
   CI only once a runner's store holds its stacks' dependencies; it is
-  local until then. `e10-browser`'s WebKit flake,
-  `store-accounts.spec.mjs:173`, is open (once in three runs, verify
-  39054436657).
+  local until then.
+
+- **WebKitGTK's network process crashes on a navigation that cancels a
+  page's just-started requests** (ADR-0280's amendment of 2026-10-18;
+  KNOWN_LIMITATIONS). It is a use-after-free in libsoup 3.x. It reproduces
+  with this program's server, master's included (3 of 750 navigations in a
+  60-line script), and not with a plain Python server serving the same
+  paths (0 of 1,200).
+  - A track of its own: find what in our server's traffic trips it, and
+    whether a newer Playwright WebKit build changes it.
+  - Until then, in WebKit, the two specs that navigated right after a soft
+    navigation let the page settle first.
+  - The owner has an upstream report to file (the handoff's
+    `tracks/train-10-webkit/upstream-report.md`); nothing is posted from
+    here.
+  - Its scripts and traces are beside the report.
 
 - ADR-0347: split scheduling's when_said from Checkout so an estimator
   outage degrades that line alone; offer delivery-streamed times. The

@@ -73,6 +73,12 @@ failed `check_latency`.
   (`e14-scheduled-orders` had recorded nothing), `e14-harness` is local
   (its sandboxes install offline from the machine's store), and the
   scheduler guard tests give an unguarded write two seconds, not 100 ms.
+- The second verify (39091059482) failed in WebKit alone. WebKitGTK's
+  network process crashed when a test's `goto` cancelled requests a page
+  had just started: a use-after-free in libsoup 3, reproduced on master and
+  outside this program. It was no flake, and no session's turn held across
+  the estimate (ADR-0280, amended 2026-10-18). In WebKit, the two specs
+  that did so now let the page settle first.
 Verify TRAIN_RUN green, with train-10.
 
 **ADR-0290 amended, 2026-10-16: no shard is dealt past the job's ceiling
