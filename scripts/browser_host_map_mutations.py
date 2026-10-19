@@ -35,6 +35,7 @@ on SIGTERM. The native suite's hosts listen on PW_HOST_TEST_PORT (PORT where
 unset).
 """
 
+import dataclasses
 import os
 import pathlib
 import re
@@ -55,27 +56,39 @@ SUITES = {
     "native": SPIKE / "host-plan.native.test.mjs",
 }
 
+@dataclasses.dataclass(frozen=True)
+class Test:
+    """The test of its suite that must fail, by the name its file gives it.
+    Not a string: a mutant's words are its description and its suite's tag
+    (`scripts/evidence_counts.py`)."""
+
+    name: str
+
+    def __str__(self) -> str:
+        return f"<{self.name}>"
+
+
 # Each suite's test names, as its file declares them: what a mutant names.
-INVENTORY = "registry covers the exact current spec inventory"
-DISJOINT = "all host and provider listeners are disjoint across adjacent and multiple slots"
-TCP = "TCP bound includes the final slot and largest concrete listener"
-OFFSETS = "duplicate, fractional, negative and escaping concrete offsets refuse"
-PROVIDERS = "provider dependencies are declared and engine compatible"
-DECLARATIONS = "unknown selected spec, project, role and conflicting declarations refuse"
-HELD = "every spec's registered hosts are exactly the hosts its source reaches"
-READ = "a spec's hosts are read from its baseURL overrides, and an unnamed loopback port is refused"
-URL_ROLE = "a test's baseURL names the one registered host of its engine"
-BUILDS = "build checks preserve whole-build runtime and source freshness with concrete prerequisites"
-KEYED = "only keyed external generated copies may be absent and existing copies remain hash checked"
-POLICY = "specs of an unbuilt optional build are left out quietly, of a stale one with a warning, and never dist's"
-DECLARED = "a selection declares only its own hosts, refuses an unservable dist and drops an optional host only for tests that skip themselves"
-DESCRIPTORS = "selected descriptors preserve memory identity blobs provider ports target and reuse policy"
-PERFORMANCE = "PW_PERFORMANCE admits only the Chromium performance host"
-FRAMING = "native collection framing preserves every opaque argument before and after separator"
-RECEIPTS = "collection receipts require exact issuer selection config completion and role identities"
-PUBLISHED = "public collection reporter publishes only one successful complete callback sequence"
-INHERITED = "native independent identical invocation cannot reuse an inherited valid receipt"
-OWN_CONFIG = "the suite's own configuration lists a selection through its plan, and starts no host"
+INVENTORY = Test("registry covers the exact current spec inventory")
+DISJOINT = Test("all host and provider listeners are disjoint across adjacent and multiple slots")
+TCP = Test("TCP bound includes the final slot and largest concrete listener")
+OFFSETS = Test("duplicate, fractional, negative and escaping concrete offsets refuse")
+PROVIDERS = Test("provider dependencies are declared and engine compatible")
+DECLARATIONS = Test("unknown selected spec, project, role and conflicting declarations refuse")
+HELD = Test("every spec's registered hosts are exactly the hosts its source reaches")
+READ = Test("a spec's hosts are read from its baseURL overrides, and an unnamed loopback port is refused")
+URL_ROLE = Test("a test's baseURL names the one registered host of its engine")
+BUILDS = Test("build checks preserve whole-build runtime and source freshness with concrete prerequisites")
+KEYED = Test("only keyed external generated copies may be absent and existing copies remain hash checked")
+POLICY = Test("specs of an unbuilt optional build are left out quietly, of a stale one with a warning, and never dist's")
+DECLARED = Test("a selection declares only its own hosts, refuses an unservable dist and drops an optional host only for tests that skip themselves")
+DESCRIPTORS = Test("selected descriptors preserve memory identity blobs provider ports target and reuse policy")
+PERFORMANCE = Test("PW_PERFORMANCE admits only the Chromium performance host")
+FRAMING = Test("native collection framing preserves every opaque argument before and after separator")
+RECEIPTS = Test("collection receipts require exact issuer selection config completion and role identities")
+PUBLISHED = Test("public collection reporter publishes only one successful complete callback sequence")
+INHERITED = Test("native independent identical invocation cannot reuse an inherited valid receipt")
+OWN_CONFIG = Test("the suite's own configuration lists a selection through its plan, and starts no host")
 
 # (what, suite, the test that must fail, file, anchor, replacement)
 MUTANTS = [
@@ -245,7 +258,7 @@ def main():
             mutation_baseline.explain()
             return 1
         baselines[suite] = results
-    missing = sorted({m[2] for m in MUTANTS if m[2] not in baselines[m[1]]})
+    missing = sorted({m[2].name for m in MUTANTS if m[2].name not in baselines[m[1]]})
     if missing:
         print("FAIL: a mutant names a test its suite does not have: " + "; ".join(missing))
         return 1
@@ -263,18 +276,17 @@ def main():
         finally:
             path.write_text(original)
         failed = sorted(name for name, r in results.items() if r is not None)
-        if status is None:
-            verdict = "DID NOT END, so it shows nothing"
-            survivors += 1
-        elif results.get(witness) == "ERR_ASSERTION":
-            verdict = f"KILLED by its test ({len(failed)} of {len(results)} tests fail)"
-        elif failed:
-            verdict = f"NOT KILLED BY ITS TEST ({witness}: {results.get(witness, 'not run')}; failing: {'; '.join(failed)})"
-            survivors += 1
+        if status is not None and results.get(witness.name) == "ERR_ASSERTION":
+            verdict = f"KILLED (by an assertion of its test; {len(failed)} of {len(results)} tests fail)"
         else:
+            # Not its test's assertion: a run past its bound, a test that
+            # failed by an error, or another test, kills nothing.
+            why = ("it ran past its bound" if status is None
+                   else f"its test {witness.name!r}: {results.get(witness.name) or 'passed'}; failing: {'; '.join(failed) or 'none'}")
+            print(f"  ({why})", flush=True)
             verdict = "SURVIVED"
             survivors += 1
-        print(f"{what}: {verdict}", flush=True)
+        print(f"{what} [{suite}]: {verdict}", flush=True)
 
     print(f"{len(MUTANTS) - survivors} of {len(MUTANTS)} mutants killed")
     return 1 if survivors else 0

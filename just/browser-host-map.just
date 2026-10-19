@@ -23,12 +23,12 @@ e14-browser-host-map:
        echo "node: $(node --version)"; \
        echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
        echo "== the map held to every spec, the registry, the builds, the declared hosts, the receipts (host-plan.test.mjs)"; echo; \
-       (cd spikes/own-renderer && node --test --test-reporter=spec host-plan.test.mjs) 2>&1 | grep -E '^(✔|✖) |^ℹ (tests|pass|fail) '; \
+       (cd spikes/own-renderer && node --test --test-reporter=tap host-plan.test.mjs) 2>&1 | grep -E '^(ok|not ok) |^# (tests|pass|fail) '; \
        echo; echo "== the plan against the real Playwright CLI, on private fixtures (host-plan.native.test.mjs)"; echo; \
-       (cd spikes/own-renderer && node --test --test-reporter=spec host-plan.native.test.mjs) 2>&1 | grep -E '^(✔|✖) |^ℹ (tests|pass|fail) '; \
+       (cd spikes/own-renderer && node --test --test-reporter=tap host-plan.native.test.mjs) 2>&1 | grep -E '^(ok|not ok) |^# (tests|pass|fail) '; \
        echo; echo "== a spec on the shared host, one on a mutating suite's, one on the feed's, in three engines"; echo; \
        bash scripts/run_suite.sh -- pnpm exec playwright test e2e/signals.spec.mjs e2e/cart.spec.mjs e2e/feed.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/browser_host_map_mutations.py)"; echo; \
        python3 scripts/browser_host_map_mutations.py; \
      } > docs/evidence/E14/browser-host-map.txt
-    @grep -E "^ℹ (tests|pass|fail) |^ +[0-9]+ (passed|failed|flaky|skipped)|mutants killed|^baseline|NOT KILLED|SURVIVED|^FAIL" docs/evidence/E14/browser-host-map.txt
+    @grep -E "^# (tests|pass|fail) |^ +[0-9]+ (passed|failed|flaky|skipped)|mutants killed|^baseline|NOT KILLED|SURVIVED|^FAIL" docs/evidence/E14/browser-host-map.txt

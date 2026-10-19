@@ -27,7 +27,7 @@ import { MUTABLE_PORTS } from "../host-metadata.mjs";
 // Its own host, per engine. "One change to public data reaches every reader"
 // renames a menu item, and a rename is broadcast to every page on the host: on
 // the shared host it reached other specs' pages mid-assertion (see
-// `MUTATING` in playwright.config.mjs). Every context this file opens,
+// `MUTABLE_PORTS` in host-metadata.mjs). Every context this file opens,
 // including `browser.newContext()`'s, takes this base URL.
 test.use({
   baseURL: async ({}, use, testInfo) => {

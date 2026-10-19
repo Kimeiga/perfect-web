@@ -173,7 +173,10 @@ function reused(library, root) {
   return receipt;
 }
 
-export async function selectedTests({ root = ROOT, timeoutMs = 30000 } = {}) {
+// The collection is bounded so that a spec that hangs as it loads fails the
+// run rather than hold it: at five minutes it is hung, not slow (it takes
+// seconds, more on a machine many runs share).
+export async function selectedTests({ root = ROOT, timeoutMs = 300000 } = {}) {
   root = resolve(root);
   const library = installed();
   if (issuedPlan) {

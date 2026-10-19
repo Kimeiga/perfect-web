@@ -315,17 +315,19 @@ class BuildsBeforeSuites(unittest.TestCase):
         self.assertEqual(found, [], "\n".join(found))
 
 
-# The canonical build admission used by the native host planner is tested
-# without Playwright here. Native selected-only config admission is exercised
-# by host-plan.test.mjs; recipe behavior above remains independent of it.
+# Since the host map (ADR-XXXX) the configuration asks `buildProblem`
+# (`host-metadata.mjs`) of `dist` where a selected test needs it, and refuses
+# what it says; it is asked here without Playwright. The planner's refusal
+# itself is `host-plan.test.mjs`'s.
 class DistIsWhole(unittest.TestCase):
-    """Canonical build admission accepts `dist` only as a whole build."""
+    """`dist` is served only as a whole build, whoever runs the suite: a
+    person, a script, or a recipe."""
 
     RUNTIME = (ROOT / "spikes/own-renderer/public/pw-runtime.mjs").read_text()
 
     def load(self, dist: dict[str, str] | None) -> str:
-        """What node says loading the config beside `dist` (each file's path
-        and text, or no `dist` at all): nothing where it loads."""
+        """What node says asking `buildProblem` of `dist` (each file's path
+        and text, or no `dist` at all): nothing where it is servable."""
         with tempfile.TemporaryDirectory(prefix="pw-dist-") as d:
             root = pathlib.Path(d)
             spike = ROOT / "spikes/own-renderer"
