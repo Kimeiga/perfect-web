@@ -7853,14 +7853,23 @@ fn main() {
         Ok("connection") => feed_pg::Isolation::ConnectionDefault,
         _ => feed_pg::Isolation::Serializable,
     };
+    // TRACK SEAM (second-host): the schema the feed's tables are in, where
+    // the deployment names one (`PW_FEED_SCHEMA`, ADR-XXXX): the hosts of
+    // one deployment name the one they share, and a test run one of its
+    // own; the connection's own search path otherwise, as before.
+    let feed_schema = std::env::var("PW_FEED_SCHEMA")
+        .ok()
+        .filter(|s| !s.is_empty());
     let feed = match std::env::var("PW_FEED_DATABASE_URL") {
-        Ok(url) if !url.is_empty() => match feed_pg::FeedPg::open_with(&url, None, isolation) {
-            Ok(layer) => Some(Arc::new(layer) as Arc<dyn data::DataLayer>),
-            Err(e) => {
-                eprintln!("pw dev server: PW_FEED_DATABASE_URL: {e}");
-                std::process::exit(1);
+        Ok(url) if !url.is_empty() => {
+            match feed_pg::FeedPg::open_with(&url, feed_schema.as_deref(), isolation) {
+                Ok(layer) => Some(Arc::new(layer) as Arc<dyn data::DataLayer>),
+                Err(e) => {
+                    eprintln!("pw dev server: PW_FEED_DATABASE_URL: {e}");
+                    std::process::exit(1);
+                }
             }
-        },
+        }
         _ => None,
     };
     // **The store's data in PostgreSQL** (track `store-pg`), where the
