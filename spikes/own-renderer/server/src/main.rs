@@ -13752,6 +13752,20 @@ public query Store(",
             2,
             "a Cart for each reader"
         );
+        // And `Cart`, which the page and its layout both bind, asked once for
+        // each reader's document (ADR-0303). Its operation's calls no longer
+        // show that alone: one render makes an identical call once (NEXT 4c's
+        // render merge), so they stay at two where the query is asked twice.
+        let carts = s
+            .queries
+            .trace()
+            .iter()
+            .filter(|t| {
+                matches!(t, pw_resource::Trace::RequestStarted { key, .. }
+                    if key.resource == "store.page.Cart")
+            })
+            .count();
+        assert_eq!(carts, 2, "Cart asked once for each reader's document");
 
         // Past Store's 30 seconds and inside Menu's five minutes.
         s.query_clock.0.advance(30_001);
