@@ -80,7 +80,13 @@ kiokun.com in Pleris, step 2 (search).
      note. kiokun.com's header does this in the browser (`navigateOrSearch`,
      `resolveWordNavigationUrl`): it goes to the word's page instead of
      searching (Difference 26).
-4. **The index, cached** (B5): built once per process from the CSV into
+4. **The index, cached** (B5; publication and retention amended
+   2026-10-16 by ADR-XXXX-kiokun-cache under the integrator's delegation):
+   the original flat-file path and automatic stale deletion below describe
+   the initial implementation. The amended policy retains published
+   versions while readers may hold them, builds privately, closes SQLite
+   before directory publication, and reuses only validated winners.
+   Originally built once per process from the CSV into
    `target/kiokun-search/kiokun-search-<digest>.db`, the digest of the
    CSV's bytes and the schema, a stale one removed when a new one is built;
    a CSV under 4 MiB is indexed in memory. Nothing is written in either

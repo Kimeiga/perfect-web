@@ -42,6 +42,7 @@ import 'just/tables.just'
 import 'just/committed-components.just'
 import 'just/browser-host-map.just'
 import 'just/parallel-mutants.just'
+import 'just/kiokun-cache.just'
 
 default:
     @just --list
