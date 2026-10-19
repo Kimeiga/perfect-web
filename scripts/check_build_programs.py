@@ -37,6 +37,9 @@ def programs():
         ('feed', std + paths('examples/feed/*.pw')), ('kiokun', std + paths('examples/kiokun/*.pw')),
         ('kiokun-site', std + paths('examples/kiokun/Shards.pw') + paths('examples/kiokun/dictionary.pw') + paths('examples/kiokun-site/*.pw')),
         ('demo', base + paths('examples/demo/*.pw')),
+        # Track `tables` (ADR-0338): the program tables.rs builds, the
+        # platform's packages and its four sources.
+        ('tables', std + paths('examples/tables/*.pw')),
         ('rules (the program of rule_fixtures.rs)', base + paths('examples/rules/**/*.pw'))]
     for group in ['counter', 'guestbook', 'hello-static', 'koka', 'render', 'streamed']:
         out.append((group, base + paths(f'examples/{group}/*.pw')))
