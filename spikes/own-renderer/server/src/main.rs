@@ -1108,17 +1108,18 @@ struct Turns {
 struct Turn<'a>(&'a Turns);
 
 /// **The subscriber table**: the frames waiting for each document
-/// (ADR-0161), behind a mutex whose `lock` checks, in tests, that no thread
-/// takes it in a render (TRACK SEAM (render-merge), NEXT 4c, the
-/// integrator's ruling 2: a render never waits for the table while it holds
-/// its seat; a document's last attempt (ADR-0151) holds the table while its
-/// render waits for one).
+/// (ADR-0161), behind a mutex whose `lock` checks, in a debug build (every
+/// test's, and the development server's: the integrator's answer of
+/// 2026-10-17), that no thread takes it in a render (TRACK SEAM
+/// (render-merge), NEXT 4c, the integrator's ruling 2: a render never waits
+/// for the table while it holds its seat; a document's last attempt
+/// (ADR-0151) holds the table while its render waits for one).
 #[derive(Default)]
 struct Table(Mutex<BTreeMap<Doc, Subscriber>>);
 
 impl Table {
     fn lock(&self) -> std::sync::LockResult<std::sync::MutexGuard<'_, BTreeMap<Doc, Subscriber>>> {
-        #[cfg(test)]
+        #[cfg(debug_assertions)]
         assert!(
             !render_merge::in_a_render(),
             "the subscriber table taken in a render (NEXT 4c)"
@@ -1139,8 +1140,10 @@ impl Turns {
     /// a turn is never poisoned: one that panics ends, and serves the next.
     fn lock(&self) -> std::sync::LockResult<Turn<'_>> {
         // TRACK SEAM (render-merge): never waited for in a render, which
-        // would hold its seat meanwhile (NEXT 4c, the integrator's ruling 2).
-        #[cfg(test)]
+        // would hold its seat meanwhile (NEXT 4c, the integrator's ruling 2),
+        // checked in a debug build, a test's or the development server's
+        // (its answer of 2026-10-17).
+        #[cfg(debug_assertions)]
         assert!(
             !render_merge::in_a_render(),
             "a session's turn taken in a render (NEXT 4c)"
@@ -7952,14 +7955,30 @@ fn main() {
         Ok("connection") => feed_pg::Isolation::ConnectionDefault,
         _ => feed_pg::Isolation::Serializable,
     };
+    // TRACK SEAM (render-merge): **how many renders read a layer's
+    // database at once, and how long one waits for its seat**, the
+    // deployment's to say (`PW_RENDER_SEATS`, `PW_RENDER_SEAT_WAIT` in
+    // seconds; eight and thirty where it says nothing: the integrator's
+    // answer of 2026-10-17), for each layer on PostgreSQL, and refused at
+    // start where it cannot be read.
+    let seats = feed_pg::RenderSeats::stated(
+        std::env::var("PW_RENDER_SEATS").ok().as_deref(),
+        std::env::var("PW_RENDER_SEAT_WAIT").ok().as_deref(),
+    )
+    .unwrap_or_else(|e| {
+        eprintln!("pw dev server: {e}");
+        std::process::exit(1);
+    });
     let feed = match std::env::var("PW_FEED_DATABASE_URL") {
-        Ok(url) if !url.is_empty() => match feed_pg::FeedPg::open_with(&url, None, isolation) {
-            Ok(layer) => Some(Arc::new(layer) as Arc<dyn data::DataLayer>),
-            Err(e) => {
-                eprintln!("pw dev server: PW_FEED_DATABASE_URL: {e}");
-                std::process::exit(1);
+        Ok(url) if !url.is_empty() => {
+            match feed_pg::FeedPg::open_with(&url, None, isolation, seats) {
+                Ok(layer) => Some(Arc::new(layer) as Arc<dyn data::DataLayer>),
+                Err(e) => {
+                    eprintln!("pw dev server: PW_FEED_DATABASE_URL: {e}");
+                    std::process::exit(1);
+                }
             }
-        },
+        }
         _ => None,
     };
     // **The store's data in PostgreSQL** (track `store-pg`), where the
@@ -7967,7 +7986,7 @@ fn main() {
     // otherwise. Its command's isolation is set as the feed's is.
     let store = match std::env::var("PW_STORE_DATABASE_URL") {
         Ok(url) if !url.is_empty() => {
-            match store_pg::StorePg::open_with(&url, store_pg::SCHEMA, isolation) {
+            match store_pg::StorePg::open_with(&url, store_pg::SCHEMA, isolation, seats) {
                 Ok(layer) => Some(Arc::new(layer) as Arc<dyn store::StoreLayer>),
                 Err(e) => {
                     eprintln!("pw dev server: PW_STORE_DATABASE_URL: {e}");

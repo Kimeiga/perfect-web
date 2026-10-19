@@ -17,8 +17,9 @@
 //!   it makes stale.
 //! - **Its snapshot is the layer's** ([`DataLayer::snapshot`]), asked for
 //!   where the render begins and given up where it ends: the store as it is
-//!   then, in memory; on PostgreSQL, one of the layer's seats
-//!   (`feed_pg::RENDER_CONNECTIONS`) and the read transaction its first read
+//!   then, in memory; on PostgreSQL, one of the layer's seats (as many as
+//!   the deployment says, `feed_pg::RenderSeats`, eight where it says
+//!   nothing) and the read transaction its first read
 //!   opens, whose snapshot is that statement's (PostgreSQL 18, 13.2.2). Two
 //!   bindings of one render cannot straddle a commit.
 //! - **Bounded, and every seat given back** (the integrator's ruling 2): a
@@ -29,7 +30,8 @@
 //!   materialization's making. Holding its seat, a render waits on nothing a
 //!   waiter for one may hold: it ends before its thread waits for the table
 //!   (`drain_held`, `send_documents_where`), and takes no session's turn
-//!   (both checked in tests: the table's and a turn's `lock`); what it waits
+//!   (both checked in a debug build, every test's and the development
+//!   server's: the table's and a turn's `lock`); what it waits
 //!   for otherwise (a lock held for a moment, a read in flight or a making
 //!   another render or a command makes) never waits for a seat, as none
 //!   begins inside one.
@@ -127,10 +129,11 @@ impl Drop for Rendering {
 }
 
 /// **Whether this thread reads in a render**, of any layer (NEXT 4c's
-/// tests): what takes the subscriber table or a session's turn checks it
-/// does not, as a render never waits for either while it holds its seat
-/// (the integrator's ruling 2).
-#[cfg(test)]
+/// checks, in a debug build: a test's, and the development server's, the
+/// integrator's answer of 2026-10-17): what takes the subscriber table or a
+/// session's turn checks it does not, as a render never waits for either
+/// while it holds its seat (the integrator's ruling 2).
+#[cfg(debug_assertions)]
 pub(crate) fn in_a_render() -> bool {
     READING
         .try_with(|reading| !reading.borrow().is_empty())

@@ -3,7 +3,8 @@
 Status: proposed by the render-merge worker, NEXT 4c's first step (track
 `render-merge`), under the owner's delegation of 2026-10-02. Dates:
 2026-10-14 (the merge), 2026-10-17 (the integrator's rulings of 2026-10-15
-built). The first of ADR-0337's ruled order ("1. The render merge"), its
+built), 2026-10-19 (merged into train-11, with the integrator's answers of
+2026-10-17 applied: "The integrator's answers" below). The first of ADR-0337's ruled order ("1. The render merge"), its
 second case. Builds on ADR-0336 (NEXT 4b: the `Counted` connection and its
 `Tally`), ADR-0352 (bounded statements wait for the completed payment),
 ADR-0218 (a host serves any program; its data is the deployment's), ADR-0246
@@ -45,7 +46,8 @@ materialization kept).
   is a deadlock. Restructured (decision 4), tested both orders, and now
   checked across the whole suite: in tests, taking the table or a session's
   turn inside a render panics (`Table::lock`, `Turns::lock`); the memory
-  suite's 612 tests met neither.
+  suite's 612 tests met neither. Since train-11 (the integrator's answer of
+  2026-10-17), in every debug build, the development server's too.
 - **A render filled the shared cache with what may be older than an
   invalidation** (found 2026-10-17): a render whose snapshot predates a
   commit, reading a query after the commit's invalidation dropped it, kept
@@ -154,7 +156,9 @@ materialization kept).
    integrator 2026-10-15). Each PostgreSQL layer has its renders' own pool
    (`feed_pg::Renders`): `RENDER_CONNECTIONS` = 8 seats, no more connections
    open than that (a seat asks for one only while it holds none, an idle one
-   first). Stated total per layer: the store's eight for commands and single
+   first). Since train-11, a deployment's setting with that default
+   (`PW_RENDER_SEATS`, `feed_pg::RenderSeats`; the integrator's answer of
+   2026-10-17). Stated total per layer: the store's eight for commands and single
    reads (`CONNECTIONS`) and eight for renders, sixteen; the feed's renders
    eight, its own pool unbounded (finding above). Deadlock-free by
    structure:
@@ -172,13 +176,15 @@ materialization kept).
      be read is said so after it. It takes no session's turn. A read in
      flight it joins, or a making it waits for, is another render's (which
      holds its seat already) or a single read's (which waits only for the
-     commands' pool, whose holders wait for no seat). Checked in every test:
+     commands' pool, whose holders wait for no seat). Checked in every test,
+     and since train-11 in every debug build (the development server's):
      the table's and a turn's `lock` panic in a render.
    - **A render that waits past `SEAT_WAIT` (30 s) fails, saying so**:
      every read of it answers that it waited; never a read outside its
      snapshot, never a seat past the bound. A backstop, not a bound a render
      is expected to meet. A test's host waits 5 s, so a control that keeps a
-     seat fails in seconds.
+     seat fails in seconds. Since train-11, a deployment's setting with that
+     default (`PW_RENDER_SEAT_WAIT`, whole seconds).
 5. **What a render takes of another's** (ruling 3, stated and closed where
    the program's invalidations say it matters). A render begins as of the
    queries' invalidations so far (`pw_resource::Resources::epoch`, taken
@@ -365,6 +371,15 @@ machine shared with other workers, load average 28 to 64 on 32 threads):
 - **The feed's own pool**, unbounded (finding).
 - **The first case** (one command's repeated reads): the composites move
   above the seam (ADR-0337's step 4).
+- **That the host hands each layer the seats its environment states**: the
+  three lines of `main` that read `PW_RENDER_SEATS` and
+  `PW_RENDER_SEAT_WAIT` and pass them to both layers are read, not tested
+  (no test starts the host's `main`); what they call is tested and
+  controlled (`RenderSeats::stated`, a layer seated as its settings say).
+- **Eight seats and thirty seconds as right for a production load**: the
+  defaults are chosen, not measured; the production track measures them.
+- **The checks in a release build**: none (`debug_assertions` is off
+  there); every test build and the development server are debug builds.
 
 ## Next
 
@@ -380,6 +395,42 @@ machine shared with other workers, load average 28 to 64 on 32 threads):
 - The table's and a turn's `lock` panic in a render in tests only (a
   structural rule checked by the whole suite): keep, or also in debug
   builds of the host?
+
+## The integrator's answers (2026-10-17), applied in train-11
+
+Applied by the integrator's delegate assembling train-11 (2026-10-19), each
+with a test and mutation controls the tests kill:
+
+1. **The seats and the seat wait are a deployment's settings, these
+   defaults where it says nothing**, to be measured under load on the
+   production track. `PW_RENDER_SEATS` (a count of one at least, eight by
+   default) and `PW_RENDER_SEAT_WAIT` (whole seconds, one at least, thirty
+   by default), read where the host starts (`feed_pg::RenderSeats::stated`)
+   and given to each layer on PostgreSQL, the feed's and the store's
+   (`FeedPg::open_with`, `StorePg::open_with`, `Renders::new`); unset or
+   empty is the default; anything else is refused at start, naming the
+   setting (as `PW_UPLOAD_MAX_BYTES` is, ADR-0260). Tests:
+   `a_deployment_states_its_renders_seats_or_its_host_is_refused` (the
+   defaults, values read, six refusals) and
+   `on_postgres_a_deployments_seats_bound_its_renders_and_their_wait` (two
+   seats: both taken, a third render refused after the deployment's half
+   second, not a test host's five, naming the two). Seven controls: the
+   default's bound or a test host's wait used whatever the deployment said;
+   the count or the wait not read; no seats or no seconds read as a count;
+   an empty count refused.
+2. **The table's and a turn's lock-order checks run in debug builds too**
+   (the development server is one), not only in tests: `Table::lock`,
+   `Turns::lock` and `render_merge::in_a_render` are compiled under
+   `debug_assertions`, so the browser suites' development server panics
+   where a render would take either. The test is the development server's
+   own binary, as `cargo build` makes it (a debug build, no test's): it
+   carries both checks' messages (`just e14-render-merge`; the mutation
+   script's `debug` suite reads them from the binary cargo names). Two
+   controls: each check narrowed to tests alone. A test build cannot tell
+   `cfg(test)` from `cfg(debug_assertions)`, so no in-process test could.
+3. **Ruling 3's answer is accepted**: a render may share an in-flight read
+   only where nothing invalidated that query since the render began; the
+   commit-to-invalidation window is Not claimed (decision 5, Not claimed).
 
 ## Merge notes
 

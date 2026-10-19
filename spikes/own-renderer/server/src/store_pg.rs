@@ -924,8 +924,8 @@ impl Rows for PgRows<'_> {
 pub(crate) struct StorePg {
     pool: Arc<Pool>,
     /// TRACK SEAM (render-merge): the renders' connections, as the feed's
-    /// (NEXT 4c): with the pool's, no more than `CONNECTIONS` +
-    /// `feed_pg::RENDER_CONNECTIONS` open.
+    /// (NEXT 4c): with the pool's, no more than `CONNECTIONS` + the
+    /// deployment's render seats (`feed_pg::RenderSeats`) open.
     renders: Arc<crate::feed_pg::Renders>,
     isolation: Isolation,
     /// One command of this host at a time, from its first write to its
@@ -943,12 +943,14 @@ pub(crate) struct StorePg {
 
 impl StorePg {
     /// **The layer on `url`**, its tables in `schema` (created if missing),
-    /// which its connections search alone, migrated, and a command's
-    /// transaction opened as `isolation` says.
+    /// which its connections search alone, migrated, a command's
+    /// transaction opened as `isolation` says, and its renders seated as the
+    /// deployment's `seats` say.
     pub(crate) fn open_with(
         url: &str,
         schema: &str,
         isolation: Isolation,
+        seats: crate::feed_pg::RenderSeats,
     ) -> Result<StorePg, String> {
         let mut admin = Client::connect(url, NoTls).map_err(pg)?;
         admin
@@ -969,7 +971,7 @@ impl StorePg {
         drop(c);
         Ok(StorePg {
             pool,
-            renders: crate::feed_pg::Renders::new(url, Some(schema)),
+            renders: crate::feed_pg::Renders::new(url, Some(schema), seats),
             isolation,
             writes: Mutex::new(()),
             faults: Faults::new(),
@@ -990,13 +992,24 @@ impl StorePg {
     /// says.
     #[cfg(test)]
     pub(crate) fn for_test_with(url: &str, isolation: Isolation) -> Result<StorePg, String> {
+        StorePg::for_test_seated(url, isolation, crate::feed_pg::RenderSeats::default())
+    }
+
+    /// [`StorePg::for_test_with`], its renders seated as `seats` say, as a
+    /// deployment's are.
+    #[cfg(test)]
+    pub(crate) fn for_test_seated(
+        url: &str,
+        isolation: Isolation,
+        seats: crate::feed_pg::RenderSeats,
+    ) -> Result<StorePg, String> {
         static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
         let schema = format!(
             "pw_store_test_{}_{}",
             std::process::id(),
             NEXT.fetch_add(1, Ordering::SeqCst)
         );
-        let mut layer = StorePg::open_with(url, &schema, isolation)?;
+        let mut layer = StorePg::open_with(url, &schema, isolation, seats)?;
         layer.owned = true;
         Ok(layer)
     }

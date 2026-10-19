@@ -8,12 +8,15 @@
 # store in memory and on PostgreSQL, the feed on PostgreSQL
 # (render_merge.rs, tests/render_merge.rs): each identical call once; one
 # snapshot, and another render's read only where nothing invalidated it
-# since the render began; on PostgreSQL a bounded few seats, every one given
+# since the render began; on PostgreSQL a bounded few seats, as many as the
+# deployment says (PW_RENDER_SEATS, PW_RENDER_SEAT_WAIT), every one given
 # back, no render holding one while it waits for the table; pw-resource's
 # reads as of an epoch (tests/read_as_of.rs); NEXT 4b's counts as re-pinned,
 # the commit's re-reads 21 -> 16 and rate_order's 42 -> 34 (32 -> 19 and
 # 53 -> 37 with scheduled-orders' page of times, train-11)
-# (tests/bounded_statements.rs); and the mutation controls, each undoing one
+# (tests/bounded_statements.rs); the table's and a turn's checks carried by
+# the development server's debug build (the integrator's answer of
+# 2026-10-17); and the mutation controls, each undoing one
 # rule (scripts/render_merge_mutations.py). It needs a throwaway PostgreSQL
 # database, PW_STORE_DATABASE_URL and PW_FEED_DATABASE_URL (either names
 # both); it skips without one, and writes no evidence.
@@ -36,7 +39,13 @@ e14-render-merge:
        PW_STORE_TEST_LAYER=postgres cargo test --locked -p pw-dev-server -- render_merge:: tests::bounded_statements:: --nocapture 2>&1 | grep -E '^(test |test result)|panicked at|^(place|rate)_order: read'; \
        echo; echo "== pw-resource: a read as of an epoch (tests/read_as_of.rs)"; echo; \
        cargo test --locked -p pw-resource --test read_as_of 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the lock-order checks in the development server's debug build, no test's (main.rs, Table::lock and Turns::lock)"; echo; \
+       cargo build --quiet --locked -p pw-dev-server; \
+       for check in "the subscriber table taken in a render (NEXT 4c)" "a session's turn taken in a render (NEXT 4c)"; do \
+         grep -qaF "$check" "${CARGO_TARGET_DIR:-target}/debug/pw-dev-server"; \
+         echo "the debug build checks: $check"; \
+       done; \
        echo; echo "== mutation controls (scripts/render_merge_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/render_merge_mutations.py; \
      } > docs/evidence/E14/render-merge.txt; \
-     grep -E "^test result|mutants killed|^---- |panicked at|memory bound" docs/evidence/E14/render-merge.txt
+     grep -E "^test result|^the debug build checks|mutants killed|^---- |panicked at|memory bound" docs/evidence/E14/render-merge.txt

@@ -28,6 +28,14 @@ Each mutant undoes one rule:
   transaction ended after every read, or kept after a read that failed; a
   refused seat read in; the store's and the feed's renders reading outside
   their seats;
+- the seats a deployment's settings (the integrator's answer of
+  2026-10-17): a layer seating to the default's bound, or waiting a test
+  host's time, whatever its deployment said; a deployment's count of seats,
+  or its seat wait, not read; no seats, or no seconds, read as a count; an
+  empty count refused;
+- the table's and a turn's checks a test's alone, not every debug build's
+  (`debug`: the development server's binary, as `cargo build` makes it,
+  carries each check's message where the check is compiled in);
 - the snapshot in memory: the store's and the feed's renders reading the
   data as it is now;
 - a read as of an epoch (`pw-resource`): each of the four invalidations
@@ -42,14 +50,17 @@ served ones with the store on PostgreSQL, and NEXT 4b's counts
 PW_STORE_DATABASE_URL and PW_FEED_DATABASE_URL; `resource`, pw-resource's
 `read_as_of` tests; `unit`, the merge's own tests alone; `bound`, the
 bound's own test alone (each of the last two for a control the whole suite
-cannot run safely: it says why). Each suite's result is read by `cargo_test_results`
-(ADR-0352): a command that does not build, is stopped, or says something
-inconsistent is no kill, and stops the run.
+cannot run safely: it says why); `debug`, the development server's debug
+build, its checks read from its binary (`debug_checks`). Each other suite's
+result is read by `cargo_test_results` (ADR-0352): a command that does not
+build, is stopped, or says something inconsistent is no kill, and stops the
+run; so is a debug build that fails, is stopped, or names no binary.
 
 Run from the repository root; `just e14-render-merge` records the output.
 The source is restored after every mutant, whatever happens.
 """
 
+import json
 import os
 import pathlib
 import signal
@@ -278,8 +289,87 @@ MUTANTS = [
         "a render past the bound is seated",
         "postgres",
         FEED_PG,
+        "        while seats.taken >= self.bound {\n",
+        "        while seats.taken >= self.bound * 100 {\n",
+    ),
+    # The integrator's answer of 2026-10-17: the seats and the seat wait are a
+    # deployment's settings, these defaults where it says nothing.
+    (
+        "a render past its deployment's seats is seated, up to the default's",
+        "memory",
+        FEED_PG,
+        "        while seats.taken >= self.bound {\n",
         "        while seats.taken >= RENDER_CONNECTIONS {\n",
-        "        while seats.taken >= RENDER_CONNECTIONS * 100 {\n",
+    ),
+    (
+        "a render waits a test host's time for its seat, not its deployment's",
+        "memory",
+        FEED_PG,
+        "            wait: Mutex::new(seats.wait),\n",
+        "            wait: Mutex::new(SEAT_WAIT),\n",
+    ),
+    (
+        "a deployment's count of seats is not read",
+        "memory",
+        FEED_PG,
+        "                Ok(n) if n >= 1 => n,\n",
+        "                Ok(n) if n >= 1 => RENDER_CONNECTIONS,\n",
+    ),
+    (
+        "a deployment's count of no seats is read",
+        "memory",
+        FEED_PG,
+        "                Ok(n) if n >= 1 => n,\n",
+        "                Ok(n) => n,\n",
+    ),
+    (
+        "an empty count of seats is refused, not the default",
+        "memory",
+        FEED_PG,
+        "        if let Some(v) = seats.filter(|v| !v.is_empty()) {\n",
+        "        if let Some(v) = seats {\n",
+    ),
+    (
+        "a deployment's seat wait is not read",
+        "memory",
+        FEED_PG,
+        "                Ok(n) if n >= 1 => std::time::Duration::from_secs(n),\n",
+        "                Ok(n) if n >= 1 => SEAT_WAIT,\n",
+    ),
+    (
+        "a deployment's seat wait of no seconds is read",
+        "memory",
+        FEED_PG,
+        "                Ok(n) if n >= 1 => std::time::Duration::from_secs(n),\n",
+        "                Ok(n) => std::time::Duration::from_secs(n),\n",
+    ),
+    # And the table's and a turn's checks run in a debug build, the
+    # development server's as much as a test's.
+    (
+        "the table's check is a test's alone, not a debug build's",
+        "debug",
+        MAIN,
+        "        #[cfg(debug_assertions)]\n"
+        "        assert!(\n"
+        "            !render_merge::in_a_render(),\n"
+        "            \"the subscriber table taken in a render (NEXT 4c)\"\n",
+        "        #[cfg(test)]\n"
+        "        assert!(\n"
+        "            !render_merge::in_a_render(),\n"
+        "            \"the subscriber table taken in a render (NEXT 4c)\"\n",
+    ),
+    (
+        "a turn's check is a test's alone, not a debug build's",
+        "debug",
+        MAIN,
+        "        #[cfg(debug_assertions)]\n"
+        "        assert!(\n"
+        "            !render_merge::in_a_render(),\n"
+        "            \"a session's turn taken in a render (NEXT 4c)\"\n",
+        "        #[cfg(test)]\n"
+        "        assert!(\n"
+        "            !render_merge::in_a_render(),\n"
+        "            \"a session's turn taken in a render (NEXT 4c)\"\n",
     ),
     (
         "a seat is never given back",
@@ -446,7 +536,21 @@ CARGO = {
         TESTS + ["render_merge::on_postgres_the_renders_bound_holds_under_many_renders_at_once"],
         {"PW_STORE_TEST_LAYER": "postgres"},
     ),
+    # The development server as `cargo build` makes it: a debug build, and
+    # no test's, where the integrator's answer of 2026-10-17 has the table's
+    # and a turn's checks run too. Its binary carries each check's message
+    # where the check is compiled in (`debug_checks`).
+    "debug": (
+        ["cargo", "build", "--quiet", "--locked", "-p", "pw-dev-server", "--message-format=json"],
+        {},
+    ),
 }
+
+# The lock-order checks' messages (main.rs, `Table::lock` and `Turns::lock`).
+CHECKS = [
+    "the subscriber table taken in a render (NEXT 4c)",
+    "a session's turn taken in a render (NEXT 4c)",
+]
 
 # How long one command may run. Past the bound it is killed with everything
 # it started, and the run stops: a command stopped is no kill.
@@ -467,13 +571,42 @@ def bounded(cmd, env):
 
 
 def cargo_tests(suite):
-    """(valid, passed, failed) over the suite's tests (`cargo_test_results`)."""
+    """(valid, passed, failed) over the suite's tests (`cargo_test_results`),
+    or for `debug`, over the checks the debug build carries."""
     cmd, env = CARGO[suite]
     out, code = bounded(cmd, env)
+    if suite == "debug":
+        return debug_checks(out, code)
     result = cargo_result(code, out)
     if not result.valid:
         return False, 0, 0
     return True, result.passed, result.failed
+
+
+def debug_checks(out, code):
+    """(valid, carried, missing) over `CHECKS`: each check's message in the
+    binary the debug build made, which cargo names (`--message-format=json`,
+    its `compiler-artifact` message's `executable`). A build that fails, is
+    stopped, or names no binary is no result."""
+    if code != 0:
+        return False, 0, 0
+    executable = None
+    for line in out.splitlines():
+        try:
+            message = json.loads(line)
+        except ValueError:
+            continue
+        if (
+            message.get("reason") == "compiler-artifact"
+            and message.get("target", {}).get("name") == "pw-dev-server"
+            and message.get("executable")
+        ):
+            executable = message["executable"]
+    if executable is None:
+        return False, 0, 0
+    binary = pathlib.Path(executable).read_bytes()
+    carried = sum(1 for check in CHECKS if check.encode() in binary)
+    return True, carried, len(CHECKS) - carried
 
 
 def main():

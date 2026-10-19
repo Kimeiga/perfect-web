@@ -17,9 +17,12 @@
 //!   store's and the feed's, in memory and on PostgreSQL; on PostgreSQL, a
 //!   render's read that fails ends its transaction.
 //! - **Bounded seats, every one given back** (the integrator's ruling 2): on
-//!   PostgreSQL a render reads in one of the layer's
-//!   `feed_pg::RENDER_CONNECTIONS` seats, its own pool, never the commands'.
-//!   A render past the bound waits for a seat, and one that waits past its
+//!   PostgreSQL a render reads in one of the layer's seats, as many as its
+//!   deployment says (`feed_pg::RenderSeats`, `feed_pg::RENDER_CONNECTIONS`
+//!   where it says nothing: the integrator's answer of 2026-10-17), its own
+//!   pool, never the commands'. A deployment's seats and seat wait are read
+//!   or refused, and bound its renders as it says. A render past the bound
+//!   waits for a seat, and one that waits past its
 //!   limit fails saying so; twenty-four renders at once are never more than
 //!   the bound seated, nor connections open; and with every seat held by a
 //!   change's render and the subscriber table held by a reader waiting for a
@@ -478,6 +481,87 @@ fn on_postgres_a_render_waiting_past_its_limit_fails_saying_so() {
     let why = read_in_a_render(&layer).expect_err("no seat");
     assert!(why.contains("waited"), "{why}");
     assert_eq!(renders.taken(), RENDER_CONNECTIONS, "none past the bound");
+}
+
+/// **A deployment states its renders' seats, or its host does not start**
+/// (the integrator's answer of 2026-10-17): `PW_RENDER_SEATS` and
+/// `PW_RENDER_SEAT_WAIT`, each its default where unset or empty, read where
+/// given, and refused, naming the setting, where it is no count of one at
+/// least.
+#[test]
+fn a_deployment_states_its_renders_seats_or_its_host_is_refused() {
+    use crate::feed_pg::RenderSeats;
+    let default = RenderSeats::default();
+    assert_eq!(default.seats, RENDER_CONNECTIONS, "where it says nothing");
+    assert_eq!(RenderSeats::stated(None, None), Ok(default));
+    assert_eq!(RenderSeats::stated(Some(""), Some("")), Ok(default));
+    assert_eq!(
+        RenderSeats::stated(Some("3"), Some("2")),
+        Ok(RenderSeats {
+            seats: 3,
+            wait: Duration::from_secs(2)
+        })
+    );
+    assert_eq!(
+        RenderSeats::stated(Some("12"), None),
+        Ok(RenderSeats {
+            seats: 12,
+            ..default
+        })
+    );
+    assert_eq!(
+        RenderSeats::stated(None, Some("45")),
+        Ok(RenderSeats {
+            wait: Duration::from_secs(45),
+            ..default
+        })
+    );
+    for (seats, wait, named) in [
+        (Some("0"), None, "PW_RENDER_SEATS=0 "),
+        (Some("eight"), None, "PW_RENDER_SEATS=eight "),
+        (Some("-1"), None, "PW_RENDER_SEATS=-1 "),
+        (None, Some("0"), "PW_RENDER_SEAT_WAIT=0 "),
+        (None, Some("1.5"), "PW_RENDER_SEAT_WAIT=1.5 "),
+        (None, Some("30s"), "PW_RENDER_SEAT_WAIT=30s "),
+    ] {
+        let why = RenderSeats::stated(seats, wait).expect_err("refused");
+        assert!(why.contains(named), "{why}");
+    }
+}
+
+/// **On PostgreSQL, a layer seats as many renders as its deployment says,
+/// and a render waits for a seat as long as it says**: two seats, both
+/// taken, and a third render refused after the deployment's half second, not
+/// a test host's five seconds, saying it waited for one of the two.
+#[test]
+fn on_postgres_a_deployments_seats_bound_its_renders_and_their_wait() {
+    let Some(url) = store_database() else { return };
+    let seats = crate::feed_pg::RenderSeats {
+        seats: 2,
+        wait: Duration::from_millis(500),
+    };
+    let layer = crate::store_pg::StorePg::for_test_seated(
+        &url,
+        crate::feed_pg::Isolation::Serializable,
+        seats,
+    )
+    .expect("the layer");
+    let renders = layer.renders_for_test().expect("the database's renders");
+    let _seated: Vec<_> = (0..2).map(|_| layer.snapshot().expect("a seat")).collect();
+    assert_eq!(renders.taken(), 2, "the deployment's two");
+    let began = Instant::now();
+    let why = read_in_a_render(&layer).expect_err("no third seat");
+    let waited = began.elapsed();
+    assert!(why.contains("one of the 2 connections"), "{why}");
+    assert!(
+        waited >= Duration::from_millis(500),
+        "the deployment's wait: {waited:?}"
+    );
+    assert!(
+        waited < Duration::from_secs(3),
+        "the deployment's wait, not a test host's five seconds: {waited:?}"
+    );
+    assert_eq!(renders.taken(), 2, "none past the deployment's bound");
 }
 
 /// The store served on PostgreSQL, where its tests serve it there: in

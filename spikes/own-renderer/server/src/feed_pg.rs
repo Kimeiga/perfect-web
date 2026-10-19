@@ -147,17 +147,22 @@ fn begin_command(c: &mut Client, isolation: Isolation) -> Result<(), postgres::E
 /// failure and never waits for a safe snapshot, as a deferrable one would.
 pub(crate) const READ_SNAPSHOT: &str = "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY";
 
-/// **How many renders read one layer's database at once** (NEXT 4c, the
-/// integrator's ruling 2 of 2026-10-15): each holds a connection of its own
-/// from its first read to its end, besides the connections the layer's
-/// commands and single reads take. A render past it waits at its beginning
+/// **How many renders read one layer's database at once, where the
+/// deployment says nothing** (NEXT 4c, the integrator's ruling 2 of
+/// 2026-10-15; its answer of 2026-10-17 makes it a deployment's setting,
+/// `PW_RENDER_SEATS`, with this default, to be measured under load on the
+/// production track): each holds a connection of its own from its first
+/// read to its end, besides the connections the layer's commands and single
+/// reads take. A render past them waits at its beginning
 /// (`render_merge::begin`), where it holds no connection.
 pub(crate) const RENDER_CONNECTIONS: usize = 8;
 
-/// **How long a render waits for its seat** before it fails, loudly: each
-/// of its reads answers that it waited. Renders give their seats back by
-/// structure (`render_merge`), so this is a backstop against a wait no one
-/// ends, never a bound a render is expected to meet.
+/// **How long a render waits for its seat, where the deployment says
+/// nothing** (`PW_RENDER_SEAT_WAIT`, the integrator's answer of
+/// 2026-10-17), before it fails, loudly: each of its reads answers that it
+/// waited. Renders give their seats back by structure (`render_merge`), so
+/// this is a backstop against a wait no one ends, never a bound a render is
+/// expected to meet.
 #[cfg(not(test))]
 pub(crate) const SEAT_WAIT: std::time::Duration = std::time::Duration::from_secs(30);
 
@@ -166,15 +171,70 @@ pub(crate) const SEAT_WAIT: std::time::Duration = std::time::Duration::from_secs
 #[cfg(test)]
 pub(crate) const SEAT_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
 
-/// **The renders' connections of one layer** (NEXT 4c): no more than
-/// [`RENDER_CONNECTIONS`] seats taken, and no more connections open than
-/// that, each a seat's or idle for the next render.
+/// **The renders' seats, as a deployment sets them** (the integrator's
+/// answer of 2026-10-17): how many renders read one layer's database at
+/// once, and how long a render waits for its seat; [`RENDER_CONNECTIONS`]
+/// and [`SEAT_WAIT`] where the deployment says nothing. The host reads them
+/// from its environment where it starts, for each layer it serves on
+/// PostgreSQL.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct RenderSeats {
+    pub(crate) seats: usize,
+    pub(crate) wait: std::time::Duration,
+}
+
+impl Default for RenderSeats {
+    fn default() -> RenderSeats {
+        RenderSeats {
+            seats: RENDER_CONNECTIONS,
+            wait: SEAT_WAIT,
+        }
+    }
+}
+
+impl RenderSeats {
+    /// **The seats as the deployment states them**: `seats`, the value of
+    /// `PW_RENDER_SEATS`, a count of one at least; `wait`, the value of
+    /// `PW_RENDER_SEAT_WAIT`, whole seconds, one at least. Each is its
+    /// default where unset or empty, and anything else is refused, by name,
+    /// so a host does not start on a setting it cannot read.
+    pub(crate) fn stated(seats: Option<&str>, wait: Option<&str>) -> Result<RenderSeats, String> {
+        let mut stated = RenderSeats::default();
+        if let Some(v) = seats.filter(|v| !v.is_empty()) {
+            stated.seats = match v.parse::<usize>() {
+                Ok(n) if n >= 1 => n,
+                _ => {
+                    return Err(format!(
+                        "PW_RENDER_SEATS={v} is not a count of seats, one at least"
+                    ));
+                }
+            };
+        }
+        if let Some(v) = wait.filter(|v| !v.is_empty()) {
+            stated.wait = match v.parse::<u64>() {
+                Ok(n) if n >= 1 => std::time::Duration::from_secs(n),
+                _ => {
+                    return Err(format!(
+                        "PW_RENDER_SEAT_WAIT={v} is not a count of seconds, one at least"
+                    ));
+                }
+            };
+        }
+        Ok(stated)
+    }
+}
+
+/// **The renders' connections of one layer** (NEXT 4c): no more seats
+/// taken than its deployment's [`RenderSeats`] say, and no more connections
+/// open than that, each a seat's or idle for the next render.
 pub(crate) struct Renders {
     url: String,
     schema: Option<String>,
+    /// How many renders are seated at once at most: the deployment's.
+    bound: usize,
     seats: Mutex<Seats>,
     freed: std::sync::Condvar,
-    /// How long a render waits for its seat: [`SEAT_WAIT`], or a test's.
+    /// How long a render waits for its seat: the deployment's, or a test's.
     wait: Mutex<std::time::Duration>,
 }
 
@@ -196,18 +256,20 @@ struct Seats {
 }
 
 impl Renders {
-    /// **The renders' connections of a layer on `url`**, one of them opened
-    /// now and kept idle, so the host's first render does not wait for a
-    /// connection to be made, as no read did before renders had their own
-    /// (the commands' pool is warm once the layer has migrated). One that
-    /// cannot be made now is made at the first read.
-    pub(crate) fn new(url: &str, schema: Option<&str>) -> Arc<Renders> {
+    /// **The renders' connections of a layer on `url`**, seated as the
+    /// deployment's `seats` say, one of them opened now and kept idle, so
+    /// the host's first render does not wait for a connection to be made, as
+    /// no read did before renders had their own (the commands' pool is warm
+    /// once the layer has migrated). One that cannot be made now is made at
+    /// the first read.
+    pub(crate) fn new(url: &str, schema: Option<&str>, seats: RenderSeats) -> Arc<Renders> {
         let renders = Arc::new(Renders {
             url: url.to_string(),
             schema: schema.map(str::to_string),
+            bound: seats.seats,
             seats: Mutex::default(),
             freed: std::sync::Condvar::new(),
-            wait: Mutex::new(SEAT_WAIT),
+            wait: Mutex::new(seats.wait),
         });
         if let Ok(c) = renders.connection() {
             renders.seats.lock().expect("seats").idle.push(c);
@@ -216,21 +278,21 @@ impl Renders {
     }
 
     /// **A render's seat**, once one is free: waited for while every seat is
-    /// taken, for [`SEAT_WAIT`] at most; past it, a seat whose every read
-    /// fails saying so.
+    /// taken, for the deployment's wait at most; past it, a seat whose every
+    /// read fails saying so.
     pub(crate) fn seat(self: &Arc<Self>) -> Seat {
         let wait = *self.wait.lock().expect("wait");
         let deadline = std::time::Instant::now() + wait;
         let mut seats = self.seats.lock().expect("seats");
-        while seats.taken >= RENDER_CONNECTIONS {
+        while seats.taken >= self.bound {
             let left = deadline.saturating_duration_since(std::time::Instant::now());
             if left.is_zero() {
                 return Seat {
                     renders: self.clone(),
                     conn: Mutex::new(None),
                     refused: Some(format!(
-                        "a render waited {wait:?} for one of the {RENDER_CONNECTIONS} \
-                         connections renders read in"
+                        "a render waited {wait:?} for one of the {} connections renders read in",
+                        self.bound
                     )),
                 };
             }
@@ -333,7 +395,7 @@ impl Renders {
 pub(crate) struct Seat {
     renders: Arc<Renders>,
     conn: Mutex<Option<Client>>,
-    /// Why there is no seat: the wait for one passed [`SEAT_WAIT`].
+    /// Why there is no seat: the wait for one passed the deployment's.
     refused: Option<String>,
 }
 
@@ -846,14 +908,16 @@ impl FeedPg {
     /// transaction serializable.
     #[cfg(test)]
     pub(crate) fn open(url: &str, schema: Option<&str>) -> Result<FeedPg, String> {
-        FeedPg::open_with(url, schema, Isolation::Serializable)
+        FeedPg::open_with(url, schema, Isolation::Serializable, RenderSeats::default())
     }
 
-    /// [`FeedPg::open`], a command's transaction opened as `isolation` says.
+    /// [`FeedPg::open`], a command's transaction opened as `isolation` says,
+    /// and its renders seated as the deployment's `seats` say.
     pub(crate) fn open_with(
         url: &str,
         schema: Option<&str>,
         isolation: Isolation,
+        seats: RenderSeats,
     ) -> Result<FeedPg, String> {
         let pool = Arc::new(Pool {
             url: url.to_string(),
@@ -874,7 +938,7 @@ impl FeedPg {
         pool.give(c);
         Ok(FeedPg {
             pool,
-            renders: Renders::new(url, schema),
+            renders: Renders::new(url, schema, seats),
             isolation,
             writes: Mutex::new(()),
             uploaded: std::sync::OnceLock::new(),
