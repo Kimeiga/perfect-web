@@ -414,6 +414,7 @@ fn steps(more: bool) -> Vec<(String, u64)> {
     // interaction's record, the outbox read back), and the session's
     // queries read again after its commit.
     let total = s.shown_total("a");
+    every_open_page_asks(&s, "a");
     let (txns, all, by_op) = (
         s.data.statements_by_transaction().len(),
         s.data.statements().expect("counted"),
@@ -489,6 +490,7 @@ fn steps(more: bool) -> Vec<(String, u64)> {
     // operations and its commit), and the reader's open pages read again
     // after it, which its cart's event regenerates (ADR-0218's session
     // entry): every page the scenario left open.
+    every_open_page_asks(&s, "a");
     let (txns, all, by_op) = (
         s.data.statements_by_transaction().len(),
         s.data.statements().expect("counted"),
@@ -556,6 +558,22 @@ fn steps(more: bool) -> Vec<(String, u64)> {
 
 fn s_val(v: &str) -> Val {
     Val::String(v.to_string())
+}
+
+/// **Every page the scenario left open has just asked** (ADR-0297): an open
+/// page asks without pause, so a commit reads each again. This scenario's
+/// pages are fetched once and keep no stream, so a page it fetched more than
+/// `LIVE` (3 s) before a commit, as a busy machine took it, was not read
+/// again then but marked to be derived when it asks, and the counts read
+/// again after `place_order` and `rate_order` went with the machine's speed
+/// (found assembling train-11, 2026-10-19: at train-10's head 9 of 16 runs
+/// under load 60-80 counted rate_order's 53 as 47 or 42 at one size).
+fn every_open_page_asks(s: &Server, session: &str) {
+    let now = std::time::Instant::now();
+    let mut pending = s.pending.lock().expect("pending");
+    for doc in documents_of(&pending, session) {
+        pending.get_mut(&doc).expect("open").seen = now;
+    }
 }
 
 /// **Every page and command of the store runs as many statements with fifty
