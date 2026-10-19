@@ -152,6 +152,10 @@ fn a_commit_is_told_once_on_each_host() {
     a.tell_waiting();
     let told_on_a = frames(&a, &mine).len();
     assert!(told_on_a > 0, "A's own page told at once");
+    assert!(
+        tail(&a).heard().expect("read").commits.is_empty(),
+        "A's reader hears none of A's own commits"
+    );
     a.hear();
     assert_eq!(
         frames(&a, &mine).len(),
