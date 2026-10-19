@@ -31,10 +31,14 @@ class RestoredBrowserGate(unittest.TestCase):
             source.write_text(original)
             producer = mock.Mock(side_effect=[(True, 1, 0), (True, 0, 1)])
             baseline = types.SimpleNamespace(explain=mock.Mock(), mutation_bound=types.SimpleNamespace(start=lambda: None))
-            with mock.patch.object(module, "MUTANTS", [("stand-in", "probe", source, "original", "mutated")]), \
-                 mock.patch.object(module, "SUITES", {"probe": producer}), \
+            # A browser mutant: refusal's script runs in parts (train-10) and
+            # restores its browser suite after a part that mutated one. Every
+            # mutant is asked for, whatever command line runs these tests.
+            with mock.patch.object(module, "MUTANTS", [("stand-in", "browser", source, "original", "mutated")]), \
+                 mock.patch.object(module, "SUITES", {"browser": producer}), \
                  mock.patch.object(module, "browser_tests", return_value=outcome) as cleanup, \
                  mock.patch.object(module.signal, "signal"), \
+                 mock.patch.object(sys, "argv", [str(ROOT / "scripts" / f"{script}_mutations.py")]), \
                  mock.patch.dict(sys.modules, {"mutation_baseline": baseline}), \
                  contextlib.redirect_stdout(io.StringIO()):
                 code = module.main()
@@ -99,6 +103,7 @@ class RestoredBrowserGate(unittest.TestCase):
                  mock.patch.object(module, "SUITES", {"probe": producer}), \
                  mock.patch.object(module, "browser_tests", return_value=(True, 1, 0)), \
                  mock.patch.object(module.signal, "signal"), \
+                 mock.patch.object(sys, "argv", [str(ROOT / "scripts" / f"{script}_mutations.py")]), \
                  mock.patch.dict(sys.modules, {"mutation_baseline": baseline}), \
                  contextlib.redirect_stdout(output):
                 code = module.main()
