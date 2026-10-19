@@ -1,0 +1,97 @@
+Track ci-diagnostics - a failure's trace is kept, and the checker's latency is measured under load
+
+produced by: just e14-ci-diagnostics
+commit: 061fdba816e032bd11d0d4027cee26f97dd99c0c
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+python: Python 3.10.12
+
+== 1. a failing browser run's output is kept where the next run does not clear it (scripts/keep_traces.py, run_suite.sh, mutation_baseline.py, ci_recipes.py, verify.yml)
+
+test_a_missing_or_empty_output_creates_nothing (scripts.tests.test_keep_traces.Keeping) ... ok
+test_a_name_never_leaves_the_root (scripts.tests.test_keep_traces.Keeping) ... ok
+test_each_entry_of_a_failed_run_is_kept (scripts.tests.test_keep_traces.Keeping) ... ok
+test_the_budget_is_the_environments_where_it_names_one (scripts.tests.test_keep_traces.Keeping) ... ok
+test_the_budget_is_the_roots_whatever_was_kept_there_before (scripts.tests.test_keep_traces.Keeping) ... ok
+test_the_command_line_keeps_a_run_and_says_so (scripts.tests.test_keep_traces.Keeping) ... ok
+test_what_does_not_fit_the_budget_is_named_and_not_copied (scripts.tests.test_keep_traces.Keeping) ... ok
+test_a_recipe_runs_with_its_name_in_pw_recipe (scripts.tests.test_keep_traces.Recipes) ... ok
+test_the_directory_is_ignored_by_git (scripts.tests.test_keep_traces.Uploads) ... ok
+test_the_reader_of_the_workflow_reads_a_dropped_path (scripts.tests.test_keep_traces.Uploads) ... ok
+test_the_traces_and_browser_uploads_name_every_kept_traces (scripts.tests.test_keep_traces.Uploads) ... ok
+test_a_call_it_cannot_read_is_refused (scripts.tests.test_run_suite.RunSuite) ... ok
+test_a_failed_suite_fails_and_its_failure_is_recorded (scripts.tests.test_run_suite.RunSuite) ... ok
+test_a_failure_to_keep_does_not_change_the_status (scripts.tests.test_run_suite.RunSuite) ... ok
+test_a_passed_suite_passes_and_keeps_its_tests_and_evidence_lines (scripts.tests.test_run_suite.RunSuite) ... ok
+test_a_run_that_fails_keeps_its_output_though_the_next_run_clears_it (scripts.tests.test_run_suite.RunSuite) ... ok
+test_a_run_that_passes_keeps_nothing (scripts.tests.test_run_suite.RunSuite) ... ok
+test_a_run_that_says_nothing_kept_shows_its_last_lines (scripts.tests.test_run_suite.RunSuite) ... ok
+test_a_suite_that_passed_no_test_fails (scripts.tests.test_run_suite.RunSuite) ... ok
+test_each_run_that_failed_is_kept_apart_from_the_others (scripts.tests.test_run_suite.RunSuite) ... ok
+test_every_run_runs_and_the_first_failure_is_its_status (scripts.tests.test_run_suite.RunSuite) ... ok
+test_it_is_kept_under_the_recipe_that_ran_it_or_local (scripts.tests.test_run_suite.RunSuite) ... ok
+test_it_runs_from_the_directory_it_is_given (scripts.tests.test_run_suite.RunSuite) ... ok
+test_its_status_is_any_exit_but_zero (scripts.tests.test_run_suite.RunSuite) ... ok
+test_the_benchmark_harness_keeps_under_its_own_directory (scripts.tests.test_run_suite.RunSuite) ... ok
+test_two_calls_in_a_recipe_keep_apart (scripts.tests.test_run_suite.RunSuite) ... ok
+test_what_is_kept_is_bounded_and_the_rest_is_named (scripts.tests.test_run_suite.RunSuite) ... ok
+test_imported_it_bounds_every_process_the_script_starts (scripts.tests.test_mutation_baseline.Bounded) ... ok
+test_guarded_bytecode_left_before_for_a_mutated_source_is_not_read (scripts.tests.test_mutation_baseline.Bytecode) ... ok
+test_guarded_no_bytecode_is_written_so_the_restored_source_runs (scripts.tests.test_mutation_baseline.Bytecode) ... ok
+test_unguarded_the_restored_source_runs_its_mutants_bytecode (scripts.tests.test_mutation_baseline.Bytecode) ... ok
+test_each_call_follows_a_red_baseline_or_one_of_five_named (scripts.tests.test_mutation_baseline.EveryCallOfExplain) ... ok
+test_every_red_baseline_says_what_failed (scripts.tests.test_mutation_baseline.EveryScript) ... ok
+test_every_script_keeps_what_its_commands_say_from_its_start (scripts.tests.test_mutation_baseline.EveryScript) ... ok
+test_a_browser_suites_failure_read_through_its_escapes (scripts.tests.test_mutation_baseline.Failures) ... ok
+test_a_build_that_failed (scripts.tests.test_mutation_baseline.Failures) ... ok
+test_a_failed_commands_output_with_no_result_is_shown_as_it_ended (scripts.tests.test_mutation_baseline.Failures) ... ok
+test_a_failing_test_and_its_panic (scripts.tests.test_mutation_baseline.Failures) ... ok
+test_a_failing_tests_records_are_shown_as_it_printed_them (scripts.tests.test_mutation_baseline.Failures) ... ok
+test_a_command_not_captured_keeps_how_it_ended (scripts.tests.test_mutation_baseline.Heard) ... ok
+test_a_command_stopped_past_its_bound_keeps_what_it_said_by_then (scripts.tests.test_mutation_baseline.Heard) ... ok
+test_commands_that_ended_well_say_what_each_counted (scripts.tests.test_mutation_baseline.Heard) ... ok
+test_explain_names_what_failed_as_it_failed (scripts.tests.test_mutation_baseline.Heard) ... ok
+test_explain_runs_nothing_again (scripts.tests.test_mutation_baseline.Heard) ... ok
+test_explain_shows_a_failing_tests_records (scripts.tests.test_mutation_baseline.Heard) ... ok
+test_only_the_last_commands_are_kept (scripts.tests.test_mutation_baseline.Heard) ... ok
+test_what_a_command_said_is_kept_with_how_it_ended (scripts.tests.test_mutation_baseline.Heard) ... ok
+test_a_browser_run_that_passed_keeps_nothing (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun) ... ok
+test_a_failure_to_keep_is_said_and_what_failed_still_is (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun) ... ok
+test_a_mutants_browser_run_is_not_kept (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun) ... ok
+test_a_red_baselines_failed_browser_run_is_kept_apart (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun) ... ok
+test_the_benchmark_harness_run_is_kept_under_its_own_directory (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun) ... ok
+test_what_an_earlier_recipe_left_is_not_kept (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun) ... ok
+Ran 53 tests in 13.820s
+OK
+
+== mutation controls (scripts/ci_diagnostics_mutations.py)
+
+baseline (helper): 16 passed, 0 failed
+baseline (keep): 11 passed, 0 failed
+baseline (baseline): 26 passed, 0 failed
+a failed run keeps nothing [helper]: KILLED (7 of 16 tests fail)
+only the last run's output is kept [helper]: KILLED (2 of 16 tests fail)
+a run that passed is kept too [helper]: KILLED (3 of 16 tests fail)
+the output is kept inside test-results, where the next run clears it [helper]: KILLED (7 of 16 tests fail)
+the recipe's name is not in the path [helper]: KILLED (6 of 16 tests fail)
+the run's number is not in the path [helper]: KILLED (5 of 16 tests fail)
+the call's own tag is the same for every call [helper]: KILLED (1 of 16 tests fail)
+a failure to keep fails the helper with a status of its own [helper]: KILLED (1 of 16 tests fail)
+the budget is not held [keep]: KILLED (2 of 11 tests fail)
+the budget counts only the run in hand [keep]: KILLED (1 of 11 tests fail)
+what was left out is not named [keep]: KILLED (1 of 11 tests fail)
+a name leaves the directory [keep]: KILLED (1 of 11 tests fail)
+the environment's budget is ignored [keep]: KILLED (1 of 11 tests fail)
+the budget is a thousand times the traces [keep]: KILLED (1 of 11 tests fail)
+a red baseline keeps nothing [baseline]: KILLED (3 of 26 tests fail)
+a browser run that passed is kept [baseline]: KILLED (2 of 26 tests fail)
+what was last run need be no browser run, so a mutant's is kept [baseline]: KILLED (1 of 26 tests fail)
+an earlier recipe's output is kept [baseline]: KILLED (1 of 26 tests fail)
+the benchmark harness's suite is not looked at [baseline]: KILLED (1 of 26 tests fail)
+a failure to keep a baseline's output hides what failed [baseline]: KILLED (1 of 26 tests fail)
+a recipe runs without its name [keep]: KILLED (1 of 11 tests fail)
+the recipes' upload drops kept-traces [keep]: KILLED (2 of 11 tests fail)
+the browser jobs' upload drops kept-traces [keep]: KILLED (2 of 11 tests fail)
+git does not ignore kept-traces at the root [keep]: KILLED (1 of 11 tests fail)
+git does not ignore kept-traces beside the suite [keep]: KILLED (1 of 11 tests fail)
+25 of 25 mutants killed
+memory bound: no process was stopped

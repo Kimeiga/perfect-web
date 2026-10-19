@@ -106,3 +106,34 @@ Amends ADR-0349's `scripts/run_suite.sh` and ADR-0344's section 4
   their `test-results/` was never lost; they upload `kept-traces/` for
   symmetry only. The 32 MiB is a choice, not a measurement of the artifact
   store's quota.
+
+## What the planner plans when `run_suite.sh` or `verify.yml` changes
+
+Measured with `scripts/ci_plan.py` on this track's first two commits
+(`a5649409`, `061fdba8`), each changed file alone:
+
+- **`scripts/run_suite.sh` alone plans 91 recipes** of the 362 CI can run:
+  every recipe whose lines name the helper's path (`reads_what_changed`'s
+  rule for "a shell script it runs", ADR-0281), `e10-browser` and every other
+  browser recipe among them. The helper's behaviour differs only on a run
+  that failed, but the planner cannot see that, so any change to it
+  re-verifies every browser recipe.
+- **`.github/workflows/verify.yml` alone plans one: `e14-ci-diagnostics`**,
+  by this track's two upload mutants. A workflow is no recipe's input; a
+  recipe is planned by it only where one of its mutants is anchored within
+  30 lines of a changed line (a change near the plan job's `--stale` case
+  would plan `e14-evidence-integrity`, as before).
+- `scripts/mutation_baseline.py` plans three, by mutants anchored near the
+  hunk (`e14-ci-diagnostics`, `e14-derived-outside`,
+  `e14-evidence-integrity`); `ci_recipes.py`, `keep_traces.py`, the
+  `.gitignore`s and the recipe file plan this track's recipe alone.
+- **Together, against train-10's head (`8c5618c8`): 92 recipes in 33
+  shards** (`ci_plan.py --shards 9 --changed 8c5618c8 HEAD --current`, which
+  leaves none out). **Against `master`, which is where a track's push
+  measures from (`git merge-base origin/master`): 178 in 39**, since
+  train-10's own changes count there, `--current` leaving out `e14-tables`.
+  So a push of this branch starts a verify of 178 recipes, hours of runners
+  repeating train-10's dispatches. The integrator may cancel it (train-6's
+  and train-10's precedent) and dispatch what the change reaches:
+  `e14-ci-diagnostics e14-evidence-integrity e14-evidence-integrity-2
+  e14-derived-outside e10-browser`.
