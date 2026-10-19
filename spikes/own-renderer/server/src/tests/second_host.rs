@@ -680,6 +680,70 @@ fn a_request_reads_its_session_once() {
     assert_eq!(kept.ran(), before, "none for a request with no session");
 }
 
+/// The body of an HTTP answer.
+fn body_of(answer: &str) -> &str {
+    answer.split_once("\r\n\r\n").map_or("", |(_, body)| body)
+}
+
+/// **A press made on a page one host served, sent again to another, is
+/// answered from what the first committed** (ADR-0325, across hosts): the
+/// request names its page by A's number, which on B is a page B showed
+/// another reader (each host numbers its pages from one), and B answers
+/// from the record A's commit wrote with its writes before it would refuse
+/// the page; nothing runs twice. A press on that page that never committed
+/// is still refused. Until then B refused the retry as a page not its
+/// reader's, though A had committed it.
+#[test]
+fn a_press_on_one_hosts_page_sent_again_to_another_is_answered_from_its_record() {
+    let Some(url) = database() else { return };
+    let db = Schema::new(&url, "pressed_on");
+    let provider = Arc::new(TestProvider::default());
+    let a = feed_host_signing_in(&url, &db, &provider);
+    let b = feed_host_signing_in(&url, &db, &provider);
+    let ada = super::sign_in::signed_in(&a, &provider, "s-came", "ada");
+    let on_a = home(&a, &ada).1;
+    let on_b = home(&b, "grace").1;
+    assert_eq!(on_a, on_b, "both hosts number their pages from one");
+    let text = "Pressed on A's page";
+    let body = serde_json::json!([text]).to_string();
+    let pressed = |s: &Server, interaction: &str| {
+        exchanged(
+            s,
+            &format!(
+                "POST /command/feed.app.post HTTP/1.1\r\nHost: t\r\nCookie: pw-session={ada}\r\n\
+                 Sec-Fetch-Site: same-origin\r\npw-interaction: {interaction}\r\n\
+                 pw-document: {on_a}\r\ncontent-type: application/json\r\n\
+                 content-length: {}\r\n\r\n{body}",
+                body.len()
+            ),
+        )
+    };
+    let first = pressed(&a, "i-1");
+    assert!(first.contains("\"committed\":true"), "{first}");
+    let again = pressed(&b, "i-1");
+    assert!(again.starts_with("HTTP/1.1 202"), "{again}");
+    // What A committed, and its result: a kept answer carries no basis of
+    // values, on one host as on two.
+    let answer = |a: &str| {
+        let v: serde_json::Value = serde_json::from_str(body_of(a)).expect("JSON");
+        (v["committed"].clone(), v["result"].clone())
+    };
+    assert_eq!(answer(&again), answer(&first), "A's answer");
+    assert_eq!(answer(&again).0, serde_json::json!(true));
+    assert_eq!(
+        db.count("SELECT count(*) FROM posts WHERE text = 'Pressed on A''s page'"),
+        1,
+        "posted once"
+    );
+    let never = pressed(&b, "i-2");
+    assert!(never.starts_with("HTTP/1.1 403"), "{never}");
+    assert_eq!(
+        db.count("SELECT count(*) FROM posts WHERE text = 'Pressed on A''s page'"),
+        1,
+        "and nothing ran"
+    );
+}
+
 /// **A layer's sessions are read on a bounded few connections**, as the
 /// render merge holds every pool (stated, and waited for past the bound):
 /// twenty-four requests at once, each holding its connection half a second,

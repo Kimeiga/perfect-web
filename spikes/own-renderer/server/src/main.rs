@@ -3058,10 +3058,35 @@ impl Server {
             .interactions
             .lock()
             .expect("interactions")
-            .get(&shown_to)?
-            .iter()
-            .any(|(k, first)| *k == key && *first == sent);
+            .get(&shown_to)
+            .is_some_and(|queue| queue.iter().any(|(k, first)| *k == key && *first == sent));
         if !first_sent {
+            // TRACK SEAM (second-host): **or what the deployment kept**
+            // (ADR-0325, ADR-XXXX): a press this host never ran, made on a
+            // page another host served (or this one, before it restarted),
+            // which committed there, is answered from the record its commit
+            // wrote with its writes, as this host's memory answers its own;
+            // nothing runs. One never committed has no record, and is
+            // refused as before. Each host numbers its pages from one, so
+            // the number another host's page carries may name a page this
+            // host showed another session: the press is looked for under
+            // the request's own session first, then the page's, as above.
+            let mut owners = vec![session];
+            if session != shown_to {
+                owners.push(shown_to.as_str());
+            }
+            for owner in owners {
+                let key = format!("{owner}\u{1f}{component_id}\u{1f}{id}");
+                match self.recalled_interaction(&key) {
+                    Ok(Some((first, answer))) if first == sent => {
+                        return Some(Answered::from_kept(&answer));
+                    }
+                    Ok(_) => {}
+                    Err(why) => {
+                        eprintln!("pw dev server: an interaction's record was not read: {why}");
+                    }
+                }
+            }
             return None;
         }
         self.commands
