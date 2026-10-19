@@ -210,12 +210,22 @@ jobs:
       # A browser test that failed in a recipe keeps its trace, and what its
       # page's runtime and the network said beside it (feed.spec.mjs's
       # record): the evidence keeps the failure's name alone. Each run of a
-      # suite clears the directory, so this is the last run's.
+      # suite clears `test-results/`, so that is the last run's. Every run
+      # that failed is also copied, as it ends, to `kept-traces/<recipe>/
+      # <time>/run-<i>/` (scripts/run_suite.sh, scripts/keep_traces.py), and
+      # a mutation script's red baseline to `<script>-baseline/`
+      # (scripts/mutation_baseline.py): 32 MiB at most in all, and none of a
+      # mutation control's intended failures (track ci-diagnostics,
+      # 2026-10-19: train-10's `traces-23` held only those, and lost the
+      # Chromium failure of `e10-browser`'s second run).
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: traces-${{ matrix.shard.index }}
-          path: spikes/own-renderer/test-results/
+          path: |
+            spikes/own-renderer/kept-traces/
+            benchmarks/harness/kept-traces/
+            spikes/own-renderer/test-results/
           if-no-files-found: ignore
           retention-days: 30
 
@@ -270,7 +280,11 @@ jobs:
         if: failure()
         with:
           name: browser-${{ matrix.engine }}
-          path: spikes/own-renderer/test-results/
+          # One run of the suite, so `test-results/` is the failing run's;
+          # `kept-traces/` too, as the recipes' upload above has it.
+          path: |
+            spikes/own-renderer/test-results/
+            spikes/own-renderer/kept-traces/
           retention-days: 30
 
   summary:

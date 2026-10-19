@@ -38,6 +38,7 @@ import 'just/argument-invariants.just'
 import 'just/scheduled-orders.just'
 import 'just/evidence-integrity-2.just'
 import 'just/tables.just'
+import 'just/ci-diagnostics.just'
 
 default:
     @just --list
