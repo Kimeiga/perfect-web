@@ -9,10 +9,23 @@
 import { expect, test } from "@playwright/test";
 import {
   FEED_PORTS,
+  HOST_ANNOTATION,
   IDENTITY_PORTS,
   KIOKUN_PORTS,
   STORE_PAYMENTS_PORTS,
+  roleOfURL,
+  servable,
 } from "../host-metadata.mjs";
+
+// This file's tests run on five hosts, so each names its own to the host map
+// (`host-metadata.mjs`), which starts only the selected tests' hosts; and
+// each is held here to run on the host it names.
+test.beforeEach(async ({ baseURL }, testInfo) => {
+  const named = testInfo.annotations.filter((a) => a.type === HOST_ANNOTATION).map((a) => a.description);
+  expect(named, "the host this test names to the host map is the one it runs on").toEqual([
+    roleOfURL(baseURL, testInfo.project.name),
+  ]);
+});
 
 /** **What the page's policy refused**, as its browser says it: each
  * `securitypolicyviolation` its documents raise, by the directive and what
@@ -198,6 +211,7 @@ test.describe("a deployment that takes payments", { annotation: { type: "pw-host
 });
 
 test.describe("the feed", { annotation: { type: "pw-host", description: "feed" } }, () => {
+  test.skip(!servable("feed"), "dist-feed is not built: run feed.sh");
   test.use({
     baseURL: async ({}, use, testInfo) => {
       await use(`http://127.0.0.1:${FEED_PORTS[testInfo.project.name]}`);
@@ -215,6 +229,7 @@ test.describe("the feed", { annotation: { type: "pw-host", description: "feed" }
 });
 
 test.describe("a sign-in, at the development provider", { annotation: { type: "pw-host", description: "identity" } }, () => {
+  test.skip(!servable("feed"), "dist-feed is not built: run feed.sh");
   test.use({
     baseURL: async ({}, use, testInfo) => {
       await use(`http://127.0.0.1:${IDENTITY_PORTS[testInfo.project.name]}`);
@@ -235,6 +250,7 @@ test.describe("a sign-in, at the development provider", { annotation: { type: "p
 });
 
 test.describe("kiokun", { annotation: { type: "pw-host", description: "kiokun" } }, () => {
+  test.skip(!servable("kiokun"), "dist-kiokun is not built: run kiokun-site.sh");
   test.use({
     baseURL: async ({}, use, testInfo) => {
       await use(`http://127.0.0.1:${KIOKUN_PORTS[testInfo.project.name]}`);

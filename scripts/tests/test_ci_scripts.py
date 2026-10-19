@@ -290,6 +290,39 @@ class Plan(unittest.TestCase):
         other = plan.recipes_for({"spikes/own-renderer/README.md": [(1, 1)]}, 30, names)
         self.assertNotIn("e14-feed", other)
 
+    def test_the_modules_the_configuration_reads_are_its_own_and_plan_as_it_does(self) -> None:
+        # The host map (ADR-XXXX): the configuration plans each run's hosts
+        # with modules of its directory and the registry they read, found by
+        # following its imports; a change to any of them is a change to every
+        # suite run there, as a change to the configuration is.
+        found = plan.suite_configuration()
+        self.assertEqual(
+            sorted(found),
+            [
+                f"{plan.SUITE_DIRECTORY}/{name}"
+                for name in ("host-metadata.mjs", "host-plan-reporter.mjs", "host-plan.mjs", "host-registry.json", "playwright.config.mjs")
+            ],
+        )
+        names = plan.recipes()
+        body = plan.bodies()
+        under = sorted(n for n in names if plan.runs_browser_suite(body.get(n, "")))
+        for module in sorted(found - {plan.PLAYWRIGHT_CONFIG}):
+            planned = plan.recipes_for({module: [(1, 1)]}, 30, names)
+            self.assertEqual(sorted(set(under) - set(planned)), [], module)
+        # Followed through what each module imports or names beside itself,
+        # and not into what it only reads by a path of the tree.
+        with tempfile.TemporaryDirectory() as d:
+            root = pathlib.Path(d)
+            suite = root / plan.SUITE_DIRECTORY
+            suite.mkdir(parents=True)
+            (suite / "playwright.config.mjs").write_text('import { a } from "./a.mjs";\nimport { defineConfig } from "@playwright/test";\n')
+            (suite / "a.mjs").write_text('const b = await import("./b.mjs");\nconst data = new URL("./c.json", import.meta.url);\nreadFileSync("public/d.mjs");\n')
+            (suite / "b.mjs").write_text('export { a } from "./a.mjs";\n')
+            self.assertEqual(
+                sorted(plan.suite_configuration(root)),
+                [f"{plan.SUITE_DIRECTORY}/{name}" for name in ("a.mjs", "b.mjs", "c.json", "playwright.config.mjs")],
+            )
+
     def test_a_changed_spec_or_a_module_its_specs_import_plans_what_runs_them(self) -> None:
         # Track evidence-integrity-2: `e2e/accessibility-rules.mjs`, which
         # three specs import, planned nothing; and `e10-browser`, which runs

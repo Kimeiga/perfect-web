@@ -1,5 +1,11 @@
-// Playwright owns selection and server lifecycle. This module frames one native
-// collection invocation and admits only its validated role dependency closure.
+// **The host plan** (the host map, ADR-XXXX). Playwright owns selection and
+// the servers' lifecycle. This module frames one native collection
+// invocation, `playwright test --list` with the caller's own arguments and
+// configuration, reads the selected tests from a reporter of its own
+// (`host-plan-reporter.mjs`), and declares only their hosts, with the
+// auxiliary listeners those depend on. It interprets no selection itself:
+// file and line filters, projects, `--grep`, shards, `--test-list` and
+// `--last-failed` all mean what Playwright says they mean.
 import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { closeSync, existsSync, lstatSync, mkdtempSync, openSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -7,7 +13,7 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { REGISTRY, PORT, rolesForTest, portsForRole, buildProblem } from "./host-metadata.mjs";
+import { REGISTRY, PORT, REQUIRED_BUILD, rolesForTest, portsForRole, buildProblem, servable } from "./host-metadata.mjs";
 
 export const PLAN_SCHEMA = 1;
 const ROOT = fileURLToPath(new URL(".", import.meta.url));
@@ -216,10 +222,24 @@ export function serversForSelection(selection, { root = ROOT, port = PORT } = {}
       chosen.set(`${role}/${engine}`, { role, engine });
     }
   }
-  const hosts = [...chosen.values()].filter(({ role }) => REGISTRY.roles[role].auxiliary !== true);
-  for (const build of new Set(hosts.map(({ role }) => REGISTRY.roles[role].build))) {
-    const problem = buildProblem(build, root);
-    if (problem) fail(problem);
+  // `dist` must be servable where a selected test needs it. An optional
+  // build that is not servable has no selected tests but those of a spec whose
+  // tests differ, which skip themselves (`page-policy.spec.mjs`): its host is
+  // not started. Any other selected test of one is a test the config should
+  // have left out, and refused.
+  const hosts = [];
+  for (const host of chosen.values()) {
+    const { auxiliary, build } = REGISTRY.roles[host.role];
+    if (auxiliary === true) continue;
+    if (build === REQUIRED_BUILD) {
+      const problem = buildProblem(build, root);
+      if (problem) fail(problem);
+    } else if (!servable(build, root)) {
+      const unskipped = selection.receipt.tests.find((test) => test.roles.includes(host.role) && REGISTRY.specs[test.file]?.annotations !== true);
+      if (unskipped) fail(`${unskipped.file} needs ${host.role}, whose build cannot be served (${buildProblem(build, root)})`);
+      continue;
+    }
+    hosts.push(host);
   }
   if (process.env.PW_PERFORMANCE && selection.receipt.tests.some((test) => test.project !== "chromium" || !same(test.roles, ["mutable:performance"]))) fail("PW_PERFORMANCE requires only the Chromium performance/runtime-size selection");
   const target = resolve(root, "../../", process.env.CARGO_TARGET_DIR ?? "target", "debug");
@@ -242,6 +262,16 @@ export function serversForSelection(selection, { root = ROOT, port = PORT } = {}
     const quote = (value) => `'${value.replaceAll("'", "'\\''")}'`;
     return { command: `${quote(join(target, executable))}${dist ? ` ${quote(dist)}` : ""}`, env, port: hostPort, reuseExistingServer: !!process.env.PW_REUSE, timeout: 60000 };
   });
+}
+
+// What the invocation that planned says before its hosts start: each stale
+// optional build, whose specs are not run, and how many hosts it starts.
+export function announce(selection, servers, unserved = []) {
+  if (!selection.receipt || selection.reused || selection.collectionOnly) return;
+  for (const { warning } of unserved) if (warning) console.warn(warning);
+  const all = Object.values(REGISTRY.roles).filter((role) => role.auxiliary !== true && role.reserved !== true)
+    .reduce((count, role) => count + Object.keys(role.offsets).length, 0);
+  console.warn(`browser host map: ${servers.length} of ${all} hosts for ${selection.receipt.tests.length} selected tests`);
 }
 
 // This explicit child-only preload runs before the native CLI parses argv.

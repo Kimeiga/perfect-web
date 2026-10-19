@@ -1,4 +1,15 @@
-// Data and projections only: importing a spec must never load Playwright's config.
+// **The browser suite's hosts, as data** (the host map, ADR-XXXX). Every host
+// a spec can reach, its port, its build and what it depends on are read from
+// `host-registry.json`; the specs import their ports from here, and the
+// config (`playwright.config.mjs`) starts only the hosts the selected tests
+// need (`host-plan.mjs`). Data and projections only: importing a spec must
+// never load Playwright's config, which plans hosts as it loads.
+//
+// The own renderer's pages come from a Rust development server that owns
+// `pw-materialize`, `pw-resource`, `pw-render` and `pw-protocol`. The browser
+// sees only the protocol. Not E8's production host: its deletion condition is
+// that E8 replaces it with the capability-constrained one while preserving
+// the `pw-protocol` boundary.
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -15,6 +26,12 @@ const names = (value, label) => {
   if (new Set(value).size !== value.length) fail(`${label} contains duplicate names`);
 };
 
+// **The registry**, checked before anything reads it: every host's offset is
+// its own and inside one slot's stride (a mutation slot's ports are
+// `PORT + k * stride + offset`, scripts/mutation_slots.py), every dependency
+// is an auxiliary listener with an offset per engine, and every spec names
+// known roles. The old stride, 200, put slot 0's reviews and guestbook hosts
+// on slot 1's base and public-fragment hosts.
 export function validateRegistry(value) {
   if (!object(value) || value.schema !== 1) fail("unsupported schema");
   integer(value.stride, "stride", 1);
@@ -84,8 +101,12 @@ export const REGISTRY = freeze(validateRegistry(JSON.parse(readFileSync(new URL(
 export const ENGINES = REGISTRY.engines;
 export const STRIDE = REGISTRY.stride;
 export const BUILDS = REGISTRY.builds;
+// A spec whose tests run on different hosts (`page-policy.spec.mjs`) names
+// each test's host with this annotation, `{ type: "pw-host", description:
+// "<role>" }`, on the test or its describe.
 export const HOST_ANNOTATION = "pw-host";
 export const PORT = Number(process.env.PORT ?? 3141);
+const ROOT = fileURLToPath(new URL(".", import.meta.url));
 
 export function listenersForSlots(registry, base, count = 1) {
   validateRegistry(registry);
@@ -104,6 +125,9 @@ export function portsForRole(role, base = PORT, registry = REGISTRY) {
   return Object.fromEntries(Object.entries(registry.roles[role].offsets).map(([engine, offset]) => [engine, base + offset]));
 }
 
+// The roles one selected test needs, with the auxiliary listeners they
+// depend on: its spec's, or for a spec whose tests differ, the one its
+// annotation names. An unregistered spec is refused, never given every host.
 export function rolesForTest(file, engine, annotations = [], registry = REGISTRY) {
   validateRegistry(registry);
   if (!registry.engines.includes(engine)) fail(`unknown project/engine ${engine}`);
@@ -117,32 +141,163 @@ export function rolesForTest(file, engine, annotations = [], registry = REGISTRY
   const closure = new Set();
   for (const role of roles) {
     if (!own(registry.roles, role) || registry.roles[role].auxiliary) fail(`unknown selected host role ${role}`);
+    // A reserved role keeps its ports for an app not on this branch.
+    if (registry.roles[role].reserved === true) fail(`selected host role ${role} is reserved: its app is not on this branch`);
     closure.add(role);
     for (const dependency of registry.roles[role].depends ?? []) closure.add(dependency);
   }
   return [...closure].sort();
 }
 
+// The role whose host a test's `baseURL` is, for the engine it runs in: what
+// `page-policy.spec.mjs` holds each test's annotation to.
+export function roleOfURL(url, engine, base = PORT, registry = REGISTRY) {
+  const port = Number(new URL(url).port);
+  const found = Object.entries(registry.roles).filter(([, role]) =>
+    Object.entries(role.offsets).some(([key, offset]) => (key === "shared" || key === engine) && base + offset === port));
+  if (found.length !== 1) fail(`${url} is no registered host of ${engine}`);
+  return found[0][0];
+}
+
 const portExport = (name) => freeze(portsForRole(REGISTRY.portExports[name]));
+
+// **The suites that mutate shared state** (`REGISTRY.mutable`), each with a
+// host per engine. The menu is public data: one list, broadcast to every
+// subscriber, which is the property `keyed-list.spec.mjs` exists to prove.
+// That makes it hostile to a parallel suite: a reorder committed by one run is
+// visible to every other, and `store.spec.mjs` reasonably assumes three items
+// in a known order. Isolation in the HARNESS rather than in the server: a
+// per-session menu would delete the property under test. One host per engine,
+// because the three engine projects run concurrently and a single extra host
+// merely moved the interference somewhere less obvious. And per SUITE: two
+// mutating files on one host interfere exactly as two engines did, and the
+// second time it presented as frames arriving in a different order rather
+// than as a wrong list.
+// - `public-fragment` since 2026-09-25: it renames a menu item and back, which
+//   broadcasts a patch to every page on its host; on the shared host a store
+//   page read another test's rename as its latest batch (1 in 15 runs).
+// - `stream` (ADR-0148): its recommender is one per server.
+// - `availability` (ADR-0157), `cart` (ADR-0172), `accessibility` (ADR-0182):
+//   an item sold out is sold out for every page on the host.
+// - `stores` (ADR-0162): store 47's menu, which a test renames.
+// - `slots` (ADR-0165): the recommender, which a test slows.
+// - `controls` (ADR-0174): the store's delay, which a test sets.
+// - `materialized` (ADR-0277): the menu a test adds to and takes from.
+// - `performance`: the performance run needs ONE host, not eleven. Playwright
+//   starts every declared `webServer` before the first test, and eleven
+//   processes coming up while the first navigation happens is itself the load
+//   a long-animation-frame measurement is trying not to see (gate 8 once
+//   reported a long frame on a cold start and none on a warm one).
 export const MUTABLE_PORTS = freeze(Object.fromEntries(Object.entries(REGISTRY.mutable).map(([name, role]) => [name, portsForRole(role)])));
+// The kiokun slice's host (E10): a second application, its own server, and
+// read-only, so every engine shares it.
 export const KIOKUN_PORT = portsForRole("legacy-kiokun").shared;
+// The keyed store's hosts (ADR-0152): the store with T07's category tabs,
+// built into `dist-keyed` by `keyed-store.sh`. One per engine, because which
+// category is slow is one per server.
 export const KEYED_PORTS = portExport("KEYED_PORTS");
+// The feed reference app's hosts (ADR-0220), built into `dist-feed` by
+// `feed.sh`. One per engine, because a post is every reader's.
 export const FEED_PORTS = portExport("FEED_PORTS");
+// The identity track's hosts (ADR-0258): the feed's build, its sessions
+// signed in through the development identity provider (`PW_IDENTITY`).
 export const IDENTITY_PORTS = portExport("IDENTITY_PORTS");
+// The uploads track's hosts (ADR-0260): the feed's build, each with a blob
+// storage of its own (`PW_BLOB_DIR`), so one engine's images are never
+// another's.
 export const UPLOADS_PORTS = portExport("UPLOADS_PORTS");
+// The notifications track's hosts (ADR-0274) and the messages track's
+// (ADR-0279): the feed's build, signed in, one per engine, because a
+// notification or a message is its users' on a host.
 export const NOTIFICATIONS_PORTS = portExport("NOTIFICATIONS_PORTS");
 export const MESSAGES_PORTS = portExport("MESSAGES_PORTS");
+// kiokun.com in Pleris (track `kiokun`), one per engine, beside the slice's
+// single host.
 export const KIOKUN_PORTS = portExport("KIOKUN_PORTS");
+// TodoMVC's hosts, reserved (its app and spec are not on this branch).
 export const TODOMVC_PORTS = portExport("TODOMVC_PORTS");
+// The store-accounts track's hosts: the store's build, signed in, one per
+// engine, because an account and its cart are every reader's on a host.
 export const STORE_ACCOUNTS_PORTS = portExport("STORE_ACCOUNTS_PORTS");
+// The store's search hosts (W9): a test adds a dish to store 47's menu.
 export const STORE_SEARCH_PORTS = portExport("STORE_SEARCH_PORTS");
+// The store's build taking payments from the development provider
+// (`PW_PAYMENTS=dev`), one per engine, because an order awaiting its payment
+// is its reader's on a host. Each host's provider listens on an origin of its
+// own, the registry's `payment-provider` port (`PW_PAYMENTS_PORT`), which the
+// order page frames; it runs in the host's own process.
 export const STORE_PAYMENTS_PORTS = portExport("STORE_PAYMENTS_PORTS");
+// The scheduled orders' hosts: as the payments' hosts, on hosts of their own,
+// because a test of an order for a time moves its host's clock forward, which
+// would sweep another suite's order awaiting its payment.
 export const SCHEDULED_ORDERS_PORTS = portExport("SCHEDULED_ORDERS_PORTS");
+// The reviews' hosts: the store's build, signed in, because a store's ratings
+// are every reader's on a host.
 export const REVIEWS_PORTS = portExport("REVIEWS_PORTS");
+// The guide's tutorial app (ADR-0343): the guestbook, built into
+// `dist-guestbook` by `guestbook.sh`, signed in.
 export const GUESTBOOK_PORTS = portExport("GUESTBOOK_PORTS");
 
-// Availability is information, never a reason for the collection phase to skip.
-// The planner checks only the builds required by its selected role closure.
+// **The hosts a spec's source reaches**, which the host map's holding test
+// (`host-plan.test.mjs`) compares with the registry for every spec. A spec
+// reaches a host only through its `baseURL`: the config's, which is `PORT`'s
+// `base` host, unless the file overrides it at its top level; or an override
+// that names a port this module exports, `http://127.0.0.1:${FEED_PORTS[..]}`.
+// A loopback address written any other way is refused: the map could not see
+// which host it is.
+export function hostsReachedBy(source, registry = REGISTRY) {
+  const roles = new Set();
+  const named = (expression) => {
+    const m = /^([A-Z_]+)(?:\.([a-z][a-z-]*)|\["([a-z][a-z-]*)"\])?(?:\[[^\]]+\])?$/.exec(expression.trim());
+    if (!m) fail(`a host named by \`${expression}\`, which names no registered role`);
+    const [, name, dotted, quoted] = m;
+    const member = dotted ?? quoted;
+    if (name === "MUTABLE_PORTS" && member && own(registry.mutable, member)) return registry.mutable[member];
+    if (name === "KIOKUN_PORT" && !member) return "legacy-kiokun";
+    if (name === "PORT" && !member) return "base";
+    if (own(registry.portExports, name) && (!member || registry.engines.includes(member))) return registry.portExports[name];
+    fail(`a host named by \`${expression}\`, which names no registered role`);
+  };
+  for (const m of source.matchAll(/(?:127\.0\.0\.1|localhost|\[::1\]):(\$\{|\d)?/g)) {
+    if (m[1] !== "${") fail(`a loopback address without a registered port (${source.slice(m.index, m.index + 30)})`);
+    let depth = 1;
+    let end = m.index + m[0].length;
+    for (; end < source.length && depth; end++) depth += source[end] === "{" ? 1 : source[end] === "}" ? -1 : 0;
+    roles.add(named(source.slice(m.index + m[0].length, end - 1)));
+  }
+  // An override of the whole file: a `test.use(..)` at its top level that
+  // gives `baseURL`. Without one, its tests (or some of them) run on `base`.
+  const topLevel = [...source.matchAll(/^test\.use\(/gm)].some((m) => {
+    let depth = 0;
+    let end = m.index + "test.use".length;
+    for (; end < source.length; end++) {
+      depth += source[end] === "(" ? 1 : source[end] === ")" ? -1 : 0;
+      if (!depth) break;
+    }
+    return /\bbaseURL\b/.test(source.slice(m.index, end));
+  });
+  if (!topLevel) roles.add("base");
+  return [...roles].sort();
+}
+
+// The host annotations a spec's source writes, for a spec whose tests differ.
+export function hostAnnotationsIn(source) {
+  return [...new Set([...source.matchAll(/\{\s*type:\s*"pw-host",\s*description:\s*"([^"]+)"\s*\}/g)].map((m) => m[1]))].sort();
+}
+
+// **Which builds a run may lack.** `dist`, the shared demo's build (the
+// `base` role's), is required: `run.sh` makes it before every suite and
+// every mutation control's run, and a selected test that needs it refuses a
+// build that is not whole or not current (ADR-0161, ADR-0166; a suite once
+// ran on a build stopped part-way, track evidence-integrity's finding 5).
+// Every other build is optional, as it was before the host map: while one is
+// unbuilt its specs are not run; while it is stale they are not run, and a
+// warning says what to run (ADR-0152, ADR-0220). Refusing them would fail
+// every recipe that builds only what its specs need.
+export const REQUIRED_BUILD = REGISTRY.roles.base.build;
+
+// Availability is information, never a reason for the collection phase to
+// skip a required build: the planner checks the builds its selection needs.
 function canonicalMissingSource(path) {
   let ancestor = path;
   const suffix = [];
@@ -159,7 +314,14 @@ function canonicalMissingSource(path) {
   return resolve(realpathSync(ancestor), ...suffix);
 }
 
-export function buildProblem(name, root = fileURLToPath(new URL(".", import.meta.url))) {
+// Why a build cannot be served, or null: it is not whole (`run.sh` records
+// its sources last, so a build stopped part-way has no `sources.json`), it
+// was built with another `pw-runtime.mjs` (a build serves the runtime it was
+// built with: `dist-keyed` once ran the old runtime against the new server),
+// a source it recorded changed or is gone since (ADR-0166), or it is not
+// built. Only `keyed-store.sh`'s copies, made outside the repository and
+// removed after its build, may be gone.
+export function buildProblem(name, root = ROOT) {
   const build = BUILDS[name];
   if (!build) fail(`unknown build ${name}`);
   if (build.dist === null) return null;
@@ -188,4 +350,39 @@ export function buildProblem(name, root = fileURLToPath(new URL(".", import.meta
   }
   if (!existsSync(resolve(directory, "build"))) return problem(`${build.dist} is not built`);
   return null;
+}
+
+// An optional build is built when its `build` directory exists; one that is
+// built and has a problem is stale. Read afresh at each call: a recipe builds
+// between runs, and a test changes a build between its checks.
+export function buildState(name, root = ROOT) {
+  const build = BUILDS[name];
+  if (!build) fail(`unknown build ${name}`);
+  const built = build.dist === null || existsSync(resolve(root, build.dist, "build"));
+  return { built, problem: buildProblem(name, root) };
+}
+
+// Whether a build can be served: what an optional build's tests ask before
+// they run (`test.skip(!servable("feed"), ..)` in a spec whose tests differ).
+export const servable = (name, root = ROOT) => buildProblem(name, root) === null;
+
+// The specs not run because an optional build they need cannot be served,
+// each with the warning to print for a stale one (null for an unbuilt one).
+export function unservedSpecs(root = ROOT, registry = REGISTRY) {
+  const states = new Map();
+  const state = (build) => {
+    if (!states.has(build)) states.set(build, buildState(build, root));
+    return states.get(build);
+  };
+  const out = [];
+  for (const [file, spec] of Object.entries(registry.specs)) {
+    if (spec.annotations === true) continue;
+    const builds = [...new Set(spec.roles.map((role) => registry.roles[role].build))];
+    const missing = builds.filter((build) => build !== REQUIRED_BUILD && state(build).problem !== null);
+    if (missing.length) {
+      const stale = missing.map(state).find(({ built }) => built);
+      out.push({ file, warning: stale ? `e2e/${file} is not run: ${stale.problem}` : null });
+    }
+  }
+  return out;
 }

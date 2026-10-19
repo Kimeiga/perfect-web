@@ -336,6 +336,31 @@ SUITE_DIRECTORY = "spikes/own-renderer"
 PLAYWRIGHT_CONFIG = f"{SUITE_DIRECTORY}/playwright.config.mjs"
 
 
+def suite_configuration(root: pathlib.Path | None = None) -> set[str]:
+    """The suite's configuration and every module of its directory it reads,
+    as far as they go: what it imports (`from "./host-plan.mjs"`) and what
+    those name beside themselves (`new URL("./host-registry.json",
+    import.meta.url)`). Since the host map (ADR-XXXX) the configuration plans
+    each run's hosts with `host-metadata.mjs`, `host-plan.mjs`, its reporter
+    and the registry, so a change to any of them is a change to every suite."""
+    root = root or ROOT
+    out: set[str] = set()
+    pending = [PLAYWRIGHT_CONFIG]
+    while pending:
+        rel = pending.pop()
+        if rel in out:
+            continue
+        out.add(rel)
+        try:
+            text = (root / rel).read_text()
+        except OSError:
+            continue
+        here = pathlib.PurePosixPath(rel).parent
+        for name in re.findall(r"""(?:\bfrom\s+|\bimport\(\s*|new URL\(\s*)["']\./([\w.-]+\.(?:mjs|js|json))["']""", text):
+            pending.append(str(here / name))
+    return out
+
+
 def suite_runs(body: str) -> list[tuple[str, str]]:
     """Each browser suite a recipe's own lines run: (the directory it runs
     from, its command), by `scripts/run_suite.sh` (from `spikes/own-renderer`
@@ -540,6 +565,7 @@ def recipes_for(changed: dict[str, list[tuple[int, int]]], near: int, names: lis
     tests = {pathlib.Path(p).stem for p in changed if "/tests/" in p and p.endswith(".rs")}
     modules = test_modules(changed)
     every_spec = any(p.startswith(f"{SUITE_DIRECTORY}/e2e/") and p.endswith(".mjs") for p in changed)
+    configuration = suite_configuration()
     out = {
         name
         for name in names
@@ -550,7 +576,7 @@ def recipes_for(changed: dict[str, list[tuple[int, int]]], near: int, names: lis
         or (every_spec and runs_every_spec(body.get(name, "")))
         # A recipe that runs a suite under the configuration the range
         # changed (the integrator's ruling 7).
-        or (PLAYWRIGHT_CONFIG in changed and runs_browser_suite(body.get(name, "")))
+        or (bool(configuration & changed.keys()) and runs_browser_suite(body.get(name, "")))
         # And one that runs a server test module the range changed, by its
         # filter (train-6's finding).
         or any(f"tests::{t}::" in body.get(name, "") for t in tests)

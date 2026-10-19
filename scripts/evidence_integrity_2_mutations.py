@@ -190,7 +190,7 @@ MUTANTS = [
         "a change to the configuration plans nothing by it",
         "plan",
         PLAN,
-        '        or (PLAYWRIGHT_CONFIG in changed and runs_browser_suite(body.get(name, "")))\n',
+        '        or (bool(configuration & changed.keys()) and runs_browser_suite(body.get(name, "")))\n',
         "        or False\n",
     ),
     (
