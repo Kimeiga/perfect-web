@@ -39,6 +39,7 @@ import 'just/argument-invariants.just'
 import 'just/scheduled-orders.just'
 import 'just/evidence-integrity-2.just'
 import 'just/tables.just'
+import 'just/committed-components.just'
 
 default:
     @just --list
@@ -431,22 +432,20 @@ e9-values:
 # by upstream `wit-component`, checked by `wit-component`'s decoder against the
 # world each contract fixed. Named by component id, which is how the host and
 # the dev server find them; held to the compiler's current output by `pw-core`'s
-# `evidence_is_current`.
+# `evidence_is_current`. Every component the store's build emits, the list
+# the build's (`components/`), never one kept here: kept here until train-11,
+# it and the test named different sets, and three components went stale.
 e10-component:
     @mkdir -p docs/evidence/E10
-    @for id in store.page.add_to_cart store.page.clear_cart store.page.increase_in_cart store.page.decrease_in_cart store.page.remove_from_cart store.page.Store store.page.Menu store.page.Cart store.page.Reach UserCarts.line_count domain.display domain.count domain.total UserCarts.subtotal store.page.MenuSize store.page.MenuLine store.hours.StoreStatus store.hours.StoresOpen store.hours.CartHours store.reviews.StoreRatings; do \
-      cargo run --quiet --locked -p pw-cli -- emit-component --component "$id" \
-        --out "docs/evidence/E10/$id.wasm" \
-        packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw \
-        examples/lib/*.pw examples/store/*.pw; \
-    done
-    @# The store page's plan (ADR-0125): what the development server's tests
-    @# run the page by. Written by `pw build`, which is the one place it is made.
-    @# The other pages' plans are not kept: nothing reads them from here, and
-    @# `evidence_is_current` holds this one alone to the compiler.
+    @# The components and the store page's plan (ADR-0125), what the
+    @# development server's tests run the page by: written by `pw build`,
+    @# which is the one place they are made. The other pages' plans are not
+    @# kept: nothing reads them from here, and `evidence_is_current` holds this
+    @# one alone to the compiler. A component the build no longer emits goes.
     @out="$(mktemp -d)"; cargo run --quiet --locked -p pw-cli -- build --out "$out" \
         packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw \
         examples/lib/*.pw examples/store/*.pw > /dev/null; \
+      rm -f docs/evidence/E10/*.wasm; cp "$out"/components/*.wasm docs/evidence/E10/; \
       mkdir -p docs/evidence/E10/pages; \
       cp "$out"/pages/store.page.StorePage.json docs/evidence/E10/pages/; rm -rf "$out"
 
