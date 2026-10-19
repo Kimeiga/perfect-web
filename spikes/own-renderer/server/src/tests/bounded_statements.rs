@@ -433,7 +433,7 @@ fn steps(more: bool) -> Vec<(String, u64)> {
     let [own] = ran[..] else {
         panic!("place_order's one transaction: {ran:?}")
     };
-    let mut in_ops = 0;
+    let (mut in_ops, mut carts_again) = (0, 0);
     for (op, (calls, statements)) in s.data.statements_by_op() {
         let (c0, r0) = by_op.get(&op).copied().unwrap_or_default();
         if calls > c0 {
@@ -446,6 +446,11 @@ fn steps(more: bool) -> Vec<(String, u64)> {
             );
             if op.starts_with("command ") {
                 in_ops += statements - r0;
+            }
+            // The cart every page's layout shows, read again after the
+            // commit (NEXT 4c's render merge).
+            if op == "read store:data/user-carts#current" {
+                carts_again = calls - c0;
             }
         }
     }
@@ -460,6 +465,10 @@ fn steps(more: bool) -> Vec<(String, u64)> {
     out.push((
         "place_order, taking no payments: its queries read again".to_string(),
         after - own,
+    ));
+    out.push((
+        "place_order, taking no payments: user-carts#current called again".to_string(),
+        carts_again,
     ));
     let mut step = |name: &str, run: &dyn Fn()| {
         let before = s.data.statements().expect("a layer that counts");
@@ -480,9 +489,10 @@ fn steps(more: bool) -> Vec<(String, u64)> {
     // operations and its commit), and the reader's open pages read again
     // after it, which its cart's event regenerates (ADR-0218's session
     // entry): every page the scenario left open.
-    let (txns, all) = (
+    let (txns, all, by_op) = (
         s.data.statements_by_transaction().len(),
         s.data.statements().expect("counted"),
+        s.data.statements_by_op(),
     );
     let rated = s
         .command_answered(
@@ -498,10 +508,37 @@ fn steps(more: bool) -> Vec<(String, u64)> {
     let [own] = ran[..] else {
         panic!("rate_order's one transaction: {ran:?}")
     };
+    // What its statements are made of, by operation, as `place_order`'s
+    // (NEXT 4c's render merge), and the two reads every open page of the
+    // reader's makes with one key: the cart its layout shows, and its order.
+    let (mut carts_again, mut orders_again) = (0, 0);
+    for (op, (calls, statements)) in s.data.statements_by_op() {
+        let (c0, r0) = by_op.get(&op).copied().unwrap_or_default();
+        if calls > c0 {
+            eprintln!(
+                "rate_order: {op}: {} calls, {} statements",
+                calls - c0,
+                statements - r0
+            );
+            match op.as_str() {
+                "read store:data/user-carts#current" => carts_again = calls - c0,
+                "read store:data/user-orders#current" => orders_again = calls - c0,
+                _ => {}
+            }
+        }
+    }
     out.push(("rate_order: its transaction".to_string(), own));
     out.push((
         "rate_order: its reader's open pages read again".to_string(),
         after - own,
+    ));
+    out.push((
+        "rate_order: user-carts#current called again".to_string(),
+        carts_again,
+    ));
+    out.push((
+        "rate_order: user-orders#current called again".to_string(),
+        orders_again,
     ));
     let mut step = |name: &str, run: &dyn Fn()| {
         let before = s.data.statements().expect("a layer that counts");
@@ -588,6 +625,24 @@ fn a_commands_commit_is_counted_with_it() {
 // back). `place_order`'s three apart, where the deployment takes no
 // payments: `user-orders#settle` (7) is among its operations, the order
 // placed at once (ADR-0332).
+//
+// NEXT 4c's render merge (track `render-merge`): the queries read again
+// after `place_order`'s commit are one render, the drain's read of the cart
+// and the session's six documents, so an operation called with the same
+// arguments by several of them is called once there: `user-carts#current`,
+// which every page's layout reads, once where seven times (its row below),
+// `hours#for-cart` (6 statements) once where twice, and `checkout#chosen`
+// once where twice (the cart page and the page of times), and 32 statements
+// became 19. And the reader's eight open pages read again after
+// `rate_order` are one render: `user-carts#current` once where eight times,
+// `user-orders#current` (2 statements) once where twice (their rows below),
+// `hours#for-cart` once where twice and `checkout#chosen` once where twice,
+// and 53 statements became 37. Measured with the merge and without it (its
+// kept answers never given, a temporary edit, reverted) on train-11,
+// 2026-10-19; on master before scheduled-orders, 21 -> 16 and 42 -> 34
+// (2026-10-17). No other count moved: `hours#for-stores` and
+// `ratings#for-stores`, called three times after `rate_order`, are called
+// with other stores each time.
 const PAGES: &[(&str, u64)] = &[
     ("add_to_cart (47)", 10),
     ("add_to_cart (48)", 11),
@@ -612,21 +667,29 @@ const PAGES: &[(&str, u64)] = &[
     // (`user-orders#settle` 8, was 7).
     ("place_order, taking no payments: its operations", 35),
     ("place_order, taking no payments: its commit", 7),
-    // Track `scheduled-orders`: 21 and 11 more, the checkout's stores'
-    // hours (3), and the open page of times read again: its time chosen
-    // (1), its stores' hours (6) and its layout's cart (1).
+    // Track `scheduled-orders`: 21 and 11 more without the render merge,
+    // the checkout's stores' hours (3), and the open page of times read
+    // again: its time chosen (1), its stores' hours (6) and its layout's
+    // cart (1); with it, 16 and 3 more (the merge's paragraph above).
     (
         "place_order, taking no payments: its queries read again",
-        32,
+        19,
+    ),
+    (
+        "place_order, taking no payments: user-carts#current called again",
+        1,
     ),
     ("/order", 6),
     // TRACK SEAM (reviews): `rate_order`'s transaction (`MayRate`'s read,
     // `#rate`'s read and its row, and its commit); the reader's open pages
     // read again after it, including scheduling's extra cart-hours read
-    // (3) and the times page with an empty cart (8): 42 + 11 = 53. The rate
+    // (3) and the times page with an empty cart (8): 42 + 11 = 53 without
+    // the render merge, 37 with it (the merge's paragraph above). The rate
     // page reads its store and the layout's cart separately.
     ("rate_order: its transaction", 8),
-    ("rate_order: its reader's open pages read again", 53),
+    ("rate_order: its reader's open pages read again", 37),
+    ("rate_order: user-carts#current called again", 1),
+    ("rate_order: user-orders#current called again", 1),
     ("/order/rate/47", 2),
 ];
 

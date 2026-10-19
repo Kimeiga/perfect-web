@@ -923,6 +923,10 @@ impl Rows for PgRows<'_> {
 /// **The store's data in one PostgreSQL schema.**
 pub(crate) struct StorePg {
     pool: Arc<Pool>,
+    /// TRACK SEAM (render-merge): the renders' connections, as the feed's
+    /// (NEXT 4c): with the pool's, no more than `CONNECTIONS` +
+    /// `feed_pg::RENDER_CONNECTIONS` open.
+    renders: Arc<crate::feed_pg::Renders>,
     isolation: Isolation,
     /// One command of this host at a time, from its first write to its
     /// commit, as the in-memory layer's lock is: a host never conflicts with
@@ -965,6 +969,7 @@ impl StorePg {
         drop(c);
         Ok(StorePg {
             pool,
+            renders: crate::feed_pg::Renders::new(url, Some(schema)),
             isolation,
             writes: Mutex::new(()),
             faults: Faults::new(),
@@ -1007,6 +1012,18 @@ impl StorePg {
     #[cfg(test)]
     pub(crate) fn sql(&self) -> Client {
         self.pool.connect().expect("connected")
+    }
+
+    /// **Every connection the pool's bound allows, taken and held** (NEXT
+    /// 4c's tests): what a single read and a command wait on, and a render,
+    /// which reads in a seat of the renders' own, does not.
+    #[cfg(test)]
+    pub(crate) fn hold_the_bound(&self) -> Vec<Box<dyn std::any::Any + Send>> {
+        (0..CONNECTIONS)
+            .map(|_| {
+                Box::new(self.pool.take().expect("a connection")) as Box<dyn std::any::Any + Send>
+            })
+            .collect()
     }
 }
 
@@ -1259,6 +1276,39 @@ impl crate::data::DataLayer for StorePg {
             crate::store::reads(with, session, &self.faults, stopped),
             "read",
         )
+    }
+
+    // TRACK SEAM (render-merge): a render's snapshot, its seat (waited for
+    // while every seat is taken) and the read transaction it holds, and each
+    // of its queries' reads in it, counted as a query's are (NEXT 4c).
+    fn snapshot(&self) -> Option<crate::data::Snapshot> {
+        Some(Box::new(Arc::new(self.renders.seat())))
+    }
+
+    fn reads_in(
+        &self,
+        snapshot: &crate::data::Snapshot,
+        session: &str,
+        stopped: Option<Stopped>,
+    ) -> Ops {
+        // Never another layer's: a render's snapshot is its layer's
+        // (`render_merge`, by the layer's address).
+        let Some(seat) = snapshot.downcast_ref::<Arc<crate::feed_pg::Seat>>() else {
+            return self.reads(session, stopped);
+        };
+        let (seat, tally) = (seat.clone(), self.tally.clone());
+        let with: With =
+            Arc::new(move |f| seat.read(|c| tally.around(|| f(&mut PgRows(Counted(c))))));
+        self.tally.by_name(
+            crate::store::reads(with, session, &self.faults, stopped),
+            "read",
+        )
+    }
+
+    /// The renders' connections (NEXT 4c's tests).
+    #[cfg(test)]
+    fn renders_for_test(&self) -> Option<Arc<crate::feed_pg::Renders>> {
+        Some(self.renders.clone())
     }
 
     fn begin<'a>(&'a self, session: &str) -> Box<dyn crate::data::Staged + 'a> {

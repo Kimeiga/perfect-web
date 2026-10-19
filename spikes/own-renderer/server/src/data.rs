@@ -12,10 +12,38 @@ use std::collections::BTreeSet;
 /// Operations by their key, `store:data/carts#add`.
 pub(crate) type Ops = BTreeMap<String, HostFn>;
 
+/// **One render's snapshot of a layer** (NEXT 4c, track `render-merge`):
+/// the layer's own value, which the host holds for the render and hands back
+/// with each query's reads ([`DataLayer::reads_in`]), and drops when the
+/// render ends. What it holds is the layer's to say: the store as one moment
+/// left it, or a read transaction.
+pub(crate) type Snapshot = Box<dyn std::any::Any + Send + Sync>;
+
 pub(crate) trait DataLayer: Send + Sync {
     /// **The operations a query reads through, for one session.** Nothing a
     /// query does commits.
     fn reads(&self, session: &str, stopped: Option<Stopped>) -> Ops;
+
+    /// **One render's snapshot** (NEXT 4c, track `render-merge`): what every
+    /// read of one render reads, asked for where the render begins and given
+    /// up where it ends, so the render sees one state of the data whatever
+    /// commits meanwhile: in memory, the data as it is when asked; on
+    /// PostgreSQL, a seat among a bounded few, waited for while every one is
+    /// taken, whose read transaction's snapshot is its first statement's
+    /// (PostgreSQL 18, 13.2.2). By default none, and each query of a render
+    /// reads as [`DataLayer::reads`] does: a layer whose data never changes
+    /// (kiokun's files) needs none.
+    fn snapshot(&self) -> Option<Snapshot> {
+        None
+    }
+
+    /// **The operations one query of a render reads through**, as
+    /// [`DataLayer::reads`] makes them for one session, every one reading
+    /// `snapshot`, which this layer's [`DataLayer::snapshot`] took (NEXT 4c).
+    /// By default [`DataLayer::reads`].
+    fn reads_in(&self, _snapshot: &Snapshot, session: &str, stopped: Option<Stopped>) -> Ops {
+        self.reads(session, stopped)
+    }
 
     /// **A command's writes, staged until its transaction commits.** The
     /// staging holds whatever the layer needs held from the call to the
@@ -73,6 +101,13 @@ pub(crate) trait DataLayer: Send + Sync {
     #[cfg(test)]
     fn execute_for_test(&self, sql: &str) -> Result<(), String> {
         Err(format!("this layer runs no SQL: {sql}"))
+    }
+
+    /// **The connections this layer's renders read in** (NEXT 4c's tests):
+    /// a database's layer's, and none in memory.
+    #[cfg(test)]
+    fn renders_for_test(&self) -> Option<Arc<crate::feed_pg::Renders>> {
+        None
     }
 
     fn provides(&self) -> Result<Provided, String> {
