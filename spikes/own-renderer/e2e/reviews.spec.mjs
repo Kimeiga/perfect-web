@@ -11,7 +11,7 @@
 // Each test rates a store no other test of this file rates, so tests that
 // run at once on one host do not change what another reads.
 import { expect, test } from "@playwright/test";
-import { REVIEWS_PORTS } from "../playwright.config.mjs";
+import { REVIEWS_PORTS } from "../host-metadata.mjs";
 
 test.use({
   baseURL: async ({}, use, testInfo) => {

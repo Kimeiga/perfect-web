@@ -315,41 +315,37 @@ class BuildsBeforeSuites(unittest.TestCase):
         self.assertEqual(found, [], "\n".join(found))
 
 
-# `@playwright/test`, as far as the config asks it: the config's own checks
-# of `dist` are what is read here, and they run as it is loaded.
-PLAYWRIGHT_STAND_IN = """export const defineConfig = (config) => config;
-export const devices = new Proxy({}, { get: () => ({}) });
-"""
-
-
+# Since the host map (ADR-XXXX) the configuration asks `buildProblem`
+# (`host-metadata.mjs`) of `dist` where a selected test needs it, and refuses
+# what it says; it is asked here without Playwright. The planner's refusal
+# itself is `host-plan.test.mjs`'s.
 class DistIsWhole(unittest.TestCase):
-    """`playwright.config.mjs` serves `dist` only as a whole build, whoever
-    runs the suite: a person, a script, or a recipe."""
+    """`dist` is served only as a whole build, whoever runs the suite: a
+    person, a script, or a recipe."""
 
     RUNTIME = (ROOT / "spikes/own-renderer/public/pw-runtime.mjs").read_text()
 
     def load(self, dist: dict[str, str] | None) -> str:
-        """What node says loading the config beside `dist` (each file's path
-        and text, or no `dist` at all): nothing where it loads."""
+        """What node says asking `buildProblem` of `dist` (each file's path
+        and text, or no `dist` at all): nothing where it is servable."""
         with tempfile.TemporaryDirectory(prefix="pw-dist-") as d:
             root = pathlib.Path(d)
             spike = ROOT / "spikes/own-renderer"
-            shutil.copy(spike / "playwright.config.mjs", root)
+            for dependency in ("host-metadata.mjs", "host-registry.json"):
+                shutil.copy(spike / dependency, root)
             (root / "public").mkdir()
             shutil.copy(spike / "public/pw-runtime.mjs", root / "public")
-            package = root / "node_modules/@playwright/test"
-            package.mkdir(parents=True)
-            (package / "package.json").write_text(
-                '{"name": "@playwright/test", "type": "module", "exports": "./index.mjs"}'
-            )
-            (package / "index.mjs").write_text(PLAYWRIGHT_STAND_IN)
             for rel, text in (dist or {}).items():
                 path = root / "dist" / rel
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(text)
-            config = (root / "playwright.config.mjs").as_uri()
+            metadata = (root / "host-metadata.mjs").as_uri()
+            invoke = (
+                f"const {{ buildProblem }} = await import({metadata!r}); "
+                "const problem = buildProblem('store'); if (problem) throw new Error(problem);"
+            )
             out = subprocess.run(
-                ["node", "--input-type=module", "-e", f"await import({config!r})"],
+                ["node", "--input-type=module", "-e", invoke],
                 cwd=root,
                 capture_output=True,
                 text=True,

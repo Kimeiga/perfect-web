@@ -28,7 +28,7 @@ Each mutant undoes one piece:
    checked: checking is pathological (the program checked ten times over,
    as the ceiling is two and a half times CI's slowest runner's, some six
    and a half times the PC's), or the thread's clock reads nothing;
-5. a browser suite runs on what its recipe built (`playwright.config.mjs`,
+5. a browser suite runs on what its recipe built (`host-metadata.mjs`,
    the justfile): a `dist` that records no sources is served; `e14-signals`
    runs its suite on what was built before; `e14-slots`'s build failing
    leaves its suite to run;
@@ -62,7 +62,7 @@ CORPUS = ROOT / "compiler/pw-core/tests/checking_source.rs"
 R004 = ROOT / "examples/rejected/R-004-private-cart-in-shared-cache.pw"
 CHECK = ROOT / "compiler/pw-core/src/check.rs"
 LATENCY = ROOT / "compiler/pw-core/tests/check_latency.rs"
-CONFIG = ROOT / "spikes/own-renderer/playwright.config.mjs"
+METADATA = ROOT / "spikes/own-renderer/host-metadata.mjs"
 JUSTFILE = ROOT / "justfile"
 ADRS = ROOT / "scripts/unnumbered_adrs.py"
 RECIPE = ROOT / "just/evidence-integrity.just"
@@ -299,9 +299,9 @@ MUTANTS = [
     (
         "a dist that records no sources is served",
         "builds",
-        CONFIG,
-        'if (!existsSync(new URL("./dist/sources.json", import.meta.url))) {\n',
-        "if (false) {\n",
+        METADATA,
+        '  if (!existsSync(resolve(directory, "sources.json"))) return problem(`${build.dist} is no whole build (sources.json is missing)`);\n',
+        '  if (!existsSync(resolve(directory, "sources.json"))) return null;\n',
     ),
     (
         "e14-signals runs its suite on what was built before",

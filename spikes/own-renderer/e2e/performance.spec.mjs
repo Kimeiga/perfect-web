@@ -43,7 +43,7 @@
 // instrument must go red.
 
 import { test, expect } from "@playwright/test";
-import { MUTABLE_PORTS } from "../playwright.config.mjs";
+import { MUTABLE_PORTS } from "../host-metadata.mjs";
 
 // Its own host: `?items=1000` replaces the shared menu, which every other spec
 // reasonably assumes is three coffees.

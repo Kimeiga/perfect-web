@@ -11,7 +11,7 @@
 //   - another reader's open page is told of the entry, and of its removal,
 //     without a reload.
 import { expect, test } from "@playwright/test";
-import { GUESTBOOK_PORTS } from "../playwright.config.mjs";
+import { GUESTBOOK_PORTS } from "../host-metadata.mjs";
 
 test.use({
   baseURL: async ({}, use, testInfo) => {

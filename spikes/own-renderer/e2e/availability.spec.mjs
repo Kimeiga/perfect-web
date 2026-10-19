@@ -6,7 +6,7 @@
 // press, and a change to it, told, reaches every page open (ADR-0178). Untold,
 // it is §15.5's forced stale item, which the first test is.
 import { expect, test } from "@playwright/test";
-import { MUTABLE_PORTS } from "../playwright.config.mjs";
+import { MUTABLE_PORTS } from "../host-metadata.mjs";
 
 test.use({
   baseURL: async ({}, use, testInfo) => {

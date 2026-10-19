@@ -5,7 +5,7 @@
 //   7. Changing the query key cancels or supersedes stale work.
 //   8. Navigating away cancels unneeded requests.
 import { expect, test } from "@playwright/test";
-import { KEYED_PORTS } from "../playwright.config.mjs";
+import { KEYED_PORTS } from "../host-metadata.mjs";
 
 test.use({
   baseURL: async ({}, use, testInfo) => {

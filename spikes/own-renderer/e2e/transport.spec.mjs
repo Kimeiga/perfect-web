@@ -22,7 +22,7 @@
 // has data.
 
 import { test, expect } from "@playwright/test";
-import { MUTABLE_PORTS } from "../playwright.config.mjs";
+import { MUTABLE_PORTS } from "../host-metadata.mjs";
 
 // Mutates the menu, so it belongs on the isolated host — see
 // `keyed-list.spec.mjs` for why that isolation is in the harness.
