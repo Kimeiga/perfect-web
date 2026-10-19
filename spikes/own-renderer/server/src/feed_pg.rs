@@ -982,6 +982,7 @@ impl crate::schedules::Runs for FeedPg {
     }
 
     fn ran(&self, id: i64) -> Result<(), String> {
+        let _writes = self.writes.lock().unwrap_or_else(|e| e.into_inner());
         self.pool.with(|c| crate::schedules::pg::ran(c, id))
     }
 
@@ -992,6 +993,7 @@ impl crate::schedules::Runs for FeedPg {
         due_ms: i64,
         failed: Option<&str>,
     ) -> Result<(), String> {
+        let _writes = self.writes.lock().unwrap_or_else(|e| e.into_inner());
         self.pool
             .with(|c| crate::schedules::pg::retry(c, id, attempts, due_ms, failed))
     }

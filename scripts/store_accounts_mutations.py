@@ -79,6 +79,13 @@ ADDRESSES_SQL = ROOT / "spikes/own-renderer/server/migrations/store/0004_address
 APP = ROOT / "examples/store/app.pw"
 
 # (what is undone, file, anchor, replacement)
+# The mutants the checker refuses, by the rule that is the protection each
+# takes away (`scripts/mutant_programs.py`): every other mutant here
+# leaves a program that checks.
+CHECKED = {
+    "the store's reach is not told when the reader's addresses change": {'PW5106'},
+}
+
 MUTANTS = [
     (
         "a user's cart is read and written by the session",

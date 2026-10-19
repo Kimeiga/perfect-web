@@ -2937,3 +2937,80 @@ sweep, NEXT 4).
   writes; each run made as a press is, on its scheduler's behalf, keyed so
   it commits once; the store's abandoned orders taken back at thirty
   minutes.
+[ADR-0335](DECISIONS/ADR-0335-wasmtime-48-0-6.md):
+Wasmtime 48.0.6, for RUSTSEC-2026-0353 to 0364 (the integrator's; the
+downloads approved by the owner, 2026-10-14).
+- CI's advisory job failed on every branch from 2026-10-14 on eleven
+  Wasmtime advisories. Every pin is 48.0.6; the engine stays as ADR-0244
+  configured it; no advisory ignored. Two are reachable by a hostile
+  component, and the version closes them.
+[ADR-0336](DECISIONS/ADR-0336-a-read-is-a-bounded-number-of-statements.md):
+a read is a bounded number of statements on PostgreSQL (W9's; NEXT 4b).
+- The store's rows read by set (`= ANY($1)`): stores by id, the stores of
+  a set of items, the hours and the coverage of a set of stores. Every
+  operation, page and command counted at the seed and with fifty stores
+  more, pinned and equal at both; a command's commit counted with it;
+  `place_order` pinned by scenario.
+[ADR-0337](DECISIONS/ADR-0337-a-read-is-bounded-by-construction.md):
+a read is bounded by construction (W9's design note for NEXT 4c, ruled by
+the integrator 2026-10-14; nothing built yet).
+- A read keyed by a loop's element refused above the seam (PW0405), its
+  set read the repair; each source operation's cost per call stated below
+  it (`sets`, PW0406) and measured by one conformance suite; the store's
+  composites moved above the seam. Built in order: the render merge, the
+  checker's rules, the suite, the composites.
+[ADR-0338](DECISIONS/ADR-0338-three-databases.md):
+one app on three kinds of database, each held to what it gives (a design
+note, ruled by the integrator 2026-10-15; nothing built yet).
+- An app's data declared in Pleris (`table`), one generic adapter per
+  database implementing every app's, no app-specific Rust; one conformance
+  suite, the 4c note's; built as tracks D1 to D5 and T1 to T6, the owner's
+  decisions 1 to 7 before T3, T4 or T5.
+[ADR-0339](DECISIONS/ADR-0339-a-collaborative-document-app.md):
+a collaborative document is merged by Automerge, edited in a mounted
+ProseMirror, and told on the stream (a design note, ruled by the
+integrator 2026-10-15; nothing built yet).
+- NEXT's Google Docs-shaped app: Automerge behind `replicated`'s
+  `rich_text` policy; Pleris renders the document and an editor's page
+  mounts ProseMirror; presence and sync on the stream. Its data declared
+  as tables (ADR-0338); its downloads wait for the owner's approval.
+[ADR-0340](DECISIONS/ADR-0340-a-read-is-bounded-by-construction-the-checkers-half.md):
+a read keyed by its loop's element is refused (NEXT 4c's second step,
+ADR-0337's checker; corpus C25).
+- PW0405 refuses a source read inside a loop over data whose key comes
+  from the loop's element, its set read the repair; `set` pairs a keyed
+  read with its set form, held by PW0407; `sets` states a source's cost per
+  set read, and PW0406 warns of one that cannot batch. kiokun-site's four
+  reads per element are warnings until its layer has set forms and key
+  records.
+[ADR-0341](DECISIONS/ADR-0341-ratings-and-reviews.md):
+a store is rated through its delivered orders, and its reviewers go
+unnamed (W9's; the DoorDash customer side's ratings and reviews).
+- Each store of a reader's latest delivered order rated once, 1 to 5 stars
+  and a comment, final; a store's mean said from ten ratings; its reviews
+  shown without their reviewer, public and unmoderated, the shared cache
+  holding no reader's value (PW5001); read by set, one statement for a
+  list of stores.
+[ADR-0342](DECISIONS/ADR-0342-the-claim-measured.md):
+the claim, measured: the bug museum and the head-to-head (track `proof`).
+- An exhibit is a census leaf with a dated primary source, its bug shown in
+  Next.js or SvelteKit with its repair as the control, and Pleris's answer,
+  misses first; five exhibits, H07's miss closed by ADR-0340's PW0405 on
+  the same train. The head-to-head's protocol, TodoMVC first; its
+  downloads wait for the owner.
+[ADR-0343](DECISIONS/ADR-0343-a-guide-whose-examples-compile.md):
+a guide whose examples compile (track `guide`; NEXT's developer
+experience).
+- `docs/guide/`, every Pleris block checked by the real `pw` (clean,
+  formatted and built, or refused with exactly its codes), the tutorial
+  byte for byte the guestbook a browser test drives, the codes' reference
+  generated from the registry, and each gap in the checks an example held
+  open until the compiler closes it.
+
+[ADR-0352](DECISIONS/ADR-0352-bounded-statements-wait-for-completed-payment.md):
+statement counts wait for the completed payment transaction.
+- Real delayed-webhook and staged PostgreSQL overlap witnesses establish the
+  completion and same-instance write-order defects; exact success pins are
+  retained. Strict Cargo producer classification refuses invalid/build/stopped
+  evidence with source restoration and no next control. Local strict12/12 and
+  fresh CI pass; exact-head remote gates and landing remain pending.

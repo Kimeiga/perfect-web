@@ -730,6 +730,9 @@ mod csp;
 // The scheduled-commands track: a command runs when the clock passes its
 // time.
 mod schedules;
+// TRACK SEAM (reviews): a store's ratings and reviews, given through a
+// delivered order.
+mod reviews;
 // Track `second-host` (ADR-XXXX): hosts on one database hear each other's
 // commits.
 mod hosts;
@@ -1193,6 +1196,9 @@ fn components() -> BTreeMap<String, Loaded> {
         "store.hours.StoreStatus",
         "store.hours.StoresOpen",
         "store.hours.CartHours",
+        // TRACK SEAM (reviews): what a store's ratings come to, and its
+        // reviews, which its page reads.
+        "store.reviews.StoreRatings",
     ] {
         let path = dir.join(format!("{id}.wasm"));
         let bytes = std::fs::read(&path).unwrap_or_else(|e| {
@@ -1403,10 +1409,13 @@ impl Server {
         {
             // TRACK SEAM (kiokun): kiokun's files, read-only, where the
             // program imports `kiokun:data/…` (docs/PARALLEL.md, W6, Q2).
-            (
-                Arc::new(store::StoreData::new()),
-                Arc::new(kiokun::KiokunData::new()?),
-            )
+            // Unit tests assert the committed sample's answers. A developer's
+            // deployment environment must not replace that test fixture.
+            #[cfg(test)]
+            let kiokun = kiokun::KiokunData::at(kiokun::sample(), None);
+            #[cfg(not(test))]
+            let kiokun = kiokun::KiokunData::new()?;
+            (Arc::new(store::StoreData::new()), Arc::new(kiokun))
         } else {
             #[cfg(test)]
             let store = store.unwrap_or_else(store::layer_for_tests);
@@ -13962,6 +13971,9 @@ public query Store(",
     // The scheduled-commands track: a command run when the clock passes its
     // time, and the store's sweep.
     mod store_scheduled;
+    // TRACK SEAM (reviews): a store's ratings and reviews, in memory and on
+    // PostgreSQL where a database is named.
+    mod reviews;
     // Track `second-host` (ADR-XXXX): hosts sharing one database.
     mod second_host;
 
@@ -15762,10 +15774,12 @@ public query Store(",
         // (track `store-accounts`); and the cart page's checkout, a code
         // applied and taken off, four tips by percent, one by amount, and the
         // code's and the typed tip's bindings (track `order-total`); and the
-        // order page's, an order awaiting its payment taken back (NEXT 6c).
+        // order page's, an order awaiting its payment taken back (NEXT 6c);
+        // and the rate page's, five stars chosen, the comment's binding and
+        // the rating sent (track `reviews`).
         assert_eq!(
             named.len(),
-            21,
+            28,
             "add_to_cart, clear_cart, a line's three (ADR-0172), place_order and an address's five: {named:?}"
         );
         assert_eq!(
@@ -17963,8 +17977,9 @@ public query Store(",
             // Track `store-accounts`: and where deliveries go, before them.
             // ADR-0323: and the cart's link, a block and the subtotal it
             // says while the cart holds a line. ADR-0308, amended: and the
-            // store's cuisine; track `store-hours`: and whether it is open.
-            whole.ends_with("</template><!--/pw-42--></body>\n</html>\n"),
+            // store's cuisine; track `store-hours`: and whether it is open;
+            // track `reviews`: and what its ratings come to.
+            whole.ends_with("</template><!--/pw-43--></body>\n</html>\n"),
             "{whole}"
         );
         // An estimator that is down fills its slot with the failure, and the

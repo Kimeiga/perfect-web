@@ -14,6 +14,34 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**Train-9 payment/scheduler correction, 2026-10-16 (ADR-0352):** scheduled
+cleanup and retry acquire the existing StorePg/FeedPg write guard before a
+pool connection. Statement witnesses wait for successful completed settlement,
+with exact37/17/25/14/26/14 pins; the old12 sweep pin was an aborted transaction.
+The strict complete12-control campaign retains13 actual native Cargo results,
+with baseline0 and12 named101 test failures. Fresh `just ci` passes2954 Rust
+tests (25 explicitly ignored); all2280 frozen source/config inputs restore
+exactly. [Current receipt and raw results](evidence/E14/train9-bounded-strict-validation.json)
+distinguish the older112 reported neighbor kills, whose individual native
+statuses/full raw were not retained, and the old2222-path inventory omission.
+GitHub verify38863242953 remains failed. New exact-head `ci` and `verify` must
+both pass before evidence fetch and landing; no remote acceptance is claimed.
+The write guard orders one instance's writes, with cross-host serializable
+refusals still possible.
+
+**Train-9 corrective validation, 2026-10-16:** the absorbed description
+control is replaced by a withheld initial shell; the complete recipe passes
+all 21 browser tests in three engines and all 9 assertion controls. Unit-test
+Kiokun servers now explicitly use the committed sample while production
+retains deployment configuration; its child regression is red-before and
+green-after, with 2/2 independent controls. Fresh inherited-environment
+`just ci` passes 2948 Rust tests (25 ignored), 167 Python tests
+and one intentional skip. The preceding 16 server failures and failed
+GitHub verify 38823189869 remain failed historical results.
+[Commands, raw results and hashes](evidence/E14/train9-corrective-validation.txt).
+New GitHub CI/verify are required before landing. Production cache
+publication/lifetime concurrency remains open.
+
 **ADR-0249, 2026-10-07: a verification shard sets up only what its recipes
 need** (the owner's approval, relayed 2026-10-07). A shard spent more than
 half its time setting up: shard 3 at `c1738ec` freed the disk for 84 s,
@@ -22,6 +50,289 @@ installed browsers for 54 s and built for 131 s, then ran its recipes for
 install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
+
+**ADR-0343, 2026-10-15: a guide whose examples compile** (NEXT's
+developer experience, its docs and tutorial for a developer from outside;
+track `guide`, merged from `49967631`, with the integrator's rulings of
+2026-10-15).
+- `docs/guide/`: why Pleris, a tour of the language, its server and its
+  pages, its errors, a tutorial, and a reference of the diagnostic codes
+  generated from the compiler's registry. The root README points to it.
+- Every Pleris block is checked by `compiler/pw-cli/tests/guide.rs`
+  through the real `pw`: a clean example reports nothing, is formatted and
+  builds; a refused one reports exactly its codes and, where shown, its
+  output; the tutorial's blocks are byte for byte `examples/guestbook`,
+  which a browser test drives in three engines. Where the checks fall
+  short, a gap is an example the test holds open, and turns red when the
+  compiler closes it: three programs `pw check` passes and `pw build`
+  refuses, an `<img>` with no `alt`, and `&&`'s message.
+- On the train: the reference regenerated for ADR-0340's three codes
+  (199), the guide's test 15 of 15 and its generator's 7 of 7. The track's
+  own runs: `guide_mutations.py` 74 of 74 and its recipe green locally;
+  its verify green at `00471782` (`e14-guide` among its jobs) and again
+  at `49967631`, with train-8 merged (38815010191), and its `ci` there
+  (38815009873).
+Verify 38909882781 green, with train-9.
+
+**ADR-0342, 2026-10-15: the claim, measured: the bug museum and the
+head-to-head** (NEXT's evidence that answers "is Pleris perfect?"; track
+`proof`, merged from `11531dba`, with the integrator's rulings of
+2026-10-15).
+- The museum's method: an exhibit is a census leaf with a dated primary
+  source, its bug shown happening in ADR-0120's Next.js or SvelteKit store
+  (a Playwright spec that passes on the bug and fails on its idiomatic
+  repair, built in place on the installed dependencies), and Pleris's
+  answer to the same change, a named code whose neighbour checks clean, a
+  runtime test, or a miss, reported first. Each refusing code has a
+  mutation control. The head-to-head's protocol is written (TodoMVC first);
+  nothing of it is measured, and its downloads wait for the owner.
+- Five exhibits: F01 (a real CVE's `{@html}`) refused by PW5010, G01 (one
+  press delivered twice) by PW0338, J08 (a server's shared state) by
+  PW5001, J01 (a page stale after a save, ADR-0280's case, in next@16.3.8)
+  at runtime; and H07 (a read per row), a miss at the museum's first
+  record.
+- **A finding, the museum working as meant: H07 is refused on this train.**
+  Merged after ADR-0340, the exhibit's unchanged program is refused by
+  PW0405, and the museum failed until the exhibit expected it: "refused,
+  PW0405: a miss the museum found, closed by ADR-0340's checker". Its
+  `--checks-only` run on the train: 4 refused, none otherwise than
+  expected; `proof_mutations.py` 4 of 4 killed, H07's new control among
+  them.
+Verify 38909882781 green, with train-9.
+
+**ADR-0341, 2026-10-15: a store is rated through its delivered orders, and
+its reviewers go unnamed** (W9's; NEXT's ratings and reviews, the DoorDash
+customer side's last piece but scheduled orders; track `reviews`, merged
+from `2190221c`, with the integrator's rulings of 2026-10-15).
+- A reader rates each store of their latest order once it is delivered: 1
+  to 5 stars, and a comment if they like, once and final. Held twice: by
+  `requires SignedIn, MayRate(store)`, read in the command's transaction,
+  and by the data's own key, `(order, store)`, on both layers.
+- A store's rating is said alike on its page, the home page and a search:
+  "No ratings yet", the count alone below ten ratings, then "4.6 out of 5 ·
+  12 ratings", the mean to one decimal, half up, by the program. A store's
+  page shows its five newest comments without their reviewer: a `public`
+  query cached `shared`, which the checker keeps the reader's handle out
+  of (PW5001, held by a test of the store itself).
+- Read by set: the ratings of a list of stores are one statement on
+  PostgreSQL, and each new operation, page and command is pinned in
+  `bounded_statements.rs`. The store, its new programs among them, checks
+  clean under PW0405 (ADR-0340).
+- The track's own runs: `tests/reviews.rs`, 14 tests in memory and 14 on
+  PostgreSQL; `reviews.spec.mjs` 6 passed in the three engines;
+  `reviews_mutations.py` 30 of 30; `just ci` green. Its verify
+  (38781487357) ran its 58 recipes green, the three scripts its seams
+  re-anchored among them, and failed two of the store page's pinned shapes
+  in every engine, an accessibility tree and a count of identity anchors,
+  which still described the page without its ratings: brought to the page
+  on the train, in a commit of their own. Its browser hosts are PORT + 200
+  to 202.
+Verify 38909882781 green, with train-9.
+
+**ADR-0340, 2026-10-15: a read keyed by its loop's element is refused**
+(NEXT 4c's second step, the checker's half of ADR-0337; track
+`bounded-checker`, merged from `e5b8cdb9`, with the integrator's rulings
+and answers of 2026-10-15; corpus C25).
+- PW0405, an error: a call that performs a source read inside a loop over
+  data, its key from the loop's element, is refused, its set read the
+  repair. A loop is a combinator's callback (a standard function by its
+  signature, the program's own by its call graph), a `for`, or a recursion
+  over data; a key comes through a field, a `let`, a match arm or a pure
+  call. `set` names a keyed read's set form, held to its shape by PW0407;
+  `sets one_call | chunked(k) | per_key` states what a set read costs a
+  source, and PW0406 warns of a set read on one that cannot batch.
+- The store, the feed and the accepted corpus read nothing per element.
+  kiokun-site reads four times per element, as kiokun.com does, each a
+  warning through `KNOWN_READS_PER_ELEMENT` until kiokun's layer has set
+  forms and the pair takes a list of key records (the integrator's
+  answer). The pair matches its key's field by type until track
+  `pair-key-by-name` matches it by name.
+- Corpus C25: R-075 to R-077 (PW0405, one per loop form), R-078 (PW0407)
+  and A-037; generality 56 / 56. The rejected corpus exercises 56 of the
+  199 codes (`pw check` over each fixture as `checking_source.rs` builds
+  it).
+- The track's own runs: `bounded_checker_mutations.py` whole, 40 of 40, and
+  `just ci` green twice, the second at its head; its `verify`
+  (38780144526) green.
+  On the train, its store test edits the home page's loop as ADR-0341
+  left it (the train's first `just ci` found the two merges meeting
+  there), and the script ran whole again, 40 of 40.
+Verify 38909882781 green, with train-9.
+
+**ADR-0339, 2026-10-15: a collaborative document is merged by Automerge,
+edited in a mounted ProseMirror, and told on the stream** (a design note
+for NEXT's Google Docs-shaped app, track `docs-design`, merged from
+`2f5e51fb`; ruled by the integrator 2026-10-15). Docs only: nothing is
+built, and nothing was downloaded.
+- Its three rulings: concurrent edits merge in Automerge, behind
+  `replicated`'s `rich_text` policy (reopened if D0's cases or budgets say
+  so); Pleris renders every reader's document, and an editor's page mounts
+  ProseMirror at the page's authority, audited and said to be unconfined;
+  presence and sync ride the stream down, one sync request up, a WebSocket
+  only if a measurement fails.
+- The ruling amends it: no app-specific Rust, the app's own data declared
+  as tables on the generic adapters (ADR-0338), so phase 3 waits for D3; a
+  predicate on a read, `requires` on a query; the owner decisions that are
+  design (3 to 9) ruled under the delegation; PW6601 upward for its codes.
+- **Its downloads wait for the owner** (owner decision 2): Automerge,
+  ProseMirror and what they bring, 16 npm packages shipped to an editor's
+  page among them; nothing is fetched before that approval.
+Verify 38773359015 green, with train-8.
+
+**ADR-0338, 2026-10-15: one app on three kinds of database, each held to
+what it gives** (a design note, track `threedb-design`, merged from
+`b60a9c71`; ruled by the integrator 2026-10-15). Docs only: nothing is
+built yet.
+- An app's data is declared in Pleris (`table`: its row, key, order,
+  indexes, uniqueness, references and bound), and one generic adapter per
+  database implements every app's, so that no app needs Rust; migrations
+  come from the declarations, and one conformance suite runs on every
+  layer. The store is placed on three sources, each held to what its
+  database gives (ADR-0207), with several layers in one host, a change
+  told to every host, and a command across sources.
+- The ruling amends its names (a set form ends in `_many`), its codes
+  (PW0354 to PW0366, declaration rules) and its suite (one with the 4c
+  note's, ADR-0337); TodoMVC is D2's first app with no Rust data layer.
+- Built as the note's tracks: D1 `tables` (in flight on `track/tables`),
+  then D2 the memory adapter with TodoMVC, D3 the PostgreSQL adapter, D4
+  and D5 the feed and the store declared, T1 several sources, T2 SQLite;
+  none downloads anything. The owner's decisions 1 to 7 (which database of
+  each pair, the downloads, what runs where) come before T3 (MongoDB), T4
+  (Cassandra or ScyllaDB) or T5 (CockroachDB) starts.
+Verify 38773359015 green, with train-8.
+
+**2026-10-15: Pleris is developed on Windows inside WSL2** (the move to the
+owner's PC; track `pc-setup`, merged from `c7f4630b`).
+- A clone is LF on every platform: a root `.gitattributes` (`* text=auto
+  eol=lf`, the tree's binary types named), where Git for Windows would
+  check the tree out CRLF; the tree renormalizes to itself.
+- `just doctor` reads a Linux host, a WSL2 Ubuntu or CI's ubuntu-24.04: its
+  processor and memory, Chrome where Playwright installed it, Linux hints,
+  and a worktree, whose `.git` is a file. A version compares by its first
+  dotted number, so a build's stamp is no difference. The Mac's output is
+  as it was. `just env-record` writes the host's own record
+  (`docs/environment/pc-wsl.md` on WSL2) and leaves `tools/versions.lock`,
+  the Mac's record advanced by ADRs, alone.
+- CI's actions run on Node 24 (`setup-just@v4`, `pnpm/action-setup@v5`;
+  `fallow.yml` on the other workflows' versions), and setup-just installs
+  the pinned just 1.58.0 where it installed the newest. The README says to
+  develop inside WSL2, on WSL's own filesystem.
+- Its verify (38659086865) was green; its `ci` (38659086894) red in
+  "licenses and advisories" alone, Wasmtime 48.0.5's (ADR-0335 above).
+Verify 38773359015 green, with train-8.
+
+**ADR-0337, 2026-10-14: a read is bounded by construction** (W9's design
+note for NEXT 4c; track `bounded-reads`, merged from `8bc1fe68`; ruled by
+the integrator 2026-10-14). Docs only: nothing is built yet.
+- Above the seam, a page's and a command's source calls are bounded by
+  its text: a read keyed by a loop's element is refused (PW0405), its set
+  read the repair. Below it, each source operation states what one call
+  costs (`sets`), measured by a conformance suite at two data sizes, and a
+  budget that grows on a source that does not batch is warned of (PW0406).
+  The store's composites move above the seam.
+- Its measurements are 4b's (ADR-0336), and its two cases are settled: one
+  command's repeated reads are read once above the seam, not coalesced by
+  the host; one render's identical calls are made once, in one snapshot.
+- Built in the ruling's order: the render merge (track `render-merge`);
+  PW0405, `set` pairs, `sets` and PW0406 (track `bounded-checker`); the
+  conformance suite, one with the three-database note's; then the
+  composites, one at a time.
+Verify 38773359015 green, with train-8.
+
+**ADR-0336, 2026-10-14: a read is a bounded number of statements on
+PostgreSQL** (W9's; NEXT 4b; track `bounded-statements`, merged from
+`a59a18a3`, with the integrator's rulings of 2026-10-14).
+- The store's logic read the layer's rows a store's or a menu's at a time,
+  and on PostgreSQL each was a statement: the order's reach one per line
+  and store, a reader's search one per store it found, the hours three per
+  store. The rows gain four set reads, each one statement on PostgreSQL
+  whatever its keys (`= ANY($1)`) and a scan in memory: stores by id, the
+  stores of a set of items, the hours of a set of stores (three statements)
+  and their coverage. The loops go; memory's scans are named, and the
+  mutants put them back.
+- Every one of the store layer's 63 operations, and every page and command,
+  counted on PostgreSQL at the seed and with fifty stores more, each count
+  pinned and equal at both (`tests/bounded_statements.rs`, as Django's
+  `assertNumQueries` pins a block's). A command's commit is counted with it
+  (its outbox, its interaction's record, its scheduled runs), and
+  `place_order` pinned by scenario: taking no payments, its operations 33,
+  its commit 7 and its queries read again 21; taking them, 37, then
+  `settle_payment` on the provider's word 17.
+- Locally on PostgreSQL 18.6 (the PC): `just e14-bounded-statements`, 4
+  passed and 7 of 7 mutants killed; `store_accounts_mutations.py` whole, 37
+  of 37; chromium's suite, 381 passed. Its own verify (38641214685) was
+  cancelled by a concurrency group: the train's run is its record.
+Verify 38773359015 green, with train-8.
+
+**ADR-0335, 2026-10-14: Wasmtime 48.0.6, for RUSTSEC-2026-0353 to 0364**
+(the integrator's; track `wasmtime-48-0-6`, merged from `af18141a`; the
+release's 28 crates and its CLI archives approved by the owner 2026-10-14).
+- GitHub's `ci` failed its "licenses and advisories" job on every branch
+  from 2026-10-14 21:33 UTC: eleven RustSec advisories against Wasmtime
+  48.0.5, RUSTSEC-2026-0353 to 0364 (0360 is against 49.0.0 to 49.0.2
+  alone). Every pin is 48.0.6: the workspace and its lockfile, `pw-host`,
+  `pw-conformance`, the standalone spike and its lockfile, and the CLI
+  `just bootstrap` installs, by three digests from GitHub's release. Cargo
+  moved the release's 28 crates in each lockfile and nothing else.
+- Each advisory read against what the host enables and calls: two, 0359 (a
+  long chain of types dropped) and 0363 (component-model handles charged to
+  no limit), are reachable by a hostile component, and the version closes
+  them; the rest need a switch the host's engine has off or an API it never
+  calls. No advisory is ignored in `deny.toml`.
+- The track's `ci` (38668653495) was green in all three jobs, "licenses and
+  advisories" among them; its `verify` (38668653510) ran the three browser
+  suites green and planned no recipe.
+- The integrator's answers (in the ADR): `wasm_function_references(false)`
+  is a hardening track of its own (NEXT); the E0 spike's evidence stays
+  historical (ADR-0116); the macOS digest is checked at the Mac's next
+  `just bootstrap`.
+Verify 38773359015 green, with train-8.
+
+**2026-10-14: a change to a source's own tests plans what runs them** (the
+integrator's finding at train-6; track `planner-test-modules`, merged from
+`80802a46`).
+- Train-6's survivor in `e14-page-policy` was killed by a test in
+  `csp.rs`'s own `mod tests`, and its push planned no `e14-page-policy`:
+  no test file, far from every mutant, while the script runs those tests by
+  the filter `csp::`. A change after a source's `#[cfg(test)] mod tests {`
+  now reaches the scripts and recipes that name the module's filter, as
+  train-6's fix made a server test module's reach those that name
+  `tests::<name>::`.
+- Held by a test whose change is far from every mutant, and three mutants
+  (`dealt_by_time_mutations.py`, 48 of 48).
+Verify 38629460236 green, with train-7.
+
+**2026-10-14: a mutant of a program's source is still a program** (the
+integrator's finding; track `mutant-programs`, merged from `6a30b2f5`).
+- Of the 237 mutants of a `.pw` source the mutation scripts plant, the
+  checker refused the program 14 left: each "killed" by the build, whatever
+  the tests hold, its verdict reading as a test's. Three were refused for
+  another reason than what they undo: store-hours' "an order is placed
+  whatever the hours" called `UserOrders.place` with one argument since
+  order-total gave it three; command-answers' wrote `&&`, which the
+  language does not have; kiokun's read a list of another type. Each is
+  well-typed now and killed by its own script's tests (3 of 13, 1 of 42, 2
+  of 2). The other eleven take away a protection the checker holds, and
+  their scripts say which rule (`CHECKED`).
+- `just ci` holds it (`mutant-programs`, `scripts/mutant_programs.py`):
+  237 mutants, 11 refused by their named rule, none failing; on the tree
+  before, all 14 fail. Its logic is held with a stand-in checker (4 tests).
+Verify 38629460236 green, with train-7.
+
+**2026-10-14: the corpus specifies `invoked_by`** (the integrator's finding;
+corpus C24; track `corpus-invoked`, merged from `64e5ee4e`).
+- NEXT 6c's five codes (PW6401 to PW6405, a command the platform invokes)
+  had no fixture: the corpus, the executable specification, did not say
+  them. C24 adds a rejected fixture for each (R-070 to R-074) and a
+  generality pair for each, a GENERAL witness on the clock's command and a
+  NEIGHBOUR beside it. Generality 54 / 54.
+- Exercising them found two diagnostics that named no boundary span, which
+  charter §16.3 requires: PW6402 and PW6405 name their `invoked_by` clause
+  now, held by a test and two mutants (`invoked_by_mutations.py`, 14 of
+  14). PW6405's invariant says the clock's word as well as a provider's.
+- Measured: the rejected corpus exercises 54 of the 196 codes. NEXT holds
+  the rest, and the rule for a new code.
+Verify 38629460236 green, with train-7.
 
 **ADR-0334, 2026-10-14: a command runs when the clock passes its time**
 (the integrator's; ADR-0332's not-claimed sweep and NEXT 4's third step;

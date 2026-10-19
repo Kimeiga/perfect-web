@@ -1,0 +1,37 @@
+# Every text file is LF, in the repository and in every checkout. Git for
+# Windows sets core.autocrlf=true system-wide, and a clone made there would
+# otherwise check the whole tree out CRLF; the toolchain and CI (ubuntu-24.04)
+# read LF. `text=auto` leaves Git's own detection in force for a type not
+# named below, and an already-LF tree renormalizes to itself (2026-10-14:
+# `git add --renormalize .` staged nothing).
+* text=auto eol=lf
+
+# What the tree holds that is not text (`git ls-files --eol`, 2026-10-14),
+# named so that no heuristic decides it: kiokun's raw-DEFLATE entries (which
+# examples/kiokun/data/.gitattributes names too), Wasm components, and the
+# renderer's image fixtures.
+*.deflate binary
+*.wasm binary
+*.png binary
+*.jpeg binary
+*.jpg binary
+*.gif binary
+*.webp binary
+
+# Not in the tree today; binary when they arrive.
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.gz binary
+*.br binary
+*.zst binary
+*.pdf binary
+
+# Preserve exact native evidence bytes; scope exceptions to these raw files.
+docs/evidence/E14/train9-bounded-completion-before.txt -text whitespace=cr-at-eol
+docs/evidence/E14/train9-bounded-focused.txt -text whitespace=cr-at-eol
+docs/evidence/E14/train9-bounded-marker-focused-failed.txt -text whitespace=cr-at-eol
+docs/evidence/E14/train9-bounded-transitions-before.txt -text whitespace=cr-at-eol
+docs/evidence/E14/train9-bounded-strict-commands/0000.txt whitespace=-blank-at-eof

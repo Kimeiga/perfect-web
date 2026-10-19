@@ -113,8 +113,9 @@ MUTANTS = [
         "the home page's stores are kept past a change to their hours",
         "server",
         HOURS_PW,
-        "    invalidates_on StoreChanged(_)\n",
-        "",
+        # Re-anchored by track reviews: a store's ratings drop them too.
+        "    invalidates_on StoreChanged(_), StoreRated(_)\n",
+        "    invalidates_on StoreRated(_)\n",
     ),
     # The integrator's rulings of 2026-10-12: a day's periods are their
     # union; the layers hand them ordered by opening (the two layers'
@@ -130,8 +131,8 @@ MUTANTS = [
         "an order is placed whatever the hours",
         "server",
         APP,
-        "        Some(closing) => Err(OrderError.Closed(closing)),\n",
-        "        Some(closing) => UserOrders.place(current_user()),\n",
+        "    match closed_in(hours_of_cart(current_user())) {\n",
+        "    match closed_in(List.take(hours_of_cart(current_user()), 0)) {\n",
     ),
     (
         "memory's hours are not written",

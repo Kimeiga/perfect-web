@@ -1,0 +1,23 @@
+// @status: GENERAL
+// @invariant: read_per_element
+// @dimension: helper extraction — the read is a declared function's, named as the combinator's callback
+//
+// No call is written in the loop: `List.map` is given `found` as a value,
+// and `found` reads the store its parameter names.
+
+module generality.stores_named
+
+import Stores
+import List
+import domain.{ StoreId }
+
+fn found(id: StoreId) -> Bool !{ database.read<Stores> } {
+    match Stores.get(id) {
+        Ok(_) => true,
+        Err(_) => false,
+    }
+}
+
+fn which_found(ids: List<StoreId>) -> List<Bool> !{ database.read<Stores> } {
+    List.map(ids, found)
+}

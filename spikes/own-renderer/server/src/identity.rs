@@ -1041,6 +1041,11 @@ impl Identity {
             // may message `to`, read through the command's own operations, so
             // within its transaction, as `OwnsPost(post)` is.
             "MayMessage" => crate::messages::may_message(self.principals.of(session), bound, host),
+            // TRACK SEAM (reviews): `MayRate(store)`, the session's
+            // principal's latest order delivered, from `store` and not yet
+            // rated by them, read through the command's own operations, so
+            // within its transaction, as `OwnsPost(post)` is.
+            "MayRate" => crate::reviews::may_rate(self.principals.of(session), bound, host),
             other => Err(format!(
                 "the development deployment has no authorization predicate `{other}`"
             )),
@@ -1060,6 +1065,8 @@ pub fn says(predicate: &str) -> Option<&'static str> {
         "OwnsPost" => "Only its author can do this.",
         // TRACK SEAM (messages).
         "MayMessage" => "You can't send this person a message.",
+        // TRACK SEAM (reviews).
+        "MayRate" => "You can rate each store of your latest order once, after it's delivered.",
         _ => return None,
     })
 }

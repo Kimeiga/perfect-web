@@ -1,0 +1,32 @@
+// @status: NEIGHBOUR
+// @invariant: read_per_element
+// @dimension: valid neighbour — the same loops, each read keyed by what is no element's, and a callback applied once
+//
+// A read in a loop whose key does not come from the element is one key, which
+// the host's cache answers again; a callback a function applies once is in no
+// loop. A rule banning reads in loops, rather than reads per element, would
+// refuse both.
+
+module generality.stores_once
+
+import Stores
+import List
+import domain.{ StoreId }
+
+fn once(id: StoreId, f: fn(StoreId) -> Int) -> Int !{} {
+    f(id)
+}
+
+fn counted(ids: List<StoreId>, home: StoreId) -> List<Int> !{ database.read<Stores> } {
+    List.map(ids, id => match Stores.get(home) {
+        Ok(_) => 1,
+        Err(_) => 0,
+    })
+}
+
+fn one(home: StoreId) -> Int !{ database.read<Stores> } {
+    once(home, id => match Stores.get(id) {
+        Ok(_) => 1,
+        Err(_) => 0,
+    })
+}

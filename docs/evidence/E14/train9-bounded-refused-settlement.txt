@@ -1,0 +1,26 @@
+2026-10-16T10:58:16Z
+   Compiling pw-dev-server v0.0.0 (/home/haki/code/pw-wt/train9-bounded-fix/spikes/own-renderer/server)
+    Finished `test` profile [unoptimized] target(s) in 3.63s
+     Running unittests src/main.rs (target/debug/deps/pw_dev_server-ff76041b108b4a26)
+
+running 1 test
+private settlement probe: intent=pi_dev000001 status=succeeded outcome=Ok(Answered { committed: true, result: Some(Object {"$case": String("ok")}), why: None, refused: None })
+private webhook probe: event=evt_dev000002 intent=pi_dev000001 response=Ok(200)
+private settlement probe: intent=pi_dev000003 status=canceled outcome=Ok(Answered { committed: true, result: Some(Object {"$case": String("ok")}), why: None, refused: None })
+private webhook probe: event=evt_dev000004 intent=pi_dev000003 response=Ok(200)
+private settlement probe: intent=pi_dev000005 status=canceled outcome=Ok(Answered { committed: false, result: None, why: Some("PostgreSQL 40001: could not serialize access due to concurrent delete"), refused: None })
+private webhook probe: event=evt_dev000006 intent=pi_dev000005 response=Ok(500)
+
+thread 'tests::bounded_statements::placing_and_settling_where_payments_are_taken_is_bounded' (2364119) panicked at spikes/own-renderer/server/src/tests/bounded_statements.rs:613:9:
+expected 3 completed payment outcomes, got 2; transactions: [0, 9, 10, 37, 17, 9, 36, 25, 14, 36, 26, 12]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test tests::bounded_statements::placing_and_settling_where_payments_are_taken_is_bounded ... FAILED
+
+failures:
+
+failures:
+    tests::bounded_statements::placing_and_settling_where_payments_are_taken_is_bounded
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 589 filtered out; finished in 20.97s
+
+error: test failed, to rerun pass `-p pw-dev-server --bin pw-dev-server`

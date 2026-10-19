@@ -1,0 +1,28 @@
+// @corpus: rejected
+// @id: R-078
+// @category: a set read that answers no result with its key
+// @rule: PW0407
+// @invariant: set_pair_shape
+// @charter: §9.5, §7.2
+// @milestone: 14
+// @expect-error: `set cents_of`
+// @expect-error: `cents_of` answers `List<Int>`, and a set read of `price_of` answers a list of `PairedPrice` with its `Int`
+// @expect-error: `cents_of` is declared here
+//
+// 4c, a read is bounded by construction: a keyed read names its set form
+// with `set`, and a loop's reads are then one read before the loop. A set
+// form that answers the cents alone cannot say which price is whose, so the
+// loop could find nothing in what was read: the `set` pairs the read with
+// nothing. A-037's `prices_of` answers each price with its item.
+
+module store.paired_prices
+
+type PairedPrice = PairedPrice { item: Int, cents: Int }
+
+fn price_of(item: Int) -> Result<PairedPrice, String> !{ database.read<PairedPrice> }
+    host "store:data/paired-prices#for-item"
+    // ERROR: a list of cents, none with its item.
+    set  cents_of
+
+fn cents_of(items: List<Int>) -> List<Int> !{ database.read<PairedPrice> }
+    host "store:data/paired-prices#cents-for-items"

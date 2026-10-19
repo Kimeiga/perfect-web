@@ -43,6 +43,10 @@ import Events.{ MenuChanged, InventoryChanged, AddressesChanged, StoreChanged }
 import store.page.{ StoreLayout }
 // TRACK SEAM (store-hours): whether each store found is open.
 import store.hours.{ OpeningHoursOf, hours_of_stores, shown_of }
+// TRACK SEAM (reviews): each store found's ratings, read at once.
+import Ratings
+import Ratings.{ RatingsOf }
+import store.reviews.{ StoreRated, said_of }
 
 // **A dish that matched**, as the search shows it: its store's page is
 // where it is ordered.
@@ -100,6 +104,8 @@ type ShownStore = ShownStore {
     description: String,
     cuisine: String,
     open: String,
+    // TRACK SEAM (reviews): what its ratings come to.
+    rating: String,
     dishes: List<DishHit>,
     more: String,
 }
@@ -116,7 +122,7 @@ type SearchShown = SearchShown {
     more: String,
 }
 
-fn shown(asked: String, answer: Result<SearchFound, SearchError>, hours: List<OpeningHoursOf>) -> SearchShown !{ clock.compare, clock.zone } {
+fn shown(asked: String, answer: Result<SearchFound, SearchError>, hours: List<OpeningHoursOf>, ratings: List<RatingsOf>) -> SearchShown !{ clock.compare, clock.zone } {
     let none: List<ShownStore> = []
     let title = if asked == "" { "Search" } else { "Search for “{asked}”" }
     let blank = "Type a store, a dish or a cuisine to search for."
@@ -126,7 +132,7 @@ fn shown(asked: String, answer: Result<SearchFound, SearchError>, hours: List<Op
             title: title,
             said: summary(asked, found),
             near: near(found),
-            stores: List.map(found.stores, s => shown_store(s, hours)),
+            stores: List.map(found.stores, s => shown_store(s, hours, ratings)),
             more: more(found.more_stores, "store", "stores"),
         },
         Err(SearchError.Blank) => SearchShown { asked: asked, title: title, said: blank, near: "", stores: none, more: "" },
@@ -134,13 +140,14 @@ fn shown(asked: String, answer: Result<SearchFound, SearchError>, hours: List<Op
     }
 }
 
-fn shown_store(s: StoreHit, hours: List<OpeningHoursOf>) -> ShownStore !{ clock.compare, clock.zone } {
+fn shown_store(s: StoreHit, hours: List<OpeningHoursOf>, ratings: List<RatingsOf>) -> ShownStore !{ clock.compare, clock.zone } {
     ShownStore {
         id: s.id,
         name: s.name,
         description: s.description,
         cuisine: s.cuisine,
         open: shown_of(s.id, hours).said,
+        rating: said_of(s.id, ratings),
         dishes: s.dishes,
         more: more(s.more_dishes, "dish", "dishes"),
     }
@@ -182,7 +189,7 @@ user query Search(q: Option<String>, reader: User<UserId>) -> SearchShown
     consistency    read_your_writes
     cache          private
     key            q, reader
-    invalidates_on MenuChanged(_), InventoryChanged(_, _), AddressesChanged(reader), StoreChanged(_)
+    invalidates_on MenuChanged(_), InventoryChanged(_, _), AddressesChanged(reader), StoreChanged(_), StoreRated(_)
     concurrency    one_per_key
     on_key_change  cancel
     timeout        2.seconds
@@ -204,7 +211,9 @@ user query Search(q: Option<String>, reader: User<UserId>) -> SearchShown
         Err(_) => no_ids,
     }
     let hours = hours_of_stores(found)
-    shown(text, answer, hours)
+    // TRACK SEAM (reviews): the ratings of each store found, one read.
+    let ratings = Ratings.for_stores(found)
+    shown(text, answer, hours, ratings)
 }
 
 // **"5 more dishes"**, or nothing where there are none.
@@ -253,6 +262,7 @@ user page SearchPage(q: Option<String>) {
                         <h2><a href="/stores/{store.id}">{store.name}</a></h2>
                         <p class="cuisine">{store.cuisine}</p>
                         <p class="open">{store.open}</p>
+                        <p class="rating">{store.rating}</p>
                         <p>{store.description}</p>
                         {#if store.dishes}
                             <ul aria-label="Dishes at {store.name}">

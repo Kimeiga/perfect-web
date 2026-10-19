@@ -59,6 +59,9 @@ import store.hours.{ StoreStatus, StoresOpen, CartHours, hours_of_cart, closed_i
 // TRACK SEAM (order-total): the order's total, priced from the store's data.
 import store.checkout.{ Priced, Chosen, priced_for, shown_for, promo_for, promo_named, parts_of_cart,
     promo_said, set_tip, set_promo, negative_tip, dollars_typed, total_charged }
+// TRACK SEAM (reviews): a store's ratings and reviews, and the stores of the
+// reader's order to rate.
+import store.reviews.{ StoreRatings, OrderRatings }
 
 // Public. Same answer for every reader, so a shared cache is correct and the
 // key is just the store. A change to one store's menu drops that store's kept
@@ -695,6 +698,8 @@ user page StorePage(id: StoreId) {
     // Whether the store reaches the reader's chosen address (track
     // `store-accounts`).
     let reach = query Reach(id, current_user())
+    // TRACK SEAM (reviews): what its ratings come to, and its reviews.
+    let ratings = query StoreRatings(id)
     // What the cart last had to say: a refusal of an add or a clear.
     signal notice: String = ""
     // Charter §15.3's slots (ADR-0165), the estimate and the recommendations,
@@ -715,6 +720,7 @@ user page StorePage(id: StoreId) {
             <h1 id="store-name">{store.name}</h1>
             <p id="store-cuisine">{store.cuisine}</p>
             <p id="store-open">{open.said}</p>
+            <p id="store-rating">{ratings.said}</p>
             <p id="store-description">{store.description}</p>
             <p id="menu-line">{line}</p>
 
@@ -848,6 +854,21 @@ user page StorePage(id: StoreId) {
                     </ready>
                     <failed><p>No recommendations right now</p></failed>
                 </stream>
+            </section>
+
+            <!-- TRACK SEAM (reviews): what its customers said, each from a
+                 delivered order, without who said it (ADR-0341). -->
+            <section aria-labelledby="reviews-heading">
+                <h2 id="reviews-heading">What customers said</h2>
+                {#if ratings.reviews}
+                    <ul id="reviews">
+                        {#each ratings.reviews as review (review.id)}
+                            <li><p class="stars">{review.stars} out of 5</p><p class="comment">{review.comment}</p></li>
+                        {/each}
+                    </ul>
+                {:else}
+                    <p id="no-reviews">No reviews yet.</p>
+                {/if}
             </section>
         </main>
     }
@@ -1060,6 +1081,7 @@ user page HomePage() {
                         <h2><a href="/stores/{store.id}">{store.name}</a></h2>
                         <p class="cuisine">{store.cuisine}</p>
                         <p class="open">{store.said}</p>
+                        <p class="rating">{store.rating}</p>
                         <p>{store.description}</p>
                     </li>
                 {/each}
@@ -1113,6 +1135,8 @@ user page OrderPage() {
     let order = query Order(current_user())
     // TRACK SEAM (order-total): what it was charged.
     let charged = query OrderTotal(current_user())
+    // TRACK SEAM (reviews): its stores to rate, once it is delivered.
+    let rate = query OrderRatings(current_user())
     // Step eight: why an order was not taken back.
     signal notice: String = ""
 
@@ -1163,6 +1187,16 @@ user page OrderPage() {
             </section>
             {:None}
             {/match}
+            <!-- TRACK SEAM (reviews): once it is delivered, each of its
+                 stores to rate, or what the reader gave it (ADR-0341). -->
+            {#if rate}<section aria-labelledby="rate-heading">
+                <h2 id="rate-heading">Rate your order</h2>
+                <ul id="rate-links">
+                    {#each rate as link (link.store)}
+                        <li>{#if link.open}<a href="/order/rate/{link.store}">{link.said}</a>{:else}{link.said}{/if}</li>
+                    {/each}
+                </ul>
+            </section>{/if}
             <!-- Why an order was not taken back: in the page from the first
                  byte, as a live region is, outside what a server value
                  decides, which the browser does not render again. -->

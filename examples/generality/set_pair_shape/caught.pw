@@ -1,0 +1,23 @@
+// @status: GENERAL
+// @invariant: set_pair_shape
+// @dimension: a reader passed along — the keyed read takes a second parameter, which its set form does not
+//
+// Structurally different from R-078: the set form answers each day's hours
+// with its store, as the shape asks, and takes a list of stores. What it
+// lacks is the day the keyed read is also given. A set form is given what the
+// keyed read is, with its key made a list, or a loop's reads could not be it.
+
+module generality.hours_by_day
+
+import List
+
+type DayHours = DayHours { store: Int, day: Int, open: Bool }
+
+type DayHoursOf = DayHoursOf { store: Int, hours: DayHours }
+
+fn hours_of(store: Int, day: Int) -> Result<DayHours, String> !{ database.read<DayHours> }
+    host "generality:data/day-hours#for-store"
+    set  hours_of_stores
+
+fn hours_of_stores(stores: List<Int>) -> List<DayHoursOf> !{ database.read<DayHours> }
+    host "generality:data/day-hours#for-stores"

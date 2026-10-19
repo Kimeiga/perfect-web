@@ -1,8 +1,8 @@
 ADR-0177 - a public read whose origin fails is answered with the last value kept
 
 produced by: just e14-last-known-good
-commit: c3a596048c572c8592ce336ede4fcb417847e5ed
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38451028940 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: e2a4acd960c88144e3b40e7a6e9d9b8bd774ee1a
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38909882781 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
@@ -17,30 +17,30 @@ test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 == PW0343 (compiler/pw-core/src/rules.rs)
 
 test rules::tests::a_last_known_good_fallback_is_public_data_alone ... ok
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 184 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 185 filtered out; finished in 0.00s
 
 == the development server (pw-dev-server)
 
 test tests::a_failed_origin_is_answered_with_the_last_public_value_kept ... ok
-test result: ok. 498 passed; 0 failed; 9 ignored; 0 measured; 0 filtered out; finished in 526.13s
+test result: ok. 586 passed; 0 failed; 9 ignored; 0 measured; 0 filtered out; finished in 766.78s
 
 == the page, in three engines (e2e/controls.spec.mjs)
 
-  15 passed (2.7m)
+  15 passed (3.6m)
 
 == mutation controls (scripts/last_known_good_mutations.py)
 
 baseline (resource): 65 passed, 0 failed
-baseline (core): 192 passed, 0 failed
+baseline (core): 193 passed, 0 failed
 baseline (server): 1 passed, 0 failed
 nothing is answered with what was kept [resource]: KILLED (2 of 65 tests fail)
 a private manifest's read is answered with what was kept [resource]: KILLED (1 of 65 tests fail)
 a private value kept under a public read's key answers it [resource]: KILLED (1 of 65 tests fail)
 `expire` expires nothing [resource]: KILLED (1 of 65 tests fail)
 an expired value is still fresh [resource]: KILLED (1 of 65 tests fail)
-PW0343 is not raised [core]: KILLED (1 of 185 tests fail)
-PW0343 is raised for public data [core]: KILLED (3 of 185 tests fail)
-the plan does not carry `fallback` [core]: KILLED (1 of 192 tests fail)
+PW0343 is not raised [core]: KILLED (1 of 186 tests fail)
+PW0343 is raised for public data [core]: KILLED (3 of 186 tests fail)
+the plan does not carry `fallback` [core]: KILLED (1 of 193 tests fail)
 the manifest does not read `fallback` [server]: KILLED (1 of 1 tests fail)
 the store's control does not expire what was kept [server]: KILLED (1 of 1 tests fail)
 the store's origin does not fail [server]: KILLED (1 of 1 tests fail)

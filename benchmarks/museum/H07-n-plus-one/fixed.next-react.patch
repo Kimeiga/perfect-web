@@ -1,0 +1,23 @@
+diff --git a/app/stores/[storeId]/page.tsx b/app/stores/[storeId]/page.tsx
+index e4405aa..75ddf81 100644
+--- a/app/stores/[storeId]/page.tsx
++++ b/app/stores/[storeId]/page.tsx
+@@ -1,5 +1,5 @@
+ import { notFound } from "next/navigation";
+-import { getCart, getMenu, getPrice, getStore, lineCount } from "@/lib/store";
++import { getCart, getMenu, getPrices, getStore, lineCount } from "@/lib/store";
+ import { currentSession } from "@/lib/session";
+ import { addToCartAction, clearCartAction } from "./actions";
+ 
+@@ -13,9 +13,8 @@ export default async function StorePage({
+   const menu = getMenu(storeId);
+   if (!store || !menu) notFound();
+   const cart = getCart(await currentSession());
+-  // Each item's price, its reads started together (Promise.all), as
+-  // independent reads are started in a Server Component.
+-  const prices = await Promise.all(menu.map((item) => getPrice(item.id)));
++  // Every item's price in one round trip.
++  const prices = await getPrices(menu.map((item) => item.id));
+ 
+   return (
+     <main>

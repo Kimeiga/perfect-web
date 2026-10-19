@@ -31,6 +31,13 @@ STORE_DATA = ROOT / "spikes/own-renderer/server/src/store.rs"
 STORE = ROOT / "examples/store/app.pw"
 
 # (what, suite, file, anchor, replacement)
+# The mutants the checker refuses, by the rule that is the protection each
+# takes away (`scripts/mutant_programs.py`): every other mutant here
+# leaves a program that checks.
+CHECKED = {
+    'the page waits for the estimate': {'PW5401'},
+}
+
 MUTANTS = [
     (
         "the recommendations are kept for no time",

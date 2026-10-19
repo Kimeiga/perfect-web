@@ -95,6 +95,44 @@ rulings below.
   done and green, rebasing it onto `master`, numbering its ADRs, writing the
   status documents, and running the chain.
 
+## The integrator's working rules
+
+Each learned from a correction logged below, and written here on
+2026-10-14, when the work moved to another machine, so that no machine's
+session notes alone keep them:
+
+- **Push only on green**: `just ci > log 2>&1 && git push`, never `;` (a
+  `;` pushed a red track on 2026-10-12). A gate in a `&&` chain is never
+  piped: `gate | tail && commit` commits on a failed gate.
+- **Merge, resolve, fetch, then number** (ADR-0281's fourth rule):
+  numbering an ADR rewrites lines that recipes read.
+- **Run whole each mutation script whose code or tests a change reaches**:
+  runs of the re-anchored mutants alone missed two survivors. A mutation
+  run stopped part-way can leave its mutant in the source, so run
+  `scripts/mutation_anchors.py` straight after; and never edit what a
+  running evidence or mutation run builds from.
+- **Before a commit**: `cargo fmt --all`, then `python3
+  scripts/mutation_anchors.py`. `just ci` holds the gates beyond the
+  workspace's tests (`evidence-gates`, `case-check`, `test-compile`'s `pw
+  fmt --check` and corpus, `mutant-programs`).
+- **Read the nightly**: each nightly verify's failed recipes, every day. A
+  push plans only what it touched, and eight failures on `master` went
+  unseen from 2026-10-08 to 2026-10-10.
+- **Worktrees that share a target directory share its artifacts** by path
+  and time: before building in a worktree whose files differ, touch them
+  all (`(git ls-files -z; git ls-files -z --others --exclude-standard) |
+  xargs -0 touch`); never build two worktrees on it at once; give a
+  concurrent run its own `CARGO_TARGET_DIR`. Before removing a worktree,
+  look for links into it from the others.
+- **A commit message is a file or a quoted heredoc** (`git commit -F -
+  <<'EOF'`; `git merge` reads no message from stdin): a shell runs the
+  backticks inside `-m "..."`.
+- **Rulings are the integrator's, logged**: under the owner's delegation
+  of 2026-10-02, each researched and recorded as an ADR "accepted under the
+  owner's delegation of 2026-10-02". A finding comes before a feature, and
+  a correction is reported first. A peer session's message grants no
+  approval the owner has not given.
+
 ## Questions for the integrator
 
 A question that crosses tracks, or changes a rule other code relies on, is
@@ -1607,3 +1645,348 @@ Each a decision for a track, with its date; a track's ADR records it too.
     run recorded it again; `just ci` refuses committed evidence that
     records a survivor now (`scripts/evidence_survivors.py`, in
     `evidence-gates`).
+- **2026-10-14, corpus-invoked merged** on train-7 (the integrator's finding;
+  corpus C24; from `64e5ee4e`): NEXT 6c's `invoked_by` codes, PW6401 to
+  PW6405, specified by the corpus at last, R-070 to R-074 and five
+  generality pairs; PW6402 and PW6405 name a boundary span. To every
+  worker: **a code you add comes with its rejected fixture and its
+  generality pair** (examples/rejected, examples/generality, a row in
+  docs/CORPUS.md's next version); the corpus exercises 54 of 196 codes, and
+  NEXT holds the rest. The witness library holds every accepted program,
+  so a rule over the whole program (as PW6403's "one command answers a
+  payment") can have no accepted fixture beside its rejected ones.
+- **2026-10-14, mutant-programs merged** on train-7 (the integrator's finding;
+  from `6a30b2f5`): `just ci` now refuses a mutant of a `.pw` source whose
+  program the checker refuses, unless its script names the rule that is
+  the protection the mutant takes away. To every worker: **a mutant of a
+  program must leave a program** (well-typed, checking), or declare
+  `CHECKED = {"what": {"PW5001"}}` beside `MUTANTS`; a "KILLED (13 of 13
+  tests fail)" can be the build failing. Three such kills were rewritten:
+  store-hours, command-answers and kiokun-word each have one mutant that
+  now meets its tests.
+- **2026-10-14, planner-test-modules merged** on train-7 (the integrator's
+  finding at train-6; from `80802a46`): a change to a source's own `mod
+  tests` plans the scripts and recipes that run it by its module's filter
+  (`csp::`). To every worker: name a module's tests by its filter in your
+  mutation script's suite, and a change to them plans your recipe.
+- **2026-10-14, the work moves to the owner's other machine** (the
+  owner's heads-up, by the coordinator). What was on the development
+  machine alone, and where it is now:
+  - **Train-7** (`track/train-7`, `2fad034d`, pushed) was in its verify,
+    run 38629460236, its 20 recipes on 17 shards and three engines. To
+    land it (ADR-0281), with the run green: `just evidence-fetch
+    38629460236` in the train's worktree; the run named where STATUS says
+    `TRAIN_RUN` (three entries); an entry here, "train-7 landed"; `just
+    case-check`, `python3 scripts/mutation_anchors.py`, `just
+    evidence-gates` and `cargo test -p pw-core --test evidence_is_current`;
+    the commit "Evidence of train-7 (verify 38629460236)"; then on `master`
+    `git merge --ff-only track/train-7`, and both pushed. A recipe that
+    failed is fixed on the train, its push's own run cancelled and the
+    recipe dispatched (`gh workflow run verify --ref track/train-7 -f
+    recipes="..."`), and both runs fetched, as train-6's landing was
+    (above).
+  - **The JSON-LD draft** (`track/structured-data`, `1602920f`, JSON as a
+    typed value, parked with NEXT's JSON-LD) is pushed as
+    `parked/structured-data`: a `parked/` branch runs no verify, and it is
+    not to merge as it is.
+  - **Scheduled orders' design** is NEXT 4's text, W9's after 4b.
+  - **W9's 4b and 4c** (`track/bounded-statements`, `track/bounded-reads`)
+    are pushed by W9 and join train-8; 4b's `store_accounts_mutations.py`,
+    run whole, and its `just e14-bounded-statements` evidence are still to
+    do.
+  - **Checked and not pushed**: two old local branches,
+    `baseline-names` and `host-binding-shape`, and a stash of
+    test-controls' narrowed suite, each on `master` in another form
+    (`scripts/mutation_baseline.py`, ADR-0262, `test_controls_mutations.py`);
+    no other local commit of the integrator's lacks a remote.
+  - **Waiting for a quiet machine**: `just e9-latency`, check-latency's
+    number, was measured under a load of about 10 on 2026-10-14 and not
+    recorded.
+- **2026-10-14, train-7 landed** (`track/train-7`, verify 38629460236):
+  corpus-invoked, mutant-programs and planner-test-modules, merged above.
+  - **What it carries.** Corpus C24: NEXT 6c's `invoked_by` codes, PW6401
+    to PW6405, specified by the corpus (R-070 to R-074 and five generality
+    pairs). A mutant of a program's source is still a program: `just ci`
+    refuses a mutant whose program the checker refuses, unless its script
+    names the rule the mutant takes away. A source's own test module plans
+    what runs it: a change to a `mod tests` plans the scripts and recipes
+    that run it by its module's filter.
+  - **Its run: 20 recipes on 17 shards and the three engines, all green.**
+    22 jobs, every one a success, and 508 of 508 mutants killed over the 20
+    recipes, whose evidence is fetched at `2fad034d` (20 files, none
+    refused as stale). The longest shard, `recipes 0`, held `e14-refusal`
+    alone and took 318 minutes of the 345-minute limit (`e14-refusal`
+    itself 18930 s; train-6's longest shard took 313).
+  - **The red GitHub `ci` is not train-7's.** Since 2026-10-14, `ci`'s
+    "licenses and advisories" job (`cargo deny`) fails on every branch:
+    eleven advisories, RUSTSEC-2026-0353 to 0364 (the job reports no
+    0360), against Wasmtime 48.0.5, each fixed by 48.0.6. Train-7's own
+    `ci` run (38629460404) was green at 20:07 UTC; the runs from 21:33 UTC
+    on, of every branch, are red in that job. `track/wasmtime-48-0-6`
+    (Wasmtime 48.0.6) fixes it, and leads train-8. This landing's push will
+    be red in the same job for the same reason.
+  - **Its local `just ci` on the PC failed one test, `check_latency`, and
+    not for train-7.** A cold check took longer than its 2,000 ms ceiling
+    while about a dozen workers kept the load average at 60 to 110; every
+    other test passed. Alone, at a load of 7, it passed (2 of 2, 19.5 s),
+    and so did the two gates the failure had stopped (`test-compile`,
+    `mutant-programs`: 237 mutants, 11 refused by their named rule, none
+    failing). A wall-clock ceiling measures the machine's load as well as
+    the compiler: `track/evidence-integrity` bounds it by the checking
+    thread's CPU time.
+  - **Landed from the owner's PC.** The work moved to the owner's PC
+    (WSL2) on 2026-10-14, and that machine's coordinator session landed
+    this train, by the steps of the move entry above.
+- **2026-10-15, train-8** (`track/train-8`, from `master` at `bb2847f6`;
+  the integrator's delegate, on the PC): seven merges, each its own merge
+  commit with its ADR numbered and its documents, merged, resolved, then
+  numbered (ADR-0281).
+  - **What it carries.** Wasmtime 48.0.6 for RUSTSEC-2026-0353 to 0364
+    (ADR-0335; track `wasmtime-48-0-6`, from `af18141a`), first, as every
+    branch's "licenses and advisories" job is red until it lands; NEXT 4b,
+    the store's reads by set and every operation's, page's and command's
+    statements pinned at two data sizes (ADR-0336, W9's; from `a59a18a3`);
+    the 4c design note (ADR-0337; from `8bc1fe68`); development on Windows
+    inside WSL2 (track `pc-setup`, from `c7f4630b`; no ADR); the
+    three-database note (ADR-0338; from `b60a9c71`); the Docs app's note
+    (ADR-0339; from `2f5e51fb`); and the capability matrix
+    (`track/capabilities`, `700d6ee1`, never pushed: its own `just ci`
+    failed `check_latency` alone), refreshed for this train.
+  - **4b's own run** (38641214685) was cancelled by a concurrency group, and
+    its local evidence is the PC's, on PostgreSQL 18.6: `just
+    e14-bounded-statements` 4 passed and 7 of 7 mutants killed,
+    `store_accounts_mutations.py` whole 37 of 37, chromium 381 passed. The
+    train's run is its record. The Wasmtime track's runs were green
+    (`ci` 38668653495, its advisory job among them; `verify` 38668653510);
+    pc-setup's `verify` (38659086865) green and its `ci` red in the
+    advisory job alone.
+  - **Rulings (the integrator's), dated**:
+    - 2026-10-14, ADR-0335's questions: `wasm_function_references(false)`
+      is a hardening track of its own (NEXT), not this bump; the E0 spike's
+      evidence stays historical (ADR-0116); the macOS digest is checked at
+      the Mac's next `just bootstrap`. The owner approved the release's
+      downloads on 2026-10-14; `just bootstrap` installed 48.0.6 in the
+      train's worktree, Koka's archive copied from the main checkout so
+      that nothing else was fetched.
+    - 2026-10-14, the 4c note (ADR-0337) accepted; its build order: (1)
+      the render merge, one snapshot per render and identical calls made
+      once (`track/render-merge`); (2) PW0405, `set` pairs, `sets` and
+      PW0406 (`track/bounded-checker`); (3) the conformance suite; (4) the
+      store's composites moved above the seam, one at a time.
+    - 2026-10-15, the three-database note (ADR-0338) accepted with its
+      amendments: an app's data declared in Pleris, one generic adapter per
+      database, no app-specific Rust. D1 `tables` is in flight on
+      `track/tables`; D2, the memory adapter with TodoMVC, is next; the
+      owner's decisions 1 to 7 come before T3, T4 or T5. Its decision 5.5
+      and the 4c note's suite are one suite: written once against the
+      DataLayer seam, run first against today's hand-written layers, and
+      generated for every declared table later.
+    - 2026-10-15, the Docs app's note (ADR-0339) accepted with its
+      amendments; its downloads wait for the owner's approval.
+  - **Open findings, in KNOWN_LIMITATIONS with their tracks**: an
+    effectful call in an `{#each}`'s head (`track/each-head-effects`); an
+    opaque type's invariant on a command's arguments
+    (`track/argument-invariants`); `pw check` passing what `pw build`
+    refuses (`track/check-is-build`); and the evidence's integrity, stale
+    bytecode, counts unchecked against their scripts, the corpus's
+    `@rule` headers and `check_latency` under load
+    (`track/evidence-integrity`).
+- **2026-10-15, train-8 landed** (`track/train-8`, verify 38773359015):
+  the Wasmtime bump (ADR-0335), NEXT 4b (ADR-0336), the 4c, three-database
+  and Docs notes, each ruled (ADR-0337 to ADR-0339), pc-setup, and the
+  capability matrix, merged above.
+  - **Its run: 10 recipes on 8 shards and the three engines, all green.**
+    13 jobs, every one a success, in 1 h 45 min, and 193 of 193 mutants
+    killed over the 10 recipes, whose evidence is fetched at `1824590b` (10
+    files, none refused as stale). Among them `e14-bounded-statements`'
+    first record: 4 passed and 7 of 7 killed on PostgreSQL 18.6. The
+    longest shard, `recipes 4 on PostgreSQL`, held `e14-store-postgres`
+    alone and took 105 minutes (the recipe itself 6154 s).
+  - **GitHub's `ci` is green again** (38773359011, on `1824590b`): its
+    "licenses and advisories" job passed with Wasmtime 48.0.6, the first
+    green since 2026-10-14 21:33 UTC, and both build-and-test jobs passed
+    on pc-setup's workflows (Node 24 actions, just 1.58.0 pinned).
+  - **Its local `just ci` passed whole** on the PC (exit 0, 32 minutes, at
+    a load of 11 to 46): 336 test binaries and none failing, `check_latency`
+    among them (2 of 2, 40 s), and `mutant-programs` (237 mutants, 11
+    refused by their named rule, none failing).
+  - Landed from the PC by the integrator's delegate, across two usage
+    cut-offs, from its progress file.
+- **2026-10-15, train-9** (`track/train-9`, from `master` at `22a0508e`;
+  the integrator's delegate, on the PC): four merges, each its own merge
+  commit with its ADR numbered and its documents, merged, resolved, then
+  numbered (ADR-0281), and four small commits.
+  - **What it carries.** NEXT 4c's checker (ADR-0340, track
+    `bounded-checker`, from `e5b8cdb9`): a read keyed by its loop's element
+    refused (PW0405), `set` pairs held to their shape (PW0407), `sets` and
+    PW0406; corpus C25. Ratings and reviews (ADR-0341, W9's, from
+    `2190221c`), the DoorDash customer side's last piece but scheduled
+    orders. The bug museum and the head-to-head's protocol (ADR-0342, track
+    `proof`, from `11531dba`). The guide whose examples compile (ADR-0343,
+    track `guide`, from `49967631`), taken with the coordinator's leave
+    once it was pushed on green, before this train's `just ci` ran again.
+    And: the store page's two pinned shapes brought to its ratings
+    (`0483e495`); `scripts/doctor.sh` and `scripts/record-environment.sh`
+    executable again (train-8's finding); `statements_separated.rs`'s stale
+    `ADR-XXXX`, ADR-0303; and `bounded_reads`' store test brought to the
+    loop reviews changed (`ed5d0bb2`, below).
+  - **The tracks' own runs.** `bounded-checker`'s verify (38780144526) and
+    `proof`'s (38734336242) green, each one's `ci` red only in "licenses and
+    advisories", Wasmtime 48.0.5's, fixed on `master` by ADR-0335.
+    `reviews`' verify (38781487357) ran its 58 recipes green, the three
+    scripts its seams re-anchored among them, and failed its three browser
+    jobs (the finding below), fixed on the train. `guide`'s verify and `ci`
+    green at `49967631`, with train-8 merged (38815010191, 38815009873).
+  - **Its local `just ci`, twice.** The first (21:22 to 21:53Z, at a load
+    of 30 to 56) failed two targets: `bounded_reads` (the finding below) and
+    `check_latency`, a wall-clock ceiling under that load. The second, on
+    `a2dc1354` with the fix and the guide merged, passed whole (exit 0,
+    22:58 to 23:21Z, at a load of 12 to 54): 338 test binaries, 2,947 tests
+    and none failing, `check_latency` among them (2 of 2, 18.8 s), and
+    `mutant-programs` (248 mutants, 11 refused by their named rule, none
+    failing). The gates before it: anchors 3,042 mutants in 266 scripts,
+    case-check 2,696 paths, evidence-gates 168 tests.
+  - **Rulings and answers (the integrator's, 2026-10-15)**, in each ADR:
+    - ADR-0340: kiokun's two-value key is a list of key records, so that no
+      layer derives a key in app-specific Rust, built with the kiokun track
+      or D1's key records; the pair's key field is matched by name in a
+      follow-up track, `pair-key-by-name`, and not claimed until then. The
+      store's own pair (`set hours_of_stores` with `sets one_call`) is not
+      written at the merge: NEXT 4c holds it.
+    - ADR-0341: its browser hosts are PORT + 200 to 202 (+190 to 192 are
+      the payments hosts' providers'); the three scripts its seams
+      re-anchored (`descriptions`, `store_hours`, `store_search`) are run
+      whole by the train's verify, their record; KNOWN_LIMITATIONS says
+      reviews are public and unmoderated, with no merchant side.
+    - ADR-0342: H07, below. Its question, whether the own renderer's
+      Playwright config should start only the hosts a spec needs, is not
+      ruled here: open.
+    - ADR-0343: the root README's link to the guide is kept; the
+      guestbook's hosts are PORT + 210 to 212, beside the reviews'; its
+      reference of codes regenerated at the merge for PW0405 to PW0407, as
+      its §3 asks; `mutant_programs.py`'s guestbook entry is open; the
+      checks' gaps go to their tracks, and the two with none (`<img>` with
+      no `alt`, `&&`'s message) to KNOWN_LIMITATIONS.
+  - **A finding, the museum working as meant: its first closed miss.**
+    Merged after ADR-0340 on the same train, the museum's `--checks-only`
+    run failed: H07's unchanged program, an N+1 read (`List.map` over
+    `Menus.price`), came out "refused after all (PW0405)" where its exhibit
+    expected a miss. A miss that starts being refused fails the recipe
+    until the exhibit says so, and the exhibit says so now, resolved in the
+    merge: "refused, PW0405: a miss the museum found, closed by ADR-0340's
+    checker", its patch, spec and reproduction unchanged, and a fourth
+    mutation control (`proof_mutations.py`, 4 of 4 killed).
+  - **A finding: a track's own suites missed two pinned shapes of the page
+    it changed.** `reviews` added a rating line and a reviews region to the
+    store's page; `accessibility.spec.mjs` (a screen reader's tree, a
+    serial file whose eight later tests then did not run) and
+    `store.spec.mjs` (the count of identity anchors, 84 then 88) still
+    described the page before it, in every engine. Its local `just ci` runs
+    no browser, and its own spec passed, so only its verify saw them. On
+    the train both files passed in the three engines (92 passed, 1
+    skipped). To every worker: a change to a page runs the browser suites
+    that pin that page's shape, not only its own spec, before its push.
+  - **A finding: two merges met in one line, which only the train saw.**
+    `bounded_reads`' store test (ADR-0340) edits `StoresOpen`'s loop in
+    `hours.pw` to read each store's hours in it and expects PW0405 there;
+    ADR-0341 had given that loop each store's ratings, so the line was gone
+    and the train's first `just ci` failed the test before it checked
+    anything. Each track was green alone. The test now edits the merged
+    line, the same refusal word for word (`ed5d0bb2`), and
+    `bounded_checker_mutations.py` ran whole again on the train, 40 of 40.
+    A train's `just ci` is where its tracks meet; a test that edits another
+    track's program text by its exact line is where they meet first.
+  - **A record's count, unchecked**: `bounded-checker`'s commit `1f0d772f`
+    says "41 in all" of a script that has 40 mutants (its ADR and its run
+    say 40); `track/evidence-integrity`'s family of findings.
+
+
+- **2026-10-16, train-9 completion and scheduler write ordering (ADR-0352).**
+  The integrator reproduced a late real signed webhook after an incomplete
+  stable statement snapshot, then a real PostgreSQL40001 settlement/cleanup
+  overlap. StorePg/FeedPg ran/retry now acquire the existing instance write
+  guard before the connection, and exact successful count witnesses wait on
+  the post-settlement marker. Strict12/12 has13 retained actual native Cargo
+  records; fresh same-input CI is green (2954 Rust passes/25ignored), with
+  all2280 frozen source/config inputs restored. Older112 reported whole kills
+  lack retained individual native statuses/raw and remain qualified history;
+  the old2222 inventory omitted55 quoted Unicode sample fixtures. Current
+  receipt: docs/evidence/E14/train9-bounded-strict-validation.json. Failed
+  verify38863242953 remains failed; new exact-head remote CI/verify, green
+  evidence fetch and main landing are pending. No cross-host serialization,
+  count relaxation or automatic payment retry is introduced.
+
+- **2026-10-17, train-9 landed** (`track/train-9`, verify 38909882781):
+  the bounded checker (ADR-0340), ratings and reviews (ADR-0341), the bug
+  museum with H07 its first closed miss (ADR-0342) and the guide (ADR-0343),
+  merged above, with the two corrections that followed the train's first
+  push: the description controls, and the payment statement counts and the
+  scheduler's write order (ADR-0352).
+  - **Its run: 85 recipes on 40 shards and the three engines, all green.**
+    45 jobs, every one a success, in 5 h 38 min, and 1,391 of 1,391 mutants
+    killed over 79 of the 82 files fetched (`e10-build`, `e10-handlers` and
+    `e10-i` record test results, not mutants; three more recipes,
+    `e10-component`, `e8-contracts` and `e8-wit`, write no file), and no
+    memory bound stopped a process. The evidence is fetched at `e2a4acd9`:
+    82 files, none refused as stale, 80 of them rewritten and 2 new to the
+    tree (`e14-bounded-reads`, 40 of 40, and `e14-guide`, 74 of 74), and
+    the seconds of all 85 recipes in `scripts/ci_seconds.json`. The
+    longest shard, `recipes 37 on PostgreSQL`, took 5 h 27 min (three of
+    the 40 shards run on PostgreSQL); the longest recipe, `e14-refusal`,
+    4 h 34 min (16,444 s).
+  - **The museum's H07 is refused in CI's record.** `e14-museum` ran on CI
+    for the first time: 5 exhibits, 5 refused, 0 missed, 0 not as expected,
+    H07's unchanged program refused by PW0405 (`Menus.price` reads `Menus`
+    once for each element of `items`), and `proof_mutations.py` 4 of 4
+    killed.
+  - **GitHub's `ci` is green** (38909883157, on `e2a4acd9`): its 3 jobs,
+    "licenses and advisories" and the two build-and-test jobs, in 1 h 19
+    min; the `failure-census` run (38909883362) too.
+  - **Two red runs came first, each failing one recipe, each repaired.**
+    - 38823189869 (on `1f370fd9`, 4 h 56 min): 82 recipes, one failed,
+      `e14-descriptions`, 8 of 9 controls killed. The WebKit control that
+      removed the store's selected paragraphs no longer removed what it was
+      named for: the page had grown other text to paint, and WebKit painted
+      before the slots filled all the same. `289068a6` retired it for a
+      control that withholds the page's initial HTML shell while its slots
+      settle, aimed at the first-paint-before-fill assertion alone, and made
+      the script fail where its restored-source browser check fails (9 of 9
+      killed on this run). The same commit isolated the unit-test servers
+      from the PC's Kiokun dataset (`KIOKUN_DATA` and `KIOKUN_APP`, which
+      16 server tests of the local `just ci` had read while another process
+      was changing it): they now choose the committed sample themselves,
+      production startup still reads its configured dataset, and
+      `e14-kiokun-test-data` holds it (2 of 2 killed).
+    - 38863242953 (on `289068a6`, 3 h 58 min): 84 recipes, one failed,
+      `e14-bounded-statements` (113 s):
+      `placing_and_settling_where_payments_are_taken_is_bounded` failed its
+      exact statement count. The test took two equal tallies 300 ms apart to
+      mean a payment had completed, and a delayed signed webhook leaves a
+      stable, incomplete tally (reproduced with the real provider event
+      held: [25] before its release, [25, 14] after). Repairing it found a
+      second defect, a real PostgreSQL 40001 between a settlement and the
+      scheduler's cleanup of the same row; the old pin of 12 statements for
+      the sweep's settlement was the count of that aborted attempt.
+      `e2a4acd9` (ADR-0352): a scenario waits for the post-settlement
+      success marker before it copies the tally; `StorePg`'s and `FeedPg`'s
+      `ran` and `retry` take the instance's existing write guard before a
+      pool connection, so one instance's scheduler writes and its command
+      staging are ordered (a second host's serializable refusals remain
+      possible, and no payment is retried by itself); the pin is 14; the
+      script holds 12 controls, from 7, all killed on this run; and it
+      refuses a Cargo result that is a build error, a stopped process or
+      self-contradictory (`cargo_test_results.py`).
+  - **Finished by another agent between sessions.** The train was
+    assembled by the integrator's delegate, finished by another agent
+    (Codex) between that delegate's sessions (`289068a6`, `e2a4acd9`, and
+    the entry above, with the integrator's rulings in ADR-0352), and landed
+    by a third session from the PC, which changed no code: it fetched this
+    run's evidence, recorded the run, and pushed. Wording that has this
+    run still to come (exact-head remote gates pending, and the like) in
+    ADR-0352's status line, STATUS's two train-9 paragraphs at its top,
+    NEXT's landing gate, KNOWN_LIMITATIONS' scheduler entry, DECISIONS'
+    ADR-0352 entry and the entry above is from before this run, whose
+    record this entry is.
+  - **Still open from the repairs**: Kiokun's search cache, whose
+    publication and version lifetime under concurrent builds NEXT's
+    integration follow-up will reproduce with private fixtures and repair.

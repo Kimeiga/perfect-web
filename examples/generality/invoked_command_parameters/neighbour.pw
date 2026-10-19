@@ -1,0 +1,16 @@
+// @status: NEIGHBOUR
+// @invariant: invoked_command_parameters
+//
+// The clock's command takes the parameters its scheduler gives it: any
+// number, of any type.
+
+module generality.clock_parameters
+
+import domain.{ InteractionId }
+
+command remind(order: String, times: Int) -> Result<Int, String>
+    invoked_by    Clock
+    idempotent_by InteractionId
+{
+    Ok(times)
+}

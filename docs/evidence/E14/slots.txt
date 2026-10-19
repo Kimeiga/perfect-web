@@ -1,8 +1,8 @@
 ADR-0165 - the store's delivery estimate and recommendations
 
 produced by: just e14-slots
-commit: 92fdd6e34743e33a80914939976125a9eb307842
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38559878637 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: e2a4acd960c88144e3b40e7a6e9d9b8bd774ee1a
+ci: https://github.com/Kimeiga/perfect-web/actions/runs/38909882781 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 playwright: Version 1.58.0
 
@@ -16,22 +16,22 @@ test a_stream_is_a_part_with_its_query_and_its_arms ... ok
 test one_the_page_waits_for_is_not_streamed ... ok
 test the_plan_names_each_stream_with_its_query_s_policies ... ok
 test the_store_streams_its_estimate_and_its_recommendations ... ok
-test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 17.65s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.49s
 
 == the store checks
 
-pw check: 63 file(s), no diagnostics
+pw check: 66 file(s), no diagnostics
 
 == the development server (pw-dev-server)
 
 test tests::a_menu_change_drops_that_stores_kept_menu_only ... ok
 test tests::a_menu_change_drops_that_stores_recommendations_only ... ok
 test tests::the_store_sends_its_slots_after_its_own_content ... ok
-test result: ok. 560 passed; 0 failed; 9 ignored; 0 measured; 0 filtered out; finished in 1317.84s
+test result: ok. 586 passed; 0 failed; 9 ignored; 0 measured; 0 filtered out; finished in 842.88s
 
 == the slots, three engines (e2e/slots.spec.mjs)
 
-  21 passed (5.6m)
+  21 passed (3.8m)
 
 == mutation controls (scripts/slots_mutations.py)
 

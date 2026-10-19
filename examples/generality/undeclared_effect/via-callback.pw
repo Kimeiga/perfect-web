@@ -12,6 +12,8 @@ import List
 import domain.{ Store, StoreId }
 import domain.{ StoreError }
 
-fn labels(ids: List<StoreId>) -> List<Result<Store, StoreError>> !{} {
-    List.map(ids, id => Stores.get(id))
+// Keyed by `home`, no element's: a read keyed by its loop's element is
+// PW0405's (4c), and this file is about the row, which the key is not.
+fn labels(ids: List<StoreId>, home: StoreId) -> List<Result<Store, StoreError>> !{} {
+    List.map(ids, id => Stores.get(home))
 }

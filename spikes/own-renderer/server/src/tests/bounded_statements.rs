@@ -64,7 +64,20 @@ fn readers_state(c: &mut postgres::Client) {
         &[&ADA, &place],
     )
     .expect("an address");
+    // TRACK SEAM (reviews): another reader, whose order from store 47 was
+    // delivered, so a rating is read and written whole.
+    c.batch_execute(&format!(
+        "INSERT INTO orders (owner, status) VALUES ('{BEA}', 'delivered');
+         INSERT INTO order_parts (order_id, position, store, subtotal, discount, funded_by,
+                                  delivery, service, small_order, taxable, tax_rate, tax)
+         SELECT id, 0, '47', 350, 0, NULL, 299, 300, 250, 350, 86250, 30
+         FROM orders WHERE owner = '{BEA}';"
+    ))
+    .expect("a delivered order");
 }
+
+/// TRACK SEAM (reviews): the reader who rates, her order delivered.
+const BEA: &str = "bea";
 
 /// Every store's id, as a list a set read takes.
 fn all_stores(c: &mut postgres::Client) -> Val {
@@ -170,6 +183,12 @@ fn arguments(op: &str, stores: &Val) -> Option<Vec<Val>> {
         "host/promos#set" => vec![crate::checkout::promo_val(
             &crate::checkout::seed_promos()[0],
         )],
+        // TRACK SEAM (reviews): every store's ratings at once, a store's
+        // reviews, and the reader's order rated.
+        "data/ratings#for-stores" => vec![stores.clone()],
+        "data/ratings#reviews" => vec![s("47")],
+        "data/ratings#for-order" => vec![s(BEA)],
+        "data/ratings#rate" => vec![s(BEA), s("47"), Val::S64(4), s("Fine.")],
         _ => return None,
     })
 }
@@ -268,6 +287,12 @@ const PINNED: &[(&str, u64)] = &[
     ("store:data/orders#placed", 1),
     ("store:data/places#list", 0),
     ("store:data/promos#find", 1),
+    // TRACK SEAM (reviews): each one statement, `#rate` its order read again
+    // and its row written.
+    ("store:data/ratings#for-order", 1),
+    ("store:data/ratings#for-stores", 1),
+    ("store:data/ratings#rate", 2),
+    ("store:data/ratings#reviews", 1),
     ("store:data/recommendations#for-store", 3),
     ("store:data/search#find", 2),
     ("store:data/search#find-for", 4),
@@ -426,6 +451,48 @@ fn steps(more: bool) -> Vec<(String, u64)> {
     step("/order", &|| {
         fetched_as(&s, "/order", Some("a"));
     });
+    // TRACK SEAM (reviews): the order delivered by the kitchen's route, no
+    // reader's step; then store 47 rated, and its rate page read.
+    let delivered = posted(&s, "/bench/order?status=delivered", "a", "", "");
+    assert!(delivered.starts_with("HTTP/1.1 200"), "{delivered}");
+    // `rate_order` apart, as `place_order` is: its transaction (its
+    // operations and its commit), and the reader's open pages read again
+    // after it, which its cart's event regenerates (ADR-0218's session
+    // entry): every page the scenario left open.
+    let (txns, all) = (
+        s.data.statements_by_transaction().len(),
+        s.data.statements().expect("counted"),
+    );
+    let rated = s
+        .command_answered(
+            "store.rate.rate_order",
+            "a",
+            &[s_val("47"), Val::S64(4), s_val("Fine.")],
+            None,
+        )
+        .expect("answered");
+    assert!(rated.committed, "{rated:?}");
+    let ran = s.data.statements_by_transaction()[txns..].to_vec();
+    let after = s.data.statements().expect("counted") - all;
+    let [own] = ran[..] else {
+        panic!("rate_order's one transaction: {ran:?}")
+    };
+    out.push(("rate_order: its transaction".to_string(), own));
+    out.push((
+        "rate_order: its reader's open pages read again".to_string(),
+        after - own,
+    ));
+    let mut step = |name: &str, run: &dyn Fn()| {
+        let before = s.data.statements().expect("a layer that counts");
+        run();
+        out.push((
+            name.to_string(),
+            s.data.statements().expect("counted") - before,
+        ));
+    };
+    step("/order/rate/47", &|| {
+        fetched_as(&s, "/order/rate/47", Some("a"));
+    });
     out
 }
 
@@ -505,10 +572,12 @@ const PAGES: &[(&str, u64)] = &[
     ("add_to_cart (48)", 11),
     ("add_address", 6),
     ("choose_tip", 6),
-    ("/", 5),
-    ("/stores/47", 16),
+    // TRACK SEAM (reviews): each list's ratings one read more, the store's
+    // page two (its ratings and its reviews), the order page one.
+    ("/", 6),
+    ("/stores/47", 18),
     ("/cart", 13),
-    ("/search?q=coffee", 8),
+    ("/search?q=coffee", 9),
     ("/stores/47/address", 2),
     ("place_order, taking no payments: its operations", 33),
     ("place_order, taking no payments: its commit", 7),
@@ -516,21 +585,37 @@ const PAGES: &[(&str, u64)] = &[
         "place_order, taking no payments: its queries read again",
         21,
     ),
-    ("/order", 5),
+    ("/order", 6),
+    // TRACK SEAM (reviews): `rate_order`'s transaction (`MayRate`'s read,
+    // `#rate`'s read and its row, and its commit); the reader's open pages
+    // read again after it, the seven the scenario left open, which its cart's
+    // event regenerates; and the rate page, its store and the layout's cart.
+    ("rate_order: its transaction", 8),
+    ("rate_order: its reader's open pages read again", 42),
+    ("/order/rate/47", 2),
 ];
 
-/// **The transactions so far, once none is still running**: the provider
-/// tells the host of a cancel as it answers it, on a connection of its own,
-/// so a `settle_payment` may still be counting when the command returns.
-fn quiet(s: &Server) -> Vec<u64> {
-    let mut last = s.data.statements_by_transaction();
+/// **The transactions after exactly `completed` payment outcomes finish**.
+/// `Payments::heard` records each only after its real settlement command
+/// returns. Equal counters for an interval do not prove that completion.
+fn after_payments(s: &Server, completed: usize) -> Vec<u64> {
+    let payments = s.payments.get().expect("payments");
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
     loop {
-        std::thread::sleep(std::time::Duration::from_millis(300));
-        let now = s.data.statements_by_transaction();
-        if now == last {
-            return now;
+        let done = payments.settled.lock().expect("settled").len();
+        assert!(
+            done <= completed,
+            "expected exactly {completed} completed outcomes, got {done}"
+        );
+        if done == completed {
+            return s.data.statements_by_transaction();
         }
-        last = now;
+        assert!(
+            std::time::Instant::now() < deadline,
+            "expected {completed} completed payment outcomes, got {done}; transactions: {:?}",
+            s.data.statements_by_transaction()
+        );
+        std::thread::sleep(std::time::Duration::from_millis(10));
     }
 }
 
@@ -602,12 +687,12 @@ fn awaiting(more: bool) -> Vec<(String, u64)> {
             Some("place-2"),
         )
         .expect("answered");
-        let before = quiet(s).len();
+        let before = after_payments(s, 1).len();
         let canceled = s
             .command_answered("store.page.cancel_order", "a", &[], Some("cancel-1"))
             .expect("answered");
         assert!(canceled.committed, "{:?}", canceled.result);
-        let ran = quiet(s)[before..].to_vec();
+        let ran = after_payments(s, 2)[before..].to_vec();
         // Its own, and `settle_payment` on the provider's word of the
         // cancel, which the provider tells the host as it answers the
         // cancel (ADR-0332's step eight).
@@ -629,10 +714,10 @@ fn awaiting(more: bool) -> Vec<(String, u64)> {
             Some("place-3"),
         )
         .expect("answered");
-        let before = quiet(s).len();
+        let before = after_payments(s, 2).len();
         s.query_clock.0.advance(30 * 60 * 1000);
         assert_eq!(s.run_due().0, 1, "the sweep, run");
-        let ran = quiet(s)[before..].to_vec();
+        let ran = after_payments(s, 3)[before..].to_vec();
         // Its own, and `settle_payment` on the provider's word of the cancel
         // the sweep asks of it.
         let [expire, told] = ran[..] else {
@@ -686,6 +771,311 @@ const AWAITING: &[(&str, u64)] = &[
     ("expire_order, run thirty minutes on: its transaction", 26),
     (
         "settle_payment, on the provider's word of the sweep's cancel: its transaction",
-        12,
+        14,
     ),
 ];
+
+/// A provider may delay its webhook after answering the cancel. Unchanged
+/// counters in that interval do not prove the provider's transaction finished.
+#[test]
+fn a_pending_real_payment_webhook_is_not_a_complete_statement_count() {
+    if std::env::var("PW_STORE_TEST_LAYER").as_deref() != Ok("postgres") {
+        eprintln!("skipped: the store is not served on PostgreSQL");
+        return;
+    }
+    super::store_payments::paying(|s, provider| {
+        s.command(
+            "store.page.add_to_cart",
+            "a",
+            &add_shown("espresso", 1),
+            false,
+        )
+        .expect("added");
+        let total = s.shown_total("a");
+        let placed = s
+            .command_answered("store.page.place_order", "a", &[total], Some("held-place"))
+            .expect("placed");
+        assert!(placed.committed, "{:?}", placed.result);
+        provider.hold();
+        let before = s.data.statements_by_transaction().len();
+        let canceled = s
+            .command_answered("store.page.cancel_order", "a", &[], Some("held-cancel"))
+            .expect("answered");
+        assert!(canceled.committed, "{:?}", canceled.result);
+
+        std::thread::scope(|scope| {
+            let (started, starting) = std::sync::mpsc::channel();
+            let (sent, received) = std::sync::mpsc::channel();
+            scope.spawn(move || {
+                started.send(()).expect("counting thread started");
+                sent.send(after_payments(s, 1)[before..].to_vec())
+                    .expect("the completed immutable count");
+            });
+            starting
+                .recv_timeout(std::time::Duration::from_secs(5))
+                .expect("the counting thread started");
+            let early = received.recv_timeout(std::time::Duration::from_millis(600));
+            // Always release and drain before asserting: the real signed HTTP
+            // event and compiled settlement run even if counting returned early.
+            provider.release_reversed();
+            let returned_early = early.is_ok();
+            let finished = early.unwrap_or_else(|_| {
+                received
+                    .recv_timeout(std::time::Duration::from_secs(10))
+                    .expect("the count after actual settlement")
+            });
+            eprintln!("delayed webhook: returned_early={returned_early}; completed={finished:?}");
+            assert!(
+                !returned_early,
+                "counting returned before the provider released its event"
+            );
+            assert_eq!(finished, [25, 14], "the exact completed transactions");
+        });
+    });
+}
+
+/// Separate the clock command and its actual Runs::ran cleanup only to
+/// control the production boundary that run_scheduled crosses in this order.
+#[test]
+fn sweep_cleanup_and_payment_commit_share_the_same_write_guard() {
+    if std::env::var("PW_STORE_TEST_LAYER").as_deref() != Ok("postgres") {
+        return;
+    }
+    super::store_payments::paying(|s, provider| {
+        s.command(
+            "store.page.add_to_cart",
+            "a",
+            &add_shown("espresso", 1),
+            false,
+        )
+        .expect("added");
+        let total = s.shown_total("a");
+        assert!(
+            s.command_answered(
+                "store.page.place_order",
+                "a",
+                &[total],
+                Some("overlap-place")
+            )
+            .expect("placed")
+            .committed
+        );
+        let runs = s.runs().all_runs().expect("the actual pending sweep");
+        let [run] = runs.as_slice() else {
+            panic!("one sweep: {runs:?}");
+        };
+        provider.hold();
+        s.query_clock.0.advance(30 * 60 * 1000);
+        let before = s.data.statements_by_transaction().len();
+        let behalf =
+            s.identity
+                .principals()
+                .on_behalf("clock", &format!("schedule-{}", run.id), &run.user);
+        let args: Vec<serde_json::Value> =
+            serde_json::from_str(&run.args).expect("the actual arguments");
+        let expired = s
+            .command_answer(
+                &run.command,
+                behalf.session(),
+                &args,
+                Some(&format!("schedule-{}", run.id)),
+            )
+            .expect("the actual clock command");
+        assert!(expired.committed, "{expired:?}");
+
+        let (at_commit, arrived) = std::sync::mpsc::channel();
+        let (resume, paused) = std::sync::mpsc::channel();
+        *s.before_commit.lock().expect("before commit") = Some(Box::new(move |_| {
+            at_commit
+                .send(())
+                .expect("the real settlement reached commit");
+            paused
+                .recv_timeout(std::time::Duration::from_secs(10))
+                .expect("release settlement");
+        }));
+        std::thread::scope(|scope| {
+            let provider_request = scope.spawn(|| provider.release_reversed());
+            arrived
+                .recv_timeout(std::time::Duration::from_secs(10))
+                .expect("the real signed webhook reached the commit barrier");
+            let (cleaned, cleanup) = std::sync::mpsc::channel();
+            scope.spawn(move || {
+                cleaned
+                    .send(s.runs().ran(run.id))
+                    .expect("the actual cleanup result");
+            });
+            let early = cleanup.recv_timeout(std::time::Duration::from_millis(300));
+            let cleanup_returned_early = early.is_ok();
+            // Release and drain every real operation before failure assertions.
+            resume.send(()).expect("release settlement");
+            early
+                .unwrap_or_else(|_| {
+                    cleanup
+                        .recv_timeout(std::time::Duration::from_secs(10))
+                        .expect("cleanup after the settlement releases the write guard")
+                })
+                .expect("the sweep row cleaned up");
+            provider_request
+                .join()
+                .expect("the actual HTTP webhook completed");
+            let finished = s.data.statements_by_transaction()[before..].to_vec();
+            let completed = s
+                .payments
+                .get()
+                .expect("payments")
+                .settled
+                .lock()
+                .expect("settled")
+                .len();
+            eprintln!(
+                "forced overlap: cleanup_returned_early={cleanup_returned_early}; completed_markers={completed}; transactions={finished:?}"
+            );
+            assert!(
+                !cleanup_returned_early,
+                "cleanup crossed the active serializable payment transaction"
+            );
+            assert_eq!(
+                completed, 1,
+                "the payment's actual command completed successfully"
+            );
+            assert_eq!(
+                finished,
+                [26, 14],
+                "the exact completed clock and payment transactions"
+            );
+            assert_eq!(
+                super::store_payments::status_of(s, "a"),
+                Some(("canceled".to_string(), None))
+            );
+            assert!(s.runs().all_runs().expect("runs").is_empty());
+        });
+    });
+}
+
+/// Each adapter's two scheduler writes must respect the same real command
+/// transaction lifetime. A moved run keeps its new identity and due time.
+fn scheduled_transition_waits<T>(layer: &T, retry: bool)
+where
+    T: crate::data::DataLayer + crate::schedules::Runs,
+{
+    let scheduled = |due| crate::schedules::Scheduled {
+        key: crate::schedules::key("test.expire", "[]"),
+        command: "test.expire".to_string(),
+        args: "[]".to_string(),
+        user: "private-test-reader".to_string(),
+        due_ms: Some(due),
+    };
+    let mut seed = layer.begin("private-test-session");
+    seed.commit(&[], &[], None, &[scheduled(10)])
+        .expect("the original run committed");
+    drop(seed);
+    let original = layer.all_runs().expect("the original run");
+    let [original] = original.as_slice() else {
+        panic!("one original run");
+    };
+    let old_id = original.id;
+    std::thread::scope(|scope| {
+        // This actual serializable transaction owns the adapter's guard.
+        let mut staged = layer.begin("private-test-session");
+        let (started, starting) = std::sync::mpsc::channel();
+        let (sent, received) = std::sync::mpsc::channel();
+        scope.spawn(move || {
+            started.send(()).expect("scheduler write started");
+            let result = if retry {
+                layer.retry(old_id, 1, 30, Some("private refusal control"))
+            } else {
+                layer.ran(old_id)
+            };
+            sent.send(result).expect("the actual scheduler result");
+        });
+        starting
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .expect("scheduler started");
+        let early = received.recv_timeout(std::time::Duration::from_millis(100));
+        let returned_early = early.is_ok();
+        let committed = staged.commit(&[], &[], None, &[scheduled(20)]);
+        // Release every guard and drain before asserting, also on a refusal.
+        drop(staged);
+        let finished = early.unwrap_or_else(|_| {
+            received
+                .recv_timeout(std::time::Duration::from_secs(10))
+                .expect("the scheduler write after command completion")
+        });
+        committed.expect("the moved run committed");
+        finished.expect("the real scheduler write completed");
+        assert!(
+            !returned_early,
+            "scheduler transition retry={retry} crossed an active command transaction"
+        );
+    });
+    let moved = layer.all_runs().expect("the moved run");
+    let [moved] = moved.as_slice() else {
+        panic!("one moved run");
+    };
+    assert_ne!(moved.id, old_id, "a reschedule owns a new identity");
+    assert_eq!(
+        moved.due_ms, 20,
+        "old cleanup/retry cannot change the new scheduling"
+    );
+    assert_eq!(moved.attempts, 0, "the moved run is a fresh attempt");
+    assert_eq!(
+        moved.failed, None,
+        "the moved run is not the previous refusal"
+    );
+}
+
+fn store_scheduled_transition(retry: bool) {
+    let Some(url) = database() else { return };
+    let layer = crate::store_pg::StorePg::for_test(&url).expect("private store schema");
+    scheduled_transition_waits(&layer, retry);
+}
+
+fn feed_scheduled_transition(retry: bool) {
+    let Some(url) = database() else { return };
+    struct Schema {
+        url: String,
+        name: String,
+    }
+    impl Drop for Schema {
+        fn drop(&mut self) {
+            if let Ok(mut client) = postgres::Client::connect(&self.url, postgres::NoTls) {
+                let _ = client.batch_execute(&format!(
+                    "DROP SCHEMA IF EXISTS {} CASCADE",
+                    crate::feed_pg::ident(&self.name)
+                ));
+            }
+        }
+    }
+    let schema = Schema {
+        url: url.clone(),
+        name: format!(
+            "pw_bounded_scheduler_{}_{}",
+            std::process::id(),
+            if retry { "retry" } else { "ran" }
+        ),
+    };
+    // layer drops before schema, so no live transaction is removed.
+    let layer =
+        crate::feed_pg::FeedPg::open(&url, Some(&schema.name)).expect("private feed schema");
+    scheduled_transition_waits(&layer, retry);
+}
+
+#[test]
+fn scheduled_state_writes_store_ran_waits_for_a_command() {
+    store_scheduled_transition(false);
+}
+
+#[test]
+fn scheduled_state_writes_store_retry_waits_for_a_command() {
+    store_scheduled_transition(true);
+}
+
+#[test]
+fn scheduled_state_writes_feed_ran_waits_for_a_command() {
+    feed_scheduled_transition(false);
+}
+
+#[test]
+fn scheduled_state_writes_feed_retry_waits_for_a_command() {
+    feed_scheduled_transition(true);
+}

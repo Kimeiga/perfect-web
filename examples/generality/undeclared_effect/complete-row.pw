@@ -17,6 +17,7 @@ fn record(id: StoreId) -> Result<Store, StoreError> !{ database.read<Stores>, ne
     Stores.get(id)
 }
 
-fn labels(ids: List<StoreId>) -> List<Result<Store, StoreError>> !{ database.read<Stores> } {
-    List.map(ids, id => Stores.get(id))
+// Keyed by `home`, no element's, as `caught.pw` is (4c's PW0405).
+fn labels(ids: List<StoreId>, home: StoreId) -> List<Result<Store, StoreError>> !{ database.read<Stores> } {
+    List.map(ids, id => Stores.get(home))
 }

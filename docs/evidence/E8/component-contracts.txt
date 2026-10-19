@@ -77,15 +77,17 @@ store.hours.StoreStatus  abi 8745b39c6f40cb6a
   host      store:data/hours#for-store  (database.read<Stores>)
   exports   query StoreStatus
 
-store.hours.StoresOpen  abi 83705ac29176622a
+store.hours.StoresOpen  abi 70a5dd9e12a7307f
   runs at   origin
   needs     clock.compare
   needs     clock.zone
+  needs     database.read<Ratings>
   needs     database.read<Stores>
   host      pw:host/clock#at  (clock.zone)
   host      pw:host/clock#passed  (clock.compare)
   host      pw:host/clock#today  (clock.compare)
   host      store:data/hours#for-stores  (database.read<Stores>)
+  host      store:data/ratings#for-stores  (database.read<Ratings>)
   host      store:data/stores#list  (database.read<Stores>)
   exports   query StoresOpen
 
@@ -183,6 +185,7 @@ store.page.OrderPage  abi ba1334c5a2f7dee7
   component pw:app/store.page.Order#Order
   component pw:app/store.page.OrderTotal#OrderTotal
   component pw:app/store.page.cancel_order#cancel_order
+  component pw:app/store.reviews.OrderRatings#OrderRatings
   host      pw:host/principal#read  (session.read)
   exports   page OrderPage
 
@@ -259,6 +262,7 @@ store.page.StorePage  abi d803b26130c7cf49
   component pw:app/store.page.decrease_in_cart#decrease_in_cart
   component pw:app/store.page.increase_in_cart#increase_in_cart
   component pw:app/store.page.remove_from_cart#remove_from_cart
+  component pw:app/store.reviews.StoreRatings#StoreRatings
   host      pw:host/principal#read  (session.read)
   exports   page StorePage
 
@@ -504,17 +508,90 @@ store.page.settle_payment  abi 8ac6e1f4e1759bef
   host      store:data/user-orders#settle  (database.write<Orders>)
   exports   command settle_payment
 
-store.search.Search  abi 9c8a7f1e53e7f531
+store.rate.RatePage  abi 1404bdc0d0d7164e
+  runs at   origin
+  needs     session.read
+  component pw:app/store.rate.rate_order#rate_order
+  component pw:app/store.reviews.StoreToRate#StoreToRate
+  host      pw:host/principal#read  (session.read)
+  exports   page RatePage
+
+store.rate.RatePage.derived_10  abi 2ae23ec8232e911e
+  runs at   origin
+  exports   derived derived$10
+
+store.rate.RatePage.derived_12  abi cb9ddb0f6c696f16
+  runs at   origin
+  exports   derived derived$12
+
+store.rate.RatePage.derived_14  abi f63d360709db7cae
+  runs at   origin
+  exports   derived derived$14
+
+store.rate.RatePage.derived_16  abi ae6bb979e0128dd6
+  runs at   origin
+  exports   derived derived$16
+
+store.rate.RatePage.derived_6  abi baa963082a1877fc
+  runs at   origin
+  exports   derived derived$6
+
+store.rate.RatePage.derived_8  abi 06baa34336c3aee4
+  runs at   origin
+  exports   derived derived$8
+
+store.rate.rate_order  abi b9227be84328b2f8
+  runs at   origin
+  needs     database.read<Orders>
+  needs     database.write<Ratings>
+  needs     outbox.write
+  needs     session.read
+  host      pw:host/invalidations#store-reviews-order-ratings  (outbox.write)
+  host      pw:host/invalidations#store-reviews-store-to-rate  (outbox.write)
+  host      pw:host/outbox#store-rated  (outbox.write)
+  host      pw:host/outbox#user-cart-changed  (outbox.write)
+  host      pw:host/principal#read  (session.read)
+  host      store:data/ratings#rate  (database.write<Ratings>)
+  exports   command rate_order
+  requires  SignedIn
+  requires  MayRate(arg 0)
+
+store.reviews.OrderRatings  abi 0780524742d7572c
+  runs at   origin
+  needs     database.read<Orders>
+  needs     database.read<Ratings>
+  needs     database.read<Stores>
+  host      store:data/ratings#for-order  (database.read<Ratings>)
+  exports   query OrderRatings
+
+store.reviews.StoreRatings  abi 9930a8b1fcfa484b
+  runs at   origin
+  needs     database.read<Ratings>
+  host      store:data/ratings#for-stores  (database.read<Ratings>)
+  host      store:data/ratings#reviews  (database.read<Ratings>)
+  exports   query StoreRatings
+
+store.reviews.StoreToRate  abi b6d304e4a35e2058
+  runs at   origin
+  needs     database.read<Orders>
+  needs     database.read<Ratings>
+  needs     database.read<Stores>
+  host      store:data/ratings#for-order  (database.read<Ratings>)
+  exports   query StoreToRate
+
+store.search.Search  abi 8db4a980491b7b06
   runs at   origin
   needs     clock.compare
   needs     clock.zone
   needs     database.read<Addresses>
   needs     database.read<Menus>
+  needs     database.read<Ratings>
   needs     database.read<Stores>
   host      pw:host/clock#at  (clock.zone)
   host      pw:host/clock#passed  (clock.compare)
   host      pw:host/clock#today  (clock.compare)
   host      store:data/hours#for-stores  (database.read<Stores>)
+  host      store:data/ratings#for-stores  (database.read<Ratings>)
   host      store:data/search#find-for  (database.read<Stores>)
   exports   query Search
 

@@ -135,6 +135,8 @@ NEEDS_DATABASE = {
     "e14-payments",
     # The scheduled-commands track: a run kept in each layer's database.
     "e14-scheduled",
+    # Track `reviews`: a store's ratings, on PostgreSQL too.
+    "e14-reviews",
 }
 
 EVIDENCE_RECIPE = re.compile(r"^e[0-9]+-[a-z0-9-]+$")
@@ -268,6 +270,36 @@ def changed_specs(changed: dict[str, list[tuple[int, int]]]) -> set[str]:
     return {pathlib.Path(p).name for p in changed if p.endswith(".spec.mjs")}
 
 
+def test_modules(changed: dict[str, list[tuple[int, int]]]) -> set[str]:
+    """The Rust sources whose own test module a change touches, by the
+    module's name: a line after `#[cfg(test)] mod tests {` in `csp.rs` is
+    `csp`'s, which a filter `csp::` runs. Train-6's survivor's test was
+    one, and planned nothing: not a test file, and far from every
+    mutant."""
+    out = set()
+    for p, hunks in changed.items():
+        if not p.endswith(".rs") or "/tests/" in p or not (ROOT / p).is_file():
+            continue
+        lines = (ROOT / p).read_text().splitlines()
+        start = next(
+            (
+                i + 1
+                for i in range(1, len(lines))
+                if lines[i].strip() == "mod tests {" and lines[i - 1].strip() == "#[cfg(test)]"
+            ),
+            None,
+        )
+        if start is not None and any(last >= start for _, last in hunks):
+            out.add(pathlib.Path(p).stem)
+    return out
+
+
+def names_module(text: str, module: str) -> bool:
+    """Whether `text` names `module`'s tests by its filter, `csp::`, and
+    not as the tail of another path, `pw_core::csp::`."""
+    return re.search(rf"(?<![\w:]){re.escape(module)}::", text) is not None
+
+
 def touched_scripts(changed: dict[str, list[tuple[int, int]]], near: int) -> set[str]:
     """The mutation scripts a change reaches: the script itself, a mutant
     within `near` lines of a changed line, or a test file it runs, a Rust
@@ -275,6 +307,7 @@ def touched_scripts(changed: dict[str, list[tuple[int, int]]], near: int) -> set
     the server's test modules by its filter, `tests::store_scheduled::`,
     which planned nothing until train-6's fix to one."""
     tests = {pathlib.Path(p).stem for p in changed if "/tests/" in p and p.endswith(".rs")}
+    modules = test_modules(changed)
     specs = changed_specs(changed)
     out = set()
     for path in sorted((ROOT / "scripts").glob("*_mutations.py")):
@@ -287,6 +320,10 @@ def touched_scripts(changed: dict[str, list[tuple[int, int]]], near: int) -> set
             f'"--test", "{t}"' in text or f"--test {t}" in text or f"tests::{t}::" in text
             for t in tests
         ):
+            out.add(path.name)
+            continue
+        # A source's own test module, by its filter.
+        if any(names_module(text, m) for m in modules):
             out.add(path.name)
             continue
         # A browser spec it runs: the mutants it plants are killed there.
@@ -397,6 +434,7 @@ def recipes_for(changed: dict[str, list[tuple[int, int]]], near: int, names: lis
     body = bodies()
     specs = changed_specs(changed)
     tests = {pathlib.Path(p).stem for p in changed if "/tests/" in p and p.endswith(".rs")}
+    modules = test_modules(changed)
     out = {
         name
         for name in names
@@ -406,6 +444,8 @@ def recipes_for(changed: dict[str, list[tuple[int, int]]], near: int, names: lis
         # And one that runs a server test module the range changed, by its
         # filter (train-6's finding).
         or any(f"tests::{t}::" in body.get(name, "") for t in tests)
+        # Or a source's own test module, by its filter.
+        or any(names_module(body.get(name, ""), m) for m in modules)
         # A recipe whose own script changed, or reads what changed.
         or reads_what_changed(body.get(name, ""), changed)
     }

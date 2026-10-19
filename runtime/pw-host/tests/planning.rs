@@ -60,6 +60,10 @@ fn full() -> Topology {
                     // A reader's addresses (track `store-accounts`).
                     "database.read<Addresses>".to_string(),
                     "database.write<Addresses>".to_string(),
+                    // A store's ratings, read for its page, the lists and the
+                    // search, and given by a reader (track `reviews`).
+                    "database.read<Ratings>".to_string(),
+                    "database.write<Ratings>".to_string(),
                     // Whether a store is open, by comparing the clock in its
                     // zone (track `store-hours`, ADR-0304).
                     "clock.compare".to_string(),
