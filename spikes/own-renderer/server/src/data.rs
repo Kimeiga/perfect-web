@@ -206,6 +206,73 @@ pub(crate) trait Staged {
     }
 }
 
+/// **The guard of a layer's writes** (ADR-0218, ADR-0352): one command of
+/// this host at a time, from its `begin` to its staging's drop, and each
+/// scheduler write (`Runs::ran`, `Runs::retry`) between two commands, never
+/// inside one. The std mutex, as `lock` returns it.
+///
+/// In a test's build a taker that finds the guard held tells the test first,
+/// if the test asked ([`Writes::tell_on_wait`]), and then waits. A guard's
+/// test waits for that report: "held at the guard" is a fact the guard can
+/// state, where "has not returned yet" is a silence that a slow write makes
+/// too.
+pub(crate) struct Writes(Mutex<()>);
+
+impl Writes {
+    pub(crate) fn new() -> Writes {
+        Writes(Mutex::new(()))
+    }
+
+    /// The guard, once whoever holds it lets go.
+    pub(crate) fn lock(&self) -> std::sync::LockResult<std::sync::MutexGuard<'_, ()>> {
+        #[cfg(test)]
+        match self.0.try_lock() {
+            Ok(guard) => return Ok(guard),
+            Err(std::sync::TryLockError::Poisoned(poisoned)) => return Err(poisoned),
+            // Held: a test that asked is told, and this thread then waits.
+            Err(std::sync::TryLockError::WouldBlock) => WAITING.with(|tell| {
+                if let Some(tell) = &*tell.borrow() {
+                    tell();
+                }
+            }),
+        }
+        self.0.lock()
+    }
+}
+
+#[cfg(test)]
+thread_local! {
+    /// What this thread's test asked to be told when it finds a write guard
+    /// held ([`Writes::tell_on_wait`]).
+    static WAITING: std::cell::RefCell<Option<Box<dyn Fn()>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(test)]
+impl Writes {
+    /// **A test's: `tell` is called on this thread each time it finds a
+    /// layer's write guard held**, just before it waits for the guard, until
+    /// the returned [`Telling`] is dropped. Only this thread's own waits are
+    /// told, so a test that spawns the write it watches hears that write and
+    /// no other.
+    pub(crate) fn tell_on_wait(tell: impl Fn() + 'static) -> Telling {
+        WAITING.with(|waiting| *waiting.borrow_mut() = Some(Box::new(tell)));
+        Telling
+    }
+}
+
+/// A test's request to be told of a wait for a write guard, until it is
+/// dropped ([`Writes::tell_on_wait`]).
+#[cfg(test)]
+pub(crate) struct Telling;
+
+#[cfg(test)]
+impl Drop for Telling {
+    fn drop(&mut self) {
+        WAITING.with(|waiting| *waiting.borrow_mut() = None);
+    }
+}
+
 /// **An interaction's record, committed with its command's writes**
 /// (ADR-0325, PW0348): its key (the session, the command and the
 /// interaction), the arguments it was sent with, and what it answered as

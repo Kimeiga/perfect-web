@@ -890,7 +890,7 @@ pub(crate) struct FeedPg {
     /// commit, as the in-memory layer's lock is: a host never conflicts with
     /// itself. A serializable transaction is what holds against any other
     /// writer of the database, and a commit it refuses keeps nothing.
-    writes: Mutex<()>,
+    writes: crate::data::Writes,
     /// Track `uploads`: the leases a post's image is committed from.
     uploaded: std::sync::OnceLock<crate::uploads::Leases>,
     /// Each session's principal (track `identity`): whom a session writes
@@ -940,7 +940,7 @@ impl FeedPg {
             pool,
             renders: Renders::new(url, schema, seats),
             isolation,
-            writes: Mutex::new(()),
+            writes: crate::data::Writes::new(),
             uploaded: std::sync::OnceLock::new(),
             principals: std::sync::RwLock::new(Principals::default()),
         })

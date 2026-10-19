@@ -932,7 +932,7 @@ pub(crate) struct StorePg {
     /// commit, as the in-memory layer's lock is: a host never conflicts with
     /// itself. A serializable transaction is what holds against any other
     /// writer of the database, and a commit it refuses keeps nothing.
-    writes: Mutex<()>,
+    writes: crate::data::Writes,
     faults: Faults,
     /// The statements its reads and commands ran (NEXT 4b).
     tally: Tally,
@@ -973,7 +973,7 @@ impl StorePg {
             pool,
             renders: crate::feed_pg::Renders::new(url, Some(schema), seats),
             isolation,
-            writes: Mutex::new(()),
+            writes: crate::data::Writes::new(),
             faults: Faults::new(),
             tally: Tally::default(),
             #[cfg(test)]

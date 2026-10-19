@@ -12,10 +12,12 @@ replaced:
   store by scanning every store's menu; and `user-estimates#for-stores`
   reading each store's coverage alone (ADR-0348).
 
-Five more restore premature payment-count completion or remove one of
-the store/feed scheduled-state write guards (ADR-0352's completion
-correction).
-Each must fail a real delayed-provider or real PostgreSQL transaction test.
+Six more restore premature payment-count completion, remove one of the
+store/feed scheduled-state write guards, or write before taking one
+(ADR-0352's completion correction). Each must fail a real delayed-provider
+or real PostgreSQL transaction test, and none by a stretch of time: a guard
+control is killed by what the guard itself reports (`Writes::tell_on_wait`),
+and the payment-count control by the count's own polls, at any speed.
 
 A mutant must fail `tests::bounded_statements::`, the store's operations
 and its pages and commands counted on PostgreSQL at the seed and with fifty
@@ -135,6 +137,13 @@ MUTANTS = [
         SRC / 'feed_pg.rs',
         '    fn retry(\n        &self,\n        id: i64,\n        attempts: i64,\n        due_ms: i64,\n        failed: Option<&str>,\n    ) -> Result<(), String> {\n        let _writes = self.writes.lock().unwrap_or_else(|e| e.into_inner());\n',
         '    fn retry(\n        &self,\n        id: i64,\n        attempts: i64,\n        due_ms: i64,\n        failed: Option<&str>,\n    ) -> Result<(), String> {\n',
+    ),
+    (
+        'feed_pg.rs ran writes before it takes the command write guard',
+        "postgres",
+        SRC / 'feed_pg.rs',
+        '    fn ran(&self, id: i64) -> Result<(), String> {\n        let _writes = self.writes.lock().unwrap_or_else(|e| e.into_inner());\n        self.pool.with(|c| crate::schedules::pg::ran(c, id))\n',
+        '    fn ran(&self, id: i64) -> Result<(), String> {\n        let written = self.pool.with(|c| crate::schedules::pg::ran(c, id));\n        let _writes = self.writes.lock().unwrap_or_else(|e| e.into_inner());\n        written\n',
     ),
 ]
 
