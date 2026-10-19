@@ -358,11 +358,14 @@ fn a_trim_between_a_hosts_two_reads_is_learned() {
 }
 
 /// **`commit`, run on A while `holder` holds the outbox's lock, waits for
-/// it, and wakes `b`, waiting, at once**: A's rows take their ids only
-/// after the holder's commit, so ids are in commit order; and what B waits
-/// for is the database's notification at A's commit, not its wait's end.
+/// it, and wakes `b`, waiting, at once**: the holder, as another host's
+/// commit does, writes a row while A waits, and A's rows take their ids
+/// only after the holder's commit, past the holder's, so ids are in commit
+/// order; and what B waits for is the database's notification at A's
+/// commit, not its wait's end.
 fn waits_for_the_lock_and_wakes(
     mut holder: postgres::Client,
+    a: &Server,
     b: &Server,
     commit: impl FnOnce() + Send,
 ) {
@@ -387,6 +390,14 @@ fn waits_for_the_lock_and_wakes(
             !committing.is_finished(),
             "A's commit waits for the outbox's lock"
         );
+        let held: i64 = holder
+            .query_one(
+                "INSERT INTO outbox (kind, name, args, host) \
+                 VALUES ('event', 'test.Held', '[]', 'h-holder') RETURNING id",
+                &[],
+            )
+            .expect("the holder's row")
+            .get(0);
         let released = std::time::Instant::now();
         holder.batch_execute("COMMIT").expect("the lock released");
         let committed = committing.join().expect("A committed");
@@ -395,6 +406,19 @@ fn waits_for_the_lock_and_wakes(
         assert!(
             waited < std::time::Duration::from_secs(10),
             "B woken by A's commit, not its wait's end: {waited:?}"
+        );
+        let mine: Vec<i64> = holder
+            .query(
+                "SELECT id FROM outbox WHERE host = $1 ORDER BY id",
+                &[&tail(a).host()],
+            )
+            .expect("A's rows")
+            .iter()
+            .map(|r| r.get(0))
+            .collect();
+        assert!(
+            !mine.is_empty() && mine.iter().all(|id| *id > held),
+            "A's ids taken after the holder's commit, past its {held}: {mine:?}"
         );
     });
 }
@@ -409,7 +433,7 @@ fn a_feed_commit_waits_for_the_outbox_lock_and_wakes_another_host() {
     let db = Schema::new(&url, "woken");
     let a = feed_host(&url, &db);
     let b = feed_host(&url, &db);
-    waits_for_the_lock_and_wakes(db.sql(), &b, || {
+    waits_for_the_lock_and_wakes(db.sql(), &a, &b, || {
         assert!(post(&a, "a", "Wakes B", "i-1").committed);
     });
 }
@@ -826,7 +850,7 @@ fn a_store_commit_waits_for_the_outbox_lock_and_wakes_another_host() {
     let hosts = stores(&url, &provider);
     let ada = super::sign_in::signed_in(&hosts.a, &provider, "came-ada", "ada");
     assert_eq!(hosts.b_layer.schema(), hosts.a_layer.schema(), "one schema");
-    waits_for_the_lock_and_wakes(hosts.a_layer.sql(), &hosts.b, || {
+    waits_for_the_lock_and_wakes(hosts.a_layer.sql(), &hosts.a, &hosts.b, || {
         hosts
             .a
             .command(ADD, &ada, &add_shown("espresso", 1), false)

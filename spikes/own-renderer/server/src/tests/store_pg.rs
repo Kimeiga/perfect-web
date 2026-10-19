@@ -495,9 +495,10 @@ fn on_postgres_a_second_hosts_commit_answers_what_the_first_committed() {
 /// a commit staged is consumed once delivered: after orders are placed and
 /// moved along, the materializer's outbox holds none, and the database's
 /// only what this host committed and read back, kept for the other hosts
-/// until it is trimmed (ADR-XXXX).
+/// until it is trimmed (ADR-XXXX; named `..._the_outboxes_hold_nothing`
+/// until the database's outbox became every host's log).
 #[test]
-fn on_postgres_an_order_keeps_its_lines_and_the_outboxes_hold_nothing() {
+fn on_postgres_an_order_keeps_its_lines_and_the_outboxes_hold_only_its_hosts_rows() {
     let Some(url) = database() else { return };
     let s = served(&url);
     for (i, session) in ["a", "b"].iter().enumerate() {
