@@ -1,0 +1,55 @@
+ADR-XXXX - what the browser host map saves: the same selections through the configuration before it and after it
+
+produced by: python3 scripts/browser_host_map_timing.py --before BEFORE --after AFTER --port-before 11541 --port-after 11541 --runs 1 [--bound N] -- SELECTION
+  BEFORE: a checkout of 587657ff828b390e958e582f8ff3749f2b0d5af9 (track/train-10-land), its
+          spikes/own-renderer/dist, dist-keyed, dist-feed, dist-kiokun and dist-guestbook copied from AFTER's
+          builds and its target/ AFTER's (no Rust source differs), so that only the configuration differs
+  AFTER:  this branch, its spikes/own-renderer as at 2f1dd100 (unchanged to 2f1dd1007c39420026582ded9b094e970415ba72)
+machine: the PC, WSL2, 32 threads, shared with ten-plus other workers: each run's load average is beside it
+hosts: counted by Playwright's own account of them (DEBUG=pw:webserver, one "Starting WebServer process" a host);
+       "first host at" is from the run's start, "all ready" from the first host's start to the last host's
+       "WebServer available"
+
+== one spec, one engine, as a mutation control runs it
+
+selection: playwright test e2e/signals.spec.mjs --project=chromium --reporter=line
+before: /home/haki/code/pw-wt/browser-host-map-base (PORT 11541); after: /home/haki/code/pw-wt/browser-host-map-train11 (PORT 11541)
+machine: 32 threads; node v22.21.1
+run 1 before:    931.2 s  hosts  77  passed    8  failed 0  flaky 0  skipped 0  exit 0  load 98.72 -> 89.24  (first host at 4.2 s, all ready 917.2 s later)
+run 1 after :     24.9 s  hosts   1  passed    8  failed 0  flaky 0  skipped 0  exit 0  load 89.24 -> 78.15  (first host at 4.6 s, all ready 11.9 s later)
+before: median 931.2 s of 1 run(s), hosts [77]
+after: median 24.9 s of 1 run(s), hosts [1]
+saved: 906.3 s a run (97% of before's median)
+
+== the whole suite in one engine, as a CI browser job runs it
+
+selection: playwright test --project=chromium --workers=4 --reporter=line
+before: /home/haki/code/pw-wt/browser-host-map-base (PORT 11541); after: /home/haki/code/pw-wt/browser-host-map-train11 (PORT 11541)
+machine: 32 threads; node v22.21.1
+run 1 before:   1145.3 s  hosts  77  passed  399  failed 0  flaky 0  skipped 2  exit 0  load 78.15 -> 48.85  (first host at 3.7 s, all ready 937.6 s later)
+run 1 after :    473.2 s  hosts  27  passed  399  failed 0  flaky 0  skipped 2  exit 0  load 48.46 -> 70.62  (first host at 8.7 s, all ready 269.9 s later)
+before: median 1145.3 s of 1 run(s), hosts [77]
+after: median 473.2 s of 1 run(s), hosts [27]
+saved: 672.0 s a run (59% of before's median)
+
+== the whole suite in three engines, one invocation, 16 workers (recorded before the script read phases)
+
+selection: playwright test  --reporter=line
+before: /home/haki/code/pw-wt/browser-host-map-base (PORT 11541); after: /home/haki/code/pw-wt/browser-host-map-train11 (PORT 11541)
+machine: 32 threads; node v22.21.1
+run 1 before:   1374.5 s  hosts  77  passed 1166  failed 5  flaky 0  skipped 19  exit 1  load 31.38 -> 65.55
+run 1 after :    881.7 s  hosts  62  passed    0  failed 0  flaky 0  skipped 0  exit 1  load 65.55 -> 63.72
+before: median 1374.5 s of 1 run(s), hosts [77]
+after: median 881.7 s of 1 run(s), hosts [62]
+saved: 492.8 s a run (36% of before's median)
+
+The after run above stopped at its 62nd host, a dist-kiokun host not ready within Playwright's 60 s webServer
+timeout (the base's) at load 64-72. Its hosts' starts, read from the before run's raw output: 52 hosts of the
+store's build (dist) at 14.6 s each (at most 29.2 s), 15 of the feed's at 2.3 s, 3 of kiokun's at 40.1 s (at most
+43.1 s), the rest under 1 s: 917.6 s from the first host's start to the last host's readiness. Run again by hand
+through the host map (`PORT=11541 DEBUG=pw:webserver node node_modules/@playwright/test/cli.js test
+--reporter=line`): 1590 s, 77 hosts, 984.9 s from the first host's start to the last one's readiness, 1091 passed,
+16 skipped, 44 did not run, and about forty WebKit tests past their 30 s at load 90-95; and once more with
+--workers=4, stopped on a host past 60 s at load ~100. Engine by engine instead (`--project=<engine>
+--workers=4`), every test passed: chromium 399 passed and 2 skipped, firefox 392 and 9, webkit 393 and 8, each
+run on 27 of the 77 hosts.

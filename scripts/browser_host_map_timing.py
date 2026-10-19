@@ -19,6 +19,7 @@ either (as CI gives none).
 """
 
 import argparse
+import datetime
 import os
 import pathlib
 import re
@@ -46,6 +47,7 @@ def run(tree, port, args, bound):
     # through pnpm, its hosts outlived it).
     cli = spike / "node_modules/@playwright/test/cli.js"
     start = time.monotonic()
+    began = datetime.datetime.now(datetime.timezone.utc)
     p = subprocess.Popen(["node", str(cli), "test", *args, "--reporter=line"], cwd=spike, env=env,
                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     try:
@@ -63,7 +65,17 @@ def run(tree, port, args, bound):
     text = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", text)
     counts = {kind: sum(int(n) for n in re.findall(rf"(\d+) {kind}\b", text)) for kind in ("passed", "failed", "flaky", "skipped")}
     hosts = text.count("Starting WebServer process")
-    return {"status": status, "seconds": seconds, "hosts": hosts, "load": f"{before} -> {load()}", "text": text, **counts}
+    # Where the time went, by Playwright's own timestamps: to its first host
+    # (the configuration loaded and, after the host map, the plan made), and
+    # from it until the last host was ready; the rest is the tests'.
+    stamp = lambda line: datetime.datetime.fromisoformat(line.split(" ", 1)[0].replace("Z", "+00:00"))
+    starts = [stamp(line) for line in text.splitlines() if "pw:webserver Starting WebServer process" in line]
+    ready = [stamp(line) for line in text.splitlines() if "pw:webserver WebServer available" in line]
+    first = (starts[0] - began).total_seconds() if starts else None
+    span = (ready[-1] - starts[0]).total_seconds() if starts and ready else None
+    text = f"started: {began.isoformat()}\n" + text
+    return {"status": status, "seconds": seconds, "hosts": hosts, "load": f"{before} -> {load()}", "text": text,
+            "first": first, "span": span, **counts}
 
 
 def main():
@@ -89,8 +101,10 @@ def main():
             if options.keep:
                 pathlib.Path(options.keep).mkdir(parents=True, exist_ok=True)
                 (pathlib.Path(options.keep) / f"run-{i + 1}-{side}.txt").write_text(r["text"])
+            phases = (f"first host at {r['first']:.1f} s, all ready {r['span']:.1f} s later"
+                      if r["first"] is not None and r["span"] is not None else "no host became ready")
             print(f"run {i + 1} {side:6}: {r['seconds']:8.1f} s  hosts {r['hosts']:3}  passed {r['passed']:4}  failed {r['failed']}  "
-                  f"flaky {r['flaky']}  skipped {r['skipped']}  exit {r['status']}  load {r['load']}", flush=True)
+                  f"flaky {r['flaky']}  skipped {r['skipped']}  exit {r['status']}  load {r['load']}  ({phases})", flush=True)
     failed = False
     for side in ("before", "after"):
         rs = results[side]
