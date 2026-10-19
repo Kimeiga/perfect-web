@@ -41,6 +41,7 @@ import 'just/evidence-integrity-2.just'
 import 'just/tables.just'
 import 'just/committed-components.just'
 import 'just/browser-host-map.just'
+import 'just/parallel-mutants.just'
 
 default:
     @just --list

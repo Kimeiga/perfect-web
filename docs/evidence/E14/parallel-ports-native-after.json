@@ -1,0 +1,12 @@
+{
+  "allocator_sha256": "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa",
+  "registry_sha256": "abcfc8d0df78aeee31456d1e8fb9f4fdd6983f9fc0e44371245a963779185f72",
+  "registry_stride": 256,
+  "base": 58287,
+  "actual_ports": [
+    58487,
+    58543
+  ],
+  "both_exclusive_binds": true,
+  "scope": "two own loopback sockets; no project host/process/signal"
+}

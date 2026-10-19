@@ -1,0 +1,266 @@
+test_a_slot_is_brought_to_the_tree_by_content (scripts.tests.test_mutation_slots.Pieces) ... ok
+test_a_slots_environment (scripts.tests.test_mutation_slots.Pieces) ... ok
+test_dealt_once_each_slot_0_holding_every_suite (scripts.tests.test_mutation_slots.Pieces) ... ok
+test_each_slots_reserved_ports_are_disjoint (scripts.tests.test_mutation_slots.Pieces) ... ok
+test_narrowed_in_place_from_the_count_dealt (scripts.tests.test_mutation_slots.Pieces) ... ok
+test_slots_asked_for (scripts.tests.test_mutation_slots.Pieces) ... ok
+test_the_bounds_line_counts_what_was_said (scripts.tests.test_mutation_slots.Pieces) ... ok
+test_the_scripts_kept_in_order_exist (scripts.tests.test_mutation_slots.Pieces) ... ok
+test_changed_registry_moves_every_slot (scripts.tests.test_mutation_slots.PortRegistry) ... ok
+test_invalid_later_slot_refuses_before_tree_preparation (scripts.tests.test_mutation_slots.PortRegistry) ... ok
+test_missing_or_invalid_metadata_refuses_allocation (scripts.tests.test_mutation_slots.PortRegistry) ... ok
+test_retained_cleanup_import_needs_no_registry (scripts.tests.test_mutation_slots.PortRegistry) ... ok
+test_whole_reserved_tcp_range_is_checked (scripts.tests.test_mutation_slots.PortRegistry) ... ok
+test_a_run_stopped_from_outside_leaves_no_mutant_and_no_process (scripts.tests.test_mutation_slots.Toy) ... ok
+test_a_script_choosing_its_mutants_is_said_as_it_chose (scripts.tests.test_mutation_slots.Toy) ... ok
+test_a_second_run_waits_for_the_slots_the_first_holds (scripts.tests.test_mutation_slots.Toy) ... ok
+test_a_slots_red_baseline_is_said_as_the_script_says_it (scripts.tests.test_mutation_slots.Toy) ... ok
+test_one_slot_asked_for_is_the_script_as_it_was (scripts.tests.test_mutation_slots.Toy) ... ok
+test_slots_say_what_the_script_says_in_order (scripts.tests.test_mutation_slots.Toy) ... ok
+test_the_tree_is_never_mutated_and_each_slot_is_its_own (scripts.tests.test_mutation_slots.Toy) ... ok
+test_a_longer_description_is_not_a_shorter_ones (scripts.tests.test_mutation_slots.Verdicts) ... ok
+test_a_slots_lines_are_each_mutants (scripts.tests.test_mutation_slots.Verdicts) ... ok
+test_each_shape_the_scripts_print (scripts.tests.test_mutation_slots.Verdicts) ... ok
+test_descent_lost_after_pin_is_not_stopped_and_handle_closes (scripts.tests.test_mutation_slot_processes.Freeze) ... ok
+test_discovered_pid_reuse_is_not_stopped (scripts.tests.test_mutation_slot_processes.Freeze) ... ok
+test_exited_root_does_not_discover_an_unrelated_reused_tree (scripts.tests.test_mutation_slot_processes.Freeze) ... ok
+test_matching_descendant_is_pinned_and_stopped_once (scripts.tests.test_mutation_slot_processes.Freeze) ... ok
+test_partial_scan_failure_still_kills_and_closes_every_pinned_child (scripts.tests.test_mutation_slot_processes.Freeze) ... ok
+test_scan_exception_closes_unaccepted_child (scripts.tests.test_mutation_slot_processes.Freeze) ... ok
+test_absent_identity_is_not_opened (scripts.tests.test_mutation_slot_processes.Identities) ... ok
+test_close_is_idempotent_and_closed_handles_cannot_signal (scripts.tests.test_mutation_slot_processes.Identities) ... ok
+test_exit_before_open_is_a_noop (scripts.tests.test_mutation_slot_processes.Identities) ... ok
+test_exited_handle_does_not_fall_back_to_a_numeric_signal (scripts.tests.test_mutation_slot_processes.Identities) ... ok
+test_identity_read_exception_closes_open_descriptor (scripts.tests.test_mutation_slot_processes.Identities) ... ok
+test_kernel_without_pidfds_refuses_before_launch (scripts.tests.test_mutation_slot_processes.Identities) ... ok
+test_missing_pidfd_api_refuses_before_preparation_or_launch (scripts.tests.test_mutation_slot_processes.Identities) ... ok
+test_reuse_before_open_is_refused_without_any_signal (scripts.tests.test_mutation_slot_processes.Identities) ... ok
+test_reuse_while_opening_closes_the_untrusted_handle (scripts.tests.test_mutation_slot_processes.Identities) ... ok
+test_signals_use_the_pinned_handle_after_numeric_pid_reuse (scripts.tests.test_mutation_slot_processes.Identities) ... ok
+test_absent_partial_malformed_duplicate_and_unknown_protocol_refuse (scripts.tests.test_mutation_slot_processes.ProducerResults) ... ok
+test_already_exited_root_explicitly_refuses_unproved_orphans (scripts.tests.test_mutation_slot_processes.ProducerResults) ... ok
+test_callback_cancel_restores_control_and_prevents_any_next_launch (scripts.tests.test_mutation_slot_processes.ProducerResults) ... preflight: 2 actual unequal source/SHA substitutions recorded
+baseline: 1 passed, 0 failed
+ok
+test_campaign_restores_source_and_launches_no_next_control_after_cancel (scripts.tests.test_mutation_slot_processes.ProducerResults) ... preflight: 2 actual unequal source/SHA substitutions recorded
+baseline: 1 passed, 0 failed
+ok
+test_cancellation_survives_stop_close_and_restore_failures (scripts.tests.test_mutation_slot_processes.ProducerResults) ... ok
+test_complete_pass_and_real_body_failure_are_accepted (scripts.tests.test_mutation_slot_processes.ProducerResults) ... ok
+test_contradictory_method_partition_refuses (scripts.tests.test_mutation_slot_processes.ProducerResults) ... ok
+test_exact_start_finish_body_and_expected_inventories_are_required (scripts.tests.test_mutation_slot_processes.ProducerResults) ... ok
+test_existing_primary_cancel_keeps_identity_after_a_later_callback (scripts.tests.test_mutation_slot_processes.ProducerResults) ... ok
+test_failed_exit_probe_still_runs_canonical_cleanup_and_closes_root (scripts.tests.test_mutation_slot_processes.ProducerResults) ... ok
+test_first_callback_during_normal_release_is_promoted_after_every_release (scripts.tests.test_mutation_slot_processes.ProducerResults) ... ok
+test_first_pending_exception_survives_a_later_installed_callback (scripts.tests.test_mutation_slot_processes.ProducerResults) ... producer cleanup refused during cancellation: output close: first pending
+ok
+test_fixture_skip_and_nonbody_events_earn_no_kill (scripts.tests.test_mutation_slot_processes.ProducerResults) ... ok
+test_fresh_harness_loads_actual_local_validation_authority (scripts.tests.test_mutation_slot_processes.ProducerResults) ... ok
+test_invalid_shared_outcome_contains_no_positive_evidence (scripts.tests.test_mutation_slot_processes.ProducerResults) ... ok
+test_missing_duplicate_contradictory_and_unknown_events_refuse (scripts.tests.test_mutation_slot_processes.ProducerResults) ... ok
+test_missing_producer_pin_retains_record_for_canonical_fallback (scripts.tests.test_mutation_slot_processes.ProducerResults) ... ok
+test_missing_repeated_or_unfinished_body_refuses (scripts.tests.test_mutation_slot_processes.ProducerResults) ... ok
+test_mocked_profile_blocks_creation_signals_and_close_globally (scripts.tests.test_mutation_slot_processes.ProducerResults) ... ok
+test_output_close_failure_cannot_replace_primary_cancellation (scripts.tests.test_mutation_slot_processes.ProducerResults) ... ok
+test_pending_cancel_diagnostics_retain_ordinary_primary_and_secondary_errors (scripts.tests.test_mutation_slot_processes.ProducerResults) ... ok
+test_preflight_rejects_identical_or_unchanged_substitutions (scripts.tests.test_mutation_slot_processes.ProducerResults) ... ok
+test_producer_root_pin_precedes_the_only_reaper (scripts.tests.test_mutation_slot_processes.ProducerResults) ... ok
+test_secondary_cancellation_from_restored_handler_is_not_stringified (scripts.tests.test_mutation_slot_processes.ProducerResults) ... producer cleanup refused during cancellation: restore handler: restored handler
+ok
+test_shared_outcome_keeps_assertions_errors_and_distinct_methods (scripts.tests.test_mutation_slot_processes.ProducerResults) ... ok
+test_stops_unexpected_exits_and_exit_contradictions_refuse (scripts.tests.test_mutation_slot_processes.ProducerResults) ... ok
+test_subtest_events_count_one_failed_method (scripts.tests.test_mutation_slot_processes.ProducerResults) ... ok
+test_timeout_reuses_retained_cleanup_without_communicate_or_numeric_groups (scripts.tests.test_mutation_slot_processes.ProducerResults) ... ok
+test_new_session_descendant_is_killed_and_unrelated_child_remains_running (scripts.tests.test_mutation_slot_processes.RealPrivateChildren) ... ok
+test_real_high_pidfd_supports_exit_wait (scripts.tests.test_mutation_slot_processes.RealPrivateChildren) ... ok
+test_custom_child_reaper_refuses_before_pidfd_probe (scripts.tests.test_mutation_slot_processes.ReviewRegressions) ... ok
+test_descendant_exit_is_confirmed_before_descriptor_close (scripts.tests.test_mutation_slot_processes.ReviewRegressions) ... ok
+test_exit_timeout_is_explicit_and_handles_still_close (scripts.tests.test_mutation_slot_processes.ReviewRegressions) ... ok
+test_failed_child_kill_does_not_skip_root_kill_close_or_reap (scripts.tests.test_mutation_slot_processes.ReviewRegressions) ... ok
+test_failed_close_does_not_skip_other_close_or_reap (scripts.tests.test_mutation_slot_processes.ReviewRegressions) ... ok
+test_failed_pin_record_is_retried_without_a_listener_or_numeric_group (scripts.tests.test_mutation_slot_processes.ReviewRegressions) ... ok
+test_failed_reap_does_not_skip_the_next_slots_cleanup (scripts.tests.test_mutation_slot_processes.ReviewRegressions) ... ok
+test_final_handle_close_failure_does_not_skip_the_next_handle (scripts.tests.test_mutation_slot_processes.ReviewRegressions) ... ok
+test_handlers_are_installed_for_both_cancellation_signals (scripts.tests.test_mutation_slot_processes.ReviewRegressions) ... ok
+test_high_descriptor_wait_has_no_select_fd_set_limit (scripts.tests.test_mutation_slot_processes.ReviewRegressions) ... ok
+test_launch_signal_at_pin_handoff_is_deferred_until_registered (scripts.tests.test_mutation_slot_processes.ReviewRegressions) ... ok
+test_launch_signal_at_popen_handoff_is_deferred_until_registered (scripts.tests.test_mutation_slot_processes.ReviewRegressions) ... ok
+test_live_descendant_with_missing_identity_is_explicitly_refused (scripts.tests.test_mutation_slot_processes.ReviewRegressions) ... ok
+test_poll_invalid_descriptor_is_an_explicit_failure (scripts.tests.test_mutation_slot_processes.ReviewRegressions) ... ok
+test_process_exit_wait_uses_retained_descriptor (scripts.tests.test_mutation_slot_processes.ReviewRegressions) ... ok
+test_repeated_signal_during_cleanup_is_deferred (scripts.tests.test_mutation_slot_processes.ReviewRegressions) ... ok
+test_send_capability_is_probed_and_descriptor_closes_on_refusal (scripts.tests.test_mutation_slot_processes.ReviewRegressions) ... ok
+test_startup_kill_failure_still_attempts_bounded_reap_and_pipe_close (scripts.tests.test_mutation_slot_processes.ReviewRegressions) ... ok
+test_startup_reap_timeout_still_closes_the_pipe (scripts.tests.test_mutation_slot_processes.ReviewRegressions) ... ok
+test_unreadable_live_root_state_is_not_treated_as_exit (scripts.tests.test_mutation_slot_processes.ReviewRegressions) ... ok
+test_unreadable_state_with_pinned_exit_is_a_valid_exit (scripts.tests.test_mutation_slot_processes.ReviewRegressions) ... ok
+test_failed_root_pin_kills_and_reaps_only_the_unreaped_direct_child (scripts.tests.test_mutation_slot_processes.Startup) ... ok
+test_root_is_pinned_before_any_reaper_thread_can_start (scripts.tests.test_mutation_slot_processes.Startup) ... ok
+test_actual_assertion_is_one_failed_method (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_actual_class_setup_error_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_actual_class_teardown_error_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_actual_cleanup_error_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_actual_crash_has_no_report (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_actual_early_stop_has_incomplete_inventory_and_refuses (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_actual_expected_failure_refuses (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_actual_import_exception_refuses_before_inventory (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_actual_missing_import_runs_no_method_and_refuses (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_actual_module_setup_error_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_actual_module_teardown_error_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_actual_partial_positive_inventory_refuses (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_actual_setup_error_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_actual_skip_refuses (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_actual_teardown_error_is_refused_after_body (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_actual_timeout_has_bounded_pidfd_cleanup_and_file_output (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_actual_unexpected_body_exception_is_one_failed_method (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_actual_unexpected_success_refuses (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_async_generator_body_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_async_generator_methods_and_fixtures_refuse_before_inventory (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_async_generator_setup_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_base_cleanup_hook_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_base_suite_fixture_dispatch_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_body_skip_and_skipped_subtest_refuse (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_cleanup_registration_hook_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_custom_class_queue_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_custom_execution_refuses_before_loading_inventory (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_custom_instance_queue_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_custom_module_queue_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_custom_suite_fixture_omission_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_deferred_class_setup_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_deferred_class_teardown_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_deferred_cleanup_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_deferred_dynamic_class_cleanup_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_deferred_dynamic_module_cleanup_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_deferred_module_setup_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_deferred_module_teardown_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_deferred_setup_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_deferred_teardown_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_failed_subtest_followed_by_body_error_is_one_method (scripts.tests.test_unittest_producer.ActualProducers) ... FAIL
+test_fixture_subtest_failure_never_becomes_a_body_failure (scripts.tests.test_unittest_producer.ActualProducers) ... FAIL
+test_instance_cleanup_hook_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_instance_suite_fixture_omission_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_late_base_execution_hook_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_late_dispatch_binding_changes_are_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_late_module_registration_alias_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_module_registration_alias_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_multiple_failed_subtests_keep_distinct_method_count (scripts.tests.test_unittest_producer.ActualProducers) ... FAIL
+test_native_setup_assertion_cannot_claim_required_body (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_native_setup_oserror_cannot_claim_required_body (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_ordinary_discovery_without_host_pidfd_apis_has_explicit_skips (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_outcome_canonical_constructor_and_alias_are_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_outcome_executor_cannot_suppress_required_fixture (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_preexisting_report_is_never_reused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_replaced_class_queue_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_replaced_instance_queue_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_replaced_module_queue_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_runner_canonical_descriptors_and_aliases_are_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_runner_execution_cannot_omit_required_fixture (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_runtime_async_generator_body_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_runtime_async_generator_setup_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_runtime_coroutine_cleanup_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_runtime_generator_result_is_closed_before_refusal (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_same_exception_reraised_from_teardown_still_refuses (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_skip_forwarding_hook_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_stock_runner_outcome_and_genuine_bound_aliases_are_supported (scripts.tests.test_unittest_producer.ActualProducers) ... FAIL
+test_stock_suite_and_genuine_bound_hook_alias_are_supported (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_successful_subtests_and_plain_method_are_real_passes (scripts.tests.test_unittest_producer.ActualProducers) ... FAIL
+test_suite_global_dispatch_helpers_are_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_suppressed_fixture_exception_without_callback_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_suppressed_subtest_exception_without_callback_is_refused (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+test_synchronous_fixture_order_aliases_reentrant_cleanups_and_restoration (scripts.tests.test_unittest_producer.ActualProducers) ... ok
+
+======================================================================
+FAIL: test_failed_subtest_followed_by_body_error_is_one_method (scripts.tests.test_unittest_producer.ActualProducers)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/parallel-instrument-wh45c80y/reviewed_unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/parallel-instrument/scripts/tests/test_unittest_producer.py", line 71, in test_failed_subtest_followed_by_body_error_is_one_method
+    self.assertEqual(result, (True, 0, 1))
+AssertionError: Tuples differ: (False, 0, 0) != (True, 0, 1)
+
+First differing element 0:
+False
+True
+
+- (False, 0, 0)
++ (True, 0, 1)
+
+======================================================================
+FAIL: test_fixture_subtest_failure_never_becomes_a_body_failure (scripts.tests.test_unittest_producer.ActualProducers)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/parallel-instrument-wh45c80y/reviewed_unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/parallel-instrument/scripts/tests/test_unittest_producer.py", line 159, in test_fixture_subtest_failure_never_becomes_a_body_failure
+    self.assertEqual(result, (False, 0, 0))
+AssertionError: Tuples differ: (True, 0, 1) != (False, 0, 0)
+
+First differing element 0:
+True
+False
+
+- (True, 0, 1)
++ (False, 0, 0)
+
+======================================================================
+FAIL: test_multiple_failed_subtests_keep_distinct_method_count (scripts.tests.test_unittest_producer.ActualProducers)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/parallel-instrument-wh45c80y/reviewed_unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/parallel-instrument/scripts/tests/test_unittest_producer.py", line 66, in test_multiple_failed_subtests_keep_distinct_method_count
+    self.assertEqual(result, (True, 1, 1))
+AssertionError: Tuples differ: (False, 0, 0) != (True, 1, 1)
+
+First differing element 0:
+False
+True
+
+- (False, 0, 0)
++ (True, 1, 1)
+
+======================================================================
+FAIL: test_stock_runner_outcome_and_genuine_bound_aliases_are_supported (scripts.tests.test_unittest_producer.ActualProducers)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/parallel-instrument-wh45c80y/reviewed_unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/parallel-instrument/scripts/tests/test_unittest_producer.py", line 571, in test_stock_runner_outcome_and_genuine_bound_aliases_are_supported
+    self.assertEqual(result, (True, 1, 0), log.read_text())
+AssertionError: Tuples differ: (False, 0, 0) != (True, 1, 0)
+
+First differing element 0:
+False
+True
+
+- (False, 0, 0)
++ (True, 1, 0) : test_body (private_fixture.Case) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.000s
+
+OK
+
+
+======================================================================
+FAIL: test_successful_subtests_and_plain_method_are_real_passes (scripts.tests.test_unittest_producer.ActualProducers)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/parallel-instrument-wh45c80y/reviewed_unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/parallel-instrument/scripts/tests/test_unittest_producer.py", line 75, in test_successful_subtests_and_plain_method_are_real_passes
+    self.assertEqual(result, (True, 2, 0))
+AssertionError: Tuples differ: (False, 0, 0) != (True, 2, 0)
+
+First differing element 0:
+False
+True
+
+- (False, 0, 0)
++ (True, 2, 0)
+
+----------------------------------------------------------------------
+Ran 164 tests in 7.007s
+
+FAILED (failures=5)
