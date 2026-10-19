@@ -7977,8 +7977,10 @@ fn main() {
     match server.data.tail() {
         Some(tail) => {
             println!(
-                "pw dev server hosts: {} on a shared database, hearing every host's commits",
-                tail.host()
+                "pw dev server hosts: {} on a shared database, schema {}, hearing every \
+                 host's commits",
+                tail.host(),
+                tail.outbox().schema
             );
             let server = server.clone();
             std::thread::spawn(move || server.hear_other_hosts());

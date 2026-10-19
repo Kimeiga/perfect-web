@@ -71,7 +71,9 @@ class Host {
       }
       try {
         if ((await fetch(`${this.origin}/`)).ok) {
-          expect(readFileSync(this.log, "utf8")).toContain("on a shared database");
+          expect(readFileSync(this.log, "utf8")).toContain(
+            `on a shared database, schema ${this.schema},`,
+          );
           return;
         }
       } catch {
