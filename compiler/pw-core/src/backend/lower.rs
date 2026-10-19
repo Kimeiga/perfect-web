@@ -82,6 +82,7 @@ pub struct Checked<'a> {
     cx: Context<'a>,
     units: &'a [crate::check::Unit],
     pages: std::cell::OnceCell<crate::page_values::Analysis>,
+    privacy: std::rc::Rc<crate::check::PrivacyFacts>,
 }
 
 impl<'a> Checked<'a> {
@@ -114,7 +115,8 @@ impl<'a> Checked<'a> {
         if syntax.iter().any(|(_, ds)| !ds.is_empty()) {
             return Err(syntax);
         }
-        let diagnostics = crate::check::check_inferred(units, cx.hirs, cx.ws, cx.sigs, inference);
+        let (diagnostics, privacy) =
+            crate::check::check_inferred_prepared(units, cx.hirs, cx.ws, cx.sigs, inference);
         if diagnostics
             .iter()
             .any(|(_, ds)| ds.iter().any(|d| d.is_error()))
@@ -126,6 +128,7 @@ impl<'a> Checked<'a> {
                     cx,
                     units,
                     pages: std::cell::OnceCell::new(),
+                    privacy: std::rc::Rc::new(privacy),
                 },
                 diagnostics,
             ))
@@ -144,7 +147,11 @@ impl<'a> Checked<'a> {
             },
             units: self.units,
             pages: std::cell::OnceCell::from(self.pages().clone()),
+            privacy: std::rc::Rc::clone(&self.privacy),
         }
+    }
+    pub(crate) fn privacy(&self) -> &crate::check::PrivacyFacts {
+        &self.privacy
     }
     pub(crate) fn set_pages(&self, pages: crate::page_values::Analysis) {
         assert!(

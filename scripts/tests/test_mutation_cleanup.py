@@ -15,9 +15,10 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 
 def load_script(name):
-    spec = importlib.util.spec_from_file_location(name, ROOT / "scripts" / f"{name}_mutations.py")
+    path = ROOT / "scripts" / f"{name}_mutations.py"
+    spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    exec(compile(path.read_bytes(), str(path), "exec"), module.__dict__)
     return module
 
 

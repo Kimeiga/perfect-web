@@ -56,9 +56,43 @@ fn every_rejected_corpus_program_has_the_same_check_and_build_codes() {
             }
         }
         program.push(fixture.clone());
+        let schema_lock = src
+            .lines()
+            .find_map(|line| line.trim().strip_prefix("// @schema-lock:"))
+            .map(|name| {
+                let path = fixture.with_file_name(name.trim());
+                assert!(
+                    path.is_file(),
+                    "declared schema lock is missing: {}",
+                    path.display()
+                );
+                path
+            });
+        let schema_errors = schema_lock.as_ref().map(|_| {
+            let id = src
+                .lines()
+                .find_map(|line| line.trim().strip_prefix("// @id:"))
+                .expect("a schema fixture has an id")
+                .trim();
+            let count = match id {
+                "R-106" => 1,
+                "R-107" => 2,
+                _ => panic!("pin the exact released-schema refusal count for {id}"),
+            };
+            let reasons: Vec<_> = src
+                .lines()
+                .filter_map(|line| line.trim().strip_prefix("// @expect-error:"))
+                .map(str::trim)
+                .collect();
+            assert_eq!(reasons.len(), count, "{id}: exact schema refusal reasons");
+            (count, reasons)
+        });
         let run = |command: &str| {
             let mut cmd = Command::new(env!("CARGO_BIN_EXE_pw"));
             cmd.arg(command).args(&program);
+            if let Some(lock) = &schema_lock {
+                cmd.arg("--schema-lock").arg(lock);
+            }
             if command == "check" {
                 cmd.arg("--plain");
             } else {
@@ -70,13 +104,50 @@ fn every_rejected_corpus_program_has_the_same_check_and_build_codes() {
                 String::from_utf8_lossy(&result.stdout),
                 String::from_utf8_lossy(&result.stderr)
             );
-            assert!(
-                !result.status.success(),
+            assert_eq!(
+                result.status.code(),
+                Some(1),
                 "{} {command}: {text}",
                 fixture.display()
             );
             let found = codes(&text);
             assert!(!found.is_empty(), "{} {command}: {text}", fixture.display());
+            if let Some((count, reasons)) = &schema_errors {
+                assert_eq!(
+                    found,
+                    BTreeSet::from(["PW0366".to_string()]),
+                    "{} {command}: {text}",
+                    fixture.display()
+                );
+                let header = if command == "check" {
+                    "error: [PW0366]"
+                } else {
+                    "[PW0366]"
+                };
+                assert_eq!(
+                    text.matches(header).count(),
+                    *count,
+                    "{} {command}: {text}",
+                    fixture.display()
+                );
+                for reason in reasons {
+                    assert!(
+                        text.contains(reason),
+                        "{} {command} omitted {reason}: {text}",
+                        fixture.display()
+                    );
+                }
+                if command == "check" {
+                    assert!(
+                        text.contains(&format!(
+                            "pw check: {} file(s), {count} error(s), 0 warning(s)",
+                            program.len()
+                        )),
+                        "{} {command}: {text}",
+                        fixture.display()
+                    );
+                }
+            }
             found
         };
         assert_eq!(run("check"), run("build"), "{}", fixture.display());
@@ -107,6 +178,57 @@ fn accepted_corpus_has_exactly_its_known_backend_refusals() {
         .collect();
     let report = pw_core::program::validate_sources(&files);
     let files_ref = &files;
+    // D1's accepted cross-source reference is a warning, separate from the
+    // executable backend's four errors. Pin its native structured identity.
+    let expected_warning = "`Comments.author` refers to `Members` in `MemberData`, and `Comments` is in `CommentData`: no database holds the reference, so the referred row may be missing";
+    let warnings: Vec<_> = report
+        .diagnostics
+        .iter()
+        .flat_map(|(path, ds)| ds.iter().filter(|d| !d.is_error()).map(move |d| (path, d)))
+        .collect();
+    assert_eq!(warnings.len(), 1, "{warnings:?}");
+    let (warning_path, warning) = warnings[0];
+    assert_eq!(warning.code, "PW0365");
+    assert_eq!(warning.severity, pw_core::diagnostics::Severity::Warning);
+    assert_eq!(
+        warning.detector,
+        pw_core::diagnostics::Detector::DeclarationRule
+    );
+    assert_eq!(warning.reason, "refers_across_sources");
+    assert_eq!(warning.message, expected_warning);
+    assert_eq!(
+        Path::new(warning_path).file_name().unwrap().to_str(),
+        Some("A-052-a-reference-across-sources-that-may-name-no-row.pw")
+    );
+    let warning_source = &files.iter().find(|(p, _)| p == warning_path).unwrap().1;
+    let warning_start = warning_source.find("refers author to Members").unwrap();
+    assert_eq!(
+        warning.primary_span,
+        warning_start..warning_start + "refers author to Members".len()
+    );
+    assert_eq!(warning.related.len(), 1);
+    let target_unit = files
+        .iter()
+        .position(|(p, _)| {
+            Path::new(p).file_name().unwrap().to_str()
+                == Some("A-051-a-reference-within-one-source.pw")
+        })
+        .unwrap();
+    let target_source = &files[target_unit].1;
+    let target_start = target_source.find("table Members").unwrap() + "table ".len();
+    // Related.unit is private; its resolved public file names this exact unit.
+    assert_eq!(
+        warning.related[0].file.as_deref(),
+        Some(files[target_unit].0.as_str())
+    );
+    assert_eq!(
+        warning.related[0].span,
+        target_start..target_start + "Members".len()
+    );
+    assert_eq!(
+        warning.related[0].label,
+        "`Members` is held by `MemberData`"
+    );
     let mut got: Vec<_> = report
         .diagnostics
         .iter()
@@ -169,8 +291,47 @@ fn accepted_corpus_has_exactly_its_known_backend_refusals() {
             String::from_utf8_lossy(&result.stdout),
             String::from_utf8_lossy(&result.stderr)
         );
-        assert!(!result.status.success(), "{command}: {text}");
-        assert_eq!(codes(&text), BTreeSet::from(["PW6601".to_string()]));
+        assert_eq!(result.status.code(), Some(1), "{command}: {text}");
+        if command == "check" {
+            assert_eq!(
+                codes(&text),
+                BTreeSet::from(["PW0365".to_string(), "PW6601".to_string()])
+            );
+            let errors: Vec<_> = text
+                .lines()
+                .filter(|line| line.starts_with("error: ["))
+                .collect();
+            assert_eq!(errors.len(), 4, "{text}");
+            assert!(
+                errors
+                    .iter()
+                    .all(|line| line.starts_with("error: [PW6601]")),
+                "{text}"
+            );
+            let warnings: Vec<_> = text
+                .lines()
+                .filter(|line| line.starts_with("warning: ["))
+                .collect();
+            let warning_header = format!("warning: [PW0365] {expected_warning}");
+            assert_eq!(warnings, vec![warning_header.as_str()], "{text}");
+            let warning_block = text.split_once(&warning_header).unwrap().1;
+            assert!(
+                warning_block.starts_with(
+                    "\n  --> A-052-a-reference-across-sources-that-may-name-no-row.pw:24:5\n"
+                ),
+                "{text}"
+            );
+            assert!(
+                text.contains(&format!(
+                    "pw check: {} file(s), 4 error(s), 1 warning(s)",
+                    program.len()
+                )),
+                "{text}"
+            );
+        } else {
+            assert_eq!(codes(&text), BTreeSet::from(["PW6601".to_string()]));
+            assert!(!text.contains("[PW0365]"), "{text}");
+        }
         assert_eq!(text.matches("[PW6601]").count(), 4, "{command}: {text}");
         for (_, _, message) in &expected {
             assert!(text.contains(message), "{command}: {text}");

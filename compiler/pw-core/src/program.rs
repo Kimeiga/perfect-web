@@ -65,8 +65,7 @@ fn with_preparation<R>(
     checked.set_pages(crate::page_values::analyze_inferred(
         &hirs, &ws, &sigs, &inference,
     ));
-    let contracts =
-        crate::contract::contracts_inferred(&hirs, &sigs, &ws, checked.pages(), &inference);
+    let contracts = crate::contract::contracts_checked(&checked, &inference);
     let prepared = checked.with_contracts(&contracts);
     f(Ok((prepared, diagnostics)))
 }

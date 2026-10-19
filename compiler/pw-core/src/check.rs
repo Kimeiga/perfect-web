@@ -59,6 +59,38 @@ pub(crate) fn check_with(
     check_inferred(units, hirs, workspace, sigs, &inference)
 }
 
+/// The exact privacy derivation for one prepared semantic program.
+/// All facts own their IDs and labels; no inference or HIR borrow escapes.
+pub(crate) struct PrivacyFacts {
+    summaries: BTreeMap<crate::resolve::DefId, Label>,
+    reads: Reads,
+    labels: BTreeMap<crate::resolve::DefId, Label>,
+}
+
+impl PrivacyFacts {
+    pub(crate) fn holds(&self, def: crate::resolve::DefId) -> Label {
+        self.reads.holds(def)
+    }
+    pub(crate) fn labels(&self) -> &BTreeMap<crate::resolve::DefId, Label> {
+        &self.labels
+    }
+}
+
+pub(crate) fn privacy_facts(
+    hirs: &[&Hir],
+    sigs: &Signatures,
+    inference: &crate::effects::Inference<'_>,
+) -> PrivacyFacts {
+    let summaries = summaries(hirs, sigs);
+    let reads = Reads::of(hirs, sigs, inference).answering(&summaries);
+    let labels = reads.labels();
+    PrivacyFacts {
+        summaries,
+        reads,
+        labels,
+    }
+}
+
 pub(crate) fn check_inferred(
     units: &[Unit],
     hirs: &[&Hir],
@@ -66,6 +98,16 @@ pub(crate) fn check_inferred(
     sigs: &Signatures,
     inference: &crate::effects::Inference<'_>,
 ) -> Vec<(String, Vec<Diagnostic>)> {
+    check_inferred_prepared(units, hirs, workspace, sigs, inference).0
+}
+
+pub(crate) fn check_inferred_prepared(
+    units: &[Unit],
+    hirs: &[&Hir],
+    workspace: &crate::resolve::Workspace,
+    sigs: &Signatures,
+    inference: &crate::effects::Inference<'_>,
+) -> (crate::program::Diagnostics, PrivacyFacts) {
     // E7: what the whole program says about a type — is it a resource, and is
     // it produced only by a scoped declaration. Both are needed before any one
     // file can be asked what its handlers may capture.
@@ -223,9 +265,11 @@ pub(crate) fn check_inferred(
     // value labels a sink reads follow a call into its callee. Made first,
     // since a secret a declaration answers, by its type or by what its body
     // makes, is held where it runs and in what keeps it (ADR-0282).
-    let summaries = summaries(hirs, sigs);
-    let reads = Reads::of(hirs, sigs, inference).answering(&summaries);
-    let labels = reads.labels();
+    let PrivacyFacts {
+        summaries,
+        reads,
+        labels,
+    } = privacy_facts(hirs, sigs, inference);
     let resources = reads.of_resources(hirs);
     // And what a view's handlers capture of what it is given (ADR-0136): a
     // page that uses the view writes it into its own document.
@@ -239,7 +283,7 @@ pub(crate) fn check_inferred(
     // unit, since a loop in one module calls a read in another.
     let bounded = crate::bounded::Reads::of(hirs, workspace, sigs, inference, &sources);
     let paths: Vec<&str> = units.iter().map(|u| u.path.as_str()).collect();
-    units
+    let diagnostics = units
         .iter()
         .enumerate()
         .map(|(i, u)| {
@@ -311,7 +355,15 @@ pub(crate) fn check_inferred(
             crate::diagnostics::resolve_files(&mut out, i, &paths);
             (u.path.clone(), out)
         })
-        .collect()
+        .collect();
+    (
+        diagnostics,
+        PrivacyFacts {
+            summaries,
+            reads,
+            labels,
+        },
+    )
 }
 
 /// **A command a page's handler calls declares `idempotent_by`**

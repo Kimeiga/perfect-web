@@ -635,3 +635,337 @@ variable renaming. The latency control must now repeat full executable
 validation five times, as the measured CLI promise changed from semantic
 checking. Preserve every control name/count/test and require complete affected
 whole suites with actual assertion failures before any assembled gate claim.
+
+
+## Integrator privacy-sharing ruling before correction
+
+The assembled unchanged CPU2s latency gate is RED1/2: cold2030.62ms and
+edit1929.98ms; an earlier clean measurement was2217.40ms. The original raw
+`/tmp/train10-cib-assembly/second-focused/1.txt` remains failed evidence,
+SHA256266e16f27f51e7ff4a5a6362ed82fb604b488bcd59089340d876aa7f3930a29c.
+No ceiling, parser proof, solver behavior, component encoding or audit may
+change as a response to that result.
+
+Three actual stage profiles retained the complete executable checker. Every
+profile restored the same2861 source paths and hashes, and the pristine CLI
+was rebuilt afterward (SHA256f03f0baf81185a4dbe826caafb86bc58f594b692eed07da2e78bbd6d81a90c04).
+Raw/restoration/measurements remain outside the repository under
+`/tmp/train10-cib-profile-20261016`, `-v4` and `-v5`. The two intervening
+instrumentation preflights refused ambiguous timer anchors before running
+Cargo; both restored every byte and earn no test or performance result.
+The final profile raw SHA256 is
+19ba2da919fc29d5a24f4869ad7e3bde9a4555b5768d8e92a9657f2db041a8a8.
+These instrumentation runs are measurements, not a replacement green latency
+gate. Their raw numbers remain separate from the original RED.
+
+The profiles identify one narrow repeated computation. The semantic checker
+builds `summaries(hirs,sigs)`, then `Reads::of(...).answering(&summaries)` and
+its labels. Contract generation immediately repeats the exact derivation for
+the same HIR/signatures/inference. The repeated contract step costs57.41ms
+CPU median in v4 and59.32ms in v5 (its summary alone48.59/50.41ms). Tables and
+cache cloning are below0.1ms; resume typing is only8–10ms per site. The55
+component encodings and55artifact audits are actual required work and stay.
+
+Integrator approved the following before permanent edits,2026-10-16:
+
+1. A crate-private immutable `check::PrivacyFacts` owns the existing summary
+   and label `BTreeMap<DefId, privacy::Label>` values and existing `Reads`.
+   Reads contains owned maps of labels, strings and DefIds; no inference or
+   HIR borrow is retained. One private derivation factory serves both paths.
+2. The semantic checker retains every analysis and its order, and returns
+   these exact already-derived facts through an internal prepared result.
+   Its existing semantic-only wrapper keeps its signature and diagnostics.
+3. `Checked::diagnose_inferred` retains exact unit/HIR identity and syntax
+   checks, and stores the facts in a private `Rc` only after clean semantic
+   diagnostics. `with_contracts` clones only this Rc for identical source
+   context. No public Context field, cache-input API or proof constructor is
+   added, and no cross-program/global cache exists.
+4. Complete composition calls `contracts_checked`, which borrows the sealed
+   Checked's exact context, pages and labels. The contract implementation
+   retains all native labels, answered-secret/placement/capability rules.
+   Existing standalone contract wrappers derive their own facts once and
+   feed the same private contract body.
+5. Behavioral tests compare standalone and complete contracts, distinguish
+   cross-module namesakes, and repeat separate programs with the same DefId
+   positions and different privacy. A genuine empty/foreign-label control
+   must fail a named behavioral assertion. No committed derivation-count
+   test or control merely repeating semantically equivalent work is added.
+   Profiling counts remain profiling evidence only. Existing proof-forgery
+   control must remain operative with the new private field, rather than
+   earning a build-failure kill from an obsolete struct initializer.
+
+Run focused privacy/generic/backend/schema tests, the unchanged actual2s
+latency gate, full source/pathset receipts and global mutation anchors before
+reporting this candidate. Full relevant whole controls/CI remain required for
+eventual integration; no source commit or optimization completion is claimed.
+The measured57–59ms elimination is not a guarantee that the2s bound passes.
+
+
+The first focused compile caught a required native consumer before any test
+ran: contract Demand also joins `Reads::holds(def)`, including answered
+secrets. A labels-only parameter does not represent the complete facts. The
+private contract body therefore borrows the entire immutable bundle, using
+its labels and unchanged holds projection. The full path receives it only
+from the sealed Checked; standalone derives one complete bundle. The genuine
+control supplies an empty bundle only to the complete path, because removing
+only labels can be absorbed by holds. Initial compile raw remains external
+`/tmp/train10-cib-profile-20261016-v5/privacy-focused.txt`; it is not a test pass.
+
+
+Narrow implementation checkpoint, before final focused gates: the checker
+retains its exact summary/Reads/label derivation in an owned private bundle.
+Checked stores an Rc only after its unchanged identity, syntax and semantic
+gates; with_contracts clones that Rc. Contracts borrow both native labels
+and unchanged Reads::holds through the same bundle. Public Context/proof
+APIs, parser/solver behavior, every component/audit and the2s bound are unchanged.
+
+The focused CIB suite passed12/12, including behavioral contract equality,
+qualified module namesakes, three alternating same-DefId programs and native
+cross-module PW5001 early-refusal parity. A genuine empty-facts control failed
+the named helper-hidden-session assertion0/1 with nativeCargo101; rawSHA256
+f062eea4c7f41503f3f292dac868f29240a756fe36bfce4c198215a742367197.
+The existing public-proof-forgery control now initializes the added private
+field but still makes the compile_fail doctest compile and fail0/1, actual
+nativeCargo101; rawSHA256be44a21c81cfbae1020630b3673282cf3e922b172f0c70e5a741c1844957f409.
+Both full outputs and exact byte-restoration receipts are external under
+`/tmp/train10-cib-privacy-final`. No derived-work-count test/control is added.
+
+Global anchor preflight found one moved contract holds projection. Its
+existing held-label control now removes the same `.join(&privacy.holds(def))`
+instead of `.join(&reads.holds(def))`; it is not dropped or credited here.
+The CIB roster is36 (originally35) and held-label roster remains8. Global3329/275 anchors
+match once. Full current-source wholes and CI remain pending; earlier feature
+campaigns retain their original source qualifications and are not relabeled.
+
+
+## Result-producer repair ruling before consumer edits
+
+The privacy-only compiler candidate passed the unchanged latency gate2/2:
+coldCPU1886.52ms, editCPU1793.51ms; the separate clean comparisonCPU1995.86ms
+remains close to its unchanged2s ceiling. Focused core18binaries223/0,
+CLI26/0, Checkedunit1/0 and public-proof doctest1/0 passed. The eight-command
+receipt preserved all2861 paths/bytes; raw and native exits remain external
+under `/tmp/train10-cib-privacy-focused-final`. This does not credit a whole
+mutation campaign or finalCI, and original latency RED remains history.
+
+Integrator review then found a separate evidence defect in the two affected
+whole scripts. Mocked children only, without signals or launched processes,
+reproduced Cargo failed summaries accepted at native0,67,-15 andNone;
+build-error text plus a failed summary was also accepted. Both mains called
+a build failure KILLED and returned0. CIB additionally trusted Python count
+text at invalid exits and fixture errors without any executed body. Actual
+regression red is4methods/17failing subcases, nativePython1; first3/12rawSHA256
+12e5f2df0d40863ed21c67f206236840768c613eecc6289237686b48253e4e1b.
+Full raw histories are `/tmp/train10-cib-privacy-review/producer-before.txt`
+and `producer-python-before.txt`; they provide no real process-stop evidence.
+
+Parent approved the bounded repair before code on2026-10-16:
+- Preserve all36 CIB and8 held-label tuples, original Cargo commands and
+  Python module selections, bounds, groups, timeout and process cleanup.
+- Consume exact canonical Cargo validatora177209c. Unknown/build/stopped
+  results are campaign failures after restoration, never kills. Native
+  doctest assertion text is retained; no second Cargo count parser is added.
+- Copy exact immutable synchronous unittest producer902dfef3 and pure
+  validator91e941dc from reviewedv17. Freeze actual method IDs for each of
+  CIB's three existing Python selections before changing source. Every run
+  gets fresh dedicated expected/report files; validate native exit, complete
+  report and exact frozen IDs. Fixture, stale/missing/invalid and ordinary
+  body-error outcomes are refusals; only body assertions earn kills.
+- An invalid outcome aborts after exact source restoration with no next
+  control. Unexpected exceptions retain their original identity through
+  secondary restoration/diagnostic failure. This does not expand process
+  ownership, change cancellation/reaper policy, or alter compiler facts.
+- Add behavioral mock classifier/main restoration/no-next regressions and
+  operative wrong-result controls. Global anchors and whole scripts must
+  run on the final refrozen source before any integration/CI readiness.
+
+The earlier64/63 roster prose was a counting error: AST and loaded inventory
+show36 current CIB tuples and35 in the frozen pre-sharing baseline. The
+corrected metadata does not add or claim any unperformed control.
+
+
+Before the test-loader correction, a private synthetic cached module witness
+was RED: both existing cleanup-test and new consumer-test loaders sawVALUE1
+from preseeded bytecode while same-size/same-mtime source readVALUE2. Actual
+nativePython1, one test/two subcase failures, no project source mutation or
+project process; raw `/tmp/train10-cib-privacy-review/loader-before.txt`.
+Parent approved before edit: retain module_from_spec identity/globals but
+execute compile(path.read_bytes(),str(path),'exec') into that dictionary.
+This changes only the two test loaders, not producer902d/protocol91e9, test
+selection or process policy. Parent also approved two actual loader-reversion
+controls, bringing proposed final CIB roster46 and held-label8 (existing
+44+8 retained). Final revised source/consumer evidence still requires review
+before any whole launch; no new whole result is claimed here.
+
+
+Before whole release, parent found one retained memory-stop accounting gap:
+held-label main imports the existing mutation_baseline Watch but did not
+consult its stopped list. A fully mocked flag-only witness, without child
+launch or signal, is RED2/2: baseline and mutant both accepted a known stop
+with apparently valid output, credited a kill and returned0. Raw retained
+`/tmp/train10-cib-privacy-review/watch-before.txt`, nativePython1.
+Parent ruling before code: obtain the existing watcher through
+mutation_baseline.mutation_bound.start() (it reuses that active watcher),
+and make both baseline/mutant validity include an empty stopped list. Abort
+after source restoration with no next control. Keep bounds, signals, groups,
+reaping, original primary identity and held8 tuples unchanged. Add one real
+guard-removal control to CIB; proposed final roster47+8. No new watcher or
+process ownership is introduced, and this is no evidence of an actual stop.
+
+
+Before launching any whole, a fully mocked private report cleanup probe found
+one new unwind defect: TemporaryDirectory.__exit__ could replace an existing
+SystemExit37 with a secondary cleanupOSError. RED1/1/nativePython1, raw
+`/tmp/train10-cib-privacy-review/report-cleanup-before.txt`, SHA256
+5414e09cbebc308ce4d516ec964168b028733434b04ab636e226d8ab71e90fab.
+Parent approved explicit owned report cleanup and the same cancellation
+precedence as the external observer. A second mocked source-release probe
+then measured two failures: an ordinary primary swallowed a first SystemExit
+from release, or a first KeyboardInterrupt from diagnostic output. Existing
+primary cancellation already retained exact identity. Rawsource-unwind-before
+is3methods,1green/2red, nativePython1; no process/signal was involved.
+
+Ruling before correction: share only this unwind rule between source/report
+cleanup. Existing SystemExit/KeyboardInterrupt primary retains exact identity;
+otherwise a first cancellation during release/diagnostic outranks an ordinary
+primary. An ordinary secondary cannot replace an existing primary, and an
+ordinary cleanup failure without a primary remains visible. Report cleanup
+is explicit and owned. Preserve every existing test selector, process group,
+reaper, signal and bound policy, and unchanged compiler/semantic inputs.
+Add report-caller reversion plus separate proven release/diagnostic-cancel
+controls; retain the existing source-primary control at its same authority.
+Proposed final roster50CIB+8held; source/focused review still precedes wholes.
+
+
+## Accepted D1 warning distinguished from backend errors
+
+First released whole50 attempt failed its unmutated baseline89passed/1failed,
+actualCargo101 in accepted_corpus_has_exactly_its_known_backend_refusals;
+zero mutants were applied and held8 was not started. All2864 source paths
+were exact afterward. OwnerPID3879781 naturally reaped at13:59:35UTC,
+raw `/tmp/train10-cib-consumers-whole-v1/check_is_build_mutations.py.txt`
+SHA2563b2c855fd9bc193ac11bab9127945ef2053a445db3622b165c801de8e9726a9a.
+Observererrors0/stops0; this is failed baseline history, not mutation evidence.
+
+Causal evidence shows no new semantic refusal. D1 accepted A052 explicitly
+expects warningPW0365: a reference across databases may name no row. Native
+structured validation still reports exactlyfourPW6601 errors plusone
+Warning/DeclarationRule/refers_across_sources at A052 bytes628..652
+(`refers author to Members`), with related A051Members bytes479..486,
+label`Members` is held by `MemberData`, canonical targetunit88. The CLI check
+renders this warning alongsidefourerrors; build's errorDisplay includes
+onlyfourerrors and writes no artifact. The test's generic codes(text) helper
+incorrectly treated the warning as an additional error. Immutable copiedCLI
+SHA256d0d7a21637fd1cc144c9859cba7963d74a8397af557852d0582bdfebb04d2ca3
+and private actual structured witness/raw/argv receipts are retained under
+`/tmp/train10-cib-privacy-review/corpus-red`.
+
+Parent ruling before test-only amendment: preserve production, corpus
+programs/@rule/diagnostics and exactfourbackend refusals. Pin exactlyone
+structured D1 warning separately (severity/reason/message/source/primary
+and related target unit/file/span/label). Check output must retainfourerror
+headers,oneexactwarningheader/source and4/1summary; build retainsfourPW6601,
+noPW0365 and no artifacts. The related unit is pinned through its resolved
+public file identity, without exposing the private Related.unit field.
+Leave the generic codes helper and rejected-corpus parity unchanged. The
+original50CIB+8held tuples/count remain fixed; refreeze and rerun complete
+wholes after the exact focused command passes. No failed history is relabeled.
+
+The reviewed test-only patch also pins both retained native CLI refusal exits
+as code1, replacing generic non-success only within this accepted-corpus
+command. Parent approved this explicit status assertion before its amendment;
+all other corpus tests and original50+8 mutation tuples remain unchanged.
+
+
+## C8 R-035 historical receiver classification (integrator ruling, 2026-10-16)
+
+The host-composition default CI exposed a real RED in corpus_history: C8's original R-035 did not report wrong_frame_phase. Its ElementRef annotation has no browser import. The canonical receiver solver refuses this unresolved type and cannot invent style effects by a global member spelling. This is FixtureDidNotExpressIt under the existing Why taxonomy, not a phase-semantics regression and not acceptance of the old program.
+
+An external immutable-input public check_sources probe, linked to already-built exact-hash pw_core/serde_json rlibs without Cargo or project changes, pins the causal distinction. Original: PW0026 unresolved_type528..551; PW0408 member_receiver_untyped736..744,736..756,779..787; PW0605 argument_type857..881. Adding ONLY import browser.{ ElementRef } restores PW0402 wrong_frame_phase766..792 at exactly it.style.set_padding(4.px), beside the old width/maximum defects PW0610/PW0605. The current typed fixture reports ONLY that PW0402; deleting ONLY the illegal setter makes its typed neighbour clean. Every other library unit is clean. The existing causal_evidence tests forbid ProgramWideName routing and effects invented for a receiver with no such member.
+
+The TEST-ONLY correction explicitly classifies this one C8 original and requires its five exact original code/symbol/span/source-text/message refusals, import-only causal control, current typed violation and clean typed neighbour. All25 historical files and the25-file floor remain unchanged; the other24 retain the original rejection assertions, including the existing R-019 parser boundary. Actual counters report23 declared-invariant catches +1 existing R-019 syntax refusal +1 classified outof25, never24 or25 original target-invariant catches. The existing R-019 assertion is unchanged. A mismatched required rejection fails before any success measurement is printed. Production scope, ambient resolution and expected-code allowlists are unchanged.
+
+Actual immutable receipt: /tmp/browser-c8-readonly-2mr9np78/receipt.json SHA256b4a04bc47e8a1ba04c435ab7ce9e0b52f8624b0af004b8e9a19354f0403e2c44; probe46ad30c3811043e0604333aea2c3f3f2f7b17aeb201892adb05d2aed5fb1cc4f, binary29e294ae82bad61d3227ed07989a22ff78b9bef775af6761a70d62db4bf8964d; pw_corec19ff415c3663da2794dabcc84ee93b9839233670702ec2b970a7f5d4056eb4d, serde_jsonf37867b2cfe65dd2cd73fe1cb915593ba7dfb685e22e2fb3d8bab8667e78a613. Complete structured native diagnostics, invocation argv/exits,49 exact library entries,57app inputs and source hashes are retained. Two initial external fixture/toolchain setup refusals are preserved separately and earn no semantic control credit.
+
+This amendment precedes canonical test correction. Proposed patch is NOT applied in the active host CI tree; integrator review and quiescent canonical validation precede adoption.
+
+This isolated CIB tree is now quiescent and parent reviewed canonicalv2 before
+adoption: patch24043cb7, proposedtestf143e622 overf4ad037f. Own post-whole
+v4currency7/7 is green, so no generated fixture refresh is indicated here.
+Ownhistory7/8red remains rawSHAe67993c628727202ac305470018b4aa02b75dbb5fc16735b5c14a5f025ba45af.
+All25 C8 file hashes match the immutable receipt before this test-only edit.
+The v4whole50+8/417children proof remains historical/source-qualified; final
+amended inputs require fresh focused gates/full50+8 and defaultCI.
+
+Before metadata reanchor, unchanged last_segment is actualRED3/4/native101:
+effects.rs:calls_with_types is unclassified, while stale display entry still
+namescalls_from. RawSHA256a39b840675df12660f61b85512660cdd2130a0027021d3f278c3e29ff6de10d7.
+Parent approved metadata-only move of that EXISTING entry to calls_with_types,
+keeping display category, exact existing prose and forbiddenzero. Typed member
+identity and fullpath/DefId/effects resolve before shortening; the short name
+feeds only Via::Helper.helper for describe(), while callee retains fullpath.
+This does not alter compiler code, whitelist membership count or category.
+Ruling and actualred precede the one-entry metadata change.
+
+
+### Released-schema context in the rejected CLI corpus (2026-10-16)
+
+The final-v5 full CI exposed a test-assembly omission: the generic rejected-program
+CLI loop passed the 50 program files for R-106 but omitted the fixture's existing
+@schema-lock companion, so check correctly exited 0 with no diagnostics.
+checking_source::check_fixture, the generality harness and the D1 table tests
+already supply that released schema. A row declaration alone cannot express the
+comparison with a released version.
+
+The immutable executable d0d7a21637fd1cc144c9859cba7963d74a8397af557852d0582bdfebb04d2ca3
+and copied, hashed inputs reproduce all eight command observations at
+/tmp/train10-cib-schema-context-v5-v2/matrix.json (SHA256
+a3712234e96e8072fa6027ae381cc0477425ce8f85b610f06e7da263ddf06267).
+For both R-106 and R-107, unlocked check/build exit 0; each build emits eight
+artifacts. Supplying the declared sibling lock makes both commands exit 1 with
+only PW0366 and no artifacts: one diagnostic for the lost Notes.body, two for
+the lost Memos.body and the new Memos.text. The first private-copy attempt
+refused an overwrite of its own read-only common input after the four R-106
+observations; its partial raw is retained separately and earns no completed
+matrix credit.
+
+The integrator rules this a **test-only missing-fixture-context correction**.
+Forward the existing declared lock symmetrically to both public commands and
+require that companion to exist. Pin native exit 1 for rejected semantic
+programs; for these two lock fixtures pin PW0366 alone, the exact one/two
+diagnostic counts and their existing header reasons. Keep source/library/fixture
+bytes, code parity and no-artifact assertions unchanged. This amends neither
+compiler behavior nor a refusal allowlist. The prior final-v5 50+8 whole results
+and failed CI remain source-qualified history; refreeze and rerun the complete
+50+8 controls and fresh CI after this test amendment.
+
+
+### Corpus enforcement evidence after the generic integration (2026-10-16)
+
+The complete final-v5 default CI naturally ended at 15:05:46 UTC with native
+status 101 and exact original 2,864-path source restoration. The complete raw
+output SHA256 is 85f458e18da32f5d613f877fb5366fb11174794cdb1971bdbccfb3b1a6fc6d48
+under /tmp/train10-cib-full-ci-v5. Its full failure census is exactly the missing
+released-schema CLI fixture context above and stale E2D enforcement evidence:
+the report records 87/87, while the canonical current test measures 93/93. The
+remaining Rust results are 3,126 passes and 25 ignored, including the unchanged
+two-second latency gate 2/2; Python ran 304 passes and two skips. This failed CI
+remains failed history and is not substituted with focused passes.
+
+Read-only comparison finds the parent's validated report differs by exactly the
+87-to-93 total and the six R-090 through R-095 rows. The complete
+checking_source.rs authority is byte-identical in both trees (SHA256
+2369ec22b14334f09199bc0a4e4de1d3a1c6d3a99eae79d40a278e5e4b363703), as are those
+six fixture files. The actual evidence-corpus recipe already selects the valid
+the_committed_enforcement_table prefix; no recipe edit is warranted.
+
+The integrator approves regeneration through this candidate's existing exact
+writer, not adoption by assumed compiler equivalence. Run cargo test --locked
+-p pw-core --test checking_source
+the_committed_enforcement_table_is_what_the_corpus_checks_now -- --exact
+--nocapture with PW_WRITE_EVIDENCE=1 in that child only. Require native 0 and
+exactly one executed test, generated report SHA256
+04178f0ffa9e2cdf09b95165d07e7b715354aaee53078ef8b63bc1d25303e127 and the exact
+six-row/header-only diff, then run the same test without write permission.
+This ruling precedes the evidence write. Refreeze the amended inputs and run
+the complete unchanged 50+8 rosters and fresh default CI before any checkpoint.

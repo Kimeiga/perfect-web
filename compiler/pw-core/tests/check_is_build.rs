@@ -169,3 +169,128 @@ fn a_bad_signal_initial_value_is_not_hidden_by_a_page_refusal() {
     );
     assert!(report.into_build().is_err());
 }
+
+fn privacy_program(left_private: bool, shared_page: bool) -> Vec<Unit> {
+    let source = |module: &str, private: bool| {
+        format!(
+            "module {module}\n{}query Held() -> Int {{ 1 }}\nfn helper() -> Int !{{}} {{ Held() }}\nquery Peek() -> Int {{ helper() }}\n",
+            if private { "session " } else { "" },
+        )
+    };
+    let left = source("left", left_private);
+    let right = source("right", !left_private);
+    let mut client =
+        "module client\nimport left\nquery Joined() -> Int { left.Peek() }\n".to_string();
+    if shared_page {
+        client.push_str("page Shared() {\n route \"/\"\n cache shared\n let n = query Joined()\n view { <title>Shared</title><p>{n}</p> }\n}\n");
+    }
+    units(&[
+        ("left.pw", &left),
+        ("right.pw", &right),
+        ("client.pw", &client),
+    ])
+}
+
+fn standalone_contracts(input: &[Unit]) -> Vec<pw_core::contract::ComponentContract> {
+    let hirs: Vec<_> = input.iter().map(|u| &u.hir).collect();
+    let workspace = pw_core::resolve::Workspace::build(&hirs);
+    let signatures = pw_core::signatures::Signatures::build(&workspace, &hirs);
+    pw_core::contract::contracts(&hirs, &signatures, &workspace)
+}
+
+fn permits_build(contracts: &[pw_core::contract::ComponentContract], name: &str) -> bool {
+    contracts
+        .iter()
+        .find(|c| c.component_id == name)
+        .unwrap_or_else(|| panic!("missing {name}"))
+        .allowed_placements
+        .iter()
+        .any(|p| p == "build")
+}
+
+#[test]
+fn prepared_privacy_stays_with_its_program_and_qualified_namesakes() {
+    let mut ids = None;
+    let mut previous = Vec::new();
+    for left_private in [true, false, true] {
+        let input = privacy_program(left_private, false);
+        let current: Vec<_> = input
+            .iter()
+            .enumerate()
+            .flat_map(|(unit, u)| {
+                u.hir
+                    .all_decls()
+                    .map(move |(id, d)| (unit, id.0, d.name.clone()))
+            })
+            .collect();
+        if let Some(ids) = &ids {
+            assert_eq!(
+                &current, ids,
+                "the programs deliberately reuse DefId positions"
+            );
+        } else {
+            ids = Some(current);
+        }
+        let standalone = standalone_contracts(&input);
+        let report = pw_core::program::validate(&input);
+        assert!(
+            report.diagnostics.iter().all(|(_, ds)| ds.is_empty()),
+            "{:?}",
+            report.diagnostics
+        );
+        let complete = report
+            .into_build()
+            .expect("the full private/public query program is executable");
+        assert_eq!(
+            permits_build(&complete.contracts, "left.Peek"),
+            !left_private,
+            "a helper-hidden session label stays in its qualified module"
+        );
+        assert_eq!(
+            permits_build(&complete.contracts, "right.Peek"),
+            left_private,
+            "an unrelated namesake keeps its own privacy"
+        );
+        assert_eq!(
+            permits_build(&complete.contracts, "client.Joined"),
+            !left_private,
+            "a cross-module read keeps its source's privacy"
+        );
+        assert_eq!(
+            serde_json::to_value(&complete.contracts).unwrap(),
+            serde_json::to_value(&standalone).unwrap(),
+            "standalone and complete contracts preserve all native capability, placement and ABI fields"
+        );
+        previous.push((left_private, complete));
+    }
+    for (left_private, build) in previous {
+        assert_eq!(
+            permits_build(&build.contracts, "client.Joined"),
+            !left_private,
+            "later programs cannot change an earlier owned plan"
+        );
+    }
+}
+
+#[test]
+fn cross_module_privacy_refusals_still_stop_complete_preparation() {
+    let input = privacy_program(true, true);
+    let files: Vec<_> = input
+        .iter()
+        .map(|u| (u.path.clone(), u.src.clone()))
+        .collect();
+    let semantic = check_sources(&files);
+    assert!(
+        semantic
+            .iter()
+            .flat_map(|(_, ds)| ds)
+            .any(|d| d.code == "PW5001"),
+        "{semantic:?}"
+    );
+    let complete = pw_core::program::validate(&input);
+    assert_eq!(
+        complete.diagnostics, semantic,
+        "native privacy diagnostics stay authoritative before support preparation"
+    );
+    assert!(complete.into_build().is_err());
+}

@@ -57,7 +57,6 @@ use crate::effects::Inference;
 use crate::hir::{DeclKind, Expr, Hir};
 use crate::ontology::Ontology;
 use crate::placement::{Demand, solve};
-use crate::privacy::Label;
 use crate::resolve::Workspace;
 use crate::signatures::Signatures;
 
@@ -1452,6 +1451,35 @@ pub(crate) fn contracts_inferred(
     pages: &crate::page_values::Analysis,
     inference: &Inference<'_>,
 ) -> Vec<ComponentContract> {
+    let privacy = crate::check::privacy_facts(hirs, sigs, inference);
+    contracts_with_privacy(hirs, sigs, ws, pages, inference, &privacy)
+}
+
+/// Complete validation lends only facts belonging to this sealed source proof.
+pub(crate) fn contracts_checked(
+    checked: &crate::backend::lower::Checked<'_>,
+    inference: &Inference<'_>,
+) -> Vec<ComponentContract> {
+    let cx = checked.context();
+    contracts_with_privacy(
+        cx.hirs,
+        cx.sigs,
+        cx.ws,
+        checked.pages(),
+        inference,
+        checked.privacy(),
+    )
+}
+
+fn contracts_with_privacy(
+    hirs: &[&Hir],
+    sigs: &Signatures,
+    ws: &Workspace,
+    pages: &crate::page_values::Analysis,
+    inference: &Inference<'_>,
+    privacy: &crate::check::PrivacyFacts,
+) -> Vec<ComponentContract> {
+    let labels = privacy.labels();
     // What each effect DECLARES about itself: whether it needs host authority,
     // and which interface serves it. Built once, beside the inference, because
     // both answer questions about the same rows.
@@ -1504,9 +1532,7 @@ pub(crate) fn contracts_inferred(
     // And what each holds where it runs (ADR-0282), as the checker's
     // placement reads it: a secret it answers or reads, never one it only
     // uses.
-    let reads = crate::check::Reads::of(hirs, sigs, inference)
-        .answering(&crate::check::summaries(hirs, sigs));
-    let labels: BTreeMap<crate::resolve::DefId, Label> = reads.labels();
+    // These labels are the exact owned privacy facts for this preparation.
 
     // The functions a page's template reads as members (ADR-0125): a host
     // calls each to compute what the page shows, so each is a component with
@@ -1669,8 +1695,8 @@ pub(crate) fn contracts_inferred(
             let def = crate::resolve::DefId { unit, decl: id.0 };
             let demand = Demand {
                 effects: effects.clone(),
-                label: crate::check::declaration_label(hir, &labels, inference, unit, decl)
-                    .join(&reads.holds(def)),
+                label: crate::check::declaration_label(hir, labels, inference, unit, decl)
+                    .join(&privacy.holds(def)),
                 declared: crate::check::declared_world(hir, decl),
             };
             // A `Blocked` effect leaves this EMPTY, and empty is the contract's
