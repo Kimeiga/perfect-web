@@ -127,27 +127,57 @@ pub(crate) struct Tail {
     between: Mutex<Option<Box<dyn FnOnce() + Send>>>,
 }
 
+/// **The outbox's highest id**, read on `c`, a connection searching its
+/// schema: where a reader opened now starts.
+pub(crate) fn highest(c: &mut Client) -> Result<i64, String> {
+    c.query_one("SELECT coalesce(max(id), 0)::bigint FROM outbox", &[])
+        .map(|r| r.get(0))
+        .map_err(pg)
+}
+
 impl Tail {
-    /// **A reader opened with its layer**: its cursor at the outbox's
-    /// highest id. The host has no page yet, and every page it serves reads
-    /// the database as it is then.
-    pub(crate) fn open(url: &str, outbox: Outbox, host: &str) -> Result<Tail, String> {
-        let tail = Tail {
+    /// **A reader opened with its layer**: its cursor at `highest`, the
+    /// outbox's highest id ([`highest`]), which the layer read on a
+    /// connection of its own as it opened. The host has no page yet, and
+    /// every page it serves reads the database as it is then. Its listening
+    /// connection is made by its first read, not here: a host connects what
+    /// it uses, and a layer whose host never reads the outbox (a test's)
+    /// holds none. Nothing is lost meanwhile: the first read listens, then
+    /// reads every row after the cursor.
+    pub(crate) fn at(url: &str, outbox: Outbox, host: &str, highest: i64) -> Tail {
+        Tail {
             url: url.to_string(),
             outbox,
             host: host.to_string(),
-            cursor: Mutex::new(0),
+            cursor: Mutex::new(highest),
             conn: Mutex::new(None),
             trimmed: Mutex::new(None),
             #[cfg(test)]
             between: Mutex::new(None),
-        };
+        }
+    }
+
+    /// [`Tail::at`] the outbox's highest id, read on the reader's own
+    /// connection: a test's reader beside the hosts'.
+    #[cfg(test)]
+    pub(crate) fn open(url: &str, outbox: Outbox, host: &str) -> Result<Tail, String> {
+        let tail = Tail::at(url, outbox, host, 0);
         let highest = tail.with(|c| {
             c.query_one("SELECT coalesce(max(id), 0)::bigint FROM outbox", &[])
                 .map(|r| r.get::<_, i64>(0))
         })?;
         *tail.cursor.lock().expect("cursor") = highest;
         Ok(tail)
+    }
+
+    /// Whether its listening connection is open.
+    #[cfg(test)]
+    pub(crate) fn listening(&self) -> bool {
+        self.conn
+            .lock()
+            .expect("the tail's connection")
+            .as_ref()
+            .is_some_and(|c| !c.is_closed())
     }
 
     /// This host's id, which its own rows carry.
@@ -345,54 +375,126 @@ impl Tail {
 /// **Sessions and sign-ins kept in a layer's schema** (ADR-XXXX):
 /// `sessions` and `sign_ins`, each by its secret's SHA-256
 /// ([`crate::identity::kept_hash`]), on connections of their own, so that a
-/// request's read of its session waits on no command.
+/// request's read of its session waits on no command; no more than
+/// [`SESSION_CONNECTIONS`] of them open at once.
 pub(crate) struct SessionsPg {
     url: String,
     schema: String,
-    idle: Mutex<Vec<Client>>,
+    /// The idle connections, and how many are open: idle, or taken.
+    idle: Mutex<(Vec<Client>, usize)>,
+    given_back: std::sync::Condvar,
     /// The statements it ran: one per request that reads its session.
     #[cfg(test)]
     pub(crate) ran: std::sync::atomic::AtomicU64,
+    /// The most connections open at once.
+    #[cfg(test)]
+    most: std::sync::atomic::AtomicUsize,
 }
 
-/// How many idle connections it keeps.
-const SESSION_CONNECTIONS: usize = 8;
+/// **How many connections a layer's sessions are read and written on at
+/// once** (ADR-XXXX; the bound the render merge's ruling holds every pool
+/// to: stated, and deadlock-free by structure): a request past it waits for
+/// one to be given back. Each is taken for one statement, by a thread that
+/// holds nothing else of the host's (a request's read of its session comes
+/// before its route; a sign-in's and a sign-out's writes hold no lock), so
+/// a waiter waits only on statements in flight.
+pub(crate) const SESSION_CONNECTIONS: usize = 8;
+
+/// **A connection taken for one statement**, given back when dropped,
+/// whatever the statement did.
+struct Taken<'a> {
+    sessions: &'a SessionsPg,
+    client: Option<Client>,
+}
+
+impl Drop for Taken<'_> {
+    fn drop(&mut self) {
+        self.sessions.give(self.client.take());
+    }
+}
 
 impl SessionsPg {
     pub(crate) fn new(url: &str, schema: &str) -> SessionsPg {
         SessionsPg {
             url: url.to_string(),
             schema: schema.to_string(),
-            idle: Mutex::new(Vec::new()),
+            idle: Mutex::new((Vec::new(), 0)),
+            given_back: std::sync::Condvar::new(),
             #[cfg(test)]
             ran: std::sync::atomic::AtomicU64::new(0),
+            #[cfg(test)]
+            most: std::sync::atomic::AtomicUsize::new(0),
         }
+    }
+
+    /// An idle connection, or a new one while fewer than
+    /// [`SESSION_CONNECTIONS`] are open; otherwise, the next given back.
+    fn take(&self) -> Result<Taken<'_>, String> {
+        let mut idle = self.idle.lock().expect("idle connections");
+        loop {
+            while let Some(c) = idle.0.pop() {
+                if !c.is_closed() {
+                    return Ok(Taken {
+                        sessions: self,
+                        client: Some(c),
+                    });
+                }
+                idle.1 -= 1;
+            }
+            if idle.1 < SESSION_CONNECTIONS {
+                idle.1 += 1;
+                #[cfg(test)]
+                self.most
+                    .fetch_max(idle.1, std::sync::atomic::Ordering::SeqCst);
+                drop(idle);
+                // Counted as open before it is made, and given back as gone
+                // if it cannot be.
+                let mut taken = Taken {
+                    sessions: self,
+                    client: None,
+                };
+                let mut c = Client::connect(&self.url, NoTls).map_err(pg)?;
+                c.batch_execute(&format!("SET search_path TO {}", ident(&self.schema)))
+                    .map_err(pg)?;
+                taken.client = Some(c);
+                return Ok(taken);
+            }
+            idle = self.given_back.wait(idle).expect("idle connections");
+        }
+    }
+
+    /// A connection given back: kept idle while it is open, and no longer
+    /// counted once it is not.
+    fn give(&self, c: Option<Client>) {
+        let mut idle = self.idle.lock().expect("idle connections");
+        match c.filter(|c| !c.is_closed()) {
+            Some(c) => idle.0.push(c),
+            None => idle.1 -= 1,
+        }
+        self.given_back.notify_one();
     }
 
     fn with<T>(
         &self,
         f: impl FnOnce(&mut Client) -> Result<T, postgres::Error>,
     ) -> Result<T, String> {
-        let taken = self.idle.lock().expect("idle connections").pop();
-        let mut c = match taken {
-            Some(c) if !c.is_closed() => c,
-            _ => {
-                let mut c = Client::connect(&self.url, NoTls).map_err(pg)?;
-                c.batch_execute(&format!("SET search_path TO {}", ident(&self.schema)))
-                    .map_err(pg)?;
-                c
-            }
-        };
+        let mut taken = self.take()?;
         #[cfg(test)]
         self.ran.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        let out = f(&mut c);
-        if !c.is_closed() {
-            let mut idle = self.idle.lock().expect("idle connections");
-            if idle.len() < SESSION_CONNECTIONS {
-                idle.push(c);
-            }
-        }
-        out.map_err(pg)
+        f(taken.client.as_mut().expect("a connection taken")).map_err(pg)
+    }
+
+    /// `seconds` of the database's sleep on one of its connections: a
+    /// request holding it that long.
+    #[cfg(test)]
+    pub(crate) fn held_for_test(&self, seconds: f64) -> Result<(), String> {
+        self.with(|c| c.execute("SELECT pg_sleep($1)", &[&seconds]).map(|_| ()))
+    }
+
+    /// The most connections open at once, so far.
+    #[cfg(test)]
+    pub(crate) fn most_open(&self) -> usize {
+        self.most.load(std::sync::atomic::Ordering::SeqCst)
     }
 }
 

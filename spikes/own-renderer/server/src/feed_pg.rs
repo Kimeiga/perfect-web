@@ -644,10 +644,11 @@ impl FeedPg {
         // has yet to read. Until then it deleted the outbox, a second host's
         // undelivered rows among it.
         let outbox = crate::hosts::Outbox::current(&mut c)?;
+        let highest = crate::hosts::highest(&mut c)?;
         pool.give(c);
         let host = crate::hosts::new_host();
         let sessions = Arc::new(crate::hosts::SessionsPg::new(url, &outbox.schema));
-        let tail = crate::hosts::Tail::open(url, outbox, &host)?;
+        let tail = crate::hosts::Tail::at(url, outbox, &host, highest);
         Ok(FeedPg {
             pool,
             isolation,

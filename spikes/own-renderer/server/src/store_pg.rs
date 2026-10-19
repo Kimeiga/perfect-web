@@ -958,9 +958,10 @@ impl StorePg {
         // reads it from its highest id, and deletes nothing another host
         // has yet to read. Until then it deleted the outbox, a second host's
         // undelivered rows among it.
+        let highest = crate::hosts::highest(c.client())?;
         drop(c);
         let host = crate::hosts::new_host();
-        let tail = crate::hosts::Tail::open(url, crate::hosts::Outbox::of(schema), &host)?;
+        let tail = crate::hosts::Tail::at(url, crate::hosts::Outbox::of(schema), &host, highest);
         let sessions = Arc::new(crate::hosts::SessionsPg::new(url, schema));
         Ok(StorePg {
             pool,

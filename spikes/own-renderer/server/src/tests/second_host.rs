@@ -5,6 +5,7 @@
 
 use super::sign_in::{REDIRECT, TestProvider, command, exchanged, get, location, set_cookie};
 use super::*;
+use crate::data::DataLayer;
 use crate::feed_pg::{FeedPg, Isolation};
 use crate::hosts::Tail;
 use crate::store_pg::StorePg;
@@ -230,6 +231,33 @@ fn a_host_started_after_commits_starts_past_them() {
         1,
         "A's row kept, its post's event: B deleted nothing at its start"
     );
+}
+
+/// **A host connects what it uses**: a layer opened on a shared database
+/// holds no listening connection until its host first reads the outbox, and
+/// its cursor is the outbox's highest id all the same, read as the layer
+/// opened; the first read listens, then reads, so a commit made meanwhile is
+/// heard. A layer whose host never reads (a test's) holds none, beside the
+/// connections its commands and reads take (the render merge's bounded
+/// model).
+#[test]
+fn a_layer_listens_only_once_its_host_reads_the_outbox() {
+    let Some(url) = database() else { return };
+    let db = Schema::new(&url, "listens");
+    let a = feed_host(&url, &db);
+    post(&a, "a", "Before B opened", "i-1");
+    let b = FeedPg::open(&url, Some(&db.name)).expect("B's layer");
+    let reader = b.tail().expect("a shared database");
+    assert!(!reader.listening(), "no listening connection at the open");
+    assert_eq!(
+        reader.cursor(),
+        db.count("SELECT max(id) FROM outbox"),
+        "at the highest id all the same"
+    );
+    post(&a, "a", "After B opened, before it listened", "i-2");
+    let heard = reader.heard().expect("read");
+    assert!(reader.listening(), "listening once it read");
+    assert_eq!(heard.commits.len(), 1, "the commit made meanwhile heard");
 }
 
 /// **A host opening the database deletes nothing from its outbox**, in
@@ -650,6 +678,32 @@ fn a_request_reads_its_session_once() {
     let fresh = get(&a, "/", "");
     assert!(fresh.starts_with("HTTP/1.1 200"), "{fresh}");
     assert_eq!(kept.ran(), before, "none for a request with no session");
+}
+
+/// **A layer's sessions are read on a bounded few connections**, as the
+/// render merge holds every pool (stated, and waited for past the bound):
+/// twenty-four requests at once, each holding its connection half a second,
+/// are all answered, and no more than [`crate::hosts::SESSION_CONNECTIONS`]
+/// connections are open at once, that many reached. Until then a connection
+/// was made for every request that asked.
+#[test]
+fn a_layers_sessions_are_read_on_a_bounded_few_connections() {
+    let Some(url) = database() else { return };
+    let db = Schema::new(&url, "sessions_bound");
+    let sessions = crate::hosts::SessionsPg::new(&url, &db.name);
+    std::thread::scope(|scope| {
+        let held: Vec<_> = (0..24)
+            .map(|_| scope.spawn(|| sessions.held_for_test(0.5)))
+            .collect();
+        for one in held {
+            one.join().expect("a request").expect("answered");
+        }
+    });
+    assert_eq!(
+        sessions.most_open(),
+        crate::hosts::SESSION_CONNECTIONS,
+        "the bound reached, and held"
+    );
 }
 
 // ---------------------------------------------------------------------------
