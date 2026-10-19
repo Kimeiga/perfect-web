@@ -567,11 +567,16 @@ fn a_commands_commit_is_counted_with_it() {
 // back). `place_order`'s three apart, where the deployment takes no
 // payments: `user-orders#settle` (7) is among its operations, the order
 // placed at once (ADR-0332).
+// Track `second-host` (ADR-XXXX): and, where a commit hands the outbox
+// anything, the outbox's lock and its notify, one statement before its
+// rows take their ids (`hosts::ordered`), so every host reads them in
+// commit order: each command here one more than before, each page the
+// same.
 const PAGES: &[(&str, u64)] = &[
-    ("add_to_cart (47)", 10),
-    ("add_to_cart (48)", 11),
-    ("add_address", 6),
-    ("choose_tip", 6),
+    ("add_to_cart (47)", 11),
+    ("add_to_cart (48)", 12),
+    ("add_address", 7),
+    ("choose_tip", 7),
     // TRACK SEAM (reviews): each list's ratings one read more, the store's
     // page two (its ratings and its reviews), the order page one.
     ("/", 6),
@@ -580,7 +585,7 @@ const PAGES: &[(&str, u64)] = &[
     ("/search?q=coffee", 9),
     ("/stores/47/address", 2),
     ("place_order, taking no payments: its operations", 33),
-    ("place_order, taking no payments: its commit", 7),
+    ("place_order, taking no payments: its commit", 8),
     (
         "place_order, taking no payments: its queries read again",
         21,
@@ -590,7 +595,7 @@ const PAGES: &[(&str, u64)] = &[
     // `#rate`'s read and its row, and its commit); the reader's open pages
     // read again after it, the seven the scenario left open, which its cart's
     // event regenerates; and the rate page, its store and the layout's cart.
-    ("rate_order: its transaction", 8),
+    ("rate_order: its transaction", 9),
     ("rate_order: its reader's open pages read again", 42),
     ("/order/rate/47", 2),
 ];
@@ -756,22 +761,24 @@ fn placing_and_settling_where_payments_are_taken_is_bounded() {
 /// Scenario (b)'s transactions, each with its commit.
 // Since ADR-0334 a command's commit writes its scheduled runs too: a delete
 // for each, and an insert for each run due. `place_order` schedules its
-// sweep (2), `settle_payment` and `cancel_order` cancel it (1).
+// sweep (2), `settle_payment` and `cancel_order` cancel it (1). Track
+// `second-host` (ADR-XXXX): and each commit's lock and notify on the
+// outbox (1), as [`PAGES`]' commands.
 const AWAITING: &[(&str, u64)] = &[
-    ("place_order, taking payments: its transaction", 37),
+    ("place_order, taking payments: its transaction", 38),
     (
         "settle_payment, on the provider's word: its transaction",
-        17,
+        18,
     ),
-    ("cancel_order: its transaction", 25),
+    ("cancel_order: its transaction", 26),
     (
         "settle_payment, on the provider's word of the cancel: its transaction",
-        14,
+        15,
     ),
-    ("expire_order, run thirty minutes on: its transaction", 26),
+    ("expire_order, run thirty minutes on: its transaction", 27),
     (
         "settle_payment, on the provider's word of the sweep's cancel: its transaction",
-        14,
+        15,
     ),
 ];
 
@@ -829,7 +836,9 @@ fn a_pending_real_payment_webhook_is_not_a_complete_statement_count() {
                 !returned_early,
                 "counting returned before the provider released its event"
             );
-            assert_eq!(finished, [25, 14], "the exact completed transactions");
+            // Each with its commit's lock and notify on the outbox (track
+            // `second-host`, ADR-XXXX), as `AWAITING`'s.
+            assert_eq!(finished, [26, 15], "the exact completed transactions");
         });
     });
 }
@@ -938,9 +947,11 @@ fn sweep_cleanup_and_payment_commit_share_the_same_write_guard() {
                 completed, 1,
                 "the payment's actual command completed successfully"
             );
+            // Each with its commit's lock and notify on the outbox (track
+            // `second-host`, ADR-XXXX), as `AWAITING`'s.
             assert_eq!(
                 finished,
-                [26, 14],
+                [27, 15],
                 "the exact completed clock and payment transactions"
             );
             assert_eq!(
