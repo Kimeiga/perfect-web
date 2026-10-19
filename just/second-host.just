@@ -1,0 +1,43 @@
+# Track `second-host`'s recipes (ADR-0253, docs/PARALLEL.md): hosts that
+# share one PostgreSQL database. The track adds its recipes here and nowhere
+# else; the root justfile imports this file, and its settings and variables
+# (`set shell`, `PATH`) apply here as there. An evidence recipe is
+# `e14-<name>:`, writes `docs/evidence/E14/<name>.txt`, and is planned by the
+# verification run like any other (scripts/ci_plan.py reads this file too).
+
+# Track `second-host` (ADR-XXXX): hosts on one database hear each other's
+# commits from the outbox, answer each other's retries from the record a
+# commit wrote, and keep their sessions in the database, by hash. The
+# server's two-host tests (two hosts in one process on one schema, the
+# feed's and the store's); the outbox kept, and the store's statements
+# counted, on PostgreSQL; two hosts in three engines
+# (e2e-hosts/second-host.spec.mjs, through playwright.hosts.config.mjs, each
+# engine's hosts on a schema of their own at PORT and above); and the
+# mutation controls. Every claim needs a database: refused without
+# PW_FEED_DATABASE_URL and PW_STORE_DATABASE_URL, throwaway ones.
+e14-second-host:
+    @if [ -z "${PW_FEED_DATABASE_URL:-}" ] || [ -z "${PW_STORE_DATABASE_URL:-}" ]; then \
+       echo "e14-second-host: refused, it needs PW_FEED_DATABASE_URL and PW_STORE_DATABASE_URL (throwaway PostgreSQL databases)"; \
+       exit 1; \
+     fi
+    @bash spikes/own-renderer/feed.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-XXXX - hosts share one database: each hears every commit from the outbox, and a session is the database's"; echo; \
+       echo "produced by: just e14-second-host"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; \
+       echo "postgres: $(psql "$PW_FEED_DATABASE_URL" -Atc 'SHOW server_version' 2>/dev/null || echo 'unknown (psql is not on PATH)')"; echo; \
+       echo "== two hosts in one process on one schema (tests/second_host.rs)"; echo; \
+       cargo test --locked -p pw-dev-server -- tests::second_host:: 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the outbox kept, and the store's statements counted (tests/feed_pg.rs, tests/store_pg.rs, tests/bounded_statements.rs)"; echo; \
+       PW_STORE_TEST_LAYER=postgres cargo test --locked -p pw-dev-server -- tests::feed_pg:: tests::store_pg:: tests::bounded_statements:: 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== two hosts in three engines (e2e-hosts/second-host.spec.mjs)"; echo; \
+       (cd spikes/own-renderer && pnpm exec playwright test --config playwright.hosts.config.mjs --reporter=line 2>&1) \
+         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
+         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       echo; echo "== mutation controls (scripts/second_host_mutations.py)"; echo; \
+       CARGO_INCREMENTAL=0 python3 scripts/second_host_mutations.py; \
+     } > docs/evidence/E14/second-host.txt
+    @grep -E "^test result|passed|mutants killed|^---- |panicked at" docs/evidence/E14/second-host.txt

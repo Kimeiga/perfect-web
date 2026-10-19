@@ -32,6 +32,7 @@ import 'just/bounded-checker.just'
 import 'just/reviews.just'
 import 'just/proof.just'
 import 'just/guide.just'
+import 'just/second-host.just'
 
 default:
     @just --list

@@ -137,6 +137,8 @@ NEEDS_DATABASE = {
     "e14-scheduled",
     # Track `reviews`: a store's ratings, on PostgreSQL too.
     "e14-reviews",
+    # Track `second-host`: hosts that share one database.
+    "e14-second-host",
 }
 
 EVIDENCE_RECIPE = re.compile(r"^e[0-9]+-[a-z0-9-]+$")
