@@ -326,6 +326,24 @@ const PINNED: &[(&str, u64)] = &[
     ("store:host/recommendations#curate", 1),
 ];
 
+/// **The reader's open pages, asking** (ADR-0297): each document of `session`
+/// counts as asked for from now for an hour, as an open page's stream asks
+/// without pause. A commit tells the documents that asked within `LIVE`
+/// (three seconds of the machine's own clock) and passes the rest by, so a page
+/// opened a few slow steps before the commit was not read again, and the
+/// statements counted for "the open pages read again" were the machine's speed:
+/// 42 on a quiet one, 36 or 31 on a loaded one. An hour ahead is a time no
+/// step reaches.
+fn open_pages_ask(s: &Server, session: &str) {
+    let asked = std::time::Instant::now() + std::time::Duration::from_secs(3600);
+    let mut open = s.pending.lock().expect("pending");
+    for doc in documents_of(&open, session) {
+        if let Some(waiting) = open.get_mut(&doc) {
+            waiting.seen = asked;
+        }
+    }
+}
+
 /// **What a page or a command ran**, each in turn, on a store served on
 /// PostgreSQL, with fifty stores more where `more` says: the reader adds a
 /// line from each seeded store, saves an address, chooses a tip, and reads
@@ -387,6 +405,7 @@ fn steps(more: bool) -> Vec<(String, u64)> {
         step(path, &|| {
             fetched_as(&s, path, Some("a"));
         });
+        open_pages_ask(&s, "a");
     }
     // `place_order`, pinned apart (the integrator's ruling on NEXT 4b): its
     // transaction's operations, its commit (what it hands the outbox, its
@@ -398,6 +417,7 @@ fn steps(more: bool) -> Vec<(String, u64)> {
         s.data.statements().expect("counted"),
         s.data.statements_by_op(),
     );
+    open_pages_ask(&s, "a");
     s.command_answered(
         "store.page.place_order",
         "a",
@@ -451,6 +471,7 @@ fn steps(more: bool) -> Vec<(String, u64)> {
     step("/order", &|| {
         fetched_as(&s, "/order", Some("a"));
     });
+    open_pages_ask(&s, "a");
     // TRACK SEAM (reviews): the order delivered by the kitchen's route, no
     // reader's step; then store 47 rated, and its rate page read.
     let delivered = posted(&s, "/bench/order?status=delivered", "a", "", "");
@@ -463,6 +484,7 @@ fn steps(more: bool) -> Vec<(String, u64)> {
         s.data.statements_by_transaction().len(),
         s.data.statements().expect("counted"),
     );
+    open_pages_ask(&s, "a");
     let rated = s
         .command_answered(
             "store.rate.rate_order",
