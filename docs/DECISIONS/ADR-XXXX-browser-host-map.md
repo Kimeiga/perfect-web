@@ -84,8 +84,9 @@ browser evidence read the owner's dictionary where CI's read the sample.
    different hosts, `page-policy.spec.mjs`, names each test's host in an
    annotation (`pw-host`), and holds each test to run on the host it names
    (`roleOfURL`, in its `beforeEach`). An unregistered spec, an unknown or
-   reserved role (TodoMVC's ports), and a wrong annotation are refused
-   before any host starts.
+   reserved role (TodoMVC's ports) and an annotation naming no host or two
+   are refused before any host starts; an annotation naming another host
+   than the test's fails that test.
 3. **Playwright selects; the plan follows.** `host-plan.mjs` asks the same
    Playwright, with the same configuration, working directory and the
    caller's own arguments, which tests are selected: it runs the CLI again
@@ -162,11 +163,12 @@ CI's per-host time is not measured here; train-11's verify will show it.
 ## Evidence
 
 - `just e14-browser-host-map` (`docs/evidence/E14/browser-host-map.txt`):
-  the map, registry, builds, declared hosts and receipts, FAST_COUNT;
-  the plan against the real Playwright CLI on private fixtures,
-  NATIVE_COUNT; three specs of three kinds of host in three engines; and
-  the mutation controls, MUTANT_COUNT, each killed by the failed assertion
-  of the test it names.
+  the map, registry, builds, declared hosts and receipts, 21 of 21 tests;
+  the plan against the real Playwright CLI on private fixtures, 16 of 16;
+  three specs of three kinds of host (signals, cart, feed) in three
+  engines, 111 passed; and the mutation controls, 47 of 47 killed, each by
+  the failed assertion (`ERR_ASSERTION`) of the test it names, none by an
+  error or another test.
 - The whole suite in three engines through the host map, engine by engine
   as CI's browser jobs run it (`playwright test --project=<engine>
   --workers=4`, PORT 11541, load 68-102): chromium 399 passed and 2
@@ -189,7 +191,12 @@ CI's per-host time is not measured here; train-11's verify will show it.
   re-anchored), `dealt_by_time_mutations.py`, `kiokun_inventory_mutations.py`,
   `mutation_bound_mutations.py`: 42 of 42, 35 of 35, 54 of 54, 27 of 27
   and 16 of 16 killed.
-- `just ci`: CI_RESULT.
+- `just ci` at this branch's head, which is pushed only on its `ci: OK`.
+- Also run: `cargo fmt --all -- --check`, `scripts/mutation_anchors.py`
+  (3326 mutants in 274 scripts, each matching once), `scripts/case-check.sh`,
+  `just evidence-gates`, `scripts/suite_status.py` (97 suites, each run by
+  `run_suite.sh`), `scripts/evidence_counts.py` (this recipe's count agrees
+  with its script).
 
 ## Not claimed; limits
 
@@ -242,3 +249,7 @@ CI's per-host time is not measured here; train-11's verify will show it.
   run's start too.
 - After train-11's verify, compare each browser recipe's seconds with
   `scripts/ci_seconds.json`'s, and refresh them.
+- kiokun's hosts: find why one takes 40 s to be ready where the store's take
+  15 s, before a loaded runner meets its 60 s bound.
+- If UI or watch mode is wanted with the host map, start every servable host
+  for it (the base's behaviour) rather than refuse.
