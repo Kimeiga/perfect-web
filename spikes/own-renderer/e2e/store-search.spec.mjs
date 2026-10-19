@@ -6,7 +6,7 @@
 // a menu changed while the page is open reaching it; and the page keeping
 // the audit's rules.
 import { expect, test } from "@playwright/test";
-import { STORE_SEARCH_PORTS } from "../playwright.config.mjs";
+import { STORE_SEARCH_PORTS } from "../host-metadata.mjs";
 import { violations } from "./accessibility-rules.mjs";
 
 test.use({

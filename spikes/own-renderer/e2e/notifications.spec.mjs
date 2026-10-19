@@ -11,7 +11,7 @@
 //   - another user's session, signed in and not, sees none of it: by page,
 //     and by the list read again (`/pw-read`).
 import { expect, test } from "@playwright/test";
-import { NOTIFICATIONS_PORTS } from "../playwright.config.mjs";
+import { NOTIFICATIONS_PORTS } from "../host-metadata.mjs";
 
 test.use({
   baseURL: async ({}, use, testInfo) => {

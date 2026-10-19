@@ -13,7 +13,7 @@
 // record said neither which nor why. A failure also attaches the runtime's
 // log and the host's records of the page's document (`record`).
 import { expect, test } from "@playwright/test";
-import { SCHEDULED_ORDERS_PORTS } from "../playwright.config.mjs";
+import { SCHEDULED_ORDERS_PORTS } from "../host-metadata.mjs";
 import { violations } from "./accessibility-rules.mjs";
 
 test.use({

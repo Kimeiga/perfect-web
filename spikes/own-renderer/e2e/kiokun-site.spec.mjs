@@ -10,7 +10,7 @@
 // The route is `/word/{word}` until the host's own paths move under
 // `/_pw/`, then kiokun.com's `/{word}`.
 import { expect, test } from "@playwright/test";
-import { KIOKUN_PORTS } from "../playwright.config.mjs";
+import { KIOKUN_PORTS } from "../host-metadata.mjs";
 
 test.use({
   baseURL: async ({}, use, testInfo) => {

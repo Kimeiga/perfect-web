@@ -8,7 +8,7 @@
 // 2.5 s, ran past the query's own 3 s timeout on a loaded machine, and the
 // slot rightly said "No recommendations right now".
 import { expect, test } from "@playwright/test";
-import { MUTABLE_PORTS } from "../playwright.config.mjs";
+import { MUTABLE_PORTS } from "../host-metadata.mjs";
 
 test.use({
   baseURL: async ({}, use, testInfo) => {

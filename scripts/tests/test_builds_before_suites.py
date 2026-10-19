@@ -315,16 +315,11 @@ class BuildsBeforeSuites(unittest.TestCase):
         self.assertEqual(found, [], "\n".join(found))
 
 
-# `@playwright/test`, as far as the config asks it: the config's own checks
-# of `dist` are what is read here, and they run as it is loaded.
-PLAYWRIGHT_STAND_IN = """export const defineConfig = (config) => config;
-export const devices = new Proxy({}, { get: () => ({}) });
-"""
-
-
+# The canonical build admission used by the native host planner is tested
+# without Playwright here. Native selected-only config admission is exercised
+# by host-plan.test.mjs; recipe behavior above remains independent of it.
 class DistIsWhole(unittest.TestCase):
-    """`playwright.config.mjs` serves `dist` only as a whole build, whoever
-    runs the suite: a person, a script, or a recipe."""
+    """Canonical build admission accepts `dist` only as a whole build."""
 
     RUNTIME = (ROOT / "spikes/own-renderer/public/pw-runtime.mjs").read_text()
 
@@ -334,22 +329,21 @@ class DistIsWhole(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="pw-dist-") as d:
             root = pathlib.Path(d)
             spike = ROOT / "spikes/own-renderer"
-            shutil.copy(spike / "playwright.config.mjs", root)
+            for dependency in ("host-metadata.mjs", "host-registry.json"):
+                shutil.copy(spike / dependency, root)
             (root / "public").mkdir()
             shutil.copy(spike / "public/pw-runtime.mjs", root / "public")
-            package = root / "node_modules/@playwright/test"
-            package.mkdir(parents=True)
-            (package / "package.json").write_text(
-                '{"name": "@playwright/test", "type": "module", "exports": "./index.mjs"}'
-            )
-            (package / "index.mjs").write_text(PLAYWRIGHT_STAND_IN)
             for rel, text in (dist or {}).items():
                 path = root / "dist" / rel
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(text)
-            config = (root / "playwright.config.mjs").as_uri()
+            metadata = (root / "host-metadata.mjs").as_uri()
+            invoke = (
+                f"const {{ buildProblem }} = await import({metadata!r}); "
+                "const problem = buildProblem('store'); if (problem) throw new Error(problem);"
+            )
             out = subprocess.run(
-                ["node", "--input-type=module", "-e", f"await import({config!r})"],
+                ["node", "--input-type=module", "-e", invoke],
                 cwd=root,
                 capture_output=True,
                 text=True,

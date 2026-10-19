@@ -7,7 +7,7 @@
 // layer (`spikes/kiokun/server`).
 
 import { test, expect } from "@playwright/test";
-import { KIOKUN_PORT } from "../playwright.config.mjs";
+import { KIOKUN_PORT } from "../host-metadata.mjs";
 
 test.use({ baseURL: `http://127.0.0.1:${KIOKUN_PORT}` });
 

@@ -8,13 +8,11 @@
 // does not work, so the policy's sources are each what something needs.
 import { expect, test } from "@playwright/test";
 import {
-  FEED_BUILT,
   FEED_PORTS,
   IDENTITY_PORTS,
-  KIOKUN_BUILT,
   KIOKUN_PORTS,
   STORE_PAYMENTS_PORTS,
-} from "../playwright.config.mjs";
+} from "../host-metadata.mjs";
 
 /** **What the page's policy refused**, as its browser says it: each
  * `securitypolicyviolation` its documents raise, by the directive and what
@@ -59,7 +57,7 @@ const RUNS = ["/", "/stores/47", "/StorePage.html", "/cart", "/search?q=pie"];
 const RUNS_NOTHING = ["/stores/999", "/HelloStatic.html", "/Tricky.html"];
 
 for (const path of RUNS) {
-  test(`${path} runs under its policy, nothing refused`, async ({ page }) => {
+  test(`${path} runs under its policy, nothing refused`, { annotation: { type: "pw-host", description: "base" } }, async ({ page }) => {
     const refused = await watching(page);
     const policy = await visit(page, path);
     expect(policy, "a policy is sent").toContain("script-src 'self' 'wasm-unsafe-eval' 'sha256-");
@@ -69,7 +67,7 @@ for (const path of RUNS) {
 }
 
 for (const path of RUNS_NOTHING) {
-  test(`${path} runs nothing, and loads what it shows`, async ({ page }) => {
+  test(`${path} runs nothing, and loads what it shows`, { annotation: { type: "pw-host", description: "base" } }, async ({ page }) => {
     const refused = await watching(page);
     const policy = await visit(page, path);
     expect(policy).toBe(
@@ -81,7 +79,7 @@ for (const path of RUNS_NOTHING) {
   });
 }
 
-test("a press reaches its handler under the policy", async ({ page }) => {
+test("a press reaches its handler under the policy", { annotation: { type: "pw-host", description: "base" } }, async ({ page }) => {
   const refused = await watching(page);
   await visit(page, "/stores/47");
   expect(await booted(page)).toBe("1");
@@ -91,7 +89,7 @@ test("a press reaches its handler under the policy", async ({ page }) => {
   expect(await refused()).toEqual([]);
 });
 
-test("the announcer, served unstyled, is seen by no one when it speaks", async ({ page }) => {
+test("the announcer, served unstyled, is seen by no one when it speaks", { annotation: { type: "pw-host", description: "base" } }, async ({ page }) => {
   // The host writes no style attribute (`pw_render::ANNOUNCER`); the runtime
   // hides the announcer through the CSSOM, which the policy allows, before
   // it says what a press that could not be sent is told.
@@ -109,7 +107,7 @@ test("the announcer, served unstyled, is seen by no one when it speaks", async (
   expect(await refused()).toEqual([]);
 });
 
-test("the control: what the policy refuses is refused, and said", async ({ page }) => {
+test("the control: what the policy refuses is refused, and said", { annotation: { type: "pw-host", description: "base" } }, async ({ page }) => {
   const refused = await watching(page);
   await visit(page, "/stores/47");
   expect(await booted(page)).toBe("1");
@@ -131,7 +129,7 @@ test("the control: what the policy refuses is refused, and said", async ({ page 
   ).not.toBe("rgb(1, 2, 3)");
 });
 
-test("the control: without 'wasm-unsafe-eval' the runtime does not start", async ({ page }) => {
+test("the control: without 'wasm-unsafe-eval' the runtime does not start", { annotation: { type: "pw-host", description: "base" } }, async ({ page }) => {
   // The document as served, its policy without the source the runtime's
   // WebAssembly needs (CSP Level 3, §6.1.10).
   await page.route(
@@ -150,7 +148,7 @@ test("the control: without 'wasm-unsafe-eval' the runtime does not start", async
   expect(await booted(page), "the runtime's WebAssembly is refused").toBe("failed");
 });
 
-test.describe("a deployment that takes payments", () => {
+test.describe("a deployment that takes payments", { annotation: { type: "pw-host", description: "payments" } }, () => {
   test.use({
     baseURL: async ({}, use, testInfo) => {
       await use(`http://127.0.0.1:${STORE_PAYMENTS_PORTS[testInfo.project.name]}`);
@@ -199,8 +197,7 @@ test.describe("a deployment that takes payments", () => {
   });
 });
 
-test.describe("the feed", () => {
-  test.skip(!FEED_BUILT, "dist-feed is not built: run feed.sh");
+test.describe("the feed", { annotation: { type: "pw-host", description: "feed" } }, () => {
   test.use({
     baseURL: async ({}, use, testInfo) => {
       await use(`http://127.0.0.1:${FEED_PORTS[testInfo.project.name]}`);
@@ -217,8 +214,7 @@ test.describe("the feed", () => {
   }
 });
 
-test.describe("a sign-in, at the development provider", () => {
-  test.skip(!FEED_BUILT, "dist-feed is not built: run feed.sh");
+test.describe("a sign-in, at the development provider", { annotation: { type: "pw-host", description: "identity" } }, () => {
   test.use({
     baseURL: async ({}, use, testInfo) => {
       await use(`http://127.0.0.1:${IDENTITY_PORTS[testInfo.project.name]}`);
@@ -238,8 +234,7 @@ test.describe("a sign-in, at the development provider", () => {
   });
 });
 
-test.describe("kiokun", () => {
-  test.skip(!KIOKUN_BUILT, "dist-kiokun is not built: run kiokun-site.sh");
+test.describe("kiokun", { annotation: { type: "pw-host", description: "kiokun" } }, () => {
   test.use({
     baseURL: async ({}, use, testInfo) => {
       await use(`http://127.0.0.1:${KIOKUN_PORTS[testInfo.project.name]}`);

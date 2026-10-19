@@ -22,7 +22,7 @@
 // the materialized bytes in rather than rendering them.
 
 import { test, expect } from "@playwright/test";
-import { MUTABLE_PORTS } from "../playwright.config.mjs";
+import { MUTABLE_PORTS } from "../host-metadata.mjs";
 
 // Its own host, per engine. "One change to public data reaches every reader"
 // renames a menu item, and a rename is broadcast to every page on the host: on
