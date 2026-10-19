@@ -38,6 +38,7 @@ import 'just/argument-invariants.just'
 import 'just/scheduled-orders.just'
 import 'just/evidence-integrity-2.just'
 import 'just/tables.just'
+import 'just/check-is-build.just'
 
 default:
     @just --list
@@ -134,7 +135,7 @@ test-unit:
 # Validates the accepted/rejected corpus. Four phases since E2:
 #   0. pw fmt --check — the corpus is canonically formatted (ADR-0013)
 #   1. corpus-check — header well-formedness and full charter §16 coverage
-#   2. pw check on accepted/ — must be CLEAN
+#   2. accepted semantic conformance is clean; complete check/build pin four backend refusals
 #   3. cargo test  — asserts rejected files are caught by their declared @rule,
 #                    that none of them is caught by the wrong one, and that
 #                    coverage does not regress (see pw-cli rules::corpus_tests)
@@ -150,7 +151,10 @@ test-compile:
     # every accepted file. Feeding it the rejected files too would ask the
     # compiler to resolve 68 files as one program, which they are not — five
     # rejected fixtures reuse module names with each other (E2B).
-    cargo run --quiet -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/accepted/*.pw
+    # Semantic language conformance and current executable support are distinct.
+    # The complete CLI gate pins all four exposed backend gaps and no artifacts.
+    cargo test --locked -p pw-core --test checking_source no_accepted_corpus_file_reports_a_body_level_error
+    cargo test --locked -p pw-cli --test check_build_corpus accepted_corpus_has_exactly_its_known_backend_refusals
     # The demo, checked as the program it is. It was outside `ci` until E6,
     # and E6's first rule found two dangling edges in it — a milestone demo
     # nothing checks is a milestone demo that can quietly stop being true.

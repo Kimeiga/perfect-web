@@ -46,10 +46,50 @@ pub struct Component {
 
 /// Parse a WIT package text, as `wit::package` emits it, into a `Resolve`.
 pub fn parse(wit: &str) -> Result<(Resolve, PackageId), String> {
+    parse_located(wit).map_err(|failure| failure.message)
+}
+
+/// Upstream's typed error span locates the emitted ABI name; its existing
+/// world identity locates the responsible Pleris declaration. This metadata
+/// never decides support: the same upstream parser remains the authority.
+pub(crate) struct PreparationError {
+    pub message: String,
+    generated: Option<std::ops::Range<usize>>,
+}
+impl PreparationError {
+    pub(crate) fn declaration(
+        &self,
+        wit: &str,
+        worlds: &[crate::wit::World],
+    ) -> Option<crate::resolve::DefId> {
+        let name = wit.get(self.generated.clone()?)?.trim_start_matches('%');
+        worlds
+            .iter()
+            .rev()
+            .find(|w| w.exports == name || w.name == name)
+            .map(|w| w.declaration)
+    }
+}
+fn parse_located(wit: &str) -> Result<(Resolve, PackageId), PreparationError> {
     let mut resolve = Resolve::new();
-    let pkg = resolve
-        .push_str("pw-app.wit", wit)
-        .map_err(|e| format!("the generated WIT does not parse: {e:#}"))?;
+    let pkg = resolve.push_str("pw-app.wit", wit).map_err(|error| {
+        let generated = error.chain().find_map(|layer| {
+            let span = layer
+                .downcast_ref::<wit_parser::ParseError>()
+                .map(|e| e.kind().span())
+                .or_else(|| {
+                    layer
+                        .downcast_ref::<wit_parser::ResolveError>()
+                        .map(|e| e.kind().span())
+                })?;
+            span.is_known()
+                .then(|| span.start() as usize..span.end() as usize)
+        });
+        PreparationError {
+            message: format!("the generated WIT does not parse: {error:#}"),
+            generated,
+        }
+    })?;
     Ok((resolve, pkg))
 }
 
@@ -69,6 +109,17 @@ pub fn build(
         Ok(r) => r,
         Err(why) => return Encoding::Blocked { why },
     };
+    build_in(&resolve, pkg, world, function, program, idents)
+}
+
+fn build_in(
+    resolve: &Resolve,
+    pkg: PackageId,
+    world: &crate::wit::World,
+    function: &Function,
+    program: &super::ir::Program,
+    idents: &std::collections::BTreeMap<crate::resolve::DefId, String>,
+) -> Encoding<Component> {
     let world_id = match resolve.select_world(&[pkg], Some(&world.name)) {
         Ok(w) => w,
         Err(e) => {
@@ -93,7 +144,7 @@ pub fn build(
     };
 
     let core = match core_module_with(
-        &resolve,
+        resolve,
         world_id,
         function,
         export,
@@ -110,7 +161,7 @@ pub fn build(
 
     let mut with_type = core.clone();
     if let Err(e) =
-        embed_component_metadata(&mut with_type, &resolve, world_id, StringEncoding::UTF8)
+        embed_component_metadata(&mut with_type, resolve, world_id, StringEncoding::UTF8)
     {
         return Encoding::Blocked {
             why: format!("wit-component could not embed the world: {e:#}"),
@@ -166,6 +217,15 @@ fn core_imports(core: &[u8]) -> Result<Vec<String>, String> {
 /// to a floor: an audit that compared nothing agrees with everything.
 pub fn audit(component: &[u8], wit: &str, world: &str) -> Result<usize, Vec<String>> {
     let (expected, pkg) = parse(wit).map_err(|e| vec![e])?;
+    audit_in(component, &expected, pkg, world)
+}
+
+fn audit_in(
+    component: &[u8],
+    expected: &Resolve,
+    pkg: PackageId,
+    world: &str,
+) -> Result<usize, Vec<String>> {
     let expected_world = expected
         .select_world(&[pkg], Some(world))
         .map_err(|e| vec![format!("the package has no world `{world}`: {e:#}")])?;
@@ -222,7 +282,7 @@ pub fn audit(component: &[u8], wit: &str, world: &str) -> Result<usize, Vec<Stri
                     continue;
                 };
                 compared += 1;
-                let (a, b) = (render_fn(&found, f), render_fn(&expected, g));
+                let (a, b) = (render_fn(&found, f), render_fn(expected, g));
                 if a != b {
                     wrong.push(format!(
                         "`{name}#{fname}` is `{a}` in the component and `{b}` in the world"
@@ -330,7 +390,10 @@ pub struct Compiled {
 
 /// A checked, lowered program with the WIT its contracts fix: what every
 /// component of it is built from. Built once per program by [`with_program`].
-struct Program<'p> {
+pub(crate) struct Program<'p> {
+    expected: &'p Resolve,
+    package: PackageId,
+
     hirs: &'p [&'p crate::hir::Hir],
     wit: &'p str,
     /// One world per contract, in contract order: a world is found through the
@@ -350,6 +413,10 @@ struct Program<'p> {
 }
 
 impl Program<'_> {
+    pub(crate) fn lowered(&self) -> &super::ir::Program {
+        self.lowered
+    }
+
     /// Why this declaration did not lower, in the lowering's own words.
     fn refused(&self, def: crate::resolve::DefId) -> String {
         self.refusals
@@ -380,36 +447,45 @@ fn with_program<R>(
     units: &[crate::check::Unit],
     f: impl FnOnce(&Program<'_>) -> Result<R, String>,
 ) -> Result<R, String> {
-    let hirs: Vec<&crate::hir::Hir> = units.iter().map(|u| &u.hir).collect();
-    let ws = crate::resolve::Workspace::build(&hirs);
-    let sigs = crate::signatures::Signatures::build(&ws, &hirs);
-    let contracts = crate::contract::contracts(&hirs, &sigs, &ws);
+    crate::program::with_backend(units, |checked| with_checked(checked, f))
+}
+
+pub(crate) fn with_checked<R>(
+    checked: &super::lower::Checked<'_>,
+    f: impl FnOnce(&Program<'_>) -> Result<R, String>,
+) -> Result<R, String> {
+    let cx = checked.context();
+    let (hirs, ws, contracts) = (cx.hirs, cx.ws, cx.contracts);
     let (wit, worlds) =
-        crate::wit::package(&hirs, &ws, &contracts).map_err(|e| format!("WIT: {e}"))?;
-    let cx = super::lower::Context {
-        hirs: &hirs,
-        ws: &ws,
-        sigs: &sigs,
-        contracts: &contracts,
-    };
-    let checked = super::lower::Checked::of(units, cx).map_err(|ds| {
-        format!(
-            "the program does not check, so nothing is compiled: {}",
-            ds.iter()
-                .map(|d| format!("[{}] {}", d.code, d.message))
-                .collect::<Vec<_>>()
-                .join("; ")
-        )
-    })?;
-    let (lowered, refusals) = super::lower::program_by_declaration(&checked);
-    let idents = crate::wit::type_idents(&hirs, &ws);
+        crate::wit::package_prepared(hirs, ws, contracts, cx.sigs, &checked.pages().derived)
+            .map_err(|e| format!("WIT: {}", e.error))?;
+    with_package(checked, &wit, &worlds, f).map_err(|failure| failure.message)
+}
+
+pub(crate) fn with_package<R>(
+    checked: &super::lower::Checked<'_>,
+    wit: &str,
+    worlds: &[crate::wit::World],
+    f: impl FnOnce(&Program<'_>) -> Result<R, String>,
+) -> Result<R, PreparationError> {
+    let cx = checked.context();
+    let (hirs, ws, contracts) = (cx.hirs, cx.ws, cx.contracts);
+    let (expected, package) = parse_located(wit)?;
+    let (lowered, refusals) = super::lower::program_by_declaration(checked);
+    let idents = crate::wit::type_idents(hirs, ws);
     f(&Program {
-        hirs: &hirs,
-        wit: &wit,
-        worlds: contracts.iter().zip(&worlds).collect(),
+        expected: &expected,
+        package,
+        hirs,
+        wit,
+        worlds: contracts.iter().zip(worlds).collect(),
         lowered: &lowered,
         idents: &idents,
         refusals: &refusals,
+    })
+    .map_err(|message| PreparationError {
+        message,
+        generated: None,
     })
 }
 
@@ -450,20 +526,29 @@ pub(crate) fn pure_queries<R>(
     units: &[crate::check::Unit],
     f: impl FnOnce(&[(String, &super::ir::Function)], &super::ir::Program) -> Result<R, String>,
 ) -> Result<R, String> {
-    with_program(units, |p| {
-        let mut pure = Vec::new();
-        for (contract, world) in &p.worlds {
-            let query = crate::resolve::declaration(p.hirs, world.declaration)
-                .is_some_and(|d| d.kind == crate::hir::DeclKind::Query);
-            if let Some(function) = p.lowered.functions.iter().find(|f| finds(f, world))
-                && query
-                && function.capabilities.is_empty()
-            {
-                pure.push((contract.component_id.clone(), function));
-            }
+    with_program(units, |p| pure_prepared(p, f))
+}
+
+pub(crate) fn pure_prepared<R>(
+    p: &Program<'_>,
+    f: impl FnOnce(&[(String, &super::ir::Function)], &super::ir::Program) -> Result<R, String>,
+) -> Result<R, String> {
+    f(&pure_functions(p), p.lowered)
+}
+
+pub(crate) fn pure_functions<'a>(p: &'a Program<'_>) -> Vec<(String, &'a super::ir::Function)> {
+    let mut pure = Vec::new();
+    for (contract, world) in &p.worlds {
+        let query = crate::resolve::declaration(p.hirs, world.declaration)
+            .is_some_and(|d| d.kind == crate::hir::DeclKind::Query);
+        if let Some(function) = p.lowered.functions.iter().find(|f| finds(f, world))
+            && query
+            && function.capabilities.is_empty()
+        {
+            pure.push((contract.component_id.clone(), function));
         }
-        f(&pure, p.lowered)
-    })
+    }
+    pure
 }
 
 /// **Compile one component of a program, end to end.**
@@ -483,7 +568,7 @@ pub fn compile(units: &[crate::check::Unit], component_id: &str) -> Result<Compi
                 p.refused(world.declaration)
             ));
         };
-        match build(p.wit, world, function, p.lowered, p.idents) {
+        match build_in(p.expected, p.package, world, function, p.lowered, p.idents) {
             Encoding::Encoded(component) => Ok(Compiled {
                 component,
                 wit: p.wit.to_string(),
@@ -532,15 +617,19 @@ fn finds(f: &Function, world: &crate::wit::World) -> bool {
 /// reported as refused rather than left out: a build that listed only what
 /// compiled would make the backend look finished.
 pub fn compile_all(units: &[crate::check::Unit]) -> Result<Vec<(String, Built)>, String> {
-    with_program(units, |p| {
-        let mut out = Vec::new();
-        for (contract, world) in &p.worlds {
-            let kind = crate::resolve::declaration(p.hirs, world.declaration).map(|d| d.kind);
-            let function = p.lowered.functions.iter().find(|f| finds(f, world));
-            let built = match (function, kind) {
-                (Some(function), _) => match build(p.wit, world, function, p.lowered, p.idents) {
+    with_program(units, compile_prepared)
+}
+
+pub(crate) fn compile_prepared(p: &Program<'_>) -> Result<Vec<(String, Built)>, String> {
+    let mut out = Vec::new();
+    for (contract, world) in &p.worlds {
+        let kind = crate::resolve::declaration(p.hirs, world.declaration).map(|d| d.kind);
+        let function = p.lowered.functions.iter().find(|f| finds(f, world));
+        let built = match (function, kind) {
+            (Some(function), _) => {
+                match build_in(p.expected, p.package, world, function, p.lowered, p.idents) {
                     Encoding::Encoded(component) => {
-                        match audit(&component.bytes, p.wit, &component.world) {
+                        match audit_in(&component.bytes, p.expected, p.package, &component.world) {
                             Ok(audited) => Built::Component {
                                 compiled: Box::new(Compiled {
                                     component,
@@ -556,31 +645,31 @@ pub fn compile_all(units: &[crate::check::Unit]) -> Result<Vec<(String, Built)>,
                         }
                     }
                     other => Built::Refused(other.to_string()),
-                },
-                (None, Some(crate::hir::DeclKind::Command | crate::hir::DeclKind::Query))
-                    if p.placeholder(world.declaration) =>
-                {
-                    Built::Placeholder
                 }
-                (
-                    None,
-                    Some(
-                        crate::hir::DeclKind::Command
-                        | crate::hir::DeclKind::Query
-                        | crate::hir::DeclKind::Fn
-                        | crate::hir::DeclKind::Materialize,
-                    ),
-                ) => Built::Refused(format!("did not lower: {}", p.refused(world.declaration))),
-                (None, Some(kind)) => Built::NoBody { kind },
-                (None, None) => {
-                    return Err(format!(
-                        "`{}`'s world names a declaration no unit holds",
-                        contract.component_id
-                    ));
-                }
-            };
-            out.push((contract.component_id.clone(), built));
-        }
-        Ok(out)
-    })
+            }
+            (None, Some(crate::hir::DeclKind::Command | crate::hir::DeclKind::Query))
+                if p.placeholder(world.declaration) =>
+            {
+                Built::Placeholder
+            }
+            (
+                None,
+                Some(
+                    crate::hir::DeclKind::Command
+                    | crate::hir::DeclKind::Query
+                    | crate::hir::DeclKind::Fn
+                    | crate::hir::DeclKind::Materialize,
+                ),
+            ) => Built::Refused(format!("did not lower: {}", p.refused(world.declaration))),
+            (None, Some(kind)) => Built::NoBody { kind },
+            (None, None) => {
+                return Err(format!(
+                    "`{}`'s world names a declaration no unit holds",
+                    contract.component_id
+                ));
+            }
+        };
+        out.push((contract.component_id.clone(), built));
+    }
+    Ok(out)
 }

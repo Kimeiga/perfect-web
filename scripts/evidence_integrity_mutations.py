@@ -282,11 +282,11 @@ MUTANTS = [
         "checking is pathological: the program is checked ten times over",
         "latency",
         CHECK,
-        "    let mut held = check_units(&units);\n",
+        "    crate::program::validate_sources_with(files, released).diagnostics\n",
         "    for _ in 0..9 {\n"
-        "        let _ = check_units(&units);\n"
+        "        let _ = crate::program::validate_sources_with(files, released);\n"
         "    }\n"
-        "    let mut held = check_units(&units);\n",
+        "    crate::program::validate_sources_with(files, released).diagnostics\n",
     ),
     (
         "the checking thread's clock reads nothing",

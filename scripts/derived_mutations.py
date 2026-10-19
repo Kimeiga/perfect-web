@@ -23,7 +23,7 @@ MUTANTS = [
     (
         "a derived value is not checked",
         CHECK,
-        "        derived_values_are_pure(&inference, &sigs, i, &u.hir, per_unit);\n",
+        '        derived_values_are_pure(inference, sigs, i, &u.hir, per_unit);\n',
         "",
     ),
     (

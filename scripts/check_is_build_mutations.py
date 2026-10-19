@@ -1,0 +1,137 @@
+#!/usr/bin/env python3
+"""Whole controls for the shared executable-program validation authority.
+
+Every baseline command must build, execute tests and succeed. Source restores
+on signals and failures. A bound stop fails the campaign; it never kills a
+mutant by timeout. No filter is implemented: this runs every listed control.
+"""
+import os
+import pathlib
+import re
+import signal
+import subprocess
+import sys
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+CLI = ROOT / "compiler/pw-cli/src/main.rs"
+PROGRAM = ROOT / "compiler/pw-core/src/program.rs"
+BUILD = ROOT / "compiler/pw-core/src/build.rs"
+LOWER = ROOT / "compiler/pw-core/src/backend/lower.rs"
+WIT = ROOT / "compiler/pw-core/src/wit.rs"
+COMPONENT = ROOT / "compiler/pw-core/src/backend/component.rs"
+JUST = ROOT / "justfile"
+
+MUTANTS = [
+    ('CLI check uses only partial-program semantics', CLI, 'pw_core::check::check_program_sources_with(&all, released.as_ref())', 'pw_core::check::check_sources_with(&all, released.as_ref())'),
+    ('CLI build discards a complete validation failure', CLI, '    let build = match pw_core::program::validate_sources_with(&sources, released).into_build() {\n        Ok(b) => b,\n        Err(e) => {\n            eprintln!("pw: {e}");\n            return ExitCode::FAILURE;\n        }\n    };\n', '    let build = match pw_core::program::validate_sources_with(&sources, released).into_build() {\n        Ok(b) => b,\n        Err(e) => {\n            eprintln!("pw: {e}");\n            return ExitCode::SUCCESS;\n        }\n    };\n'),
+    ('support refusals disappear from check diagnostics', PROGRAM, '    for refusal in refusals {', '    for refusal in refusals.into_iter().take(0) {'),
+    ('depended placeholders are accepted', BUILD, '                .filter(|target| placeholders.contains(target))', '                .filter(|_| false)'),
+    ('page-plan refusals disappear', BUILD, '        for p in &self.pages {', '        for p in self.pages.iter().take(0) {'),
+    ('blocked renderer parts are accepted', BUILD, '        for blocked in t.blocked() {', '        for blocked in t.blocked().into_iter().take(0) {'),
+    ('WIT collision ownership points at the wrong file', PROGRAM, 'crate::wit::WitError::Collision { second, .. } => second.clone(),', 'crate::wit::WitError::Collision { .. } => String::new(),'),
+    ('a proof applies to other HIR of equal length', LOWER, '                    .all(|(unit, hir)| std::ptr::eq(&unit.hir, *hir)),', '                    .all(|_| true),'),
+    ('support diagnostics have no responsible source span', PROGRAM, 'primary_span: span', 'primary_span: 0..0'),
+    ('placeholder stage metadata names a different stage', PROGRAM, 'Self::Placeholder => "backend_placeholder",', 'Self::Placeholder => "backend_component",'),
+    ('a partial inspection plan is written', BUILD, '        if !refused.is_empty() {', '        if false && !refused.is_empty() {'),
+    ('early WIT failure erases independent page refusal', BUILD, 'early.extend(build.support_refusals());', ''),
+    ('an unmappable export loses source ownership', WIT, 'LocatedError::at(error, declaration)', 'LocatedError::from(error)'),
+    ('public report data can mint a validated plan', PROGRAM, '(true, Ok(build)) => Plan::Validated(Executable { build }),', '(_, Ok(build)) => Plan::Validated(Executable { build }),'),
+    ('a caller can mint a proof from a foreign context', LOWER, "impl<'a> Checked<'a> {", "impl<'a> Checked<'a> {\n    pub fn of(units: &'a [crate::check::Unit], cx: Context<'a>) -> Self {\n        Self { cx, units, pages: std::cell::OnceCell::new() }\n    }"),
+    ('syntax refusal omits clean sibling diagnostics', PROGRAM, 'if parsed.iter().any(|file| !file.ok()) {', 'if false && parsed.iter().any(|file| !file.ok()) {'),
+    ('a page failure hides its signal failure', BUILD, '(Err(why), Err(_)) => early.push(', '(Err(why), Err(_)) => Vec::<crate::program::Refusal>::new().push('),
+    ('the complete accepted-corpus gate is not run', JUST, '    cargo test --locked -p pw-cli --test check_build_corpus accepted_corpus_has_exactly_its_known_backend_refusals', '    true'),
+    ('the semantic accepted-corpus gate is not run', JUST, '    cargo test --locked -p pw-core --test checking_source no_accepted_corpus_file_reports_a_body_level_error', '    true'),
+    ('a parsed WIT failure loses its generated source identity', COMPONENT, '.find(|w| w.exports == name || w.name == name)', '.find(|_| false)'),
+    ('build_id restored browser failure is accepted', ROOT / "scripts/build_id_mutations.py", '    if not built or failed or not passed or (watch is not None and watch.stopped):\n        print("FAIL: the restored browser suite is not green")', '    if False:\n        print("FAIL: the restored browser suite is not green")'),
+    ('build_id bypasses shared browser suite authority', ROOT / "scripts/build_id_mutations.py", '["bash", str(ROOT / "scripts/run_suite.sh"), "-C", ".", "--",', '["bash", "-c", "exit 0", "--",'),
+    ('build_id producer failure is hidden by passed counts', ROOT / "scripts/build_id_mutations.py", 'if code != (1 if command_failed else 0):', 'if False and code != (1 if command_failed else 0):'),
+    ('refusal restored browser failure is accepted', ROOT / "scripts/refusal_mutations.py", '    if not built or failed or not passed or (watch is not None and watch.stopped):\n        print("FAIL: the restored browser suite is not green")', '    if False:\n        print("FAIL: the restored browser suite is not green")'),
+    ('refusal bypasses shared browser suite authority', ROOT / "scripts/refusal_mutations.py", '["bash", str(ROOT / "scripts/run_suite.sh"), "-C", ".", "--",', '["bash", "-c", "exit 0", "--",'),
+    ('refusal producer failure is hidden by passed counts', ROOT / "scripts/refusal_mutations.py", 'if code != (1 if command_failed else 0):', 'if False and code != (1 if command_failed else 0):'),
+    ('refusal batched test inventory drifts', ROOT / "scripts/refusal_mutations.py", 'if actual is None or Counter(expected) != Counter(actual):', 'if actual is None:'),
+    ('refusal accepts a failed test inventory producer', ROOT / "scripts/refusal_mutations.py", '    if code != 0:\n        return None\n', '    if False and code != 0:\n        return None\n'),
+    ('build_id invalid producer earns an assertion kill', ROOT / "scripts/build_id_mutations.py", 'not built or passed + failed == 0 or stopped', 'False'),
+    ('build_id cargo producer status contradicts its counts', ROOT / "scripts/build_id_mutations.py", 'valid = code == (101 if failed else 0) and passed + failed > 0', 'valid = True'),
+    ('build_id memory-stopped mutant earns a kill', ROOT / "scripts/build_id_mutations.py", 'stopped = watch is not None and bool(watch.stopped)', 'stopped = False'),
+    ('refusal invalid producer earns an assertion kill', ROOT / "scripts/refusal_mutations.py", 'not built or passed + failed == 0 or stopped', 'False'),
+    ('refusal cargo producer status contradicts its counts', ROOT / "scripts/refusal_mutations.py", 'valid = code == (101 if failed else 0) and passed + failed > 0', 'valid = True'),
+    ('refusal memory-stopped mutant earns a kill', ROOT / "scripts/refusal_mutations.py", 'stopped = watch is not None and bool(watch.stopped)', 'stopped = False'),
+    ('refusal named checker exception accepts extra codes', ROOT / "scripts/refusal_mutations.py", 'result.codes == named', 'named <= result.codes'),
+ ]
+COMMANDS = [
+    ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--doc", "backend::lower::Checked"],
+    ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--lib", "backend::lower::checked_input_tests"],
+    ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "check_is_build"],
+    ["cargo", "test", "--quiet", "--locked", "-p", "pw-cli", "--test", "check_is_build"],
+    ["cargo", "test", "--quiet", "--locked", "-p", "pw-cli", "--test", "check_build_corpus", "accepted_corpus"],
+    ["python3", "scripts/tests/test_check_build_gate.py"],
+    ["python3", "scripts/tests/test_mutation_cleanup.py"],
+    ["python3", "scripts/tests/test_run_suite.py"],
+]
+BOUND = 180
+
+def run_tests():
+    built, passed, failed, stopped = True, 0, 0, False
+    outputs = []
+    for command in COMMANDS:
+        child = subprocess.Popen(command, cwd=ROOT, start_new_session=True,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        try:
+            out, _ = child.communicate(timeout=BOUND)
+        except subprocess.TimeoutExpired:
+            os.killpg(child.pid, signal.SIGKILL)
+            out, _ = child.communicate()
+            stopped = True
+        outputs.append(out)
+        summaries = re.findall(r"test result: \w+\. (\d+) passed; (\d+) failed", out)
+        if command[0] == "python3":
+            ran = re.search(r"Ran (\d+) tests?", out)
+            if ran:
+                count = int(ran[1])
+                failures = sum(int(n) for n in re.findall(r"(?:failures|errors)=(\d+)", out))
+                summaries = [(str(count - failures), str(failures))]
+        count = sum(int(p) + int(f) for p, f in summaries)
+        if not summaries or not count:
+            built = False
+        passed += sum(int(p) for p, _ in summaries)
+        failed += sum(int(f) for _, f in summaries)
+        if child.returncode != 0 and not any(int(f) for _, f in summaries):
+            built = False
+    return built, passed, failed, stopped, outputs
+
+def main():
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(1))
+    built, passed, failed, stopped, outputs = run_tests()
+    print(f"baseline: {passed} passed, {failed} failed", flush=True)
+    if not built or not passed or failed or stopped:
+        print("FAIL: baseline did not build, execute tests and succeed")
+        print("\n".join(outputs))
+        return 1
+    survivors = stops = 0
+    for what, path, anchor, replacement in MUTANTS:
+        original = path.read_text()
+        if original.count(anchor) != 1:
+            print(f"{what}: ANCHOR NOT FOUND EXACTLY ONCE in {path.name}", flush=True)
+            survivors += 1
+            continue
+        try:
+            path.write_text(original.replace(anchor, replacement, 1))
+            built, passed, failed, stopped, outputs = run_tests()
+        finally:
+            path.write_text(original)
+        if stopped:
+            verdict = "BOUND STOP (campaign fails; not a kill)"
+            stops += 1
+        elif not built:
+            verdict = "KILLED (does not build)"
+        elif failed:
+            verdict = f"KILLED ({failed} of {passed + failed} tests fail)"
+        else:
+            verdict = "SURVIVED"
+            survivors += 1
+        print(f"{what}: {verdict}", flush=True)
+    print(f"{len(MUTANTS) - survivors - stops} of {len(MUTANTS)} mutants killed; {stops} bound stops", flush=True)
+    return 1 if survivors or stops else 0
+
+if __name__ == "__main__":
+    sys.exit(main())

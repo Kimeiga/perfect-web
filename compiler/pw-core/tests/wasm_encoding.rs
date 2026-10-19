@@ -20,7 +20,7 @@
 
 use pw_core::backend::component;
 use pw_core::backend::ir::Program;
-use pw_core::backend::lower::{Checked, Context, program};
+use pw_core::backend::lower::program;
 use pw_core::backend::wasm::{self, Encoding};
 use pw_core::check::Unit;
 use pw_core::contract::{ComponentContract, contracts};
@@ -74,27 +74,16 @@ fn units(files: &[(String, String)]) -> Vec<Unit> {
 fn store() -> (Program, Vec<ComponentContract>) {
     let files = store_files();
     let units = units(&files);
-    let hirs: Vec<Hir> = files
-        .iter()
-        .map(|(_, s)| lower_file(s, &parse_tree(s).green))
-        .collect();
-    let refs: Vec<&Hir> = hirs.iter().collect();
+    let refs: Vec<&Hir> = units.iter().map(|u| &u.hir).collect();
     let ws = Workspace::build(&refs);
     let sigs = Signatures::build(&ws, &refs);
     let cs = contracts(&refs, &sigs, &ws);
-    let cx = Context {
-        hirs: &refs,
-        ws: &ws,
-        sigs: &sigs,
-        contracts: &cs,
-    };
-    let checked = Checked::of(&units, cx).unwrap_or_else(|ds| {
-        panic!(
-            "the store does not check: {:?}",
-            ds.iter().map(|d| d.code).collect::<Vec<_>>()
-        )
-    });
-    (program(&checked).0, cs.clone())
+    (
+        pw_core::program::with_semantic_program(&units, program)
+            .unwrap_or_else(|d| panic!("{d:?}"))
+            .0,
+        cs.clone(),
+    )
 }
 
 /// `wasmparser`'s verdict, not this repo's.

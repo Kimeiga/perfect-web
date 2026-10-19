@@ -34,46 +34,66 @@ pub struct Unit {
 
 /// Check every unit against the shared environment.
 pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
+    let hirs: Vec<&Hir> = units.iter().map(|u| &u.hir).collect();
+    let workspace = crate::resolve::Workspace::build(&hirs);
+    let sigs = Signatures::build(&workspace, &hirs);
+    check_with(units, &hirs, &workspace, &sigs)
+}
+
+/// The existing semantic analyses, using the program's shared environment.
+pub(crate) fn check_with(
+    units: &[Unit],
+    hirs: &[&Hir],
+    workspace: &crate::resolve::Workspace,
+    sigs: &Signatures,
+) -> Vec<(String, Vec<Diagnostic>)> {
     // E2B: one workspace module graph, built before any semantic analysis.
     // Resolution failures are reported per unit, so a file importing a module
     // that does not exist says so instead of failing later in a checker that
     // cannot explain why.
-    let hirs: Vec<&Hir> = units.iter().map(|u| &u.hir).collect();
-    let workspace = crate::resolve::Workspace::build(&hirs);
-    // E2C: one set of resolved signatures, shared by every analysis.
-    let sigs = Signatures::build(&workspace, &hirs);
+    // E2C: resolution and signatures are prepared once by the caller.
     // E2D: effects inferred over the whole program, so a helper declared in
     // another module still contributes to its caller's row.
-    let mut inference = crate::effects::Inference::new(&sigs, &workspace);
-    inference.run(&hirs);
+    let mut inference = crate::effects::Inference::new(sigs, workspace);
+    inference.run(hirs);
+    check_inferred(units, hirs, workspace, sigs, &inference)
+}
+
+pub(crate) fn check_inferred(
+    units: &[Unit],
+    hirs: &[&Hir],
+    workspace: &crate::resolve::Workspace,
+    sigs: &Signatures,
+    inference: &crate::effects::Inference<'_>,
+) -> Vec<(String, Vec<Diagnostic>)> {
     // E7: what the whole program says about a type — is it a resource, and is
     // it produced only by a scoped declaration. Both are needed before any one
     // file can be asked what its handlers may capture.
-    let manifest = crate::boundary::TypeFacts::build(&hirs, &sigs);
+    let manifest = crate::boundary::TypeFacts::build(hirs, sigs);
     // E8 step 2: what a capability's type argument may name, PER UNIT.
     //
     // Whole-program until 2026-08-07, which was assumption A-017 and is now
     // retired: an argument resolves from where it was written, exactly as a
     // type in an expression does.
     let visible_types: Vec<std::collections::BTreeSet<String>> = (0..units.len())
-        .map(|u| crate::ontology::argument_names_visible_from(&workspace, u, &hirs))
+        .map(|u| crate::ontology::argument_names_visible_from(workspace, u, hirs))
         .collect();
     // E8 slice 2: what each effect a row names actually IS. One ontology for
     // the whole program, beside the signatures, because both answer questions
     // about the same rows.
-    let ontology = crate::ontology::Ontology::build_with(&hirs, &workspace);
+    let ontology = crate::ontology::Ontology::build_with(hirs, workspace);
     // E6: every route the program declares, so a link can be checked against
     // what exists rather than against a naming convention.
-    let routes = crate::routes::table(&hirs);
+    let routes = crate::routes::table(hirs);
     // E6: the resource dependency graph, over every unit at once. A fragment
     // in one module depends on a query in another, so a per-file graph would
     // report a dangling edge for exactly the case the milestone is about.
-    let graph = crate::graph::Graph::build(&hirs, &workspace);
+    let graph = crate::graph::Graph::build(hirs, workspace);
     // ADR-0101: what a command's write has to reach, over every unit, since
     // a command in one module writes what a query in another reads.
-    let readers = cached_readers(&inference, &graph, &hirs);
+    let readers = cached_readers(inference, &graph, hirs);
     // ADR-0207: every data source the program declares.
-    let sources = declared_sources(&hirs);
+    let sources = declared_sources(hirs);
     let mut resolution: BTreeMap<usize, Vec<Diagnostic>> = BTreeMap::new();
     for e in &workspace.errors {
         resolution
@@ -83,16 +103,16 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
     }
     for (i, u) in units.iter().enumerate() {
         let per_unit = resolution.entry(i).or_default();
-        per_unit.extend(unresolved_uses(&workspace, &hirs, i, &u.hir));
+        per_unit.extend(unresolved_uses(workspace, hirs, i, &u.hir));
         // ADR-0072: an element named with a capital letter is a view.
-        per_unit.extend(view_elements(&workspace, &hirs, i, &u.hir));
+        per_unit.extend(view_elements(workspace, hirs, i, &u.hir));
         // ADR-0204: an element holds the children HTML permits, as it
         // renders them.
-        per_unit.extend(nesting(&workspace, &hirs, i, &u.hir));
+        per_unit.extend(nesting(workspace, hirs, i, &u.hir));
         // ADR-0207: a data source states what it guarantees, and nothing
         // asks it for more.
         per_unit.extend(sources_give_what_is_asked(
-            &inference,
+            inference,
             &sources,
             &visible_types[i],
             i,
@@ -100,19 +120,19 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         ));
         // ADR-0214: an opaque type's `.value` is its representation in its
         // own module, and nothing else there.
-        per_unit.extend(representation_unshadowed(&sigs, i, &u.hir));
+        per_unit.extend(representation_unshadowed(sigs, i, &u.hir));
         // ADR-0263: a session's, a user's or an organization's handle is
         // the platform's to make.
-        per_unit.extend(handles_are_the_platforms(&workspace, &sigs, i, &u.hir));
+        per_unit.extend(handles_are_the_platforms(workspace, sigs, i, &u.hir));
         // ADR-0264: and a session's never reaches the browser.
-        per_unit.extend(sessions_stay_on_the_server(&workspace, &sigs, i, &u.hir));
+        per_unit.extend(sessions_stay_on_the_server(workspace, sigs, i, &u.hir));
         // ADR-0212: a `query` reads a query or a resource, and a
         // `subscription` a subscription.
-        per_unit.extend(reads_name_their_kind(&workspace, &hirs, &sigs, i, &u.hir));
+        per_unit.extend(reads_name_their_kind(workspace, hirs, sigs, i, &u.hir));
         per_unit.extend(dependencies_stated_once(&u.hir));
         // ADR-0148: a streamed query is read by a `<stream>`, which shows
         // each state its query can be in.
-        per_unit.extend(crate::streams::check(&workspace, &hirs, &sigs, i, &u.hir));
+        per_unit.extend(crate::streams::check(workspace, hirs, sigs, i, &u.hir));
         // ADR-0094: a template writes no code.
         per_unit.extend(code_in_markup(&u.hir));
         // ADR-0167: a comment in markup is `<!-- -->`.
@@ -129,7 +149,7 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         // with it, and ARIA is what WAI-ARIA defines.
         per_unit.extend(ids_and_aria(&u.hir));
         // ADR-0089: a policy's value is one its domain has.
-        per_unit.extend(policy_values(&workspace, i, &u.hir));
+        per_unit.extend(policy_values(workspace, i, &u.hir));
         // ADR-0107: a cache key names each parameter its entry depends on.
         per_unit.extend(keys_name_what_is_read(&u.hir));
         // ADR-0114: what is built before any request reads none of its values.
@@ -138,7 +158,7 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         per_unit.extend(handlers_read_their_captures(&u.hir));
         // ADR-0113: and performs only what the browser may.
         per_unit.extend(handlers_run_in_the_browser(
-            &inference, &ontology, &workspace, &hirs, i, &u.hir,
+            inference, &ontology, workspace, hirs, i, &u.hir,
         ));
         // ADR-0098: a name is written once where it is declared.
         per_unit.extend(declared_once(&u.hir));
@@ -148,10 +168,10 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         per_unit.extend(clauses_in_place(&u.hir));
         // ADR-0105: a command invalidates the entry it speculates on; and
         // ADR-0101, what it writes, where it does not speculate on it.
-        let speculated = speculations(&workspace, &hirs, i);
+        let speculated = speculations(workspace, hirs, i);
         per_unit.extend(speculation_reconciled(&graph, &speculated, &u.hir));
         per_unit.extend(writes_invalidated(
-            &inference,
+            inference,
             &graph,
             &readers,
             &speculated,
@@ -163,24 +183,24 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
         // they refuse: R-015's `retry forever` became a component.
         per_unit.extend(crate::rules::check(&u.hir));
         // ADR-0047: a name used as a value resolves too, in lexical scope.
-        let names = crate::names::check(&workspace, &hirs, i, &u.src);
+        let names = crate::names::check(workspace, hirs, i, &u.src);
         per_unit.extend(names.diagnostics);
         // ADR-0247: and a clause the walk reads in a block is judged as one
         // heading a declaration is.
-        per_unit.extend(clause_values(&workspace, i, &u.hir, &names.clauses));
+        per_unit.extend(clause_values(workspace, i, &u.hir, &names.clauses));
         // Every effect row, against the declarations. Reported beside the
         // resolution failures because that is what it is: a name in a row that
         // resolves to nothing is the same class of mistake as a name in an
         // expression that does.
-        crate::ontology::check_effect_rows(&ontology, &workspace, i, &u.hir, per_unit);
+        crate::ontology::check_effect_rows(&ontology, workspace, i, &u.hir, per_unit);
         // And the declarations themselves: an impact condition naming nothing
         // makes a facet silently inapplicable.
         crate::ontology::check_effect_declarations(&ontology, per_unit, i);
         // E10, ADR-0025: an optimistic transition is a separate execution root
         // with its own effect row, and its context permits none.
-        named_roots_respect_their_context(&inference, i, &u.hir, per_unit);
-        derived_values_are_pure(&inference, &sigs, i, &u.hir, per_unit);
-        optimistic_targets_are_resource_entries(&sigs, &workspace, &hirs, i, per_unit);
+        named_roots_respect_their_context(inference, i, &u.hir, per_unit);
+        derived_values_are_pure(inference, sigs, i, &u.hir, per_unit);
+        optimistic_targets_are_resource_entries(sigs, workspace, hirs, i, per_unit);
     }
 
     // Declaration name → its privacy label, across every unit. A `page` in one
@@ -203,21 +223,21 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
     // value labels a sink reads follow a call into its callee. Made first,
     // since a secret a declaration answers, by its type or by what its body
     // makes, is held where it runs and in what keeps it (ADR-0282).
-    let summaries = summaries(&hirs, &sigs);
-    let reads = Reads::of(&hirs, &sigs, &inference).answering(&summaries);
+    let summaries = summaries(hirs, sigs);
+    let reads = Reads::of(hirs, sigs, inference).answering(&summaries);
     let labels = reads.labels();
-    let resources = reads.of_resources(&hirs);
+    let resources = reads.of_resources(hirs);
     // And what a view's handlers capture of what it is given (ADR-0136): a
     // page that uses the view writes it into its own document.
-    let captured = crate::resume::captured_params(&hirs, &sigs);
+    let captured = crate::resume::captured_params(hirs, sigs);
     // And what each view needs provided, and which hold signals (ADR-0144).
-    let provision = crate::signals::Provision::of(&hirs, &sigs);
+    let provision = crate::signals::Provision::of(hirs, sigs);
     // And each command a page's handler calls (ADR-0154): what a browser
     // sends, and can send twice.
-    let sent = crate::resume::sent_commands(&hirs, &sigs);
+    let sent = crate::resume::sent_commands(hirs, sigs);
     // 4c: what keys each source read, and what loops over it, over every
     // unit, since a loop in one module calls a read in another.
-    let bounded = crate::bounded::Reads::of(&hirs, &workspace, &sigs, &inference, &sources);
+    let bounded = crate::bounded::Reads::of(hirs, workspace, sigs, inference, &sources);
     let paths: Vec<&str> = units.iter().map(|u| u.path.as_str()).collect();
     units
         .iter()
@@ -227,46 +247,45 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
             out.extend(sent_without_idempotency(&u.hir, i, &sent));
             // ADR-0157: a command is one request a page's handler sends, and
             // what it answers is whether it committed.
-            out.extend(called_outside_a_handler(&u.hir, i, &sigs));
+            out.extend(called_outside_a_handler(&u.hir, i, sigs));
             // ADR-0160: a page is served at its route, which gives its
             // parameters, and one route is one page's.
-            out.extend(crate::routes::parameters_agree(&u.hir, i, &sigs));
-            out.extend(crate::routes::declared_twice(&hirs, i));
+            out.extend(crate::routes::parameters_agree(&u.hir, i, sigs));
+            out.extend(crate::routes::declared_twice(hirs, i));
             // ADR-0302: a predicate is declared once, with one set of words.
-            out.extend(crate::predicates::declared_twice(&hirs, i));
+            out.extend(crate::predicates::declared_twice(hirs, i));
             // Track `uploads` (ADR-0260): an upload's clauses, its paths, and
             // the forms that post a file.
-            out.extend(crate::uploads::check(&hirs, i));
-            // Track `tables` (ADR-0338): a table's declaration, and its rows
-            // reached only through the functions it gives (PW0361, PW0362,
-            // PW0365).
-            out.extend(crate::tables::check(&hirs, i, &workspace, &sigs));
+            out.extend(crate::uploads::check(hirs, i));
+            // Tables obey the same prepared semantic environment as every
+            // other declaration and can be reached only through given functions.
+            out.extend(crate::tables::check(hirs, i, workspace, sigs));
             // NEXT 6c: a command the platform invokes, which no reader
             // presses (PW64xx).
-            out.extend(crate::invoked::check(&hirs, i, &workspace, &sent));
+            out.extend(crate::invoked::check(hirs, i, workspace, &sent));
             // The scheduled-commands track: a schedule names a command the
             // clock invokes, in a command, at its time (PW65xx).
-            out.extend(crate::scheduled::check(&hirs, i, &workspace, &sigs));
+            out.extend(crate::scheduled::check(hirs, i, workspace, sigs));
             // 4c, a read is bounded by construction: no read in a loop over
             // data is keyed by its element (PW0405), a set read's source
             // batches (PW0406), and a keyed read names its set form (PW0407).
             out.extend(bounded.check(i, &u.src));
             // ADR-0163: a page says when its address names nothing.
-            out.extend(not_found_names_a_case(&u.hir, i, &sigs, &workspace));
+            out.extend(not_found_names_a_case(&u.hir, i, sigs, workspace));
             // ADR-0295: and when it is another address of the page.
-            out.extend(redirect_names_a_case(&u.hir, i, &sigs, &workspace));
+            out.extend(redirect_names_a_case(&u.hir, i, sigs, workspace));
             // ADR-0302: a predicate the program declares says what a refusal
             // by it is told, and is given what it takes.
-            out.extend(crate::predicates::check(&u.hir, i, &sigs, &workspace));
+            out.extend(crate::predicates::check(&u.hir, i, sigs, workspace));
             // ADR-0307: a control is shown where its command's predicates hold.
-            out.extend(crate::holds::check(&hirs, &workspace, &sigs, i));
-            out.extend(answer_read_for_a_value(&u.hir, i, &sigs));
+            out.extend(crate::holds::check(hirs, workspace, sigs, i));
+            out.extend(answer_read_for_a_value(&u.hir, i, sigs));
             // ADR-0280: a handler navigates once its command commits.
-            out.extend(navigations(&workspace, &u.hir, i, &sigs));
+            out.extend(navigations(workspace, &u.hir, i, sigs));
             // ADR-0311: and a page's canonical address is a page's.
-            out.extend(canonical_addresses(&workspace, &hirs, i, &sigs));
+            out.extend(canonical_addresses(workspace, hirs, i, sigs));
             // ADR-0303: a page is shown in its layout.
-            out.extend(crate::layouts::check(&hirs, &workspace, i));
+            out.extend(crate::layouts::check(hirs, workspace, i));
             // ADR-0243's amendment: markup is no operand.
             out.extend(markup_as_an_operand(&u.hir));
             out.extend(check_unit_with(
@@ -275,14 +294,14 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
                 &summaries,
                 &captured,
                 &provision,
-                &sigs,
-                &inference,
+                sigs,
+                inference,
                 &manifest,
                 &routes,
                 &graph,
                 &resources,
                 &ontology,
-                &workspace,
+                workspace,
                 i,
                 &visible_types[i],
                 u,
@@ -7767,18 +7786,50 @@ fn to_exhaust_pattern(
 /// file's environment (E0 finding F-4). Until ADR-0200 every file was lowered
 /// whatever the parser said, and its syntax errors were not reported: a
 /// test's program with a typo checked clean.
+/// Semantic-only source checks, including partial/library programs.
+/// Use `check_program_sources` for the executable-program promise of CLI check.
 pub fn check_sources(files: &[(String, String)]) -> Vec<(String, Vec<Diagnostic>)> {
     check_sources_with(files, None)
 }
 
-/// **[`check_sources`], and the program held to the schema released**
-/// (track `tables`, ADR-0338, PW0366): `released` is the `schema.lock` a
-/// deployment holds it to, and each change from it that loses or
-/// reinterprets data with no `migrate` stating it is refused in the file of
-/// its table.
+/// Semantic-only source checks held to the released schema (PW0366).
+/// Complete executable programs use check_program_sources_with instead.
 pub fn check_sources_with(
     files: &[(String, String)],
     released: Option<&crate::tables::Schema>,
+) -> Vec<(String, Vec<Diagnostic>)> {
+    check_parsed_sources(files, |units| {
+        let mut held = check_units(units);
+        if released.is_some() {
+            let hirs: Vec<&Hir> = units.iter().map(|u| &u.hir).collect();
+            let ws = crate::resolve::Workspace::build(&hirs);
+            let sigs = Signatures::build(&ws, &hirs);
+            for (unit, diagnostic) in crate::tables::held_to(&hirs, &ws, &sigs, released).1 {
+                if let Some((_, found)) = held.get_mut(unit) {
+                    found.push(diagnostic);
+                    found.sort_by_key(|d| d.primary_span.start);
+                }
+            }
+        }
+        held
+    })
+}
+
+/// Full executable-program validation shared by CLI check and build.
+pub fn check_program_sources(files: &[(String, String)]) -> Vec<(String, Vec<Diagnostic>)> {
+    check_program_sources_with(files, None)
+}
+
+pub fn check_program_sources_with(
+    files: &[(String, String)],
+    released: Option<&crate::tables::Schema>,
+) -> Vec<(String, Vec<Diagnostic>)> {
+    crate::program::validate_sources_with(files, released).diagnostics
+}
+
+fn check_parsed_sources(
+    files: &[(String, String)],
+    check: impl FnOnce(&[Unit]) -> Vec<(String, Vec<Diagnostic>)>,
 ) -> Vec<(String, Vec<Diagnostic>)> {
     let parsed: Vec<pw_syntax::Parse> = files
         .iter()
@@ -7794,19 +7845,7 @@ pub fn check_sources_with(
             hir: crate::lower::lower_file(src, &p.green),
         })
         .collect();
-    let mut held = check_units(&units);
-    if released.is_some() {
-        let hirs: Vec<&Hir> = units.iter().map(|u| &u.hir).collect();
-        let ws = crate::resolve::Workspace::build(&hirs);
-        let sigs = Signatures::build(&ws, &hirs);
-        for (unit, d) in crate::tables::held_to(&hirs, &ws, &sigs, released).1 {
-            if let Some((_, found)) = held.get_mut(unit) {
-                found.push(d);
-                found.sort_by_key(|d| d.primary_span.start);
-            }
-        }
-    }
-    let mut checked = held.into_iter();
+    let mut checked = check(&units).into_iter();
     files
         .iter()
         .zip(parsed)

@@ -180,11 +180,11 @@ MUTANTS = [
         "```pw file=guestbook/page.pw\nmodule guestbook.pages\n",
     ),
     (
-        "a gap's build output is not what `pw build` prints",
-        "guide",
+        'the closed title gap claims check still accepts it',
+        'guide',
         TOUR_PAGES,
-        "does not render again (ADR-0137)\npw: 1 refusal(s); nothing written\n",
-        "does not render again (ADR-0137)\npw: 2 refusal(s); nothing written\n",
+        '```pw fails=PW6601\nmodule shop.titled',
+        '```pw gap=build\nmodule shop.titled',
     ),
     (
         "a build gap is closed: the build accepts it",
@@ -201,12 +201,11 @@ MUTANTS = [
         '            <input type="text">\n',
     ),
     (
-        "a build gap shows no build output",
-        "guide",
+        'the closed two-signal gap claims the wrong refusal',
+        'guide',
         TOUR_PAGES,
-        "```text pw-build\npw: refused: `shop.sum.Sum`'s values: part 0 computes a value from `a` and `b`, "
-        "and a host computes one from one value (ruling 0073-a)\npw: 1 refusal(s); nothing written\n```\n\n",
-        "",
+        '```pw fails=PW6601\nmodule shop.sum',
+        '```pw fails=PW0606\nmodule shop.sum',
     ),
     # --- the guide rots: the reference of codes --------------------------
     (
@@ -646,10 +645,10 @@ MUST = {
     "a page's files no longer check together": {GUIDE_TEST},
     "the tutorial and the app differ by a byte": {DIRECTORY},
     "the tutorial builds a file the app does not have": {DIRECTORY},
-    "a gap's build output is not what `pw build` prints": {GUIDE_TEST},
+    'the closed two-signal gap claims the wrong refusal': {GUIDE_TEST},
     "a build gap is closed: the build accepts it": {GUIDE_TEST},
     "a check gap is closed: the check refuses it": {GUIDE_TEST},
-    "a build gap shows no build output": {GUIDE_TEST},
+    'the closed title gap claims check still accepts it': {GUIDE_TEST},
     "the reference has no row for a code": {REFERENCE_TEST, CURRENT},
     "the reference gives a code another invariant": {REFERENCE_TEST, CURRENT},
     "the reference has a row for a code the compiler lacks": {REFERENCE_TEST, CURRENT},

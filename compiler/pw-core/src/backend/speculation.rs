@@ -41,7 +41,6 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::hir::{DeclId, DeclKind, Expr, ExprId, Hir, Pattern};
 use crate::resolve::{DefId, Namespace, Resolution, Workspace};
-use crate::signatures::Signatures;
 
 use super::ir::Lowering;
 use super::ir::{Function, Type};
@@ -257,33 +256,25 @@ fn arm_names(part: &crate::template_ir::Part) -> BTreeSet<String> {
 }
 
 pub fn compile(units: &[crate::check::Unit]) -> Result<Vec<Compiled>, String> {
-    let hirs: Vec<&Hir> = units.iter().map(|u| &u.hir).collect();
-    let ws = Workspace::build(&hirs);
-    let sigs = Signatures::build(&ws, &hirs);
-    let contracts = crate::contract::contracts(&hirs, &sigs, &ws);
-    let cx = Context {
-        hirs: &hirs,
-        ws: &ws,
-        sigs: &sigs,
-        contracts: &contracts,
-    };
-    lower::Checked::of(units, cx).map_err(|ds| {
-        format!(
-            "the program does not check, so nothing is compiled: {}",
-            ds.iter()
-                .map(|d| format!("[{}] {}", d.code, d.message))
-                .collect::<Vec<_>>()
-                .join("; ")
-        )
-    })?;
-    let sources: Vec<&str> = units.iter().map(|u| u.src.as_str()).collect();
-    let handlers = super::js::handlers(&hirs, &sources, &ws, &sigs);
-    let cx = Context {
-        hirs: &hirs,
-        ws: &ws,
-        sigs: &sigs,
-        contracts: &contracts,
-    };
+    crate::program::with_backend(units, compile_checked)
+}
+
+pub(crate) fn compile_checked(
+    checked: &super::lower::Checked<'_>,
+) -> Result<Vec<Compiled>, String> {
+    let cx = checked.context();
+    let (hirs, ws, sigs) = (cx.hirs, cx.ws, cx.sigs);
+    let sources = checked.sources();
+    let handlers = super::js::handlers(hirs, &sources, ws, sigs);
+    compile_with_handlers(checked, &handlers)
+}
+
+pub(crate) fn compile_with_handlers(
+    checked: &super::lower::Checked<'_>,
+    handlers: &[super::js::Compiled],
+) -> Result<Vec<Compiled>, String> {
+    let cx = checked.context();
+    let (hirs, ws, sigs) = (cx.hirs, cx.ws, cx.sigs);
     let mut out = Vec::new();
     for (unit, hir) in hirs.iter().enumerate() {
         for (id, decl) in hir.all_decls() {
@@ -295,9 +286,9 @@ pub fn compile(units: &[crate::check::Unit]) -> Result<Vec<Compiled>, String> {
             // command is the page's button.
             let mut written = vec![crate::contract::component_id(hir, id)];
             for v in crate::template_ir::lowered(
-                &hirs,
-                &ws,
-                &sigs,
+                hirs,
+                ws,
+                sigs,
                 &crate::template_ir::Handlers::new(),
                 unit,
                 id,
@@ -320,7 +311,7 @@ pub fn compile(units: &[crate::check::Unit]) -> Result<Vec<Compiled>, String> {
             let speculating: Vec<String> = commands
                 .into_iter()
                 .filter(|c| {
-                    command_decl(&hirs, c)
+                    command_decl(hirs, c)
                         .is_some_and(|(u, d)| !hirs[u].decl(d).optimistic_clauses().is_empty())
                 })
                 .collect();
@@ -328,7 +319,7 @@ pub fn compile(units: &[crate::check::Unit]) -> Result<Vec<Compiled>, String> {
                 continue;
             }
             let page = template_path(hir, id);
-            let module = page_module(&cx, unit, id, &page, &speculating);
+            let module = page_module(cx, unit, id, &page, &speculating);
             // A page that shows none of its commands' targets speculates on
             // nothing (ADR-0238): no module.
             if let Encoding::Encoded(m) = &module

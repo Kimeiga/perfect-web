@@ -59,11 +59,33 @@ pub fn module(units: &[crate::check::Unit], component_id: &str) -> Result<String
 /// **Every query of a program that reaches no host, as a module**, by
 /// component id: what `pw build` writes to `modules/`.
 pub fn modules(units: &[crate::check::Unit]) -> Result<Vec<(String, String)>, String> {
-    super::component::pure_queries(units, |pure, program| {
-        pure.iter()
-            .map(|(id, function)| Ok((id.clone(), encode(id, function, program)?)))
-            .collect()
-    })
+    super::component::pure_queries(units, encode_modules)
+}
+
+pub(crate) fn modules_prepared(
+    p: &super::component::Program<'_>,
+) -> Result<Vec<(String, String)>, crate::program::Refusal> {
+    encode_prepared(&super::component::pure_functions(p), p.lowered())
+}
+
+fn encode_modules(
+    pure: &[(String, &Function)],
+    program: &Program,
+) -> Result<Vec<(String, String)>, String> {
+    encode_prepared(pure, program).map_err(|r| r.message)
+}
+
+fn encode_prepared(
+    pure: &[(String, &Function)],
+    program: &Program,
+) -> Result<Vec<(String, String)>, crate::program::Refusal> {
+    pure.iter()
+        .map(|(id, function)| {
+            encode(id, function, program)
+                .map(|source| (id.clone(), source))
+                .map_err(|why| crate::program::Refusal::new(crate::program::Stage::PureJs, id, why))
+        })
+        .collect()
 }
 
 fn encode(component_id: &str, function: &Function, program: &Program) -> Result<String, String> {
