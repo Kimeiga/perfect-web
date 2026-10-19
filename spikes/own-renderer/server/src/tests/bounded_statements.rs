@@ -615,7 +615,37 @@ fn after_payments(s: &Server, completed: usize) -> Vec<u64> {
             "expected {completed} completed payment outcomes, got {done}; transactions: {:?}",
             s.data.statements_by_transaction()
         );
+        POLLING.with(|polling| {
+            if let Some(polled) = &*polling.borrow() {
+                polled();
+            }
+        });
         std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+}
+
+std::thread_local! {
+    /// What this thread's test does each time `after_payments` finds fewer
+    /// payment outcomes than it waits for, before it waits again.
+    static POLLING: std::cell::RefCell<Option<Box<dyn Fn()>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// **A test's: `polled` is called on this thread each time `after_payments`
+/// finds fewer outcomes than it waits for**, until the guard is dropped. The
+/// waiting is counted in the helper's own polls, which a slow machine
+/// stretches along with the work it waits for: no stretch of time is
+/// guessed.
+fn tell_on_poll(polled: impl Fn() + 'static) -> PollingTold {
+    POLLING.with(|polling| *polling.borrow_mut() = Some(Box::new(polled)));
+    PollingTold
+}
+
+struct PollingTold;
+
+impl Drop for PollingTold {
+    fn drop(&mut self) {
+        POLLING.with(|polling| *polling.borrow_mut() = None);
     }
 }
 
@@ -775,6 +805,19 @@ const AWAITING: &[(&str, u64)] = &[
     ),
 ];
 
+/// How many polls of `after_payments` a held event must outlast: sixty,
+/// ten milliseconds apart, twice the 300 ms of equal counters that once
+/// stood for completion.
+const POLLS: usize = 60;
+
+/// What the counting thread tells the test, in the order it happens.
+enum Counting {
+    /// `after_payments` found the payment outcome missing, and waits again.
+    Polled,
+    /// It returned this count.
+    Counted(Vec<u64>),
+}
+
 /// A provider may delay its webhook after answering the cancel. Unchanged
 /// counters in that interval do not prove the provider's transaction finished.
 #[test]
@@ -804,25 +847,43 @@ fn a_pending_real_payment_webhook_is_not_a_complete_statement_count() {
         assert!(canceled.committed, "{:?}", canceled.result);
 
         std::thread::scope(|scope| {
-            let (started, starting) = std::sync::mpsc::channel();
-            let (sent, received) = std::sync::mpsc::channel();
+            let (told, heard) = std::sync::mpsc::channel();
             scope.spawn(move || {
-                started.send(()).expect("counting thread started");
-                sent.send(after_payments(s, 1)[before..].to_vec())
-                    .expect("the completed immutable count");
+                let polls = told.clone();
+                let _polling = tell_on_poll(move || {
+                    let _ = polls.send(Counting::Polled);
+                });
+                let counted = after_payments(s, 1)[before..].to_vec();
+                let _ = told.send(Counting::Counted(counted));
             });
-            starting
-                .recv_timeout(std::time::Duration::from_secs(5))
-                .expect("the counting thread started");
-            let early = received.recv_timeout(std::time::Duration::from_millis(600));
+            // The held event keeps the count waiting: `POLLS` of its polls
+            // pass, or it returns. The wait is counted in the count's own
+            // polls, so a slow machine stretches it with the count; and a
+            // count that stops polling, to return on counters that are
+            // equal, is heard returning where it should have polled.
+            let (mut polled, mut early) = (0, None);
+            while polled < POLLS && early.is_none() {
+                match heard
+                    .recv_timeout(MUST_HAPPEN)
+                    .expect("the counting thread neither polled nor returned")
+                {
+                    Counting::Polled => polled += 1,
+                    Counting::Counted(counted) => early = Some(counted),
+                }
+            }
             // Always release and drain before asserting: the real signed HTTP
             // event and compiled settlement run even if counting returned early.
             provider.release_reversed();
-            let returned_early = early.is_ok();
-            let finished = early.unwrap_or_else(|_| {
-                received
-                    .recv_timeout(std::time::Duration::from_secs(10))
-                    .expect("the count after actual settlement")
+            let returned_early = early.is_some();
+            let finished = early.unwrap_or_else(|| {
+                loop {
+                    let counting = heard
+                        .recv_timeout(MUST_HAPPEN)
+                        .expect("the count after actual settlement");
+                    if let Counting::Counted(counted) = counting {
+                        break counted;
+                    }
+                }
             });
             eprintln!("delayed webhook: returned_early={returned_early}; completed={finished:?}");
             assert!(
@@ -832,6 +893,74 @@ fn a_pending_real_payment_webhook_is_not_a_complete_statement_count() {
             assert_eq!(finished, [25, 14], "the exact completed transactions");
         });
     });
+}
+
+/// The longest a test waits for something that must happen. Only a hang
+/// reaches it: what happens is read the moment it does.
+const MUST_HAPPEN: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// **What a write met at the layer's write guard**, in the order it met it.
+enum Met<T> {
+    /// It found the guard held, and waits for it: it has written nothing.
+    Waits,
+    /// It returned.
+    Returned(T),
+}
+
+/// **A write on a thread of its own, and whether the layer's write guard held
+/// it back** (ADR-0352). The guard says so itself (`Writes::tell_on_wait`),
+/// before the write waits for it; a write that skips the guard says nothing
+/// and returns. So the first thing heard is the verdict, at any machine's
+/// speed: a stretch of time could only say that a write had not returned
+/// *yet*, and a slow write outlasts any stretch.
+struct Watched<T> {
+    heard: std::sync::mpsc::Receiver<Met<T>>,
+    first: Option<Met<T>>,
+}
+
+impl<T: Send + 'static> Watched<T> {
+    fn spawn<'scope, 'env>(
+        scope: &'scope std::thread::Scope<'scope, 'env>,
+        write: impl FnOnce() -> T + Send + 'scope,
+    ) -> Watched<T> {
+        let (told, heard) = std::sync::mpsc::channel();
+        scope.spawn(move || {
+            let waiting = told.clone();
+            let _tells = crate::data::Writes::tell_on_wait(move || {
+                let _ = waiting.send(Met::Waits);
+            });
+            let _ = told.send(Met::Returned(write()));
+        });
+        Watched { heard, first: None }
+    }
+
+    fn next(&self, what: &str) -> Met<T> {
+        self.heard.recv_timeout(MUST_HAPPEN).expect(what)
+    }
+
+    /// **Whether the write found the guard held**, known as soon as it has
+    /// either waited for the guard or returned without.
+    fn waited(&mut self) -> bool {
+        let first = self.next("the write neither waited for the guard nor returned");
+        let waited = matches!(first, Met::Waits);
+        self.first = Some(first);
+        waited
+    }
+
+    /// **What the write returned**, once the guard it waits for is let go.
+    fn returned(mut self) -> T {
+        let mut met = match self.first.take() {
+            Some(met) => met,
+            None => self.next("the write neither waited for the guard nor returned"),
+        };
+        if matches!(met, Met::Waits) {
+            met = self.next("the write after the guard was let go");
+        }
+        match met {
+            Met::Returned(returned) => returned,
+            Met::Waits => panic!("the write waited for the guard twice"),
+        }
+    }
 }
 
 /// Separate the clock command and its actual Runs::ran cleanup only to
@@ -898,23 +1027,12 @@ fn sweep_cleanup_and_payment_commit_share_the_same_write_guard() {
             arrived
                 .recv_timeout(std::time::Duration::from_secs(10))
                 .expect("the real signed webhook reached the commit barrier");
-            let (cleaned, cleanup) = std::sync::mpsc::channel();
-            scope.spawn(move || {
-                cleaned
-                    .send(s.runs().ran(run.id))
-                    .expect("the actual cleanup result");
-            });
-            let early = cleanup.recv_timeout(std::time::Duration::from_millis(300));
-            let cleanup_returned_early = early.is_ok();
+            // The actual cleanup meets the guard the payment's transaction holds.
+            let mut cleanup = Watched::spawn(scope, || s.runs().ran(run.id));
+            let cleanup_waited = cleanup.waited();
             // Release and drain every real operation before failure assertions.
             resume.send(()).expect("release settlement");
-            early
-                .unwrap_or_else(|_| {
-                    cleanup
-                        .recv_timeout(std::time::Duration::from_secs(10))
-                        .expect("cleanup after the settlement releases the write guard")
-                })
-                .expect("the sweep row cleaned up");
+            cleanup.returned().expect("the sweep row cleaned up");
             provider_request
                 .join()
                 .expect("the actual HTTP webhook completed");
@@ -928,10 +1046,10 @@ fn sweep_cleanup_and_payment_commit_share_the_same_write_guard() {
                 .expect("settled")
                 .len();
             eprintln!(
-                "forced overlap: cleanup_returned_early={cleanup_returned_early}; completed_markers={completed}; transactions={finished:?}"
+                "forced overlap: cleanup_waited={cleanup_waited}; completed_markers={completed}; transactions={finished:?}"
             );
             assert!(
-                !cleanup_returned_early,
+                cleanup_waited,
                 "cleanup crossed the active serializable payment transaction"
             );
             assert_eq!(
@@ -954,6 +1072,12 @@ fn sweep_cleanup_and_payment_commit_share_the_same_write_guard() {
 
 /// Each adapter's two scheduler writes must respect the same real command
 /// transaction lifetime. A moved run keeps its new identity and due time.
+///
+/// **The write is held at the guard, not timed.** While a command's staging
+/// holds the guard the write starts, and the test hears what it met first:
+/// the guard held, which the guard itself reports, or nothing and a return.
+/// No stretch of time decides it, so neither a slow machine nor a slow write
+/// lets a write that skips the guard pass.
 fn scheduled_transition_waits<T>(layer: &T, retry: bool)
 where
     T: crate::data::DataLayer + crate::schedules::Runs,
@@ -977,35 +1101,30 @@ where
     std::thread::scope(|scope| {
         // This actual serializable transaction owns the adapter's guard.
         let mut staged = layer.begin("private-test-session");
-        let (started, starting) = std::sync::mpsc::channel();
-        let (sent, received) = std::sync::mpsc::channel();
-        scope.spawn(move || {
-            started.send(()).expect("scheduler write started");
-            let result = if retry {
+        let mut write = Watched::spawn(scope, || {
+            if retry {
                 layer.retry(old_id, 1, 30, Some("private refusal control"))
             } else {
                 layer.ran(old_id)
-            };
-            sent.send(result).expect("the actual scheduler result");
+            }
         });
-        starting
-            .recv_timeout(std::time::Duration::from_secs(5))
-            .expect("scheduler started");
-        let early = received.recv_timeout(std::time::Duration::from_millis(100));
-        let returned_early = early.is_ok();
+        let waited = write.waited();
+        // Waiting at the guard, the write has changed nothing yet.
+        let while_waiting = layer.all_runs().expect("the runs while the write waits");
         let committed = staged.commit(&[], &[], None, &[scheduled(20)]);
         // Release every guard and drain before asserting, also on a refusal.
         drop(staged);
-        let finished = early.unwrap_or_else(|_| {
-            received
-                .recv_timeout(std::time::Duration::from_secs(10))
-                .expect("the scheduler write after command completion")
-        });
+        let finished = write.returned();
         committed.expect("the moved run committed");
         finished.expect("the real scheduler write completed");
         assert!(
-            !returned_early,
+            waited,
             "scheduler transition retry={retry} crossed an active command transaction"
+        );
+        assert_eq!(
+            while_waiting.as_slice(),
+            std::slice::from_ref(original),
+            "a write waiting at the guard has changed nothing"
         );
     });
     let moved = layer.all_runs().expect("the moved run");
