@@ -34,10 +34,47 @@
 //! correct answer looks like*; this finds inputs neither of us thought of. The
 //! report keeps them separate, because merging them into one "fuzzed" badge
 //! would hide that the structured suites are the ones with properties.
+//!
+//! # It refuses to fuzz blind
+//!
+//! The coverage is read with `llvm-profdata`, a program of the rustup component
+//! `llvm-tools` (listed in `rust-toolchain.toml`). It is looked for in the
+//! active toolchain's own `lib/rustlib/<host>/bin/` (`rustc --print sysroot`,
+//! and the `host:` line of `rustc -vV`), or in the directory `PW_LLVM_BIN_DIR`
+//! names.
+//!
+//! An earlier version looked in one machine's
+//! `~/.rustup/toolchains/1.97.1-aarch64-apple-darwin/...`, found nothing on any
+//! other, and read nothing as "no regions": every target reported
+//! "0 covered regions ... 0 finding(s)" and the process exited 0 (2026-10-20, on
+//! the PC). A fuzzer that reports success having measured nothing is worse than
+//! none, so it now stops, with a message naming what is missing, when
+//!
+//! - `llvm-profdata` cannot be found or run: before anything is built;
+//! - `llvm-profdata` fails on a run's profile, or lists no executed function in
+//!   it (its output is no longer what `covered` reads, which is how the first
+//!   version measured 69 regions for a whole compiler);
+//! - a target ends with no covered region.
+//!
+//! Exit status: 0 clean, 1 a finding, 2 the run measured nothing (or was
+//! called wrongly).
 
 use std::collections::BTreeSet;
+use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+
+#[cfg(test)]
+mod tests;
+
+/// The LLVM program the coverage is read with.
+const PROFDATA: &str = "llvm-profdata";
+
+/// Names the directory of the LLVM programs, where the active toolchain's own
+/// is not the one wanted.
+const BIN_DIR_ENV: &str = "PW_LLVM_BIN_DIR";
+
+const USAGE: &str = "usage: pw-fuzz [--iterations N]";
 
 /// One fuzz target: a name, and the harness binary that runs one input.
 struct Target {
@@ -46,57 +83,139 @@ struct Target {
     seeds: Vec<Vec<u8>>,
 }
 
+/// What one target's run found.
+#[derive(Debug)]
+struct Outcome {
+    execs: usize,
+    /// Distinct regions the run's inputs covered.
+    regions: usize,
+    findings: Vec<String>,
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let budget: usize = args
-        .iter()
-        .position(|a| a == "--iterations")
-        .and_then(|i| args.get(i + 1))
-        .and_then(|n| n.parse().ok())
-        .unwrap_or(2000);
+    match run(&args) {
+        Ok(status) => std::process::exit(status),
+        Err(why) => {
+            eprintln!("pw-fuzz: {why}");
+            std::process::exit(2);
+        }
+    }
+}
 
+/// What a run was asked to do.
+#[derive(Debug)]
+struct Options {
+    /// Executions per target.
+    iterations: usize,
+}
+
+fn options(args: &[String]) -> Result<Options, String> {
+    let mut options = Options { iterations: 2000 };
+    let mut args = args.iter();
+    while let Some(flag) = args.next() {
+        match flag.as_str() {
+            "--iterations" => {
+                let value = args
+                    .next()
+                    .ok_or_else(|| format!("{flag} wants a count\n{USAGE}"))?;
+                options.iterations = value
+                    .parse()
+                    .map_err(|_| format!("{flag} wants a whole number, not {value:?}\n{USAGE}"))?;
+            }
+            other => return Err(format!("unknown argument {other:?}\n{USAGE}")),
+        }
+    }
+    Ok(options)
+}
+
+fn run(args: &[String]) -> Result<i32, String> {
+    let options = options(args)?;
     let root = repo_root();
+
+    // Before anything slow is built: can the coverage be read at all?
+    let profdata = llvm_tool(&root, PROFDATA)?;
+
     let work = root.join("target/fuzz");
-    std::fs::create_dir_all(&work).expect("work dir");
+    std::fs::create_dir_all(&work).map_err(|e| format!("cannot make {}: {e}", work.display()))?;
 
     // Build the instrumented harness once. Every target runs through it, with
     // the target name as its first argument.
     eprintln!("building the instrumented harness...");
     let harness = build_instrumented(&root, &work);
 
-    let targets = targets(&root);
-    let mut report = String::new();
-    let mut total_execs = 0usize;
-    let mut total_findings = 0usize;
+    campaign(
+        &harness,
+        &work,
+        &targets(&root),
+        &profdata,
+        options.iterations,
+    )
+}
 
-    for t in &targets {
-        let (execs, regions, findings) = fuzz_one(&harness, &work, t, budget);
-        total_execs += execs;
-        total_findings += findings.len();
+/// Fuzz every target, print the report, and say how the process should end:
+/// `Ok(0)` clean, `Ok(1)` a finding, `Err` the run measured nothing.
+fn campaign(
+    harness: &Path,
+    work: &Path,
+    targets: &[Target],
+    profdata: &Path,
+    budget: usize,
+) -> Result<i32, String> {
+    let mut report = String::new();
+    let mut outcomes = Vec::new();
+    for t in targets {
+        let outcome = fuzz_one(harness, work, t, profdata, budget)?;
         report.push_str(&format!(
-            "  {:28} {execs:>7} execs  {regions:>6} covered regions  {} finding(s)\n",
+            "  {:28} {:>7} execs  {:>6} covered regions  {} finding(s)\n",
             t.name,
-            findings.len()
+            outcome.execs,
+            outcome.regions,
+            outcome.findings.len()
         ));
-        for f in &findings {
+        for f in &outcome.findings {
             report.push_str(&format!("      FINDING: {f}\n"));
         }
+        outcomes.push((t.name, outcome));
     }
+    let execs: usize = outcomes.iter().map(|(_, o)| o.execs).sum();
+    let findings: usize = outcomes.iter().map(|(_, o)| o.findings.len()).sum();
 
     println!("coverage-guided fuzzing");
     println!("  toolchain: rustc 1.97.1 stable, -C instrument-coverage, llvm-profdata");
+    println!("  llvm-profdata: {}", profdata.display());
     println!("  NOT libFuzzer: a process per input, so executions/second are low");
     println!();
     print!("{report}");
     println!();
     println!(
-        "  {} targets, {total_execs} executions, {total_findings} findings",
+        "  {} targets, {execs} executions, {findings} findings",
         targets.len()
     );
 
-    if total_findings > 0 {
-        std::process::exit(1);
+    floor(&outcomes)?;
+    Ok(if findings > 0 { 1 } else { 0 })
+}
+
+/// The non-vacuity floor: a target that ended having covered no region
+/// measured nothing, whatever else it says, and "0 findings" from it means
+/// nothing.
+fn floor(outcomes: &[(&str, Outcome)]) -> Result<(), String> {
+    let empty: Vec<String> = outcomes
+        .iter()
+        .filter(|(_, o)| o.regions == 0)
+        .map(|(name, o)| format!("{name} ({} executions)", o.execs))
+        .collect();
+    if empty.is_empty() {
+        return Ok(());
     }
+    Err(format!(
+        "covered 0 regions: {}\n  \
+         nothing was measured, so 0 findings from it would mean nothing.\n  \
+         Is llvm-profdata the one of the toolchain that built the harness, \
+         and was the harness built with -C instrument-coverage?",
+        empty.join(", ")
+    ))
 }
 
 fn repo_root() -> PathBuf {
@@ -183,15 +302,19 @@ fn targets(root: &Path) -> Vec<Target> {
 }
 
 /// The loop: run, measure, keep what covers more, mutate.
+///
+/// An error is a run that could not be carried out or measured (the harness
+/// would not start, `llvm-profdata` failed), not a finding.
 fn fuzz_one(
     harness: &Path,
     work: &Path,
     target: &Target,
+    profdata: &Path,
     budget: usize,
-) -> (usize, usize, Vec<String>) {
+) -> Result<Outcome, String> {
     let dir = work.join(target.name);
     let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).expect("target dir");
+    std::fs::create_dir_all(&dir).map_err(|e| format!("cannot make {}: {e}", dir.display()))?;
 
     let mut corpus: Vec<Vec<u8>> = if target.seeds.is_empty() {
         vec![b"seed".to_vec()]
@@ -218,14 +341,15 @@ fn fuzz_one(
 
         let profraw = dir.join(format!("{execs}.profraw"));
         let input_path = dir.join("input.bin");
-        std::fs::write(&input_path, &input).expect("write input");
+        std::fs::write(&input_path, &input)
+            .map_err(|e| format!("cannot write {}: {e}", input_path.display()))?;
 
         let out = Command::new(harness)
             .arg(target.name)
             .arg(&input_path)
             .env("LLVM_PROFILE_FILE", &profraw)
             .output()
-            .expect("run harness");
+            .map_err(|e| format!("cannot run {}: {e}", harness.display()))?;
 
         // A crash is a finding. The harness returns 101 for a panic it caught
         // and reported; anything else non-zero is an uncaught abort.
@@ -243,14 +367,15 @@ fn fuzz_one(
             );
             if !findings.contains(&finding) {
                 let saved = dir.join(format!("finding-{}.bin", findings.len()));
-                std::fs::write(&saved, &input).expect("save finding");
+                std::fs::write(&saved, &input)
+                    .map_err(|e| format!("cannot save {}: {e}", saved.display()))?;
                 findings.push(finding);
             }
             continue;
         }
 
         // Coverage feedback: did this input reach regions the corpus has not?
-        let new = regions(&profraw, harness)
+        let new = regions(profdata, &profraw)?
             .into_iter()
             .filter(|r| !seen_regions.contains(r))
             .collect::<Vec<_>>();
@@ -265,20 +390,59 @@ fn fuzz_one(
         }
     }
 
-    (execs, seen_regions.len(), findings)
+    Ok(Outcome {
+        execs,
+        regions: seen_regions.len(),
+        findings,
+    })
 }
 
-/// Covered region hashes, from `llvm-profdata show`.
-fn regions(profraw: &Path, _harness: &Path) -> Vec<u64> {
-    let llvm = llvm_bin("llvm-profdata");
-    let out = Command::new(llvm)
+/// Covered region hashes, from `llvm-profdata show` on one run's profile.
+///
+/// An error is a measurement that did not happen. It must not read as "this
+/// input covered nothing new": that is how the fuzzer ran blind, reporting
+/// success, on every machine but the one whose path it had hard-coded.
+fn regions(profdata: &Path, profraw: &Path) -> Result<Vec<u64>, String> {
+    let out = match Command::new(profdata)
         .args(["show", "--counts", "--all-functions"])
         .arg(profraw)
-        .output();
-    let Ok(out) = out else { return Vec::new() };
+        .output()
+    {
+        Ok(out) => out,
+        Err(e) => return Err(format!("cannot run {}: {e}", profdata.display())),
+    };
     if !out.status.success() {
-        return Vec::new();
+        return Err(format!(
+            "{} could not read {}: {}\n  was the harness built with -C instrument-coverage?",
+            profdata.display(),
+            profraw.display(),
+            first_line(&out.stderr)
+        ));
     }
+    let found = covered(&String::from_utf8_lossy(&out.stdout));
+    if found.is_empty() {
+        // A run of the instrumented harness executes at least its `main`.
+        return Err(format!(
+            "{} lists no executed function in {}: its output is no longer what pw-fuzz reads",
+            profdata.display(),
+            profraw.display()
+        ));
+    }
+    Ok(found)
+}
+
+/// The first line of what a program wrote, or a note that it wrote none.
+fn first_line(bytes: &[u8]) -> String {
+    String::from_utf8_lossy(bytes)
+        .lines()
+        .next()
+        .unwrap_or("<no message>")
+        .to_string()
+}
+
+/// The regions that ran, in the text `llvm-profdata show --counts
+/// --all-functions` prints.
+fn covered(text: &str) -> Vec<u64> {
     // One hash per (function, counter index) that executed at least once. The
     // exact numbers do not matter; what matters is the SET, and whether an
     // input grows it.
@@ -293,7 +457,6 @@ fn regions(profraw: &Path, _harness: &Path) -> Vec<u64> {
     // and NOT `Function name: ..`, which is what a first version looked for —
     // so it matched nothing in the dependencies and reported 69 regions for a
     // whole compiler. The number being implausibly small is what gave it away.
-    let text = String::from_utf8_lossy(&out.stdout);
     let mut function = String::new();
     let mut out_regions = Vec::new();
     for line in text.lines() {
@@ -321,11 +484,82 @@ fn regions(profraw: &Path, _harness: &Path) -> Vec<u64> {
     out_regions
 }
 
-fn llvm_bin(tool: &str) -> PathBuf {
-    let home = std::env::var("HOME").expect("HOME");
-    PathBuf::from(home)
-        .join(".rustup/toolchains/1.97.1-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin")
-        .join(tool)
+/// The LLVM program `tool`, found where the active toolchain keeps it, and
+/// checked: it is there and it runs.
+///
+/// `root` is where `rustc` is asked, so that it is the toolchain `cargo build`
+/// builds the harness with there (`rust-toolchain.toml`).
+fn llvm_tool(root: &Path, tool: &str) -> Result<PathBuf, String> {
+    let rustc = std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into());
+    let dir = bin_dir(&rustc, root, std::env::var_os(BIN_DIR_ENV))?;
+    runnable(&dir, tool)
+}
+
+/// The directory of the LLVM programs: `over_ride` (`PW_LLVM_BIN_DIR`) if
+/// one is given, else the active toolchain's
+/// `<sysroot>/lib/rustlib/<host>/bin`, which `rustc` itself says.
+fn bin_dir(rustc: &OsStr, cwd: &Path, over_ride: Option<OsString>) -> Result<PathBuf, String> {
+    if let Some(dir) = over_ride.filter(|d| !d.is_empty()) {
+        return Ok(PathBuf::from(dir));
+    }
+    let sysroot = ask_rustc(rustc, cwd, &["--print", "sysroot"])?;
+    let version = ask_rustc(rustc, cwd, &["-vV"])?;
+    let host = host_of(&version).ok_or_else(|| "`rustc -vV` names no host".to_string())?;
+    Ok(Path::new(sysroot.trim())
+        .join("lib/rustlib")
+        .join(host)
+        .join("bin"))
+}
+
+/// What `rustc` prints for `args`, run in `cwd`.
+fn ask_rustc(rustc: &OsStr, cwd: &Path, args: &[&str]) -> Result<String, String> {
+    let shown = Path::new(rustc).display();
+    let out = Command::new(rustc)
+        .args(args)
+        .current_dir(cwd)
+        .output()
+        .map_err(|e| format!("cannot run {shown}: {e}"))?;
+    if !out.status.success() {
+        return Err(format!(
+            "`{shown} {}` failed ({}): {}",
+            args.join(" "),
+            out.status,
+            first_line(&out.stderr)
+        ));
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+}
+
+/// The target triple of the machine, from the output of `rustc -vV`.
+fn host_of(verbose_version: &str) -> Option<&str> {
+    verbose_version
+        .lines()
+        .find_map(|line| line.strip_prefix("host: "))
+        .map(str::trim)
+}
+
+/// `dir/tool`, if it exists and runs.
+fn runnable(dir: &Path, tool: &str) -> Result<PathBuf, String> {
+    let path = dir.join(tool);
+    if !path.is_file() {
+        return Err(format!(
+            "{tool} not found: {} is not a file\n  \
+             pw-fuzz reads its coverage with it; without it every target would report 0 covered regions.\n  \
+             Get it with `rustup component add llvm-tools` (rust-toolchain.toml lists it),\n  \
+             or set {BIN_DIR_ENV} to a directory that holds it.",
+            path.display()
+        ));
+    }
+    match Command::new(&path).arg("--version").output() {
+        Ok(out) if out.status.success() => Ok(path),
+        Ok(out) => Err(format!(
+            "{} --version failed ({}): {}",
+            path.display(),
+            out.status,
+            first_line(&out.stderr)
+        )),
+        Err(e) => Err(format!("cannot run {}: {e}", path.display())),
+    }
 }
 
 fn fnv(s: &str) -> u64 {

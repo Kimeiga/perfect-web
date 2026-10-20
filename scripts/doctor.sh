@@ -228,7 +228,7 @@ fi
 check opam optional 'opam --version' "spikes/bonsai-incremental-model (charter v2)"
 
 echo
-bold "Rust targets"
+bold "Rust targets and components"
 if command -v rustup >/dev/null 2>&1; then
     if rustup target list --installed 2>/dev/null | grep -qx 'wasm32-wasip2'; then
         ok "wasm32-wasip2" "installed"
@@ -237,6 +237,18 @@ if command -v rustup >/dev/null 2>&1; then
         printf '      get it: rustup target add wasm32-wasip2\n'
         missing=$((missing + 1))
     fi
+    # llvm-profdata is in this component. pw-fuzz (`just fuzz`) and its tests
+    # read coverage with it, and a fuzzer without it once reported success.
+    # A `case`, not a pipe into `grep -q`: under pipefail a reader that quits
+    # early fails the pipe.
+    case "$(rustup component list --installed 2>/dev/null)" in
+        *llvm-tools*) ok "llvm-tools" "installed (llvm-profdata, for pw-fuzz)" ;;
+        *)
+            bad "llvm-tools" "MISSING — pw-fuzz (just fuzz) and its tests read coverage with llvm-profdata"
+            printf '      get it: rustup component add llvm-tools   (rust-toolchain.toml lists it)\n'
+            missing=$((missing + 1))
+            ;;
+    esac
 else
     bad "rustup" "MISSING — needed to manage the pinned toolchain"
     missing=$((missing + 1))
