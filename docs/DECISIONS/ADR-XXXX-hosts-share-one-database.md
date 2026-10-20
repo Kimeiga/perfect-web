@@ -59,6 +59,17 @@ seats and its snapshots).
   after): a renamed sign-in and sign-out path, and a duplicated line. Anchors
   are checked by text, so a track that moves shared code re-anchors it, and
   runs each re-anchored script whole.
+- **Two flakes seen, neither this track's** (recorded, nothing loosened):
+  `tests::bounded_statements::each_page_and_command_is_a_bounded_number_of_statements`
+  on PostgreSQL failed "equal at both sizes" in 2 of 2 runs at load 80-90
+  (rate_order's reader's open pages read again 42 at the seed, 31 with
+  fifty stores more; every command's row, this track's among them, equal):
+  ADR-0297's LIVE window leaving the earliest-fetched pages out of a
+  commit's re-reads on a slow machine, found on train-10's head and fixed
+  test-side on train-11 (1e2dd39c), not yet on master; at load 40-55 its
+  mutation script's baseline passed. And
+  `the_store_sends_its_slots_after_its_own_content` (1 of 1 whole-suite
+  runs at load 60-74), as the render merge's ADR records it on master.
 
 ## Context
 
@@ -481,7 +492,38 @@ layer and host:
 
 ## Evidence
 
-(Filled in once the runs below end; the commands are recorded.)
+Recorded on the PC, 2026-10-19/20 (WSL2, 32 threads shared with other
+workers, load averages 40-100 through these runs), PostgreSQL 18.6, rustc
+1.97.1, Playwright 1.58.0:
+
+- **`just e14-second-host`** at 5cf742f2, clean
+  (`docs/evidence/E14/second-host.txt`, 61 min, PORT=9264):
+  `tests::second_host::` 22 passed; `tests::feed_pg::` and
+  `tests::store_pg::` on PostgreSQL 32 passed;
+  `e2e-hosts/second-host.spec.mjs` 12 passed (4 tests in Chromium, Firefox
+  and WebKit, 1.2 min); `scripts/second_host_mutations.py` **34 of 34
+  mutants killed** (31 by the two-host tests, 1 by the store's, 2 by the
+  browser suite), every baseline green, no process stopped by the memory
+  bound.
+- **Every mutation script the branch reaches** (`ci_plan.py --changed
+  origin/master HEAD`: twelve recipes), each run whole on this branch's code
+  (057801ce, the same code as 5cf742f2), in this worktree and two
+  throwaway lanes of it: scheduled 37 of 37, reviews 30 of 30, identity 16
+  of 16, bounded_statements 12 of 12, store_postgres 12 of 12,
+  interactions 10 of 10, cross_session 8 of 8, feed_postgres 7 of 7,
+  notifications 23 of 23, uploads 33 of 33, store_accounts 37 of 37 (their
+  browser suites in Chromium at PORT=9141, one at a time); with this
+  track's own, **259 of 259 mutants killed in twelve scripts**, every
+  baseline green, no process stopped by the memory bound, the anchors
+  checked after each (3083 in 268 scripts, each once).
+- **The server's whole suite** at 057801ce's code (in memory, the
+  PostgreSQL tests with the databases named): 607 passed, 1 failed, 9
+  ignored; the one, `the_store_sends_its_slots_after_its_own_content`
+  (154.1 ms past its 150 ms bound at load 60-74), passed alone, the flake
+  the render merge's ADR records on master.
+- **The render merge composed** (above): 93 passed on a local trial merge.
+- `just ci` at the pushed head, before the push (`just ci > log && git
+  push`): nothing is pushed on a red one.
 
 ## Next
 
