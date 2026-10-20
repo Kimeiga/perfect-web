@@ -3,9 +3,10 @@
 // with its test, and each test with a control where it has one.
 //
 // The program is `examples/todomvc`, built by `todomvc.sh` into
-// `dist-todomvc` and served on a host per engine (`TODOMVC_PORTS`). A
-// session's todos are its own, and each test is its own browser context, so
-// its own session: the tests need no order and no clearing.
+// `dist-todomvc` and served on a host per engine (`TODOMVC_PORTS`). The
+// todos are the device's (track `device-store`): kept in the browser's own
+// storage, and each test is its own browser context, so its own storage: the
+// tests need no order and no clearing.
 //
 // The spec's sections, in its order:
 // - No todos: `.main` and `.footer` are hidden.
@@ -16,8 +17,8 @@
 // - Editing: Enter and blur save, trimmed; empty destroys; Escape discards.
 // - Counter: "1 item left", "2 items left".
 // - Clear completed: shown only where one is.
-// - Persistence: the framework's own, a session's, in place of
-//   `localStorage` (the spec allows it).
+// - Persistence: `localStorage`, under `todos-pleris`, a list of
+//   `{id, title, completed}`, which no server is told.
 // - Routing: `#/`, `#/active`, `#/completed`, filtered by the model, the
 //   `selected` class on the links, and a fragment kept on reload.
 import { expect, test } from "@playwright/test";
@@ -199,8 +200,7 @@ test("the toggle-all, pressed, still follows the todos: unchecked when one is cl
   await expect(all).not.toBeChecked();
   await all.check({ force: true });
   await expect(all).toBeChecked();
-  // The press checks the box at once; the todos are completed when the host
-  // has answered, and a todo cleared before then is completed after.
+  // The press checks the box, and completes the todos, at once.
   for (const n of [0, 1]) await expect(items(page).nth(n)).toHaveClass(/completed/);
   await items(page).nth(0).locator(".toggle").uncheck();
   await expect(items(page).nth(0)).not.toHaveClass(/completed/);
@@ -503,6 +503,51 @@ test("the todos are the framework's to keep: they outlive a reload, as they were
   await expect(page.locator(".todo-count")).toHaveText("1 item left");
 });
 
+test("the todos are kept in the browser's own storage, as TodoMVC's spec names them", async ({
+  page,
+}) => {
+  await open(page);
+  await add(page, ONE, TWO);
+  await items(page).nth(1).locator(".toggle").check();
+  await expect(items(page).nth(1)).toHaveClass(/completed/);
+  const kept = await page.evaluate(() =>
+    Object.fromEntries(
+      Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i)).map((k) => [
+        k,
+        localStorage.getItem(k),
+      ]),
+    ),
+  );
+  // One key, the spec's `todos-[framework]`; the spec's three keys an item.
+  expect(Object.keys(kept)).toEqual(["todos-pleris"]);
+  expect(JSON.parse(kept["todos-pleris"])).toEqual([
+    { id: 1, title: ONE, completed: false },
+    { id: 2, title: TWO, completed: true },
+  ]);
+  // Editing is not persisted (the spec): a field open keeps nothing more.
+  await items(page).nth(0).locator("label").dblclick();
+  await expect(items(page).nth(0).locator(".edit")).toBeFocused();
+  expect(await page.evaluate(() => localStorage.length)).toBe(1);
+});
+
+test("no request carries a todo: the server is told none", async ({ page }) => {
+  const sent = [];
+  page.on("request", (r) => sent.push(`${r.method()} ${r.url()} ${r.postData() ?? ""}`));
+  await open(page);
+  const marker = `todo-${Date.now()}`;
+  await add(page, marker);
+  await items(page).nth(0).locator(".toggle").check();
+  await items(page).nth(0).locator("label").dblclick();
+  await items(page).nth(0).locator(".edit").fill(`${marker} edited`);
+  await items(page).nth(0).locator(".edit").press("Enter");
+  await expect(items(page)).toHaveText([`${marker} edited`]);
+  await page.reload();
+  await page.waitForFunction(() => document.documentElement.dataset.pwReady === "1");
+  await expect(items(page)).toHaveText([`${marker} edited`]);
+  expect(sent.length).toBeGreaterThan(0);
+  expect(sent.filter((r) => r.includes(marker))).toEqual([]);
+});
+
 test("another visitor has a list of their own", async ({ page, browser, baseURL }) => {
   await open(page);
   await add(page, ONE);
@@ -516,7 +561,7 @@ test("another visitor has a list of their own", async ({ page, browser, baseURL 
   await other.close();
 });
 
-test("a second tab of the same session shows the same list, and each change reaches it", async ({
+test("a second tab on the same device shows the same list, and each change reaches it", async ({
   page,
 }) => {
   await open(page);
@@ -576,13 +621,16 @@ test("an item updated while filtered is updated accordingly", async ({ page }) =
   await add(page, ONE, TWO, THREE);
   await link(page, "Active").click();
   await expect(items(page)).toHaveCount(3);
-  // Checked, it is no longer active: it goes.
-  await items(page).nth(1).locator(".toggle").check();
+  // Checked, it is no longer active: it goes. Pressed, not `check()`ed:
+  // the browser renders the list again as it is pressed (track
+  // `device-store`), so the box leaves with its todo, and none is left to be
+  // seen checked; what the list holds says what the press did.
+  await items(page).nth(1).locator(".toggle").click();
   await expect(items(page)).toHaveText([ONE, THREE]);
   // And in completed, un-checked, it goes the other way.
   await link(page, "Completed").click();
   await expect(items(page)).toHaveText([TWO]);
-  await items(page).nth(0).locator(".toggle").uncheck();
+  await items(page).nth(0).locator(".toggle").click();
   await expect(items(page)).toHaveCount(0);
   await link(page, "All").click();
   await expect(items(page)).toHaveCount(3);

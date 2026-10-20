@@ -3189,14 +3189,20 @@ fn lower_block_at(
     if let Some(each) = each {
         let binding = each.binder.clone();
         // The list's path, read from the expression it is (ADR-0345): a
-        // name, or fields read from one.
-        let Some(collection) = value_path(body, each.list) else {
+        // name, or fields read from one. Or **a list the browser computes**
+        // from the values it holds (track `device-store`, ADR-XXXX, decision
+        // 7), read by the path the compiler names, as a computed subject is
+        // (ADR-0229); the plan says who computes it, and refuses one no one
+        // does.
+        let computed = value_path(body, each.list).is_none();
+        let collection = value_path(body, each.list).unwrap_or_default();
+        if computed && inputs_of(body, each.list, ctx).is_empty() {
             out.push(blocked(format!(
                 "`{{#each}}` reads its list by path, and `{}` is computed",
                 each.written.list
             )));
             return;
-        };
+        }
         // The key as the path from the element to it: `id` from `(item.id)`,
         // `r.id` from `(item.r.id)`, and empty from `(item)`. Until 2026-09-26
         // it was the key's last segment, so `(item.r.id)` keyed on `item.id`
@@ -3224,8 +3230,22 @@ fn lower_block_at(
             ));
             return;
         }
-        let collection = ctx.read(collection);
-        ix.read(id, &collection, ReadKind::List, ReadAt::List(node), ctx);
+        let collection = match computed {
+            true => {
+                let inputs = inputs_of(body, each.list, ctx);
+                let value = ix.computed_path(id, &inputs);
+                ix.read(id, &value, ReadKind::List, ReadAt::Expr(each.list), ctx);
+                if let Some(read) = ix.reads.last_mut() {
+                    read.inputs = Some(inputs);
+                }
+                value
+            }
+            false => {
+                let collection = ctx.read(collection);
+                ix.read(id, &collection, ReadKind::List, ReadAt::List(node), ctx);
+                collection
+            }
+        };
         let (scope, mut written) = ctx.binding(std::slice::from_ref(&binding), ix);
         ix.frames += 1;
         ix.loops

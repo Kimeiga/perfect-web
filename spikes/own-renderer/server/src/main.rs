@@ -5982,7 +5982,8 @@ impl Server {
                 continue;
             };
             let part = live["part"].as_u64().unwrap_or_default() as u32;
-            // A text part, an attribute, or a block's subject (ADR-0229).
+            // A text part, an attribute, or a block's subject (ADR-0229); or
+            // a list the browser computes (track `device-store`, ADR-XXXX).
             let path = match find_part(&template.chunks, part) {
                 Some(
                     pw_render::ir::Part::Text { value, .. }
@@ -5991,14 +5992,29 @@ impl Server {
                     | pw_render::ir::Part::Conditional { value, .. }
                     | pw_render::ir::Part::Match { value, .. },
                 ) => value.clone(),
+                Some(pw_render::ir::Part::Each { collection, .. }) => collection.clone(),
                 _ => return Err(format!("part {part} reads no value")),
             };
-            let mut at = live["path"].as_str().unwrap_or_default().split('.');
-            let mut first = first_value(plan, at.next().unwrap_or_default());
-            for field in at {
-                first = first[field].clone();
-            }
-            let value = self.computed_from(id, &first)?;
+            // Each value it reads, at its first: one at `path`, or several
+            // (track `device-store`), in order.
+            let paths: Vec<&str> = match live["paths"].as_array() {
+                Some(several) if !several.is_empty() => {
+                    several.iter().filter_map(|p| p.as_str()).collect()
+                }
+                _ => vec![live["path"].as_str().unwrap_or_default()],
+            };
+            let firsts: Vec<serde_json::Value> = paths
+                .iter()
+                .map(|p| {
+                    let mut at = p.split('.');
+                    let mut first = first_value(plan, at.next().unwrap_or_default());
+                    for field in at {
+                        first = first[field].clone();
+                    }
+                    first
+                })
+                .collect();
+            let value = self.computed_from(id, &firsts)?;
             env = env.set(&path, val_to_value(&value));
         }
         Ok(env)
@@ -6006,7 +6022,7 @@ impl Server {
 
     /// **A computed value's component, run with `json`** (ADR-0227), typed
     /// by its parameter as a command's argument is: pure, with what it reads.
-    fn computed_from(&self, id: &str, json: &serde_json::Value) -> Result<Val, String> {
+    fn computed_from(&self, id: &str, json: &[serde_json::Value]) -> Result<Val, String> {
         let loaded = self
             .components
             .get(id)
@@ -6018,9 +6034,7 @@ impl Server {
             .and_then(|c| c.exports.first())
             .and_then(|e| e.component.clone())
             .ok_or_else(|| format!("`{id}`'s contract does not locate its export"))?;
-        let args = loaded
-            .prepared
-            .arguments_for(&export, std::slice::from_ref(json))?;
+        let args = loaded.prepared.arguments_for(&export, json)?;
         self.run(id, "", &BTreeMap::new(), &args)?
             .into_iter()
             .next()

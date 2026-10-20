@@ -1302,8 +1302,19 @@ async function computedNow() {
   const module = await computedValues();
   return computed.map((l) => [
     `#${parts.template}~${l.part}`,
-    module.parts[l.part](signalAt(l.path)),
+    module.parts[l.part](...argsOf(l)),
   ]);
+}
+
+/** **What a computed part is given**: the signal's value at its path, or
+ * each of several it reads, in order (track `device-store`, decision 7). */
+function argsOf(live) {
+  return (live.paths?.length ? live.paths : [live.path]).map(signalAt);
+}
+
+/** The signals a computed part is computed again for. */
+function readsOf(live) {
+  return live.reads?.length ? live.reads : [live.signal];
 }
 
 /** The block numbered `id`, rendered at the signals' values now, and what
@@ -1501,6 +1512,173 @@ function replaceBlock(id, html) {
   return replaceRangeAt(addressOf([], id), html) ?? [];
 }
 
+// --- a block rendered again keeps its nodes (track `device-store`, ADR-XXXX) --
+//
+// A block the browser renders again from its signals (ADR-0130) was replaced
+// whole until 2026-10-20: every node in it new each time a signal it reads
+// changed. A row of a list in it was another element after each press, so
+// focus, a hover, what assistive technology held and a test's handle on the
+// row were lost: TodoMVC's own tests hold a todo's `<li>` across its toggle,
+// and once its list was the browser's to render (a value the device keeps),
+// four of them failed for it. Now what was rendered is morphed into what is
+// rendered: a node the new rendering has where the old one had one of the same
+// kind is kept, its attributes and text set to the new ones; a row of a keyed
+// list is matched by its key's anchor (`pw:s{part}@{token}`, the token the
+// renderer derives from the key) and kept, moved or removed as its key says;
+// only what is new is inserted, and only what is gone removed. A control's
+// state, `checked` and `value`, follows the new rendering where it changed,
+// as a part set in place does (ADR-0142).
+
+/** The key anchor `node` opens or closes, `{ part, token, start }`, or none. */
+function rowAnchor(node) {
+  if (node.nodeType !== Node.COMMENT_NODE) return null;
+  const m = /^pw:([se])(\d+)@(.+)$/.exec(node.data);
+  return m ? { start: m[1] === "s", part: m[2], token: m[3] } : null;
+}
+
+/** `nodes` as the items a morph matches: each a node, or a row of a keyed
+ * list, its anchors and what is between them. */
+function rowsOf(nodes) {
+  const items = [];
+  for (let i = 0; i < nodes.length; i++) {
+    const a = rowAnchor(nodes[i]);
+    if (a?.start) {
+      const end = nodes.findIndex(
+        (n, j) => j > i && n.nodeType === Node.COMMENT_NODE && n.data === `pw:e${a.part}@${a.token}`,
+      );
+      if (end > i) {
+        items.push({ key: `${a.part}@${a.token}`, nodes: nodes.slice(i, end + 1) });
+        i = end;
+        continue;
+      }
+    }
+    items.push({ node: nodes[i] });
+  }
+  return items;
+}
+
+/** Whether `old` can be kept as `fresh`: a node of its kind, an element of
+ * its tag and its identity, a comment of its text. */
+function sameKind(old, fresh) {
+  if (old.nodeType !== fresh.nodeType) return false;
+  if (old.nodeType === Node.ELEMENT_NODE) {
+    return (
+      old.tagName === fresh.tagName &&
+      old.getAttribute("data-pw") === fresh.getAttribute("data-pw") &&
+      old.getAttribute("id") === fresh.getAttribute("id")
+    );
+  }
+  if (old.nodeType === Node.COMMENT_NODE) return old.data === fresh.data;
+  return true;
+}
+
+/** `old` made what `fresh` is, kept. */
+function morphNode(old, fresh, inserted) {
+  if (old.nodeType === Node.TEXT_NODE) {
+    if (old.data !== fresh.data) old.data = fresh.data;
+    return;
+  }
+  if (old.nodeType !== Node.ELEMENT_NODE) return;
+  // A control's state follows the new rendering where it changed it.
+  const wasChecked = old.hasAttribute("checked");
+  const wasValue = old.getAttribute("value");
+  for (const a of [...old.attributes]) {
+    if (!fresh.hasAttribute(a.name)) old.removeAttribute(a.name);
+  }
+  for (const a of [...fresh.attributes]) {
+    if (old.getAttribute(a.name) !== a.value) old.setAttribute(a.name, a.value);
+  }
+  if (typeof old.checked === "boolean" && (wasChecked !== fresh.hasAttribute("checked") || old.checked !== fresh.hasAttribute("checked"))) {
+    old.checked = fresh.hasAttribute("checked");
+  }
+  if ("value" in old && old.tagName !== "TEXTAREA" && wasValue !== fresh.getAttribute("value")) {
+    old.value = fresh.getAttribute("value") ?? "";
+  }
+  morphChildren(old, [...old.childNodes], [...fresh.childNodes], null, inserted);
+}
+
+/** **`olds`, children of `parent`, made `freshes`**, before `before`: each
+ * kept where it can be, each row by its key, and in the new order. */
+function morphChildren(parent, olds, freshes, before, inserted) {
+  const old = rowsOf(olds);
+  const fresh = rowsOf(freshes);
+  const byKey = new Map(old.filter((o) => o.key).map((o) => [o.key, o]));
+  const loose = old.filter((o) => o.node);
+  const used = new Set();
+  let cursor = 0;
+  const placed = [];
+  for (const f of fresh) {
+    if (f.key) {
+      const o = byKey.get(f.key);
+      if (o && !used.has(o)) {
+        used.add(o);
+        const [start, ...rest] = o.nodes;
+        const end = rest.pop();
+        const freshInner = f.nodes.slice(1, -1);
+        morphChildren(parent, rest, freshInner, end, inserted);
+        placed.push(...between(start, end));
+      } else {
+        placed.push(...f.nodes);
+        inserted.push(...f.nodes);
+      }
+      continue;
+    }
+    // A loose node: the next loose old one of its kind, in order.
+    let match = null;
+    while (cursor < loose.length) {
+      const o = loose[cursor++];
+      if (used.has(o)) continue;
+      if (sameKind(o.node, f.node)) {
+        match = o;
+        break;
+      }
+    }
+    if (match) {
+      used.add(match);
+      morphNode(match.node, f.node, inserted);
+      placed.push(match.node);
+    } else {
+      placed.push(f.node);
+      inserted.push(f.node);
+    }
+  }
+  // What the new rendering has not, gone: a modal dialog among it closed
+  // first, its focus given back (ADR-0141).
+  for (const o of old) {
+    if (used.has(o)) continue;
+    for (const n of o.nodes ?? [o.node]) {
+      if (n.nodeType === Node.ELEMENT_NODE) {
+        for (const d of dialogsIn([n], true)) {
+          d.close();
+          giveFocusBack(d);
+        }
+      }
+      n.remove();
+    }
+  }
+  // In the new order, a kept node moved only where it is not already.
+  let anchor = before;
+  for (let i = placed.length - 1; i >= 0; i--) {
+    const n = placed[i];
+    if (n.parentNode !== parent || n.nextSibling !== anchor) {
+      if (n.isConnected && n.parentNode === parent) moveNodes(parent, [n], anchor);
+      else parent.insertBefore(n, anchor);
+    }
+    anchor = n;
+  }
+}
+
+/** **A block the browser renders again, morphed**: what it rendered kept
+ * where the new rendering has it, and the nodes it inserted. */
+function morphBlock(id, html) {
+  const r = index.get(addressOf([], id));
+  if (!r?.start) return [];
+  const parent = r.start.parentNode;
+  const inserted = [];
+  morphChildren(parent, between(r.start, r.end), parseInstance(html), r.end.nextSibling, inserted);
+  return inserted;
+}
+
 /** The range at `key` replaced by `html`, or `null` where the document has
  * no such range (ADR-0146). */
 function replaceRangeAt(key, html) {
@@ -1603,10 +1781,14 @@ async function flushSignals() {
   let rendered = false;
   const inserted = [];
   for (const live of parts.live ?? []) {
+    // A value computed for a block's render alone (track `device-store`):
+    // its block is rendered again, below, and computes it then.
+    if (live.kind === "value") continue;
     if (live.derived && SET_IN_PLACE.has(live.kind)) {
-      // A value computed from the signal (ADR-0227), by its part's function.
-      if (!changed.has(live.signal)) continue;
-      const v = (await computedValues()).parts[live.part](signalAt(live.path));
+      // A value computed from the signal (ADR-0227), by its part's function;
+      // or from several (track `device-store`).
+      if (!readsOf(live).some((s) => changed.has(s))) continue;
+      const v = (await computedValues()).parts[live.part](...argsOf(live));
       if (live.kind === "text") setRange(addressOf([], live.part), textOf(v));
       else setAttributePart(live, from.get(live.signal), v);
       log.push(`signal ${live.signal} -> computed part ${live.part}`);
@@ -1629,7 +1811,9 @@ async function flushSignals() {
           arms.set(live.part, arm);
         }
       }
-      inserted.push(...replaceBlock(live.part, await renderBlock(live.part)));
+      // Morphed, so what it held is kept where it is rendered again (track
+      // `device-store`): a row by its key.
+      inserted.push(...morphBlock(live.part, await renderBlock(live.part)));
       rendered = true;
       log.push(`signal ${[...changed].join(",")} -> block ${live.part}`);
     }

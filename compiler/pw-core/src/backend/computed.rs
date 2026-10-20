@@ -184,12 +184,27 @@ fn module(
     source.push_str("export const parts = {\n");
     for (n, live) in computed.iter().enumerate() {
         let f = &program.functions[n];
-        let (_, input) = f
-            .params
-            .first()
-            .ok_or_else(|| format!("part {} of `{page}` takes nothing", live.part))?;
-        let decode = super::js_pure::decoder(&program, input, "j")?;
-        source.push_str(&format!("  \"{}\": (j) => f{n}({decode}),\n", live.part));
+        if f.params.is_empty() {
+            return Err(format!("part {} of `{page}` takes nothing", live.part));
+        }
+        // Each value it reads, decoded from its wire form, in order: one, or
+        // several the browser holds (track `device-store`, decision 7).
+        let mut takes = Vec::new();
+        let mut decoded = Vec::new();
+        for (i, (_, input)) in f.params.iter().enumerate() {
+            let j = match f.params.len() {
+                1 => "j".to_string(),
+                _ => format!("j{i}"),
+            };
+            decoded.push(super::js_pure::decoder(&program, input, &j)?);
+            takes.push(j);
+        }
+        source.push_str(&format!(
+            "  \"{}\": ({}) => f{n}({}),\n",
+            live.part,
+            takes.join(", "),
+            decoded.join(", ")
+        ));
     }
     source.push_str("};\n");
     Ok(source)
