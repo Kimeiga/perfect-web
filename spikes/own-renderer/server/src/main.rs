@@ -3095,27 +3095,18 @@ impl Server {
             // which committed there, is answered from the record its commit
             // wrote with its writes, as this host's memory answers its own;
             // nothing runs. One never committed has no record, and is
-            // refused as before. It is looked for under the request's own
-            // session first (a page another host served, which this one
-            // never showed), then the page's (one this host showed a session
-            // whose reader signed in or out since, as above).
-            let mut owners = vec![session];
-            if session != shown_to {
-                owners.push(shown_to.as_str());
-            }
-            for owner in owners {
-                let key = format!("{owner}\u{1f}{component_id}\u{1f}{id}");
-                match self.recalled_interaction(&key) {
-                    Ok(Some((first, answer))) if first == sent => {
-                        return Some(Answered::from_kept(&answer));
-                    }
-                    Ok(_) => {}
-                    Err(why) => {
-                        eprintln!("pw dev server: an interaction's record was not read: {why}");
-                    }
+            // refused as before. It is looked for under the page's session,
+            // as above: the request's own where this host does not hold the
+            // page (page numbers are apart on every host, so another host's
+            // page is never one this host showed another session).
+            return match self.recalled_interaction(&key) {
+                Ok(Some((first, answer))) if first == sent => Some(Answered::from_kept(&answer)),
+                Ok(_) => None,
+                Err(why) => {
+                    eprintln!("pw dev server: an interaction's record was not read: {why}");
+                    None
                 }
-            }
-            return None;
+            };
         }
         self.commands
             .command_outcome(&key)

@@ -22,7 +22,7 @@ Each mutant undoes one rule:
   not the database's, an abandoned sign-in kept, a session kept by its id,
   the sessions' connections unbounded;
 - a retry across hosts: a press on another host's page not answered from
-  its record, or looked for under the page's session alone;
+  its record;
 - the deployment's schema (`PW_FEED_SCHEMA`) not the one its tables are in
   (the browser's), or honored for any deployment where it is a test's
   (the integrator's ruling 4 of 2026-10-20);
@@ -414,18 +414,8 @@ MUTANTS = [
         "a press on another host's page is not answered from its record",
         "hosts",
         SERVER,
-        "            for owner in owners {\n",
-        "            for owner in owners.into_iter().take(0) {\n",
-    ),
-    (
-        "a press on another host's page is looked for under the page's session alone",
-        "hosts",
-        SERVER,
-        "            let mut owners = vec![session];\n"
-        "            if session != shown_to {\n"
-        "                owners.push(shown_to.as_str());\n"
-        "            }\n",
-        "            let owners = vec![shown_to.as_str()];\n",
+        "                Ok(Some((first, answer))) if first == sent => Some(Answered::from_kept(&answer)),\n",
+        "                Ok(Some((first, _))) if first == sent => None,\n",
     ),
     # --- The deployment's schema.
     (

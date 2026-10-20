@@ -282,14 +282,15 @@ On this ADR's four questions, each accepted under the owner's delegation of
   from its interaction's committed record where it has one
   (`Server::kept_answer`: where the host's memory holds nothing of the
   press, the layer's record, or the materializer's where the layer keeps
-  none, under the request's own session and then the page's), and refused
-  otherwise as `another-host`, "This page is served by another host. Reload
-  it to go on.", never as out of date. A page this host gave and no longer
-  holds, or a number in no host's instance, is out of date as before. The
-  order of the checks (a kept answer, the stale page, the order's wait, the
-  command) is unchanged. An interaction's id is 128 random bits, so the
-  lookup under the page's session exposes nothing the host's memory did not
-  already answer.
+  none, under the page's session, which is the request's own where this
+  host does not hold the page), and refused otherwise as `another-host`,
+  "This page is served by another host. Reload it to go on.", never as out
+  of date. A page this host gave and no longer holds, or a number in no
+  host's instance, is out of date as before. The order of the checks (a
+  kept answer, the stale page, the order's wait, the command) is unchanged.
+  (A second lookup, under the request's own session, was built first for
+  numbers that collided; with numbers apart it could find nothing the
+  first did not, and its mutant survived as an equivalent: removed.)
 
 ### 3. A session is the database's, kept only as its hash
 
