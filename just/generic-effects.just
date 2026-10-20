@@ -9,3 +9,13 @@ e14-generic-effects:
        python3 scripts/generic_effects_mutations.py; \
      } > docs/evidence/E14/generic-effects.txt 2>&1
     @grep -E '^test result|mutants killed|^baseline:' docs/evidence/E14/generic-effects.txt
+
+# ADR-0351: restored controls retain strict native producer evidence.
+e14-generic-finish-producers:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0351 - query and discard producer controls"; echo; \
+       echo "produced by: just e14-generic-finish-producers"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
+       python3 scripts/generic_finish_producer_mutations.py; \
+     } > docs/evidence/E14/generic-finish-producers.txt 2>&1
+    @grep -E '^baseline:|mutants killed|KILLED|REFUSED|SURVIVED' docs/evidence/E14/generic-finish-producers.txt

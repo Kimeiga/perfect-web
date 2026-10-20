@@ -19,12 +19,12 @@ The source is restored after every mutant, whatever happens.
 """
 
 import pathlib
-import re
 import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 INFER = ROOT / "compiler/pw-core/src/infer.rs"
+VALUES = ROOT / "compiler/pw-core/src/values.rs"
 SERVER = ROOT / "spikes/own-renderer/server/src/main.rs"
 STORE_DATA = ROOT / "spikes/own-renderer/server/src/store.rs"
 BIN = ROOT / "runtime/pw-render/src/bin/pw-render.rs"
@@ -32,11 +32,17 @@ BIN = ROOT / "runtime/pw-render/src/bin/pw-render.rs"
 # (what, which tests, file, anchor, replacement)
 MUTANTS = [
     (
-        "a query binding has no type",
+        "a query value has no canonical type",
         "typer",
-        INFER,
-        "                bindings.entry(Binder::Pattern(*pat)).or_insert(v);\n",
-        "                let _ = v;\n",
+        VALUES,
+        # ADR-0351's shared solver recovers a missing infer.rs binding.
+        # Erase the canonical query value instead; argument checking reads it.
+        """                    Ty::Builtin(Builtin::Result, mut args) if args.len() == 2 => {
+                        args.swap_remove(0)
+                    }
+""",
+        """                    Ty::Builtin(Builtin::Result, args) if args.len() == 2 => Ty::Unknown,
+""",
     ),
     (
         "a query binding is its `Result`",
@@ -106,11 +112,12 @@ CARGO = {
 
 def run(kind):
     """(built, passed, failed) over one crate's tests."""
+    from cargo_test_results import parse
     r = subprocess.run(CARGO[kind], cwd=ROOT, capture_output=True, text=True)
-    results = re.findall(r"test result: \w+\. (\d+) passed; (\d+) failed", r.stdout + r.stderr)
-    if not results:
+    outcome = parse(r.returncode, r.stdout + r.stderr)
+    if not outcome.valid:
         return False, 0, 0
-    return True, sum(int(p) for p, _ in results), sum(int(f) for _, f in results)
+    return True, outcome.passed, outcome.failed
 
 
 def main():
@@ -136,7 +143,8 @@ def main():
         finally:
             path.write_text(original)
         if not built:
-            verdict = "KILLED (does not build)"
+            print(f"{what} [{kind}]: REFUSED (invalid Cargo producer)")
+            return 1
         elif failed:
             verdict = f"KILLED ({failed} of {passed + failed} tests fail)"
         else:

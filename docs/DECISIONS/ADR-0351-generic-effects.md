@@ -661,3 +661,50 @@ edits, still say the combined gates are pending.
 **Next.** Merge `origin/master` when train-10 lands on it (never rebase),
 run the gates and `just ci` again, and push `track/generic-train11` on
 green.
+
+## Train-13 survivor repair (2026-10-20)
+
+Master 115895de is merged without rebasing, preserving its check/build and
+producer-validity work. Six stale controls remained on the generic track:
+two query-value controls and four discard-inference controls. The shared
+value solver recovers concrete types when the older declaration-only
+approximation is removed; deleting that approximation alone does not prove
+that a consumer loses its type.
+
+The four discard controls retain their existing production anchors. A new
+semantic regression carries the enclosing function's rigid T through `?`,
+`if`, `match` and a block into a named `Result<T, String>`, then drops it.
+Each must produce PW0618 at that name, while explicit discard is accepted.
+The solver's concrete resolved-type projection cannot replace that declared
+parameter, so each control now fails this assertion.
+
+The loop/arm iteration control also keeps its production anchor. A generic
+function's template matches an `Option<List<Row<T>>>` and then loops over it.
+The phantom T does not affect its concrete record fields' capture schema,
+but its binding must retain T. A resumable capture verifies that declaration
+propagation reached the loop, and a missing Err arm still produces PW0305.
+This is a frontend witness, not a claim of generic UI/backend specialization.
+
+The deleted query-binding approximation is redundant for these concrete
+query declarations. Its control instead erases the canonical value solver's
+query success type. A new function-argument witness accepts Option<Status>
+and refuses passing that query value to Option<Int> with exact PW0605.
+The existing incorrect-Result control and all original query tests remain.
+No production implementation or language semantics changed in this repair.
+
+Both campaign consumers now delegate Cargo exit/result validation to the
+existing `cargo_test_results` authority. Build failures, missing/empty output,
+contradictory results and unexpected exits refuse the campaign after source
+restoration; none earns a kill. Five executable injection/restoration tests
+cover both consumers. Four additional controls undo actual-exit validation
+or the refusal status, and are judged through the shared frozen-inventory
+unittest producer/protocol (`guide_python` launches it); only completed body
+assertions count as kills.
+
+Local focused validation: query_values 6/6 and let_discard 12/12; all six
+formerly surviving semantic controls build and fail their new assertions;
+producer controls 4/4, five tests in their green baseline. Full query/discard
+and generic regression campaigns plus exact-commit CI remain pending on
+GitHub. Raw local logs are /tmp/generic-finish-focused-final.log,
+/tmp/generic-finish-six.log and /tmp/generic-finish-producers.log; these local
+counts do not replace whole campaign evidence.
