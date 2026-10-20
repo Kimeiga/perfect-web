@@ -1,0 +1,410 @@
+ADR-XXXX - a train is pre-verified locally
+
+produced by: just e14-preverify
+commit: 33277666cd37f8c9d6b20f0d89b8329d4ab84bb2
+python: Python 3.10.12
+just: just 1.58.0
+git: git version 2.34.1
+
+== the tool (scripts/tests/test_preverify.py)
+
+test_a_changed_file_is_refused_and_said_with_why (scripts.tests.test_preverify.CleanTree) ... ok
+test_a_plan_alone_needs_no_clean_tree (scripts.tests.test_preverify.CleanTree) ... ok
+test_a_tree_with_no_toolchain_is_told_so (scripts.tests.test_preverify.CleanTree) ... ok
+test_a_tree_with_one_is_not (scripts.tests.test_preverify.CleanTree) ... ok
+test_an_untracked_file_is_a_change_too (scripts.tests.test_preverify.CleanTree) ... ok
+test_ignored_files_are_not_changes (scripts.tests.test_preverify.CleanTree) ... ok
+test_many_changes_are_counted_and_five_shown (scripts.tests.test_preverify.CleanTree) ... ok
+test_what_differs_from_head_is_listed_as_git_status_lists_it (scripts.tests.test_preverify.CleanTree) ... ok
+test_a_database_is_given_only_where_asked (scripts.tests.test_preverify.Environment) ... ok
+test_a_deployments_variables_and_slots_do_not_reach_a_lane (scripts.tests.test_preverify.Environment) ... ok
+test_a_lane_has_its_own_target_temporary_directory_and_jobs (scripts.tests.test_preverify.Environment) ... ok
+test_every_family_of_ports_is_the_lanes (scripts.tests.test_preverify.Environment) ... ok
+test_the_cargo_settings_are_a_runners (scripts.tests.test_preverify.Environment) ... ok
+test_the_cargo_settings_are_the_workflows (scripts.tests.test_preverify.Environment) ... ok
+test_what_a_lane_does_not_set_stays_the_callers (scripts.tests.test_preverify.Environment) ... ok
+test_zero_only_where_every_recipe_passed_every_lane_stood_and_nothing_stopped_the_run (scripts.tests.test_preverify.ExitStatus) ... ok
+test_colours_are_taken_out_lines_are_once_each_and_the_list_is_capped (scripts.tests.test_preverify.FailingLines) ... ok
+test_what_cargo_says_of_a_failed_test (scripts.tests.test_preverify.FailingLines) ... ok
+test_what_playwright_says (scripts.tests.test_preverify.FailingLines) ... ok
+test_what_unittest_and_a_mutation_script_say (scripts.tests.test_preverify.FailingLines) ... ok
+test_the_default_base_is_origin_master_and_four_lanes (scripts.tests.test_preverify.Help) ... ok
+test_the_defaults_are_a_jobs_limit_eight_gib_a_lane_and_the_range_for_lanes (scripts.tests.test_preverify.Help) ... ok
+test_the_help_says_it_is_a_pre_check_and_cis_verify_is_the_record (scripts.tests.test_preverify.Help) ... ok
+test_the_module_says_so_too (scripts.tests.test_preverify.Help) ... ok
+test_the_ports_option_is_a_range_in_order (scripts.tests.test_preverify.Help) ... ok
+test_the_recipe_passes_its_arguments_through (scripts.tests.test_preverify.Help) ... ok
+The repository moved (2026-10-20): what is planned comes from the ... ok
+test_a_non_zero_exit_is_failed_and_says_the_exit (scripts.tests.test_preverify.Judging) ... ok
+test_a_recipe_not_run_is_said_not_run (scripts.tests.test_preverify.Judging) ... ok
+test_a_recipe_passes_on_a_zero_exit_with_no_survivor (scripts.tests.test_preverify.Judging) ... ok
+test_a_result_is_read_from_the_runners_record_and_its_evidence (scripts.tests.test_preverify.Judging) ... ok
+test_a_survivor_fails_a_recipe_and_the_first_three_are_the_reason (scripts.tests.test_preverify.Judging) ... ok
+test_a_survivor_is_a_line_that_says_survived_or_an_anchor_gone (scripts.tests.test_preverify.Judging) ... ok
+test_an_exit_wins_over_survivors_in_the_reason (scripts.tests.test_preverify.Judging) ... ok
+test_evidence_the_runner_wrote_and_did_not_copy_fails_a_recipe (scripts.tests.test_preverify.Judging) ... ok
+test_no_record_is_a_failure_saying_why (scripts.tests.test_preverify.Judging) ... ok
+test_processes_left_behind_are_a_note_not_a_failure (scripts.tests.test_preverify.Judging) ... ok
+test_the_memory_bound_lines_are_listed_but_not_the_untouched_one (scripts.tests.test_preverify.Judging) ... ok
+test_a_lane_that_exists_is_refused_not_overwritten (scripts.tests.test_preverify.LaneUnits) ... ok
+test_a_lane_with_no_toolchain_to_copy_sets_up_all_the_same (scripts.tests.test_preverify.LaneUnits) ... ok
+test_a_toolchain_that_cannot_be_linked_is_copied (scripts.tests.test_preverify.LaneUnits) ... ok
+test_a_worktree_git_does_not_know_is_still_taken_away (scripts.tests.test_preverify.LaneUnits) ... ok
+test_the_toolchain_is_hard_linked_where_it_can_be (scripts.tests.test_preverify.LaneUnits) ... ok
+test_a_database_reaches_only_the_recipe_that_needs_one (scripts.tests.test_preverify.Lanes) ... ok
+test_a_failed_recipe_makes_the_exit_one_and_the_run_still_finishes_the_rest (scripts.tests.test_preverify.Lanes) ... ok
+test_a_lane_has_a_runners_environment (scripts.tests.test_preverify.Lanes) ... ok
+test_a_lane_has_its_own_ports_target_temporary_directory_and_jobs (scripts.tests.test_preverify.Lanes) ... ok
+test_a_lane_is_a_detached_worktree_of_head (scripts.tests.test_preverify.Lanes) ... ok
+test_a_recipe_that_exits_non_zero_fails_with_its_exit_and_its_failing_lines (scripts.tests.test_preverify.Lanes) ... ok
+test_a_run_says_what_it_is_doing (scripts.tests.test_preverify.Lanes) ... ok
+test_a_run_says_where_the_logs_are_and_that_it_takes_the_worktrees_away (scripts.tests.test_preverify.Lanes) ... ok
+test_a_survivor_in_the_evidence_fails_a_recipe_that_exited_zero (scripts.tests.test_preverify.Lanes) ... ok
+test_every_recipe_runs_once_in_a_lane (scripts.tests.test_preverify.Lanes) ... ok
+CI's `ci_summary.py`, run on the lanes' output laid out as a run's ... ok
+test_the_costliest_recipes_start_first (scripts.tests.test_preverify.Lanes) ... ok
+test_the_evidence_and_logs_are_kept_under_the_run_directory (scripts.tests.test_preverify.Lanes) ... ok
+`long` and `mid` each wait for the other to have started, so that ... ok
+test_the_lanes_worktrees_are_taken_away_and_the_logs_stay (scripts.tests.test_preverify.Lanes) ... ok
+test_the_others_pass (scripts.tests.test_preverify.Lanes) ... ok
+test_the_report_is_cis_with_each_recipes_lane_and_ci_seconds (scripts.tests.test_preverify.Lanes) ... ok
+test_the_report_is_kept_beside_the_logs (scripts.tests.test_preverify.Lanes) ... ok
+test_the_tree_it_was_run_in_is_untouched (scripts.tests.test_preverify.Lanes) ... ok
+test_the_wall_clock_is_the_runs_own (scripts.tests.test_preverify.Lanes) ... ok
+test_the_load_is_sampled_at_the_start_and_at_the_end_whatever_happens_between (scripts.tests.test_preverify.Load) ... ok
+test_the_load_is_sampled_while_a_run_goes_on_and_at_both_ends (scripts.tests.test_preverify.Load) ... ok
+test_a_plan_needs_no_ports (scripts.tests.test_preverify.Locks) ... ok
+test_a_run_on_other_ports_is_not_held_up (scripts.tests.test_preverify.Locks) ... ok
+test_the_lock_names_its_owner_and_is_let_go_with_the_run (scripts.tests.test_preverify.Locks) ... ok
+test_two_runs_do_not_share_ports (scripts.tests.test_preverify.Locks) ... ok
+test_a_clean_run_exits_zero (scripts.tests.test_preverify.Outcomes) ... ok
+test_a_database_recipe_with_no_database_is_not_run_and_fails_the_run (scripts.tests.test_preverify.Outcomes) ... ok
+test_a_lane_runs_one_recipe_at_a_time_and_takes_the_next_when_free (scripts.tests.test_preverify.Outcomes) ... ok
+test_a_process_a_recipe_leaves_running_is_stopped_and_said (scripts.tests.test_preverify.Outcomes) ... ok
+test_a_recipe_past_its_time_is_stopped_and_fails (scripts.tests.test_preverify.Outcomes) ... ok
+test_a_signal_stops_the_lane_starts_nothing_more_and_leaves_nothing (scripts.tests.test_preverify.Outcomes) ... ok
+test_one_lane_takes_the_recipes_longest_first (scripts.tests.test_preverify.Outcomes) ... ok
+test_the_lanes_worktrees_are_kept_if_asked (scripts.tests.test_preverify.Outcomes) ... ok
+test_a_directory_named_relatively_is_the_callers_whatever_the_lanes_run_from (scripts.tests.test_preverify.Plan) ... ok
+test_a_job_carries_what_the_plan_knows_of_its_recipe (scripts.tests.test_preverify.Plan) ... ok
+test_a_plan_is_the_recipes_of_its_shards_once_each (scripts.tests.test_preverify.Plan) ... ok
+test_a_recipe_unmeasured_is_taken_as_one (scripts.tests.test_preverify.Plan) ... ok
+test_a_recipe_without_a_cost_is_taken_as_one_not_as_nothing (scripts.tests.test_preverify.Plan) ... ok
+test_a_tracks_push_is_planned_as_the_workflow_plans_it (scripts.tests.test_preverify.Plan) ... ok
+test_a_trains_push_asks_for_what_is_stale_too (scripts.tests.test_preverify.Plan) ... ok
+test_output_with_no_plan_is_refused (scripts.tests.test_preverify.Plan) ... ok
+test_recipes_named_are_planned_by_name_whatever_the_range (scripts.tests.test_preverify.Plan) ... ok
+test_the_current_evidence_is_kept_in_only_if_asked (scripts.tests.test_preverify.Plan) ... ok
+test_the_queue_is_the_costliest_first_ties_by_name (scripts.tests.test_preverify.Plan) ... ok
+test_the_run_directory_is_named_by_the_head_unless_told (scripts.tests.test_preverify.Plan) ... ok
+test_the_workflows_plan_of_a_tracks_push_is_what_the_tool_asks (scripts.tests.test_preverify.Plan) ... ok
+test_a_base_that_is_no_ref_is_refused (scripts.tests.test_preverify.Planner) ... ok
+test_a_range_that_changed_no_recipe_runs_nothing_and_succeeds (scripts.tests.test_preverify.Planner) ... ok
+test_a_recipe_that_is_none_is_the_planners_refusal (scripts.tests.test_preverify.Planner) ... ok
+test_a_root_that_is_no_git_is_refused_in_gits_words (scripts.tests.test_preverify.Planner) ... ok
+test_a_run_interrupted_before_the_lanes_exist_is_said_not_a_traceback (scripts.tests.test_preverify.Planner) ... ok
+test_a_train_branch_asks_for_what_is_stale_and_another_does_not (scripts.tests.test_preverify.Planner) ... ok
+test_current_evidence_is_left_out_as_a_push_leaves_it_and_the_planners_note_is_passed_on (scripts.tests.test_preverify.Planner) ... ok
+test_lanes_of_none_are_refused (scripts.tests.test_preverify.Planner) ... ok
+test_no_more_lanes_than_recipes (scripts.tests.test_preverify.Planner) ... ok
+test_recipes_named_twice_are_planned_once (scripts.tests.test_preverify.Planner) ... ok
+test_the_base_is_a_ref_and_the_range_starts_at_its_merge_base (scripts.tests.test_preverify.Planner) ... ok
+test_the_plan_is_said_as_ci_would_be_asked_it (scripts.tests.test_preverify.Planner) ... ok
+test_the_plan_says_the_queue_the_ports_and_what_each_recipe_sets_up (scripts.tests.test_preverify.Planner) ... ok
+test_the_recipes_a_range_changed_are_the_planners_own (scripts.tests.test_preverify.Planner) ... ok
+test_the_seconds_and_the_bodies_are_the_trees_own_not_this_repositorys (scripts.tests.test_preverify.Planner) ... ok
+test_a_lane_is_not_zero (scripts.tests.test_preverify.Ports) ... ok
+test_a_lane_takes_the_host_registrys_stride_from_the_first_port (scripts.tests.test_preverify.Ports) ... ok
+A server that closed its connection first leaves its port in ... ok
+test_a_port_something_listens_on_is_found_and_a_free_one_is_not (scripts.tests.test_preverify.Ports) ... ok
+test_a_range_past_the_last_port_is_refused (scripts.tests.test_preverify.Ports) ... ok
+test_jobs_are_the_threads_over_the_lanes_and_at_least_one (scripts.tests.test_preverify.Ports) ... ok
+test_lanes_that_fit_the_range_exactly_are_not_refused_and_one_port_short_is (scripts.tests.test_preverify.Ports) ... ok
+test_more_lanes_than_the_range_holds_are_refused_saying_how_many_fit (scripts.tests.test_preverify.Ports) ... ok
+test_no_two_lanes_share_a_port_and_each_stays_in_the_range (scripts.tests.test_preverify.Ports) ... ok
+test_the_first_port_of_a_range_is_checked_too (scripts.tests.test_preverify.Ports) ... ok
+test_the_ports_checked_are_the_registrys_reserved_ones (scripts.tests.test_preverify.Ports) ... ok
+test_the_range_is_this_workers_assignment (scripts.tests.test_preverify.Ports) ... ok
+test_the_room_is_counted_in_whole_strides_over_the_whole_range (scripts.tests.test_preverify.Ports) ... ok
+test_the_spacing_is_the_registrys_not_a_number_of_this_tools (scripts.tests.test_preverify.Ports) ... ok
+test_a_marked_process_is_found_in_a_session_of_its_own_and_an_unmarked_one_is_not (scripts.tests.test_preverify.Processes) ... ok
+test_a_marker_is_matched_whole_not_as_a_prefix (scripts.tests.test_preverify.Processes) ... ok
+test_a_process_is_given_the_grace_to_end_cleanly (scripts.tests.test_preverify.Processes) ... ok
+test_a_term_proof_group_is_killed (scripts.tests.test_preverify.Processes) ... ok
+test_a_term_proof_process_is_killed_after_the_grace (scripts.tests.test_preverify.Processes) ... ok
+test_a_watched_process_that_ends_is_done_and_one_that_overstays_is_stopped (scripts.tests.test_preverify.Processes) ... ok
+test_a_zombie_is_not_alive_and_a_pid_that_is_gone_is_not_either (scripts.tests.test_preverify.Processes) ... ok
+test_terminate_stops_a_process_and_its_group (scripts.tests.test_preverify.Processes) ... ok
+test_the_marked_are_stopped_and_the_rest_left (scripts.tests.test_preverify.Processes) ... ok
+test_a_clean_summary_has_no_failure_section (scripts.tests.test_preverify.Report) ... ok
+test_a_failure_shows_its_failing_lines_and_the_tail_of_its_log_and_evidence (scripts.tests.test_preverify.Report) ... ok
+test_a_lane_that_stopped_and_each_lanes_setup_are_said (scripts.tests.test_preverify.Report) ... ok
+test_a_long_log_is_shown_by_its_last_forty_lines (scripts.tests.test_preverify.Report) ... ok
+test_a_recipe_not_run_has_a_block_of_one_line (scripts.tests.test_preverify.Report) ... ok
+test_a_run_of_named_recipes_says_so_in_place_of_a_base (scripts.tests.test_preverify.Report) ... ok
+test_a_run_prints_a_line_to_run_the_failed_ones_again (scripts.tests.test_preverify.Report) ... ok
+test_processes_a_recipe_left_are_listed_apart (scripts.tests.test_preverify.Report) ... ok
+test_the_summary_has_the_count_the_failures_and_the_table (scripts.tests.test_preverify.Report) ... ok
+test_the_summary_is_sorted_by_recipe_as_cis_is (scripts.tests.test_preverify.Report) ... ok
+test_the_totals_say_the_wall_clock_the_load_and_ci_seconds (scripts.tests.test_preverify.Report) ... ok
+test_what_the_memory_bound_stopped_is_listed_apart (scripts.tests.test_preverify.Report) ... ok
+test_a_directory_that_is_no_earlier_run_is_never_touched (scripts.tests.test_preverify.RunTwice) ... ok
+test_a_port_in_use_is_refused_before_anything_runs (scripts.tests.test_preverify.RunTwice) ... ok
+test_a_previous_that_is_no_earlier_run_is_not_deleted_either (scripts.tests.test_preverify.RunTwice) ... ok
+test_a_relative_directory_is_made_where_the_caller_asked (scripts.tests.test_preverify.RunTwice) ... ok
+test_a_run_still_going_is_not_taken_from (scripts.tests.test_preverify.RunTwice) ... ok
+test_an_earlier_run_at_the_same_head_is_kept_beside_the_new_one (scripts.tests.test_preverify.RunTwice) ... ok
+test_lanes_the_range_cannot_hold_are_refused (scripts.tests.test_preverify.RunTwice) ... ok
+test_only_the_run_before_is_kept (scripts.tests.test_preverify.RunTwice) ... ok
+test_the_disk_is_read_where_the_directory_would_be_made (scripts.tests.test_preverify.RunTwice) ... ok
+test_the_disk_needed_is_for_each_lane (scripts.tests.test_preverify.RunTwice) ... ok
+test_the_left_overs_of_a_run_that_died_are_cleaned_first (scripts.tests.test_preverify.RunTwice) ... ok
+test_too_little_disk_is_refused_before_an_earlier_run_is_moved (scripts.tests.test_preverify.RunTwice) ... ok
+test_the_stamp_counts_hours_minutes_and_seconds_since_the_start (scripts.tests.test_preverify.Say) ... ok
+test_a_failed_build_stops_the_lane_and_leaves_its_recipe_to_another (scripts.tests.test_preverify.Setup) ... ok
+test_a_fault_in_the_tool_is_a_recipes_failure_said_not_a_lost_result (scripts.tests.test_preverify.Setup) ... ok
+test_a_fault_that_ends_a_lane_is_said_and_the_others_go_on (scripts.tests.test_preverify.Setup) ... ok
+test_a_lane_builds_once_however_many_recipes_need_it (scripts.tests.test_preverify.Setup) ... ok
+test_a_lane_told_to_skip_setup_runs_none_of_it (scripts.tests.test_preverify.Setup) ... ok
+test_a_lane_whose_install_fails_stops_and_says_so_while_another_runs_everything (scripts.tests.test_preverify.Setup) ... ok
+test_a_run_says_what_the_lanes_are_doing_every_so_often (scripts.tests.test_preverify.Setup) ... ok
+test_every_lane_installs_and_only_a_lane_that_needs_the_build_builds (scripts.tests.test_preverify.Setup) ... ok
+test_the_callers_signal_handlers_are_put_back (scripts.tests.test_preverify.Setup) ... ok
+test_the_steps_run_in_the_lanes_tree_in_order_and_with_its_environment (scripts.tests.test_preverify.Setup) ... ok
+test_the_toolchain_is_copied_into_the_lanes_and_not_downloaded (scripts.tests.test_preverify.Setup) ... ok
+test_when_no_lane_can_set_up_what_is_left_is_not_run (scripts.tests.test_preverify.Setup) ... ok
+test_the_status_says_what_each_lane_runs_and_how_far_the_queue_is (scripts.tests.test_preverify.Status) ... ok
+test_the_default_steps_are_a_shards (scripts.tests.test_preverify.Steps) ... ok
+Ran 167 tests in 76.171s
+OK
+
+== mutation controls (scripts/preverify_mutations.py)
+
+baseline: 167 passed, 0 failed
+the range for lanes starts below its assignment: KILLED (1 of 8 tests fail)
+the range for lanes ends past its assignment: KILLED (1 of 8 tests fail)
+a lane's incremental builds are the caller's: KILLED (1 of 19 tests fail)
+a lane's cargo output is coloured: KILLED (1 of 20 tests fail)
+a lane's debug builds carry debug info: KILLED (1 of 19 tests fail)
+a lane's test builds carry debug info: KILLED (1 of 20 tests fail)
+a deployment's kiokun data reaches a lane: KILLED (1 of 16 tests fail)
+a deployment's kiokun app reaches a lane: KILLED (1 of 16 tests fail)
+the caller's feed database reaches every recipe: KILLED (1 of 15 tests fail)
+the caller's store database reaches every recipe: KILLED (1 of 15 tests fail)
+the caller's mutant slots reach a lane: KILLED (1 of 16 tests fail)
+the caller's server reuse reaches a lane: KILLED (1 of 16 tests fail)
+a lane's PORT is the caller's: KILLED (1 of 18 tests fail)
+the messages mutation script's ports are the machine's, not the lane's: KILLED (1 of 18 tests fail)
+the notifications mutation script's ports are the machine's, not the lane's: KILLED (1 of 18 tests fail)
+the benchmark harness's ports are the machine's, not the lane's: KILLED (1 of 18 tests fail)
+a lane's processes are marked by another name than the tests look for: KILLED (1 of 17 tests fail)
+a lane's node install may download: KILLED (1 of 35 tests fail)
+a lane's node install may change the lockfile: KILLED (1 of 35 tests fail)
+a lane's build is not locked: KILLED (1 of 35 tests fail)
+a lane's build of the store's pages starts the suite: KILLED (1 of 35 tests fail)
+a lane does not build the keyed store: KILLED (1 of 35 tests fail)
+a lane does not build the feed: KILLED (1 of 35 tests fail)
+a track's push is planned in other shards: KILLED (1 of 27 tests fail)
+every track's push plans what is stale: KILLED (1 of 34 tests fail)
+a failed libtest test is not named: KILLED (1 of 47 tests fail)
+a libtest failure's header is not named: KILLED (1 of 48 tests fail)
+a panic is not named: KILLED (1 of 48 tests fail)
+a failed libtest summary is not named: KILLED (1 of 48 tests fail)
+a Playwright failure's listing is not named: KILLED (1 of 49 tests fail)
+a list reporter's cross is not named: KILLED (1 of 49 tests fail)
+a count of no failures is a failure: KILLED (1 of 49 tests fail)
+a flaky count is not named: KILLED (1 of 49 tests fail)
+an errored unittest is not named: KILLED (1 of 50 tests fail)
+a mutation script's missing anchor is not named: KILLED (1 of 50 tests fail)
+a baseline of no failures is a failure: KILLED (1 of 50 tests fail)
+a compiler error is not named: KILLED (1 of 50 tests fail)
+an indented error is not named: KILLED (1 of 50 tests fail)
+a colour with a semicolon is left in a quoted line: KILLED (1 of 47 tests fail)
+no lanes is a number of lanes: KILLED (1 of 1 tests fail)
+lanes are spaced by a number of the tool's own: KILLED (1 of 2 tests fail)
+the last lane may end a port past the range: KILLED (1 of 7 tests fail)
+the last lane's ports are not counted against the range: KILLED (1 of 7 tests fail)
+the room in the range is counted short: KILLED (1 of 13 tests fail)
+a registry that cannot be read is a traceback: KILLED (1 of 5 tests fail)
+a lane has no cargo jobs where the machine has fewer threads than lanes: KILLED (1 of 6 tests fail)
+the threads are divided among one lane more: KILLED (1 of 6 tests fail)
+the caller's environment reaches a lane whole: KILLED (1 of 15 tests fail)
+a lane's cargo settings are the caller's: KILLED (1 of 19 tests fail)
+a lane's ports are one past its own: KILLED (1 of 18 tests fail)
+a lane builds in its tree, not its target: KILLED (1 of 17 tests fail)
+a lane builds with one cargo job too many: KILLED (1 of 17 tests fail)
+a lane's temporary directory is its tree: KILLED (1 of 17 tests fail)
+what a lane starts is not marked: KILLED (1 of 17 tests fail)
+every recipe is given a database: KILLED (1 of 15 tests fail)
+a database is given under the store's name: KILLED (1 of 15 tests fail)
+the highest reserved port is not checked: KILLED (1 of 11 tests fail)
+the first port of a range is not checked: KILLED (1 of 10 tests fail)
+a port in TIME_WAIT is busy: KILLED (1 of 3 tests fail)
+no port is busy: KILLED (1 of 4 tests fail)
+an untracked file is not a change: KILLED (1 of 108 tests fail)
+recipes named are planned from a range: KILLED (1 of 30 tests fail)
+the range is planned backwards: KILLED (1 of 27 tests fail)
+current evidence is always left out: KILLED (1 of 31 tests fail)
+current evidence is never left out: KILLED (1 of 27 tests fail)
+what is stale is always planned: KILLED (1 of 27 tests fail)
+a plan is dealt in the planner's default shards: KILLED (1 of 27 tests fail)
+a recipe in two shards is run twice: KILLED (1 of 24 tests fail)
+a plan with no plan is read as empty: KILLED (1 of 29 tests fail)
+a planner's refusal is not one: KILLED (1 of 91 tests fail)
+the planner's notes are dropped: KILLED (1 of 95 tests fail)
+the cheapest recipe is taken first: KILLED (1 of 23 tests fail)
+recipes of one cost are taken in the order given: KILLED (1 of 26 tests fail)
+a recipe without a cost is taken as nothing: KILLED (1 of 26 tests fail)
+no recipe needs a database: KILLED (1 of 23 tests fail)
+CI's seconds are not kept with a recipe: KILLED (1 of 23 tests fail)
+a recipe's seconds are read from another tree: KILLED (1 of 103 tests fail)
+a recipe's body is read from another tree: KILLED (1 of 103 tests fail)
+a survivor does not fail a recipe: KILLED (1 of 38 tests fail)
+a failed exit with no survivor passes: KILLED (1 of 36 tests fail)
+a survivor needs both of CI's phrases: KILLED (1 of 40 tests fail)
+a memory bound that stopped nothing is listed: KILLED (1 of 46 tests fail)
+the failing lines are not capped: KILLED (1 of 47 tests fail)
+a failing line is quoted each time it is said: KILLED (1 of 47 tests fail)
+colours are left in the failing lines: KILLED (1 of 47 tests fail)
+what a recipe left running is not said: KILLED (1 of 45 tests fail)
+a recipe that timed out is said interrupted: KILLED (1 of 44 tests fail)
+a recipe with no record passes: KILLED (1 of 44 tests fail)
+a survivor is not read from the evidence: KILLED (1 of 40 tests fail)
+the memory bound is not read from the evidence: KILLED (1 of 62 tests fail)
+an exit is not a failure's reason: KILLED (1 of 36 tests fail)
+five survivors are the reason: KILLED (1 of 40 tests fail)
+a recipe's seconds are not the runner's: KILLED (1 of 39 tests fail)
+a survivor is not weighed in the result: KILLED (1 of 40 tests fail)
+a zombie is alive: KILLED (1 of 86 tests fail)
+a process that is gone is alive: KILLED (1 of 86 tests fail)
+a marker matches as a prefix: KILLED (1 of 81 tests fail)
+a lane's marker is not what is looked for: KILLED (1 of 80 tests fail)
+what a lane left is stopped by SIGTERM alone: KILLED (1 of 84 tests fail)
+what a lane left is killed with no grace: KILLED (1 of 82 tests fail)
+a process stopped is stopped alone, not its group: KILLED (1 of 87 tests fail)
+a process that ignores SIGTERM is never killed: KILLED (1 of 83 tests fail)
+a run stopped from outside waits for its recipes: KILLED (1 of 85 tests fail)
+a recipe has no time limit: KILLED (1 of 85 tests fail)
+a watched process that overstays is left running: KILLED (1 of 85 tests fail)
+the minutes of a stamp run past the hour: KILLED (1 of 65 tests fail)
+the hours of a stamp are not counted: KILLED (1 of 65 tests fail)
+a lane that exists is overwritten: KILLED (1 of 75 tests fail)
+a worktree git does not know is left: KILLED (1 of 78 tests fail)
+a lane's temporary directory is left: KILLED (1 of 78 tests fail)
+lanes to be kept are taken away: KILLED (1 of 155 tests fail)
+a database reaches a lane's setup: KILLED (1 of 128 tests fail)
+a setup command that fails passes: KILLED (1 of 156 tests fail)
+the toolchain is not copied: KILLED (1 of 77 tests fail)
+the toolchain is copied, not linked: KILLED (1 of 79 tests fail)
+a toolchain that cannot be linked is not copied: KILLED (1 of 77 tests fail)
+setup runs in a lane told to skip it: KILLED (1 of 160 tests fail)
+a lane builds again for each recipe: KILLED (1 of 159 tests fail)
+a lane never knows it has built: KILLED (1 of 159 tests fail)
+a database recipe is given no database: KILLED (1 of 128 tests fail)
+what a recipe left running is left: KILLED (1 of 151 tests fail)
+a database recipe is run with no database: KILLED (1 of 149 tests fail)
+every recipe wants a database: KILLED (1 of 149 tests fail)
+every recipe wants the build: KILLED (1 of 163 tests fail)
+a recipe whose lane could not build is lost: KILLED (1 of 156 tests fail)
+a lane whose setup fails does not say so: KILLED (1 of 161 tests fail)
+a lane goes on after the run is stopped: KILLED (1 of 153 tests fail)
+a recipe not run has a block of lines: KILLED (1 of 55 tests fail)
+a failure shows no failing lines: KILLED (1 of 52 tests fail)
+a failure shows the last twenty lines: KILLED (1 of 54 tests fail)
+the summary is not sorted by recipe: KILLED (1 of 60 tests fail)
+a recipe not run is not counted failed: KILLED (1 of 57 tests fail)
+a lane that stopped is not listed: KILLED (1 of 53 tests fail)
+a clean summary has a blank line more: KILLED (1 of 51 tests fail)
+the memory bound is not listed: KILLED (1 of 62 tests fail)
+what a recipe left running is not listed: KILLED (1 of 58 tests fail)
+CI's seconds are not in the table: KILLED (1 of 59 tests fail)
+CI's seconds are counted, not summed: KILLED (1 of 61 tests fail)
+the wall-clock is said in hours: KILLED (1 of 61 tests fail)
+the load at the end is the load at the start: KILLED (1 of 61 tests fail)
+a lane's setup is not said: KILLED (1 of 53 tests fail)
+a failure's lines are not shown: KILLED (1 of 52 tests fail)
+every recipe is named to run again: KILLED (1 of 57 tests fail)
+a run directory is named by a shorter head: KILLED (1 of 33 tests fail)
+any directory is an earlier run's: KILLED (1 of 112 tests fail)
+a previous run's directory is not protected: KILLED (1 of 114 tests fail)
+a run still going is taken from: KILLED (1 of 116 tests fail)
+a run that died holds its directory: KILLED (1 of 122 tests fail)
+a run that died leaves its lanes registered: KILLED (1 of 122 tests fail)
+an older previous run is not replaced: KILLED (1 of 119 tests fail)
+an earlier run is not kept: KILLED (1 of 117 tests fail)
+the disk is read where nothing is: KILLED (1 of 106 tests fail)
+the load is not sampled at the end: KILLED (1 of 73 tests fail)
+the load is not sampled at the start: KILLED (1 of 73 tests fail)
+a base that is no ref is not refused: KILLED (1 of 89 tests fail)
+the default lanes are three: KILLED (1 of 66 tests fail)
+the default base is another ref: KILLED (1 of 66 tests fail)
+current evidence is not left out by default: KILLED (1 of 66 tests fail)
+a lane needs four GiB of disk: KILLED (1 of 67 tests fail)
+a recipe may take an hour: KILLED (1 of 67 tests fail)
+the default ports are one short: KILLED (1 of 67 tests fail)
+the help does not say it is a pre-check only: KILLED (1 of 68 tests fail)
+the module does not say it is no evidence: KILLED (1 of 69 tests fail)
+a one-port range is no range: KILLED (1 of 70 tests fail)
+the last port is out of range: KILLED (1 of 70 tests fail)
+a range past the ports passes: KILLED (1 of 70 tests fail)
+a refusal exits 1: KILLED (1 of 89 tests fail)
+git's failure is a traceback: KILLED (1 of 92 tests fail)
+a train's branch does not plan what is stale: KILLED (1 of 94 tests fail)
+a base is merged though recipes are named: KILLED (1 of 91 tests fail)
+the planner's notes are not shown: KILLED (1 of 95 tests fail)
+nothing to run is a failure: KILLED (1 of 90 tests fail)
+more lanes than recipes are made: KILLED (1 of 97 tests fail)
+a plan starts a run: KILLED (1 of 95 tests fail)
+a dirty tree is run: KILLED (1 of 104 tests fail)
+the changes shown are not tidied: KILLED (1 of 104 tests fail)
+more than five changes are not counted: KILLED (1 of 110 tests fail)
+ports in use are run on: KILLED (1 of 113 tests fail)
+the disk is counted for one lane: KILLED (1 of 121 tests fail)
+an earlier run is not moved aside: KILLED (1 of 106 tests fail)
+a tree with no toolchain is not told so: KILLED (1 of 106 tests fail)
+the lanes are given the machine's threads each: KILLED (1 of 131 tests fail)
+the database is not read from the caller: KILLED (1 of 129 tests fail)
+the lanes set up though told not to: KILLED (1 of 154 tests fail)
+every lane listens on the first lane's ports: KILLED (1 of 131 tests fail)
+the lanes take the recipes cheapest first: KILLED (1 of 139 tests fail)
+a signal does not stop the lanes: KILLED (1 of 153 tests fail)
+a run does not write its pid: KILLED (1 of 153 tests fail)
+a run leaves its pid behind: KILLED (1 of 153 tests fail)
+the caller's signal handlers are not put back: KILLED (1 of 164 tests fail)
+lanes to be kept are taken away at the end of a run: KILLED (1 of 155 tests fail)
+a run does not say it takes the lanes away: KILLED (1 of 135 tests fail)
+what is left in the queue is lost: KILLED (1 of 153 tests fail)
+a signal is not said: KILLED (1 of 121 tests fail)
+the status is never said: KILLED (1 of 162 tests fail)
+the wall-clock is the clock's: KILLED (1 of 147 tests fail)
+a run's plan is not kept: KILLED (1 of 117 tests fail)
+a run's summary is not kept: KILLED (1 of 133 tests fail)
+a failed recipe is not a failed run: KILLED (1 of 64 tests fail)
+a lane that stopped is not a failed run: KILLED (1 of 64 tests fail)
+a run stopped from outside is not a failed run: KILLED (1 of 64 tests fail)
+the status names no lane: KILLED (1 of 63 tests fail)
+the status counts only the recipes that failed, not those not run: KILLED (1 of 63 tests fail)
+a fault in a lane ends it unsaid: KILLED (1 of 158 tests fail)
+a fault in a recipe's run loses its result: KILLED (1 of 157 tests fail)
+evidence the runner did not copy passes: KILLED (1 of 43 tests fail)
+a second run takes the ports a run holds: KILLED (1 of 126 tests fail)
+the lock does not name its owner: KILLED (1 of 126 tests fail)
+every range of ports shares one lock: KILLED (1 of 125 tests fail)
+a run holds no ports: KILLED (1 of 127 tests fail)
+the plan is not said as CI would be asked it: KILLED (1 of 100 tests fail)
+the plan is said with the caller's interpreter: KILLED (1 of 100 tests fail)
+a directory named relatively is kept relative: KILLED (1 of 22 tests fail)
+a run interrupted before its lanes exist is a traceback: KILLED (does not run)
+verify.yml plans a track's push in other shards: KILLED (1 of 34 tests fail)
+verify.yml plans a track's push with no regard to its evidence: KILLED (1 of 34 tests fail)
+verify.yml asks for what is stale on every track: KILLED (1 of 34 tests fail)
+verify.yml's merge base is another ref: KILLED (1 of 34 tests fail)
+verify.yml's Build step is not locked: KILLED (1 of 35 tests fail)
+verify.yml's Build step builds one thing more: KILLED (1 of 35 tests fail)
+verify.yml's cargo is incremental: KILLED (1 of 20 tests fail)
+the recipe takes a base and flags, not the tool's arguments: KILLED (1 of 71 tests fail)
+the recipe joins its arguments into one: KILLED (1 of 71 tests fail)
+the tool names the repository it was written for: KILLED (1 of 72 tests fail)
+the recipe asks GitHub before it runs: KILLED (1 of 71 tests fail)
+225 of 225 mutants killed
+memory bound: no process was stopped
