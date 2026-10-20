@@ -334,11 +334,11 @@ file alone (`scripts/ci_plan.py` as `recipes_for` reads a file's hunks):
 - **Not claimed.** A run on a GitHub runner: its speed-up, its disk and its
   4 vCPUs are not measured here; the numbers are the PC's. That every script
   is as much quicker: a script of few mutants gains little (the baseline
-  costs the same), one whose mutants reach a crate's every function more
-  than one that reaches a line. That incremental compilation cannot change a
-  verdict: the same 34 of 34 verdicts is one script's, and the 69 mutation
-  controls of this track ran with it on in CI-shaped environments only as
-  tests (the verify run is the evidence). The release-like profiles are not
+  costs the same), and a mutant in a crate's root rebuilds more of it than
+  one in a leaf. That incremental compilation cannot change a
+  verdict: the same 34 of 34 verdicts are one script's, and the verify run
+  with the step on is the evidence for the 273 others, as it is for every
+  recipe. The release-like profiles are not
   built incrementally, so the wasm bytes the browser suites load are as they
   were.
 
