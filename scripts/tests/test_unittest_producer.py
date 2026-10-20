@@ -211,14 +211,14 @@ class ActualProducers(unittest.TestCase):
                 'suite=loader.discover("scripts/tests",pattern="test_mutation_slot*.py"); '
                 'suite.addTests(loader.loadTestsFromName("scripts.tests.test_unittest_producer")); '
                 'result=unittest.TextTestRunner(verbosity=1).run(suite); '
-                'assert result.testsRun==164 and len(result.skipped)==81, (result.testsRun,len(result.skipped)); '
-                'assert result.testsRun-len(result.skipped)==83; '
-                'print("ordinary discovery: 164 methods, 83 passed, 81 explicit Linux skips"); '
+                'assert result.testsRun==165 and len(result.skipped)==81, (result.testsRun,len(result.skipped)); '
+                'assert result.testsRun-len(result.skipped)==84; '
+                'print("ordinary discovery: 165 methods, 84 passed, 81 explicit Linux skips"); '
                 'sys.exit(0 if result.wasSuccessful() else 1)')
         output = self.folder / 'nonlinux-discovery.txt'
         status = harness.execute([sys.executable, '-B', '-c', code], output, self.env, bound=30)
         self.assertEqual(status, 0, output.read_text())
-        self.assertIn('83 passed, 81 explicit Linux skips', output.read_text())
+        self.assertIn('84 passed, 81 explicit Linux skips', output.read_text())
 
     def test_preexisting_report_is_never_reused(self):
         report = self.folder / 'report.json'; report.write_text('old bytes')
