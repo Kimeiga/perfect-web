@@ -553,9 +553,15 @@ atexit.register(verify)
         self.assertTrue(any('unmatched captured exception' in reason for reason in __import__('json').loads(text)['refusals']))
 
     def test_suppressed_subtest_exception_without_callback_is_refused(self):
-        source = ('class Filter(list):\n def append(self,item):\n'
-                  '  if not isinstance(item[0],unittest.case._SubTest): super().append(item)\n'
-                  'class Case(unittest.TestCase):\n def setUp(self): self._outcome.errors=Filter(self._outcome.errors)\n'
+        # The subtest's failure is kept from the result's `addSubTest`, which
+        # every Python's unittest calls with it: 3.10 from `_Outcome.errors`,
+        # 3.11 and later from the part executor (they have no `errors`, so a
+        # filter of it, as this fixture was until train-11, raised in setUp on
+        # CI's Python 3.12 and was refused for that instead).
+        source = ('class Case(unittest.TestCase):\n def setUp(self):\n  result=self._outcome.result\n'
+                  '  add=result.addSubTest\n'
+                  '  def suppressed(test,subtest,err):\n   if err is None: add(test,subtest,err)\n'
+                  '  result.addSubTest=suppressed\n'
                   ' def test_body(self):\n  with self.subTest(): self.fail("suppressed subtest")\n  self.fail("body")\n')
         result, status, text, log = self.direct_fixture(source)
         self.assertEqual(result, (False, 0, 0), log.read_text())
