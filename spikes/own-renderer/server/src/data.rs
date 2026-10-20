@@ -157,6 +157,30 @@ pub(crate) trait DataLayer: Send + Sync {
         None
     }
 
+    /// **This host's reader of the other hosts' commits** (ADR-XXXX, track
+    /// `second-host`), where the layer's database is shared: the outbox read
+    /// from the host's cursor. A layer in memory is one host by definition,
+    /// its data the process's, and has none.
+    fn tail(&self) -> Option<&crate::hosts::Tail> {
+        None
+    }
+
+    /// **This host's instance on the database it shares** (track
+    /// `second-host`, the integrator's ruling 1 of 2026-10-20), which every
+    /// page number it gives carries, so that hosts number their pages apart.
+    /// A layer in memory is one host by definition, and has none.
+    fn instance(&self) -> Option<u64> {
+        None
+    }
+
+    /// **Where its sessions and sign-ins are kept beyond the host's memory**
+    /// (ADR-XXXX, track `second-host`): its database, where the hosts share
+    /// one, so a restarted host or another keeps a reader signed in. A layer
+    /// in memory keeps them in the host's, as long as it runs.
+    fn sessions(&self) -> Option<Arc<dyn crate::identity::Kept>> {
+        None
+    }
+
     /// **Every operation it supplies**, read from the functions it builds,
     /// not from a list kept beside them.
     fn operations(&self) -> BTreeSet<String> {

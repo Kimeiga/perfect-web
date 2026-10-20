@@ -61,6 +61,16 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "0009_schedules",
         include_str!("../migrations/feed/0009_schedules.sql"),
     ),
+    // Track `second-host` (ADR-XXXX): the outbox a log every host reads.
+    (
+        "0010_outbox_log",
+        include_str!("../migrations/feed/0010_outbox_log.sql"),
+    ),
+    // Track `second-host` (ADR-XXXX): sessions and sign-ins kept.
+    (
+        "0011_sessions",
+        include_str!("../migrations/feed/0011_sessions.sql"),
+    ),
 ];
 
 /// **How a command's transaction is opened.** The layer sets serializable on
@@ -896,6 +906,15 @@ pub(crate) struct FeedPg {
     /// Each session's principal (track `identity`): whom a session writes
     /// as. Until the server hands its own, every session is its own guest.
     principals: std::sync::RwLock<Principals>,
+    /// **This host's reader of the outbox** (ADR-XXXX): every other host's
+    /// commits, from its cursor; and its id, which its own rows carry.
+    tail: crate::hosts::Tail,
+    /// **Its sessions and sign-ins, kept where the hosts share them**
+    /// (ADR-XXXX).
+    sessions: Arc<crate::hosts::SessionsPg>,
+    /// **This host's instance on the database** (ADR-XXXX), which its page
+    /// numbers carry.
+    instance: u64,
 }
 
 impl FeedPg {
@@ -931,11 +950,17 @@ impl FeedPg {
         }
         let mut c = pool.connect()?;
         migrate(&mut c)?;
-        // What a host that stopped between a commit and its delivery left in
-        // the outbox: a host just opened keeps no answer it could make stale,
-        // and has no open session to tell.
-        c.batch_execute("DELETE FROM outbox").map_err(pg)?;
+        // **The outbox is every host's** (ADR-XXXX): a host just opened
+        // reads it from its highest id, and deletes nothing another host
+        // has yet to read. Until then it deleted the outbox, a second host's
+        // undelivered rows among it.
+        let outbox = crate::hosts::Outbox::current(&mut c)?;
+        let highest = crate::hosts::highest(&mut c)?;
+        let instance = crate::hosts::instance(&mut c)?;
         pool.give(c);
+        let host = crate::hosts::new_host();
+        let sessions = Arc::new(crate::hosts::SessionsPg::new(url, &outbox.schema));
+        let tail = crate::hosts::Tail::at(url, outbox, &host, highest);
         Ok(FeedPg {
             pool,
             renders: Renders::new(url, schema, seats),
@@ -943,6 +968,9 @@ impl FeedPg {
             writes: crate::data::Writes::new(),
             uploaded: std::sync::OnceLock::new(),
             principals: std::sync::RwLock::new(Principals::default()),
+            tail,
+            sessions,
+            instance,
         })
     }
 }
@@ -1028,6 +1056,10 @@ pub(crate) struct Staging<'a> {
     /// collected once it commits where no post names it (ADR-0261).
     leases: Option<crate::uploads::Leases>,
     released: Arc<Mutex<Vec<String>>>,
+    /// The schema's outbox, which its rows are ordered in, and this host's
+    /// id, which they carry (ADR-XXXX).
+    outbox: &'a crate::hosts::Outbox,
+    host: &'a str,
 }
 
 impl crate::data::Staged for Staging<'_> {
@@ -1055,9 +1087,20 @@ impl crate::data::Staged for Staging<'_> {
         let c = conn
             .as_mut()
             .ok_or("the command's transaction did not open")?;
+        // Track `uploads`: a post's image in the deployment's blob storage
+        // before its row commits, so no committed post names bytes the
+        // deployment does not have.
+        self.claims.lock().expect("claims").keep()?;
+        // **The interaction's answer, with the writes** (ADR-0325).
+        if let Some(r) = interaction {
+            record(c, r)?;
+        }
+        // **And the runs it scheduled, or cancelled** (the
+        // scheduled-commands track).
+        crate::schedules::pg::write(c, scheduled).map_err(pg)?;
         // What the command handed the outbox, in its transaction: an
         // invalidated entry's `_` as `null` (ADR-0256).
-        let handed = events
+        let handed: Vec<_> = events
             .iter()
             .map(|(name, values)| {
                 (
@@ -1070,15 +1113,23 @@ impl crate::data::Staged for Staging<'_> {
                 invalidated
                     .iter()
                     .map(|(name, values)| ("invalidation", name, values.clone())),
-            );
+            )
+            .collect();
+        // **Last, and in commit order** (ADR-XXXX): the outbox's lock, held
+        // to the commit's end, before its rows take their ids, so every host
+        // reads them in the order the commits were made; and each host
+        // listening woken at the commit.
+        if !handed.is_empty() {
+            crate::hosts::ordered(c, self.outbox).map_err(pg)?;
+        }
         let mut ids: Vec<i64> = Vec::new();
         for (kind, name, values) in handed {
             let args = json_of(name, &values)?;
             let row = c
                 .query_one(
-                    "INSERT INTO outbox (kind, name, args) VALUES ($1, $2, $3::text::jsonb) \
-                     RETURNING id",
-                    &[&kind, name, &args],
+                    "INSERT INTO outbox (kind, name, args, host) \
+                     VALUES ($1, $2, $3::text::jsonb, $4) RETURNING id",
+                    &[&kind, name, &args, &self.host],
                 )
                 .map_err(pg)?;
             ids.push(row.get(0));
@@ -1086,17 +1137,6 @@ impl crate::data::Staged for Staging<'_> {
         // The writes and the outbox's rows, at once or not at all. A commit
         // the database refuses (a serialization failure, a deferred
         // constraint) has rolled back, and nothing is delivered.
-        // Track `uploads`: a post's image in the deployment's blob storage
-        // before its row commits, so no committed post names bytes the
-        // deployment does not have.
-        self.claims.lock().expect("claims").keep()?;
-        // **The interaction's answer, with the writes** (ADR-0325).
-        if let Some(r) = interaction {
-            record(c, r)?;
-        }
-        // **And the runs it scheduled, or cancelled** (the
-        // scheduled-commands track).
-        crate::schedules::pg::write(c, scheduled).map_err(pg)?;
         c.batch_execute("COMMIT").map_err(pg)?;
         self.committed = true;
         // Track `uploads`: each lease the command committed or discarded
@@ -1119,8 +1159,8 @@ impl crate::data::Staged for Staging<'_> {
         match delivered(c, &ids) {
             Ok(read) => Ok(Some(read)),
             // Committed, and not read back: what it handed is what
-            // committed. Its rows stay, consumed when a host next opens the
-            // database; the command is not answered as refused.
+            // committed, and the other hosts read its rows from their
+            // cursors; the command is not answered as refused.
             Err(why) => {
                 eprintln!("pw dev server: the feed's outbox was not read back: {why}");
                 Ok(Some((events.to_vec(), invalidated.to_vec())))
@@ -1170,19 +1210,31 @@ fn names_blob(c: &mut Client, key: &str) -> Result<bool, postgres::Error> {
     .map(|row| row.get(0))
 }
 
-/// **What the outbox committed, read back and consumed**: what is delivered
-/// is what was committed, and nothing else.
+/// **What the outbox committed, read back**: what is delivered is what was
+/// committed, and nothing else. Its rows are kept for the other hosts on
+/// the database, which read them from their cursors, until they are trimmed
+/// (ADR-XXXX, `hosts.rs`); until then a delivery consumed them, and a second
+/// host heard nothing.
 pub(crate) fn delivered(c: &mut Client, ids: &[i64]) -> Result<Outboxed, String> {
     let rows = c
         .query(
-            "DELETE FROM outbox WHERE id = ANY($1) RETURNING id, kind, name, args::text",
+            "SELECT id, kind, name, args::text FROM outbox WHERE id = ANY($1)",
             &[&ids],
         )
         .map_err(pg)?;
-    let mut read: Vec<(i64, String, String, String)> = rows
-        .iter()
-        .map(|r| (r.get(0), r.get(1), r.get(2), r.get(3)))
-        .collect();
+    outboxed_of(
+        rows.iter()
+            .map(|r| (r.get(0), r.get(1), r.get(2), r.get(3)))
+            .collect(),
+    )
+}
+
+/// **The outbox's rows as what was handed it**: each row's id, kind, name
+/// and values, in the order of their ids, the events and then the
+/// invalidated entries.
+pub(crate) fn outboxed_of(
+    mut read: Vec<(i64, String, String, String)>,
+) -> Result<Outboxed, String> {
     read.sort();
     let (mut emitted, mut dropped) = (Vec::new(), Vec::new());
     for (_, kind, name, args) in read {
@@ -1333,6 +1385,18 @@ impl crate::data::DataLayer for FeedPg {
 
     fn runs(&self) -> Option<&dyn crate::schedules::Runs> {
         Some(self)
+    }
+
+    fn tail(&self) -> Option<&crate::hosts::Tail> {
+        Some(&self.tail)
+    }
+
+    fn sessions(&self) -> Option<Arc<dyn crate::identity::Kept>> {
+        Some(self.sessions.clone())
+    }
+
+    fn instance(&self) -> Option<u64> {
+        Some(self.instance)
     }
 
     fn identified_by(&self, principals: Principals) {
@@ -1675,6 +1739,8 @@ impl crate::data::DataLayer for FeedPg {
             claims,
             leases,
             released,
+            outbox: self.tail.outbox(),
+            host: self.tail.host(),
         })
     }
 

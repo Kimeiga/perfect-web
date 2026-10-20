@@ -165,6 +165,8 @@ NEEDS_DATABASE = {
     # Track `argument-invariants` (ADR-0346): a row on PostgreSQL held to
     # its type's invariant, run where a database is named.
     "e14-argument-invariants",
+    # Track `second-host`: hosts that share one database.
+    "e14-second-host",
 }
 
 EVIDENCE_RECIPE = re.compile(r"^e[0-9]+-[a-z0-9-]+$")

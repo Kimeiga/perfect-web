@@ -50,6 +50,7 @@ import 'just/guide-producer.just'
 import 'just/preverify.just'
 import 'just/todomvc.just'
 import 'just/device-store.just'
+import 'just/second-host.just'
 
 default:
     @just --list

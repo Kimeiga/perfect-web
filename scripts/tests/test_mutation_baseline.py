@@ -452,8 +452,8 @@ class KeepsABaselinesBrowserRun(unittest.TestCase):
 class EveryCallOfExplain(unittest.TestCase):
     """`explain()` keeps the output of the last command a script ran where it
     was a browser run that failed, so a script that calls it after a MUTANT's
-    browser run would keep a control's intended failure. 278 of the 292 calls
-    follow the baseline's own red print; these fourteen are the others, each a
+    browser run would keep a control's intended failure. 286 of the 301 calls
+    follow the baseline's own red print; these fifteen are the others, each a
     red baseline in its own words (one suite's, or after the output it
     printed) or a call with a command last that is no mutant's browser run (a
     producer refused, a build, the restored source's own check). Train-11
@@ -461,7 +461,10 @@ class EveryCallOfExplain(unittest.TestCase):
     kiokun-cache's, the render merge's, the skipped specs' guard's; and with
     check-is-build and guide-producer-validity build_id's and refusal's
     restored-suite checks, held_labels' refused producer, a cargo run, and the
-    guide producer's red baseline), each read for that."""
+    guide producer's red baseline), and train-12 one (the second host's: its
+    mutant's producer refused, a build that failed or a run past its bound,
+    whose output is what the refusal says, never a kill's), each read for
+    that."""
 
     OTHERS = {
         ("bounded_statements_mutations.py", "REFUSED (invalid or stopped Cargo producer; no kill)"),
@@ -476,6 +479,7 @@ class EveryCallOfExplain(unittest.TestCase):
         ("proof_mutations.py", "pw does not build unmutated"),
         ("refusal_mutations.py", "the restored browser suite is not green"),
         ("render_merge_mutations.py", "REFUSED (invalid or stopped Cargo producer; no kill)"),
+        ("second_host_mutations.py", "REFUSED (invalid or stopped producer; no kill)"),
         ("skipped_specs_mutations.py", "REFUSED (the tests errored or said no count; no kill)"),
         ("store_hours_mutations.py", "REFUSED (invalid or stopped Cargo producer; no kill)"),
     }

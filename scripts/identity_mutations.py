@@ -47,16 +47,15 @@ MUTANTS = [
     (
         "a sign-in leaves the session it replaced signed in",
         IDENTITY,
-        "        self.principals.close(session);\n"
-        "        self.principals.open(&rotated, principal.clone());\n",
-        "        self.principals.open(&rotated, principal.clone());\n",
+        "            .sign_out(session)\n"
+        "            .and_then(|()| self.principals.sign_in(&rotated, principal.clone()))\n",
+        "            .sign_in(&rotated, principal.clone())\n",
     ),
     (
         "signing out leaves the session signed in",
         IDENTITY,
-        "    fn sign_out(&self, session: &str) -> Reply {\n"
-        "        self.principals.close(session);\n",
-        "    fn sign_out(&self, session: &str) -> Reply {\n",
+        "        if let Err(why) = self.principals.sign_out(session) {\n",
+        "        if let Err(why) = Ok::<(), String>(()) {\n",
     ),
     (
         "a callback is not bound to the browser that started it (login CSRF)",

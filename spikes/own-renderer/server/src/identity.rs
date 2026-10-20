@@ -273,12 +273,170 @@ impl Principal {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 struct PrincipalsInner {
     /// The accounts model: a session is signed in only where a sign-in put
     /// it in `sessions`. Otherwise every session is its own guest.
     accounts: AtomicBool,
-    sessions: RwLock<HashMap<String, Principal>>,
+    sessions: RwLock<HashMap<String, Held>>,
+    /// TRACK SEAM (second-host): **where sessions are kept beyond this
+    /// host's memory** (ADR-XXXX), the database the hosts share, where the
+    /// data layer has one. `sessions` is then each request's copy of it.
+    kept: OnceLock<Arc<dyn Kept>>,
+    /// TRACK SEAM (second-host): **how long a session lives**, idle and in
+    /// all (the integrator's ruling 2 of 2026-10-20 on this track), as the
+    /// deployment states them.
+    lifetimes: RwLock<SessionLifetimes>,
+}
+
+/// **A session's principal as this host holds it**, and when it was opened
+/// and last used here, by which a session in this host's memory alone
+/// expires (ADR-XXXX). Where sessions are kept beyond the host, the
+/// database's clock decides, and this is each request's copy.
+#[derive(Debug)]
+struct Held {
+    principal: Principal,
+    opened: std::time::Instant,
+    /// Milliseconds after `opened` it was last used.
+    seen: std::sync::atomic::AtomicU64,
+}
+
+impl Held {
+    fn new(principal: Principal) -> Held {
+        Held {
+            principal,
+            opened: std::time::Instant::now(),
+            seen: std::sync::atomic::AtomicU64::new(0),
+        }
+    }
+
+    /// Past its lifetime, or idle past its idle time, now.
+    fn expired(&self, lifetimes: &SessionLifetimes) -> bool {
+        let age = self.opened.elapsed();
+        let seen = Duration::from_millis(self.seen.load(Ordering::SeqCst));
+        age > lifetimes.absolute || age.saturating_sub(seen) > lifetimes.idle
+    }
+
+    /// Used now.
+    fn touch(&self) {
+        let age = u64::try_from(self.opened.elapsed().as_millis()).unwrap_or(u64::MAX);
+        self.seen.store(age, Ordering::SeqCst);
+    }
+}
+
+impl std::fmt::Debug for PrincipalsInner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PrincipalsInner")
+            .field("accounts", &self.accounts)
+            .field("sessions", &self.sessions)
+            .field("kept", &self.kept.get().is_some())
+            .field("lifetimes", &self.lifetimes)
+            .finish()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TRACK SEAM (second-host): how long a session lives
+// ---------------------------------------------------------------------------
+
+/// **How long a session lives** (the integrator's ruling 2 of 2026-10-20 on
+/// track second-host; OWASP's Session Management Cheat Sheet asks both): an
+/// idle timeout, past which a session unused is signed out, and an absolute
+/// lifetime, past which it is signed out however it is used. A deployment's
+/// settings (`PW_SESSION_IDLE`, `PW_SESSION_LIFETIME`, whole seconds),
+/// [`SessionLifetimes::default`]'s where it says nothing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct SessionLifetimes {
+    pub(crate) idle: Duration,
+    pub(crate) absolute: Duration,
+}
+
+/// A day.
+const DAY: Duration = Duration::from_secs(24 * 60 * 60);
+
+impl Default for SessionLifetimes {
+    /// Fourteen days idle and sixty in all, as the integrator ruled.
+    fn default() -> SessionLifetimes {
+        SessionLifetimes {
+            idle: DAY * 14,
+            absolute: DAY * 60,
+        }
+    }
+}
+
+impl SessionLifetimes {
+    /// **The lifetimes as the deployment states them**: `idle`, the value
+    /// of `PW_SESSION_IDLE`, and `absolute`, of `PW_SESSION_LIFETIME`, each
+    /// whole seconds, one at least, and its default where unset or empty.
+    /// Anything else is refused, by name, so a host does not start on a
+    /// setting it cannot read (as `PW_RENDER_SEATS` is).
+    pub(crate) fn stated(
+        idle: Option<&str>,
+        absolute: Option<&str>,
+    ) -> Result<SessionLifetimes, String> {
+        let mut stated = SessionLifetimes::default();
+        for (name, value, into) in [
+            ("PW_SESSION_IDLE", idle, &mut stated.idle),
+            ("PW_SESSION_LIFETIME", absolute, &mut stated.absolute),
+        ] {
+            if let Some(v) = value.filter(|v| !v.is_empty()) {
+                *into = match v.parse::<u64>() {
+                    Ok(n) if n >= 1 => Duration::from_secs(n),
+                    _ => {
+                        return Err(format!(
+                            "{name}={v} is not a count of seconds, one at least"
+                        ));
+                    }
+                };
+            }
+        }
+        Ok(stated)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TRACK SEAM (second-host): sessions kept where the hosts share them
+// ---------------------------------------------------------------------------
+
+/// **A secret as it is kept**: its SHA-256, never the secret (ADR-XXXX). A
+/// session's id (128 bits from the operating system) and a sign-in's state
+/// (256) are past any guess, so a fast hash is enough: a copy of what is
+/// kept opens no session and completes no sign-in. A password, which a
+/// person chose, is the slow hash's (ADR-0258's Argon2id).
+pub(crate) fn kept_hash(secret: &str) -> Vec<u8> {
+    use sha2::Digest;
+    sha2::Sha256::digest(secret.as_bytes()).to_vec()
+}
+
+/// **Where a deployment keeps its sessions and its sign-ins under way**
+/// beyond one host's memory (ADR-XXXX, track `second-host`): the database
+/// its hosts share, so that a host restarted, or another one, knows the
+/// reader a sign-in made, and a sign-in begun on one host completes on
+/// another. Each by its secret's [`kept_hash`].
+pub(crate) trait Kept: Send + Sync {
+    /// The principal of the session whose id hashes to `hash`, or none: none
+    /// past `lifetimes` (the database's clock), and such a session signed
+    /// out where it is kept. Its use recorded.
+    fn session(
+        &self,
+        hash: &[u8],
+        lifetimes: &SessionLifetimes,
+    ) -> Result<Option<Principal>, String>;
+    /// A session opened for `principal`.
+    fn open(&self, hash: &[u8], principal: &Principal) -> Result<(), String>;
+    /// A session closed: no one from now on.
+    fn close(&self, hash: &[u8]) -> Result<(), String>;
+    /// A sign-in begun: its nonce and its PKCE verifier, which the token
+    /// request needs as they are.
+    fn begin_sign_in(&self, hash: &[u8], nonce: &str, verifier: &str) -> Result<(), String>;
+    /// A sign-in's nonce and verifier, and how long ago it began, taken: it
+    /// completes once.
+    fn take_sign_in(&self, hash: &[u8]) -> Result<Option<(String, String, Duration)>, String>;
+    /// The statements it ran, which a test counts.
+    #[cfg(test)]
+    fn ran(&self) -> u64 {
+        0
+    }
 }
 
 /// **A session open on a reader's behalf**, closed when it goes.
@@ -319,8 +477,20 @@ impl Principals {
         if session.is_empty() {
             return None;
         }
-        if let Some(p) = self.0.sessions.read().expect("principals").get(session) {
-            return Some(p.clone());
+        let lifetimes = self.lifetimes();
+        let expired = match self.0.sessions.read().expect("principals").get(session) {
+            Some(held) if !held.expired(&lifetimes) => {
+                held.touch();
+                return Some(held.principal.clone());
+            }
+            Some(_) => true,
+            None => false,
+        };
+        // TRACK SEAM (second-host): **a session past its lifetimes is signed
+        // out** (ADR-XXXX), here as where it is kept: it is no one, or its
+        // own guest in the guest model, from now on.
+        if expired {
+            self.close(session);
         }
         (!self.0.accounts.load(Ordering::SeqCst)).then(|| Principal::guest(session))
     }
@@ -338,11 +508,81 @@ impl Principals {
             .sessions
             .write()
             .expect("principals")
-            .insert(session.to_string(), principal);
+            .insert(session.to_string(), Held::new(principal));
+    }
+
+    /// TRACK SEAM (second-host): **how long its sessions live**, as the
+    /// deployment states them (ADR-XXXX), set where the host starts.
+    pub(crate) fn expire_after(&self, lifetimes: SessionLifetimes) {
+        *self.0.lifetimes.write().expect("lifetimes") = lifetimes;
+    }
+
+    /// How long its sessions live.
+    pub(crate) fn lifetimes(&self) -> SessionLifetimes {
+        *self.0.lifetimes.read().expect("lifetimes")
     }
 
     fn close(&self, session: &str) {
         self.0.sessions.write().expect("principals").remove(session);
+    }
+
+    /// TRACK SEAM (second-host): **sessions kept in `kept`** (ADR-XXXX),
+    /// handed once, when the server is built on a layer that has one.
+    pub(crate) fn keep_in(&self, kept: Arc<dyn Kept>) {
+        let _ = self.0.kept.set(kept);
+    }
+
+    /// Where sessions are kept beyond this host's memory, where they are.
+    pub(crate) fn kept(&self) -> Option<Arc<dyn Kept>> {
+        self.0.kept.get().cloned()
+    }
+
+    /// TRACK SEAM (second-host): **`session` as it is kept, read once for a
+    /// request** (ADR-XXXX): signed in on another host, or by this one
+    /// before it restarted, it is signed in here; signed out anywhere, or
+    /// past its lifetimes on the database's clock, it is no one here. One
+    /// statement, in the accounts model where sessions are kept; nothing
+    /// otherwise. A read that fails signs the request out: it is no one
+    /// rather than someone it may no longer be.
+    pub fn refresh(&self, session: &str) {
+        let Some(kept) = self.0.kept.get() else {
+            return;
+        };
+        if !self.0.accounts.load(Ordering::SeqCst)
+            || session.is_empty()
+            || session.starts_with(ON_BEHALF)
+        {
+            return;
+        }
+        match kept.session(&kept_hash(session), &self.lifetimes()) {
+            Ok(Some(principal)) => self.open(session, principal),
+            Ok(None) => self.close(session),
+            Err(why) => {
+                eprintln!("pw dev server: a session was not read: {why}");
+                self.close(session);
+            }
+        }
+    }
+
+    /// **`session` signed in as `principal`**: kept first where sessions are
+    /// kept, so that no host knows a sign-in the others cannot.
+    fn sign_in(&self, session: &str, principal: Principal) -> Result<(), String> {
+        if let Some(kept) = self.0.kept.get() {
+            kept.open(&kept_hash(session), &principal)?;
+        }
+        self.open(session, principal);
+        Ok(())
+    }
+
+    /// **`session` signed out**: no one wherever it is kept, then here.
+    fn sign_out(&self, session: &str) -> Result<(), String> {
+        if let Some(kept) = self.0.kept.get()
+            && !session.is_empty()
+        {
+            kept.close(&kept_hash(session))?;
+        }
+        self.close(session);
+        Ok(())
     }
 
     /// **A session the platform opens on a reader's behalf** (NEXT 6c, step
@@ -377,6 +617,45 @@ impl Principals {
     #[cfg(test)]
     pub fn signed_in(&self) -> usize {
         self.0.sessions.read().expect("principals").len()
+    }
+
+    /// TRACK SEAM (second-host): `session` held as `principal`, opened
+    /// `opened_ago` and last used `seen_after` after it was opened, as a
+    /// test ages a session in this host's memory alone.
+    #[cfg(test)]
+    pub(crate) fn held_for_test(
+        &self,
+        session: &str,
+        principal: Principal,
+        opened_ago: Duration,
+        seen_after: Duration,
+    ) {
+        let held = Held {
+            principal,
+            opened: std::time::Instant::now()
+                .checked_sub(opened_ago)
+                .expect("the host has run that long"),
+            seen: std::sync::atomic::AtomicU64::new(
+                u64::try_from(seen_after.as_millis()).unwrap_or(u64::MAX),
+            ),
+        };
+        self.0
+            .sessions
+            .write()
+            .expect("principals")
+            .insert(session.to_string(), held);
+    }
+
+    /// When `session` was last used, after it was opened, as this host
+    /// holds it; none where it holds it not.
+    #[cfg(test)]
+    pub(crate) fn seen_for_test(&self, session: &str) -> Option<Duration> {
+        self.0
+            .sessions
+            .read()
+            .expect("principals")
+            .get(session)
+            .map(|h| Duration::from_millis(h.seen.load(Ordering::SeqCst)))
     }
 }
 
@@ -589,19 +868,23 @@ impl Identity {
     /// **`session` signed in as `user`, without the flow** (track
     /// `notifications`): the accounts model, a test's principal, so a test
     /// holds one user in two sessions and another user beside them. The
-    /// flow itself is `tests/sign_in.rs`'s to hold.
+    /// flow itself is `tests/sign_in.rs`'s to hold. Kept where the hosts
+    /// keep sessions, as a sign-in's is (ADR-XXXX): a request reads its
+    /// session from there, and would find no one.
     #[cfg(test)]
     pub fn signed_in_for_test(&self, session: &str, user: &str, name: &str) {
         self.principals.set_accounts(true);
-        self.principals.open(
-            session,
-            Principal {
-                user: user.to_string(),
-                handle: format!("@{user}"),
-                name: name.to_string(),
-                issuer: "https://id.example.test".to_string(),
-            },
-        );
+        self.principals
+            .sign_in(
+                session,
+                Principal {
+                    user: user.to_string(),
+                    handle: format!("@{user}"),
+                    name: name.to_string(),
+                    issuer: "https://id.example.test".to_string(),
+                },
+            )
+            .expect("signed in where sessions are kept");
     }
 
     /// **A request the identity track answers**, before any other route.
@@ -668,7 +951,20 @@ impl Identity {
         };
         let (state, nonce, verifier) = (token(), token(), token());
         let challenge = s256(&verifier);
-        {
+        // TRACK SEAM (second-host): kept where the hosts share it, so that
+        // the callback completes it on whichever host it reaches.
+        if let Some(kept) = self.principals.kept() {
+            if let Err(why) = kept.begin_sign_in(&kept_hash(&state), &nonce, &verifier) {
+                return Some(Reply::page(
+                    503,
+                    "Sign-in not started",
+                    &format!(
+                        "<p role=\"alert\">Sign-in could not start: {}.</p>",
+                        escape(&why)
+                    ),
+                ));
+            }
+        } else {
             let mut pending = accounts.pending.lock().expect("pending");
             pending.retain(|_, p| p.started.elapsed() < SIGN_IN_LIFETIME);
             pending.insert(
@@ -737,10 +1033,29 @@ impl Identity {
         if state.is_empty() || !same(&state, &bound) {
             return Some(refused("it was not started by this browser"));
         }
-        let Some(pending) = accounts.pending.lock().expect("pending").remove(&state) else {
+        // TRACK SEAM (second-host): taken from where the hosts keep it,
+        // once, whichever host began it.
+        let taken = match self.principals.kept() {
+            Some(kept) => match kept.take_sign_in(&kept_hash(&state)) {
+                Ok(taken) => taken,
+                Err(why) => return Some(refused(&why)),
+            },
+            None => accounts
+                .pending
+                .lock()
+                .expect("pending")
+                .remove(&state)
+                .map(|p| (p.nonce, p.verifier, p.started.elapsed())),
+        };
+        let Some((nonce, verifier, age)) = taken else {
             return Some(refused("it was already completed or is unknown"));
         };
-        if pending.started.elapsed() > SIGN_IN_LIFETIME {
+        let pending = Pending {
+            nonce,
+            verifier,
+            started: Instant::now(),
+        };
+        if age > SIGN_IN_LIFETIME {
             return Some(refused("it took too long"));
         }
         let code = fields.get("code").cloned().unwrap_or_default();
@@ -770,8 +1085,15 @@ impl Identity {
         // signed-in session that signs in again is signed out, and what it
         // held is its user's, never the next one's.
         let was_guest = self.principals.of(session).is_none_or(|p| p.is_guest());
-        self.principals.close(session);
-        self.principals.open(&rotated, principal.clone());
+        // TRACK SEAM (second-host): kept where the hosts share them, before
+        // the browser is answered (ADR-XXXX).
+        if let Err(why) = self
+            .principals
+            .sign_out(session)
+            .and_then(|()| self.principals.sign_in(&rotated, principal.clone()))
+        {
+            return Some(refused(&format!("the session was not kept: {why}")));
+        }
         // TRACK SEAM (store-accounts): the deployment told, before the
         // browser is answered.
         if was_guest && !session.is_empty() {
@@ -795,7 +1117,18 @@ impl Identity {
     /// replayed, is no one; and a new session, so the browser is not left
     /// holding the old one.
     fn sign_out(&self, session: &str) -> Reply {
-        self.principals.close(session);
+        // TRACK SEAM (second-host): no one on any host (ADR-XXXX); a
+        // sign-out not kept is said, and the browser keeps its session.
+        if let Err(why) = self.principals.sign_out(session) {
+            return Reply::page(
+                503,
+                "Sign-out not completed",
+                &format!(
+                    "<p role=\"alert\">Sign-out was not completed: {}.</p>",
+                    escape(&why)
+                ),
+            );
+        }
         let rotated = new_session_id();
         Reply::redirect(
             "/",

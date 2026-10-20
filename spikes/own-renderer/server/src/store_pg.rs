@@ -95,6 +95,16 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "0017_ratings",
         include_str!("../migrations/store/0017_ratings.sql"),
     ),
+    // Track `second-host` (ADR-XXXX): the outbox a log every host reads.
+    (
+        "0018_outbox_log",
+        include_str!("../migrations/store/0018_outbox_log.sql"),
+    ),
+    // Track `second-host` (ADR-XXXX): sessions and sign-ins kept.
+    (
+        "0019_sessions",
+        include_str!("../migrations/store/0019_sessions.sql"),
+    ),
 ];
 
 /// **The schema a deployment's store is in**, unless it names another.
@@ -936,6 +946,15 @@ pub(crate) struct StorePg {
     faults: Faults,
     /// The statements its reads and commands ran (NEXT 4b).
     tally: Tally,
+    /// **This host's reader of the outbox** (ADR-XXXX): every other host's
+    /// commits, from its cursor; and its id, which its own rows carry.
+    tail: crate::hosts::Tail,
+    /// **Its sessions and sign-ins, kept where the hosts share them**
+    /// (ADR-XXXX).
+    sessions: Arc<crate::hosts::SessionsPg>,
+    /// **This host's instance on the database** (ADR-XXXX), which its page
+    /// numbers carry.
+    instance: u64,
     /// A test's schema, dropped with the layer.
     #[cfg(test)]
     owned: bool,
@@ -964,11 +983,16 @@ impl StorePg {
         });
         let mut c = pool.take()?;
         migrate(c.client())?;
-        // What a host that stopped between a commit and its delivery left in
-        // the outbox: a host just opened keeps no answer it could make stale,
-        // and has no open session to tell.
-        c.client().batch_execute("DELETE FROM outbox").map_err(pg)?;
+        // **The outbox is every host's** (ADR-XXXX): a host just opened
+        // reads it from its highest id, and deletes nothing another host
+        // has yet to read. Until then it deleted the outbox, a second host's
+        // undelivered rows among it.
+        let highest = crate::hosts::highest(c.client())?;
+        let instance = crate::hosts::instance(c.client())?;
         drop(c);
+        let host = crate::hosts::new_host();
+        let tail = crate::hosts::Tail::at(url, crate::hosts::Outbox::of(schema), &host, highest);
+        let sessions = Arc::new(crate::hosts::SessionsPg::new(url, schema));
         Ok(StorePg {
             pool,
             renders: crate::feed_pg::Renders::new(url, Some(schema), seats),
@@ -976,6 +1000,9 @@ impl StorePg {
             writes: crate::data::Writes::new(),
             faults: Faults::new(),
             tally: Tally::default(),
+            tail,
+            sessions,
+            instance,
             #[cfg(test)]
             owned: false,
         })
@@ -1071,6 +1098,10 @@ pub(crate) struct Staging<'a> {
     /// The layer's tally, and this command's place in it (NEXT 4b).
     tally: Tally,
     txn: Option<usize>,
+    /// The schema's outbox, which its rows are ordered in, and this host's
+    /// id, which they carry (ADR-XXXX).
+    outbox: &'a crate::hosts::Outbox,
+    host: &'a str,
 }
 
 impl crate::data::Staged for Staging<'_> {
@@ -1120,34 +1151,6 @@ impl Staging<'_> {
             .as_mut()
             .ok_or("the command's transaction did not open")?
             .client();
-        // What the command handed the outbox, in its transaction: an
-        // invalidated entry's `_` as `null` (ADR-0256).
-        let handed = events
-            .iter()
-            .map(|(name, values)| {
-                (
-                    "event",
-                    name,
-                    values.iter().cloned().map(Some).collect::<Vec<_>>(),
-                )
-            })
-            .chain(
-                invalidated
-                    .iter()
-                    .map(|(name, values)| ("invalidation", name, values.clone())),
-            );
-        let mut ids: Vec<i64> = Vec::new();
-        for (kind, name, values) in handed {
-            let args = json_of(name, &values)?;
-            let row = Counted(c)
-                .query_one(
-                    "INSERT INTO outbox (kind, name, args) VALUES ($1, $2, $3::text::jsonb) \
-                     RETURNING id",
-                    &[&kind, name, &args],
-                )
-                .map_err(pg)?;
-            ids.push(row.get(0));
-        }
         // **The interaction's answer, with the writes** (ADR-0325).
         if let Some(r) = interaction {
             crate::feed_pg::record(c, r)?;
@@ -1164,6 +1167,43 @@ impl Staging<'_> {
                 .map(|s| 1 + u64::from(s.due_ms.is_some()))
                 .sum(),
         );
+        // What the command handed the outbox, in its transaction: an
+        // invalidated entry's `_` as `null` (ADR-0256).
+        let handed: Vec<_> = events
+            .iter()
+            .map(|(name, values)| {
+                (
+                    "event",
+                    name,
+                    values.iter().cloned().map(Some).collect::<Vec<_>>(),
+                )
+            })
+            .chain(
+                invalidated
+                    .iter()
+                    .map(|(name, values)| ("invalidation", name, values.clone())),
+            )
+            .collect();
+        // **Last, and in commit order** (ADR-XXXX): the outbox's lock, held
+        // to the commit's end, before its rows take their ids, so every host
+        // reads them in the order the commits were made; and each host
+        // listening woken at the commit. One statement.
+        if !handed.is_empty() {
+            crate::hosts::ordered(c, self.outbox).map_err(pg)?;
+            Counted::ran(1);
+        }
+        let mut ids: Vec<i64> = Vec::new();
+        for (kind, name, values) in handed {
+            let args = json_of(name, &values)?;
+            let row = Counted(c)
+                .query_one(
+                    "INSERT INTO outbox (kind, name, args, host) \
+                     VALUES ($1, $2, $3::text::jsonb, $4) RETURNING id",
+                    &[&kind, name, &args, &self.host],
+                )
+                .map_err(pg)?;
+            ids.push(row.get(0));
+        }
         // The writes and the outbox's rows, at once or not at all. A commit
         // the database refuses (a serialization failure, a deferred
         // constraint) has rolled back, and nothing is delivered.
@@ -1174,8 +1214,8 @@ impl Staging<'_> {
         match delivered(c, &ids) {
             Ok(read) => Ok(Some(read)),
             // Committed, and not read back: what it handed is what
-            // committed. Its rows stay, consumed when a host next opens the
-            // database; the command is not answered as refused.
+            // committed, and the other hosts read its rows from their
+            // cursors; the command is not answered as refused.
             Err(why) => {
                 eprintln!("pw dev server: the store's outbox was not read back: {why}");
                 Ok(Some((events.to_vec(), invalidated.to_vec())))
@@ -1272,6 +1312,18 @@ impl crate::data::DataLayer for StorePg {
         Some(self)
     }
 
+    fn tail(&self) -> Option<&crate::hosts::Tail> {
+        Some(&self.tail)
+    }
+
+    fn sessions(&self) -> Option<Arc<dyn crate::identity::Kept>> {
+        Some(self.sessions.clone())
+    }
+
+    fn instance(&self) -> Option<u64> {
+        Some(self.instance)
+    }
+
     fn reads(&self, session: &str, stopped: Option<Stopped>) -> Ops {
         let (pool, tally) = (self.pool.clone(), self.tally.clone());
         let with: With = Arc::new(move |f| {
@@ -1365,6 +1417,8 @@ impl crate::data::DataLayer for StorePg {
             ops,
             tally: self.tally.clone(),
             txn,
+            outbox: self.tail.outbox(),
+            host: self.tail.host(),
         })
     }
 

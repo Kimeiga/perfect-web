@@ -208,7 +208,8 @@ fn on_postgres_the_database_provides_what_the_feed_states() {
 
 /// **A post commits with its event, in one transaction** (ADR-0208): the
 /// post's row and the outbox's are written by one transaction, and what was
-/// delivered was consumed.
+/// delivered is kept for the other hosts, the committing host's
+/// (ADR-XXXX).
 #[test]
 fn on_postgres_a_post_commits_with_its_event_in_one_transaction() {
     let Some(url) = database() else { return };
@@ -230,10 +231,21 @@ fn on_postgres_a_post_commits_with_its_event_in_one_transaction() {
         [("feed.app.Posted".to_string(), true)],
         "one event, written by the post's own transaction"
     );
+    // Delivered, and kept for the other hosts on the database, which read
+    // it from their cursors (ADR-XXXX): until then it was consumed.
     assert_eq!(
         s.db.count("SELECT count(*) FROM outbox"),
-        0,
-        "delivered, and consumed"
+        1,
+        "delivered, and kept for the other hosts"
+    );
+    let host = s.data.tail().expect("a shared database").host().to_string();
+    assert_eq!(
+        s.db.sql()
+            .query_one("SELECT count(*) FROM outbox WHERE host = $1", &[&host])
+            .expect("counted")
+            .get::<_, i64>(0),
+        1,
+        "the committing host's"
     );
 }
 
