@@ -3,9 +3,10 @@ say what the script says run in order, and never mutate the tree.
 
 A toy tree holds a toy script of the scripts' shape (`MUTANTS`, a baseline
 per suite in the order of its suites' names, one verdict a mutant, the
-count) beside copies of `mutation_baseline.py`, `mutation_bound.py` and
-`mutation_slots.py`, and is committed to a git of its own. Its suite asks
-git what is tracked, and records where it ran and with what environment.
+count) beside copies of the scripts' machinery (`mutation_baseline.py` and
+the modules of `scripts/` it imports: `machinery()`), and is committed to a
+git of its own. Its suite asks git what is tracked, and records where it ran
+and with what environment.
 One of its mutants must survive: a comment changed (the control).
 """
 
@@ -156,6 +157,25 @@ if __name__ == "__main__":
 '''
 
 
+def machinery() -> list[str]:
+    """The scripts' machinery a mutation script imports: `mutation_baseline`
+    and every module of `scripts/` it imports, and they import, read from
+    their sources, so that a module the machinery comes to import is in the
+    toy tree too (train-11: ci-diagnostics' `mutant_incremental`, imported
+    as `mutation_baseline` loads, was not in a list kept here by hand)."""
+    names, todo = set(), ["mutation_baseline"]
+    while todo:
+        name = todo.pop()
+        if name in names:
+            continue
+        names.add(name)
+        source = (SCRIPTS / f"{name}.py").read_text()
+        for m in re.finditer(r"^\s*(?:import|from)\s+([A-Za-z_]\w*)", source, re.M):
+            if (SCRIPTS / f"{m.group(1)}.py").is_file():
+                todo.append(m.group(1))
+    return sorted(names)
+
+
 def toy_tree(where: pathlib.Path) -> pathlib.Path:
     """A toy tree, committed, with the scripts' machinery beside its script."""
     root = where / "tree"
@@ -164,7 +184,7 @@ def toy_tree(where: pathlib.Path) -> pathlib.Path:
     (root / "tests").mkdir()
     (root / "node_modules" / "pkg").mkdir(parents=True)
     (root / "node_modules" / "pkg" / "index.js").write_text("module.exports = 1;\n")
-    for name in ("mutation_baseline", "mutation_bound", "mutation_slots"):
+    for name in machinery():
         shutil.copy(SCRIPTS / f"{name}.py", root / "scripts" / f"{name}.py")
     registry = root / "spikes/own-renderer/host-registry.json"
     registry.parent.mkdir(parents=True)
