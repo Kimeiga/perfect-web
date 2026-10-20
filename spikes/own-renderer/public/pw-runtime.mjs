@@ -1302,8 +1302,19 @@ async function computedNow() {
   const module = await computedValues();
   return computed.map((l) => [
     `#${parts.template}~${l.part}`,
-    module.parts[l.part](signalAt(l.path)),
+    module.parts[l.part](...argsOf(l)),
   ]);
+}
+
+/** **What a computed part is given**: the signal's value at its path, or
+ * each of several it reads, in order (track `device-store`, decision 7). */
+function argsOf(live) {
+  return (live.paths?.length ? live.paths : [live.path]).map(signalAt);
+}
+
+/** The signals a computed part is computed again for. */
+function readsOf(live) {
+  return live.reads?.length ? live.reads : [live.signal];
 }
 
 /** The block numbered `id`, rendered at the signals' values now, and what
@@ -1501,6 +1512,173 @@ function replaceBlock(id, html) {
   return replaceRangeAt(addressOf([], id), html) ?? [];
 }
 
+// --- a block rendered again keeps its nodes (track `device-store`, ADR-XXXX) --
+//
+// A block the browser renders again from its signals (ADR-0130) was replaced
+// whole until 2026-10-20: every node in it new each time a signal it reads
+// changed. A row of a list in it was another element after each press, so
+// focus, a hover, what assistive technology held and a test's handle on the
+// row were lost: TodoMVC's own tests hold a todo's `<li>` across its toggle,
+// and once its list was the browser's to render (a value the device keeps),
+// four of them failed for it. Now what was rendered is morphed into what is
+// rendered: a node the new rendering has where the old one had one of the same
+// kind is kept, its attributes and text set to the new ones; a row of a keyed
+// list is matched by its key's anchor (`pw:s{part}@{token}`, the token the
+// renderer derives from the key) and kept, moved or removed as its key says;
+// only what is new is inserted, and only what is gone removed. A control's
+// state, `checked` and `value`, follows the new rendering where it changed,
+// as a part set in place does (ADR-0142).
+
+/** The key anchor `node` opens or closes, `{ part, token, start }`, or none. */
+function rowAnchor(node) {
+  if (node.nodeType !== Node.COMMENT_NODE) return null;
+  const m = /^pw:([se])(\d+)@(.+)$/.exec(node.data);
+  return m ? { start: m[1] === "s", part: m[2], token: m[3] } : null;
+}
+
+/** `nodes` as the items a morph matches: each a node, or a row of a keyed
+ * list, its anchors and what is between them. */
+function rowsOf(nodes) {
+  const items = [];
+  for (let i = 0; i < nodes.length; i++) {
+    const a = rowAnchor(nodes[i]);
+    if (a?.start) {
+      const end = nodes.findIndex(
+        (n, j) => j > i && n.nodeType === Node.COMMENT_NODE && n.data === `pw:e${a.part}@${a.token}`,
+      );
+      if (end > i) {
+        items.push({ key: `${a.part}@${a.token}`, nodes: nodes.slice(i, end + 1) });
+        i = end;
+        continue;
+      }
+    }
+    items.push({ node: nodes[i] });
+  }
+  return items;
+}
+
+/** Whether `old` can be kept as `fresh`: a node of its kind, an element of
+ * its tag and its identity, a comment of its text. */
+function sameKind(old, fresh) {
+  if (old.nodeType !== fresh.nodeType) return false;
+  if (old.nodeType === Node.ELEMENT_NODE) {
+    return (
+      old.tagName === fresh.tagName &&
+      old.getAttribute("data-pw") === fresh.getAttribute("data-pw") &&
+      old.getAttribute("id") === fresh.getAttribute("id")
+    );
+  }
+  if (old.nodeType === Node.COMMENT_NODE) return old.data === fresh.data;
+  return true;
+}
+
+/** `old` made what `fresh` is, kept. */
+function morphNode(old, fresh, inserted) {
+  if (old.nodeType === Node.TEXT_NODE) {
+    if (old.data !== fresh.data) old.data = fresh.data;
+    return;
+  }
+  if (old.nodeType !== Node.ELEMENT_NODE) return;
+  // A control's state follows the new rendering where it changed it.
+  const wasChecked = old.hasAttribute("checked");
+  const wasValue = old.getAttribute("value");
+  for (const a of [...old.attributes]) {
+    if (!fresh.hasAttribute(a.name)) old.removeAttribute(a.name);
+  }
+  for (const a of [...fresh.attributes]) {
+    if (old.getAttribute(a.name) !== a.value) old.setAttribute(a.name, a.value);
+  }
+  if (typeof old.checked === "boolean" && (wasChecked !== fresh.hasAttribute("checked") || old.checked !== fresh.hasAttribute("checked"))) {
+    old.checked = fresh.hasAttribute("checked");
+  }
+  if ("value" in old && old.tagName !== "TEXTAREA" && wasValue !== fresh.getAttribute("value")) {
+    old.value = fresh.getAttribute("value") ?? "";
+  }
+  morphChildren(old, [...old.childNodes], [...fresh.childNodes], null, inserted);
+}
+
+/** **`olds`, children of `parent`, made `freshes`**, before `before`: each
+ * kept where it can be, each row by its key, and in the new order. */
+function morphChildren(parent, olds, freshes, before, inserted) {
+  const old = rowsOf(olds);
+  const fresh = rowsOf(freshes);
+  const byKey = new Map(old.filter((o) => o.key).map((o) => [o.key, o]));
+  const loose = old.filter((o) => o.node);
+  const used = new Set();
+  let cursor = 0;
+  const placed = [];
+  for (const f of fresh) {
+    if (f.key) {
+      const o = byKey.get(f.key);
+      if (o && !used.has(o)) {
+        used.add(o);
+        const [start, ...rest] = o.nodes;
+        const end = rest.pop();
+        const freshInner = f.nodes.slice(1, -1);
+        morphChildren(parent, rest, freshInner, end, inserted);
+        placed.push(...between(start, end));
+      } else {
+        placed.push(...f.nodes);
+        inserted.push(...f.nodes);
+      }
+      continue;
+    }
+    // A loose node: the next loose old one of its kind, in order.
+    let match = null;
+    while (cursor < loose.length) {
+      const o = loose[cursor++];
+      if (used.has(o)) continue;
+      if (sameKind(o.node, f.node)) {
+        match = o;
+        break;
+      }
+    }
+    if (match) {
+      used.add(match);
+      morphNode(match.node, f.node, inserted);
+      placed.push(match.node);
+    } else {
+      placed.push(f.node);
+      inserted.push(f.node);
+    }
+  }
+  // What the new rendering has not, gone: a modal dialog among it closed
+  // first, its focus given back (ADR-0141).
+  for (const o of old) {
+    if (used.has(o)) continue;
+    for (const n of o.nodes ?? [o.node]) {
+      if (n.nodeType === Node.ELEMENT_NODE) {
+        for (const d of dialogsIn([n], true)) {
+          d.close();
+          giveFocusBack(d);
+        }
+      }
+      n.remove();
+    }
+  }
+  // In the new order, a kept node moved only where it is not already.
+  let anchor = before;
+  for (let i = placed.length - 1; i >= 0; i--) {
+    const n = placed[i];
+    if (n.parentNode !== parent || n.nextSibling !== anchor) {
+      if (n.isConnected && n.parentNode === parent) moveNodes(parent, [n], anchor);
+      else parent.insertBefore(n, anchor);
+    }
+    anchor = n;
+  }
+}
+
+/** **A block the browser renders again, morphed**: what it rendered kept
+ * where the new rendering has it, and the nodes it inserted. */
+function morphBlock(id, html) {
+  const r = index.get(addressOf([], id));
+  if (!r?.start) return [];
+  const parent = r.start.parentNode;
+  const inserted = [];
+  morphChildren(parent, between(r.start, r.end), parseInstance(html), r.end.nextSibling, inserted);
+  return inserted;
+}
+
 /** The range at `key` replaced by `html`, or `null` where the document has
  * no such range (ADR-0146). */
 function replaceRangeAt(key, html) {
@@ -1581,12 +1759,16 @@ let sources = new Map();
 
 /** A handler changed `name`: held now, and rendered once per press. A value
  * the signal already holds changes nothing, and renders nothing. */
-function setSignal(name, value, source) {
+function setSignal(name, value, source, kept = true) {
   if (JSON.stringify(signals.get(name)) === JSON.stringify(value)) return;
   signals.set(name, value);
   if (source) sources.set(name, source);
   else sources.delete(name);
   dirty.add(name);
+  // A value the device keeps is written as it changes (track
+  // `device-store`), unless the change is the device's own: read at start,
+  // or another tab's.
+  if (kept && deviceHeld.has(name)) keep(deviceHeld.get(name), value, source);
   flushing ??= Promise.resolve().then(flushSignals);
 }
 
@@ -1599,10 +1781,14 @@ async function flushSignals() {
   let rendered = false;
   const inserted = [];
   for (const live of parts.live ?? []) {
+    // A value computed for a block's render alone (track `device-store`):
+    // its block is rendered again, below, and computes it then.
+    if (live.kind === "value") continue;
     if (live.derived && SET_IN_PLACE.has(live.kind)) {
-      // A value computed from the signal (ADR-0227), by its part's function.
-      if (!changed.has(live.signal)) continue;
-      const v = (await computedValues()).parts[live.part](signalAt(live.path));
+      // A value computed from the signal (ADR-0227), by its part's function;
+      // or from several (track `device-store`).
+      if (!readsOf(live).some((s) => changed.has(s))) continue;
+      const v = (await computedValues()).parts[live.part](...argsOf(live));
       if (live.kind === "text") setRange(addressOf([], live.part), textOf(v));
       else setAttributePart(live, from.get(live.signal), v);
       log.push(`signal ${live.signal} -> computed part ${live.part}`);
@@ -1625,7 +1811,9 @@ async function flushSignals() {
           arms.set(live.part, arm);
         }
       }
-      inserted.push(...replaceBlock(live.part, await renderBlock(live.part)));
+      // Morphed, so what it held is kept where it is rendered again (track
+      // `device-store`): a row by its key.
+      inserted.push(...morphBlock(live.part, await renderBlock(live.part)));
       rendered = true;
       log.push(`signal ${[...changed].join(",")} -> block ${live.part}`);
     }
@@ -1638,6 +1826,352 @@ async function flushSignals() {
   }
   readAgain(changed);
   window.__pw.signals = Object.fromEntries(signals);
+}
+
+// --- the address's fragment, bound to a signal (track `todomvc`) ------------
+//
+// A page that states `fragment filter "/" => "all", "/active" => "active"`
+// binds the signal to its address's fragment, which no server sees: the
+// document says which signal and each form the fragment takes with the value
+// the signal takes then (`parts.fragment`). The signal follows the fragment:
+// at start, and on each `hashchange`, a link's or the back button's. A
+// fragment that is no form, or none, is the signal's first value, the page's
+// declared default, which the server rendered. The address is the signal's
+// only writer: the compiler refuses a handler that assigns it (PW6105), so
+// the two cannot differ.
+
+/** The value the signal takes at the address's fragment now. */
+function fragmentValue(binding) {
+  const form = location.hash.slice(1);
+  return binding.forms.find((f) => f.form === form)?.value ?? firstValues.get(binding.signal);
+}
+
+/** The signal set to what the fragment says, held and rendered as any
+ * signal's change is: the parts that read it, and a query it keys. */
+function followFragment(binding) {
+  const value = fragmentValue(binding);
+  if (signals.get(binding.signal) === value) return;
+  log.push(`fragment ${location.hash || "(none)"} -> ${binding.signal} ${JSON.stringify(value)}`);
+  setSignal(binding.signal, value, null);
+}
+
+/** The signal follows the fragment, from now: once it is read at start. */
+function bindFragment(binding) {
+  followFragment(binding);
+  addEventListener("hashchange", () => followFragment(binding), { signal: life.signal });
+}
+
+// --- `autofocus` on an element a block shows (track `todomvc`) --------------
+//
+// HTML runs `autofocus` when a page loads, and ignores it on an element put
+// in later. A page shows fields after it has loaded, as TodoMVC shows its
+// edit field when a person asks to edit a todo ("the edit field should be
+// focused"): the field they asked for is the one they type in. So an element
+// that arrives with `autofocus`, in a block a signal renders or in a patch
+// from the server, takes focus as it arrives, each time it arrives. What the
+// page was served with is left alone: the browser focused that. (A modal
+// dialog's `autofocus` element is the one `showModal` focuses (ADR-0141): it
+// is already focused by the time this looks.)
+
+/** The element, among `nodes` and what they hold, that asks for focus. */
+function autofocusIn(nodes) {
+  for (const node of nodes) {
+    if (node.nodeType !== Node.ELEMENT_NODE) continue;
+    const asking = node.matches("[autofocus]") ? [node] : [...node.querySelectorAll("[autofocus]")];
+    const found = asking.find((el) => el.isConnected);
+    if (found) return found;
+  }
+  return null;
+}
+
+/** Whatever is put into the page from now on, one change at a time. */
+function followAutofocus() {
+  const observer = new MutationObserver((records) => {
+    const el = autofocusIn(records.flatMap((r) => [...r.addedNodes]));
+    if (el && document.activeElement !== el) el.focus();
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+  life.signal.addEventListener("abort", () => observer.disconnect(), { once: true });
+}
+
+// --- values the device keeps (track `device-store`, ADR-XXXX) --------------
+//
+// A module's signal declared `storage device "name"` and `privacy Device` is
+// the device's: the document says which ones the page holds, the name each
+// is kept under, its version and each version's form (`parts.device`). The
+// server rendered each one's declared default, and the elements it decides
+// are hidden while the root says `data-pw-device="reading"`. So, before any
+// handler binds:
+// - each is read from the browser's own storage, `localStorage`, under its
+//   key (the name at version 1, `name@v` after), and decoded against its
+//   form, never trusted (charter §7.10); an earlier version is decoded with
+//   its own form, taken to this one by the steps the page's computed module
+//   holds, written under the new key, and only then is the old one removed;
+// - what each value decides is rendered, as any signal's change is;
+// - and the root's mark is taken away, so the first frame that shows what
+//   the device decides shows the device's value.
+// From then on each change is written with `setItem`, whole; every other
+// tab hears it as a `storage` event and shows it, writing nothing back
+// (`conflict last_write_wins`: the whole value written last is every tab's).
+// A value no decoder takes is never used and never lost: the default is
+// shown, and the text is copied to `key!unreadable` before the first write
+// replaces it. A page that finds a newer version than its own writes nothing
+// more, and says so. A write the store refuses (`QuotaExceededError`) keeps
+// what was stored, and is said where the change was made. Nothing here
+// sends anything to any server.
+
+/** What the device keeps that this page holds, by the signal it is held as. */
+const deviceHeld = new Map((parts.device ?? []).map((h) => [h.signal, h]));
+
+/** Where each stands, for the tests to read: `default`, `read`, `migrated`,
+ * `unreadable`, `stale` or `unavailable`. */
+const deviceState = {};
+let deviceWrites = 0;
+
+/** The platform's words for what the device did not keep. */
+const DEVICE_SAYS = {
+  full: "This device has no room to keep that.",
+  stale: "This page is out of date. Reload to keep your changes.",
+};
+
+/** The key version `v` of `held` is kept under. */
+function deviceKey(held, v) {
+  return v === 1 ? held.name : `${held.name}@${v}`;
+}
+
+/** The browser's store, or none where it is refused: its getter throws in a
+ * document whose storage the browser keeps from it. */
+function deviceStore() {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+/** **Why `v` is not of the form `s`**, or `null` where it is: the wire form
+ * the browser's modules read (`js_pure`), checked whole. */
+function unlike(v, s, at) {
+  const record = (x) => x !== null && typeof x === "object" && !Array.isArray(x);
+  const ofCases = (x, cases) => {
+    if (!record(x) || typeof x.$case !== "string") return `${at} is no case`;
+    const found = cases.find(([name]) => name === x.$case);
+    if (!found) return `${at}'s case \`${x.$case}\` is none its type has`;
+    const [, fields] = found;
+    const extra = Object.keys(x).filter((k) => k !== "$case" && k !== "value");
+    if (extra.length) return `${at} holds \`${extra[0]}\`, which no case does`;
+    if (fields.length === 0) return "value" in x ? `${at}'s case holds nothing` : null;
+    if (fields.length === 1) return unlike(x.value, fields[0], `${at}.value`);
+    if (!Array.isArray(x.value) || x.value.length !== fields.length) {
+      return `${at}'s case holds ${fields.length} values`;
+    }
+    for (let i = 0; i < fields.length; i++) {
+      const why = unlike(x.value[i], fields[i], `${at}.value[${i}]`);
+      if (why) return why;
+    }
+    return null;
+  };
+  switch (s.t) {
+    case "int":
+      return Number.isSafeInteger(v) ? null : `${at} is no whole number`;
+    case "float":
+      return typeof v === "number" && Number.isFinite(v) ? null : `${at} is no number`;
+    case "bool":
+      return typeof v === "boolean" ? null : `${at} is no Bool`;
+    case "string":
+      return typeof v === "string" ? null : `${at} is no String`;
+    case "unit":
+      return v === null ? null : `${at} is no ()`;
+    case "list": {
+      if (!Array.isArray(v)) return `${at} is no list`;
+      for (let i = 0; i < v.length; i++) {
+        const why = unlike(v[i], s.of, `${at}[${i}]`);
+        if (why) return why;
+      }
+      return null;
+    }
+    case "option":
+      return ofCases(v, [["some", [s.of]], ["none", []]]);
+    case "result":
+      return ofCases(v, [["ok", [s.ok]], ["err", [s.err]]]);
+    case "record": {
+      if (!record(v)) return `${at} is no record`;
+      const names = new Set(s.fields.map(([name]) => name));
+      const extra = Object.keys(v).find((k) => !names.has(k));
+      if (extra !== undefined) return `${at} holds \`${extra}\`, which its type does not`;
+      for (const [name, f] of s.fields) {
+        if (!(name in v)) return `${at} has no \`${name}\``;
+        const why = unlike(v[name], f, `${at}.${name}`);
+        if (why) return why;
+      }
+      return null;
+    }
+    case "cases":
+      return ofCases(v, s.cases);
+    default:
+      return `${at}'s form \`${s.t}\` is none this runtime reads`;
+  }
+}
+
+/** **What the store holds, decoded** against `schema`: `{ value }`, or `{
+ * error }` naming what is wrong. */
+function decodeKept(text, schema) {
+  let json;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    return { error: "it is not JSON" };
+  }
+  const why = unlike(json, schema, "the value");
+  return why ? { error: why } : { value: json };
+}
+
+/** The newest version of `held` the store holds after this page's, if any:
+ * a newer build has taken it on, and this page writes it no more. */
+function newerKept(store, held) {
+  const prefix = `${held.name}@`;
+  let newest = 0;
+  for (let i = 0; i < store.length; i++) {
+    const key = store.key(i);
+    if (!key?.startsWith(prefix)) continue;
+    const v = Number(key.slice(prefix.length));
+    if (Number.isInteger(v) && v > held.version && v > newest) newest = v;
+  }
+  return newest;
+}
+
+/** **One value, read**: what the device holds of it at this page's version,
+ * or taken to it from the newest earlier one, or the default. */
+async function readKept(store, held) {
+  if (!store) return { state: "unavailable" };
+  if (newerKept(store, held)) return { state: "stale" };
+  const schema = held.schemas[held.version - 1];
+  const key = deviceKey(held, held.version);
+  const text = store.getItem(key);
+  if (text !== null) {
+    const got = decodeKept(text, schema);
+    if (got.error) return { state: "unreadable", why: got.error };
+    return { state: "read", value: got.value };
+  }
+  for (let v = held.version - 1; v >= 1; v--) {
+    const old = store.getItem(deviceKey(held, v));
+    if (old === null) continue;
+    const got = decodeKept(old, held.schemas[v - 1]);
+    if (got.error) return { state: "unreadable", why: `version ${v}: ${got.error}` };
+    let value = got.value;
+    try {
+      const steps = (await computedValues()).migrations?.[held.signal] ?? [];
+      for (let at = v; at < held.version; at++) value = steps[at - 1](value);
+    } catch (error) {
+      return { state: "unreadable", why: `version ${v} did not migrate: ${error.message}` };
+    }
+    const why = unlike(value, schema, "the migrated value");
+    if (why) return { state: "unreadable", why };
+    // Written under its own key before the old one goes: a stop between the
+    // two leaves both, and the next page reads the newer.
+    try {
+      store.setItem(key, wire(value));
+      store.removeItem(deviceKey(held, v));
+    } catch (error) {
+      log.push(`device: ${held.name} migrated from ${v}, not kept: ${error.name}`);
+    }
+    return { state: "migrated", from: v, value };
+  }
+  return { state: "default" };
+}
+
+/** **A change kept**: the whole value, under its version's key. */
+function keep(held, value, source) {
+  if (deviceState[held.signal] === "stale") {
+    if (source?.el) tell(source.el, DEVICE_SAYS.stale, "device-stale");
+    else say(DEVICE_SAYS.stale);
+    log.push(`device: ${held.name} not kept: a newer version holds it`);
+    return;
+  }
+  const store = deviceStore();
+  if (!store) return;
+  const key = deviceKey(held, held.version);
+  try {
+    // An unreadable value is kept aside before the first write replaces it.
+    if (deviceState[held.signal] === "unreadable") {
+      const unread = store.getItem(key);
+      if (unread !== null) store.setItem(`${key}!unreadable`, unread);
+    }
+    store.setItem(key, wire(value));
+    deviceState[held.signal] = "read";
+    deviceWrites++;
+  } catch (error) {
+    // The store refused it: what was kept stays (the HTML algorithm throws
+    // before the map changes), and the page holds what the person did.
+    if (source?.el) tell(source.el, DEVICE_SAYS.full, "device-full");
+    else say(DEVICE_SAYS.full);
+    log.push(`device: ${held.name} not kept: ${error.name}`);
+  }
+  window.__pw.device = { state: { ...deviceState }, writes: deviceWrites };
+}
+
+/** What another tab's write of `held` says, decoded as a read is. */
+function heardValue(held, e) {
+  if (e.newValue === null) return { state: "default" };
+  const got = decodeKept(e.newValue, held.schemas[held.version - 1]);
+  return got.error ? { state: "unreadable", why: got.error } : { state: "read", value: got.value };
+}
+
+/** **Another tab's write**: shown here, written nowhere. A `clear()`, whose
+ * event has no key, is every value read again. */
+async function heardKept(e) {
+  const store = deviceStore();
+  if (!store || e.storageArea !== store) return;
+  for (const held of deviceHeld.values()) {
+    if (e.key === null || e.key === deviceKey(held, held.version)) {
+      const got = e.key === null ? await readKept(store, held) : heardValue(held, e);
+      deviceState[held.signal] = got.state;
+      if (got.state === "unreadable") log.push(`device: ${held.name} unreadable: ${got.why}`);
+      log.push(`device: ${held.name} heard from another tab`);
+      setSignal(held.signal, "value" in got ? got.value : firstValues.get(held.signal), null, false);
+    } else if (e.key.startsWith(`${held.name}@`)) {
+      const v = Number(e.key.slice(held.name.length + 1));
+      if (Number.isInteger(v) && v > held.version && deviceState[held.signal] !== "stale") {
+        deviceState[held.signal] = "stale";
+        say(DEVICE_SAYS.stale);
+        log.push(`device: ${held.name} is held at version ${v} by another page`);
+      }
+    }
+  }
+  window.__pw.device = { state: { ...deviceState }, writes: deviceWrites };
+}
+
+/** **The device read before what it decides is shown**: each value set,
+ * what it decides rendered, and the root's mark taken away. The address's
+ * fragment, which no server sees either, is followed first, so the device's
+ * values are first shown as the address asks. */
+async function readDevice() {
+  if (deviceHeld.size === 0) return;
+  const store = deviceStore();
+  try {
+    // Each value read first, then all of them set at once: one render shows
+    // them, and the mark waits for that render. Set as each was read, a
+    // value read later started a render of its own, and the mark waited for
+    // that one alone, so an earlier value's part was shown at its default
+    // while it was still being computed.
+    const read = [];
+    for (const held of deviceHeld.values()) {
+      const got = await readKept(store, held);
+      deviceState[held.signal] = got.state;
+      if (got.state === "unreadable") log.push(`device: ${held.name} unreadable: ${got.why}`);
+      log.push(`device: ${held.name} ${got.state}`);
+      read.push([held, got]);
+    }
+    for (const [held, got] of read) {
+      if ("value" in got) setSignal(held.signal, got.value, null, false);
+    }
+    if (parts.fragment) followFragment(parts.fragment);
+    if (flushing) await flushing;
+  } finally {
+    document.documentElement.dataset.pwDevice = "read";
+    window.__pw.device = { state: { ...deviceState }, writes: deviceWrites };
+  }
+  addEventListener("storage", (e) => void heardKept(e), { signal: life.signal });
 }
 
 // --- ADR-0152: a key a page changes ---------------------------------------
@@ -2045,6 +2579,9 @@ const bound = new WeakMap();
  */
 const DOM_EVENTS = {
   press: "click",
+  // Track `todomvc` (ADR-XXXX): a double press, and a control's losing focus.
+  dblclick: "dblclick",
+  blur: "blur",
   input: "input",
   change: "change",
   keydown: "keydown",
@@ -2060,9 +2597,11 @@ const DOM_EVENTS = {
 function eventRecord(name, e) {
   switch (name) {
     case "press":
+    case "dblclick":
       return { x: Math.round(e.clientX ?? 0), y: Math.round(e.clientY ?? 0) };
     case "input":
     case "change":
+    case "blur":
       return { value: String(e.target?.value ?? "") };
     case "keydown":
       return { key: String(e.key ?? "") };
@@ -2308,6 +2847,10 @@ async function attach() {
 
   await bootDecision();
 
+  // What the device keeps, read, and what it decides shown, before any
+  // handler binds (track `device-store`).
+  await readDevice();
+
   bindEvents();
   booted = true;
   // A dialog the server rendered at a signal's first value is shown as one
@@ -2327,6 +2870,10 @@ async function attach() {
   // A page whose values are its signals alone listens for nothing
   // (ADR-0130): no resource of its changes on the server.
   if (parts.listens !== false) subscribe();
+  // The signal a page binds to its address's fragment follows it from here.
+  if (parts.fragment) bindFragment(parts.fragment);
+  // What a block shows from here on, with `autofocus`, takes focus.
+  followAutofocus();
   window.__pw.signals = Object.fromEntries(signals);
   window.__pw.ready = true;
   document.documentElement.dataset.pwReady = "1";
@@ -2394,6 +2941,15 @@ function addressKey(address) {
  * platform's own parser reads it, so a patched attribute means what a
  * rendered one does. Until 2026-10-03 no patch set an attribute: an Add button
  * kept the name of an item renamed since.
+ *
+ * **A checkbox's state follows the attribute** (track `todomvc`, ADR-XXXX).
+ * `checked` is an attribute only until a person has pressed the box: from
+ * then on the property is the box's own, and the attribute no longer moves it.
+ * A patch that unchecks the "toggle all" box, or checks it, is shown only if
+ * the property is set as well, as a signal-set attribute already does
+ * (`setAttributePart`). Until then a box a person had pressed stayed as they
+ * left it, whatever the page said it was. (An option's `selected` is the same
+ * and is not set here: no page has needed it yet, and none tests it.)
  */
 function setAttributeAt(address, op) {
   const part = (parts.parts ?? []).find((p) => p.id === address.part);
@@ -2403,6 +2959,7 @@ function setAttributeAt(address, op) {
   if (!element) return false;
   if (op.op === "remove_attribute") {
     element.removeAttribute(op.name);
+    if (op.name === "checked" && "checked" in element) element.checked = false;
     return true;
   }
   const parsed = document.createElement("template");
@@ -2411,6 +2968,7 @@ function setAttributeAt(address, op) {
   // A value set again, the same, is a change all the same, and a control's
   // name changed is said again where it has focus (ADR-0182).
   if (element.getAttribute(op.name) !== value) element.setAttribute(op.name, value);
+  if (op.name === "checked" && "checked" in element) element.checked = true;
   return true;
 }
 

@@ -62,9 +62,10 @@ MUTANTS = [
     (
         "the style is in the body",
         SERVER,
-        # Re-anchored by ADR-0220: the style is the data layer's.
-        "{metadata}{style}</head>\\n<body>\\n{body}\\n\\\n",
-        "{metadata}</head>\\n<body>\\n{body}\\n\\\n         {style}\\\n",
+        # Re-anchored by ADR-0220: the style is the data layer's; and by track
+        # `device-store`, whose style follows it.
+        "{metadata}{style}{device}</head>\\n<body>\\n{body}\\n\\\n",
+        "{metadata}{device}</head>\\n<body>\\n{body}\\n\\\n         {style}\\\n",
     ),
 ]
 

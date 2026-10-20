@@ -14,7 +14,7 @@ code the compiler can emit, from its registry, `compiler/pw-core/src/codes.rs`.
 - **What the program must hold to**: the registry's own sentence.
 - **ADR**: the decisions its registry entry cites, where it cites one.
 
-205 codes are registered; 92 of them cite an ADR in the registry.
+219 codes are registered; 92 of them cite an ADR in the registry.
 A code whose entry cites none is marked `—`: search `docs/DECISIONS/` for its
 number or its symbol.
 
@@ -300,6 +300,17 @@ number or its symbol.
 | PW5602 | `upload_route_taken` | an upload's paths are its own: no page's, and no other upload's | — |
 | PW5603 | `file_form_posts_to_no_upload` | a form that sends a file posts it, as multipart/form-data, to an upload the program declares | — |
 
+## Todomvc
+
+| Code | Symbol | What the program must hold to | ADR |
+|---|---|---|---|
+| PW6101 | `fragment_names_no_signal` | a page's `fragment` clause names a signal the page declares | — |
+| PW6102 | `fragment_signal_not_text` | a signal bound to the address's fragment is a `String`: a fragment is text | — |
+| PW6103 | `fragment_forms` | a fragment's forms are written `"form" => "value"`, each form once, in characters a fragment holds | — |
+| PW6104 | `fragment_default` | a signal bound to the fragment starts at a value one of the forms gives | — |
+| PW6105 | `fragment_signal_assigned` | a signal bound to the fragment is written by the address alone, and no handler assigns it | — |
+| PW6106 | `link_names_no_form` | a link to a fragment of a page that binds its fragment names a form the page takes | — |
+
 ## Payments
 
 | Code | Symbol | What the program must hold to | ADR |
@@ -317,6 +328,19 @@ number or its symbol.
 | PW6501 | `schedule_names_no_clocked_command` | a `schedule` names a command `invoked_by Clock`, written as a call | — |
 | PW6502 | `scheduled_outside_a_command` | a `schedule` or an `unschedule` is a command's statement: what a page shows schedules nothing | — |
 | PW6503 | `schedule_time` | a scheduled run's time is `at` an `Instant` or `after` a `Duration` | — |
+
+## Device store
+
+| Code | Symbol | What the program must hold to | ADR |
+|---|---|---|---|
+| PW6801 | `device_value_to_a_command` | a value the device keeps is no command's argument, and decides no command's call: a command runs on the server | — |
+| PW6802 | `device_value_keys_a_query` | a value the device keeps keys no page's query: the key is sent to the server to read it again | — |
+| PW6803 | `device_value_sent` | a value the device keeps is written nowhere the browser sends: a navigation, an address, a form | — |
+| PW6804 | `device_keeps_its_own` | a signal the device keeps is assigned no session's, user's, organization's or secret's value | — |
+| PW6805 | `device_signal_clauses` | a signal the device keeps says where it rests, `storage device "name"` (one name a program), whose it is, `privacy Device`, and what two tabs' writes do, `conflict last_write_wins` | — |
+| PW6806 | `device_signal_versions` | a signal the device keeps has a pure migration for each version before its own, each taking the one before it to the next | — |
+| PW6807 | `device_signal_form` | a signal the device keeps is of a type the device can hold: data, no function, no type that contains itself, no opaque type with a `where` | — |
+| PW6808 | `device_signal_provided` | a signal the device keeps is provided by the device: no `provide` gives it a value | — |
 
 ## Retired codes
 

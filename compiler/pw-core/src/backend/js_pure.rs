@@ -234,6 +234,27 @@ pub(crate) fn isolated(function: &Function, program: &Program) -> Result<String,
     ))
 }
 
+/// **A step from one version of a value the device keeps to the next**
+/// (track `device-store`, ADR-XXXX, decision 4): `function`, as [`isolated`]
+/// writes it, taking the stored value in the browser's wire form and giving
+/// the next version's in the same form, with each helper the decoding and the
+/// encoding use.
+pub(crate) fn wire_to_wire(function: &Function, program: &Program) -> Result<String, String> {
+    let f = isolated(function, program)?;
+    let [(_, from)] = function.params.as_slice() else {
+        return Err(format!("`{}` does not take one value", function.export));
+    };
+    let none = BTreeMap::new();
+    let mut e = Emitter::new(program, &none, &[]);
+    let decode = e.decode("j", from)?;
+    let encode = e.wire_value("r", &function.ret)?;
+    let before = e.prelude().join("\n\n");
+    Ok(format!(
+        "(() => {{\n{before}{}const f = {f};\nreturn (j) => {{\n  const r = f({decode});\n  return {encode};\n}};\n}})()",
+        if before.is_empty() { "" } else { "\n\n" }
+    ))
+}
+
 /// **A JSON value read as the module's value of `ty`** (ADR-0122), by the
 /// rule a handler reads its captures by: an `Int` into a `BigInt`, a record
 /// by its field names, an opaque type as its representation.

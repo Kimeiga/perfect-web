@@ -77,7 +77,15 @@ fi
 exit 0
 """
 PROGRAMS = ("cargo", "pnpm", "python3", "node", "rustc", "psql", "git", "npx")
-BUILD_SCRIPTS = ("run.sh", "feed.sh", "keyed-store.sh", "kiokun-site.sh", "baseline-store.sh", "guestbook.sh")
+BUILD_SCRIPTS = (
+    "run.sh",
+    "feed.sh",
+    "keyed-store.sh",
+    "kiokun-site.sh",
+    "baseline-store.sh",
+    "guestbook.sh",
+    "todomvc.sh",
+)
 SUITE = re.compile(r"playwright test")
 
 # A call: the program's name, where it ran from, and its arguments.
@@ -161,6 +169,11 @@ def run_full(
         for where, names in (
             (root / ".toolchain/prefix/bin", PROGRAMS),
             (root / "spikes/own-renderer", BUILD_SCRIPTS),
+            # TodoMVC's own Cypress suite, which `e14-todomvc` runs after its
+            # browser suite (track `todomvc`), and its probes (track
+            # `device-store`).
+            (root / "spikes/todomvc-cypress", ("run.sh",)),
+            (root / "spikes/todomvc-cypress-probes", ("run.sh",)),
             (root / "target/debug", ("pw", "pw-dev-server", "kiokun-server")),
             (root / "target/wasm32-unknown-unknown/browser", ("pw_render_wasm.wasm", "pw_resume_wasm.wasm")),
         ):

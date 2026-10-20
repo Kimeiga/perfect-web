@@ -145,8 +145,8 @@ MUTANTS = [
     (
         "a computed list's rows have no type",
         INFER,
-        "                    None if crate::lexical::path_root(body, *list).is_none() => types\n",
-        "                    None if false && crate::lexical::path_root(body, *list).is_none() => types\n",
+        "                    None if crate::lexical::path_root(body, *list)\n                        .is_none_or(of_a_module_signal) =>\n",
+        "                    None if false\n                        && crate::lexical::path_root(body, *list)\n                            .is_none_or(of_a_module_signal) =>\n",
     ),
     (
         "a loop's list shows no dialog",

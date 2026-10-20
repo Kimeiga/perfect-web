@@ -1,0 +1,49 @@
+// @corpus: fixture
+// @id: DEMO-focus
+// @category: UI state — an element a block shows with `autofocus` takes focus
+// @charter: §8.2
+// @milestone: E14
+//
+// Track `todomvc` (ADR-XXXX): HTML's `autofocus` runs once, when a page
+// loads. A page shows a field after it has loaded, when a person asks to edit
+// something, and the field that appears is expected to be the one they type
+// in (TodoMVC's spec: the edit field "should be focused"). What this shows, in
+// each engine:
+// - a field a block shows with `autofocus` takes focus as it appears, each time;
+// - a field shown without it does not: focus stays where it was.
+
+module demo.focus
+
+import events.{ KeyEvent }
+
+page FocusPage() {
+    cache private
+
+    signal editing: Bool = false
+    signal hinting: Bool = false
+    signal note: String = "Buy milk"
+
+    view {
+        <title>Focus</title>
+        <main>
+            <button id="edit" type="button" on:press={() => editing = true}>Edit the note</button>
+            <button id="hint" type="button" on:press={() => hinting = true}>Show a hint</button>
+            {#if editing}
+                <input
+                    id="note"
+                    type="text"
+                    aria-label="Note"
+                    autofocus
+                    bind:value={note}
+                    on:keydown={(e: KeyEvent) => if e.key == "Escape" {
+                        editing = false
+                    }}
+                />
+            {/if}
+            {#if hinting}
+                <input id="hint-field" type="text" aria-label="Hint" />
+            {/if}
+            <p id="echo">{note}</p>
+        </main>
+    }
+}

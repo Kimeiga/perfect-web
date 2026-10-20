@@ -34,8 +34,12 @@ argument-invariants checked in its own script.
 For each, the program is checked in a scratch copy before and after the
 mutant. It passes where the mutant adds no error, or only errors of the
 codes its script names for it; a script that names codes for a mutant that
-adds none is told so too. Non-vacuity: every mutant of a `.pw` source is
-judged in at least one program, or fails.
+adds none in any program that holds its source is told so too. A standard
+package's mutant is refused only where a program uses what it takes away
+(track `device-store`, 2026-10-20: the platform's `on:blur` taken away
+refuses TodoMVC's program, PW5022, and leaves every other one checking), so
+its names are met by the programs that refuse it. Non-vacuity: every mutant
+of a `.pw` source is judged in at least one program, or fails.
 
     python3 scripts/mutant_programs.py PW
 
@@ -211,9 +215,15 @@ def errors(pw: str, root: pathlib.Path, files: list[str]) -> list[tuple[str, str
     return sorted(set(found))
 
 
+# A mutant its script names codes for, which adds no error in one program:
+# wrong only where it is so in every program that holds its source (`main`).
+CLEAN = "clean"
+
+
 def judge(pw: str, root: pathlib.Path, files: list[str], base: list, m) -> str | None:
-    """Why the mutant `m` fails the rule in the program of `files`, or none
-    where it passes."""
+    """Why the mutant `m` fails the rule in the program of `files`, `CLEAN`
+    where its script names codes it adds none of here, or none where it
+    passes."""
     script, what, rel, anchor, replacement, named = m
     target = root / rel
     original = target.read_text()
@@ -227,7 +237,7 @@ def judge(pw: str, root: pathlib.Path, files: list[str], base: list, m) -> str |
     added = [e for e in after if e not in base]
     codes = {code for code, _ in added}
     if not added and named:
-        return f"{script}: {what}: names {sorted(named)}, and the program it leaves checks"
+        return CLEAN
     if added and not codes <= named:
         shown = "; ".join(f"[{c}] {msg}" for c, msg in added[:3])
         return f"{script}: {what}: leaves a program the checker refuses: {shown}"
@@ -257,6 +267,9 @@ def main() -> int:
         pairs += [(r, m) for r in within]
     scratch = pathlib.Path(tempfile.mkdtemp(prefix="pw-mutant-programs-"))
     trees = []
+    # Each mutant's verdict in each program, by whether it added nothing
+    # where its script names codes.
+    clean: dict[tuple[str, str], list[bool]] = {}
     try:
         needed = sorted({f for r in roots for f in held[r]})
         for i in range(WORKERS):
@@ -267,18 +280,22 @@ def main() -> int:
             trees.append(tree)
         base = {r: errors(pw, trees[0], held[r]) for r in roots}
 
-        def worker(i: int) -> list[str]:
-            return [
-                why
-                for r, m in pairs[i::WORKERS]
-                if (why := judge(pw, trees[i], held[r], base[r], m)) is not None
-            ]
+        def worker(i: int) -> list[tuple[tuple[str, str], str | None]]:
+            return [((m[0], m[1]), judge(pw, trees[i], held[r], base[r], m)) for r, m in pairs[i::WORKERS]]
 
         with concurrent.futures.ThreadPoolExecutor(WORKERS) as pool:
             for out in pool.map(worker, range(WORKERS)):
-                failures.extend(out)
+                for key, why in out:
+                    clean.setdefault(key, []).append(why == CLEAN)
+                    if why is not None and why != CLEAN:
+                        failures.append(why)
     finally:
         shutil.rmtree(scratch, ignore_errors=True)
+    # A mutant whose script names codes for it, which every program that
+    # holds its source checks: the names are met nowhere.
+    for m in found:
+        if m[5] and clean.get((m[0], m[1])) and all(clean[(m[0], m[1])]):
+            failures.append(f"{m[0]}: {m[1]}: names {sorted(m[5])}, and the program it leaves checks")
     judged = {(m[0], m[1]) for _, m in pairs}
     if not found:
         failures.append("no mutant of a `.pw` source found: the gate read nothing")

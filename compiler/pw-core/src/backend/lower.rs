@@ -971,16 +971,21 @@ pub fn hole(cx: &Context<'_>, d: &crate::page_values::Derived) -> Lowering<Funct
         Some(b) => hir.body(b).expr_span(d.expr),
         None => hir.decl_span(d.origin.1),
     };
-    let input = match backend_type(cx, &d.input.1, &span) {
-        Lowering::Lowered(t) => t,
-        other => return other.map(|_| unreachable!()),
-    };
+    // Each input, in order (track `device-store`: several, where the browser
+    // computes it from several values it holds).
+    let mut inputs = Vec::new();
+    for (name, ty) in &d.inputs {
+        match backend_type(cx, ty, &span) {
+            Lowering::Lowered(t) => inputs.push((name.clone(), t)),
+            other => return other.map(|_| unreachable!()),
+        }
+    }
     pure_expr(
         cx,
         d.origin.0,
         d.origin.1,
         d.expr,
-        &[(d.input.0.clone(), input)],
+        &inputs,
         &d.export(),
         span,
     )

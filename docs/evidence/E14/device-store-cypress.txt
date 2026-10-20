@@ -1,0 +1,80 @@
+ADR-XXXX - TodoMVC's own Cypress suite over TodoMVC on the device, and the Cypress it runs in
+
+produced by: just e14-device-store-cypress
+commit: b3fe0365cf34681ff5dfba3797c933f12b37bee6
+node: v22.21.1
+cypress: Cypress package version: 15.21.1 Cypress binary version: 15.21.1 Electron version: 37.6.0 Bundled Node version: 22.19.0 
+
+== the acceptance (spikes/todomvc-cypress/run.sh): all 29 must pass, and it is not met where it says FAILED
+
+todomvc-cypress: 7 files are upstream's, byte for byte; cypress 15.21.1
+cypress: Cypress package version: 15.21.1 Cypress binary version: 15.21.1 Electron version: 37.6.0 Bundled Node version: 22.19.0 
+Acceptance requires all 29 official Cypress tests to execute and pass, with exit status zero.
+Storage, timing and skipped-test mismatches remain unmet requirements even when understood.
+
+acceptance: 24 of 29 passed; 3 failed (2 tests, 1 hook); 2 not run
+cypress 15.21.1 on Electron 138 (headless); exit status 3
+
+  1  pass    [When page is initially opened] should focus on the todo input field  (spec.cy.js:533)
+  2  pass    [No Todos] starts with nothing  (spec.cy.js:547)
+  3  pass    [No Todos] should hide #main and #footer  (spec.cy.js:551)
+  4  FAIL    [New Todo] should allow me to add todo items  (spec.cy.js:561)
+             unmet official requirement: checkItemSaved, checkNumberOfTodosInLocalStorage
+             cypress: CypressError: Timed out retrying after 4000ms: `cy.invoke()` errored because the property: `reset` does not exist on your subject.
+  5  pass    [New Todo] should clear text input field when an item is added  (spec.cy.js:589)
+  6  pass    [New Todo] should append new items to the bottom of the list  (spec.cy.js:595)
+  7  pass    [New Todo] should trim text input  (spec.cy.js:613)
+  8  pass    [New Todo] should show #main and #footer when items added  (spec.cy.js:632)
+  9  HOOK    [Mark all as completed] should allow me to mark all items as completed  (spec.cy.js:663)
+             its beforeEach failed: the polling loops of the failed tests before it read a localStorage that Cypress had cleared away, which throws in the spec's own window and is charged to this hook; Cypress then skips the rest of the suite
+             cypress: CypressError: Timed out retrying after 4000ms: `cy.invoke()` errored because the property: `reset` does not exist on your subject.
+ 10  not run [Mark all as completed] should allow me to clear the complete state of all items  (spec.cy.js:677)
+             not run (a failed hook skipped it); it asks localStorage (checkItemSaved, checkNumberOfCompletedTodosInLocalStorage, checkNumberOfTodosInLocalStorage (its context's beforeEach asks it too)): it would fail there, by design
+ 11  not run [Mark all as completed] complete all checkbox should update state when items are completed / cleared  (spec.cy.js:690)
+             not run (a failed hook skipped it); it asks localStorage (checkItemSaved, checkNumberOfCompletedTodosInLocalStorage, checkNumberOfTodosInLocalStorage (its context's beforeEach asks it too)): it would fail there, by design
+ 12  pass    [Item] should allow me to mark items as complete  (spec.cy.js:728)
+ 13  pass    [Item] should allow me to un-mark items as complete  (spec.cy.js:747)
+ 14  pass    [Item] should allow me to edit an item  (spec.cy.js:763)
+ 15  pass    [Editing] should hide other controls when editing  (spec.cy.js:803)
+ 16  pass    [Editing] should save edits on blur  (spec.cy.js:811)
+ 17  pass    [Editing] should trim entered text  (spec.cy.js:832)
+ 18  pass    [Editing] should remove the item if an empty text string was entered  (spec.cy.js:849)
+ 19  pass    [Editing] should cancel edits on escape  (spec.cy.js:864)
+ 20  pass    [Counter] should display the current number of todo items  (spec.cy.js:881)
+ 21  pass    [Clear completed button] should display the correct text  (spec.cy.js:895)
+ 22  pass    [Clear completed button] should remove completed items when clicked  (spec.cy.js:900)
+ 23  pass    [Clear completed button] should be hidden when there are no items that are completed  (spec.cy.js:913)
+ 24  FAIL    [Persistence] should persist its data  (spec.cy.js:921)
+             unmet official requirement: checkCompletedKeywordInLocalStorage, checkNumberOfCompletedTodosInLocalStorage, checkTodosInLocalStorage
+             cypress: CypressError: Timed out retrying after 4000ms: `cy.should()` failed because the page updated as a result of this command, but you tried to continue the command chain. The subject is no longer attached to the DOM, and Cypress cannot requery the page after commands such as `cy.should()`.
+ 25  pass    [Routing] should allow me to display active items  (spec.cy.js:970)
+ 26  pass    [Routing] should respect the back button  (spec.cy.js:981)
+ 27  pass    [Routing] should allow me to display completed items  (spec.cy.js:1004)
+ 28  pass    [Routing] should allow me to display all items  (spec.cy.js:1011)
+ 29  pass    [Routing] should highlight the currently applied filter  (spec.cy.js:1020)
+
+PROBLEM: acceptance requires Cypress exit status 0, explicitly recorded
+PROBLEM: test 4 ('should allow me to add todo items') is fail: acceptance requires every official test to pass
+PROBLEM: test 9 ('should allow me to mark all items as completed') is hook: acceptance requires every official test to pass
+PROBLEM: test 10 ('should allow me to clear the complete state of all items') is skip: acceptance requires every official test to pass
+PROBLEM: test 11 ('complete all checkbox should update state when items are completed / cleared') is skip: acceptance requires every official test to pass
+PROBLEM: test 24 ('should persist its data') is fail: acceptance requires every official test to pass
+acceptance: FAILED: 6 problem(s): the required test outcomes did not pass
+acceptance: exit 1: NOT MET
+
+== the probes, with no app (spikes/todomvc-cypress-probes/run.sh)
+
+probes: Cypress package version: 15.21.1 Cypress binary version: 15.21.1 Electron version: 37.6.0 Bundled Node version: 22.19.0 
+
+== spy (exit 0)
+  ✓ a spy has resetHistory, and no reset
+  ✓ the spec's own call, invoke('reset'), errs as its tests do
+PROBE cypress 15.21.1: reset:undefined resetHistory:function
+spy: 2 passing, 0 failing
+
+== alias (exit 0)
+  ✓ an alias a custom command made with .then() is not read again after a reload
+  ✓ the control: an alias cy.get made is read again after a reload
+alias: 2 passing, 0 failing
+
+probes: OK: both facts hold in this Cypress, with no app

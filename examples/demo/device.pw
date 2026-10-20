@@ -1,0 +1,130 @@
+// @corpus: fixture
+// @id: DEMO-device
+// @category: kind-4 state — values the reader's device keeps
+// @charter: §9.1
+// @milestone: E14
+//
+// Track `device-store` (ADR-XXXX): two values the device keeps, each a
+// module's signal the device provides. The browser keeps them in its own
+// storage, reads them before what they decide is shown, writes each change,
+// and tells every other tab of it; no server is told either.
+// What this shows, in each engine:
+// - the server renders each declared default, and the document says what
+//   the device keeps, under which name and at which version;
+// - a value kept survives a reload, and two tabs agree;
+// - a value version 1 kept is taken to version 2 by `notes_from_1`;
+// - an unreadable value is refused, kept aside, and the default shown;
+// - a full store is said where the change was made;
+// - a value computed from the device's value and the page's is computed
+//   again when either changes, and a row keeps its element as its list is
+//   reordered.
+//
+// The list has an element of its own, `#list`: an element holding what the
+// device decides is hidden until the device is read, and the field above it
+// is the page's, shown and focusable from the first byte.
+
+module demo.device
+
+import List
+import String
+import events.{ KeyEvent }
+
+// A note as the device keeps it at version 2: its text, and whether it is
+// pinned.
+type Note = Note { id: String, text: String, pinned: Bool }
+
+// A note as version 1 kept it: its text alone.
+type NoteV1 = NoteV1 { text: String }
+
+// **The notes this device keeps**, under `demo-notes@2`.
+signal notes: List<Note> = []
+    storage  device "demo-notes"
+    privacy  Device
+    conflict last_write_wins
+    version  2
+    migrate  notes_from_1
+
+// **Version 1's notes, at version 2**: each kept, unpinned, its text its
+// identity, as version 1 had none other.
+fn notes_from_1(old: List<NoteV1>) -> List<Note> !{} {
+    List.map(old, (n) => Note { id: n.text, text: n.text, pinned: false })
+}
+
+// **How many times this device pressed "Count"**, under `demo-count`.
+signal presses: Int = 0
+    storage  device "demo-count"
+    privacy  Device
+    conflict last_write_wins
+
+// A note added at the bottom, named by how many came before it.
+fn added(notes: List<Note>, text: String) -> List<Note> !{} {
+    let trimmed = String.trim(text)
+    if String.length(trimmed) == 0 {
+        notes
+    } else {
+        List.concat(notes, [Note { id: "{List.length(notes)}-{trimmed}", text: trimmed, pinned: false }])
+    }
+}
+
+fn counted(n: Int) -> String !{} {
+    if n == 1 {
+        "1 note"
+    } else {
+        "{n} notes"
+    }
+}
+
+// **The notes in the order shown**: as added, or the newest first. The rows
+// are the same notes either way, each one row the browser keeps as it moves.
+fn ordered(notes: List<Note>, newest: Bool) -> List<Note> !{} {
+    if newest {
+        List.reverse(notes)
+    } else {
+        notes
+    }
+}
+
+// **What the notes would be with what is typed**, computed from both, the
+// device's value and the page's, again whenever either changes.
+fn summary(notes: List<Note>, draft: String) -> String !{} {
+    let typed = String.trim(draft)
+    if String.length(typed) == 0 {
+        counted(List.length(notes))
+    } else {
+        "{counted(List.length(notes) + 1)} once {typed} is added"
+    }
+}
+
+page DevicePage() {
+    cache private
+
+    signal draft: String = ""
+    signal newest: Bool = false
+
+    view {
+        <title>Kept on this device</title>
+        <main>
+            <h1>Notes</h1>
+            <input id="draft" aria-label="A note" bind:value={draft}
+                on:keydown={(e: KeyEvent) => if e.key == "Enter" {
+                    notes = added(notes, draft)
+                    draft = ""
+                }} />
+            <p id="summary">{summary(notes, draft)}</p>
+            <p id="count">{counted(List.length(notes))}</p>
+            <section id="list" aria-label="The notes">
+                {#if List.length(notes) > 0}
+                    <ul id="notes">
+                        {#each ordered(notes, newest) as note (note.id)}
+                            <li>{note.text}</li>
+                        {/each}
+                    </ul>
+                {/if}
+            </section>
+            <button id="newest" type="button" on:press={() => newest = !newest}>Newest first</button>
+            <button id="clear" type="button" on:press={() => notes = []}>Clear</button>
+            <button id="press" type="button" on:press={() => presses = presses + 1}>Count</button>
+            <p id="presses">{presses}</p>
+        </main>
+    }
+}

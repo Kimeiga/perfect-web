@@ -891,6 +891,9 @@ mod materializations;
 mod messages;
 // TRACK SEAM (kiokun): kiokun's dictionary, read (docs/PARALLEL.md, W6).
 mod kiokun;
+// TRACK SEAM (device-store): a document of a page that holds values the
+// device keeps (ADR-XXXX).
+mod device;
 // ADR-0304: the platform's clock, and what a value read by it holds until.
 mod clock;
 // ADR-0305: a page's commands run in the order it sent them.
@@ -1871,10 +1874,21 @@ impl Server {
                     .as_str()
                     .is_some_and(notifications::is_current_user)
             });
+        // TRACK SEAM (device-store): a page that holds a value the device
+        // keeps hides what it decides until it is read, by a style its
+        // policy allows by its hash (ADR-XXXX).
+        let mut needs = csp::Needs::of(&templates);
+        if std::iter::once(&plan)
+            .chain(plans.values())
+            .any(device::holds)
+        {
+            needs.styles.insert(device::READING.to_string());
+            needs.styles.insert(device::UNSCRIPTED.to_string());
+        }
         Server {
             cart_by_reader,
             build_id,
-            needs: csp::Needs::of(&templates),
+            needs,
             templates,
             data,
             store,
@@ -6121,7 +6135,8 @@ impl Server {
                 continue;
             };
             let part = live["part"].as_u64().unwrap_or_default() as u32;
-            // A text part, an attribute, or a block's subject (ADR-0229).
+            // A text part, an attribute, or a block's subject (ADR-0229); or
+            // a list the browser computes (track `device-store`, ADR-XXXX).
             let path = match find_part(&template.chunks, part) {
                 Some(
                     pw_render::ir::Part::Text { value, .. }
@@ -6130,14 +6145,29 @@ impl Server {
                     | pw_render::ir::Part::Conditional { value, .. }
                     | pw_render::ir::Part::Match { value, .. },
                 ) => value.clone(),
+                Some(pw_render::ir::Part::Each { collection, .. }) => collection.clone(),
                 _ => return Err(format!("part {part} reads no value")),
             };
-            let mut at = live["path"].as_str().unwrap_or_default().split('.');
-            let mut first = first_value(plan, at.next().unwrap_or_default());
-            for field in at {
-                first = first[field].clone();
-            }
-            let value = self.computed_from(id, &first)?;
+            // Each value it reads, at its first: one at `path`, or several
+            // (track `device-store`), in order.
+            let paths: Vec<&str> = match live["paths"].as_array() {
+                Some(several) if !several.is_empty() => {
+                    several.iter().filter_map(|p| p.as_str()).collect()
+                }
+                _ => vec![live["path"].as_str().unwrap_or_default()],
+            };
+            let firsts: Vec<serde_json::Value> = paths
+                .iter()
+                .map(|p| {
+                    let mut at = p.split('.');
+                    let mut first = first_value(plan, at.next().unwrap_or_default());
+                    for field in at {
+                        first = first[field].clone();
+                    }
+                    first
+                })
+                .collect();
+            let value = self.computed_from(id, &firsts)?;
             env = env.set(&path, val_to_value(&value));
         }
         Ok(env)
@@ -6145,7 +6175,7 @@ impl Server {
 
     /// **A computed value's component, run with `json`** (ADR-0227), typed
     /// by its parameter as a command's argument is: pure, with what it reads.
-    fn computed_from(&self, id: &str, json: &serde_json::Value) -> Result<Val, String> {
+    fn computed_from(&self, id: &str, inputs: &[serde_json::Value]) -> Result<Val, String> {
         let loaded = self
             .components
             .get(id)
@@ -6157,9 +6187,7 @@ impl Server {
             .and_then(|c| c.exports.first())
             .and_then(|e| e.component.clone())
             .ok_or_else(|| format!("`{id}`'s contract does not locate its export"))?;
-        let args = loaded
-            .prepared
-            .arguments_for(&export, std::slice::from_ref(json))?;
+        let args = loaded.prepared.arguments_for(&export, inputs)?;
         self.run(id, "", &BTreeMap::new(), &args)?
             .into_iter()
             .next()
@@ -10221,6 +10249,10 @@ fn serve_file(server: &Server, stream: &mut TcpStream, route: &str) {
         // A stylesheet the build ships, which a page's policy allows from
         // this origin, and which a browser applies only as `text/css`.
         Some("css") => "text/css; charset=utf-8",
+        // TRACK SEAM (todomvc): a drawing the build ships, which the page's
+        // stylesheet draws a checkbox with (`img-src 'self'`, ADR-0333): a
+        // browser draws an image only as `image/svg+xml`, under `nosniff`.
+        Some("svg") => "image/svg+xml",
         _ => "application/octet-stream",
     };
     match std::fs::read(&path) {
@@ -10299,6 +10331,18 @@ fn signal_manifest(
     (signals, live, blocks)
 }
 
+/// **The signal a page binds to its address's fragment** (track `todomvc`,
+/// ADR-XXXX), as its plan states it: the signal and each form the fragment
+/// takes with the value the signal takes then, carried in the document's
+/// manifest. The browser keeps the signal in step with `location.hash`; this
+/// host renders the signal's first value, since a request carries no
+/// fragment.
+fn with_fragment(manifest: &mut serde_json::Value, plan: &serde_json::Value) {
+    if let Some(binding) = plan.get("fragment").filter(|f| !f.is_null()) {
+        manifest["fragment"] = binding.clone();
+    }
+}
+
 /// Each signal's first value, set into a rendering environment (ADR-0130).
 fn with_signals(mut env: Env, plan: &serde_json::Value) -> Env {
     for s in plan["signals"].as_array().into_iter().flatten() {
@@ -10329,7 +10373,10 @@ fn computed_module(plan: &serde_json::Value) -> Option<String> {
         .as_array()
         .into_iter()
         .flatten()
-        .any(|l| l["derived"].is_string());
+        .any(|l| l["derived"].is_string())
+        // TRACK SEAM (device-store): or the steps of a value the device
+        // keeps from an earlier version to its own.
+        || device::migrates(plan);
     computes.then(|| {
         format!(
             "/computed/{}.mjs",
@@ -10368,6 +10415,10 @@ fn signal_document(
         "listens": false,
     });
     let mut manifest = manifest;
+    // The signal it binds to its address's fragment (track `todomvc`).
+    with_fragment(&mut manifest, plan);
+    // TRACK SEAM (device-store): what the device keeps that it holds.
+    device::with_device(&mut manifest, plan);
     // What it computes from its signals (ADR-0227).
     if let Some(module) = computed_module(plan) {
         manifest["computed"] = serde_json::Value::String(module);
@@ -10381,10 +10432,13 @@ fn signal_document(
         pw_render::escape::json_in_script(&serde_json::to_string(&manifest).unwrap_or_default());
     // Where a failed press is said (ADR-0302), from the first byte.
     let announcer = pw_render::ANNOUNCER;
+    // TRACK SEAM (device-store): its root reading the device, and the style
+    // that hides what the device decides until it has (ADR-XXXX).
+    let (root, device) = (device::root(plan), device::head(plan));
     format!(
-        "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
+        "<!doctype html>\n<html{root}>\n<head>\n<meta charset=\"utf-8\">\n\
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
-         <title>{}</title>\n{metadata}</head>\n<body>\n{body}\n\
+         <title>{}</title>\n{metadata}{device}</head>\n<body>\n{body}\n\
          {announcer}\n<script type=\"application/json\" id=\"pw-parts\">{json}</script>\n\
          {RUNTIME}\n{DOCUMENT_END}",
         pw_render::escape::text(title)
@@ -10548,6 +10602,10 @@ fn document(
         manifest["live"] = live;
         manifest["blocks"] = serde_json::Value::Object(blocks);
     }
+    // The signal it binds to its address's fragment (track `todomvc`).
+    with_fragment(&mut manifest, plan);
+    // TRACK SEAM (device-store): what the device keeps that it holds.
+    device::with_device(&mut manifest, plan);
     // What it computes from them (ADR-0227).
     if let Some(module) = computed_module(plan) {
         manifest["computed"] = serde_json::Value::String(module);
@@ -10628,10 +10686,13 @@ fn document(
     };
     // Where a failed press is said (ADR-0302), from the first byte.
     let announcer = pw_render::ANNOUNCER;
+    // TRACK SEAM (device-store): its root reading the device, and the style
+    // that hides what the device decides until it has (ADR-XXXX).
+    let (root, device) = (device::root(plan), device::head(plan));
     format!(
-        "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
+        "<!doctype html>\n<html{root}>\n<head>\n<meta charset=\"utf-8\">\n\
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
-         <title>{title}</title>\n{metadata}{style}</head>\n<body>\n{body}\n\
+         <title>{title}</title>\n{metadata}{style}{device}</head>\n<body>\n{body}\n\
          {announcer}\n<script type=\"application/json\" id=\"pw-parts\">{json}</script>\n\
          {RUNTIME}\n{DOCUMENT_END}",
         title = pw_render::escape::text(title)
@@ -14535,6 +14596,17 @@ public query Store(",
     // TRACK SEAM (kiokun): kiokun.com's word page, served from kiokun's
     // files (docs/PARALLEL.md, W6).
     mod kiokun;
+
+    // TRACK SEAM (todomvc): a page's fragment binding reaches its document
+    // (docs/PARALLEL.md, W7).
+    mod address_fragment;
+
+    // TRACK SEAM (todomvc): TodoMVC, built and served (docs/PARALLEL.md, W7).
+    mod todomvc;
+
+    // TRACK SEAM (device-store): a page that holds a value the device keeps,
+    // served (ADR-XXXX).
+    mod device_store;
 
     // TRACK SEAM (store-search): the store's search page, served (W9).
     mod store_search;

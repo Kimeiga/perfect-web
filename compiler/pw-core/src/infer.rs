@@ -322,14 +322,24 @@ impl<'a> Types<'a> {
                 if types.bindings.contains_key(&Binder::Each(*n)) {
                     continue;
                 }
+                // A path whose root no binding holds is a module's signal's
+                // (track `device-store`): of the type it declares.
+                let of_a_module_signal = |root: ExprId| match body.expr(root) {
+                    Expr::Name(n) => types.module_signal(n).is_some(),
+                    _ => false,
+                };
                 let elem = match head {
                     Some(b) => types.element_at(body, *b, fields),
-                    None if crate::lexical::path_root(body, *list).is_none() => types
-                        .of(body, *list)
-                        .as_ref()
-                        .and_then(element_of_type)
-                        .filter(|t| !mentions_parameter(t))
-                        .cloned(),
+                    None if crate::lexical::path_root(body, *list)
+                        .is_none_or(of_a_module_signal) =>
+                    {
+                        types
+                            .of(body, *list)
+                            .as_ref()
+                            .and_then(element_of_type)
+                            .filter(|t| !mentions_parameter(t))
+                            .cloned()
+                    }
                     None => None,
                 };
                 if let Some(elem) = elem {
@@ -662,13 +672,32 @@ impl<'a> Types<'a> {
         &self.lexical
     }
 
+    /// The type a module's signal named `n` declares, where `n` names one
+    /// from this body's module.
+    fn module_signal(&self, n: &str) -> Option<ResolvedType> {
+        let unit = self.sigs.unit_of(self.module.as_deref())?;
+        let def = match self
+            .sigs
+            .workspace()
+            .resolve_in(unit, crate::resolve::Namespace::Term, n)
+        {
+            crate::resolve::Resolution::Local(d)
+            | crate::resolve::Resolution::Imported { def: d, .. } => d,
+            _ => return None,
+        };
+        self.sigs.signal_type(def)?.resolved().cloned()
+    }
+
     pub fn of(&self, body: &Body, id: ExprId) -> Option<ResolvedType> {
         match body.expr(id) {
             // The binding the name means here (ADR-0063), or `self`.
             Expr::Name(n) => match self.lexical.binder(id) {
                 Some(b) => self.bindings.get(&b).cloned(),
                 None if n == "self" => self.self_type.clone(),
-                None => None,
+                // A module's signal the body reads, provided to it or kept
+                // by the device: of the type it declares (ADR-0144; track
+                // `device-store`).
+                None => self.module_signal(n),
             },
             Expr::Field { base, name } => {
                 let receiver = self.of(body, *base)?;

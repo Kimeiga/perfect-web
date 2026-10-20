@@ -1,0 +1,43 @@
+// @status: NEIGHBOUR
+// @invariant: device_value_to_a_command
+// @dimension: valid neighbour — a command given the page's own value, and the device's shown
+module generality.device_summary_ok
+
+import List
+import String
+import events.{ KeyEvent }
+
+type Note = Note { text: String }
+
+signal notes: List<Note> = []
+    storage  device "generality-notes-ok"
+    privacy  Device
+    conflict last_write_wins
+
+opaque type Press = String
+
+command report(summary: String) -> Result<Int, String>
+    idempotent_by Press
+{
+    Ok(String.length(summary))
+}
+
+page Notes() {
+    route "/notes"
+    cache private
+
+    signal draft: String = ""
+
+    view {
+        <title>Notes</title>
+        <main>
+            <p>{List.length(notes)} kept on this device</p>
+            <input aria-label="Report" bind:value={draft} on:keydown={(e: KeyEvent) => if e.key == "Enter" {
+                match report(draft) {
+                    Ok(_) => draft = "",
+                    Err(_) => draft = draft,
+                }
+            }} />
+        </main>
+    }
+}

@@ -537,6 +537,22 @@ pub(crate) fn manifest_scope(hir: &Hir, decl: &Decl) -> Option<crate::privacy::L
     }
 }
 
+/// **A capture of what the device keeps is written where the device is**
+/// (track `device-store`, ADR-XXXX): such a value exists only in the
+/// browser, which renders the parts that read it, and writes their handlers'
+/// captures into the document it holds, on the device. The server writes a
+/// capture of one only at its declared default, a constant of the program's
+/// own text. So `Device` is no restriction on the document a capture lands
+/// in; every other one is, as before.
+fn written_by_its_device(label: crate::privacy::Label) -> crate::privacy::Label {
+    label
+        .restrictions()
+        .filter(|r| **r != crate::privacy::Restriction::Device)
+        .fold(crate::privacy::Label::public(), |l, r| {
+            l.join(&crate::privacy::Label::of(r.clone()))
+        })
+}
+
 pub fn check(
     hir: &Hir,
     sigs: &Signatures,
@@ -648,7 +664,7 @@ pub fn check(
                     &BoundaryContext {
                         boundary: Boundary::Resume,
                         direction: Direction::Outbound,
-                        label: labels.label(body, expr),
+                        label: written_by_its_device(labels.label(body, expr)),
                         destination: destination.clone(),
                     },
                 );

@@ -1,0 +1,167 @@
+TodoMVC acceptance gate correction, 2026-10-15 America/New_York
+This validates refusal of a failing application; it is not passing application acceptance.
+commit before corrective commit: faaa1afaf4665ed7f3ba77c77813a09e375b683c + uncommitted gate changes
+Reproduce:
+  python3 -B -m unittest scripts/tests/test_todomvc_cypress.py
+  PYTHONDONTWRITEBYTECODE=1 python3 scripts/todomvc_cypress_mutations.py
+  PORT=7541 OUT=/tmp/todomvc-cypress.txt bash spikes/todomvc-cypress/run.sh
+    EXPECTED CURRENT APPLICATION RESULT: gate exit 1, because official acceptance fails
+  just evidence-gates
+  just ci
+
+Gate input SHA256:
+8b824553a496ded564592b94e77e3b95a6194111807ce6d6d135fcd6e287d4ec  scripts/todomvc_cypress_result.py
+9b815d3002d028dcab25779c08292c5b19749a063ba413201da0f474120f3230  scripts/tests/test_todomvc_cypress.py
+f75cbc16be9422d6c22c4811ee1b76016ae4ca8486e8b5edac6c8133139e3a7c  scripts/todomvc_cypress_mutations.py
+1522bbdeb8d548d69dd4d2eec5973803dfee40b91f1e4d8ead3ab1ecf2823cfa  spikes/todomvc-cypress/run.sh
+
+Corrective gate tests: 41 passed (including synthetic complete-output positives).
+Evidence harness: 201 passed, one intentional skip (202 total).
+Full just ci: ci: OK; Rust summaries total 2913 passed, 25 ignored across 337 result sections.
+mutant programs: 279 mutants, 13 refused by their named rule, 0 failing.
+
+== Whole gate mutation run (raw)
+baseline: 41 passed, 0 failed
+acceptance: an incomplete official suite is let by: KILLED (3 of 41 tests fail)
+acceptance: no explicit successful exit status is needed: KILLED (1 of 41 tests fail)
+a blob is hashed without its header, so it is not git's: KILLED (13 of 41 tests fail)
+a vendored file that is gone is not a problem: KILLED (1 of 41 tests fail)
+a vendored file that differs from upstream's is not a problem: KILLED (1 of 41 tests fail)
+another Cypress than upstream's lockfile pins is not a problem: KILLED (1 of 41 tests fail)
+a suite that is not upstream's exits 0: KILLED (1 of 41 tests fail)
+a context's beforeEach asks nothing of localStorage: KILLED (2 of 41 tests fail)
+a test asks localStorage only in its own body: KILLED (2 of 41 tests fail)
+colour codes are part of a line: KILLED (1 of 41 tests fail)
+a pending test is not read: KILLED (6 of 41 tests fail)
+the table of counts is not read: KILLED (21 of 41 tests fail)
+the browser's record of the polling loop's throw is not read: KILLED (3 of 41 tests fail)
+a failed hook is taken for a failed test of its own name: KILLED (2 of 41 tests fail)
+output with no results table is read as results: KILLED (4 of 41 tests fail)
+the spec's number of tests is not held: KILLED (1 of 41 tests fail)
+Cypress's table is not held to its own lines: KILLED (1 of 41 tests fail)
+a failing count one too many is not seen: KILLED (7 of 41 tests fail)
+Cypress's exit status is not held to its failing count: KILLED (2 of 41 tests fail)
+a test the spec does not have is let by: KILLED (1 of 41 tests fail)
+diagnostic: the persistence test need not be skipped by the suite: KILLED (1 of 41 tests fail)
+diagnostic: the test that races the host is not known: KILLED (4 of 41 tests fail)
+diagnostic: the test that races the host may fail for any reason: KILLED (1 of 41 tests fail)
+diagnostic: the test that races the host may be skipped: KILLED (1 of 41 tests fail)
+diagnostic: no other test need pass: KILLED (1 of 41 tests fail)
+both modes are judged as the diagnostic: KILLED (6 of 41 tests fail)
+a run with problems exits 0: KILLED (7 of 41 tests fail)
+output that is not there exits 0: KILLED (1 of 41 tests fail)
+a report of problems does not say it failed: KILLED (3 of 41 tests fail)
+a report of a suite that did not run does not say so: KILLED (1 of 41 tests fail)
+run.sh does not look for Xvfb: KILLED (1 of 41 tests fail)
+run.sh runs a Cypress whose binary is not installed: KILLED (1 of 41 tests fail)
+run.sh runs without a build of the app: KILLED (1 of 41 tests fail)
+run.sh does not look for the host's binary: KILLED (1 of 41 tests fail)
+run.sh's cannot-run exits 0: KILLED (4 of 41 tests fail)
+run.sh's own status is not the verdict's: KILLED (4 of 41 tests fail)
+run.sh judges the diagnostic as the acceptance: KILLED (1 of 41 tests fail)
+run.sh does not tell the verdict what Cypress exited with: KILLED (2 of 41 tests fail)
+run.sh leaves the browser's console off, where a failed hook says why: KILLED (1 of 41 tests fail)
+run.sh leaves the machine's display in Cypress's environment: KILLED (1 of 41 tests fail)
+run.sh names the acceptance's app as the diagnostic's: KILLED (1 of 41 tests fail)
+run.sh's diagnostic reaches the page without its fragment: KILLED (1 of 41 tests fail)
+42 of 42 mutants killed
+memory bound: no process was stopped
+
+== Actual unchanged official Cypress run (raw verdict; gate exits 1)
+todomvc-cypress: 7 files are upstream's, byte for byte; cypress 15.21.1
+cypress: Cypress package version: 15.21.1 Cypress binary version: 15.21.1 Electron version: 37.6.0 Bundled Node version: 22.19.0 
+Acceptance requires all 29 official Cypress tests to execute and pass, with exit status zero.
+Storage, timing and skipped-test mismatches remain unmet requirements even when understood.
+
+acceptance: 3 of 29 passed; 3 failed (2 tests, 1 hook); 23 not run
+cypress 15.21.1 on Electron 138 (headless); exit status 3
+
+  1  pass    [When page is initially opened] should focus on the todo input field  (spec.cy.js:533)
+  2  pass    [No Todos] starts with nothing  (spec.cy.js:547)
+  3  pass    [No Todos] should hide #main and #footer  (spec.cy.js:551)
+  4  FAIL    [New Todo] should allow me to add todo items  (spec.cy.js:561)
+             unmet official requirement: checkItemSaved, checkNumberOfTodosInLocalStorage
+             cypress: AssertionError: Timed out retrying after 4000ms: expected setItem to have been called at least once, but it was never called
+  5  FAIL    [New Todo] should clear text input field when an item is added  (spec.cy.js:589)
+             unmet official requirement: checkNumberOfTodosInLocalStorage
+             cypress: CypressError: `cy.then()` timed out after waiting `4000ms`.
+  6  HOOK    [New Todo] should append new items to the bottom of the list  (spec.cy.js:595)
+             its beforeEach failed: the polling loops of the failed tests before it read a localStorage that Cypress had cleared away, which throws in the spec's own window and is charged to this hook; Cypress then skips the rest of the suite
+             cypress: Error: Cannot determine what kind of selectors this app uses.
+  7  not run [New Todo] should trim text input  (spec.cy.js:613)
+             not run (a failed hook skipped it); it asks localStorage (checkNumberOfTodosInLocalStorage): it would fail there, by design
+  8  not run [New Todo] should show #main and #footer when items added  (spec.cy.js:632)
+             not run (a failed hook skipped it); it asks localStorage (checkNumberOfTodosInLocalStorage): it would fail there, by design
+  9  not run [Mark all as completed] should allow me to mark all items as completed  (spec.cy.js:663)
+             not run (a failed hook skipped it); it asks localStorage (checkItemSaved, checkNumberOfCompletedTodosInLocalStorage, checkNumberOfTodosInLocalStorage (its context's beforeEach asks it too)): it would fail there, by design
+ 10  not run [Mark all as completed] should allow me to clear the complete state of all items  (spec.cy.js:677)
+             not run (a failed hook skipped it); it asks localStorage (checkItemSaved, checkNumberOfCompletedTodosInLocalStorage, checkNumberOfTodosInLocalStorage (its context's beforeEach asks it too)): it would fail there, by design
+ 11  not run [Mark all as completed] complete all checkbox should update state when items are completed / cleared  (spec.cy.js:690)
+             not run (a failed hook skipped it); it asks localStorage (checkItemSaved, checkNumberOfCompletedTodosInLocalStorage, checkNumberOfTodosInLocalStorage (its context's beforeEach asks it too)): it would fail there, by design
+ 12  not run [Item] should allow me to mark items as complete  (spec.cy.js:728)
+             not run (a failed hook skipped it); it asks localStorage (checkNumberOfCompletedTodosInLocalStorage): it would fail there, by design
+ 13  not run [Item] should allow me to un-mark items as complete  (spec.cy.js:747)
+             not run (a failed hook skipped it); it asks localStorage (checkNumberOfCompletedTodosInLocalStorage): it would fail there, by design
+ 14  not run [Item] should allow me to edit an item  (spec.cy.js:763)
+             not run (a failed hook skipped it); it asks localStorage (checkTodosInLocalStorage): it would fail there, by design
+ 15  not run [Editing] should hide other controls when editing  (spec.cy.js:803)
+             not run (a failed hook skipped it); it asks localStorage (checkNumberOfTodosInLocalStorage (its context's beforeEach asks it too)): it would fail there, by design
+ 16  not run [Editing] should save edits on blur  (spec.cy.js:811)
+             not run (a failed hook skipped it); it asks localStorage (checkNumberOfTodosInLocalStorage, checkTodosInLocalStorage (its context's beforeEach asks it too)): it would fail there, by design
+ 17  not run [Editing] should trim entered text  (spec.cy.js:832)
+             not run (a failed hook skipped it); it asks localStorage (checkNumberOfTodosInLocalStorage, checkTodosInLocalStorage (its context's beforeEach asks it too)): it would fail there, by design
+ 18  not run [Editing] should remove the item if an empty text string was entered  (spec.cy.js:849)
+             not run (a failed hook skipped it); it asks localStorage (checkNumberOfTodosInLocalStorage (its context's beforeEach asks it too)): it would fail there, by design
+ 19  not run [Editing] should cancel edits on escape  (spec.cy.js:864)
+             not run (a failed hook skipped it); it asks localStorage (checkNumberOfTodosInLocalStorage (its context's beforeEach asks it too)): it would fail there, by design
+ 20  not run [Counter] should display the current number of todo items  (spec.cy.js:881)
+             not run (a failed hook skipped it); it asks localStorage (checkNumberOfTodosInLocalStorage): it would fail there, by design
+ 21  not run [Clear completed button] should display the correct text  (spec.cy.js:895)
+             not run (a failed hook skipped it); it asks nothing of localStorage: the diagnostic runs it
+ 22  not run [Clear completed button] should remove completed items when clicked  (spec.cy.js:900)
+             not run (a failed hook skipped it); it asks nothing of localStorage: the diagnostic runs it
+ 23  not run [Clear completed button] should be hidden when there are no items that are completed  (spec.cy.js:913)
+             not run (a failed hook skipped it); it asks nothing of localStorage: the diagnostic runs it
+ 24  not run [Persistence] should persist its data  (spec.cy.js:921)
+             not run (a failed hook skipped it); it asks localStorage (checkCompletedKeywordInLocalStorage, checkNumberOfCompletedTodosInLocalStorage, checkTodosInLocalStorage): it would fail there, by design
+ 25  not run [Routing] should allow me to display active items  (spec.cy.js:970)
+             not run (a failed hook skipped it); it asks localStorage (checkNumberOfCompletedTodosInLocalStorage, checkTodosInLocalStorage (its context's beforeEach asks it too)): it would fail there, by design
+ 26  not run [Routing] should respect the back button  (spec.cy.js:981)
+             not run (a failed hook skipped it); it asks localStorage (checkNumberOfCompletedTodosInLocalStorage, checkTodosInLocalStorage (its context's beforeEach asks it too)): it would fail there, by design
+ 27  not run [Routing] should allow me to display completed items  (spec.cy.js:1004)
+             not run (a failed hook skipped it); it asks localStorage (checkNumberOfCompletedTodosInLocalStorage, checkTodosInLocalStorage (its context's beforeEach asks it too)): it would fail there, by design
+ 28  not run [Routing] should allow me to display all items  (spec.cy.js:1011)
+             not run (a failed hook skipped it); it asks localStorage (checkNumberOfCompletedTodosInLocalStorage, checkTodosInLocalStorage (its context's beforeEach asks it too)): it would fail there, by design
+ 29  not run [Routing] should highlight the currently applied filter  (spec.cy.js:1020)
+             not run (a failed hook skipped it); it asks localStorage (checkTodosInLocalStorage (in its context's beforeEach)): it would fail there, by design
+
+recorded by the browser: Uncaught SecurityError: Failed to read the 'length' property from 'Storage' ...
+
+PROBLEM: acceptance requires Cypress exit status 0, explicitly recorded
+PROBLEM: test 4 ('should allow me to add todo items') is fail: acceptance requires every official test to pass
+PROBLEM: test 5 ('should clear text input field when an item is added') is fail: acceptance requires every official test to pass
+PROBLEM: test 6 ('should append new items to the bottom of the list') is hook: acceptance requires every official test to pass
+PROBLEM: test 7 ('should trim text input') is skip: acceptance requires every official test to pass
+PROBLEM: test 8 ('should show #main and #footer when items added') is skip: acceptance requires every official test to pass
+PROBLEM: test 9 ('should allow me to mark all items as completed') is skip: acceptance requires every official test to pass
+PROBLEM: test 10 ('should allow me to clear the complete state of all items') is skip: acceptance requires every official test to pass
+PROBLEM: test 11 ('complete all checkbox should update state when items are completed / cleared') is skip: acceptance requires every official test to pass
+PROBLEM: test 12 ('should allow me to mark items as complete') is skip: acceptance requires every official test to pass
+PROBLEM: test 13 ('should allow me to un-mark items as complete') is skip: acceptance requires every official test to pass
+PROBLEM: test 14 ('should allow me to edit an item') is skip: acceptance requires every official test to pass
+PROBLEM: test 15 ('should hide other controls when editing') is skip: acceptance requires every official test to pass
+PROBLEM: test 16 ('should save edits on blur') is skip: acceptance requires every official test to pass
+PROBLEM: test 17 ('should trim entered text') is skip: acceptance requires every official test to pass
+PROBLEM: test 18 ('should remove the item if an empty text string was entered') is skip: acceptance requires every official test to pass
+PROBLEM: test 19 ('should cancel edits on escape') is skip: acceptance requires every official test to pass
+PROBLEM: test 20 ('should display the current number of todo items') is skip: acceptance requires every official test to pass
+PROBLEM: test 21 ('should display the correct text') is skip: acceptance requires every official test to pass
+PROBLEM: test 22 ('should remove completed items when clicked') is skip: acceptance requires every official test to pass
+PROBLEM: test 23 ('should be hidden when there are no items that are completed') is skip: acceptance requires every official test to pass
+PROBLEM: test 24 ('should persist its data') is skip: acceptance requires every official test to pass
+PROBLEM: test 25 ('should allow me to display active items') is skip: acceptance requires every official test to pass
+PROBLEM: test 26 ('should respect the back button') is skip: acceptance requires every official test to pass
+PROBLEM: test 27 ('should allow me to display completed items') is skip: acceptance requires every official test to pass
+PROBLEM: test 28 ('should allow me to display all items') is skip: acceptance requires every official test to pass
+PROBLEM: test 29 ('should highlight the currently applied filter') is skip: acceptance requires every official test to pass
+acceptance: FAILED: 27 problem(s): the required test outcomes did not pass

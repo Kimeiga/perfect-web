@@ -1222,6 +1222,33 @@ pub fn lowered(
         provided.insert(signal, name.clone());
         signals.insert(name);
     }
+    // **And each signal the device keeps that it, its layout or a view it
+    // composes names** (track `device-store`, ADR-XXXX): one value for the
+    // page, under the name it is declared with, its first value the
+    // declaration's default, which the server renders and the browser
+    // replaces with the device's.
+    if decl.kind == crate::hir::DeclKind::Page {
+        for (name, signal) in crate::device_store::held_by(hirs, ws, sigs, unit, id) {
+            if signals.contains(&name) {
+                continue;
+            }
+            let Some(init) = crate::resolve::declaration(hirs, signal)
+                .and_then(|d| d.body)
+                .map(|b| hirs[signal.unit].body(b).root)
+            else {
+                continue;
+            };
+            ix.instances.push(Instance {
+                name: name.clone(),
+                origin: (signal.unit, DeclId(signal.decl)),
+                init,
+                ty: InstanceType::Declared(signal),
+                within: Vec::new(),
+            });
+            provided.insert(signal, name.clone());
+            signals.insert(name);
+        }
+    }
     // The names its markup can read outside any block (ADR-0310): its
     // parameters, its query bindings and its signals.
     let around: BTreeSet<String> = decl
@@ -2347,6 +2374,60 @@ struct Element<'a> {
     self_closing: bool,
 }
 
+/// **Whether `e` reads a signal the device keeps** (track `device-store`):
+/// a name of one among the signals this body reads.
+fn reads_the_device(body: &Body, e: ExprId, ctx: &Lowering<'_>) -> bool {
+    body.walk_from(e).into_iter().any(|x| match body.expr(x) {
+        Expr::Name(n) => {
+            ctx.signals.contains(n)
+                && matches!(
+                    ctx.ws.resolve(ctx.unit, n),
+                    crate::resolve::Resolution::Local(d)
+                        | crate::resolve::Resolution::Imported { def: d, .. }
+                        if ctx.sigs.kept_by_the_device(d)
+                )
+        }
+        _ => false,
+    })
+}
+
+/// **Whether an element holds a part the device decides** (track
+/// `device-store`): one of its attributes, a handler's aside, reads a signal
+/// the device keeps, or a text or block whose nearest element it is does,
+/// through the blocks between, which are no element.
+fn decided_by_the_device(
+    body: &Body,
+    attrs: &[crate::hir::Attr],
+    children: &[NodeId],
+    ctx: &Lowering<'_>,
+) -> bool {
+    fn own(body: &Body, n: NodeId, ctx: &Lowering<'_>) -> bool {
+        match body.node(n) {
+            Node::Interpolation(e) => reads_the_device(body, *e, ctx),
+            Node::Block {
+                subject,
+                each,
+                children,
+                ..
+            } => {
+                subject.is_some_and(|e| reads_the_device(body, e, ctx))
+                    || each
+                        .as_ref()
+                        .is_some_and(|h| reads_the_device(body, h.list, ctx))
+                    || children.iter().any(|c| own(body, *c, ctx))
+            }
+            Node::Branch { condition, .. } => {
+                condition.is_some_and(|e| reads_the_device(body, e, ctx))
+            }
+            _ => false,
+        }
+    }
+    attrs.iter().any(|a| {
+        a.event().is_none()
+            && matches!(a.value, AttrValue::Expr(e) if reads_the_device(body, e, ctx))
+    }) || children.iter().any(|c| own(body, *c, ctx))
+}
+
 fn lower_element(
     body: &Body,
     el: Element<'_>,
@@ -2448,6 +2529,15 @@ fn lower_element(
     out.push(Chunk::Static(format!("<{tag}")));
     if let Some(o) = owner {
         out.push(Chunk::Static(format!(" data-pw=\"{o}\"")));
+    }
+    // **What the device decides is not shown until the device is read**
+    // (track `device-store`, ADR-XXXX, decision 3): an element one of whose
+    // attributes, or a text or block whose nearest element it is, reads a
+    // signal the device keeps. The server renders the declared default; the
+    // document's head keeps a marked element hidden while the document is
+    // reading the device, and the runtime shows it once it has.
+    if decided_by_the_device(body, attrs, children, ctx) {
+        out.push(Chunk::Static(" data-pw-device".to_string()));
     }
     // **Which instance each signal its handlers name is** (ADR-0144). A
     // handler's module is compiled once and names a signal as its body
@@ -3099,14 +3189,23 @@ fn lower_block_at(
     if let Some(each) = each {
         let binding = each.binder.clone();
         // The list's path, read from the expression it is (ADR-0345): a
-        // name, or fields read from one.
-        let Some(collection) = value_path(body, each.list) else {
+        // name, or fields read from one. Or **a list the browser computes**
+        // from the values it holds (track `device-store`, ADR-XXXX, decision
+        // 7), read by the path the compiler names, as a computed subject is
+        // (ADR-0229); the plan says who computes it, and refuses one no one
+        // does.
+        let computed = value_path(body, each.list).is_none();
+        let collection = value_path(body, each.list).unwrap_or_default();
+        let browsers = inputs_of(body, each.list, ctx);
+        if computed
+            && (browsers.is_empty() || !browsers.iter().all(|(name, _)| ctx.signals.contains(name)))
+        {
             out.push(blocked(format!(
                 "`{{#each}}` reads its list by path, and `{}` is computed",
                 each.written.list
             )));
             return;
-        };
+        }
         // The key as the path from the element to it: `id` from `(item.id)`,
         // `r.id` from `(item.r.id)`, and empty from `(item)`. Until 2026-09-26
         // it was the key's last segment, so `(item.r.id)` keyed on `item.id`
@@ -3134,8 +3233,22 @@ fn lower_block_at(
             ));
             return;
         }
-        let collection = ctx.read(collection);
-        ix.read(id, &collection, ReadKind::List, ReadAt::List(node), ctx);
+        let collection = match computed {
+            true => {
+                let inputs = browsers;
+                let value = ix.computed_path(id, &inputs);
+                ix.read(id, &value, ReadKind::List, ReadAt::Expr(each.list), ctx);
+                if let Some(read) = ix.reads.last_mut() {
+                    read.inputs = Some(inputs);
+                }
+                value
+            }
+            false => {
+                let collection = ctx.read(collection);
+                ix.read(id, &collection, ReadKind::List, ReadAt::List(node), ctx);
+                collection
+            }
+        };
         let (scope, mut written) = ctx.binding(std::slice::from_ref(&binding), ix);
         ix.frames += 1;
         ix.loops

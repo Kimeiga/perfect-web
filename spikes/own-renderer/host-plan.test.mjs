@@ -173,8 +173,8 @@ test("unknown selected spec, project, role and conflicting declarations refuse",
   for (const annotations of [[], [{ type: "pw-host", description: "unknown" }], [{ type: "pw-host", description: "base" }, { type: "pw-host", description: "feed" }]]) {
     assert.throws(() => rolesForTest("page-policy.spec.mjs", "chromium", annotations), /host annotation|host role/);
   }
-  // TodoMVC's ports are kept for its app, which is not on this branch.
-  assert.throws(() => rolesForTest("page-policy.spec.mjs", "chromium", [{ type: "pw-host", description: "todomvc" }]), /todomvc is reserved/);
+  // TodoMVC's hosts serve its spec, its app on this branch (track `todomvc`).
+  assert.deepEqual(rolesForTest("todomvc.spec.mjs", "firefox"), ["todomvc"]);
   assert.deepEqual(rolesForTest("signals.spec.mjs", "chromium"), ["base"]);
   assert.deepEqual(rolesForTest("page-policy.spec.mjs", "webkit", [{ type: "pw-host", description: "payments" }]), ["payment-provider", "payments"]);
 });
@@ -273,8 +273,8 @@ test("specs of an optional build that cannot be served are left out, each said w
     const optional = (root) => Object.fromEntries(unservedSpecs(root).map(({ file, warning }) => [file, warning]));
     const feed = ["feed.spec.mjs", "identity.spec.mjs", "messages.spec.mjs", "notifications.spec.mjs", "uploads.spec.mjs"];
     const unbuilt = optional(root);
-    assert.deepEqual(Object.keys(unbuilt).sort(), [...feed, "guestbook.spec.mjs", "keyed.spec.mjs", "kiokun-site.spec.mjs"].sort());
-    const lacking = { "guestbook.spec.mjs": ["dist-guestbook", "guestbook.sh"], "keyed.spec.mjs": ["dist-keyed", "keyed-store.sh"], "kiokun-site.spec.mjs": ["dist-kiokun", "kiokun-site.sh"] };
+    assert.deepEqual(Object.keys(unbuilt).sort(), [...feed, "guestbook.spec.mjs", "keyed.spec.mjs", "kiokun-site.spec.mjs", "todomvc.spec.mjs"].sort());
+    const lacking = { "guestbook.spec.mjs": ["dist-guestbook", "guestbook.sh"], "keyed.spec.mjs": ["dist-keyed", "keyed-store.sh"], "kiokun-site.spec.mjs": ["dist-kiokun", "kiokun-site.sh"], "todomvc.spec.mjs": ["dist-todomvc", "todomvc.sh"] };
     for (const file of feed) lacking[file] = ["dist-feed", "feed.sh"];
     for (const [file, [dist, prerequisite]] of Object.entries(lacking)) {
       assert.equal(unbuilt[file], `e2e/${file} is not run: ${dist} is not built: run ${prerequisite}`);

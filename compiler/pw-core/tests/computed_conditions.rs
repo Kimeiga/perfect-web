@@ -182,12 +182,12 @@ fn an_else_if_a_match_and_a_value_in_a_hosts_block_are_computed_too() {
 #[test]
 fn what_a_condition_does_not_compute_yet_is_refused_by_name() {
     for (files, why) in [
-        // A value from a signal inside a block: the browser computes one at
-        // the top of the page.
+        // A value from a signal inside a block a host renders, which the
+        // browser does not render again (track `device-store`).
         (
             page("{#if post.pinned}<p>{shown(open)}</p>{/if}"),
-            "computes a value from the signal `open` inside a block, and the browser computes \
-             one at the top of the page (ruling 0073-a)",
+            "computes a value from the signal `open` inside a block a value other than a signal \
+             decides, which the browser does not render again (ruling 0073-a)",
         ),
         // A value from a query inside a block a signal decides, which the
         // browser renders again from the signals alone.

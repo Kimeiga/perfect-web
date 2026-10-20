@@ -54,6 +54,11 @@ pub enum Domain {
     /// set is the domain's whole content — an unlisted word is an error, not
     /// an extension point.
     Word(&'static [&'static str]),
+    /// **Where a value rests** (track `device-store`, ADR-XXXX): `device` or
+    /// `origin`, as a replicated value says it, and, for a signal the device
+    /// keeps, the name it is kept under: `storage device "todos-pleris"`.
+    /// What the name may be is `device_store`'s (PW6805).
+    Storage,
     /// Words from a closed set, one or more, by commas: `reads snapshot,
     /// read_your_writes` (ADR-0207).
     Words(&'static [&'static str]),
@@ -155,6 +160,12 @@ pub enum Domain {
     /// declaration's parameters, and charter §8.2 checks every internal link
     /// against the set of these.
     RoutePattern,
+    /// **A signal bound to the address's fragment, and the forms it takes**
+    /// (track `todomvc`): `fragment filter "/" => "all", "/active" =>
+    /// "active"`. A signal of the page, then each form the fragment takes
+    /// and the value the signal takes with it, each a quoted literal. Read
+    /// and held by `address_fragment::check`.
+    Fragment,
     /// A declaration this program defines, named for attribution:
     /// `attributes_forced_layout_to VendorMap`.
     DeclRef,
@@ -365,6 +376,8 @@ pub fn domain_of(head: &str) -> Option<Domain> {
         // ADR-0040: the operation the compiler supplies, by its name.
         "intrinsic" => Domain::Str,
         "route" => Domain::RoutePattern,
+        // Track `todomvc`: a page's fragment, bound to one of its signals.
+        "fragment" => Domain::Fragment,
         "layout" => Domain::LayoutRef,
         "not_found_on" => Domain::CaseRef,
         // ADR-0295: `redirect_on KiokunError.Moved permanent`, a case and how
@@ -384,13 +397,16 @@ pub fn domain_of(head: &str) -> Option<Domain> {
 
         // --- operators
         "retry" | "reconnect" => Domain::Operator(RETRY_OPS, &["none", "forever"]),
-        "conflict" => Domain::Operator(CONFLICT_OPS, &[]),
+        // A signal the device keeps states the only policy its tabs have
+        // (track `device-store`): the whole value written last is every
+        // tab's. Named, so that it is never silent (A-011).
+        "conflict" => Domain::Operator(CONFLICT_OPS, &["last_write_wins"]),
         "identity" => Domain::Operator(IDENTITY_OPS, &[]),
 
         // --- transport, storage, lifecycle
         "transport" => Domain::Word(&["websocket", "sse", "poll"]),
         "delivery" => Domain::Word(&["streamed", "batched"]),
-        "storage" => Domain::Word(&["device", "origin"]),
+        "storage" => Domain::Storage,
         "offline" => Domain::Word(&["writable", "readable"]),
         "sync" => Domain::Word(&["on_reconnect", "immediate"]),
         "on_conflict_unresolved" => Domain::Word(&["surface_to_user", "refuse"]),
@@ -418,6 +434,9 @@ pub fn domain_of(head: &str) -> Option<Domain> {
         "refers" => Domain::Reference,
         "bounded" => Domain::Count,
         "migrate" => Domain::Migration,
+        // Track `device-store` (ADR-XXXX): the version of a value the device
+        // keeps; each earlier one is its `migrate`'s.
+        "version" => Domain::Count,
         // An upload's (track `uploads`, ADR-0260): where its committed files
         // are served, its limits, and its kinds, a closed set each sniffed
         // from a file's bytes.
@@ -655,10 +674,15 @@ pub fn declared_by(head: &str) -> Option<(&'static [crate::hir::DeclKind], &'sta
         "revision" => (&[K::Page], "a page"),
         // A page's address, or where a form posts an upload (track `uploads`).
         "route" => (&[K::Page, K::Upload], "a page or an upload"),
+        // A page's address's fragment, bound to a signal (track `todomvc`).
+        "fragment" => (&[K::Page], "a page"),
         // The layout a page is shown in (ADR-0303): a page's, and not a
         // layout's, which names none.
         "layout" => (&[K::Page], "a page"),
-        "privacy" => (&[K::Page, K::Other], "a page or a replicated value"),
+        "privacy" => (
+            &[K::Page, K::Other, K::Signal],
+            "a page, a replicated value or a signal the device keeps",
+        ),
         // An effect's.
         "capability" | "impact" => (&[K::Effect], "an effect"),
         // A function's binding to what supplies it.
@@ -669,9 +693,14 @@ pub fn declared_by(head: &str) -> Option<(&'static [crate::hir::DeclKind], &'sta
         // A keyed read's set form (4c): a function's.
         "set" => (&[K::Fn], "a function"),
         // A table's (track `tables`, ADR-0338).
-        "row" | "order" | "index" | "unique" | "refers" | "bounded" | "migrate" => {
-            (&[K::Table], "a table")
-        }
+        "row" | "order" | "index" | "unique" | "refers" | "bounded" => (&[K::Table], "a table"),
+        // A table's change from its schema released, or a device's value's
+        // from its version released (track `device-store`).
+        "migrate" => (
+            &[K::Table, K::Signal],
+            "a table or a signal the device keeps",
+        ),
+        "version" => (&[K::Signal], "a signal the device keeps"),
         // An upload's (track `uploads`, ADR-0260).
         "serves" | "max_bytes" | "types" | "max_width" | "max_height" => {
             (&[K::Upload], "an upload")
@@ -680,9 +709,13 @@ pub fn declared_by(head: &str) -> Option<(&'static [crate::hir::DeclKind], &'sta
         // A painter's, a replicated value's, a handler policy's: forms the
         // grammar keeps as `Other`.
         "draw" | "inputs" | "isolated" => (&[K::Other], "a painter"),
-        "storage" | "offline" | "sync" | "conflict" | "on_conflict_unresolved" => {
-            (&[K::Other], "a replicated value")
-        }
+        "offline" | "sync" | "on_conflict_unresolved" => (&[K::Other], "a replicated value"),
+        // Where a value rests and what two copies' writes do: a replicated
+        // value's, and a signal's the device keeps (track `device-store`).
+        "storage" | "conflict" => (
+            &[K::Other, K::Signal],
+            "a replicated value or a signal the device keeps",
+        ),
         "identity" | "captures" | "load" | "on_version_mismatch" => {
             (&[K::Other], "a handler policy")
         }
@@ -1006,10 +1039,34 @@ fn wit_id(id: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// **Where a value may rest** (`storage`'s words).
+pub const STORAGES: &[&str] = &["device", "origin"];
+
+/// **`storage`'s value, read** (track `device-store`): its word, and the
+/// quoted name after it where one is written, `device "todos-pleris"`. `None`
+/// where the word is no storage, or what follows is not one quoted text
+/// without an escape.
+pub fn storage(value: &str) -> Option<(&str, Option<&str>)> {
+    let value = value.trim();
+    let (word, rest) = value.split_once(char::is_whitespace).unwrap_or((value, ""));
+    if !STORAGES.contains(&word) {
+        return None;
+    }
+    let rest = rest.trim();
+    if rest.is_empty() {
+        return Some((word, None));
+    }
+    let name = rest.strip_prefix('"')?.strip_suffix('"')?;
+    (!name.contains('"') && !name.contains('\\')).then_some((word, Some(name)))
+}
+
 pub fn value_fault(head: &str, value: &str) -> Option<ValueFault> {
     let value = value.trim();
     match domain_of(head)? {
         Domain::Word(words) => (!words.contains(&value)).then_some(ValueFault::Word(words)),
+        Domain::Storage => storage(value)
+            .is_none()
+            .then_some(ValueFault::Word(STORAGES)),
         Domain::Words(words) => value
             .split(',')
             .map(str::trim)
@@ -1188,6 +1245,7 @@ mod tests {
         "invoked_by",
         "placement",
         "route",
+        "fragment",
         "layout",
         "not_found_on",
         "redirect_on",

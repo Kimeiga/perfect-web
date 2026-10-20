@@ -364,9 +364,12 @@ page Counter() {
 ```
 
 
-A part of a page cannot compute a value from two signals (ruling 0073-a):
+A part of a page may compute a value from two signals, or from any of the
+values the browser holds: the browser computes it again when either changes,
+and the host computes its first from their first values (track
+`device-store`, ruling 0073-a's later steps):
 
-```pw fails=PW6601
+```pw
 module shop.sum
 
 page Sum() {
@@ -386,7 +389,6 @@ page Sum() {
     }
 }
 ```
-
 
 Effects in an `{#each}` head are checked just as they are elsewhere in
 the view (ADR-0345). This view claims `!{}` and calls a database read in its

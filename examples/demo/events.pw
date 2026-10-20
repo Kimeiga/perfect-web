@@ -7,10 +7,15 @@
 // ADR-0138: a handler listens for the event it is written for and is given
 // that event's record: what was typed, which key was pressed. A form's own
 // submission is stopped in the listener, before the handler's code loads.
+//
+// Track `todomvc` (ADR-XXXX): a double press is its own event, given where
+// the pointer was, and a control's losing focus is its own, given the value
+// it held. Neither is a press: a single press runs the press's handler and
+// not the double press's.
 
 module demo.events
 
-import events.{ InputEvent, KeyEvent }
+import events.{ BlurEvent, InputEvent, KeyEvent, PressEvent }
 
 page EventsPage() {
     cache private
@@ -18,6 +23,10 @@ page EventsPage() {
     signal typed: String = ""
     signal last: String = "none"
     signal sent: Int = 0
+    signal single: Int = 0
+    signal doubled: Int = 0
+    signal where_: String = "none"
+    signal left_with: String = "none"
 
     view {
         <main>
@@ -34,6 +43,24 @@ page EventsPage() {
                 <button id="go" type="submit">Send</button>
             </form>
             <p id="sent">{sent}</p>
+            <label
+                id="word"
+                on:press={() => single = single + 1}
+                on:dblclick={(e: PressEvent) => {
+                    doubled = doubled + 1
+                    where_ = "{e.x},{e.y}"
+                }}
+            >A word</label>
+            <p id="single">{single}</p>
+            <p id="doubled">{doubled}</p>
+            <p id="where">{where_}</p>
+            <input
+                id="leave"
+                type="text"
+                aria-label="Leave"
+                on:blur={(e: BlurEvent) => left_with = e.value}
+            />
+            <p id="left-with">{left_with}</p>
         </main>
     }
 }

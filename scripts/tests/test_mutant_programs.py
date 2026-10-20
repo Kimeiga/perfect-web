@@ -110,6 +110,35 @@ class MutantPrograms(unittest.TestCase):
         self.assertEqual(code, 1, out)
         self.assertIn("names ['PW5001'], and the program it leaves checks", out)
 
+    def test_a_named_rule_met_where_a_program_uses_what_it_takes_away_passes(self):
+        # A standard package's mutant (track `device-store`, 2026-10-20): the
+        # program that uses what it takes away is refused by the rule its
+        # script names, and one that does not checks.
+        files = {
+            "examples/domain.pw": "module domain\n",
+            "examples/store/app.pw": "module store.app\nimport domain.{ Id }\nuses helper\nplace(a, b, c)\n",
+            "examples/feed/app.pw": "module feed.app\npost(a)\n",
+            "packages/pw-std/Tools.pw": "module Tools\nfn helper() {}\n",
+        }
+
+        def script(replacement: str) -> str:
+            return (
+                "CHECKED = {'the helper is gone': {'PW0100'}}\n"
+                "MUTANTS = [\n"
+                f"    ('the helper is gone', 'x', ROOT / 'packages/pw-std/Tools.pw', 'fn helper() {{}}\\n', {replacement!r}),\n"
+                "    ('a call reordered', 'x', ROOT / 'examples/store/app.pw', 'place(a, b, c)\\n', 'place(b, a, c)\\n'),\n"
+                "    ('a post reordered', 'x', ROOT / 'examples/feed/app.pw', 'post(a)\\n', 'post(b)\\n'),\n"
+                "]\n"
+            )
+
+        code, out = run(tree(files, script("\n")))
+        self.assertEqual(code, 0, out)
+        self.assertIn("1 refused by the rule their script names, 0 failing", out)
+        # The control: a mutant every program checks, its names met nowhere.
+        code, out = run(tree(files, script("fn helper() {} // kept\n")))
+        self.assertEqual(code, 1, out)
+        self.assertIn("the helper is gone: names ['PW0100'], and the program it leaves checks", out)
+
     def test_the_control_a_mutant_that_leaves_a_program_passes(self):
         code, out = self.run_on("place(b, a, c)")
         self.assertEqual(code, 0, out)

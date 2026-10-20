@@ -206,11 +206,11 @@ MUTANTS = [
         '            <input type="text">\n',
     ),
     (
-        'the closed two-signal gap claims the wrong refusal',
+        'the closed two-signal gap is claimed to be refused still',
         'guide',
         TOUR_PAGES,
+        '```pw\nmodule shop.sum',
         '```pw fails=PW6601\nmodule shop.sum',
-        '```pw fails=PW0606\nmodule shop.sum',
     ),
     # --- the guide rots: the reference of codes --------------------------
     (

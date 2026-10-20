@@ -1,0 +1,278 @@
+// @corpus: reference
+// @id: TODOMVC
+// @category: a reference app everyone knows: TodoMVC, held to its own spec
+// @milestone: E14
+//
+// TodoMVC (https://todomvc.com): the owner's "something people are familiar
+// with" (docs/PARALLEL.md, W7's plan), held to TodoMVC's own spec
+// (`app-spec.md`) and its own official tests (the Cypress suite, run
+// unchanged). Its markup and class names are the template's, and its
+// stylesheets are TodoMVC's own (`todomvc-app-css`, `todomvc-common`), so the
+// official tests' selectors find what they look for.
+//
+// What the spec states, and where this states it:
+// - **Persistence**: the todos are kept on the reader's device, in the
+//   browser's own storage, under TodoMVC's name for them, `todos-pleris`, a
+//   list of `{id, title, completed}`: `todos`, a signal the device keeps
+//   (track `device-store`, ADR-XXXX). No server holds them, or is told
+//   them: the page is the browser's to compute and to render, from what the
+//   device holds, and a second tab shows what the first wrote.
+// - **No todos**: `.main` and `.footer` are hidden, not absent, while the
+//   list is empty (`hidden={List.length(todos) == 0}`).
+// - **New todo**: Enter adds it, `title_of` trims it and refuses it where
+//   nothing is left, the input is cleared once the todo is added, and it has
+//   `autofocus`.
+// - **Mark all as complete**: `toggled_all`, whose checkbox is checked when
+//   there are todos and none is active, so it follows each one.
+// - **Item**: a checkbox that toggles it, a double press on its label that
+//   begins editing, a `.destroy` button.
+// - **Editing**: the field shows the title, focused; Enter and blur save it,
+//   Escape leaves it as it was, and a title trimmed to nothing destroys the
+//   todo (`retitled`). The editing mode is the page's signal, never kept
+//   (the spec: "Editing mode should not be persisted").
+// - **Counter**: the number in a `<strong>`, `item left` or `items left`.
+// - **Clear completed**: `.clear-completed`, hidden where none is completed.
+// - **Routing**: `#/`, `#/active` and `#/completed`, the address's fragment
+//   bound to the `filter` signal, which the model filters by.
+
+module todomvc.app
+
+import List
+import String
+import events.{ BlurEvent, InputEvent, KeyEvent }
+
+// **A todo as the device keeps it**, by TodoMVC's own keys (the spec: "If
+// possible, use the keys `id`, `title`, `completed` for each item").
+type Todo = Todo { id: Int, title: String, completed: Bool }
+
+// **The todos this device keeps**: TodoMVC's `todos-[framework]`, the
+// device's own, and the whole list written last every tab's.
+signal todos: List<Todo> = []
+    storage  device "todos-pleris"
+    privacy  Device
+    conflict last_write_wins
+
+// **A todo as the list shows it**: whether its field is shown, and its
+// class, which the model says from the page's `editing`.
+type Row = Row { id: Int, title: String, completed: Bool, editing: Bool, class: String }
+
+// **A draft as a title, or none**, as the spec asks: trimmed, and nothing
+// left of it is no todo.
+fn title_of(draft: String) -> Option<String> !{} {
+    let trimmed = String.trim(draft)
+    if String.length(trimmed) >= 1 & String.length(trimmed) <= 1000 {
+        Some(trimmed)
+    } else {
+        None
+    }
+}
+
+// --- the model: what each change makes of the todos ------------------------
+
+// **A todo added at the bottom**, its id one more than any before it.
+fn added(todos: List<Todo>, title: String) -> List<Todo> !{} {
+    let last = List.fold(todos, 0, (m, t) => if t.id > m {
+        t.id
+    } else {
+        m
+    })
+    List.concat(todos, [Todo { id: last + 1, title: title, completed: false }])
+}
+
+// **A todo completed, or not**: the other of what it is.
+fn toggled(todos: List<Todo>, id: Int) -> List<Todo> !{} {
+    List.map(todos, (t) => if t.id == id {
+        Todo { id: t.id, title: t.title, completed: !t.completed }
+    } else {
+        t
+    })
+}
+
+// **Every todo completed**, or, where every one is, none: the toggle-all's
+// state after a press is what it was not.
+fn toggled_all(todos: List<Todo>) -> List<Todo> !{} {
+    let any_active = List.any(todos, (t) => !t.completed)
+    List.map(todos, (t) => Todo { id: t.id, title: t.title, completed: any_active })
+}
+
+// **An edit saved**: the todo titled as written, trimmed, or destroyed where
+// nothing is left (the spec: "if it's empty the todo should instead be
+// destroyed").
+fn retitled(todos: List<Todo>, id: Int, text: String) -> List<Todo> !{} {
+    match title_of(text) {
+        Some(title) => List.map(todos, (t) => if t.id == id {
+            Todo { id: t.id, title: title, completed: t.completed }
+        } else {
+            t
+        }),
+        None => removed(todos, id),
+    }
+}
+
+fn removed(todos: List<Todo>, id: Int) -> List<Todo> !{} {
+    List.filter(todos, (t) => t.id != id)
+}
+
+fn cleared(todos: List<Todo>) -> List<Todo> !{} {
+    List.filter(todos, (t) => !t.completed)
+}
+
+// --- the model: what the filters show, and how many there are -------------
+
+// **Whether a filter shows a todo**: `active`, `completed`, and everything
+// else, which is `all`.
+fn shown(t: Todo, filter: String) -> Bool !{} {
+    if filter == "active" {
+        !t.completed
+    } else if filter == "completed" {
+        t.completed
+    } else {
+        true
+    }
+}
+
+fn row_class(completed: Bool, editing: Bool) -> String !{} {
+    if completed & editing {
+        "completed editing"
+    } else if completed {
+        "completed"
+    } else if editing {
+        "editing"
+    } else {
+        ""
+    }
+}
+
+// **The rows the filter shows**, each as the list shows it: the model filters
+// (the spec: "filtered on a model level"), and says which row is edited.
+fn rows(todos: List<Todo>, filter: String, editing: Int) -> List<Row> !{} {
+    List.map(List.filter(todos, (t) => shown(t, filter)), (t) => Row {
+        id: t.id,
+        title: t.title,
+        completed: t.completed,
+        editing: t.id == editing,
+        class: row_class(t.completed, t.id == editing),
+    })
+}
+
+fn left(todos: List<Todo>) -> Int !{} {
+    List.length(List.filter(todos, (t) => !t.completed))
+}
+
+fn done(todos: List<Todo>) -> Int !{} {
+    List.length(List.filter(todos, (t) => t.completed))
+}
+
+fn all_done(todos: List<Todo>) -> Bool !{} {
+    List.length(todos) > 0 & List.all(todos, (t) => t.completed)
+}
+
+// --- what the page computes from what it holds ----------------------------
+
+// **The counter's words**: `1 item left`, `2 items left`, `0 items left`.
+fn items_left(n: Int) -> String !{} {
+    if n == 1 {
+        "item left"
+    } else {
+        "items left"
+    }
+}
+
+// **The filter link of the page's filter** is `selected`.
+fn selected(filter: String, mine: String) -> String !{} {
+    if filter == mine {
+        "selected"
+    } else {
+        ""
+    }
+}
+
+page Todos() {
+    route     "/"
+    placement origin
+    // The address's fragment, which no server sees, is the filter: `#/` shows
+    // every todo, and a fragment that is none of these does too.
+    fragment  filter "/" => "all", "/active" => "active", "/completed" => "completed"
+
+    signal filter: String = "all"
+    // The todo being edited, by its id, or none (0); and what its field holds.
+    signal editing: Int = 0
+    signal edit_text: String = ""
+    signal draft: String = ""
+
+    view {
+        <title>TodoMVC: Pleris</title>
+        <link rel="stylesheet" href="/todomvc-base.css" />
+        <link rel="stylesheet" href="/todomvc-app.css" />
+        <link rel="stylesheet" href="/todomvc-pleris.css" />
+        <section class="todoapp">
+            <header class="header">
+                <h1>todos</h1>
+                <input class="new-todo" placeholder="What needs to be done?" aria-label="New todo" autofocus
+                    bind:value={draft}
+                    on:keydown={(e: KeyEvent) => if e.key == "Enter" {
+                        match title_of(draft) {
+                            Some(title) => {
+                                todos = added(todos, title)
+                                draft = ""
+                            },
+                            None => draft = draft,
+                        }
+                    }} />
+            </header>
+            <section class="main" hidden={List.length(todos) == 0}>
+                <input id="toggle-all" class="toggle-all" type="checkbox" checked={all_done(todos)}
+                    on:press={() => todos = toggled_all(todos)} />
+                <label for="toggle-all">Mark all as complete</label>
+                <ul class="todo-list">
+                    {#if List.length(todos) > 0}
+                        {#each rows(todos, filter, editing) as row (row.id)}
+                            <li class={row.class}>
+                                <div class="view">
+                                    <input class="toggle" type="checkbox" aria-label="Completed" checked={row.completed}
+                                        on:press={resumable(captures = { row }) => todos = toggled(todos, row.id)} />
+                                    <label on:dblclick={resumable(captures = { row }) => {
+                                        edit_text = row.title
+                                        editing = row.id
+                                    }}>{row.title}</label>
+                                    <button class="destroy" type="button" aria-label="Delete"
+                                        on:press={resumable(captures = { row }) => todos = removed(todos, row.id)}></button>
+                                </div>
+                                {#if row.editing}
+                                    <input class="edit" aria-label="Edit" autofocus value={row.title}
+                                        on:input={(e: InputEvent) => edit_text = e.value}
+                                        on:keydown={(e: KeyEvent) => if e.key == "Enter" {
+                                            todos = retitled(todos, editing, edit_text)
+                                            editing = 0
+                                        } else if e.key == "Escape" {
+                                            editing = 0
+                                        }}
+                                        on:blur={(e: BlurEvent) => if editing != 0 {
+                                            todos = retitled(todos, editing, edit_text)
+                                            editing = 0
+                                        }} />
+                                {/if}
+                            </li>
+                        {/each}
+                    {/if}
+                </ul>
+            </section>
+            <footer class="footer" hidden={List.length(todos) == 0}>
+                <span class="todo-count"><strong>{left(todos)}</strong> {items_left(left(todos))}</span>
+                <ul class="filters">
+                    <li><a class={selected(filter, "all")} href="#/">All</a></li>
+                    <li><a class={selected(filter, "active")} href="#/active">Active</a></li>
+                    <li><a class={selected(filter, "completed")} href="#/completed">Completed</a></li>
+                </ul>
+                <button class="clear-completed" type="button" hidden={done(todos) == 0}
+                    on:press={() => todos = cleared(todos)}>Clear completed</button>
+            </footer>
+        </section>
+        <footer class="info">
+            <p>Double-click to edit a todo</p>
+            <p>Created with Pleris</p>
+            <p>Part of <a href="https://todomvc.com">TodoMVC</a></p>
+            <p>Styled by <a href="https://github.com/tastejs/todomvc-app-css">todomvc-app-css</a>, Sindre Sorhus, CC BY 4.0</p>
+        </footer>
+    }
+}

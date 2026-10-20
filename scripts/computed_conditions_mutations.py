@@ -52,14 +52,16 @@ MUTANTS = [
         "a subject the browser computes decides no block",
         "cargo",
         VALUES,
-        "                    browser_subjects\n                        .insert(read.part.0, (signal, path, derived.component_id.clone()));\n",
-        "                    let _ = (signal, path);\n",
+        # Re-anchored by track `device-store`: a subject's inputs, one or
+        # several.
+        "                    browser_subjects.insert(read.part.0, (inputs, derived.component_id.clone()));\n",
+        "                    let _ = inputs;\n",
     ),
     (
         "a block whose subject the browser computes is not rendered again for its signal",
         "cargo",
         VALUES,
-        "                reads.insert(0, signal.clone());\n",
+        "                    reads.insert(0, s.clone());\n",
         "",
     ),
     (

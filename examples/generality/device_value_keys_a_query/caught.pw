@@ -1,0 +1,48 @@
+// @status: GENERAL
+// @invariant: device_value_keys_a_query
+//
+// Structurally different from R-109: the key is a page's signal a key
+// handler assigns, trimmed, from the device's value, and the query is keyed
+// by it beside the session.
+
+module generality.device_key
+
+import String
+import events.{ KeyEvent }
+import context.{ current_session }
+import capability.{ Session, SessionId }
+
+signal last: String = ""
+    storage  device "generality-last"
+    privacy  Device
+    conflict last_write_wins
+
+session query Lookup(session: Session<SessionId>, term: String) -> String
+    freshness     0.seconds
+    consistency   read_your_writes
+    cache         private
+    key           session, term
+    concurrency   one_per_key
+    on_key_change cancel
+    timeout       2.seconds
+{
+    term
+}
+
+page Find() {
+    route "/find"
+    cache private
+
+    signal term: String = ""
+    let found = query Lookup(current_session(), term)
+
+    view {
+        <title>Find</title>
+        <main>
+            <input aria-label="Again" on:keydown={(e: KeyEvent) => if e.key == "Enter" {
+                term = String.trim(last)
+            }} />
+            <p>{found}</p>
+        </main>
+    }
+}

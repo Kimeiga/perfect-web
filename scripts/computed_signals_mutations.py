@@ -47,34 +47,34 @@ MUTANTS = [
         "a text part computed from a signal names no component",
         "cargo",
         VALUES,
-        '                    kind: "text".to_string(),\n'
-        "                    reads: Vec::new(),\n"
-        "                    attribute: String::new(),\n"
-        "                    owns: Vec::new(),\n"
-        "                    derived: derived.component_id.clone(),\n",
-        '                    kind: "text".to_string(),\n'
-        "                    reads: Vec::new(),\n"
-        "                    attribute: String::new(),\n"
-        "                    owns: Vec::new(),\n"
-        "                    derived: String::new(),\n",
+        # Re-anchored by track `device-store`: a computed part's entry is
+        # `computed_live`'s, given the component at each call.
+        '                    if hole.nested { "value" } else { "text" },\n'
+        "                    String::new(),\n"
+        "                    inputs,\n"
+        "                    derived.component_id.clone(),\n",
+        '                    if hole.nested { "value" } else { "text" },\n'
+        "                    String::new(),\n"
+        "                    inputs,\n"
+        "                    String::new(),\n",
     ),
     (
         "an attribute computed from a signal names no component",
         "cargo",
         VALUES,
         "                        attribute,\n"
-        "                        owns: Vec::new(),\n"
-        "                        derived: derived.component_id.clone(),\n",
+        "                        inputs,\n"
+        "                        derived.component_id.clone(),\n",
         "                        attribute,\n"
-        "                        owns: Vec::new(),\n"
-        "                        derived: String::new(),\n",
+        "                        inputs,\n"
+        "                        String::new(),\n",
     ),
     (
         "a view's field of a signal is read at the signal",
         "cargo",
         VALUES,
-        "            path: read.clone(),\n",
-        "            path: root.to_string(),\n",
+        "                inputs: vec![(root.to_string(), read.clone())],\n",
+        "                inputs: vec![(root.to_string(), root.to_string())],\n",
     ),
     (
         "a page that computes from a signal has no module",
@@ -94,15 +94,17 @@ MUTANTS = [
         "the module names each function by its order",
         "cargo",
         MODULE,
-        '        source.push_str(&format!("  \\"{}\\": (j) => f{n}({decode}),\\n", live.part));\n',
-        '        source.push_str(&format!("  \\"{n}\\": (j) => f{n}({decode}),\\n"));\n',
+        # Re-anchored by track `device-store`: a part's function given each
+        # value it reads.
+        '            live.part,\n            takes.join(", "),\n',
+        '            n,\n            takes.join(", "),\n',
     ),
     (
         "the module does not decode the signal's value",
         "cargo",
         MODULE,
-        '        source.push_str(&format!("  \\"{}\\": (j) => f{n}({decode}),\\n", live.part));\n',
-        '        let _ = decode;\n        source.push_str(&format!("  \\"{}\\": (j) => f{n}(j),\\n", live.part));\n',
+        '            decoded.join(", ")\n        ));\n',
+        '            takes.join(", ")\n        ));\n',
     ),
     (
         "a module that did not compile is no refusal",
@@ -138,8 +140,8 @@ MUTANTS = [
         "the document names no module",
         "cargo",
         SERVER,
-        '        .any(|l| l["derived"].is_string());\n',
-        '        .any(|l| l["derived"].is_string() && false);\n',
+        '        .any(|l| l["derived"].is_string())\n',
+        '        .any(|l| l["derived"].is_string() && false)\n',
     ),
     (
         "a module no plan names is read",
@@ -160,7 +162,7 @@ MUTANTS = [
         "the browser computes each value from the signal's first",
         "browser",
         RUNTIME,
-        "      const v = (await computedValues()).parts[live.part](signalAt(live.path));\n",
+        "      const v = (await computedValues()).parts[live.part](...argsOf(live));\n",
         "      const v = (await computedValues()).parts[live.part](firstValues.get(live.signal));\n",
     ),
     (

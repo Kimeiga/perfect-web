@@ -214,7 +214,7 @@ export const MESSAGES_PORTS = portExport("MESSAGES_PORTS");
 // kiokun.com in Pleris (track `kiokun`), one per engine, beside the slice's
 // single host.
 export const KIOKUN_PORTS = portExport("KIOKUN_PORTS");
-// TodoMVC's hosts, reserved (its app and spec are not on this branch).
+// TodoMVC's hosts (track `todomvc`), one per engine.
 export const TODOMVC_PORTS = portExport("TODOMVC_PORTS");
 // The store-accounts track's hosts: the store's build, signed in, one per
 // engine, because an account and its cart are every reader's on a host.
