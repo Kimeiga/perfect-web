@@ -37,9 +37,7 @@ e14-second-host:
        echo; echo "== the outbox kept, read back and read by every host (tests/feed_pg.rs, tests/store_pg.rs)"; echo; \
        PW_STORE_TEST_LAYER=postgres cargo test --locked -p pw-dev-server -- tests::feed_pg:: tests::store_pg:: 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== two hosts in three engines (e2e-hosts/second-host.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test --config playwright.hosts.config.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test --config playwright.hosts.config.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/second_host_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/second_host_mutations.py; \
      } > docs/evidence/E14/second-host.txt
