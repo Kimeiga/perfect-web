@@ -1,8 +1,8 @@
 ADR-0090 - pw build checks what pw check checks
 
 produced by: just e10-one-checker
-commit: ddaeeb1dfba9630371b7dd5b127c23855d245c74
-ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39131257549 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 320c52a44840a80423609ab476eb847c04de34a6
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39442025240 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == one checker (compiler/pw-core/tests/one_checker.rs)
@@ -10,7 +10,7 @@ rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 test check_sources_runs_the_declaration_rules ... ok
 test the_build_refuses_what_check_refuses ... ok
 test a_program_that_checks_builds ... ok
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 19.98s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.91s
 
 == the corpus standard (compiler/pw-core/tests/checking_source.rs)
 
@@ -19,9 +19,9 @@ test a_match_whose_scrutinee_type_is_unknown_is_not_reported ... ok
 test an_unmodelled_capability_family_never_manufactures_a_placement_error ... ok
 test a_nullary_constructor_is_not_read_as_a_binding ... ok
 test constructor_arity_is_respected ... ok
+test a_caught_file_conveys_every_fact_its_expect_error_lines_declare ... ok
 test every_body_level_rejection_matches_its_declared_rule ... ok
 test corpus_enforcement_is_reported_as_three_numbers_not_one ... ok
-test a_caught_file_conveys_every_fact_its_expect_error_lines_declare ... ok
 test a_fixtures_declared_symbol_matches_the_symbol_it_is_caught_by has been running for over 60 seconds
 test every_rejected_fixture_emits_only_its_own_defect ... ok
 test a_fixtures_declared_symbol_matches_the_symbol_it_is_caught_by ... ok
@@ -36,7 +36,7 @@ test the_unhandled_variant_case_is_caught_at_its_real_span ... ok
 test every_diagnostic_carries_what_charter_16_3_requires ... ok
 test the_structured_concurrency_rules_run_on_real_bodies ... ok
 test the_privacy_and_placement_rules_catch_their_corpus_cases ... ok
-test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 160.53s
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 138.95s
 
 == mutation controls (scripts/one_checker_mutations.py)
 

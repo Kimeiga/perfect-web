@@ -14,6 +14,50 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**Train-11 landed, 2026-10-20** (`track/train-11`, verify 39442025240 at
+`320c52a4`, and dispatch 39478386992 at `2b8a8b81` for the six recipes its
+last fix reached; the integrator's delegate assembled it). Each item:
+
+- **ADR-0354, a render reads each call once** (NEXT 4c, track
+  `render-merge`): one render's identical calls are made once, read as of
+  one snapshot; on PostgreSQL in one of a deployment's seats
+  (`PW_RENDER_SEATS`, `PW_RENDER_SEAT_WAIT`, 8 and 30 s where unset); the
+  table's and a turn's lock-order checks run in every debug build. Verify 39442025240 and dispatch 39478386992 green, with train-11.
+- **ADR-0355, the committed components are the build's**: every component
+  the store's build emits is committed current (55; three were stale on
+  train-10's head), the list derived from the build, with a control; the
+  planner and the evidence fetch read a binary file's change by the lines
+  that name it (8c5618c8 now plans 9 recipes, none before). Verify 39442025240 and dispatch 39478386992 green, with train-11.
+- **ADR-0356, the browser host map**: a run starts only the hosts its
+  selected tests need; a spec its optional build cannot serve is left out
+  and said, and a guard holds that each runs where its build is made. Verify 39442025240 and dispatch 39478386992 green, with train-11.
+- **ADR-0357, mutants run in parallel slots** (`PW_MUTANT_SLOTS`; off on
+  CI). Verify 39442025240 and dispatch 39478386992 green, with train-11.
+- **ADR-0358, a Kiokun search cache is published whole**, and a reader
+  keeps the version it opened. Verify 39442025240 and dispatch 39478386992 green, with train-11.
+- **ADR-0359, CI reliability**: a failing browser run's trace and a red
+  baseline's are kept (`kept-traces/`); `check_latency` bounds the fastest
+  of seven or more checks (800 ms a thousand lines); a mutant is built
+  incrementally on verify's recipe step; the nightly does not repeat a
+  verified head. Verify 39442025240 and dispatch 39478386992 green, with train-11.
+- **ADR-0360, the coverage-guided fuzzer measures or fails**
+  (`llvm-tools`), and `e14-fuzz-floor` records E9C's evidence. Verify 39442025240 and dispatch 39478386992 green, with train-11.
+- **ADR-0361, check is build**: `pw check` and `pw build` share one
+  complete validation; the four accepted programs it refuses are listed,
+  with their messages, in `examples/accepted/build-refusals.json`, which
+  every corpus check reads (A-007, A-013, A-018 use features not built
+  yet; A-008's generated WIT names an item twice, NEXT). Verify 39442025240 and dispatch 39478386992 green, with train-11.
+- **ADR-0362, the guide's mutation kills require valid producer
+  outcomes**. Verify 39442025240 and dispatch 39478386992 green, with train-11.
+- **ADR-0363, Wasmtime 48.0.7**, for RUSTSEC-2026-0378 and 0379. Verify 39442025240 and dispatch 39478386992 green, with train-11.
+- **Bounded-race**: the write-guard controls wait for the guard's own
+  report, not a timer. Verify 39442025240 and dispatch 39478386992 green, with train-11.
+- **The train's own fixes**: three hand-kept lists that other tracks'
+  changes broke (the explain() calls, the slots' toy machinery, the slots'
+  reviewed-source pin), a Python 3.10-only test fixture CI's 3.12 exposed,
+  a flaky test that patched `builtins.open` for every thread, the layouts
+  survivor the render merge hid, and NEXT 4b's count flake. Verify 39442025240 and dispatch 39478386992 green, with train-11.
+
 **Train-9 payment/scheduler correction, 2026-10-16 (ADR-0352):** scheduled
 cleanup and retry acquire the existing StorePg/FeedPg write guard before a
 pool connection. Statement witnesses wait for successful completed settlement,

@@ -1,22 +1,23 @@
 ADR-0075 - a mounted resource does not build; ADR-0148 - a stream builds as a part
 
 produced by: just e10-streams
-commit: ddaeeb1dfba9630371b7dd5b127c23855d245c74
-ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39131257549 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 320c52a44840a80423609ab476eb847c04de34a6
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39442025240 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == streams and resources (compiler/pw-core/tests/streams_and_resources.rs)
 
+test a_stream_builds_as_a_part ... ok
+test the_complete_stream_example_reports_its_exact_wit_collision ... ok
 test a_mounted_resource_does_not_build ... ok
 test a_static_resource_attribute_is_an_attribute ... ok
-test a_stream_builds_as_a_part ... ok
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.46s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.29s
 
 == mutation controls (scripts/stream_mutations.py)
 
-baseline: 3 passed, 0 failed
-a stream lowers as an element: KILLED (1 of 3 tests fail)
-a mounted resource lowers as an element: KILLED (1 of 3 tests fail)
-a static `resource` attribute mounts a resource: KILLED (1 of 3 tests fail)
+baseline: 4 passed, 0 failed
+a stream lowers as an element: KILLED (1 of 4 tests fail)
+a mounted resource lowers as an element: KILLED (1 of 4 tests fail)
+a static `resource` attribute mounts a resource: KILLED (1 of 4 tests fail)
 3 of 3 mutants killed
 memory bound: no process was stopped

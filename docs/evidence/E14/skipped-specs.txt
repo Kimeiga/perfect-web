@@ -1,0 +1,28 @@
+Train-11 - every spec an optional build can leave out runs where that build is made
+
+produced by: just e14-skipped-specs
+commit: 320c52a44840a80423609ab476eb847c04de34a6
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39442025240 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+python: Python 3.12.3
+
+== the check (scripts/skipped_specs.py) and its tests (scripts/tests/test_skipped_specs.py)
+
+test_a_build_made_where_the_spec_is_not_run_is_named (scripts.tests.test_skipped_specs.TheCheck.test_a_build_made_where_the_spec_is_not_run_is_named) ... ok
+test_a_spec_run_where_its_build_is_not_made_is_named (scripts.tests.test_skipped_specs.TheCheck.test_a_spec_run_where_its_build_is_not_made_is_named) ... ok
+test_one_recipe_that_makes_the_build_and_runs_the_spec_holds_it (scripts.tests.test_skipped_specs.TheCheck.test_one_recipe_that_makes_the_build_and_runs_the_spec_holds_it) ... ok
+test_the_build_and_the_run_in_two_recipes_are_named (scripts.tests.test_skipped_specs.TheCheck.test_the_build_and_the_run_in_two_recipes_are_named) ... ok
+test_every_spec_an_optional_build_can_leave_out_runs_where_that_build_is_made (scripts.tests.test_skipped_specs.TheRepository.test_every_spec_an_optional_build_can_leave_out_runs_where_that_build_is_made) ... ok
+test_the_specs_it_holds_are_the_registrys (scripts.tests.test_skipped_specs.TheRepository.test_the_specs_it_holds_are_the_registrys) ... ok
+Ran 6 tests in 0.008s
+OK
+
+== mutation controls (scripts/skipped_specs_mutations.py)
+
+baseline: 6 passed, 0 failed
+a recipe that runs the spec need not make its build: KILLED (3 of 6 tests fail)
+a recipe that makes the build need not run the spec: KILLED (2 of 6 tests fail)
+a suite that names another spec runs this one: KILLED (1 of 6 tests fail)
+an annotated spec's roles are not read: KILLED (1 of 6 tests fail)
+a build with no directory is optional: KILLED (2 of 6 tests fail)
+5 of 5 mutants killed
+memory bound: no process was stopped

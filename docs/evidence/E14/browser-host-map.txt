@@ -1,7 +1,8 @@
 ADR-0356 - the browser host map: a run starts only the hosts its selected tests need
 
 produced by: just e14-browser-host-map
-commit: 5dc22548d37c2f671f458c8be9bd89ee7c913e2e
+commit: 320c52a44840a80423609ab476eb847c04de34a6
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39442025240 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 node: v22.21.1
 playwright: Version 1.58.0
 
@@ -20,7 +21,7 @@ ok 10 - unknown selected spec, project, role and conflicting declarations refuse
 ok 11 - schema, engines, role builds and spec mappings fail closed
 ok 12 - build checks preserve whole-build runtime and source freshness with concrete prerequisites
 ok 13 - only keyed external generated copies may be absent and existing copies remain hash checked
-ok 14 - specs of an unbuilt optional build are left out quietly, of a stale one with a warning, and never dist's
+ok 14 - specs of an optional build that cannot be served are left out, each said with the build it lacks, and never dist's
 ok 15 - a selection declares only its own hosts, refuses an unservable dist and drops an optional host only for tests that skip themselves
 ok 16 - selected descriptors preserve memory identity blobs provider ports target and reuse policy
 ok 17 - PW_PERFORMANCE admits only the Chromium performance host
@@ -56,7 +57,7 @@ ok 16 - the suite's own configuration lists a selection through its plan, and st
 
 == a spec on the shared host, one on a mutating suite's, one on the feed's, in three engines
 
-  111 passed (5.1m)
+  111 passed (2.2m)
 
 == mutation controls (scripts/browser_host_map_mutations.py)
 
@@ -86,7 +87,8 @@ a recorded source may be gone [fast]: KILLED (by an assertion of its test; 2 of 
 a changed source passes [fast]: KILLED (by an assertion of its test; 2 of 21 tests fail)
 keyed's exemption covers the repository [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
 an optional build's specs run though it cannot be served [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
-a stale optional build says nothing [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
+a spec left out is left out silently [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
+a stale optional build says nothing of why [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
 dist's specs are left out quietly too [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
 the collection's --list goes after the separator [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
 a partial receipt is taken as complete [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
@@ -109,5 +111,5 @@ the performance run admits other hosts [fast]: KILLED (by an assertion of its te
 an independent run reuses an inherited receipt [native]: KILLED (by an assertion of its test; 1 of 16 tests fail)
 the reporter publishes before Playwright's end [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
 the configuration allows a focused test [native]: KILLED (by an assertion of its test; 1 of 16 tests fail)
-47 of 47 mutants killed
+48 of 48 mutants killed
 memory bound: no process was stopped
