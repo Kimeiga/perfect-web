@@ -450,7 +450,7 @@ MUTANTS = [
     ),
     (
         "rows are matched by their place, not their key",
-        "todomvc",
+        "browser",
         RUNTIME,
         "    const a = rowAnchor(nodes[i]);\n    if (a?.start) {\n",
         "    const a = rowAnchor(nodes[i]);\n    if (false && a?.start) {\n",
@@ -471,7 +471,7 @@ MUTANTS = [
     ),
     (
         "a computed part is computed again for its first value alone",
-        "todomvc",
+        "browser",
         RUNTIME,
         "  return live.reads?.length ? live.reads : [live.signal];\n",
         "  return [live.signal];\n",

@@ -511,12 +511,17 @@ and `just e14-device-store-cypress` (`docs/evidence/E14/device-store-cypress.txt
   host's block. The corpus gains A-054, R-108 (PW6801) and R-109 (PW6802)
   (C28; the enforcement table 89 of 89), and the generality witnesses
   `device_value_to_a_command` and `device_value_keys_a_query` (62 of 62).
-- **The host** (`tests::todomvc::`, 4 tests): TodoMVC's document renders
-  the declared default, marks and hides what the device decides while the
-  device is read, names what the device keeps in its manifest, and no host
-  holds a todo: TodoMVC's host layer (`server/src/todomvc.rs`) is gone.
+- **The host** (`tests::todomvc::` and `tests::device_store::`, 5 tests):
+  TodoMVC's document renders the declared default, marks and hides what the
+  device decides while the device is read, its policy allowing both of the
+  head's styles by their hashes, names what the device keeps in its
+  manifest, and no host holds a todo: TodoMVC's host layer
+  (`server/src/todomvc.rs`) is gone. A page whose browser computes nothing
+  but a step between versions is served the module that holds it.
 - **The browser, three engines**: the demo (`e2e/device-store.spec.mjs`
-  over `examples/demo/device.pw`, 13 tests, 39 of 39) and TodoMVC
+  over `examples/demo/device.pw`, 15 tests, 45 of 45, a value computed from
+  the device's value and the page's and a list reordered among them) and
+  TodoMVC
   (`e2e/todomvc.spec.mjs`, 50 tests, 150 of 150); and the whole browser
   suite, since the block morph (decision 7) is every signal block's: 1391
   of its 1416 passed and 22 skipped as their specs say, and the 3 that
@@ -552,9 +557,12 @@ and `just e14-device-store-cypress` (`docs/evidence/E14/device-store-cypress.txt
   `<li>` across its toggle, and a block replaced whole made it another
   element.
 - **The mutation controls** (`scripts/device_store_mutations.py`): each
-  rule, each step of the build, the host and the runtime, and TodoMVC's
-  morph undone in turn, each to be killed by the track's own tests, the
-  count in the evidence.
+  rule, each step of the build, the host and the runtime, and the morph
+  undone in turn. The first whole run killed 54 of 58; each of the four
+  that survived named a test missing, now written: the host's policy of the
+  head's styles, a page whose one computing is a step, a list reordered,
+  and a value computed again for its second input. The count of the run
+  after them is in the evidence.
 
 ## Questions for the integrator
 

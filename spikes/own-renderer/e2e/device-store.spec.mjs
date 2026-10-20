@@ -12,6 +12,9 @@
 // - a page that finds a newer version writes nothing more, and says so;
 // - an unreadable value is refused, kept aside, and never used;
 // - a write the store refuses is said where it was made;
+// - a value computed from the device's value and the page's is computed
+//   again when either changes, and a row keeps its element as its list is
+//   reordered (the block's morph, matched by key);
 // - no request carries what the device keeps;
 // - and the store's own limit, measured in each engine.
 import { expect, test } from "@playwright/test";
@@ -293,6 +296,38 @@ test("a write the store refuses is said where it was made, and what was kept sta
   await note(page, "kept");
   await expect(page.locator("#count")).toHaveText("1 note");
   expect((await stored(page))["demo-notes@2"]).toContain("kept");
+});
+
+test("a value computed from the device's value and the page's is computed again when either changes", async ({
+  page,
+}) => {
+  await ready(page);
+  await expect(page.locator("#summary")).toHaveText("0 notes");
+  // The page's own value changes: what is typed.
+  await page.locator("#draft").fill("milk");
+  await expect(page.locator("#summary")).toHaveText("1 note once milk is added");
+  // The device's: the note added, and the field emptied.
+  await page.locator("#draft").press("Enter");
+  await expect(page.locator("#summary")).toHaveText("1 note");
+  await page.locator("#draft").fill("bread");
+  await expect(page.locator("#summary")).toHaveText("2 notes once bread is added");
+});
+
+test("a row keeps its element as its list is reordered, matched by its note's key", async ({ page }) => {
+  await ready(page);
+  for (const text of ["first", "second", "third"]) await note(page, text);
+  const rows = page.locator("#notes li");
+  await expect(rows).toHaveText(["first", "second", "third"]);
+  const held = await Promise.all([0, 1, 2].map((i) => rows.nth(i).elementHandle()));
+  await page.locator("#newest").click();
+  await expect(rows).toHaveText(["third", "second", "first"]);
+  // Each row the element it was, moved: none made again.
+  for (const [i, at] of [[0, 2], [1, 1], [2, 0]]) {
+    expect(await rows.nth(at).evaluate((li, was) => li === was, held[i])).toBe(true);
+  }
+  await page.locator("#newest").click();
+  await expect(rows).toHaveText(["first", "second", "third"]);
+  expect(await rows.nth(0).evaluate((li, was) => li === was, held[0])).toBe(true);
 });
 
 test("no request carries what the device keeps", async ({ page }) => {
