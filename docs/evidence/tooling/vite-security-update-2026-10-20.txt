@@ -1,0 +1,128 @@
+Vite security update, ADR-0370
+generated: 2026-10-20T23:10:02.024618+00:00
+commands: pnpm install --frozen-lockfile --ignore-scripts; pnpm --filter pw-bench-sveltekit typecheck; pnpm --filter pw-bench-sveltekit build; pnpm --filter spike-marko-stream-resume build; pnpm --filter spike-pw-to-marko build; pnpm audit --json; bash scripts/audit-node.sh
+pw-to-marko: the first build had no routes; generated static/counter/streamed with pw emit-marko and rebuilt (last log section). Modern StorePage uses a layout and emit-marko refuses it; no store build claim.
+before audit advisory instances: 7
+  GHSA-vfj7-8cjw-p6xm braces <=3.0.3
+  GHSA-698v-4r3x-3vcv vite >=8.2.0 <=8.2.3
+  GHSA-698v-4r3x-3vcv vite >=8.3.0 <=8.3.2
+  GHSA-r825-w8mm-5pxw vite >=8.2.0 <=8.2.3
+  GHSA-r825-w8mm-5pxw vite >=8.3.0 <=8.3.2
+  GHSA-587h-7wmj-h5pm vite >=8.2.0 <=8.2.3
+  GHSA-587h-7wmj-h5pm vite >=8.3.0 <=8.3.2
+after audit advisory instances: 1
+  GHSA-vfj7-8cjw-p6xm braces <=3.0.3
+pnpm-lock.yaml sha256: 51ed271df1fd21c3869d1fe2380b0beeb0391514ec5c11759e806aebcf3668c7
+benchmarks/baselines/sveltekit           |  WARN  The field "pnpm.overrides" was found in /home/haki/code/pw-wt/train-12/benchmarks/baselines/sveltekit/package.json. This will not take effect. You should configure "pnpm.overrides" at the root of the workspace instead.
+Scope: all 8 workspace projects
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +10 -9
+++++++++++---------
+Progress: resolved 10, reused 9, downloaded 1, added 8, done
+
+Done in 522ms using pnpm v10.15.1
+benchmarks/baselines/sveltekit           |  WARN  The field "pnpm.overrides" was found in /home/haki/code/pw-wt/train-12/benchmarks/baselines/sveltekit/package.json. This will not take effect. You should configure "pnpm.overrides" at the root of the workspace instead.
+
+> pw-bench-sveltekit@ typecheck /home/haki/code/pw-wt/train-12/benchmarks/baselines/sveltekit
+> svelte-kit sync && svelte-check --tsconfig ./tsconfig.json
+
+Loading svelte-check in workspace: /home/haki/code/pw-wt/train-12/benchmarks/baselines/sveltekit
+Getting Svelte diagnostics...
+
+svelte-check found 0 errors and 0 warnings
+benchmarks/baselines/sveltekit           |  WARN  The field "pnpm.overrides" was found in /home/haki/code/pw-wt/train-12/benchmarks/baselines/sveltekit/package.json. This will not take effect. You should configure "pnpm.overrides" at the root of the workspace instead.
+
+> pw-bench-sveltekit@ build /home/haki/code/pw-wt/train-12/benchmarks/baselines/sveltekit
+> vite build
+
+vite v8.3.3 building ssr environment for production...
+transforming...
+✓ 163 modules transformed.
+rendering chunks...
+vite v8.3.3 building client environment for production...
+transforming...
+✓ 160 modules transformed.
+rendering chunks...
+computing gzip size...
+.svelte-kit/output/client/_app/version.json                        0.02 kB │ gzip:  0.04 kB
+.svelte-kit/output/client/.vite/manifest.json                      2.60 kB │ gzip:  0.56 kB
+.svelte-kit/output/client/_app/immutable/chunks/xihTtKlq.js        0.06 kB │ gzip:  0.08 kB
+.svelte-kit/output/client/_app/immutable/entry/start.CM4m4zBZ.js   0.08 kB │ gzip:  0.09 kB
+.svelte-kit/output/client/_app/immutable/nodes/0.BKtxqS9o.js       0.17 kB │ gzip:  0.15 kB
+.svelte-kit/output/client/_app/immutable/nodes/1.DmWuu6CT.js       0.57 kB │ gzip:  0.32 kB
+.svelte-kit/output/client/_app/immutable/chunks/Bjy-W4x2.js        1.36 kB │ gzip:  0.65 kB
+.svelte-kit/output/client/_app/immutable/nodes/2.CmlEf-Mi.js       2.70 kB │ gzip:  1.33 kB
+.svelte-kit/output/client/_app/immutable/entry/app.PLlgjugI.js     4.14 kB │ gzip:  1.91 kB
+.svelte-kit/output/client/_app/immutable/chunks/BMBnB_AF.js       34.75 kB │ gzip: 13.01 kB
+.svelte-kit/output/client/_app/immutable/chunks/DCZRS3cz.js       42.63 kB │ gzip: 16.35 kB
+
+✓ built in 102ms
+computing gzip size...
+.svelte-kit/output/server/.vite/manifest.json                                  5.06 kB │ gzip:  0.73 kB
+.svelte-kit/output/server/entries/hooks.server.js                              0.21 kB │ gzip:  0.16 kB
+.svelte-kit/output/server/env.js                                               0.22 kB │ gzip:  0.14 kB
+.svelte-kit/output/server/chunks/env.js                                        0.28 kB │ gzip:  0.17 kB
+.svelte-kit/output/server/internal.js                                          0.40 kB │ gzip:  0.19 kB
+.svelte-kit/output/server/entries/fallbacks/layout.svelte.js                   0.43 kB │ gzip:  0.30 kB
+.svelte-kit/output/server/chunks/session.js                                    0.63 kB │ gzip:  0.34 kB
+.svelte-kit/output/server/chunks/internal2.js                                  0.89 kB │ gzip:  0.44 kB
+.svelte-kit/output/server/entries/pages/stores/_storeId_/_page.svelte.js       1.10 kB │ gzip:  0.56 kB
+.svelte-kit/output/server/entries/pages/stores/_storeId_/_page.server.ts.js    2.05 kB │ gzip:  0.90 kB
+.svelte-kit/output/server/chunks/client.js                                     2.09 kB │ gzip:  0.84 kB
+.svelte-kit/output/server/entries/fallbacks/error.svelte.js                    3.21 kB │ gzip:  1.25 kB
+.svelte-kit/output/server/chunks/exports.js                                   11.88 kB │ gzip:  3.73 kB
+.svelte-kit/output/server/chunks/uneval.js                                    19.41 kB │ gzip:  5.35 kB
+.svelte-kit/output/server/chunks/shared.js                                    30.77 kB │ gzip:  8.25 kB
+.svelte-kit/output/server/chunks/utils.js                                     37.49 kB │ gzip: 10.85 kB
+.svelte-kit/output/server/chunks/internal.js                                  40.59 kB │ gzip: 11.59 kB
+.svelte-kit/output/server/remote-entry.js                                     55.51 kB │ gzip: 12.13 kB
+.svelte-kit/output/server/chunks/server.js                                   119.66 kB │ gzip: 31.17 kB
+.svelte-kit/output/server/index.js                                           137.67 kB │ gzip: 34.73 kB
+
+✓ built in 1.22s
+
+Run npm run preview to preview your production build locally.
+
+> Using @sveltejs/adapter-node
+Generated an empty chunk: "chunks/env.js".
+  ✔ done
+benchmarks/baselines/sveltekit           |  WARN  The field "pnpm.overrides" was found in /home/haki/code/pw-wt/train-12/benchmarks/baselines/sveltekit/package.json. This will not take effect. You should configure "pnpm.overrides" at the root of the workspace instead.
+
+> spike-marko-stream-resume@0.0.0 build /home/haki/code/pw-wt/train-12/spikes/marko-stream-resume
+> marko-run build
+
+[90m┌────────[39m[90m┬────────────────[39m[90m┬───────[39m[90m┬────────────┐[39m
+[90m│[39m[31m METHOD [39m[90m│[39m[31m PATH           [39m[90m│[39m[31m ENTRY [39m[90m│[39m[31m  SIZE/GZIP [39m[90m│[39m
+[90m├────────[39m[90m┼────────────────[39m[90m┼───────[39m[90m┼────────────┤[39m
+[90m│[39m GET    [90m│[39m /counter       [90m│[39m page  [90m│[39m 2.7/1.6 kB [90m│[39m
+[90m│[39m GET    [90m│[39m /counter-large [90m│[39m page  [90m│[39m 2.7/1.6 kB [90m│[39m
+[90m│[39m GET    [90m│[39m /static        [90m│[39m page  [90m│[39m     0.0 kB [90m│[39m
+[90m│[39m GET    [90m│[39m /stream        [90m│[39m page  [90m│[39m     0.0 kB [90m│[39m
+[90m└────────[39m[90m┴────────────────[39m[90m┴───────[39m[90m┴────────────┘[39m
+benchmarks/baselines/sveltekit           |  WARN  The field "pnpm.overrides" was found in /home/haki/code/pw-wt/train-12/benchmarks/baselines/sveltekit/package.json. This will not take effect. You should configure "pnpm.overrides" at the root of the workspace instead.
+
+> spike-pw-to-marko@0.0.0 build /home/haki/code/pw-wt/train-12/spikes/pw-to-marko
+> marko-run build
+
+[90m┌────────[39m[90m┬──────[39m[90m┬───────[39m[90m┬───────────┐[39m
+[90m│[39m[31m METHOD [39m[90m│[39m[31m PATH [39m[90m│[39m[31m ENTRY [39m[90m│[39m[31m SIZE/GZIP [39m[90m│[39m
+[90m├────────┴──────┴───────┴───────────┤[39m
+[90m│[39m          No routes found          [90m│[39m
+[90m└───────────────────────────────────┘[39m
+raw pnpm audit: remaining advisories ['GHSA-vfj7-8cjw-p6xm']
+audit-node: OK (no new advisories; 2 accepted and documented)
+VITE VALIDATION OK
+benchmarks/baselines/sveltekit           |  WARN  The field "pnpm.overrides" was found in /home/haki/code/pw-wt/train-12/benchmarks/baselines/sveltekit/package.json. This will not take effect. You should configure "pnpm.overrides" at the root of the workspace instead.
+
+> spike-pw-to-marko@0.0.0 build /home/haki/code/pw-wt/train-12/spikes/pw-to-marko
+> marko-run build
+
+[90m┌────────[39m[90m┬───────────[39m[90m┬───────[39m[90m┬────────────┐[39m
+[90m│[39m[31m METHOD [39m[90m│[39m[31m PATH      [39m[90m│[39m[31m ENTRY [39m[90m│[39m[31m  SIZE/GZIP [39m[90m│[39m
+[90m├────────[39m[90m┼───────────[39m[90m┼───────[39m[90m┼────────────┤[39m
+[90m│[39m GET    [90m│[39m /counter  [90m│[39m page  [90m│[39m 3.4/1.8 kB [90m│[39m
+[90m│[39m GET    [90m│[39m /static   [90m│[39m page  [90m│[39m     0.0 kB [90m│[39m
+[90m│[39m GET    [90m│[39m /streamed [90m│[39m page  [90m│[39m     0.0 kB [90m│[39m
+[90m└────────[39m[90m┴───────────[39m[90m┴───────[39m[90m┴────────────┘[39m
+
