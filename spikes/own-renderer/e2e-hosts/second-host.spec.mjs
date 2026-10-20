@@ -10,6 +10,8 @@
 //     reader's page on B, live: B hears A's commit from the outbox;
 //   - a post's request sent again to B, as a retrying proxy sends it once
 //     A's answer was lost, is answered from what A committed, and posts once;
+//   - a press sent to the wrong host (session affinity broken) is refused as
+//     another host's page, in the platform's words, and nothing runs;
 //   - B stopped while A commits, and started again: its page, told by the
 //     new process to reload, shows what A committed meanwhile, its reader
 //     signed in still, and is told A's next post live;
@@ -219,6 +221,44 @@ test("a post's request sent again to B is answered from what A committed, and po
   await expect(post(onB, text)).toHaveCount(1);
   await home(onA, A);
   await expect(post(onA, text)).toHaveCount(1);
+  await context.close();
+});
+
+test("a press sent to the wrong host is refused as another host's page, and nothing runs", async ({
+  browser,
+}, testInfo) => {
+  // Session affinity broken (the integrator's rulings 1 and 3 of
+  // 2026-10-20): a load balancer sends the press of a page A served to B,
+  // which never served it. B answers that the page is another host's, in
+  // the platform's words, told where the press was; nothing is posted, and
+  // the reader is not told the page is out of date.
+  const context = await browser.newContext();
+  const onA = await context.newPage();
+  await signUp(onA, A, handle(testInfo, "ivy"), `Ivy ${testInfo.project.name}`);
+  await onA.route("**/command/feed.app.post", async (route) => {
+    const request = route.request();
+    const there = new URL(request.url());
+    there.port = String(B.port);
+    const headers = { ...(await request.allHeaders()), origin: B.origin };
+    delete headers.host;
+    await route.fulfill({ response: await route.fetch({ url: there.href, headers }) });
+  });
+  const text = `Sent to the wrong host at ${Date.now()}`;
+  await onA.getByLabel("What's happening?").fill(text);
+  const answered = onA.waitForResponse((r) => r.url().includes("/command/feed.app.post"));
+  await onA.getByRole("button", { name: "Post" }).click();
+  expect((await answered).status()).toBe(403);
+  await expect(onA.locator("form + .pw-refusal").first()).toHaveText(
+    "This page is served by another host. Reload it to go on.",
+  );
+  await expect(post(onA, text)).toHaveCount(0);
+  await onA.unrouteAll({ behavior: "ignoreErrors" });
+  // Nothing was posted, as either host reads it.
+  for (const host of [A, B]) {
+    const page = await context.newPage();
+    await home(page, host);
+    await expect(post(page, text)).toHaveCount(0);
+  }
   await context.close();
 });
 

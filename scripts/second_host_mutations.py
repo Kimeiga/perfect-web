@@ -24,10 +24,21 @@ Each mutant undoes one rule:
 - a retry across hosts: a press on another host's page not answered from
   its record, or looked for under the page's session alone;
 - the deployment's schema (`PW_FEED_SCHEMA`) not the one its tables are in
-  (the browser's).
+  (the browser's), or honored for any deployment where it is a test's
+  (the integrator's ruling 4 of 2026-10-20);
+- pages numbered apart (ruling 1): every host numbering from one, or
+  taking one instance; another host's page refused as out of date; a
+  number in no instance taken for another host's;
+- sessions that expire (ruling 2): a kept session idle or past its
+  lifetime signed in still, its use not recorded or written at every
+  request, an expired one's row kept, the deployment's lifetimes not read
+  or not held to; signing in keeping the session the browser came with;
+  in one host's memory, an idle or an old session signed in still, its use
+  not recorded, an expired one not forgotten.
 
 The tests then fail: `tests::second_host::` (`hosts`), two of the store's
-PostgreSQL tests (`store`), or the two-host browser suite in Chromium
+PostgreSQL tests (`store`), identity's own (`unit`), or the two-host browser
+suite in Chromium
 (`browser`, `e2e-hosts/second-host.spec.mjs` through
 `playwright.hosts.config.mjs`; it needs the feed's build, `feed.sh`). Every
 suite needs a database: PW_FEED_DATABASE_URL and PW_STORE_DATABASE_URL, a
@@ -429,6 +440,133 @@ MUTANTS = [
         "                isolation,\n"
         "            ) {\n",
     ),
+    (
+        "PW_FEED_SCHEMA is honored for any deployment",
+        "hosts",
+        HOSTS,
+        "        Some(s) if deployment.development && deployment.loopback() => Ok(Some(s.to_string())),\n",
+        "        Some(s) if !s.is_empty() => Ok(Some(s.to_string())),\n",
+    ),
+    # --- The integrator's ruling 1 of 2026-10-20: pages numbered apart.
+    (
+        "every host numbers its pages from one",
+        "hosts",
+        HOSTS,
+        "    instance.map_or(0, |i| i << PAGE_COUNT_BITS) | 1\n",
+        "    instance.map_or(0, |_| 0) | 1\n",
+    ),
+    (
+        "every host on a database takes one instance",
+        "hosts",
+        HOSTS,
+        "    Ok((u64::try_from(n).unwrap_or(1).max(1) - 1) % PAGE_INSTANCES + 1)\n",
+        "    Ok(u64::from(n == i64::MIN) + 1)\n",
+    ),
+    (
+        "a page another host served is refused as out of date",
+        "hosts",
+        SERVER,
+        "            None if hosts::another_hosts(document, self.first_page) => Some(ANOTHER_HOST),\n",
+        "            None if hosts::another_hosts(document, self.first_page) => Some(PAGE_NOT_HELD),\n",
+    ),
+    (
+        "a page in no host's instance is another host's",
+        "hosts",
+        HOSTS,
+        "    theirs != 0 && theirs != mine\n",
+        "    theirs != mine\n",
+    ),
+    # --- The integrator's ruling 2 of 2026-10-20: sessions that expire.
+    (
+        "a kept session idle past its idle time is signed in still",
+        "hosts",
+        HOSTS,
+        "                     AND seen > clock_timestamp() - make_interval(secs => $3)), \\\n",
+        "                     AND $3::float8 >= 0), \\\n",
+    ),
+    (
+        "a kept session past its lifetime is signed in still",
+        "hosts",
+        HOSTS,
+        "                     AND opened > clock_timestamp() - make_interval(secs => $2) \\\n",
+        "                     AND $2::float8 >= 0 \\\n",
+    ),
+    (
+        "a kept session's use is not recorded",
+        "hosts",
+        HOSTS,
+        "                         WHERE seen < clock_timestamp() - make_interval(secs => $4))), \\\n",
+        "                         WHERE $4::float8 < 0)), \\\n",
+    ),
+    (
+        "a kept session's use is written at every request",
+        "hosts",
+        HOSTS,
+        "                         WHERE seen < clock_timestamp() - make_interval(secs => $4))), \\\n",
+        "                         WHERE $4::float8 >= 0)), \\\n",
+    ),
+    (
+        "an expired kept session's row stays",
+        "hosts",
+        HOSTS,
+        "                     AND NOT EXISTS (SELECT 1 FROM live)) \\\n",
+        "                     AND false) \\\n",
+    ),
+    (
+        "a deployment's session lifetimes are not read",
+        "hosts",
+        IDENTITY,
+        "            if let Some(v) = value.filter(|v| !v.is_empty()) {\n",
+        "            if let Some(v) = value.filter(|_| false) {\n",
+    ),
+    (
+        "a host holds its kept sessions to the defaults, not its deployment's",
+        "hosts",
+        IDENTITY,
+        "        match kept.session(&kept_hash(session), &self.lifetimes()) {\n",
+        "        match kept.session(&kept_hash(session), &SessionLifetimes::default()) {\n",
+    ),
+    (
+        "signing in keeps the session the browser came with",
+        "hosts",
+        IDENTITY,
+        "            issuer: claims.iss,\n"
+        "        };\n"
+        "        let rotated = new_session_id();\n",
+        "            issuer: claims.iss,\n"
+        "        };\n"
+        "        let rotated = session.to_string();\n",
+    ),
+    (
+        "in memory, an idle session is signed in still",
+        "unit",
+        IDENTITY,
+        "        age > lifetimes.absolute || age.saturating_sub(seen) > lifetimes.idle\n",
+        "        age > lifetimes.absolute\n",
+    ),
+    (
+        "in memory, a session past its lifetime is signed in still",
+        "unit",
+        IDENTITY,
+        "        age > lifetimes.absolute || age.saturating_sub(seen) > lifetimes.idle\n",
+        "        age.saturating_sub(seen) > lifetimes.idle\n",
+    ),
+    (
+        "in memory, a session's use is not recorded",
+        "unit",
+        IDENTITY,
+        "        self.seen.store(age, Ordering::SeqCst);\n",
+        "        let _ = age;\n",
+    ),
+    (
+        "in memory, an expired session is not forgotten",
+        "unit",
+        IDENTITY,
+        "        if expired {\n"
+        "            self.close(session);\n"
+        "        }\n",
+        "        let _ = expired;\n",
+    ),
 ]
 
 CARGO = ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--"]
@@ -439,6 +577,8 @@ STORE_TESTS = [
 SUITES = {
     "hosts": (CARGO + ["tests::second_host::"], {}),
     "store": (CARGO + STORE_TESTS, {}),
+    # A session in one host's memory alone, its expiry by the host's clock.
+    "unit": (CARGO + ["identity::tests::"], {}),
 }
 
 # The browser suite: the development server built from the source as it is,
@@ -510,7 +650,7 @@ def main():
         if not os.environ.get(needed):
             print(f"FAIL: every suite needs {needed}, a throwaway database")
             return 1
-    for suite in ("hosts", "store", "browser"):
+    for suite in ("hosts", "store", "unit", "browser"):
         valid, passed, failed = run(suite)
         print(f"baseline ({suite}): {passed} passed, {failed} failed", flush=True)
         if not valid or failed or not passed or watch.stopped:
