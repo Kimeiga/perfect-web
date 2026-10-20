@@ -9,8 +9,9 @@
 # commits from the outbox, answer each other's retries from the record a
 # commit wrote, and keep their sessions in the database, by hash. The
 # server's two-host tests (two hosts in one process on one schema, the
-# feed's and the store's); the outbox kept, and the store's statements
-# counted, on PostgreSQL; two hosts in three engines
+# feed's and the store's); the outbox kept, on PostgreSQL (the store's
+# statements this track adds to each command are e14-bounded-statements'
+# pins, and its evidence); two hosts in three engines
 # (e2e-hosts/second-host.spec.mjs, through playwright.hosts.config.mjs, each
 # engine's hosts on a schema of their own at PORT and above); and the
 # mutation controls. Every claim needs a database: refused without
@@ -33,8 +34,8 @@ e14-second-host:
        echo "postgres: $(psql "$PW_FEED_DATABASE_URL" -Atc 'SHOW server_version' 2>/dev/null || echo 'unknown (psql is not on PATH)')"; echo; \
        echo "== two hosts in one process on one schema (tests/second_host.rs)"; echo; \
        cargo test --locked -p pw-dev-server -- tests::second_host:: 2>&1 | grep -E '^(test |test result)|panicked at'; \
-       echo; echo "== the outbox kept, and the store's statements counted (tests/feed_pg.rs, tests/store_pg.rs, tests/bounded_statements.rs)"; echo; \
-       PW_STORE_TEST_LAYER=postgres cargo test --locked -p pw-dev-server -- tests::feed_pg:: tests::store_pg:: tests::bounded_statements:: 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the outbox kept, read back and read by every host (tests/feed_pg.rs, tests/store_pg.rs)"; echo; \
+       PW_STORE_TEST_LAYER=postgres cargo test --locked -p pw-dev-server -- tests::feed_pg:: tests::store_pg:: 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== two hosts in three engines (e2e-hosts/second-host.spec.mjs)"; echo; \
        (cd spikes/own-renderer && pnpm exec playwright test --config playwright.hosts.config.mjs --reporter=line 2>&1) \
          | sed 's/\x1b\[[0-9;]*m//g;s/\x1b\[1A\x1b\[2K//g' \
