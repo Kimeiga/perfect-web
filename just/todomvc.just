@@ -28,9 +28,7 @@ e14-address-fragment:
        echo; echo "== the host (tests::address_fragment)"; echo; \
        cargo test --locked -p pw-dev-server -- tests::address_fragment:: 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the browser in three engines (e2e/fragment.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/fragment.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/fragment.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/address_fragment_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/address_fragment_mutations.py; \
      } > docs/evidence/E14/address-fragment.txt
@@ -55,9 +53,7 @@ e14-dom-events:
        echo "== the compiler (tests/declared_events.rs, events.rs, platform_contracts.rs)"; echo; \
        cargo test --locked -p pw-core --test declared_events --test events --test platform_contracts 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the browser in three engines (e2e/events.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/events.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/events.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/dom_events_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/dom_events_mutations.py; \
      } > docs/evidence/E14/dom-events.txt
@@ -79,9 +75,7 @@ e14-autofocus:
        echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
        echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
        echo "== the browser in three engines (e2e/focus.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/focus.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/focus.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/autofocus_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/autofocus_mutations.py; \
      } > docs/evidence/E14/autofocus.txt
@@ -89,15 +83,16 @@ e14-autofocus:
 
 # Track `todomvc` (ADR-XXXX): TodoMVC in Pleris, held to TodoMVC's own spec
 # (`app-spec.md`): every behaviour it states, each with its test. The program
-# (examples/todomvc) and its data layer's tests on the host (tests::todomvc::),
+# (examples/todomvc) and its document's tests on the host (tests::todomvc::;
+# its todos are the reader's device's since track `device-store`, ADR-XXXX),
 # the browser in three engines over the program built by
 # spikes/own-renderer/todomvc.sh and served on a host per engine
 # (e2e/todomvc.spec.mjs), and the mutation controls
 # (scripts/todomvc_mutations.py), each program mutant checked to be a
 # well-typed program. And TodoMVC's own Cypress suite, vendored unchanged
 # (spikes/todomvc-cypress), run against the app twice: as the suite ships (the
-# acceptance: every test that asks localStorage fails by design, and Cypress
-# skips the rest of a suite after a failed hook) and, labelled as not the
+# acceptance: all 29 must pass; `just e14-device-store-cypress` shows why five
+# cannot under this Cypress, for any app) and, labelled as not the
 # acceptance, under a name its own tables take as keeping nothing in
 # localStorage. Each run is judged by scripts/todomvc_cypress_result.py from
 # what Cypress printed. THIS RECIPE FAILS where Cypress cannot run (no Xvfb, no
@@ -106,6 +101,7 @@ e14-autofocus:
 # Cypress's own cache (`cypress install` does nothing where it is there). The
 # Cypress suite is not part of `just ci`.
 e14-todomvc:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
     @bash spikes/own-renderer/todomvc.sh > /dev/null
     @cargo build --quiet --locked -p pw-dev-server -p kiokun-server
     @cd spikes/todomvc-cypress && pnpm exec cypress install > /dev/null
@@ -118,12 +114,10 @@ e14-todomvc:
        echo "todomvc-app-css: $(node -p "require('./spikes/own-renderer/node_modules/todomvc-app-css/package.json').version") ($(node -p "require('./spikes/own-renderer/node_modules/todomvc-app-css/package.json').license"))"; \
        echo "todomvc-common: $(node -p "require('./spikes/own-renderer/node_modules/todomvc-common/package.json').version") ($(node -p "require('./spikes/own-renderer/node_modules/todomvc-common/package.json').license"))"; \
        echo "cypress: $(cd spikes/todomvc-cypress && pnpm exec cypress --version | tr '\n' ' ')"; echo; \
-       echo "== the host: a session's todos, the commands over them, and the page (tests::todomvc::)"; echo; \
+       echo "== the host: the page's document, its defaults and what the device decides (tests::todomvc::)"; echo; \
        cargo test --locked -p pw-dev-server -- tests::todomvc:: 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the browser in three engines (e2e/todomvc.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/todomvc.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/todomvc.spec.mjs --reporter=line; \
        echo; echo "== TodoMVC's own Cypress suite, unchanged: the acceptance (spikes/todomvc-cypress/run.sh)"; echo; \
        bash spikes/todomvc-cypress/run.sh; \
        echo; echo "== TodoMVC's own Cypress suite, unchanged: the diagnostic, not the acceptance (DIAGNOSTIC=1)"; echo; \

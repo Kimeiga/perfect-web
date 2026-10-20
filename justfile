@@ -45,6 +45,7 @@ import 'just/parallel-mutants.just'
 import 'just/kiokun-cache.just'
 import 'just/ci-diagnostics.just'
 import 'just/todomvc.just'
+import 'just/device-store.just'
 
 default:
     @just --list
