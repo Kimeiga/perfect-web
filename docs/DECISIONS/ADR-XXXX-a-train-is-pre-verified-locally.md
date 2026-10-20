@@ -196,16 +196,30 @@ On the PC (WSL2, 32 threads, shared with ten-plus other workers), Python
   17,658 s, against 8,234 s here). What they give is each failure on the PC,
   before a push, and a survivor within minutes of its being written (decision
   5), not a faster whole.
-- **The tool's tests and mutants**: 167 tests (45 s on a quiet machine, 76 to
-  110 s at load 100+), and 225 mutants of the tool, of `verify.yml` and of the
-  recipe, all killed, in 4 allocator slots in 25 minutes (the first whole run
-  killed 220 of 226: its six survivors were four tests missing and one
+- **A failure, on real recipes' output.** A throwaway worktree of this branch
+  with `assert_eq!(1, 2)` put in one of `pw-syntax`'s unit tests (never
+  committed to a branch; removed), run as `--recipes e14-logical-mixed
+  --lanes 1`: the recipe fails in 4.4 s in a cold lane, and the report names
+  `test grammar::tests::a_self_closing_element_has_no_children ... FAILED`, its
+  `panicked at compiler/pw-syntax/src/grammar.rs:3474:9`, `test result: FAILED.
+  97 passed; 1 failed` and just's own `exit code 101`, then the tail of the
+  log and of the evidence as CI's runner prints it.
+- **No false alarm on a recipe that passed.** Of the 287 evidence files the
+  CI recipes write (`ci_plan.evidence_files`), as committed from green runs,
+  none holds a line the failing-lines list, and so the early notice, would say;
+  of all 504 files under `docs/evidence/`, 119 do, and they are the recorded
+  red runs (the allocator's causal-RED transcripts, a recorded Playwright
+  failure, ADR 0344's), which no recipe rewrites.
+- **The tool's tests and mutants**: 179 tests (45 to 65 s on a quiet machine,
+  up to 110 s at load 100+), and 242 mutants of the tool, of `verify.yml` and of
+  the recipe, all killed, in 4 allocator slots in 25 minutes (the first whole
+  run killed 220 of 226: its six survivors were four tests missing and one
   redundant line, and are fixed).
 
 ## Evidence
 
 - `just e14-preverify` (`docs/evidence/E14/preverify.txt`, recorded at
-  33277666 with `PW_MUTANT_SLOTS=4`): the 167 tests, and 225 of 225
+  fd29aceb with `PW_MUTANT_SLOTS=4`): the 179 tests, and 242 of 242
   mutants killed, each by the failed assertion of a test of
   `scripts/tests/test_preverify.py`, the cheap classes first.
 - The real subset's report is quoted above (`/tmp/preverify-proof1/`: its
@@ -213,7 +227,11 @@ On the PC (WSL2, 32 threads, shared with ten-plus other workers), Python
   evidence; the PC's /tmp is not a record, and CI's verify of a train carrying
   these recipes is). A second look at the final code, on four cheap recipes,
   is in "Measured".
-- `just ci` at this branch's last commit that touches Rust or `.pw`: <FILL>.
+- `just ci` at 658a5c5f, the code and evidence this ADR describes: `ci: OK`,
+  51 minutes (the Python gates 617 tests, 2 skipped; `case-check` 3,233 paths;
+  3,724 mutants in 280 scripts, each matching once; 347 test binaries, 3,112
+  passed, 0 failed, 25 ignored; 301 program mutants judged), the same counts
+  as train-11's. The commits after it change this ADR alone.
 
 ## Not claimed; limits
 
@@ -245,6 +263,10 @@ On the PC (WSL2, 32 threads, shared with ten-plus other workers), Python
   but a kept worktree contradicts "a detached worktree of HEAD, removed at the
   end", and a target reused under another path is the stale-artifact hazard
   of the slots' ADR; not built.
+- **The early notice is a notice, not a verdict.** It quotes a failing line
+  when it is written; a recipe that rewrites it, or retries and passes (a
+  Playwright flake), is judged by its end, as CI judges it. Only the recipe's
+  evidence file is looked at, not its log.
 - **Linux only** for the leftover-process scan (`/proc`); elsewhere a
   recipe's strays are not found, and everything else works.
 - The default port range is this worker's assignment (see the questions).
@@ -260,6 +282,17 @@ On the PC (WSL2, 32 threads, shared with ten-plus other workers), Python
 3. **A warm target** across runs: not built; say if it is wanted, and whether
    a persistent worktree per lane (updated by `git checkout --detach`, as
    `lane-setup.sh` does) may replace "removed at the end".
+4. **A dispatch of `verify` starts the three whole-suite browser jobs.** Found
+   while following the 2026-10-20 push policy (a push of a branch on the
+   unlanded train-11 plans ~190 recipes, so a track dispatches only its own):
+   `browser` runs `if: needs.plan.outputs.browsers != 'false'`, and only a
+   push to `master` (where the verified base differs from the push's before)
+   sets that output; a track's push, a dispatch and the nightly leave it
+   empty, which is not `'false'`, so dispatching one recipe still starts three
+   browser jobs of up to two hours each, as every track push does ("Every
+   push's", the workflow's own comment). The dispatch saves the ~190 recipes'
+   shards, not those three jobs. Intended? (A dispatch could pass
+   `browsers=false` unless it names a recipe that needs a browser.)
 
 ## What to do next
 
