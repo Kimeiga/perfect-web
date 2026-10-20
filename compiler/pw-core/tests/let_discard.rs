@@ -482,3 +482,47 @@ fn a_resources_acquire_clause_holds_its_value() {
         "{f:#?}"
     );
 }
+
+#[test]
+fn a_generic_results_failure_is_not_lost_through_value_constructs() {
+    // The value solver cannot convert a rigid T into a concrete resolved
+    // type. These constructs must retain the enclosing function's declared
+    // Result<T, String>, including its obligation to handle the failure.
+    for (parameters, expression, result, tail) in [
+        (
+            "r: Result<Result<T, String>, String>",
+            "r?",
+            "Result<(), String>",
+            "Ok(())",
+        ),
+        (
+            "r: Result<T, String>, flag: Bool",
+            "if flag { r } else { r }",
+            "()",
+            "()",
+        ),
+        (
+            "r: Result<T, String>, flag: Bool",
+            "match flag { true => r, false => r }",
+            "()",
+            "()",
+        ),
+        ("r: Result<T, String>", "{ r }", "()", "()"),
+    ] {
+        let wrong = format!(
+            "module m\n\nfn f<T>({parameters}) -> {result} !{{}} {{\n    let held = {expression}\n    held\n    {tail}\n}}\n"
+        );
+        let diagnostics = found(&wrong, false);
+        assert_eq!(
+            said(&diagnostics),
+            vec![(
+                "PW0618",
+                "this `Result<T, String>` is dropped, and its failure with it",
+                "held"
+            )],
+            "{wrong}\n{diagnostics:#?}"
+        );
+        let handled = wrong.replace("    held\n", "    let _ = held\n");
+        assert_eq!(found(&handled, false), vec![], "{handled}");
+    }
+}

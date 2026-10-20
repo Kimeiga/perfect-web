@@ -1,0 +1,73 @@
+   Compiling pw-core v0.0.0 (/home/haki/code/pw-wt/train-10-next/compiler/pw-core)
+    Finished `test` profile [unoptimized] target(s) in 0.45s
+     Running tests/bounded_tables.rs (target/debug/deps/bounded_tables-30c98d852efea014)
+
+running 1 test
+test a_generated_read_through_a_member_stays_a_read_per_row ... FAILED
+
+failures:
+
+---- a_generated_read_through_a_member_stays_a_read_per_row stdout ----
+
+thread 'a_generated_read_through_a_member_stays_a_read_per_row' (2186675) panicked at compiler/pw-core/tests/bounded_tables.rs:262:5:
+assertion `left == right` failed
+  left: [("rows(row)", ["PW0405"]), ("row.rows", []), ("row.rows()", ["PW0405"])]
+ right: [("rows(row)", ["PW0405"]), ("row.rows", ["PW0405"]), ("row.rows()", ["PW0405"])]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    a_generated_read_through_a_member_stays_a_read_per_row
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.30s
+
+error: test failed, to rerun pass `-p pw-core --test bounded_tables`
+   Compiling pw-core v0.0.0 (/home/haki/code/pw-wt/train-10-next/compiler/pw-core)
+    Finished `test` profile [unoptimized] target(s) in 0.48s
+     Running tests/generic_effects.rs (target/debug/deps/generic_effects-3c2ca0bcd3692a20)
+
+running 1 test
+test an_interface_term_local_call_never_calls_a_namesake_global ... FAILED
+
+failures:
+
+---- an_interface_term_local_call_never_calls_a_namesake_global stdout ----
+
+thread 'an_interface_term_local_call_never_calls_a_namesake_global' (2186822) panicked at compiler/pw-core/tests/generic_effects.rs:921:5:
+assertion `left == right` failed: module t
+
+import List
+
+type Item = Item { name: String }
+
+fn label(i: Item) -> String !{ database.read<Item> }
+    host "shop:data/items#label"
+
+fn stamp() -> String !{ database.read<Item> }
+    host "shop:data/items#stamp"
+
+event Changed(id: Int)
+
+query Number(id: Int) -> Int
+    invalidates_on Changed(id)
+{ id }
+
+fn consume<T>(f: T, n: Int) -> Int !{} { n }
+
+command Put(id: Int) -> Result<Int, String>
+    emits Changed(id)
+    optimistic Number(id) as n => consume((stamp: fn() -> String) => stamp(), n)
+
+
+  left: [("PW0330", "consume((stamp: fn() -> String) => stamp(), n)")]
+ right: []
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    an_interface_term_local_call_never_calls_a_namesake_global
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.05s
+
+error: test failed, to rerun pass `-p pw-core --test generic_effects`
+Probe native exits: bounded=101 lexical=101

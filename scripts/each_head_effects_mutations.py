@@ -26,7 +26,6 @@ LOWER = ROOT / "compiler/pw-core/src/lower.rs"
 LEXICAL = ROOT / "compiler/pw-core/src/lexical.rs"
 NAMES = ROOT / "compiler/pw-core/src/names.rs"
 LABELS = ROOT / "compiler/pw-core/src/labels.rs"
-INFER = ROOT / "compiler/pw-core/src/infer.rs"
 SIGNALS = ROOT / "compiler/pw-core/src/signals.rs"
 MARKO = ROOT / "compiler/pw-core/src/marko.rs"
 CHECK = ROOT / "compiler/pw-core/src/check.rs"
@@ -143,10 +142,10 @@ MUTANTS = [
         "                let l = Label::public();\n",
     ),
     (
-        "a computed list's rows have no type",
-        INFER,
-        "                    None if crate::lexical::path_root(body, *list)\n                        .is_none_or(of_a_module_signal) =>\n",
-        "                    None if false\n                        && crate::lexical::path_root(body, *list)\n                            .is_none_or(of_a_module_signal) =>\n",
+        "a computed or declared list loses its row typing",
+        LEXICAL,
+        "        self.each.iter().map(|(n, (list, head))| (*n, *list, *head))\n",
+        "        self.each.iter().filter(|(_, (_, head))| head.is_some()).map(|(n, (list, head))| (*n, *list, *head))\n",
     ),
     (
         "a loop's list shows no dialog",
@@ -185,19 +184,17 @@ TESTS = [
 
 
 def run_tests():
-    """(built, passed, failed) over every test command."""
-    built, passed, failed = True, 0, 0
+    """Every native Cargo binary contributes; invalid producers earn no kill."""
+    from cargo_test_results import parse
+    passed = failed = 0
     for cmd in TESTS:
-        r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
-        out = r.stdout + r.stderr
-        results = re.findall(r"test result: \w+\. (\d+) passed; (\d+) failed", out)
-        if not results:
-            built = False
-            continue
-        for p, f in results:
-            passed += int(p)
-            failed += int(f)
-    return built, passed, failed
+        result = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
+        outcome = parse(result.returncode, result.stdout + result.stderr)
+        if not outcome.valid:
+            return False, 0, 0
+        passed += outcome.passed
+        failed += outcome.failed
+    return True, passed, failed
 
 
 def main():
@@ -222,7 +219,8 @@ def main():
         finally:
             path.write_text(original)
         if not built:
-            verdict = "KILLED (does not build)"
+            verdict = "REFUSED (invalid Cargo producer)"
+            survivors += 1
         elif failed:
             verdict = f"KILLED ({failed} of {passed + failed} tests fail)"
         else:

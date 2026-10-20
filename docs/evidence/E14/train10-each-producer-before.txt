@@ -1,0 +1,50 @@
+test_invalid_outcome_cannot_earn_a_kill (test_each_mutation_results.EachResults) ... test_named_test_failure_earns_a_kill_and_restores (test_each_mutation_results.EachResults) ... ok
+
+======================================================================
+FAIL: test_invalid_outcome_cannot_earn_a_kill (test_each_mutation_results.EachResults) (status=-9)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/train-10-next/scripts/tests/test_each_mutation_results.py", line 42, in test_invalid_outcome_cannot_earn_a_kill
+    self.assertEqual(code,1,text)
+AssertionError: 0 != 1 : baseline: 1 passed, 0 failed
+one source control: KILLED (1 of 1 tests fail)
+1 of 1 mutants killed
+
+
+======================================================================
+FAIL: test_invalid_outcome_cannot_earn_a_kill (test_each_mutation_results.EachResults) (status=137)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/train-10-next/scripts/tests/test_each_mutation_results.py", line 42, in test_invalid_outcome_cannot_earn_a_kill
+    self.assertEqual(code,1,text)
+AssertionError: 0 != 1 : baseline: 1 passed, 0 failed
+one source control: KILLED (1 of 1 tests fail)
+1 of 1 mutants killed
+
+
+======================================================================
+FAIL: test_invalid_outcome_cannot_earn_a_kill (test_each_mutation_results.EachResults) (status=1)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/train-10-next/scripts/tests/test_each_mutation_results.py", line 42, in test_invalid_outcome_cannot_earn_a_kill
+    self.assertEqual(code,1,text)
+AssertionError: 0 != 1 : baseline: 1 passed, 0 failed
+one source control: KILLED (1 of 1 tests fail)
+1 of 1 mutants killed
+
+
+======================================================================
+FAIL: test_invalid_outcome_cannot_earn_a_kill (test_each_mutation_results.EachResults) (status=101)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/train-10-next/scripts/tests/test_each_mutation_results.py", line 42, in test_invalid_outcome_cannot_earn_a_kill
+    self.assertEqual(code,1,text)
+AssertionError: 0 != 1 : baseline: 1 passed, 0 failed
+one source control: KILLED (does not build)
+1 of 1 mutants killed
+
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.004s
+
+FAILED (failures=4)

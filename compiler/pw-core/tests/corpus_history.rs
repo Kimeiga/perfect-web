@@ -353,9 +353,152 @@ fn historical_event_annotation_is_blocked_not_a_nominal_mismatch() {
 ///
 /// Twenty-five rejected fixtures gained an import or a corrected library type
 /// on 2026-09-24 (`docs/CORPUS.md` §C8), because the value relations made a
-/// written type that names nothing an error. Exactly the shape of change this
-/// suite exists to watch: each old text must still be caught for its declared
-/// invariant — now beside a `PW0026` for the import the repair added.
+/// written type that names nothing an error. This suite distinguishes their
+/// required rejections: declared-invariant catches, the existing R-019 syntax
+/// boundary, and R-035's explicitly classified missing receiver import. A
+/// classified original is still refused; it is not a declared-invariant catch.
+// C8's original R-035 cannot establish a receiver effect: ElementRef was
+// never imported. Preserve that refusal rather than inferring a member from
+// a program-wide spelling. The import-only and typed controls below retain
+// the illegal phase effect as a separate, causal obligation.
+const C8_CLASSIFIED: &[(&str, Why, &str)] = &[(
+    "R-035-layout-write-during-measure-phase.pw",
+    Why::FixtureDidNotExpressIt,
+    "C8's ElementRef receiver has no visible type. The original stays refused \
+     for its exact unresolved-receiver diagnostics; adding only its import \
+     restores wrong_frame_phase at the setter, and the current typed fixture \
+     retains that violation while its pure typed neighbour is clean.",
+)];
+
+fn c8_r035_diagnostics(name: &str, src: &str) -> Vec<pw_core::diagnostics::Diagnostic> {
+    let judged = check_sources(&c8_program(name, src));
+    for (other, diagnostics) in &judged {
+        if other != name {
+            assert!(
+                diagnostics.is_empty(),
+                "the C8 R-035 control's library must be clean: {other}: {diagnostics:?}"
+            );
+        }
+    }
+    judged
+        .into_iter()
+        .find(|(file, _)| file == name)
+        .expect("the C8 R-035 control was actually checked")
+        .1
+}
+
+fn c8_r035_keeps_its_refusal_and_typed_phase_controls(name: &str, src: &str) {
+    use pw_core::diagnostics::Severity;
+
+    let original = c8_r035_diagnostics(name, src);
+    assert!(original.iter().all(|d| d.severity == Severity::Error));
+    let observed: Vec<_> = original
+        .iter()
+        .map(|d| {
+            (
+                d.code,
+                d.symbol(),
+                d.primary_span.clone(),
+                &src[d.primary_span.clone()],
+                d.message.as_str(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        observed,
+        vec![
+            (
+                "PW0026",
+                "unresolved_type",
+                528..551,
+                "items: List<ElementRef>",
+                "parameter `items` names `List<ElementRef>`: `ElementRef` is not a type visible here",
+            ),
+            (
+                "PW0408",
+                "member_receiver_untyped",
+                736..744,
+                "it.style",
+                "the type of `it` is not known here, so what `.style` reads cannot be checked",
+            ),
+            (
+                "PW0408",
+                "member_receiver_untyped",
+                736..756,
+                "it.style.set_padding",
+                "the type of `it.style` is not known here, so what `.set_padding` reads cannot be checked",
+            ),
+            (
+                "PW0408",
+                "member_receiver_untyped",
+                779..787,
+                "it.width",
+                "the type of `it` is not known here, so what `.width` reads cannot be checked",
+            ),
+            (
+                "PW0605",
+                "argument_type",
+                857..881,
+                "widths |> List.maximum()",
+                "argument 2 of `style.set_width` is declared `Float` and this is `Option<Float>`",
+            ),
+        ],
+        "C8 R-035 is classified only while these exact original refusals hold"
+    );
+
+    assert_eq!(src.matches("import style\n").count(), 1);
+    assert!(!src.contains("import browser"));
+    let imported = src.replacen(
+        "import style\n",
+        "import style\nimport browser.{ ElementRef }\n",
+        1,
+    );
+    let import_diagnostics = c8_r035_diagnostics(name, &imported);
+    assert_eq!(
+        import_diagnostics
+            .iter()
+            .map(|d| (d.code, d.symbol()))
+            .collect::<Vec<_>>(),
+        vec![
+            ("PW0402", "wrong_frame_phase"),
+            ("PW0610", "unknown_member"),
+            ("PW0605", "argument_type")
+        ],
+        "adding only ElementRef's import restores the phase finding beside the old width/maximum defects"
+    );
+
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let current = std::fs::read_to_string(root.join("examples/rejected").join(name))
+        .expect("the current typed R-035 fixture");
+    let current_diagnostics = c8_r035_diagnostics(name, &current);
+    assert_eq!(current_diagnostics.len(), 1, "{current_diagnostics:?}");
+    for (text, diagnostic) in [
+        (imported.as_str(), &import_diagnostics[0]),
+        (current.as_str(), &current_diagnostics[0]),
+    ] {
+        assert_eq!(diagnostic.code, "PW0402");
+        assert_eq!(diagnostic.symbol(), "wrong_frame_phase");
+        assert_eq!(diagnostic.severity, Severity::Error);
+        assert_eq!(diagnostic.primary_span, 766..792);
+        assert_eq!(
+            &text[diagnostic.primary_span.clone()],
+            "it.style.set_padding(4.px)"
+        );
+        assert_eq!(
+            diagnostic.message,
+            "`style.mutate<LayoutAffect>` happens in the `measure` phase, which may not do it"
+        );
+    }
+
+    let setter = "                it.style.set_padding(4.px)\n";
+    assert_eq!(current.matches(setter).count(), 1);
+    let pure = current.replacen(setter, "", 1);
+    assert!(
+        c8_r035_diagnostics(name, &pure).is_empty(),
+        "removing only the illegal setter makes the typed neighbour clean"
+    );
+}
+
 /// **The C8 texts that no longer parse**, each refused for that instead.
 ///
 /// `pw check` keeps a file that does not parse out of the program, and since
@@ -392,12 +535,25 @@ fn the_c8_text_of_every_repaired_rejected_fixture_is_still_caught() {
     );
 
     let mut wrong = Vec::new();
+    let mut classified = Vec::new();
+    let mut invariant_caught = 0;
+    let mut syntax_refused = 0;
     for (name, src) in &old {
         let declared = src
             .lines()
             .find_map(|l| l.trim().strip_prefix("// @invariant:"))
             .map(|s| s.trim().to_string())
             .unwrap_or_else(|| panic!("{name} has no @invariant"));
+        if let Some((_, class, why)) = C8_CLASSIFIED
+            .iter()
+            .find(|(file, _, _)| *file == name.as_str())
+        {
+            assert_eq!(*class, Why::FixtureDidNotExpressIt);
+            assert_eq!(declared, "wrong_frame_phase");
+            c8_r035_keeps_its_refusal_and_typed_phase_controls(name, src);
+            classified.push((name.as_str(), *class, *why));
+            continue;
+        }
         // The old text as the rejected-corpus harness assembles a fixture: the
         // CURRENT library (its own C8 repairs included — the question is
         // whether the fixture's defect survived its obstruction being removed)
@@ -414,6 +570,7 @@ fn the_c8_text_of_every_repaired_rejected_fixture_is_still_caught() {
                 !pw_syntax::parse_tree(src).ok() && symbols.contains(&"unclosed_block"),
                 "{name}: listed as no longer parsing, and it reports {symbols:?}"
             );
+            syntax_refused += 1;
             continue;
         }
         // Declaration-header rules run inside `check_sources` since ADR-0090;
@@ -423,9 +580,33 @@ fn the_c8_text_of_every_repaired_rejected_fixture_is_still_caught() {
                 "{name}: its pre-C8 text is no longer caught for `{declared}` \
                  (it reports {symbols:?}) — the C8 repair removed the defect"
             ));
+        } else {
+            invariant_caught += 1;
         }
     }
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+    assert_eq!(
+        C8_CLASSIFIED.len(),
+        1,
+        "one explicitly classified C8 fixture"
+    );
+    assert_eq!(classified.len(), C8_CLASSIFIED.len());
+    assert_eq!(
+        (invariant_caught, syntax_refused, classified.len()),
+        (23, 1, 1)
+    );
+    assert_eq!(
+        invariant_caught + syntax_refused + classified.len(),
+        old.len()
+    );
+    eprintln!(
+        "  historical compatibility: {invariant_caught}/{} C8 declared-invariant catches; {syntax_refused} syntax refusal; {} classified",
+        old.len(),
+        classified.len()
+    );
+    for (name, class, why) in classified {
+        eprintln!("    {name}: {class:?}: {why}");
+    }
 }
 
 /// **C9: a page states its title** (ADR-0183, `docs/CORPUS.md` §C9).

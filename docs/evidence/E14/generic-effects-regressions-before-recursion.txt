@@ -1,0 +1,82 @@
+produced by: CARGO_PROFILE_TEST_OPT_LEVEL=1 whole regression mutation scripts listed below, sequentially in generic-effects worktree
+commit: 2d2c5f0524952f31825c5626e247e5a739614255
+
+== /usr/bin/python3 -u scripts/callback_mutations.py
+baseline: 57 passed, 0 failed
+callback parameters take the sibling parameters types: KILLED (8 of 57 tests fail)
+a declared callback parameter type is not read: KILLED (2 of 57 tests fail)
+solved callback parameter types are discarded: KILLED (14 of 57 tests fail)
+a piped value is not the first argument: KILLED (5 of 57 tests fail)
+a solved lambda's parameters are forgotten: KILLED (14 of 57 tests fail)
+a parameter known only in part is not typed: KILLED (1 of 57 tests fail)
+a lambda bound with a written type is not typed by it: KILLED (1 of 57 tests fail)
+a returned lambda is not typed by the declared result: KILLED (1 of 57 tests fail)
+8 of 8 mutants killed
+memory bound: no process was stopped
+EXIT callback: 0, seconds 196.3
+mutation anchors: 2911 mutants in 263 scripts, each matching once
+
+== /usr/bin/python3 -u scripts/effect_value_mutations.py
+baseline: 12 passed, 0 failed
+a function named as a value is not counted: KILLED (5 of 12 tests fail)
+a binding in scope is read as the declaration it shadows: KILLED (4 of 12 tests fail)
+a helper declaring no row carries only what it calls: KILLED (1 of 12 tests fail)
+a function named as a value is said to be called: KILLED (1 of 12 tests fail)
+4 of 4 mutants killed
+memory bound: no process was stopped
+EXIT effect_value: 0, seconds 258.7
+mutation anchors: 2911 mutants in 263 scripts, each matching once
+
+== /usr/bin/python3 -u scripts/name_binding_mutations.py
+baseline: 12 passed, 0 failed
+a stream part's name is left unbound where it binds: KILLED (1 of 12 tests fail)
+a call through a local is resolved by its spelling: KILLED (1 of 12 tests fail)
+no body's scopes are kept to ask: KILLED (4 of 12 tests fail)
+a handler's call through a local is a command's request: KILLED (1 of 12 tests fail)
+a declaration's label reads a local's namesake: KILLED (1 of 12 tests fail)
+the reads a body makes read a local's namesake: KILLED (2 of 12 tests fail)
+the cause a label names is a local's namesake: KILLED (1 of 12 tests fail)
+a page's names are not around its markup: KILLED (6 of 12 tests fail)
+a composed view is not given what its use can read: KILLED (1 of 12 tests fail)
+a layout's blocks keep their names: KILLED (1 of 12 tests fail)
+a view in a layout keeps its blocks' names: KILLED (1 of 12 tests fail)
+a block's binding is not around the blocks inside it: KILLED (1 of 12 tests fail)
+a block that binds a name the template can read keeps it: KILLED (6 of 12 tests fail)
+a block's binding does not hide a signal of its spelling: KILLED (1 of 12 tests fail)
+14 of 14 mutants killed
+memory bound: no process was stopped
+EXIT name_binding: 0, seconds 404.2
+mutation anchors: 2911 mutants in 263 scripts, each matching once
+
+== /usr/bin/python3 -u scripts/member_mutations.py
+baseline: 13 passed, 0 failed
+no member relation is recorded: KILLED (7 of 13 tests fail)
+every known type has every member: KILLED (6 of 13 tests fail)
+a declaration taking the type is not a member: KILLED (3 of 13 tests fail)
+a unit on a number is read as a member: KILLED (1 of 13 tests fail)
+a module path is recorded as a member: KILLED (1 of 13 tests fail)
+an opaque type's value is readable from any module: KILLED (2 of 13 tests fail)
+an opaque type's value is refused in its own module: KILLED (3 of 13 tests fail)
+an opaque type's value has no type: KILLED (2 of 13 tests fail)
+an optional's contents are an ordinary missing member: KILLED (2 of 13 tests fail)
+one defect is reported by every rule that reaches it: KILLED (1 of 13 tests fail)
+10 of 10 mutants killed
+memory bound: no process was stopped
+EXIT member: 0, seconds 173.1
+mutation anchors: 2911 mutants in 263 scripts, each matching once
+
+== /usr/bin/python3 -u scripts/member_resolution_mutations.py
+baseline: 7 passed, 0 failed
+a second declaration replaces the first: KILLED (7 of 7 tests fail)
+the calling module is not asked: KILLED (4 of 7 tests fail)
+an import is not seen: KILLED (4 of 7 tests fail)
+a term beside its type is not seen: KILLED (1 of 7 tests fail)
+no declaration is named where none is seen: KILLED (1 of 7 tests fail)
+an ambiguous member is not refused: KILLED (4 of 7 tests fail)
+the value relations ask as no module: KILLED (4 of 7 tests fail)
+the inference asks as no module: KILLED (1 of 7 tests fail)
+an ambiguous member is a function value: KILLED (1 of 7 tests fail)
+9 of 9 mutants killed
+memory bound: no process was stopped
+
+Stopped coordinator only after member_resolution completed naturally9/9; these results precede the recursive-instantiation correction.

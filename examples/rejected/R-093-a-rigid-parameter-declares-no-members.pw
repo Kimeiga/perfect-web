@@ -1,0 +1,21 @@
+// @corpus: rejected
+// @id: R-093
+// @category: a rigid parameter declares no members
+// @rule: PW0610
+// @invariant: unknown_member
+// @charter: §7.2, §7.4
+// @milestone: 7
+// @expect-error: a member read retains its receiver type and effects
+
+module generic_effects.fixture
+
+import List
+
+type GenericItem = GenericItem { name: String }
+
+fn label(i: GenericItem) -> String !{ database.read<GenericItem> }
+    host "generic:data/items#label"
+
+fn unknown<T>(item: T) -> String !{} {
+    item.label
+}

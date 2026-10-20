@@ -3215,12 +3215,15 @@ fn handles_are_the_platforms(
     };
     // PW5037: made by a call to its type, anywhere a program is written.
     for (_, body, _) in hir.bodies.iter() {
+        let Some(lexical) = crate::lexical::Lexical::build_in(hir, body.owner) else {
+            continue;
+        };
         for (_, e, span) in body.exprs.iter() {
             let Expr::Call { callee, .. } = e else {
                 continue;
             };
             let crate::values::Named::Target(crate::values::Target::Opaque(def)) =
-                crate::values::named(sigs, workspace, unit, body, *callee)
+                crate::values::named_at(sigs, workspace, unit, body, &lexical, *callee)
             else {
                 continue;
             };
@@ -11005,7 +11008,11 @@ fn effect_rows(
 ) {
     use crate::effects::{Reuse, forbidden_in, forbidden_in_phase};
 
-    let Some(body_id) = decl.body else { return };
+    // Interface clauses have their own term arena too: an unknown member
+    // in an optimistic transition must be refused even without a body.
+    let Some(body_id) = decl.terms_body() else {
+        return;
+    };
     let body = hir.body(body_id);
     // The SAME type environment the inference built, not a narrower one
     // assembled here.
@@ -11021,6 +11028,51 @@ fn effect_rows(
     // wins, which is exactly what happened.
     let types = crate::infer::Types::of_decl(sigs, hir, id, body);
     let mut found = inference.infer_in_at(at, body, &types);
+
+    // **A member read through a value whose type nothing states** (ADR-0351,
+    // the generic-effects track): which member it is, what it performs and
+    // what it carries are each read through the receiver's type, so neither
+    // this row nor any caller's can be checked over it. Until then each
+    // analysis skipped it unseen: `let f = (x) => x.label`, `label` reading
+    // the database, held a `!{}` row.
+    for read in types.untyped_receivers(body) {
+        let Expr::Field { base, name } = body.expr(read) else {
+            continue;
+        };
+        let receiver = match crate::infer::path_of(body, *base) {
+            p if p.is_empty() => "this value".to_string(),
+            p => format!("`{p}`"),
+        };
+        out.push(Diagnostic {
+            code: crate::codes::MEMBER_RECEIVER_UNTYPED.id,
+            invariant: crate::codes::MEMBER_RECEIVER_UNTYPED.invariant,
+            reason: "member_receiver_untyped",
+            detector: Detector::Signature,
+            severity: Severity::Error,
+            message: format!(
+                "the type of {receiver} is not known here, so what `.{name}` reads cannot be checked"
+            ),
+            primary_span: body.expr_span(read),
+            related: vec![Related::new(
+                body.expr_span(*base),
+                "no declaration gives this value a type, and no call solves one".to_string(),
+            )],
+            explanation: Some(format!(
+                "A member read is a call (ADR-0048), found by its receiver's type: which \
+                 `{name}` this is, the effects it performs and the label of what it gives are \
+                 each read through that type, and `{}` cannot be checked against a read no \
+                 analysis can see.",
+                decl.name
+            )),
+            repairs: vec![Repair {
+                description: format!(
+                    "write {receiver}'s type where it is bound, as `(x: Item) => ..` does for \
+                     a lambda's parameter"
+                ),
+                replacement: None,
+            }],
+        });
+    }
 
     // **Plus the named roots that ARE this declaration's work.**
     //

@@ -25,7 +25,7 @@ MUTANTS = [
     (
         "a function named as a value is not counted",
         EFFECTS,
-        "        self.value_effects(unit, body, types, &mut out);\n",
+        "        self.value_effects(unit, body, body.root, types, &mut out);\n",
         "",
     ),
     (

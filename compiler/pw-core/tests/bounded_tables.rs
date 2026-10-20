@@ -203,3 +203,68 @@ fn per(keys: List<ListId>) -> List<Option<TodoList>> !{ database.read<Lists> } {
     assert!(help.contains("matching rows"), "{help}");
     assert!(help.contains("`id`"), "{help}");
 }
+
+// Integrator draft: append to bounded_tables.rs only after the generic merge.
+// These use that suite's real D1 fixtures and canonical checker.
+#[test]
+fn a_generated_read_in_a_generic_result_callback_remains_a_read_per_row() {
+    let src = r#"
+fn per(given: List<Item>) -> List<List<Item>> !{ database.read<Items> } {
+    List.map(List.reverse(given), row => Items.of_list(row.list))
+}
+"#;
+    let ds = diagnostics(src, Some("one_call"));
+    assert_eq!(
+        ds.iter().map(|d| d.code).collect::<Vec<_>>(),
+        ["PW0405"],
+        "{ds:#?}"
+    );
+    assert!(ds[0].repairs[0].description.contains("Items.of_list_many"));
+}
+
+#[test]
+fn a_generated_batch_before_generic_row_selection_keeps_its_source_cost() {
+    let src = r#"
+fn together(keys: List<ListId>) -> List<List<Item>> !{ database.read<Items> } {
+    let found = Items.of_list_many(keys)
+    List.map(List.reverse(keys), key => List.filter(found, row => row.list == key))
+}
+"#;
+    assert!(diagnostics(src, Some("one_call")).is_empty());
+    assert!(diagnostics(src, Some("chunked(50)")).is_empty());
+    let ds = diagnostics(src, Some("per_key"));
+    assert_eq!(
+        ds.iter().map(|d| d.code).collect::<Vec<_>>(),
+        ["PW0406"],
+        "{ds:#?}"
+    );
+}
+
+#[test]
+fn a_generated_read_through_a_member_stays_a_read_per_row() {
+    let results: Vec<_> = ["rows(row)", "row.rows", "row.rows()"]
+        .into_iter()
+        .map(|call| {
+            let src = format!(
+                "fn rows(row: Item) -> List<Item> !{{ database.read<Items> }} {{\n    Items.of_list(row.list)\n}}\n\nfn per(given: List<Item>) -> List<List<Item>> !{{ database.read<Items> }} {{\n    List.map(List.reverse(given), row => {call})\n}}\n"
+            );
+            let ds = diagnostics(&src, Some("one_call"));
+            let codes: Vec<_> = ds.iter().map(|d| d.code).collect();
+            let pure = src.replace(
+                "fn rows(row: Item) -> List<Item> !{ database.read<Items> } {\n    Items.of_list(row.list)\n}",
+                "fn rows(row: Item) -> List<Item> !{} { [] }",
+            );
+            assert_ne!(pure, src);
+            assert!(diagnostics(&pure, Some("one_call")).is_empty(), "{pure}");
+            (call, codes)
+        })
+        .collect();
+    assert_eq!(
+        results,
+        [
+            ("rows(row)", vec!["PW0405"]),
+            ("row.rows", vec!["PW0405"]),
+            ("row.rows()", vec!["PW0405"]),
+        ]
+    );
+}

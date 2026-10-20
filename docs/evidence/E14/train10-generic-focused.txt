@@ -1,0 +1,174 @@
+mutation anchors: 3292 mutants in 274 scripts, each matching once
+test_a_later_build_failure_cannot_hide_behind_a_test_result (test_bounded_mutation_results.RustResults) ... ok
+test_a_missing_result_is_no_assertion_failure (test_bounded_mutation_results.RustResults) ... ok
+test_a_positive_wrapper_exit_is_not_a_test_failure (test_bounded_mutation_results.RustResults) ... ok
+test_a_stopped_process_cannot_earn_a_kill (test_bounded_mutation_results.RustResults) ... ok
+test_a_successful_summary_cannot_hide_a_failed_command (test_bounded_mutation_results.RustResults) ... ok
+test_an_actual_assertion_failure_earns_a_kill_and_restores_source (test_bounded_mutation_results.RustResults) ... ok
+test_an_invalid_build_is_refused_and_fails_the_campaign (test_bounded_mutation_results.RustResults) ... ok
+test_every_binary_in_one_command_contributes_its_result (test_bounded_mutation_results.RustResults) ... ok
+test_every_command_contributes_its_result (test_bounded_mutation_results.RustResults) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.006s
+
+OK
+test_a_build_or_stopped_binary_is_not_a_kill (test_cargo_test_results.CargoResults) ... ok
+test_color_and_quiet_failure_names_are_diagnostics (test_cargo_test_results.CargoResults) ... ok
+test_empty_missing_and_contradictory_results_refuse (test_cargo_test_results.CargoResults) ... ok
+test_every_binary_contributes (test_cargo_test_results.CargoResults) ... ok
+test_only_real_cargo_exits_match_the_result (test_cargo_test_results.CargoResults) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.001s
+
+OK
+   Compiling pw-core v0.0.0 (/home/haki/code/pw-wt/train-10-next/compiler/pw-core)
+    Finished `test` profile [unoptimized] target(s) in 0.89s
+     Running tests/bounded_tables.rs (target/debug/deps/bounded_tables-30c98d852efea014)
+
+running 8 tests
+test a_generated_read_named_as_the_callback_has_the_same_matching_row_repair ... ok
+test a_generated_read_in_a_generic_result_callback_remains_a_read_per_row ... ok
+test a_generated_many_read_before_the_loop_selects_each_turns_matching_rows ... ok
+test a_generated_batch_before_generic_row_selection_keeps_its_source_cost ... ok
+test generated_many_reads_accept_one_call_and_chunked_sources ... ok
+test generated_many_reads_warn_for_default_and_per_key_sources ... ok
+test a_generated_read_through_a_member_stays_a_read_per_row ... ok
+test generated_key_prefix_and_index_repairs_name_the_matching_many_read ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s
+
+     Running tests/checking_source.rs (target/debug/deps/checking_source-9166b1a7d916f70f)
+
+running 20 tests
+test a_fixtures_header_is_held_to_its_code_as_written ... ok
+test a_match_whose_scrutinee_type_is_unknown_is_not_reported ... ok
+test a_nullary_constructor_is_not_read_as_a_binding ... ok
+test an_unmodelled_capability_family_never_manufactures_a_placement_error ... ok
+test constructor_arity_is_respected ... ok
+test every_body_level_rejection_matches_its_declared_rule ... ok
+test a_caught_file_conveys_every_fact_its_expect_error_lines_declare ... ok
+test corpus_enforcement_is_reported_as_three_numbers_not_one ... ok
+test a_fixtures_declared_symbol_matches_the_symbol_it_is_caught_by ... ok
+test every_rejected_fixtures_rule_is_a_code_its_check_reports ... ok
+test no_accepted_corpus_file_reports_a_body_level_error ... ok
+test every_rejected_fixture_emits_only_its_own_defect ... ok
+test semantic_coverage_of_the_rejected_corpus_does_not_regress ... ok
+test the_environment_spans_every_file_checked_together ... ok
+test no_diagnostic_restates_its_invariant_in_its_own_words ... ok
+test the_committed_enforcement_table_is_what_the_corpus_checks_now ... ok
+test the_unhandled_variant_case_is_caught_at_its_real_span ... ok
+test every_diagnostic_carries_what_charter_16_3_requires ... ok
+test the_structured_concurrency_rules_run_on_real_bodies ... ok
+test the_privacy_and_placement_rules_catch_their_corpus_cases ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 57.07s
+
+     Running tests/each_head_effects.rs (target/debug/deps/each_head_effects-d8340980b491e89f)
+
+running 9 tests
+test a_member_read_from_a_computed_lists_row_is_found ... ok
+test a_list_read_through_an_effectful_member_is_refused ... ok
+test a_dialog_in_a_loop_over_a_modules_signal_is_shown_by_it ... ok
+test a_loop_over_what_a_view_may_read_is_accepted ... ok
+test an_effect_in_a_nested_each_head_is_refused ... ok
+test marko_reads_a_list_from_a_parameter_from_input ... ok
+test an_effect_in_an_each_key_is_refused_at_the_key ... ok
+test an_effectful_call_in_an_each_head_is_refused_at_the_head ... ok
+test a_secret_reached_through_a_computed_list_is_refused ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+
+     Running tests/generality.rs (target/debug/deps/generality-e099b6cfaacb9aff)
+
+running 6 tests
+test every_headline_invariant_has_a_challenge_matrix ... ok
+test every_witness_names_a_registered_invariant ... ok
+test generality_is_reported_separately_from_conformance ... ok
+test a_witness_is_valid_except_for_the_invariant_it_is_about ... ok
+test every_witness_is_valid_evidence ... ok
+test a_general_witness_is_caught_and_a_narrow_one_is_not ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 59.26s
+
+     Running tests/generic_effects.rs (target/debug/deps/generic_effects-3c2ca0bcd3692a20)
+
+running 31 tests
+test a_computed_receiver_is_never_resolved_by_its_members_spelling ... ok
+test a_computed_receiver_keeps_its_member_call_and_never_becomes_a_partial_path ... ok
+test a_draw_binder_has_the_platforms_declared_context_and_arguments ... ok
+test a_function_named_as_a_member_receiver_performs_its_effects ... ok
+test a_function_receiver_keeps_its_capability_and_privacy ... ok
+test a_local_receiver_never_borrows_a_type_qualified_constructor ... ok
+test a_generic_each_header_keeps_its_members_privacy_in_key_and_body ... ok
+test a_member_read_on_a_rigid_type_parameter_is_refused ... ok
+test a_member_read_in_a_match_arm_over_a_generic_result_is_seen ... ok
+test a_generic_each_header_types_members_in_both_its_key_and_body ... ok
+test a_member_read_through_a_generic_calls_result_in_a_function_is_seen ... ok
+test a_member_read_on_a_loops_or_an_arms_binder_is_seen ... ok
+test a_member_read_through_a_generic_calls_result_in_a_view_is_refused ... ok
+test a_member_read_on_any_receiver_is_seen ... ok
+test a_member_with_additional_parameters_is_a_function_value_not_its_result ... ok
+test a_member_read_through_a_user_written_generic_function_is_seen ... ok
+test a_member_read_whose_receivers_type_nothing_states_is_refused ... ok
+test a_module_path_prefix_is_never_charged_as_a_function_value ... ok
+test a_querys_contract_requires_what_a_member_of_a_generic_result_reads ... ok
+test a_member_with_no_row_is_charged_what_its_body_performs ... ok
+test a_member_read_through_a_nested_generic_is_seen ... ok
+test a_nested_function_instantiates_an_enclosing_generics_result ... ok
+test an_interfaces_term_roots_refuse_untyped_member_receivers ... ok
+test a_recursive_call_instantiates_its_own_generic_result ... ok
+test an_interface_term_local_call_never_calls_a_namesake_global ... ok
+test member_invocations_have_one_typed_callee_and_their_actual_effects ... ok
+test a_secret_read_through_a_generic_result_is_refused_in_markup ... ok
+test solved_loop_binders_are_available_to_every_type_reader ... ok
+test rooted_effect_inference_sees_member_reads_and_function_values ... ok
+test member_and_local_function_callees_keep_their_actual_result_type ... ok
+test every_generic_function_of_the_standard_packages_passes_its_element_types_through ... ok
+
+test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.66s
+
+     Running tests/platform_contracts.rs (target/debug/deps/platform_contracts-ccefde98f1bd330a)
+
+running 4 tests
+test the_trusted_platform_contract_is_hashed ... ok
+test the_signatures_the_checkers_depend_on_are_exercised ... ok
+test every_platform_signature_is_internally_consistent ... ok
+test the_platform_library_parses_resolves_and_checks_clean ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+
+     Running tests/view_positions.rs (target/debug/deps/view_positions-3df9b29b62ad1dc1)
+
+running 2 tests
+test node_exprs_finds_each_position_where_it_is_written ... ok
+test every_analysis_reads_every_position ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.58s
+
+   Compiling pw-core v0.0.0 (/home/haki/code/pw-wt/train-10-next/compiler/pw-core)
+   Compiling pw-cli v0.0.0 (/home/haki/code/pw-wt/train-10-next/compiler/pw-cli)
+    Finished `test` profile [unoptimized] target(s) in 4.87s
+     Running tests/guide.rs (target/debug/deps/guide-171ef653322e12f7)
+
+running 15 tests
+test a_fence_is_read_as_commonmark_reads_it ... ok
+test a_page_with_no_example_or_a_block_unseen_is_reported ... ok
+test a_gaps_build_output_belongs_to_the_gap_before_it ... ok
+test a_page_is_held_to_the_directory_it_names ... ok
+test a_pages_file_blocks_are_its_program_in_order ... ok
+test a_program_differs_from_a_directory_by_a_file_or_a_byte ... ok
+test a_refused_examples_codes_are_read_from_its_output ... ok
+test an_info_string_says_what_a_block_is ... ok
+test an_unclosed_or_indented_fence_is_refused ... ok
+test shown_output_belongs_to_the_refused_example_before_it ... ok
+test a_pages_program_is_the_directory_it_names ... ok
+test the_reference_is_held_to_the_registry ... ok
+test the_diagnostic_reference_lists_every_registered_code ... ok
+test every_example_in_the_guide_compiles_as_it_says ... ok
+test a_wrong_example_is_reported_and_a_right_one_is_not ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.55s
+
+Final generic canonical invocation + lexical + strict Cargo focused gates: OK

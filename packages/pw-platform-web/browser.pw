@@ -78,3 +78,10 @@ fn getBoundingClientRect(el: ElementRef) -> Rect !{ layout.measure } {
 fn content_width(el: ElementRef) -> Float !{ layout.measure } { 0.0 }
 
 fn height(el: ElementRef) -> Float !{ layout.measure } { 0.0 }
+
+// The context a paint declaration's draw block receives (ADR-0351,
+// generic-effects). Its size comes from declared inputs; it does not read
+// the document. This is a declaration, not a canvas runtime implementation.
+opaque type PaintContext = String
+
+fn rect(ctx: PaintContext, x: Float, y: Float, width: Float, height: Float) -> () !{ paint.custom } { todo }

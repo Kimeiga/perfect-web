@@ -1,0 +1,113 @@
+   Compiling pw-core v0.0.0 (/home/haki/code/pw-wt/train-10-next/compiler/pw-core)
+    Finished `test` profile [unoptimized] target(s) in 0.59s
+     Running tests/bounded_tables.rs (target/debug/deps/bounded_tables-30c98d852efea014)
+
+running 8 tests
+test a_generated_read_named_as_the_callback_has_the_same_matching_row_repair ... ok
+test a_generated_read_in_a_generic_result_callback_remains_a_read_per_row ... ok
+test a_generated_many_read_before_the_loop_selects_each_turns_matching_rows ... ok
+test a_generated_batch_before_generic_row_selection_keeps_its_source_cost ... ok
+test generated_many_reads_accept_one_call_and_chunked_sources ... ok
+test generated_many_reads_warn_for_default_and_per_key_sources ... ok
+test generated_key_prefix_and_index_repairs_name_the_matching_many_read ... ok
+test a_generated_read_through_a_member_stays_a_read_per_row ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s
+
+     Running tests/generic_effects.rs (target/debug/deps/generic_effects-3c2ca0bcd3692a20)
+
+running 31 tests
+test a_computed_receiver_is_never_resolved_by_its_members_spelling ... ok
+test a_computed_receiver_keeps_its_member_call_and_never_becomes_a_partial_path ... ok
+test a_draw_binder_has_the_platforms_declared_context_and_arguments ... ok
+test a_function_named_as_a_member_receiver_performs_its_effects ... ok
+test a_local_receiver_never_borrows_a_type_qualified_constructor ... FAILED
+test a_function_receiver_keeps_its_capability_and_privacy ... ok
+test a_generic_each_header_keeps_its_members_privacy_in_key_and_body ... ok
+test a_member_read_on_a_rigid_type_parameter_is_refused ... ok
+test a_member_read_in_a_match_arm_over_a_generic_result_is_seen ... ok
+test a_generic_each_header_types_members_in_both_its_key_and_body ... ok
+test a_member_read_through_a_generic_calls_result_in_a_function_is_seen ... ok
+test a_member_read_on_a_loops_or_an_arms_binder_is_seen ... ok
+test a_member_read_through_a_generic_calls_result_in_a_view_is_refused ... ok
+test a_member_read_on_any_receiver_is_seen ... ok
+test a_member_with_additional_parameters_is_a_function_value_not_its_result ... ok
+test a_member_read_through_a_user_written_generic_function_is_seen ... ok
+test a_module_path_prefix_is_never_charged_as_a_function_value ... ok
+test a_member_read_through_a_nested_generic_is_seen ... ok
+test a_member_read_whose_receivers_type_nothing_states_is_refused ... ok
+test a_querys_contract_requires_what_a_member_of_a_generic_result_reads ... ok
+test a_member_with_no_row_is_charged_what_its_body_performs ... ok
+test a_nested_function_instantiates_an_enclosing_generics_result ... ok
+test a_recursive_call_instantiates_its_own_generic_result ... ok
+test an_interface_term_local_call_never_calls_a_namesake_global ... ok
+test an_interfaces_term_roots_refuse_untyped_member_receivers ... ok
+test member_and_local_function_callees_keep_their_actual_result_type ... FAILED
+test member_invocations_have_one_typed_callee_and_their_actual_effects ... ok
+test solved_loop_binders_are_available_to_every_type_reader ... ok
+test a_secret_read_through_a_generic_result_is_refused_in_markup ... ok
+test rooted_effect_inference_sees_member_reads_and_function_values ... ok
+test every_generic_function_of_the_standard_packages_passes_its_element_types_through ... ok
+
+failures:
+
+---- a_local_receiver_never_borrows_a_type_qualified_constructor stdout ----
+
+thread 'a_local_receiver_never_borrows_a_type_qualified_constructor' (2289564) panicked at compiler/pw-core/tests/generic_effects.rs:1044:5:
+assertion `left == right` failed: module t
+
+import List
+
+type Item = Item { name: String }
+
+fn label(i: Item) -> String !{ database.read<Item> }
+    host "shop:data/items#label"
+
+type Shape = Circle | Empty
+
+fn Empty(i: Item) -> String !{} { i.name }
+
+fn property(Shape: Item) -> String !{} { Shape.Empty }
+fn explicit(Shape: Item) -> String !{} { Shape.Empty() }
+fn genuine() -> Shape !{} { Shape.Empty }
+
+
+  left: [("PW0606", "Shape.Empty")]
+ right: []
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- member_and_local_function_callees_keep_their_actual_result_type stdout ----
+
+thread 'member_and_local_function_callees_keep_their_actual_result_type' (2289584) panicked at compiler/pw-core/tests/generic_effects.rs:1074:9:
+assertion `left == right` failed: module t
+
+import List
+
+type Item = Item { name: String }
+
+fn label(i: Item) -> String !{ database.read<Item> }
+    host "shop:data/items#label"
+
+type Detail = Detail { text: String }
+
+fn length(i: Item) -> Detail !{} { Detail { text: i.name } }
+
+fn f() -> Int !{} { 0 }
+
+fn caption(d: Detail) -> String !{ database.read<Detail> }
+    host "shop:data/details#caption"
+
+fn shadow(List: Item) -> String !{} { List.length().caption }
+
+
+  left: []
+ right: [("PW0400", "List.length().caption")]
+
+
+failures:
+    a_local_receiver_never_borrows_a_type_qualified_constructor
+    member_and_local_function_callees_keep_their_actual_result_type
+
+test result: FAILED. 29 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.90s
+
+error: test failed, to rerun pass `-p pw-core --test generic_effects`

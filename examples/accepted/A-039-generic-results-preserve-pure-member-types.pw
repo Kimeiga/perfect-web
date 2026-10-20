@@ -1,0 +1,25 @@
+// @corpus: accepted
+// @id: A-039
+// @category: generic results preserve pure member types
+// @charter: §7.2, §7.4
+// @milestone: 7
+
+module generic_effects.accepted
+
+import List
+
+type Entry = Entry { name: String }
+type Box<T> = Box { value: T }
+
+fn same<T>(x: T) -> T !{} { x }
+
+fn name(box: Box<Entry>) -> String !{} { same(box).value.name }
+
+view Names(given: List<Entry>) !{} {
+    let all = List.reverse(List.take(given, 2))
+    <ul>
+        {#each all as item (item.name)}
+            <li>{item.name}</li>
+        {/each}
+    </ul>
+}

@@ -14,7 +14,6 @@ The source is restored after every mutant, whatever happens.
 """
 
 import pathlib
-import re
 import subprocess
 import sys
 
@@ -225,18 +224,16 @@ TESTS = [
 
 def run_tests():
     """(built, passed, failed) over every test command."""
-    built, passed, failed = True, 0, 0
+    from cargo_test_results import parse
+    passed = failed = 0
     for cmd in TESTS:
         r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
-        out = r.stdout + r.stderr
-        results = re.findall(r"test result: \w+\. (\d+) passed; (\d+) failed", out)
-        if not results:
-            built = False
-            continue
-        for p, f in results:
-            passed += int(p)
-            failed += int(f)
-    return built, passed, failed
+        outcome = parse(r.returncode, r.stdout + r.stderr)
+        if not outcome.valid:
+            return False, 0, 0
+        passed += outcome.passed
+        failed += outcome.failed
+    return True, passed, failed
 
 
 def main():
@@ -261,7 +258,8 @@ def main():
         finally:
             path.write_text(original)
         if not built:
-            verdict = "KILLED (does not build)"
+            print(f"{what}: REFUSED (invalid Cargo producer)")
+            return 1
         elif failed:
             verdict = f"KILLED ({failed} of {passed + failed} tests fail)"
         else:

@@ -14804,6 +14804,8 @@ public query Store(",
     // TRACK SEAM (argument-invariants): a value from a browser held to its
     // type's invariant where it arrives (ADR-0346).
     mod argument_invariants;
+    // ADR-0351: the actual member receiver survives component lowering.
+    mod receiver_identity;
     // TRACK SEAM (scheduled-orders): an order placed for a time its reader
     // chooses, and sent to its stores when it is due.
     mod scheduled_orders;

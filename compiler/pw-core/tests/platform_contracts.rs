@@ -497,7 +497,11 @@ fn the_trusted_platform_contract_is_hashed() {
     // declares `dblclick`, a double press, read as a press is, and `blur`, a
     // control's losing focus, with a `BlurEvent` holding the value it held
     // (track `todomvc`: an edit begun by a double press and saved on blur).
-    const EXPECTED: u64 = 0x27e5_b533_8728_97f1;
+    // 2026-10-16: `browser` declares the opaque `PaintContext` given to a
+    // painter's draw binder and `rect` with four Float arguments and
+    // `paint.custom`, so A-021's operation is typed and its effect observed
+    // (ADR-0351-generic-effects; declaration-only platform scope).
+    const EXPECTED: u64 = 0x5636d21c1f9cab88;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

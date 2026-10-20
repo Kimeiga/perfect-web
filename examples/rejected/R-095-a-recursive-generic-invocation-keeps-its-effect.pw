@@ -1,0 +1,23 @@
+// @corpus: rejected
+// @id: R-095
+// @category: a recursive generic invocation keeps its effect
+// @rule: PW0400
+// @invariant: undeclared_effect
+// @charter: §7.4
+// @milestone: 7
+// @expect-error: the recursive call instantiates its result at that invocation
+
+module generic_effects.recursive
+
+type RecursiveItem = RecursiveItem { name: String }
+
+fn label(i: RecursiveItem) -> String !{ database.read<RecursiveItem> }
+    host "shop:data/items#label"
+
+fn first<T>(value: T, count: Int) -> T !{} {
+    if count > 0 {
+        let item = first(RecursiveItem { name: "x" }, 0)
+        let text = item.label
+    }
+    value
+}

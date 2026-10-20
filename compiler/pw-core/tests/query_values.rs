@@ -103,3 +103,40 @@ fn a_query_s_failure_is_not_taken_apart_yet() {
         "{found:?}"
     );
 }
+
+#[test]
+fn loops_and_arms_preserve_the_enclosing_generic_parameter() {
+    // Phantom T keeps the binding generic while every captured field still
+    // has a concrete schema. Solved concrete-type fallback cannot replace
+    // the declared loop/arm propagation that carries this binding.
+    let right = "module t\n\ntype Row<T> = Row { id: String, result: Result<Int, String> }\n\nfn consume(value: String) -> () !{} { () }\n\nfn outer<T>(rows: Option<List<Row<T>>>) -> () !{} {\n    <main>\n        {#match rows}\n        {:Some(items)}\n            {#each items as item (item.id)}\n                {#match item.result}{:Ok(value)}<button type=\"button\" on:press={resumable(captures = { item }) => consume(item.id)}>ok</button>{:Err(error)}<p>{error}</p>{/match}\n            {/each}\n        {:None}<p>none</p>\n        {/match}\n    </main>\n()\n}\n";
+    assert_eq!(reported(right), Vec::<String>::new());
+    assert_eq!(
+        reported(&right.replace("{:Err(error)}<p>{error}</p>", "")),
+        ["PW0305 `{#match item.result}` does not cover `Err`"]
+    );
+}
+
+#[test]
+fn a_query_values_type_is_checked_at_a_function_argument() {
+    let right = page(STATUS, LIST)
+        .replace(
+            "page P()",
+            "fn consume(value: Option<Status>) -> () !{} { () }\n\npage P()",
+        )
+        .replace(
+            "    signal picked:",
+            "    let _ = consume(s)\n    signal picked:",
+        );
+    assert_eq!(reported(&right), Vec::<String>::new());
+    let wrong = right.replace(
+        "consume(value: Option<Status>)",
+        "consume(value: Option<Int>)",
+    );
+    assert_eq!(
+        reported(&wrong),
+        [
+            "PW0605 argument 1 of `t.consume` is declared `Option<Int>` and this is `Option<t.Status>`"
+        ]
+    );
+}

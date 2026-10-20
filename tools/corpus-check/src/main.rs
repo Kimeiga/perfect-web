@@ -86,6 +86,9 @@ const ACCEPTED_CATEGORIES: &[&str] = &[
     // Track `device-store` (ADR-0366), corpus C28: a value the device keeps,
     // read and written by a page and never sent.
     "a value the reader's device keeps",
+    // ADR-0351-generic-effects, assembled corpus C29: generic/member reads
+    // retain their types and effects, and a receiver has a known type.
+    "generic results preserve pure member types",
 ];
 
 /// Charter §16.2: "Create at least one minimal file for each".
@@ -218,6 +221,14 @@ const REJECTED_CATEGORIES: &[&str] = &[
     // beside its accepted control (A-054).
     "a value the device keeps sent as a command's argument",
     "a query keyed by a value the device keeps",
+    // ADR-0351-generic-effects, assembled corpus C29: generic/member reads
+    // retain their types and effects, and a receiver has a known type.
+    "a generic result cannot hide a views member effect",
+    "a generic result cannot hide a functions member effect",
+    "a member read needs a known receiver",
+    "a rigid parameter declares no members",
+    "a function value receiver keeps its effect",
+    "a recursive generic invocation keeps its effect",
 ];
 
 /// Milestone 0 gate (charter §14 M0): ">= 10 accepted and 20 rejected".

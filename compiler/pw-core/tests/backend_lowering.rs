@@ -599,3 +599,87 @@ command Add(id: Int) -> Int
         "declaring the callee did not satisfy the gate"
     );
 }
+
+fn local_member_is_refused(expression: &str, result: &str) {
+    let src = format!(
+        r#"module receiver
+import List
+type Shape = Circle(Int) | Empty
+type Item = Item {{ name: String }}
+fn Circle(item: Item, n: Int) -> Shape !{{}} {{ Shape.Empty }}
+query Shadow() -> {result} {{
+    let Shape = Item {{ name: "x" }}
+    {expression}
+}}
+query Genuine() -> Shape {{ Shape.Circle(7) }}
+"#
+    );
+    let (program, refused) = lowered(&Built::synthetic(&src));
+    assert!(
+        program.functions.iter().any(|f| f.export == "Genuine"),
+        "{refused:?}"
+    );
+    assert!(
+        !program.functions.iter().any(|f| f.export == "Shadow"),
+        "a local member must never compile as the namesake constructor: {program:?}"
+    );
+    assert!(
+        refused
+            .iter()
+            .any(|r| matches!(r, Lowering::Unsupported { construct, .. }
+        if *construct == "a local member used as a callable")),
+        "{refused:?}"
+    );
+}
+
+#[test]
+fn local_member_call_cannot_lower_as_a_type_constructor() {
+    local_member_is_refused("Shape.Circle(7)", "Shape");
+}
+
+#[test]
+fn local_member_callback_cannot_lower_as_a_type_constructor() {
+    local_member_is_refused("List.map([7], Shape.Circle)", "List<Shape>");
+}
+
+fn local_module_member_is_refused(expression: &str, result: &str) {
+    let src = format!(
+        r#"module receiver
+import List
+import List.{{ map }}
+type Item = Item {{ name: String }}
+fn reverse(item: Item, values: List<Int>) -> List<Int> !{{}} {{ [42] }}
+query Shadow() -> {result} {{
+    let List = Item {{ name: "x" }}
+    {expression}
+}}
+query Genuine() -> List<Int> {{ List.reverse([7]) }}
+"#
+    );
+    let (program, refused) = lowered(&Built::synthetic(&src));
+    assert!(
+        program.functions.iter().any(|f| f.export == "Genuine"),
+        "{refused:?}"
+    );
+    assert!(
+        !program.functions.iter().any(|f| f.export == "Shadow"),
+        "a local member must never compile as the namesake module function: {program:?}"
+    );
+    assert!(
+        refused
+            .iter()
+            .any(|r| matches!(r, Lowering::Unsupported { construct, .. }
+        if *construct == "a local member used as a callable")),
+        "{refused:?}"
+    );
+}
+
+#[test]
+fn local_member_call_cannot_lower_as_a_module_function() {
+    local_module_member_is_refused("List.reverse([7])", "List<Int>");
+}
+
+#[test]
+fn local_member_callback_cannot_lower_as_a_module_function() {
+    local_module_member_is_refused("map([[7]], List.reverse)", "List<List<Int>>");
+}

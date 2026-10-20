@@ -1,0 +1,9 @@
+// @status: NEIGHBOUR
+// @invariant: unknown_member
+// @dimension: a generic value passed whole preserves its rigid type
+
+module generic_effects.whole
+
+fn same<T>(value: T) -> T !{} {
+    value
+}

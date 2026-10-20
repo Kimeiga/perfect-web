@@ -462,6 +462,7 @@ pub fn function(cx: &Context<'_>, unit: usize, decl: &Decl, span: Span) -> Lower
         next_value: 0,
         instrs: Vec::new(),
         locals: BTreeMap::new(),
+        lexicals: BTreeMap::new(),
         types: BTreeMap::new(),
         inlining: vec![def],
         subst: BTreeMap::new(),
@@ -705,6 +706,7 @@ pub fn handler(
         next_value: 0,
         instrs: Vec::new(),
         locals: BTreeMap::new(),
+        lexicals: BTreeMap::new(),
         types: BTreeMap::new(),
         inlining: vec![def],
         subst: BTreeMap::new(),
@@ -912,6 +914,7 @@ pub fn pure_expr_as(
         next_value: 0,
         instrs: Vec::new(),
         locals: BTreeMap::new(),
+        lexicals: BTreeMap::new(),
         types: BTreeMap::new(),
         inlining: vec![def],
         subst: BTreeMap::new(),
@@ -1147,6 +1150,7 @@ fn lower_internal(
         next_value: 0,
         instrs: Vec::new(),
         locals: BTreeMap::new(),
+        lexicals: BTreeMap::new(),
         types: BTreeMap::new(),
         inlining: vec![def],
         subst,
@@ -1243,6 +1247,7 @@ fn lower_closure(
         next_value: 0,
         instrs: Vec::new(),
         locals: BTreeMap::new(),
+        lexicals: BTreeMap::new(),
         types: BTreeMap::new(),
         inlining,
         subst,
@@ -1488,6 +1493,8 @@ struct Lower<'a> {
     next_value: u32,
     instrs: Vec<Instr>,
     locals: BTreeMap<String, ValueId>,
+    /// Cached canonical lexical views, including bodies currently inlined.
+    lexicals: BTreeMap<(usize, crate::hir::DeclId), std::rc::Rc<crate::lexical::Lexical>>,
     /// Every value's type, recorded where the value is made. A `match` asks
     /// what its scrutinee is, and a field access what record it reads.
     types: BTreeMap<ValueId, Type>,
@@ -1591,6 +1598,29 @@ fn instantiate(
 }
 
 impl<'a> Lower<'a> {
+    fn lexical(&mut self, body: &Body) -> Option<std::rc::Rc<crate::lexical::Lexical>> {
+        let key = (self.unit, body.owner);
+        if let Some(found) = self.lexicals.get(&key) {
+            return Some(found.clone());
+        }
+        let lexical = std::rc::Rc::new(crate::lexical::Lexical::build_in(
+            self.cx.hirs.get(self.unit)?,
+            body.owner,
+        )?);
+        self.lexicals.insert(key, lexical.clone());
+        Some(lexical)
+    }
+
+    fn declaration_path(&mut self, body: &Body, expr: ExprId) -> bool {
+        self.lexical(body)
+            .is_some_and(|lexical| lexical.unbound_path(body, expr))
+    }
+
+    fn expression_case(&mut self, body: &Body, expr: ExprId) -> Option<crate::values::CaseNamed> {
+        let lexical = self.lexical(body)?;
+        crate::values::case_named_at(self.cx.sigs, self.cx.ws, self.unit, body, &lexical, expr)
+    }
+
     /// A declared type, under the type arguments this body was instantiated
     /// at (ADR-0050).
     fn ty(&self, resolution: &TypeResolution, span: &Span) -> Lowering<Type> {
@@ -2345,12 +2375,9 @@ impl<'a> Lower<'a> {
             Expr::Match { scrutinee, arms } => self.matched(body, *scrutinee, arms, expected, span),
             Expr::Field { base, name } => {
                 // `Shape.Empty`, a case through its type (ADR-0059).
-                if let Some(crate::values::CaseNamed::Case(def, index)) = crate::values::case_named(
-                    self.cx.sigs,
-                    self.cx.ws,
-                    self.unit,
-                    &crate::infer::path_of(body, e),
-                ) {
+                if let Some(crate::values::CaseNamed::Case(def, index)) =
+                    self.expression_case(body, e)
+                {
                     return self.case_value(def, index, expected, span);
                 }
                 self.field(body, *base, name, span)
@@ -3553,17 +3580,21 @@ impl<'a> Lower<'a> {
                 ))
             }
             Expr::Name(_) | Expr::Field { .. } => {
+                if !self.declaration_path(body, f) {
+                    return Lowering::Unsupported {
+                        construct: "a local member used as a callable",
+                        span,
+                        reason: "this callable value needs receiver lowering".to_string(),
+                    };
+                }
                 let path = crate::infer::path_of(body, f);
                 // A sum type's case (ADR-0059): `List.map(radii,
                 // Shape.Circle)` builds one per element.
                 let case = match path.contains('.') {
-                    true => {
-                        match crate::values::case_named(self.cx.sigs, self.cx.ws, self.unit, &path)
-                        {
-                            Some(crate::values::CaseNamed::Case(def, index)) => Some((def, index)),
-                            _ => None,
-                        }
-                    }
+                    true => match self.expression_case(body, f) {
+                        Some(crate::values::CaseNamed::Case(def, index)) => Some((def, index)),
+                        _ => None,
+                    },
                     false => crate::values::bare_case(self.cx.sigs, self.cx.ws, self.unit, &path),
                 };
                 if let Some((def, index)) = case {
@@ -5847,6 +5878,14 @@ impl<'a> Lower<'a> {
             return self.call_value(body, f, &ps, *r, args, piped, span);
         }
 
+        if !self.declaration_path(body, callee) {
+            return Lowering::Unsupported {
+                construct: "a local member used as a callable",
+                span,
+                reason: "this callable value needs receiver lowering".to_string(),
+            };
+        }
+
         // **Through `Signatures`, keyed by the path a call site writes.**
         // `Carts.add` is a qualified path across a module boundary, and
         // `Workspace::resolve_in` answers about a single name — asking it for a
@@ -5899,7 +5938,7 @@ impl<'a> Lower<'a> {
             // **A sum type's case** (ADR-0059): `Shape.Circle(3)`, through
             // its type, by the rule the checker typed it with.
             if let Some(crate::values::CaseNamed::Case(def, index)) =
-                crate::values::case_named(self.cx.sigs, self.cx.ws, self.unit, &path)
+                self.expression_case(body, callee)
             {
                 return self.case(body, def, index, args, piped, expected, span);
             }
