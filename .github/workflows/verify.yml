@@ -3,7 +3,9 @@
 # Evidence recipes — the tests, the mutation controls, the browser specs each
 # one runs — sharded across parallel jobs, and the whole browser suite in
 # each engine. A push runs the recipes its commits touch (the chain's
-# choice, `scripts/ci_plan.py --changed`); the nightly run, every one. A
+# choice, `scripts/ci_plan.py --changed`); the nightly run, every one, unless
+# a push's or a nightly's run has succeeded at `master`'s head already
+# (`scripts/nightly_skip.py`), and Sunday's, every one whatever has passed. A
 # recipe's output is an artifact; `just evidence-fetch <run>` copies a run's
 # evidence into docs/evidence/, each file naming the run that produced it.
 #
@@ -17,7 +19,20 @@ on:
     # A track's branch too (ADR-0253, docs/PARALLEL.md), for what it changed.
     branches: [master, "track/**"]
   schedule:
-    - cron: "17 6 * * *"
+    # **The nightly is skipped where `master`'s head has a successful run
+    # already** (track ci-diagnostics, 2026-10-20: 691 runner-hours in seven
+    # days, 27% of all our CI, re-verifying a head `master` held for three
+    # days): `scripts/nightly_skip.py` asks the GitHub API, and the plan job
+    # below plans nothing, recipes and browsers, where a push's or an earlier
+    # nightly's run succeeded at the exact commit. **Sunday's schedule is
+    # never skipped**: it runs every recipe whatever has passed, so that slow
+    # drift (a dependency's new advisory, a test that fails one run in
+    # twenty) is met within a week. The strings here are the script's
+    # `WEEKLY` and the weekday's, and a test holds them to it. A
+    # `workflow_dispatch` is the override: it never asks, and with no
+    # recipes named it runs every one.
+    - cron: "17 6 * * 1-6"
+    - cron: "17 6 * * 0"
   workflow_dispatch:
     inputs:
       recipes:
@@ -84,6 +99,8 @@ jobs:
           RECIPES: ${{ inputs.recipes }}
           SHARDS: ${{ inputs.shards || '17' }}
           GH_TOKEN: ${{ github.token }}
+          # Which schedule fired, for the nightly (scripts/nightly_skip.py).
+          SCHEDULE: ${{ github.event.schedule }}
         run: |
           case "$EVENT" in
             push)
@@ -120,9 +137,22 @@ jobs:
                 python3 scripts/ci_plan.py --shards 17 --all >> "$GITHUB_OUTPUT"
               fi ;;
             schedule)
-              # 17 shards, a database recipe's among them, and three browser
-              # jobs: the Free plan's 20 at once (ADR-0249, ADR-0278).
-              python3 scripts/ci_plan.py --shards 17 --all >> "$GITHUB_OUTPUT" ;;
+              # Skipped where a push's or a nightly's run has succeeded at
+              # this exact commit, recipes and browser suites alike, and the
+              # run's summary says which run it stands on; never on Sunday's
+              # schedule, and never where the API cannot say
+              # (scripts/nightly_skip.py).
+              if why=$(python3 scripts/nightly_skip.py "$GITHUB_SHA" "$SCHEDULE"); then
+                echo "$why"
+                echo "$why" >> "$GITHUB_STEP_SUMMARY"
+                echo "shards=[]" >> "$GITHUB_OUTPUT"
+                echo "browsers=false" >> "$GITHUB_OUTPUT"
+              else
+                echo "$why"
+                # 17 shards, a database recipe's among them, and three browser
+                # jobs: the Free plan's 20 at once (ADR-0249, ADR-0278).
+                python3 scripts/ci_plan.py --shards 17 --all >> "$GITHUB_OUTPUT"
+              fi ;;
             *)
               if [ -n "$RECIPES" ]; then
                 python3 scripts/ci_plan.py --shards "$SHARDS" $RECIPES >> "$GITHUB_OUTPUT"
