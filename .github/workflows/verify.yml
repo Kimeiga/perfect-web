@@ -203,10 +203,13 @@ jobs:
           # undoes one line, so its build redoes what the line reaches, not a
           # crate whole (a one-line `pw-core` mutant's test binaries: 21 to 23
           # s against 33 to 37, on the PC at load 37; train-9's verify ran
-          # 1,391 mutants). `scripts/mutation_baseline.py` turns
-          # `CARGO_INCREMENTAL=1` on for the script and what it starts, over
-          # its recipe's own `CARGO_INCREMENTAL=0` (the Mac's disk, 2026-09-24:
-          # no recipe's line is edited), and removes the caches past 6 GiB
+          # 1,391 mutants). `scripts/mutation_baseline.py` removes
+          # `CARGO_INCREMENTAL` from the script's environment and so from what
+          # it starts, its recipe's own `CARGO_INCREMENTAL=0` with it (the
+          # Mac's disk, 2026-09-24: no recipe's line is edited), so that
+          # cargo's defaults apply: incremental for the dev and test profiles,
+          # never for the `browser` profile's wasm (`CARGO_INCREMENTAL=1`
+          # would force it there too). It removes the caches past 6 GiB
           # (`scripts/mutant_incremental.py`); `ci_recipes.py` removes them
           # between recipes. Nothing else of this job builds incrementally:
           # the `Build` step above fills the cache above's way.

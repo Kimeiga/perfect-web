@@ -38,9 +38,10 @@ than the bound is stopped, the script's output says so, and its last line
 says what the bound did, a kind of kill apart from a test's.
 
 And where the run sets `PW_MUTANT_INCREMENTAL=1` (verify.yml's recipe step),
-the script and every process it starts build with `CARGO_INCREMENTAL=1`,
-whatever its recipe's line says, and the incremental caches are removed when
-they hold more than a bound (`mutant_incremental.py`, 2026-10-20).
+the script and every process it starts have no `CARGO_INCREMENTAL`, whatever
+its recipe's line says, so that cargo's defaults apply (incremental for the dev
+and test profiles), and the incremental caches are removed when they hold more
+than a bound (`mutant_incremental.py`, 2026-10-20).
 """
 
 import collections

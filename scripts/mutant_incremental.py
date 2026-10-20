@@ -20,13 +20,17 @@ incremental build artifacts" before it is persisted (`cleanTargetDir` keeps a
 profile's `build`, `.fingerprint` and `deps` and removes the rest, so
 `target/*/incremental` never reaches the saved cache).
 
-`PW_MUTANT_INCREMENTAL=1`, which `verify.yml`'s `Recipes` step sets, turns
-`CARGO_INCREMENTAL=1` on for a mutation script and every process it starts
-(`mutation_baseline.py` calls `start()` as the script begins), whatever its
-recipe's line says: no recipe's line is edited, so none is planned for it.
-Nothing else turns it on: the `Build` steps that populate the cache, the
-browser jobs and a recipe's own commands outside its mutation scripts keep
-the workflow's `0`.
+`PW_MUTANT_INCREMENTAL=1`, which `verify.yml`'s `Recipes` step sets, removes
+`CARGO_INCREMENTAL` from the environment of a mutation script and every process
+it starts (`mutation_baseline.py` calls `start()` as the script begins),
+its recipe's `CARGO_INCREMENTAL=0` with it: no recipe's line is edited, so none
+is planned for it. **Removed, not set to 1**: cargo's own defaults then apply,
+incremental for the dev and test profiles, which are a mutant's rebuilds, and
+never for a release-like profile; `CARGO_INCREMENTAL=1` forces it for every
+profile, the `browser` profile's wasm among them (`run.sh`, `--profile browser`:
+opt-level `z`, LTO), whose bytes a spec gates by size. Nothing else is
+changed: the `Build` steps that populate the cache, the browser jobs and a
+recipe's own commands outside its mutation scripts keep the workflow's `0`.
 
 **It is bounded.** A runner has about 14 GB free, and 25 GB more once what
 the image ships is removed (`verify.yml`), and the target directory is some
@@ -58,10 +62,11 @@ def asked(env=None) -> bool:
 
 
 def start() -> None:
-    """Turn incremental compilation on for this process and every process it
-    starts, where the run asks; leave the environment alone otherwise."""
+    """Leave incremental compilation to cargo's defaults for this process and
+    every process it starts (the variable removed, a recipe's zero with it),
+    where the run asks; leave the environment alone otherwise."""
     if asked():
-        os.environ["CARGO_INCREMENTAL"] = "1"
+        os.environ.pop("CARGO_INCREMENTAL", None)
 
 
 def limit_bytes() -> int:
@@ -109,11 +114,11 @@ def runs_cargo(args) -> bool:
 
 
 def bounded(args, target: pathlib.Path | None = None, limit: int | None = None) -> int:
-    """After a command a mutation script ran: where it was cargo's and
-    incremental compilation is on, remove every incremental cache if together
-    they hold more than the limit. The bytes removed (none where they hold
-    less, or the command was no cargo's, or it is off)."""
-    if os.environ.get("CARGO_INCREMENTAL") != "1" or not runs_cargo(args):
+    """After a command a mutation script ran: where it was cargo's and the
+    run asked for incremental builds, remove every incremental cache if
+    together they hold more than the limit. The bytes removed (none where they
+    hold less, or the command was no cargo's, or the run did not ask)."""
+    if not asked() or not runs_cargo(args):
         return 0
     target = target or target_dir()
     limit = limit_bytes() if limit is None else limit

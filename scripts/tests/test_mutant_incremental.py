@@ -8,6 +8,11 @@ against 33 to 37 for a one-line `pw-core` mutant on the PC. `verify.yml` had
 `CARGO_INCREMENTAL=0` for every job, and 104 recipes put the same before their
 mutation script; `PW_MUTANT_INCREMENTAL=1`, set on the `Recipes` step, turns it
 on for a mutation script and what it starts, and nothing else.
+
+It removes `CARGO_INCREMENTAL` rather than setting it to 1: cargo's defaults
+then apply, incremental for the dev and test profiles and never for a
+release-like one, while `CARGO_INCREMENTAL=1` forces it for every profile
+(the `browser` profile's wasm, whose size a spec gates, among them).
 """
 
 from __future__ import annotations
@@ -53,11 +58,15 @@ class Asked(unittest.TestCase):
             env = {} if said is None else {"PW_MUTANT_INCREMENTAL": said}
             self.assertFalse(incremental.asked(env), said)
 
-    def test_asked_it_turns_incremental_on_over_a_recipes_own_zero(self):
+    def test_asked_it_removes_a_recipes_own_zero_leaving_cargos_defaults(self):
         # A recipe's line, `CARGO_INCREMENTAL=0 python3 scripts/..._mutations.py`.
         with mock.patch.dict(os.environ, {"CARGO_INCREMENTAL": "0", "PW_MUTANT_INCREMENTAL": "1"}):
             incremental.start()
-            self.assertEqual(os.environ["CARGO_INCREMENTAL"], "1")
+            self.assertNotIn("CARGO_INCREMENTAL", os.environ)
+        # Not forced to 1, which is every profile's, the browser wasm's too.
+        with mock.patch.dict(os.environ, {"CARGO_INCREMENTAL": "1", "PW_MUTANT_INCREMENTAL": "1"}):
+            incremental.start()
+            self.assertNotIn("CARGO_INCREMENTAL", os.environ)
 
     def test_not_asked_it_leaves_the_environment_as_the_recipe_has_it(self):
         with mock.patch.dict(os.environ, {"CARGO_INCREMENTAL": "0"}):
@@ -69,7 +78,7 @@ class Asked(unittest.TestCase):
             incremental.start()
             self.assertNotIn("CARGO_INCREMENTAL", os.environ)
 
-    def test_a_mutation_script_and_what_it_starts_build_incrementally_when_asked(self):
+    def test_a_mutation_script_and_what_it_starts_have_cargos_defaults_when_asked(self):
         # The path a recipe takes: a script that imports `mutation_baseline` first
         # thing in `main()`, started with its recipe's line's zero.
         tmp = pathlib.Path(tempfile.mkdtemp(prefix="pw-incremental-"))
@@ -80,7 +89,7 @@ class Asked(unittest.TestCase):
             "def main():\n"
             "    import mutation_baseline  # keeps what each command says\n"
             "    child = subprocess.run(['sh', '-c', 'echo $CARGO_INCREMENTAL'], capture_output=True, text=True)\n"
-            "    print('script', os.environ.get('CARGO_INCREMENTAL'), 'child', child.stdout.strip())\n"
+            "    print('script', os.environ.get('CARGO_INCREMENTAL'), 'child', repr(child.stdout.strip()))\n"
             "main()\n"
         )
 
@@ -93,16 +102,16 @@ class Asked(unittest.TestCase):
             self.assertEqual(out.returncode, 0, out.stdout + out.stderr)
             return out.stdout.splitlines()[0]
 
-        self.assertEqual(run(True), "script 1 child 1")
+        self.assertEqual(run(True), "script None child ''")
         # The control: not asked, the recipe's zero stands for both.
-        self.assertEqual(run(False), "script 0 child 0")
+        self.assertEqual(run(False), "script 0 child '0'")
 
 
 class Bounded(unittest.TestCase):
     def setUp(self):
         self.target = pathlib.Path(tempfile.mkdtemp(prefix="pw-incremental-target-"))
         self.addCleanup(shutil.rmtree, self.target, True)
-        self.on = mock.patch.dict(os.environ, {"CARGO_INCREMENTAL": "1"})
+        self.on = mock.patch.dict(os.environ, {"PW_MUTANT_INCREMENTAL": "1"})
         self.on.start()
         self.addCleanup(self.on.stop)
 
@@ -143,9 +152,9 @@ class Bounded(unittest.TestCase):
         self.caches()
         self.assertEqual(incremental.bounded(["/home/u/.cargo/bin/cargo", "test"], target=self.target, limit=1), 6000)
 
-    def test_with_incremental_off_nothing_is_removed(self):
+    def test_where_the_run_did_not_ask_nothing_is_removed(self):
         self.caches()
-        with mock.patch.dict(os.environ, {"CARGO_INCREMENTAL": "0"}):
+        with mock.patch.dict(os.environ, {"PW_MUTANT_INCREMENTAL": "0"}):
             self.assertEqual(incremental.bounded(["cargo", "test"], target=self.target, limit=1), 0)
         self.assertEqual(len(incremental.caches(self.target)), 2)
 
@@ -173,6 +182,46 @@ class Bounded(unittest.TestCase):
             cargo.chmod(0o755)
             subprocess.run([str(cargo), "build"], capture_output=True)
             self.assertEqual(incremental.caches(self.target), [])
+
+
+@unittest.skipUnless(shutil.which("cargo"), "cargo is not on the path")
+class CargosDefaults(unittest.TestCase):
+    """What cargo itself does with `-C incremental`, on a crate of its own with
+    a `browser` profile as the workspace has (inheriting release): the reason
+    the run's word removes `CARGO_INCREMENTAL` and does not set it to 1."""
+
+    def build(self, *args: str, incremental: str | None) -> str:
+        root = pathlib.Path(tempfile.mkdtemp(prefix="pw-cargo-defaults-"))
+        self.addCleanup(shutil.rmtree, root, True)
+        (root / "src").mkdir()
+        (root / "src/main.rs").write_text("fn main() {}\n")
+        (root / "Cargo.toml").write_text(
+            '[package]\nname = "probe"\nversion = "0.0.0"\nedition = "2021"\n'
+            '[profile.browser]\ninherits = "release"\nopt-level = "z"\nlto = true\n'
+        )
+        env = {k: v for k, v in os.environ.items() if k != "CARGO_INCREMENTAL"}
+        env["CARGO_TARGET_DIR"] = str(root / "target")
+        # The repository's pinned toolchain, whose file a crate outside it does not find.
+        pinned = re.search(r'channel = "([^"]+)"', (ROOT / "rust-toolchain.toml").read_text())
+        if pinned and "RUSTUP_TOOLCHAIN" not in env:
+            env["RUSTUP_TOOLCHAIN"] = pinned.group(1)
+        if incremental is not None:
+            env["CARGO_INCREMENTAL"] = incremental
+        done = subprocess.run(
+            ["cargo", "build", "-v", "--offline", *args], cwd=root, env=env, capture_output=True, text=True, timeout=300
+        )
+        self.assertEqual(done.returncode, 0, done.stderr)
+        return done.stderr
+
+    def test_with_the_variable_removed_a_dev_build_is_incremental_and_a_browser_build_is_not(self):
+        self.assertIn("incremental=", self.build(incremental=None))
+        self.assertNotIn("incremental=", self.build("--profile", "browser", incremental=None))
+
+    def test_a_zero_makes_neither_incremental(self):
+        self.assertNotIn("incremental=", self.build(incremental="0"))
+
+    def test_a_one_makes_a_browser_build_incremental_too_which_is_why_it_is_not_set(self):
+        self.assertIn("incremental=", self.build("--profile", "browser", incremental="1"))
 
 
 class Pruned(unittest.TestCase):

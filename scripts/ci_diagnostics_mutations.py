@@ -28,7 +28,8 @@ Each mutant undoes one piece:
 3. a mutation script's mutants are built incrementally where the run asks
    (`mutant_incremental.py`, `mutation_baseline.py`, `ci_recipes.py`,
    `verify.yml`): the run's word is not heard, or is taken whether given or
-   not, or does not win over the recipe's own `CARGO_INCREMENTAL=0`; the
+   not, or does not win over the recipe's own `CARGO_INCREMENTAL=0`, or is
+   forced to 1, which is every profile's; the
    script never starts it, or the caches are never looked at after a command,
    or are removed whatever they hold, or never, or a target triple's are
    missed, or a command that is no cargo's is looked at, or incremental
@@ -358,8 +359,15 @@ MUTANTS = [
         "a recipe's own zero wins over the run's word",
         "incremental",
         INCREMENTAL,
+        '        os.environ.pop("CARGO_INCREMENTAL", None)\n',
+        "        pass\n",
+    ),
+    (
+        "the run's word forces incremental builds for every profile",
+        "incremental",
+        INCREMENTAL,
+        '        os.environ.pop("CARGO_INCREMENTAL", None)\n',
         '        os.environ["CARGO_INCREMENTAL"] = "1"\n',
-        '        os.environ.setdefault("CARGO_INCREMENTAL", "1")\n',
     ),
     (
         "the script never starts it",
@@ -400,14 +408,14 @@ MUTANTS = [
         "a command that is no cargo's is looked at",
         "incremental",
         INCREMENTAL,
-        '    if os.environ.get("CARGO_INCREMENTAL") != "1" or not runs_cargo(args):\n',
-        '    if os.environ.get("CARGO_INCREMENTAL") != "1":\n',
+        "    if not asked() or not runs_cargo(args):\n",
+        "    if not asked():\n",
     ),
     (
-        "the caches are removed where incremental builds are off",
+        "the caches are removed where the run did not ask",
         "incremental",
         INCREMENTAL,
-        '    if os.environ.get("CARGO_INCREMENTAL") != "1" or not runs_cargo(args):\n',
+        "    if not asked() or not runs_cargo(args):\n",
         "    if not runs_cargo(args):\n",
     ),
     (
