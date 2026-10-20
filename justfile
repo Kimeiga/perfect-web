@@ -43,6 +43,7 @@ import 'just/committed-components.just'
 import 'just/browser-host-map.just'
 import 'just/parallel-mutants.just'
 import 'just/kiokun-cache.just'
+import 'just/preverify.just'
 
 default:
     @just --list
