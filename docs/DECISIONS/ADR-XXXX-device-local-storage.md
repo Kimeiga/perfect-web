@@ -384,6 +384,112 @@ keeps, so the refusal is this one and not a type the build lacks).
   changed them (ADR-0142); and a modal dialog that goes is closed first, its
   focus given back (ADR-0141).
 
+#### The two refusals decision 7 lifts, what each said and why, and what
+still fires
+
+*Ruled by the integrator, 2026-10-20 (ruling 3 on this note's questions):*
+decision 7 is accepted on condition that this note names each ruling-0073-a
+refusal it lifts, its original reason, why that reason cannot apply to a
+value that never leaves the device, and a test that each refusal still fires
+for a value a host holds. This is that, written at the train-12 merge; its
+test and mutants are the train's.
+
+**What is lifted is lifted for the browser's values**: the page's signals,
+the values the device keeps among them. A signal's first value is the
+declaration's, which a host renders; every later one is the browser's alone
+(ADR-0130). A value the device keeps is not in a host at all: PW6801 to
+PW6804 refuse each way it could go there, the `Device` label follows what
+is computed from it, and a public log, a shared cache and placement refuse
+it as before (decision 5). A **host's** value is a query's, a page's or a
+view's parameter, and anything computed from one. The lift looks at each
+value a computed part reads (`computed_part`'s `browsers`): a part whose
+every input is a signal is the browser's; a part with a host's value among
+its inputs is refused as it was.
+
+**1. A value computed from several values.**
+
+- *What it said* (`page_values.rs`, `computed_part`): "part N computes a
+  value from `a` and `b`, and a host computes one from one value (ruling
+  0073-a)".
+- *Its reason.* ADR-0226 and ADR-0227 give the refusal as "not yet"
+  (ADR-0226 decision 5: "one from several values, or from none"; ADR-0227
+  decision 5: "one from a signal and a query's value together"). The reason
+  that holds for a host's value is that a computed part is one function
+  computed by the one party that holds each input and hears of each change:
+  a host for a query's value, which it reads again; the browser for a
+  signal's, which no host hears of. From a signal and a query's value
+  together neither is that party: the host never hears the signal change,
+  and the browser has the query's value only as the page was rendered, so
+  whichever computed the part would show a value no longer true of one of
+  its inputs. Ruling 0073-a itself says the browser computes "when the
+  inputs are signals or speculated values".
+- *Why it cannot apply.* Every input is the browser's: it holds each and
+  hears of each change, as it does of one. No input is a host's that could
+  change without it; a host renders the first value from each input's
+  declared default, and the browser replaces it. For a value the device
+  keeps a host has no value that could disagree, since none reaches it, and
+  what is computed from the value carries `Device` and goes where the value
+  goes.
+- *Still fires, for a host's value.* A query's value read with the device's,
+  with a signal's or with another query's is refused in the same words:
+  `a_value_a_host_holds_is_still_refused_where_decision_7_lifts_the_refusals`
+  (`compiler/pw-core/tests/device_store.rs`: `total(notes, likes)`, the
+  device's value and a query's, and `sum(likes, more)`, two queries'),
+  `what_a_host_does_not_compute_is_refused_by_name` (`computed_holes.rs`) and
+  `what_the_browser_does_not_compute_yet_is_refused_by_name`
+  (`computed_signals.rs`). Its mutant, "a value from a browser value and a
+  host's together is built as the browser's"
+  (`scripts/device_store_mutations.py`), is killed by the first and by no
+  other test of that file.
+
+**2. A value computed inside a block a signal decides, and the list such a
+block reads.**
+
+- *What it said*: "part N computes a value inside a block a signal decides,
+  and the browser, which renders that block again, computes none yet (ruling
+  0073-a)" (`page_values.rs`, `rendered_again`), and for a block's list,
+  "`{#each}` reads its list by path, and `f(x)` is computed"
+  (`template_ir.rs`, `lower_block_at`).
+- *Its reason.* A block a signal decides is rendered again, whole, by the
+  browser, from the page's signals alone (ADR-0130, ADR-0137; ADR-0229
+  decision 4). A value a host computes from a query's value is not among
+  them, so the second rendering would not have it and the part would stay at
+  its first value; and the browser computed only at the top of a page, never
+  before a block renders (ADR-0227 decision 1). A list is read by its path
+  and the renderer computes none (ADR-0073).
+- *Why it cannot apply.* The value the lift builds is not a host's. The
+  browser computes it from the signals it holds before it renders the block
+  and gives the block its value by path, as it does a computed hole's
+  (ADR-0226), computing it again and rendering the block again when any of
+  its inputs changes (the plan's `reads`): nothing stays at a first value. A
+  list is the same, its function's inputs signals and its rows keyed as any
+  list's. For a value the device keeps there is no host's value to be
+  missing from the second rendering.
+- *Still fires, for a host's value.* A query's value computed inside a block
+  a signal decides, beside the device's or alone, and a list computed from a
+  query's value, are refused in the same words: the device-store test above
+  (`total(notes, likes)` and `plus_one(likes)` inside `{#if
+  List.length(notes) > 0}`, and `{#each merged(notes, pinned)}` and `{#each
+  only(pinned)}` in it), `what_a_host_does_not_compute_is_refused_by_name`
+  (`computed_holes.rs`: a query's value inside `{#if open}`),
+  `what_a_condition_does_not_compute_yet_is_refused_by_name`
+  (`computed_conditions.rs`) and `the_ir_blocks_a_computed_list_and_a_
+  foreign_key` (`template_values.rs`: a list computed from a view's
+  parameter). Its mutants, "a value a host computes inside a block a signal
+  decides is let through" and "a list computed from a host's value is built
+  as the browser's", are each killed by the device-store test and by no
+  other test of that file.
+
+**Not lifted.** A value computed from the browser's values inside a block a
+host decides is refused by name, in new words (the browser does not render
+that block again; "the browser computes one at the top of the page" is no
+longer the reason): `a_value_computed_from_the_devices_inside_a_hosts_block_
+is_refused_by_name`. One in a loop's row is refused as before:
+`a_value_computed_in_a_browser_rows_is_refused_by_name`. The rest of ruling
+0073-a's list (a page's parameter, an arm from the names it binds, a view
+that contains itself, a speculated value, an attribute's text) is not
+touched by decision 7.
+
 ### 8. How the Docs app and the encrypted messages build on it
 
 - **D1's replicated document** is kind 4 with a sync and a conflict policy,
@@ -463,7 +569,9 @@ rule, which the first version does not offer.
   rejected corpus gains an exhibit for PW6801 and PW6802.
 - **What the browser computes** (decision 7): several signals' value at the
   top and in a block, and a computed `{#each}` list in a block, each built,
-  with the host's first render and the browser's agreeing.
+  with the host's first render and the browser's agreeing; and each
+  refusal it lifts still firing for a value a host holds (the section under
+  decision 7, ruling 3).
 - **The runtime, in three engines** (`e2e/device-store.spec.mjs`, a demo
   page): a value persists across a reload; two tabs agree; a schema change
   migrates (a version-1 value read by a version-2 page); a stale tab stops
@@ -593,3 +701,31 @@ and `just e14-device-store-cypress` (`docs/evidence/E14/device-store-cypress.txt
 6. **The published generality figure** moved from 60/60 to 62/62 (this
    track's two invariants, corpus C28): `tests/generality.rs` holds it, and
    STATUS's "generality is 60/60" is the integrator's to move.
+
+## The integrator's rulings (2026-10-20)
+
+The answers to the questions above, from the integrator's message of about
+11:40Z, recorded at the train-12 merge:
+
+1. **PW68xx stays** this track's own block (a new capability, charter 9.1
+   kind 4); its owner is registered in `codes.rs` as `DeviceStore`.
+2. **Deleting TodoMVC's Rust host layer is accepted**: it is the steering
+   goal, no app-specific Rust.
+3. **Decision 7's two lifted refusals are accepted on condition** that this
+   note names each, its original reason, why that reason cannot apply to a
+   value that never leaves the device, and a test that each still fires for
+   a value a host holds. Met at the train-12 merge: the section under
+   decision 7, its test and its three mutants.
+4. **TodoMVC's acceptance is stated as** the official suite, run unchanged,
+   on the Cypress version tastejs/todomvc itself pins (found in that
+   repository's `package.json`; Cypress is an owner-approved download for
+   TodoMVC, and the version's source and size are stated when it is
+   fetched): all 29 there is acceptance met. Also reported: 24 of 29 on
+   Cypress 15.21.1, the five others shown impossible for any app on Cypress
+   4.0 and later (Sinon's `spy.reset` removed; an alias read again after a
+   reload) by the app-less minimal tests committed here. The pinned-version
+   run is not made; NEXT holds it.
+5. **`device.lock` later is accepted**: listed as not claimed in the first
+   version.
+6. **STATUS's generality is 62/62**: the integrator writes it at the
+   merge.
