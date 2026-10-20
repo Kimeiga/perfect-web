@@ -2,10 +2,12 @@
 
 Status: proposed by track `second-host` (`track/second-host`, first based on
 `track/bounded-statements` a59a18a3, merged with `origin/master` at train-9,
-32757966, on 2026-10-19), under the owner's delegation of 2026-10-02. Dates:
-2026-10-14 (the design), 2026-10-15 (the integrator's rulings, the outbox,
-the sessions), 2026-10-19 (the merge, the render merge's seat model, the
-browser suite, the mutation controls). Milestone: E14. Builds on ADR-0246
+32757966, on 2026-10-19, and at train-10, 39e953eb, on 2026-10-20), under the
+owner's delegation of 2026-10-02. Dates: 2026-10-14 (the design), 2026-10-15
+(the integrator's rulings, the outbox, the sessions), 2026-10-19 (the merge,
+the render merge's seat model, the browser suite, the mutation controls),
+2026-10-20 (the integrator's rulings on this ADR's four questions, built;
+the merge of train-10). Milestone: E14. Builds on ADR-0246
 (the feed on PostgreSQL, its outbox read back by the committing host),
 ADR-0297 (a commit tells the pages that ask, at once), ADR-0298 (the store on
 PostgreSQL), ADR-0325 (an interaction's answer commits with its writes),
@@ -24,13 +26,13 @@ seats and its snapshots).
   trim between the two is learned, at worst a needless reload. Tested by
   running a trim between the two reads.
 - **A press made on a page one host served, sent again to another, was
-  refused, though the first host had committed it** (found 2026-10-19 by
-  this track's browser suite; fixed, interim: Decision 2). A command names
-  its page (`pw-document`) by the number its host gave it, and each host
-  numbers its pages from one: on B the number names no page, or a page B
-  showed another reader, and B answered 403 `out-of-date` or
-  `another-reader` before any record was read. Nothing ran twice, but the
-  reader was told the page was out of date for a press that had committed.
+  refused, though the first host had committed it; and one host's page
+  could be taken for another's** (found 2026-10-19 by this track's browser
+  suite; ruled 2026-10-20 and built: Decision 2). A command names its page
+  (`pw-document`) by the number its host gave it, and each host numbered its
+  pages from one: on B the number named no page, and B answered 403
+  `out-of-date` before any record was read; or it named B's own page of the
+  same session, and B took the press for one made on its own page.
 - **A live page is its host's** (found by the same suite, stated as a
   deployment requirement below): its documents, subscribers and query
   entries are the host's memory (ADR-0161), so a page's stream that reaches
@@ -189,6 +191,31 @@ Each ruled by the integrator, 2026-10-15, on this track's questions:
    this ADR says what a second host does to that claim: below, "What a
    second host does to the render merge's claims": not claimed.
 
+## The integrator's rulings (2026-10-20)
+
+On this ADR's four questions, each accepted under the owner's delegation of
+2026-10-02, and built:
+
+1. **Both**: page identities unique across hosts (a per-host instance in a
+   page's number), since host-local numbers collide and B would take A's
+   page 5 for its own, a safety bug and not only a refusal; and a retried
+   press still answered from its committed ADR-0325 record wherever it
+   lands. A press naming another host's page that has no committed record
+   is refused precisely ("this page is served by another host"), never as
+   out of date. Tests for each, with controls (Decision 2).
+2. **Sessions expire**: an idle timeout and an absolute lifetime, both a
+   deployment's settings (14 days idle and 60 in all where it says
+   nothing), the session id rotated at sign-in (fixation) and on a change of
+   privilege; expired means signed out cleanly, tested on both hosts
+   (Decision 3).
+3. **Session affinity is a stated deployment requirement** for live pages,
+   until pages can move between hosts: in this ADR's consequences, and in
+   KNOWN_LIMITATIONS' wording, which the integrator writes at the landing
+   (proposed under Consequences), with a test that a press to the wrong host
+   is handled as ruling 1 says (Decision 4).
+4. **`PW_FEED_SCHEMA` stays a test's setting**, not a deployment's (Decision
+   4).
+
 ## Decision
 
 ### 1. The outbox is a log every host reads by its cursor; NOTIFY only wakes them
@@ -240,17 +267,29 @@ Each ruled by the integrator, 2026-10-15, on this track's questions:
   record by its key rolls back and answers it. With sessions persisted (3),
   a retry through B names the same key as A's press, and is answered from
   A's record, not refused for a session B does not know.
-- **A press made on a page another host served** (the finding above,
-  interim, cheap to reverse): `Server::kept_answer`, which answers a press
-  from a page the host no longer holds or showed another session out of
-  the host's memory (the integrator's finding of 2026-10-11), now, where
-  the host's memory holds nothing of the press, looks for its interaction's
-  committed record (the layer's, or the materializer's where the layer
-  keeps none), under the request's own session and then the page's, and
-  answers from it. Nothing runs; a press never committed has no record and
-  is refused as before; the order of the checks (a kept answer, the stale
-  page, the order's wait, the command) is unchanged. One statement, on the
-  refusing path only.
+- **Pages numbered apart on every host** (ruling 1): each host takes an
+  instance as it opens a layer on PostgreSQL, the next of the schema's
+  `host_instances` (a sequence the outbox's migration makes, feed 0010,
+  store 0018), and numbers its pages from `instance << 32 | 1`
+  (`hosts::first_page`). The instance is unique among the hosts of one
+  database until a million hosts' starts have gone by, and every number
+  stays below JavaScript's exact integers (2^53), as the runtime reads it; a
+  document's frames are numbered from its number, as before. A host in
+  memory numbers from 1, as before: it is one host. A page of A's is never
+  B's, whatever session it is shown to.
+- **A command naming a page another host served** (its number in another
+  host's instance: `hosts::another_hosts`, in `stale_document`) is answered
+  from its interaction's committed record where it has one
+  (`Server::kept_answer`: where the host's memory holds nothing of the
+  press, the layer's record, or the materializer's where the layer keeps
+  none, under the request's own session and then the page's), and refused
+  otherwise as `another-host`, "This page is served by another host. Reload
+  it to go on.", never as out of date. A page this host gave and no longer
+  holds, or a number in no host's instance, is out of date as before. The
+  order of the checks (a kept answer, the stale page, the order's wait, the
+  command) is unchanged. An interaction's id is 128 random bits, so the
+  lookup under the page's session exposes nothing the host's memory did not
+  already answer.
 
 ### 3. A session is the database's, kept only as its hash
 
@@ -265,9 +304,26 @@ Each ruled by the integrator, 2026-10-15, on this track's questions:
   statement of its own, before the browser is answered; one not kept is
   said, and the browser keeps its session (503) or the sign-in is refused.
 - **Each request reads its session once** (`Principals::refresh`, one
-  statement by the hash's primary key, before the request's route), so a
-  sign-out on A is seen by B's next request; what the host keeps in memory
-  is that request's copy. A read that fails signs the request out.
+  statement by the hash's primary key, before the request's route, which
+  also holds its lifetimes, below), so a sign-out on A is seen by B's next
+  request; what the host keeps in memory is that request's copy. A read
+  that fails signs the request out.
+- **A session expires** (ruling 2): idle past `PW_SESSION_IDLE`, or past
+  `PW_SESSION_LIFETIME` however it is used (whole seconds, one at least; 14
+  and 60 days where unset or empty; refused at start by name, as
+  `PW_RENDER_SEATS` is: `identity::SessionLifetimes`). Where sessions are
+  kept, the request's one statement holds both on the database's clock
+  (`sessions.opened`, `sessions.seen`), records the session's use where the
+  last was more than a minute ago (a quarter of the idle time where that is
+  shorter: `hosts::touched_after`), so a session in use writes at most once
+  a minute, and deletes one past either: signed out cleanly, on every host.
+  A host in memory alone holds both on its own clock (`identity::Held`), and
+  forgets an expired session.
+- **The session id is rotated wherever whom the session is changes**: a
+  sign-in gives a new id, and the one the browser came with, which another
+  could have set, is no one (fixation); signing in again as another user
+  gives another; signing out gives a new one (ADR-0258). Pleris has no other
+  change of a session's privilege yet.
 - **A sign-in under way is the database's too** (`sign_ins`: the state's
   hash, the nonce and the PKCE verifier, and when it began): a callback that
   lands on another host completes it, once, within ten minutes on the
@@ -280,15 +336,18 @@ Each ruled by the integrator, 2026-10-15, on this track's questions:
 ### 4. A deployment of several hosts
 
 - **Every host of a deployment opens its layer on one database and one
-  schema**: the store's `pw_store`, or `PW_STORE_DATABASE_URL`'s; the feed's
-  the connection's search path, or `PW_FEED_SCHEMA` where the deployment
-  names one (TRACK SEAM (second-host) in `main()`; a test run names its
-  own).
-- **It routes a session's requests to one host while that host lives**
-  (session affinity): a page's live state is its host's (the finding above).
-  A host gone, its pages reload on another, which finds their readers in
-  the database; a press whose answer was lost with it is answered from its
-  record (Decision 2).
+  schema**: the store's `pw_store`, and the feed's its connection's search
+  path. `PW_FEED_SCHEMA` names another only for a test run (ruling 4):
+  honored for a development deployment on this machine, as the development
+  identity provider is, and refused at start for any other
+  (`hosts::test_schema`).
+- **Session affinity is the deployment's requirement** (ruling 3): it routes
+  a session's requests to one host while that host lives, since a live
+  page's state is its host's (its documents, subscribers and query entries,
+  ADR-0161). A host gone, its pages reload on another, which finds their
+  readers in the database; a press whose answer was lost with it is answered
+  from its record; a press that reaches a host that did not serve its page is
+  refused as another host's (Decision 2, and the browser's test).
 
 ### 5. Connections, in the render merge's bounded model
 
@@ -322,7 +381,7 @@ layer and host:
 ### 6. Tests
 
 - Two hosts in one process, each its own `Server` on one PostgreSQL schema
-  (`tests/second_host.rs`, 22): a post through A told live to a page on B,
+  (`tests/second_host.rs`, 30): a post through A told live to a page on B,
   and not before B reads; each commit told once on each host (A's reader
   hears none of A's own); B's listening connection terminated
   (`pg_terminate_backend`) while A commits, and B catching up from its
@@ -338,22 +397,35 @@ layer and host:
   one forgotten; a sign-out on A no one on B; a restarted host keeping its
   readers; a request reading its session once; the sessions' bound held
   under 24 requests at once; the store: a cart changed through A told to
-  the reader's page on B; a retry through B answered from A's record; a
-  press on A's page sent again to B answered from A's record.
+  the reader's page on B; a retry through B answered from A's record.
+  For the rulings of 2026-10-20: pages numbered apart on two hosts; a press
+  on another host's page that committed nowhere refused as that host's,
+  nothing run, with its controls (the same press on its own host runs, one
+  on B's own page runs, one on a page B no longer holds or numbered in no
+  instance is out of date); a press on A's page sent again to B answered
+  from A's record, and one never committed refused as another host's; a
+  session idle past its idle time, or past its lifetime, signed out on both
+  hosts, its row gone, each with its control; its use recorded at most once
+  a minute; a deployment's lifetimes read, refused by name, and held to;
+  signing in, and again as another user, rotating the session on both
+  hosts; `PW_FEED_SCHEMA` a test's. In `identity.rs`: a session in one
+  host's memory alone expiring idle and past its lifetime.
 - The browser: two servers per engine on one schema of the engine's own, in
   Chromium, Firefox and WebKit (`e2e-hosts/second-host.spec.mjs`, through
-  `playwright.hosts.config.mjs`): a session made on A holding on B and a
-  post through A told live to B's page, not reloaded; the browser's post
-  request sent again to B answered with A's result, posted once; B stopped
-  while A commits and started again, its page reloaded by the new process
-  showing what A committed meanwhile, signed in still, and told A's next
-  post live; a session signed out on B no one on A.
-- `scripts/second_host_mutations.py`, 34 mutants, each rule's;
+  `playwright.hosts.config.mjs`, 5 tests): a session made on A holding on B
+  and a post through A told live to B's page, not reloaded; the browser's
+  post request sent again to B answered with A's result, posted once; a
+  press sent to the wrong host refused as another host's page, in the
+  platform's words where it was pressed, nothing posted; B stopped while A
+  commits and started again, its page reloaded by the new process showing
+  what A committed meanwhile, signed in still, and told A's next post live;
+  a session signed out on B no one on A.
+- `scripts/second_host_mutations.py`, 51 mutants, each rule's;
   `just e14-second-host`.
 - `tests/bounded_statements.rs` re-pinned where a commit gains its lock and
-  notify (each command one more); a request's session read is no statement
-  of the store's tally (its own connections), pinned at one in
-  `tests/second_host.rs`.
+  notify (each command one more, on train-10's pins); a request's session
+  read is no statement of the store's tally (its own connections), pinned at
+  one in `tests/second_host.rs`.
 
 ## What a second host does to the render merge's claims
 
@@ -412,10 +484,11 @@ layer and host:
 - **Sessions as signed cookies** (no table): sign-out cannot revoke one
   before it expires (OWASP's Session Management Cheat Sheet: on logout the
   server must invalidate the session).
-- **Page numbers made deployment-wide** (the host's id in each), so another
-  host would know a page is another's: it changes the protocol's document
-  cursor and every page's number for a refusal the record already answers
-  (Decision 2); left for the integrator's question below.
+- **Unguessable page ids instead of numbers** (ruling 1's other choice):
+  the runtime and the protocol read a page's number as its cursor, which
+  its frames are numbered from; a per-host instance in the number keeps
+  both, and the hosts' database makes it unique, where random ids are only
+  likely unique.
 
 ## Failure cases
 
@@ -430,6 +503,9 @@ layer and host:
 | Two hosts run one interaction | ADR-0325: one commit records it; the other rolls back and answers the record. |
 | A press's answer lost, its retry on another host | Answered from the record its commit wrote (Decision 2); a press never committed is refused as from a page the host does not hold. |
 | A session signed out on A | B's next request reads no row, and the id is no one. |
+| A session idle past its idle time, or past its lifetime | Its next request, on any host, reads no one, and deletes its row. |
+| A press reaches a host that did not serve its page | Answered from its record if it committed where it was served; refused as another host's page otherwise (Decision 2). |
+| Two hosts start on one database | Each takes its own instance; their page numbers never meet. |
 | More requests at once than the sessions' connections | They wait for one given back; each holder runs one statement. |
 
 ## Not claimed
@@ -445,27 +521,36 @@ layer and host:
   older value after a newer.
 - **A render's snapshot consistent with a serial order of two hosts'
   commands** (13.2.2's read-only anomaly; above).
-- **A page served by one host, its stream or its commands on another**:
-  told to reload, or answered as from a page that host does not hold (a
-  committed press from its record). A deployment routes a session to one
-  host (Decision 4).
-- **Sessions that expire**: a session row lives until its sign-out
-  (ADR-0258 claims no expiry either; it now outlives the process).
+- **A page moving between hosts**: its stream on another host is told to
+  reload, and its commands are answered there from their records or refused
+  as another host's (Decision 2): a deployment keeps a session on one host
+  (Decision 4, Consequences).
+- **Page numbers apart past a million hosts' starts on one database**: the
+  instance comes round again (`host_instances` modulo 2^20 - 1); a page that
+  old is long gone from every host.
 - **The development provider's accounts across hosts.**
 - **A replica**, as ADR-0246.
 
 ## Questions for the integrator
 
-1. **A press on another host's page answered from its record** (Decision 2,
-   interim, one call in `kept_answer`): keep it, or make page numbers
-   deployment-wide (the host's id in each) so a host knows another's page?
-2. **Session expiry**: a session row lives until sign-out. An idle or
-   absolute lifetime (OWASP: both) is a rule ADR-0258 never had; a
-   deployment setting?
-3. **Session affinity** as a stated requirement of a deployment of several
-   hosts (Decision 4): in `docs/` where a deployment is described?
-4. **`PW_FEED_SCHEMA`**: a deployment setting (the store's schema is fixed
-   at `pw_store`): keep, and give the store one?
+None open: the four of 2026-10-19 were ruled on 2026-10-20 (above).
+
+## Consequences
+
+- **A deployment of several hosts keeps each session on one host** while
+  that host lives (session affinity at its load balancer, as by the
+  `pw-session` cookie): a live page cannot move between hosts yet. Proposed
+  wording for `docs/KNOWN_LIMITATIONS.md`, the integrator's to write at the
+  landing: "Several hosts on one database need session affinity. A live
+  page's state is its host's: its stream, reaching another host, is told to
+  reload, and its commands are answered there only from their committed
+  records (a press that committed on the host that served it) or refused as
+  another host's page. Pages cannot yet move between hosts (ADR-XXXX)."
+- A page's number carries its host's instance in its high 20 bits (of 52):
+  the protocol's cursor, a JSON number, carries it exactly.
+- A request on a kept session writes the session's use at most once a
+  minute; a sign-in, a sign-out, and an expired session's first request
+  after its expiry each write a row.
 
 ## Merge notes
 
@@ -473,12 +558,26 @@ layer and host:
   three conflicts, each a list both sides appended to, resolved keeping
   both (main.rs' module list and test-module list; store_pg.rs'
   MIGRATIONS, reviews' 0017_ratings before this track's 0018 and 0019).
-- **With train-10 and train-11** (not on master on 2026-10-19):
-  `bounded_statements`' pins move on each (train-10 32/53, the render merge
-  16/34, the two 19/37 per train-11's notes); this track adds one statement
-  to each command that hands the outbox anything and none to a page, so
-  each command's pin there is one more, each page's the same. The render
-  merge's composition is measured above.
+- Merged `origin/master` at train-10 (39e953eb), 493800d5: four
+  conflicts. The justfile's imports, `ci_plan.py`'s `NEEDS_DATABASE` and
+  main.rs' module lists, lists both sides appended to, kept both, master's
+  first; and `tests/bounded_statements.rs`' pins, re-measured on PostgreSQL
+  at the merge, equal at both sizes: each page train-10's, each command
+  train-10's and one more (this track's lock and notify). Two of them git
+  merged without a conflict and wrongly: `place_order` 37 -> 38 and
+  `settle_payment` 17 -> 18 on both sides, each side's one statement, 39 and
+  19 measured. Migrations in order: store 0016_scheduled_orders,
+  0017_ratings, then this track's 0018 and 0019.
+- **With train-11** (not on master on 2026-10-20): the render merge's pins
+  (train-10 with it 19/37 per train-11's notes) are pages, which this track
+  leaves alone; its commands' pins are one more each with this track. The
+  render merge's composition is measured above. Its
+  `FeedPg::open_with`/`StorePg::open_with` take its seats too, where this
+  track's opens take the instance and the tail.
+- This track's four migrations (feed 0010, 0011; store 0018, 0019) were
+  amended for the rulings of 2026-10-20 (the `host_instances` sequence,
+  `sessions.seen`): none is on master, and no database outside a test's has
+  applied them.
 - **The browser host map** (train-11) registers every spec under `e2e/` and
   starts only the selected tests' hosts; this track's suite is outside it
   (`e2e-hosts/`, its own configuration), its spec starting its own hosts at
@@ -530,4 +629,5 @@ workers, load averages 40-100 through these runs), PostgreSQL 18.6, rustc
 
 - The feed's own pool bounded as the store's (the render merge's next step);
   this track's table above then states every layer's total.
-- An answer to each question above.
+- When pages can move between hosts (their state kept beyond the host),
+  session affinity stops being a requirement.
