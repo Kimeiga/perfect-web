@@ -46,6 +46,8 @@ MUTANTS = [
      ' --producer-exit "$status"\n', '\n'),
     ('nonempty incomplete reports pass their count check', 'NodeAudit.test_one_allowed_advisory_cannot_hide_a_missing_subset', AUDIT,
      '    if observed != counts:\n', '    if bool(advisories) != any(counts.values()):\n'),
+    ('total-only counts hide severity redistribution', 'NodeAudit.test_severity_distribution_must_match_even_when_totals_match', AUDIT,
+     '    if observed != counts:\n', '    if sum(observed.values()) != sum(counts.values()):\n'),
 ]
 SELECTOR = "test_node_audit"
 SEARCH = ROOT / "scripts/tests"

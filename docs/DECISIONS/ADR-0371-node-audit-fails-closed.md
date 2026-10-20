@@ -42,7 +42,7 @@ configuration; this repository's documented allowance file remains the
 single review boundary. The actual reports before and after ADR-0370 agree
 exactly by severity: moderate 4/high 3, then high 1. Root review found that
 checking only whether both collections were nonempty allowed missing
-subsets; two added regression tests failed before the exact comparison.
+subsets; two added regression tests failed before the exact comparison. Separate controls weaken the check to nonempty agreement and total-only agreement; each must fail its named missing-subset or severity-redistribution assertion.
 
 ## Evidence and limits
 
@@ -60,5 +60,5 @@ audit and require a later successful scan.
 
 The final 24 audit regressions and 26 baseline-harness tests pass locally.
 [Before/after command output](../evidence/tooling/node-audit-regression-2026-10-20.txt).
-The whole 17-control campaign and full CI remain required on the exact
+The whole 18-control campaign and full CI remain required on the exact
 commit before the train is advanced.
