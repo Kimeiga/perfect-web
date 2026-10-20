@@ -3303,6 +3303,16 @@ impl Server {
         heard.more
     }
 
+    /// TRACK SEAM (second-host): **its pages numbered from `first_page`**,
+    /// another host's, as a test that compares two hosts' pages to the byte
+    /// has them: a page's number is its host's (ADR-XXXX), not its data's.
+    /// Before it serves any.
+    #[cfg(test)]
+    fn numbered_from(&mut self, first_page: u64) {
+        self.first_page = first_page;
+        *self.documents.get_mut() = first_page;
+    }
+
     /// **Each live document read again at the instant what it shows holds
     /// until** (ADR-0304), for as long as the host runs: woken when an
     /// instant is set or the clock is moved, and each second at least, as the

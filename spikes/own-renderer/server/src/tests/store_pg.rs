@@ -565,17 +565,19 @@ fn on_postgres_an_order_keeps_its_lines_and_the_outboxes_hold_only_its_hosts_row
 #[test]
 fn on_postgres_the_two_layers_answer_alike() {
     let Some(url) = database() else { return };
-    // In memory whatever layer the rest of the suite is on.
+    let on_pg = served(&url);
+    // In memory whatever layer the rest of the suite is on; its pages
+    // numbered as the PostgreSQL host's are, from that host's instance
+    // (track `second-host`), so that the two hosts' pages compare to the
+    // byte: a page's number is its host's, not what the layer answers.
     let in_memory = {
         let (dir, out) = built_from_patches_in("examples", |app| app.to_string(), &[]);
         let layer: Arc<dyn crate::store::StoreLayer> = Arc::new(crate::store::StoreData::new());
-        Served {
-            server: Server::from_build_layers(out.clone(), out, None, Some(layer))
-                .expect("served in memory"),
-            _dir: dir,
-        }
+        let mut server = Server::from_build_layers(out.clone(), out, None, Some(layer))
+            .expect("served in memory");
+        server.numbered_from(on_pg.first_page);
+        Served { server, _dir: dir }
     };
-    let on_pg = served(&url);
     let servers: [&Server; 2] = [&in_memory, &on_pg];
     for s in servers {
         // The slow sources' delays are test controls, not data.
