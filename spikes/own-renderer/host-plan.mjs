@@ -18,6 +18,15 @@ import { REGISTRY, PORT, REQUIRED_BUILD, rolesForTest, portsForRole, buildProble
 export const PLAN_SCHEMA = 1;
 const ROOT = fileURLToPath(new URL(".", import.meta.url));
 const REPORTER = fileURLToPath(new URL("./host-plan-reporter.mjs", import.meta.url));
+const LAUNCHER = fileURLToPath(new URL("./serve-while-owned.sh", import.meta.url));
+const quote = (value) => `'${value.replaceAll("'", "'\\''")}'`;
+
+// **A host's command, run so that it ends with the process that started it**
+// (`serve-while-owned.sh`). Playwright stops its hosts as it ends, but a
+// runner that is killed outright (a recipe's bound, the out-of-memory
+// killer) stops none: each host, the leader of a group of its own, lived on
+// holding its port, and every later run on the port failed to start.
+export const ownedCommand = (argv) => ["sh", quote(LAUNCHER), ...argv.map(quote)].join(" ");
 const REQUEST = "PW_HOST_COLLECTION_REQUEST";
 const CONTEXT = "PW_HOST_INVOCATION";
 const own = (value, key) => Object.hasOwn(value, key);
@@ -262,8 +271,7 @@ export function serversForSelection(selection, { root = ROOT, port = PORT } = {}
     }
     const executable = definition.build === "legacy-kiokun" ? "kiokun-server" : "pw-dev-server";
     const dist = REGISTRY.builds[definition.build].dist;
-    const quote = (value) => `'${value.replaceAll("'", "'\\''")}'`;
-    return { command: `${quote(join(target, executable))}${dist ? ` ${quote(dist)}` : ""}`, env, port: hostPort, reuseExistingServer: !!process.env.PW_REUSE, timeout: 60000 };
+    return { command: ownedCommand([join(target, executable), ...(dist ? [dist] : [])]), env, port: hostPort, reuseExistingServer: !!process.env.PW_REUSE, timeout: 60000 };
   });
 }
 

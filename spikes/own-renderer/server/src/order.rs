@@ -53,6 +53,15 @@ pub struct Order {
     fates: Mutex<BTreeMap<String, VecDeque<(String, Fate)>>>,
     changed: Condvar,
     wait: Duration,
+    /// How many times a command has begun to wait for the one it names: a
+    /// test hears that one waits (and that another does not) from this, where
+    /// "has not returned yet" is a silence a slow machine makes too.
+    #[cfg(test)]
+    waits: std::sync::atomic::AtomicUsize,
+    /// Of those, how many were for a command not here at all (not one in
+    /// flight): a command let go of while it ran is waited for as missing.
+    #[cfg(test)]
+    waits_for_arrival: std::sync::atomic::AtomicUsize,
 }
 
 impl Default for Order {
@@ -68,7 +77,26 @@ impl Order {
             fates: Mutex::new(BTreeMap::new()),
             changed: Condvar::new(),
             wait,
+            #[cfg(test)]
+            waits: std::sync::atomic::AtomicUsize::new(0),
+            #[cfg(test)]
+            waits_for_arrival: std::sync::atomic::AtomicUsize::new(0),
         }
+    }
+
+    /// **A test's: how many times a command has begun to wait** for the one
+    /// it names, for the wait to end or the one named to answer.
+    #[cfg(test)]
+    pub fn waits(&self) -> usize {
+        self.waits.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    /// **A test's: how many of those waits were for a command that was not
+    /// here at all**, as opposed to one here and running.
+    #[cfg(test)]
+    pub fn waits_for_arrival(&self) -> usize {
+        self.waits_for_arrival
+            .load(std::sync::atomic::Ordering::SeqCst)
     }
 
     /// `interaction` is here for `session`. What became of it is told when
@@ -98,11 +126,23 @@ impl Order {
                 Some(Fate::Answered) => return Turn::Run,
                 Some(Fate::Early) => return Turn::Early,
                 // Running, or waiting for its own: either ends.
-                Some(Fate::Here) => fates = self.changed.wait(fates).expect("order"),
+                Some(Fate::Here) => {
+                    #[cfg(test)]
+                    self.waits.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    fates = self.changed.wait(fates).expect("order")
+                }
                 None => {
                     let now = Instant::now();
                     if now >= deadline {
                         return Turn::Early;
+                    }
+                    // Told first, so that a test which has heard the wait
+                    // begin hears what it is for too.
+                    #[cfg(test)]
+                    {
+                        self.waits_for_arrival
+                            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                        self.waits.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     }
                     fates = self
                         .changed
@@ -179,6 +219,20 @@ mod tests {
 
     const SHORT: Duration = Duration::from_millis(200);
 
+    /// The most a test waits for an event that must come: a bound on a
+    /// hang, never on the speed of the machine.
+    const MUST_HAPPEN: Duration = Duration::from_secs(10);
+
+    /// Until `order` has seen `n` waits begin, however long that takes (and
+    /// no longer than `MUST_HAPPEN`): the event a sleep guessed at.
+    fn until_waits(order: &Order, n: usize) {
+        let deadline = Instant::now() + MUST_HAPPEN;
+        while order.waits() < n {
+            assert!(Instant::now() < deadline, "{n} wait(s) never began");
+            std::thread::sleep(Duration::from_millis(1));
+        }
+    }
+
     #[test]
     fn a_command_whose_named_one_was_answered_runs() {
         let order = Order::waiting(SHORT);
@@ -200,10 +254,11 @@ mod tests {
                 drop(arrival);
             })
         };
-        std::thread::sleep(Duration::from_millis(100));
+        until_waits(&order, 1);
         let arrival = order.arrive("s", "one");
-        // Here and running: the second still waits.
-        std::thread::sleep(Duration::from_millis(100));
+        // Here and running: the second still waits (it began to wait again
+        // for it).
+        until_waits(&order, 2);
         ran.lock().unwrap().push("one");
         drop(arrival);
         second.join().unwrap();
@@ -219,22 +274,24 @@ mod tests {
             let order = order.clone();
             std::thread::spawn(move || told.send(order.follow("s", "lost")));
         }
-        // Watched from here: a wait with no end fails, and does not hang.
+        // Watched from here: a wait with no end fails, and does not hang
+        // (for as long as a hang is told by, not for as long as the wait
+        // is: a cap of five waits was a speed bound a slow machine outran).
         let turn = answer
-            .recv_timeout(SHORT * 5)
+            .recv_timeout(MUST_HAPPEN)
             .expect("answered within the wait");
         assert_eq!(turn, Turn::Early);
         let waited = started.elapsed();
         assert!(waited >= SHORT, "answered early after {waited:?}");
+        assert!(order.waits() >= 1, "it waited");
     }
 
     #[test]
     fn a_command_whose_named_one_was_answered_early_is_answered_early() {
         let order = Order::waiting(Duration::from_secs(5));
         order.arrive("s", "one").early();
-        let started = Instant::now();
         assert_eq!(order.follow("s", "one"), Turn::Early);
-        assert!(started.elapsed() < Duration::from_secs(1));
+        assert_eq!(order.waits(), 0, "answered at once, without waiting");
     }
 
     #[test]
@@ -246,7 +303,7 @@ mod tests {
             std::thread::spawn(move || order.follow("s", "one"))
         };
         // Its page sends it again, and it runs.
-        std::thread::sleep(Duration::from_millis(100));
+        until_waits(&order, 1);
         drop(order.arrive("s", "one"));
         assert_eq!(follower.join().unwrap(), Turn::Run);
     }
@@ -268,9 +325,21 @@ mod tests {
         // The oldest answered went; the one in flight stayed, and is waited for.
         assert_eq!(order.follow("s", "i0"), Turn::Early);
         assert_eq!(order.follow("s", &format!("i{}", KEPT * 2 - 1)), Turn::Run);
+        let waited = order.waits();
+        let missing = order.waits_for_arrival();
         let waiting = std::thread::scope(|scope| {
             let follower = scope.spawn(|| order.follow("s", "first"));
-            std::thread::sleep(SHORT * 2);
+            until_waits(&order, waited + 1);
+            // It found the command in flight, and waits for it as long as it
+            // runs. One let go of while it ran would be waited for as one
+            // missing (until the window ends) and answered all the same once
+            // it ended: only what the wait is for tells the two apart, with
+            // no sleep to see the window end by.
+            assert_eq!(
+                order.waits_for_arrival(),
+                missing,
+                "the command in flight was let go of: its follower waits for it as for one missing"
+            );
             let finished = follower.is_finished();
             drop(here);
             (finished, follower.join().unwrap())

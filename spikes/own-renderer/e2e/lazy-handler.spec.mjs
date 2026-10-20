@@ -179,9 +179,21 @@ test("an unauthorised handler is never fetched", async ({ page }) => {
   await page.goto("/StorePage.html");
   await page.waitForFunction(() => document.documentElement.dataset.pwReady);
   await page.locator("#menu button").first().click();
-  await page.waitForTimeout(400);
+  // The decision's word, not a pause of 400 ms that a loaded machine
+  // outlasted: the runtime logs its refusal as it makes it, and the log is
+  // the one of whichever document has one (a document between two, its
+  // runtime not yet booted, has none: `window.__pw` is undefined there, which
+  // a pause and a read of it met when the page was being read again). And a
+  // turn of the page's event loop after it, for anything the refusal left
+  // running to have asked.
+  const log = await (
+    await page.waitForFunction(() => {
+      const lines = window.__pw?.log ?? [];
+      return lines.some((line) => /refused \d+:/.test(line)) && lines.join("\n");
+    })
+  ).jsonValue();
+  await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 0))).catch(() => {});
 
-  const log = await page.evaluate(() => window.__pw.log.join("\n"));
   expect(log, "the decision refused").toMatch(/refused \d+:/);
   expect(fetched, "and nothing was fetched").toEqual([]);
   await expect(page.locator("#cart-count"), "the button is inert").toHaveText("0");
@@ -207,9 +219,15 @@ test("a handler this build did not compile is refused, whatever the document say
   await page.goto("/StorePage.html");
   await page.waitForFunction(() => document.documentElement.dataset.pwReady);
   await page.locator("#menu button").first().click();
-  await page.waitForTimeout(400);
+  // The decision's word (see above): refused, as this build's code 4.
+  const log = await (
+    await page.waitForFunction(() => {
+      const lines = window.__pw?.log ?? [];
+      return lines.some((line) => /refused \d+: code 4 /.test(line)) && lines.join("\n");
+    })
+  ).jsonValue();
+  await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 0))).catch(() => {});
 
-  const log = await page.evaluate(() => window.__pw.log.join("\n"));
   expect(log, "the build's handlers are known").toMatch(/knows \d+ handler\(s\)/);
   expect(log, "this one is not among them").toMatch(/refused \d+: code 4 /);
   expect(fetched, "and nothing was fetched").toEqual([]);

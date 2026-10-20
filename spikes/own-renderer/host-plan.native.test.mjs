@@ -11,8 +11,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { closeSync, mkdtempSync, mkdirSync, openSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, mkdtempSync, mkdirSync, openSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
+import net from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -30,7 +31,10 @@ const records = (file) => {
   catch (error) { if (error.code === "ENOENT") return []; throw error; }
 };
 
-function nativeFixture() {
+// `owned`: the fixture's host is run as the real configuration runs it, by the
+// launcher that ends it with its runner (`ownedCommand`), and its one test
+// hangs, so that a runner can be killed in the middle of a run.
+function nativeFixture(owned = false) {
   const root = mkdtempSync(join(tmpdir(), "pw-host-native-"));
   mkdirSync(join(root, "e2e"));
   symlinkSync(join(SPIKE, "node_modules"), join(root, "node_modules"), "dir");
@@ -51,16 +55,22 @@ for(const signal of ["SIGTERM","SIGINT"])process.on(signal,()=>server.close(()=>
 process.on("exit",()=>log({phase:"exit",pid:process.pid}));
 `);
   writeFileSync(join(root, "custom.config.mjs"), `import {defineConfig} from "@playwright/test";import {appendFileSync} from "node:fs";
-import {selectedTests,serversForSelection} from ${JSON.stringify(PLAN_MODULE)};
+import {selectedTests,serversForSelection,ownedCommand} from ${JSON.stringify(PLAN_MODULE)};
 const selection=await selectedTests({root:${JSON.stringify(root)}});
 appendFileSync(${JSON.stringify(plans)},JSON.stringify({pid:process.pid,ppid:process.ppid,reused:selection.reused,list:selection.collectionOnly,ids:selection.receipt?.tests.map(t=>t.id),nonce:selection.receipt?.nonce,roleBindings:selection.receipt?.tests.map(t=>[t.id,t.roles]),context:process.env.PW_HOST_INVOCATION})+"\\n");
-export default defineConfig({testDir:"./e2e",forbidOnly:true,outputDir:"./custom-results",projects:[{name:"chromium"},{name:"firefox"},{name:"webkit"}],use:{baseURL:"http://127.0.0.1:${P}"},webServer:serversForSelection(selection,{root:${JSON.stringify(root)},port:${P}}).map(server=>({...server,command:"node host.mjs",env:{...server.env,PW_PROBE_LOG:${JSON.stringify(hosts)}},gracefulShutdown:{signal:"SIGTERM",timeout:1000}}))});
+export default defineConfig({testDir:"./e2e",forbidOnly:true,outputDir:"./custom-results",projects:[{name:"chromium"},{name:"firefox"},{name:"webkit"}],use:{baseURL:"http://127.0.0.1:${P}"},webServer:serversForSelection(selection,{root:${JSON.stringify(root)},port:${P}}).map(server=>({...server,command:${owned ? 'ownedCommand(["node","host.mjs"])' : '"node host.mjs"'},env:{...server.env,PW_PROBE_LOG:${JSON.stringify(hosts)}}${owned ? "" : ',gracefulShutdown:{signal:"SIGTERM",timeout:1000}'}}))});
 `);
-  writeFileSync(join(root, "e2e/signals.spec.mjs"), `import {test,expect} from "@playwright/test";import {appendFileSync} from "node:fs";
+  const marker = join(root, "running");
+  writeFileSync(join(root, "e2e/signals.spec.mjs"), owned
+    ? `import {test} from "@playwright/test";import {writeFileSync} from "node:fs";
+test.setTimeout(0);
+test("hangs while its host is up",async()=>{writeFileSync(${JSON.stringify(marker)},"running");await new Promise(()=>{});});
+`
+    : `import {test,expect} from "@playwright/test";import {appendFileSync} from "node:fs";
 test("plain alpha",async({request},info)=>{expect((await request.get("/")).status()).toBe(200);appendFileSync(${JSON.stringify(bodies)},JSON.stringify({id:info.testId,pid:process.pid})+"\\n");});
 test("value --ui stays opaque",async({request},info)=>{expect((await request.get("/")).status()).toBe(200);appendFileSync(${JSON.stringify(bodies)},JSON.stringify({id:info.testId,pid:process.pid})+"\\n");});
 `);
-  return { root, plans, hosts, bodies, runs: 0 };
+  return { root, plans, hosts, bodies, marker, runs: 0 };
 }
 
 async function native(fixture, args, extraEnv = {}, onSpawn = () => {}) {
@@ -505,4 +515,55 @@ test("the suite's own configuration lists a selection through its plan, and star
   assert.ok(listed.length > 0, one.stdout);
   assert.match(one.stdout, new RegExp(`Total: ${listed.length} tests? in 1 file`));
   assert.doesNotMatch(one.stdout + one.stderr, /browser host map:|webServer/);
+});
+
+const connects = (port) => new Promise((accept) => {
+  const socket = net.connect(port, "127.0.0.1");
+  socket.once("connect", () => { socket.destroy(); accept(true); });
+  socket.once("error", () => accept(false));
+});
+// Until `check` holds: the event itself, with a cap on a hang.
+async function until(check, what, cap = 30000) {
+  const deadline = Date.now() + cap;
+  while (!(await check())) {
+    if (Date.now() > deadline) assert.fail(`${what}: not within ${cap} ms`);
+    await new Promise((accept) => setTimeout(accept, 10));
+  }
+}
+
+// **A runner killed outright leaves none of its hosts listening.** A recipe's
+// bound kills a run's process group (`os.killpg(p.pid, SIGKILL)`), which
+// Playwright does not survive to stop its hosts, and each host is the leader
+// of a group of its own: 52 of them kept their ports after e14-refusal's
+// bound of 1,200 s, and every later run on those ports refused to start. The
+// host here is the real configuration's kind (`ownedCommand`) and the test
+// waits for its port to close, the event itself.
+test("native a runner killed outright leaves none of its hosts listening", async () => {
+  const fixture = nativeFixture(true);
+  const output = join(fixture.root, "owned.log");
+  const descriptor = openSync(output, "wx", 0o600);
+  const env = { ...process.env, PORT: String(P), KIOKUN_DATA: join(fixture.root, "private-data"), KIOKUN_APP: join(fixture.root, "private-app") };
+  delete env.PWTEST_WATCH;
+  // A group of its own, as the bound's kill takes one.
+  const runner = spawn(process.execPath, [CLI, "test", "--config", "custom.config.mjs", "signals.spec.mjs", "--project=chromium", "--workers=1", "--reporter=line"], { cwd: fixture.root, env, detached: true, stdio: ["ignore", descriptor, descriptor] });
+  let host;
+  try {
+    try {
+      // The test is running: Playwright started the host and waited for it.
+      await until(() => existsSync(fixture.marker), "the hanging test running");
+    } catch (error) {
+      error.message += `\n${readFileSync(output, "utf8")}`;
+      throw error;
+    }
+    host = records(fixture.hosts).find((record) => record.phase === "launch");
+    assert.ok(host, "the host launched");
+    assert.equal(await connects(host.port), true, "the host listens while its runner runs");
+    process.kill(-runner.pid, "SIGKILL");
+    await until(async () => !(await connects(host.port)), `the host's port ${host.port} closing after its runner was killed`);
+  } finally {
+    try { process.kill(-runner.pid, "SIGKILL"); } catch { /* gone */ }
+    if (host) { try { process.kill(host.pid, "SIGKILL"); } catch { /* gone */ } }
+    closeSync(descriptor);
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
 });

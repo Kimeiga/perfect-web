@@ -24,7 +24,11 @@ by any test or by an error:
    host's environment (in memory, no deployment's kiokun data, identity,
    blobs, its provider's port), the performance run's one host, an
    inherited receipt kept from an independent run, the reporter's
-   publication, and the configuration's `forbidOnly`.
+   publication, and the configuration's `forbidOnly`;
+5. the hosts' launcher (`serve-while-owned.sh`, `ownedCommand`): a host ends
+   with the process that started it, so that a runner killed at a recipe's
+   bound leaves none of them listening; each word of its command quoted, its
+   input kept open for the watcher, its status the host's.
 
 Each runs the Node suite that holds it: `host-plan.test.mjs` (`fast`, under
 a second) or `host-plan.native.test.mjs` (`native`, the real Playwright CLI
@@ -48,6 +52,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 SPIKE = ROOT / "spikes/own-renderer"
 METADATA = SPIKE / "host-metadata.mjs"
 PLAN = SPIKE / "host-plan.mjs"
+LAUNCHER = SPIKE / "serve-while-owned.sh"
 REPORTER = SPIKE / "host-plan-reporter.mjs"
 REGISTRY = SPIKE / "host-registry.json"
 CONFIG = SPIKE / "playwright.config.mjs"
@@ -90,6 +95,10 @@ RECEIPTS = Test("collection receipts require exact issuer selection config compl
 PUBLISHED = Test("public collection reporter publishes only one successful complete callback sequence")
 INHERITED = Test("native independent identical invocation cannot reuse an inherited valid receipt")
 OWN_CONFIG = Test("the suite's own configuration lists a selection through its plan, and starts no host")
+WORDS = Test("a host's command passes each word to its host as it is")
+LAUNCH_ENDS = Test("a host's launcher keeps its host while its input is open and ends it when the input ends")
+LAUNCH_STATUS = Test("a host's launcher ends with its host's status, whatever its input")
+KILLED_RUNNER = Test("native a runner killed outright leaves none of its hosts listening")
 
 # (what, suite, the test that must fail, file, anchor, replacement)
 MUTANTS = [
@@ -212,6 +221,24 @@ MUTANTS = [
      "if (!this.selection) return;"),
     ("the configuration allows a focused test", "native", OWN_CONFIG, CONFIG,
      "  forbidOnly: true,\n", "  forbidOnly: false,\n"),
+    # 5. A host ends with the process that started it (track flake-hunt,
+    # 2026-10-20): a runner killed at a recipe's bound left its hosts holding
+    # their ports.
+    ("a selection starts a host by its command alone, not by the launcher", "fast", DESCRIPTORS, PLAN,
+     "command: ownedCommand([join(target, executable), ...(dist ? [dist] : [])]),",
+     "command: [join(target, executable), ...(dist ? [dist] : [])].map(quote).join(\" \"),"),
+    ("a host's command is not run by the launcher, as before the track", "native", KILLED_RUNNER, PLAN,
+     'export const ownedCommand = (argv) => ["sh", quote(LAUNCHER), ...argv.map(quote)].join(" ");',
+     "export const ownedCommand = (argv) => argv.map(quote).join(\" \");"),
+    ("a word of a host's command is not quoted", "fast", WORDS, PLAN,
+     "const quote = (value) => `'${value.replaceAll(\"'\", \"'\\\\''\")}'`;",
+     "const quote = (value) => value;"),
+    ("the launcher does not end its host when its input ends", "fast", LAUNCH_ENDS, LAUNCHER,
+     '  kill -KILL "$host" 2>/dev/null\n', "  :\n"),
+    ("the launcher ends its host as it starts", "fast", LAUNCH_ENDS, LAUNCHER,
+     "while read -r _ <&3; do :; done", "while read -r _ </dev/null; do :; done"),
+    ("the launcher answers with another status than its host's", "fast", LAUNCH_STATUS, LAUNCHER,
+     'exit "$status"\n', "exit 0\n"),
 ]
 
 # How long one suite may run before it is a hang, killed with everything it

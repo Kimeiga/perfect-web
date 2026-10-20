@@ -43,7 +43,13 @@ test("any other recovery is recorded, not acted on", async ({ page }) => {
       recovery: { recovery: "retry-interaction" },
     });
   });
-  await page.waitForTimeout(300);
+  // The runtime's record of it, not a pause of 300 ms a loaded machine
+  // outlasted; and a turn of the page's event loop after it, for a reload,
+  // were one to be acted on, to have begun.
+  await page.waitForFunction(() =>
+    window.__pw?.log?.some((line) => /recovery: .*retry-interaction/.test(line)),
+  );
+  await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 0)));
   expect(await page.evaluate(() => window.__beforeRecovery)).toBe(true);
   expect(await page.evaluate(() => window.__pw.log.join("\n"))).toMatch(
     /recovery: .*retry-interaction/,
