@@ -14,16 +14,18 @@
 # (e2e-hosts/second-host.spec.mjs, through playwright.hosts.config.mjs, each
 # engine's hosts on a schema of their own at PORT and above); and the
 # mutation controls. Every claim needs a database: refused without
-# PW_FEED_DATABASE_URL and PW_STORE_DATABASE_URL, throwaway ones.
+# PW_FEED_DATABASE_URL, a throwaway one, which stands in for the store's
+# (PW_STORE_DATABASE_URL) where that is not set, as on CI's database shards.
 e14-second-host:
-    @if [ -z "${PW_FEED_DATABASE_URL:-}" ] || [ -z "${PW_STORE_DATABASE_URL:-}" ]; then \
-       echo "e14-second-host: refused, it needs PW_FEED_DATABASE_URL and PW_STORE_DATABASE_URL (throwaway PostgreSQL databases)"; \
+    @if [ -z "${PW_FEED_DATABASE_URL:-}" ]; then \
+       echo "e14-second-host: refused, it needs PW_FEED_DATABASE_URL (a throwaway PostgreSQL database)"; \
        exit 1; \
      fi
     @bash spikes/own-renderer/feed.sh > /dev/null
     @cargo build --quiet --locked -p pw-dev-server
     @mkdir -p docs/evidence/E14
-    @{ echo "ADR-XXXX - hosts share one database: each hears every commit from the outbox, and a session is the database's"; echo; \
+    @{ export PW_STORE_DATABASE_URL="${PW_STORE_DATABASE_URL:-$PW_FEED_DATABASE_URL}"; \
+       echo "ADR-XXXX - hosts share one database: each hears every commit from the outbox, and a session is the database's"; echo; \
        echo "produced by: just e14-second-host"; \
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
        echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
