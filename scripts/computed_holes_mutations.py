@@ -104,8 +104,10 @@ MUTANTS = [
     (
         "a computed value in a signal's block is said as a path",
         VALUES,
-        "                if own.iter().any(|v| v.starts_with('#')) {\n",
-        "                if false {\n",
+        # Re-anchored by track `device-store`: one the browser computes from
+        # the signals it holds is read there (decision 7).
+        "                    .any(|v| v.starts_with('#') && !computed.contains_key(v))\n",
+        "                    .any(|v| false && v.starts_with('#') && !computed.contains_key(v))\n",
     ),
     (
         "the lifted function's contract is a query's",
@@ -128,7 +130,8 @@ MUTANTS = [
     (
         "the lifted function is given nothing",
         LOWER,
-        "        &[(d.input.0.clone(), input)],\n",
+        # Re-anchored by track `device-store`: its inputs, one or several.
+        "        &inputs,\n",
         "        &[],\n",
     ),
     # "a value computed from a speculated one is built" is retired: since

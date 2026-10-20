@@ -26,7 +26,15 @@ MUTANTS = [
         PLAN,
         # Re-anchored by ADR-0229, which gives it the subjects the browser
         # computes.
-        "    rendered_again(&template.chunks, &signals, &browser, &Reach::Top)?;\n",
+        # And by track `device-store`, which gives it what the browser
+        # computes from the signals it holds.
+        "    rendered_again(\n"
+        "        &template.chunks,\n"
+        "        &signals,\n"
+        "        &browser,\n"
+        "        &computed_inputs,\n"
+        "        &Reach::Top,\n"
+        "    )?;\n",
         "",
     ),
     (
@@ -34,16 +42,16 @@ MUTANTS = [
         PLAN,
         "                    _ => Reach::Frame,\n"
         "                };\n"
-        "                rendered_again(body, signals, browser, &inner)?;\n",
+        "                rendered_again(body, signals, browser, computed, &inner)?;\n",
         "                    _ => Reach::Top,\n"
         "                };\n"
-        "                rendered_again(body, signals, browser, &inner)?;\n",
+        "                rendered_again(body, signals, browser, computed, &inner)?;\n",
     ),
     (
         "a block a signal decides may read anything",
         PLAN,
-        "                if let Some(other) = own.iter().find(|v| !signal(v) && !bound.contains(&root(v))) {\n",
-        "                if let Some(other) = own.iter().find(|v| !signal(v) && !bound.contains(&root(v)) && false) {\n",
+        "                    .find(|v| !signal(v) && !bound.contains(&root(v)) && !computed.contains_key(*v))\n",
+        "                    .find(|v| !signal(v) && !bound.contains(&root(v)) && !computed.contains_key(*v) && false)\n",
     ),
     (
         "a loop's name is not its block's",

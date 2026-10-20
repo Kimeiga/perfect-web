@@ -124,8 +124,10 @@ MUTANTS = [
         "compiler",
         PLAN,
         # Re-anchored by ADR-0229, whose computed subject's block owns too.
-        "                reads: block_reads(part, &signals),\n                attribute: String::new(),\n                owns: owned(entry.id.0),\n",
-        "                reads: block_reads(part, &signals),\n                attribute: String::new(),\n                owns: Vec::new(),\n",
+        # And by track `device-store`, whose block reads what a value computed
+        # inside it reads.
+        "                reads: block_reads(part, &signals, &computed_inputs),\n                attribute: String::new(),\n                owns: owned(entry.id.0),\n",
+        "                reads: block_reads(part, &signals, &computed_inputs),\n                attribute: String::new(),\n                owns: Vec::new(),\n",
     ),
     (
         "the plan holds the page's own signals alone",

@@ -70,14 +70,12 @@ MUTANTS = [
     ),
     (
         "the store's page says no language",
-        SERVER,
-        # Re-anchored by ADR-0183.
-        r"""        "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
-         <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
-         <title>{title}</title>""",
-        r"""        "<!doctype html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n\
-         <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
-         <title>{title}</title>""",
+        # Re-anchored by ADR-0183, and by track `device-store`: a document's
+        # root's attributes are `device::root`'s, the store's page's `lang`
+        # among them.
+        SERVER.parent / "device.rs",
+        r"""        false => " lang=\"en\"",""",
+        r"""        false => "",""",
     ),
     (
         "a part's text is written again when it holds it already",

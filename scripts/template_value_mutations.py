@@ -71,8 +71,12 @@ MUTANTS = [
     (
         "a computed list is read as a path",
         IR,
-        "        let Some(collection) = value_path(body, each.list) else {\n",
-        "        let Some(collection) = value_path(body, each.list).or(Some(each.written.list.clone())) else {\n",
+        # Re-anchored by track `device-store`, which lifts a list computed
+        # from the signals it holds and refuses every other.
+        "        let computed = value_path(body, each.list).is_none();\n"
+        "        let collection = value_path(body, each.list).unwrap_or_default();\n",
+        "        let computed = false;\n"
+        "        let collection = value_path(body, each.list).unwrap_or(each.written.list.clone());\n",
     ),
     (
         "a key read from another name keys on the element",

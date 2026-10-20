@@ -204,8 +204,10 @@ MUTANTS = [
         "a build gap shows no build output",
         "guide",
         TOUR_PAGES,
-        "```text pw-build\npw: refused: `shop.sum.Sum`'s values: part 0 computes a value from `a` and `b`, "
-        "and a host computes one from one value (ruling 0073-a)\npw: 1 refusal(s); nothing written\n```\n\n",
+        # Re-anchored by track `device-store`, which closed the gap this
+        # anchored (a value from two signals): the title's, still open.
+        "```text pw-build\npw: refused: `shop.titled.Counter`'s values: part 1 is a title part the signal "
+        "`count` decides, which the browser does not render again (ADR-0137)\npw: 1 refusal(s); nothing written\n```\n\n",
         "",
     ),
     # --- the guide rots: the reference of codes --------------------------
