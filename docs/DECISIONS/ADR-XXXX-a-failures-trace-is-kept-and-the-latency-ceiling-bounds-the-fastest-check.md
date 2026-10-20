@@ -190,17 +190,126 @@ Measured with `scripts/ci_plan.py` on this track's first two commits
   or once among real readings, is refused by the control; the slow path is
   judged at the fastest of both. 13 mutation controls on them
   (`ci_diagnostics_mutations.py`), killed; and `evidence_integrity_mutations.py`'s
-  two on the measurement itself (the checker run ten times over; the
-  thread's clock reading nothing) still killed by the real tests.
-  **The proof, at load** (the numbers below).
+  two on the measurement itself still killed by the real tests, run whole
+  (42 of 42): the checker run ten times over fails 1 of its 11 tests (the
+  cold test), the thread's clock reading nothing 2 of 11.
+  **The proof, at load.** The first test as committed, and the old
+  one (`8c5618c8`'s, the median of seven) beside it, alternately, as test
+  binaries built from a scratch copy of the tree (`/tmp/cid-proof`), the
+  checker as it is, made two and three times over (the complete-validation
+  checker costs 2.0 to 2.9 times as much), and ten times over (the
+  control). On the PC (32 threads) beside the other workers' builds and
+  tests and a looping `cargo build --workspace`; the one-minute load average
+  at the start of each run in the table. ms are of CPU time a thousand
+  lines; the ceiling is 800.
+
+  | checker | test | runs passed | median of seven | fastest of seven or more | load |
+  |---|---|---|---|---|---|
+  | as is | old | 10 of 10 | 333 to 562 | | 49 to 92 |
+  | as is | **new** | **10 of 10** | 323 to 644 | 240 to 461 | 57 to 116 |
+  | 2 times over | old | 3 of 5 | 678 to 976 | | 45 to 76 |
+  | 2 times over | **new** | **5 of 5** | 559 to 781 | 476 to 651 | 47 to 71 |
+  | 3 times over | old | 0 of 4 | 931 to 1,329 | | 47 to 52 |
+  | 3 times over | **new** | **4 of 4** | 730 to 1,181 | 642 to 702 | 43 to 56 |
+  | 10 times over | **new** | **0 of 10 pass** | 2,742 to 3,610 | 2,389 to 3,442 | 66 |
+
+  So: **the new test is green in 10 of 10 runs at load, and the slowed
+  control fails in 10 of 10** (three to four times the ceiling at its
+  fastest, so no number of checks lets it through). The old statistic
+  failed the checker two times over in 2 of 5 runs and three times over in
+  4 of 4, which the fastest of seven or more passes; one run of the latter
+  took 12 checks, waiting for a quieter moment (its first seven's median
+  was 1,181). At loads of 77 to 89, an earlier build of the same test (90 s
+  window), the checker three times over failed both (the fastest 985, the
+  median 1,209 and 1,329): see the next bullet.
 - **Not claimed.** That the ceiling is proof against any load: a machine
   loaded through the whole of a measurement (four minutes) with every check
-  stretched past the ceiling still fails it, and a sustained 2 times over
-  an expensive checker is the ceiling's margin to carry (train-10's
-  checker: 800 against 143 to 330 on the PC, 321 on ARM; the
-  complete-validation checker is 2.0 to 2.9 times that, which is the
-  integrator's to rule on: ARM would measure 640 to 930). That CPU time is
+  stretched past the ceiling still fails it. Beside a load of 77 to 120 the
+  PC's CPU time for the same check is up to 3 times its quiet time (the
+  hybrid cores, SMT and the host, which a guest cannot see: WSL2 reports 16
+  cores of two threads), and the checker three times over fails there
+  whatever the statistic. That is the ceiling's margin to carry
+  (train-10's checker: 800 against 143 to 330 on the PC, 321 on ARM; the
+  complete-validation checker is 2.0 to 2.9 times that: ARM would measure
+  640 to 930 against the 800, which is the integrator's to rule on, and
+  no measurement here changes). A calibration loop would hold the verdict
+  at any load, and needs a constant per machine class that only the ARM
+  runner can give. That CPU time is
   the work. That `e9-latency`'s wording ("median of 7 runs") changed: it
   prints the medians still, and the fastest beside them. The real
   measurement's assertion lines are tested through `fast_enough` and
   `happened`, not mutated in place.
+
+## End to end, with a real Playwright
+
+`scripts/run_suite.sh --runs 3` on a toy spec that fails its first and
+third runs and passes its second (Playwright 1.58.0, Chromium, `trace:
+"retain-on-failure"`): run 1's `trace.zip` (5.8 KiB) was in
+`kept-traces/e10-browser/<time>-<pid>/run-1/` after run 2 had cleared
+`test-results/` and run 3 had left its own there; run 3's was kept as well;
+the helper's lines named both before their exits. (A toy tree under `/tmp`:
+the repository's own suite needs its builds, and is the verify run's.)
+
+## Alternatives
+
+- **A `test-results/` of its own for each run** (`outputDir` in
+  `playwright.config.mjs`, by a timestamp): keeps every run's failures, a
+  mutation control's among them (the swamp), and bounds nothing.
+- **Upload after every recipe**: an artifact per recipe, hundreds a run,
+  against the artifact store's quota, to keep what a few recipes fail.
+- **The helper alone, not the red baseline**: a baseline that came out red
+  loses its trace to the shard's later runs as `e10-browser`'s second run
+  did; 59 scripts run Playwright, all through `explain()`.
+- **Keeping a mutant's failing run too, under a label**: hundreds of traces
+  a shard that the kill already explains.
+- **A hardware instruction count, a calibration loop, pinning to a core,
+  skipping under load, a higher ceiling**: section 2.
+
+## Next
+
+- Merge with train-11 (the integrator's); `check_latency.rs` differs from
+  `track/check-is-build-train11`'s by one line, `check_program_sources`:
+  take both.
+- Rule on the ceiling for the complete-validation checker (800 ms a thousand
+  lines; ARM would measure 640 to 930), or on a calibration loop with
+  per-architecture constants, once `check-is-build` lands.
+- A push of this branch plans 177 recipes in 39 shards (92 against
+  train-10's head): cancel it and dispatch `e14-ci-diagnostics
+  e14-evidence-integrity e14-evidence-integrity-2 e14-derived-outside
+  e10-browser`, or merge first.
+
+## Questions for the integrator
+
+1. The base: this track is on train-10's head, not on `master`
+   `32757966` (the first correction). Is that what you want, or should its
+   commits wait for train-10 to land, or move onto train-11's tip?
+2. Is a mutant's browser run never kept right (section 1), or should a
+   failing mutant run in a recipe whose baseline passed (a mutant killed for
+   the wrong reason) be kept under a label, within the same 32 MiB?
+3. Should `e9-latency`'s wording ("Median of 7 runs") say that the ceiling
+   bounds the fastest of them? (Its evidence is the Mac's, `LOCAL_ONLY`;
+   unchanged here.)
+
+## Acceptance
+
+- **Tests.** `scripts/tests/test_keep_traces.py` (11), `test_run_suite.py`
+  (16, 8 new), `test_mutation_baseline.py` (26, 8 new), `check_latency.rs`
+  (11, 9 new, none timed); `just evidence-gates` passes whole.
+- **Every mutation script the change reaches, run whole** (the tree at
+  `e438f689`; the last two in clones of it, so as not to wait for the first
+  three): `ci_diagnostics_mutations.py` 38 of 38 (25 + 13),
+  `derived_outside_mutations.py` 10 of 10, `mutation_bound_mutations.py`
+  16 of 16, `evidence_integrity_2_mutations.py` 35 of 35 (`run_suite.sh`'s
+  anchors and `test_run_suite.py`), `evidence_integrity_mutations.py` 42 of
+  42 (`mutation_baseline.py`'s and `check_latency.rs`'s). The memory bound
+  stopped nothing; `mutation_anchors.py` finds 3,317 mutants in 274 scripts,
+  each matching once, after each.
+- **`just e14-ci-diagnostics`** records them (`docs/evidence/E14/ci-diagnostics.txt`,
+  at `e438f689`); its evidence of record is the next train's run.
+- **`just ci`** on `24c11117` (the code of `e438f689` and its recorded
+  evidence), 00:46 to 02:08Z on the PC at loads of 40 to 90: `ci: OK`;
+  evidence-gates 292 tests (2 skipped), case-check 2,876 paths, anchors
+  3,317 mutants in 274 scripts, 346 test binaries with 3,074 tests passed,
+  none failed, 25 ignored (train-10's 3,065 and this track's 9), mutant
+  programs 301 judged in 12. Its own `check_latency` ran at a load of 55 to
+  62: the fastest of seven 229.5 ms a thousand lines, the median 245.4.
