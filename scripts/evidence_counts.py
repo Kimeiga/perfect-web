@@ -43,9 +43,12 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 COUNT = re.compile(r"^(\d+) of (\d+) mutants killed")
 # What a script says of each mutant (`mutation_anchors.py`'s shapes, and the
-# verdicts the scripts print).
+# verdicts the scripts print). A kill may say what killed it, as the guide's
+# script says (`KILLED by the checker (PW5048)`, ADR-0343): until train-10's
+# landing such a verdict was read as none, and the guide's evidence, once
+# current, named none of its 74 mutants.
 VERDICT = re.compile(
-    r"^(.*): (KILLED \(.*\)|SURVIVED|DID NOT BUILD.*|ANCHOR NOT FOUND EXACTLY ONCE in .+)$"
+    r"^(.*): (KILLED(?: by [^()]+)? \(.*\)|SURVIVED|DID NOT BUILD.*|ANCHOR NOT FOUND EXACTLY ONCE in .+)$"
 )
 # A suite's tag beside a mutant's description: `[core]`, `[server]`.
 TAG = re.compile(r"\[[\w./ -]*\]")
