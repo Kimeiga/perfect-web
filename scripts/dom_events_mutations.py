@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mutation controls for track `todomvc`'s two events (ADR-XXXX): a double
+"""Mutation controls for track `todomvc`'s two events (ADR-0367): a double
 press (`on:dblclick`) and a control's losing focus (`on:blur`), which the
 platform declares and the runtime listens for.
 

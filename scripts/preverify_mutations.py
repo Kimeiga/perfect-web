@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mutation controls for ADR-XXXX: a train is pre-verified here, before it is
+"""Mutation controls for ADR-0364: a train is pre-verified here, before it is
 pushed (`scripts/preverify.py`, `just preverify`).
 
 Each mutant undoes one thing the tool does: the plan it asks for (a track's

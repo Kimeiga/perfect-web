@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mutation controls for track `todomvc`'s fragment binding (ADR-XXXX): a page
+"""Mutation controls for track `todomvc`'s fragment binding (ADR-0367): a page
 binds a signal to its address's fragment.
 
 Each mutant undoes one piece:

@@ -279,7 +279,7 @@ fn an_element_s_handlers_are_lowered_last_and_together() {
 }
 
 /// **A double press and a control's losing focus are events the platform
-/// declares** (track `todomvc`, ADR-XXXX): a double press is read as a press
+/// declares** (track `todomvc`, ADR-0367): a double press is read as a press
 /// is, where the pointer was, and a blur as an input is, the value the
 /// control held. Each with its control: the other event's record is refused.
 #[test]

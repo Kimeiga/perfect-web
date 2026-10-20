@@ -1,5 +1,5 @@
 //! **A page's fragment binding reaches its document** (track `todomvc`,
-//! ADR-XXXX): `fragment tab "/" => "overview", ..` binds a signal to the
+//! ADR-0367): `fragment tab "/" => "overview", ..` binds a signal to the
 //! address's fragment, and the document of a page that states it says which
 //! signal and each form the fragment takes, for the browser to keep the two
 //! in step. A host renders the signal's first value: a request carries no

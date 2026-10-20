@@ -1,4 +1,4 @@
-ADR-XXXX - hosts share one database: each hears every commit from the outbox, and a session is the database's
+ADR-0369 - hosts share one database: each hears every commit from the outbox, and a session is the database's
 
 produced by: just e14-second-host
 commit: e5a64c97f58252896e4cdbb9483041d085d4714b

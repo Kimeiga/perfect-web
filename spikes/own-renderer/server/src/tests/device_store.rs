@@ -1,5 +1,5 @@
 //! **A page that holds a value the device keeps, served** (track
-//! `device-store`, ADR-XXXX): what the host serves for one beyond what
+//! `device-store`, ADR-0366): what the host serves for one beyond what
 //! TodoMVC's document shows (`tests::todomvc::`). Here, the steps that take
 //! a stored value's earlier version to the page's, which the browser runs
 //! before it shows the value, served where the page computes nothing else.

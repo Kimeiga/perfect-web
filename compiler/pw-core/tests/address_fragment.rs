@@ -1,5 +1,5 @@
 //! **A page binds a signal to its address's fragment** (track `todomvc`,
-//! ADR-XXXX; the integrator's ruling of 2026-10-14).
+//! ADR-0367; the integrator's ruling of 2026-10-14).
 //!
 //! `fragment filter "/" => "all", "/active" => "active"` names a signal of
 //! the page and each form the fragment takes with the value the signal takes

@@ -444,7 +444,7 @@ const PAGE_NOT_HELD: (&str, &str) = (
 );
 
 /// TRACK SEAM (second-host): **a command from a page another host served**
-/// (ADR-XXXX, the integrator's ruling 1 of 2026-10-20): its number is in
+/// (ADR-0369, the integrator's ruling 1 of 2026-10-20): its number is in
 /// another host's instance. A press that committed there is answered from
 /// its record first ([`Server::kept_answer`]); any other is refused, as the
 /// page's, never as one out of date: a deployment routes a page's requests
@@ -904,7 +904,7 @@ mod messages;
 // TRACK SEAM (kiokun): kiokun's dictionary, read (docs/PARALLEL.md, W6).
 mod kiokun;
 // TRACK SEAM (device-store): a document of a page that holds values the
-// device keeps (ADR-XXXX).
+// device keeps (ADR-0366).
 mod device;
 // ADR-0304: the platform's clock, and what a value read by it holds until.
 mod clock;
@@ -934,7 +934,7 @@ mod scheduled_orders;
 // TRACK SEAM (render-merge): one render's identical calls made once, in one
 // snapshot (NEXT 4c).
 mod render_merge;
-// Track `second-host` (ADR-XXXX): hosts on one database hear each other's
+// Track `second-host` (ADR-0369): hosts on one database hear each other's
 // commits.
 mod hosts;
 
@@ -1064,7 +1064,7 @@ struct Server {
     /// [`Server::first_page`], so a document's cursor is never zero.
     documents: std::sync::atomic::AtomicU64,
     /// TRACK SEAM (second-host): **this host's first page number**
-    /// (ADR-XXXX, the integrator's ruling 1 of 2026-10-20): its instance on
+    /// (ADR-0369, the integrator's ruling 1 of 2026-10-20): its instance on
     /// the database it shares in the high bits, so no two hosts number a
     /// page alike, and a page another host served is told apart from one
     /// this host no longer holds. One, its data in its memory.
@@ -1885,7 +1885,7 @@ impl Server {
         let identity = identity::Identity::default();
         data.identified_by(identity.principals());
         // TRACK SEAM (second-host): its sessions kept where the hosts share
-        // them, where the layer's database is shared (ADR-XXXX).
+        // them, where the layer's database is shared (ADR-0369).
         if let Some(kept) = data.sessions() {
             identity.principals().keep_in(kept);
         }
@@ -1902,7 +1902,7 @@ impl Server {
             });
         // TRACK SEAM (device-store): a page that holds a value the device
         // keeps hides what it decides until it is read, by a style its
-        // policy allows by its hash (ADR-XXXX).
+        // policy allows by its hash (ADR-0366).
         let mut needs = csp::Needs::of(&templates);
         if std::iter::once(&plan)
             .chain(plans.values())
@@ -3344,7 +3344,7 @@ impl Server {
             .is_some_and(|queue| queue.iter().any(|(k, first)| *k == key && *first == sent));
         if !first_sent {
             // TRACK SEAM (second-host): **or what the deployment kept**
-            // (ADR-0325, ADR-XXXX): a press this host never ran, made on a
+            // (ADR-0325, ADR-0369): a press this host never ran, made on a
             // page another host served (or this one, before it restarted),
             // which committed there, is answered from the record its commit
             // wrote with its writes, as this host's memory answers its own;
@@ -3484,7 +3484,7 @@ impl Server {
         }
     }
 
-    /// **Every other host's commits, heard and told** (ADR-XXXX, track
+    /// **Every other host's commits, heard and told** (ADR-0369, track
     /// `second-host`), for as long as the host runs: woken by a commit's
     /// notification, and each [`hosts::WAIT_MS`] without one. A layer in
     /// memory is one host by definition, and has nothing to hear.
@@ -3550,7 +3550,7 @@ impl Server {
 
     /// TRACK SEAM (second-host): **its pages numbered from `first_page`**,
     /// another host's, as a test that compares two hosts' pages to the byte
-    /// has them: a page's number is its host's (ADR-XXXX), not its data's.
+    /// has them: a page's number is its host's (ADR-0369), not its data's.
     /// Before it serves any.
     #[cfg(test)]
     fn numbered_from(&mut self, first_page: u64) {
@@ -6259,7 +6259,7 @@ impl Server {
             };
             let part = live["part"].as_u64().unwrap_or_default() as u32;
             // A text part, an attribute, or a block's subject (ADR-0229); or
-            // a list the browser computes (track `device-store`, ADR-XXXX).
+            // a list the browser computes (track `device-store`, ADR-0366).
             let path = match find_part(&template.chunks, part) {
                 Some(
                     pw_render::ir::Part::Text { value, .. }
@@ -8287,7 +8287,7 @@ fn main() {
         std::process::exit(1);
     });
     // TRACK SEAM (second-host): the schema a test run's hosts keep the
-    // feed's tables in (`PW_FEED_SCHEMA`, ADR-XXXX): a test's setting, not a
+    // feed's tables in (`PW_FEED_SCHEMA`, ADR-0369): a test's setting, not a
     // deployment's (the integrator's ruling 4 of 2026-10-20), honored only
     // for a development deployment on this machine and refused at start for
     // any other; the connection's own search path otherwise, as before.
@@ -8353,7 +8353,7 @@ fn main() {
             eprintln!("pw dev server: {e}");
             std::process::exit(1);
         });
-    // TRACK SEAM (second-host): **how long a session lives** (ADR-XXXX, the
+    // TRACK SEAM (second-host): **how long a session lives** (ADR-0369, the
     // integrator's ruling 2 of 2026-10-20), the deployment's to say
     // (`PW_SESSION_IDLE`, `PW_SESSION_LIFETIME`, in seconds; fourteen days
     // and sixty where it says nothing), refused at start where it cannot be
@@ -8424,7 +8424,7 @@ fn main() {
         let server = server.clone();
         std::thread::spawn(move || server.run_when_due());
     }
-    // **Every other host's commits, told to this host's pages** (ADR-XXXX,
+    // **Every other host's commits, told to this host's pages** (ADR-0369,
     // track `second-host`), where its data layer's database is shared.
     match server.data.tail() {
         Some(tail) => {
@@ -8476,7 +8476,7 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
     }
     let (session, fresh) = session_of(&headers);
     // TRACK SEAM (second-host): the session as the hosts keep it, read once
-    // for the request (ADR-XXXX): signed in or out on another host, it is so
+    // for the request (ADR-0369): signed in or out on another host, it is so
     // here too.
     if !fresh {
         server.identity.principals().refresh(&session);
@@ -10502,7 +10502,7 @@ fn signal_manifest(
 }
 
 /// **The signal a page binds to its address's fragment** (track `todomvc`,
-/// ADR-XXXX), as its plan states it: the signal and each form the fragment
+/// ADR-0367), as its plan states it: the signal and each form the fragment
 /// takes with the value the signal takes then, carried in the document's
 /// manifest. The browser keeps the signal in step with `location.hash`; this
 /// host renders the signal's first value, since a request carries no
@@ -10603,7 +10603,7 @@ fn signal_document(
     // Where a failed press is said (ADR-0302), from the first byte.
     let announcer = pw_render::ANNOUNCER;
     // TRACK SEAM (device-store): its root reading the device, and the style
-    // that hides what the device decides until it has (ADR-XXXX).
+    // that hides what the device decides until it has (ADR-0366).
     let (root, device) = (device::root(plan), device::head(plan));
     format!(
         "<!doctype html>\n<html{root}>\n<head>\n<meta charset=\"utf-8\">\n\
@@ -10857,7 +10857,7 @@ fn document(
     // Where a failed press is said (ADR-0302), from the first byte.
     let announcer = pw_render::ANNOUNCER;
     // TRACK SEAM (device-store): its root reading the device, and the style
-    // that hides what the device decides until it has (ADR-XXXX).
+    // that hides what the device decides until it has (ADR-0366).
     let (root, device) = (device::root(plan), device::head(plan));
     format!(
         "<!doctype html>\n<html{root}>\n<head>\n<meta charset=\"utf-8\">\n\
@@ -14775,7 +14775,7 @@ public query Store(",
     mod todomvc;
 
     // TRACK SEAM (device-store): a page that holds a value the device keeps,
-    // served (ADR-XXXX).
+    // served (ADR-0366).
     mod device_store;
 
     // TRACK SEAM (store-search): the store's search page, served (W9).
@@ -14807,7 +14807,7 @@ public query Store(",
     // TRACK SEAM (scheduled-orders): an order placed for a time its reader
     // chooses, and sent to its stores when it is due.
     mod scheduled_orders;
-    // Track `second-host` (ADR-XXXX): hosts sharing one database.
+    // Track `second-host` (ADR-0369): hosts sharing one database.
     mod second_host;
 
     /// **A second program is served by the same host** (ADR-0218): the

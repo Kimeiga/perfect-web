@@ -665,7 +665,7 @@ fn a_commands_commit_is_counted_with_it() {
 // (2026-10-17). No other count moved: `hours#for-stores` and
 // `ratings#for-stores`, called three times after `rate_order`, are called
 // with other stores each time.
-// Track `second-host` (ADR-XXXX): and, where a commit hands the outbox
+// Track `second-host` (ADR-0369): and, where a commit hands the outbox
 // anything, the outbox's lock and its notify, one statement before its
 // rows take their ids (`hosts::ordered`), so every host reads them in
 // commit order: each command here one more than before, each page the
@@ -979,7 +979,7 @@ fn placing_and_settling_where_payments_are_taken_is_bounded() {
 // sweep (2), `settle_payment` and `cancel_order` cancel it (1).
 // Track `scheduled-orders`: `place_order` reads the time chosen (1 more),
 // and `settle_payment` the order's time where it settles one paid (1 more).
-// Track `second-host` (ADR-XXXX): and each commit's lock and notify on the
+// Track `second-host` (ADR-0369): and each commit's lock and notify on the
 // outbox (1), as [`PAGES`]' commands.
 const AWAITING: &[(&str, u64)] = &[
     ("place_order, taking payments: its transaction", 39),
@@ -1104,7 +1104,7 @@ fn a_pending_real_payment_webhook_is_not_a_complete_statement_count() {
                 "counting returned before the provider released its event"
             );
             // Each with its commit's lock and notify on the outbox (track
-            // `second-host`, ADR-XXXX), as `AWAITING`'s.
+            // `second-host`, ADR-0369), as `AWAITING`'s.
             assert_eq!(finished, [26, 15], "the exact completed transactions");
         });
     });
@@ -1272,7 +1272,7 @@ fn sweep_cleanup_and_payment_commit_share_the_same_write_guard() {
                 "the payment's actual command completed successfully"
             );
             // Each with its commit's lock and notify on the outbox (track
-            // `second-host`, ADR-XXXX), as `AWAITING`'s.
+            // `second-host`, ADR-0369), as `AWAITING`'s.
             assert_eq!(
                 finished,
                 [27, 15],

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mutation controls for track `device-store` (ADR-XXXX): a value the
+"""Mutation controls for track `device-store` (ADR-0366): a value the
 reader's device keeps, and what the browser computes for one.
 
 Each mutant undoes one piece:

@@ -1,4 +1,4 @@
-//! **Hosts sharing one database** (ADR-XXXX, track `second-host`).
+//! **Hosts sharing one database** (ADR-0369, track `second-host`).
 //!
 //! Each host on a PostgreSQL layer tells its own pages of every commit,
 //! whichever host made it:
@@ -83,7 +83,7 @@ impl Outbox {
     }
 }
 
-/// **The outbox's rows, in commit order** (ADR-XXXX): the lock taken in the
+/// **The outbox's rows, in commit order** (ADR-0369): the lock taken in the
 /// command's transaction, held to its end, before its rows take their ids;
 /// and every host listening woken at the commit, and not before. One
 /// statement, run only by a commit that hands the outbox anything.
@@ -118,7 +118,7 @@ type OutboxRow = (i64, String, String, String);
 /// it, and its rows so far.
 type Gathered = (String, i64, Vec<OutboxRow>);
 
-/// **A host's reader of the outbox** (ADR-XXXX): its cursor, the last id it
+/// **A host's reader of the outbox** (ADR-0369): its cursor, the last id it
 /// has delivered or passed by, and a connection of its own that listens on
 /// the schema's channel and reads the rows after the cursor.
 pub(crate) struct Tail {
@@ -439,7 +439,7 @@ impl Tail {
     }
 }
 
-/// **Sessions and sign-ins kept in a layer's schema** (ADR-XXXX):
+/// **Sessions and sign-ins kept in a layer's schema** (ADR-0369):
 /// `sessions` and `sign_ins`, each by its secret's SHA-256
 /// ([`crate::identity::kept_hash`]), on connections of their own, so that a
 /// request's read of its session waits on no command; no more than
@@ -459,7 +459,7 @@ pub(crate) struct SessionsPg {
 }
 
 /// **How many connections a layer's sessions are read and written on at
-/// once** (ADR-XXXX; the bound the render merge's ruling holds every pool
+/// once** (ADR-0369; the bound the render merge's ruling holds every pool
 /// to: stated, and deadlock-free by structure): a request past it waits for
 /// one to be given back. Each is taken for one statement, by a thread that
 /// holds nothing else of the host's (a request's read of its session comes

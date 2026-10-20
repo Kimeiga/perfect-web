@@ -6,7 +6,7 @@
 # is planned by the verification run like any other (scripts/ci_plan.py reads
 # this file too).
 
-# Track `todomvc` (ADR-XXXX): a page binds a signal to its address's
+# Track `todomvc` (ADR-0367): a page binds a signal to its address's
 # fragment, which no server sees (`fragment filter "/" => "all", ..`), and the
 # runtime keeps the two in step. The compiler's checks (tests/address_fragment.rs,
 # PW6101 to PW6106, and the clause's own tests among the policy table's), the
@@ -17,7 +17,7 @@ e14-address-fragment:
     @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
     @cargo build --quiet --locked -p pw-dev-server -p kiokun-server
     @mkdir -p docs/evidence/E14
-    @{ echo "ADR-XXXX - a page binds a signal to its address's fragment"; echo; \
+    @{ echo "ADR-0367 - a page binds a signal to its address's fragment"; echo; \
        echo "produced by: just e14-address-fragment"; \
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
        echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
@@ -34,7 +34,7 @@ e14-address-fragment:
      } > docs/evidence/E14/address-fragment.txt
     @grep -E "^test result|passed|mutants killed|^---- |panicked at" docs/evidence/E14/address-fragment.txt
 
-# Track `todomvc` (ADR-XXXX): the platform declares a double press
+# Track `todomvc` (ADR-0367): the platform declares a double press
 # (`on:dblclick`) and a control's losing focus (`on:blur`), which the runtime
 # listens for and gives its handler the record it reads in the listener: where
 # the pointer was, and the value the control held. The compiler's tests
@@ -45,7 +45,7 @@ e14-dom-events:
     @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
     @cargo build --quiet --locked -p pw-dev-server -p kiokun-server
     @mkdir -p docs/evidence/E14
-    @{ echo "ADR-XXXX - a double press and a control's losing focus are events the platform declares"; echo; \
+    @{ echo "ADR-0367 - a double press and a control's losing focus are events the platform declares"; echo; \
        echo "produced by: just e14-dom-events"; \
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
        echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
@@ -59,7 +59,7 @@ e14-dom-events:
      } > docs/evidence/E14/dom-events.txt
     @grep -E "^test result|passed|mutants killed|^---- |panicked at" docs/evidence/E14/dom-events.txt
 
-# Track `todomvc` (ADR-XXXX): an element a block shows with `autofocus`, after
+# Track `todomvc` (ADR-0367): an element a block shows with `autofocus`, after
 # the page has loaded, takes focus as it appears, as TodoMVC's edit field
 # does (HTML runs `autofocus` once, when a page loads). The browser in three
 # engines (e2e/focus.spec.mjs over examples/demo/focus.pw) and the mutation
@@ -69,7 +69,7 @@ e14-autofocus:
     @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
     @cargo build --quiet --locked -p pw-dev-server -p kiokun-server
     @mkdir -p docs/evidence/E14
-    @{ echo "ADR-XXXX - an element a block shows with autofocus takes focus as it appears"; echo; \
+    @{ echo "ADR-0367 - an element a block shows with autofocus takes focus as it appears"; echo; \
        echo "produced by: just e14-autofocus"; \
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
        echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
@@ -81,10 +81,10 @@ e14-autofocus:
      } > docs/evidence/E14/autofocus.txt
     @grep -E "^test result|passed|mutants killed|^---- |panicked at" docs/evidence/E14/autofocus.txt
 
-# Track `todomvc` (ADR-XXXX): TodoMVC in Pleris, held to TodoMVC's own spec
+# Track `todomvc` (ADR-0367): TodoMVC in Pleris, held to TodoMVC's own spec
 # (`app-spec.md`): every behaviour it states, each with its test. The program
 # (examples/todomvc) and its document's tests on the host (tests::todomvc::;
-# its todos are the reader's device's since track `device-store`, ADR-XXXX),
+# its todos are the reader's device's since track `device-store`, ADR-0366),
 # the browser in three engines over the program built by
 # spikes/own-renderer/todomvc.sh and served on a host per engine
 # (e2e/todomvc.spec.mjs), and the mutation controls
@@ -106,7 +106,7 @@ e14-todomvc:
     @cargo build --quiet --locked -p pw-dev-server -p kiokun-server
     @cd spikes/todomvc-cypress && pnpm exec cypress install > /dev/null
     @mkdir -p docs/evidence/E14
-    @{ echo "ADR-XXXX - TodoMVC in Pleris, held to its own spec and its own tests"; echo; \
+    @{ echo "ADR-0367 - TodoMVC in Pleris, held to its own spec and its own tests"; echo; \
        echo "produced by: just e14-todomvc"; \
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
        echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \

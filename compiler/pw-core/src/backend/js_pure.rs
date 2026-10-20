@@ -235,7 +235,7 @@ pub(crate) fn isolated(function: &Function, program: &Program) -> Result<String,
 }
 
 /// **A step from one version of a value the device keeps to the next**
-/// (track `device-store`, ADR-XXXX, decision 4): `function`, as [`isolated`]
+/// (track `device-store`, ADR-0366, decision 4): `function`, as [`isolated`]
 /// writes it, taking the stored value in the browser's wire form and giving
 /// the next version's in the same form, with each helper the decoding and the
 /// encoding use.

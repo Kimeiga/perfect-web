@@ -1,4 +1,4 @@
-// Values the reader's device keeps (track `device-store`, ADR-XXXX), in
+// Values the reader's device keeps (track `device-store`, ADR-0366), in
 // each engine.
 //
 // `examples/demo/device.pw` holds two: `notes`, a list at version 2 under

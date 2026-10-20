@@ -218,7 +218,7 @@ impl Lowerer<'_> {
     }
 
     /// **The default of a signal the device keeps** (track `device-store`,
-    /// ADR-XXXX): `signal todos: List<Todo> = []` at module level, its clauses
+    /// ADR-0366): `signal todos: List<Todo> = []` at module level, its clauses
     /// below it. Its value is a body of its own, whose root is the value, so
     /// it is resolved, typed and checked as data where it is written, and
     /// the build writes it as a page's signal's first value is written

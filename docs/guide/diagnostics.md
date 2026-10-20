@@ -14,7 +14,7 @@ code the compiler can emit, from its registry, `compiler/pw-core/src/codes.rs`.
 - **What the program must hold to**: the registry's own sentence.
 - **ADR**: the decisions its registry entry cites, where it cites one.
 
-219 codes are registered; 92 of them cite an ADR in the registry.
+219 codes are registered; 93 of them cite an ADR in the registry.
 A code whose entry cites none is marked `—`: search `docs/DECISIONS/` for its
 number or its symbol.
 
@@ -333,7 +333,7 @@ number or its symbol.
 
 | Code | Symbol | What the program must hold to | ADR |
 |---|---|---|---|
-| PW6801 | `device_value_to_a_command` | a value the device keeps is no command's argument, and decides no command's call: a command runs on the server | — |
+| PW6801 | `device_value_to_a_command` | a value the device keeps is no command's argument, and decides no command's call: a command runs on the server | [0366](../DECISIONS/ADR-0366-device-local-storage.md) |
 | PW6802 | `device_value_keys_a_query` | a value the device keeps keys no page's query: the key is sent to the server to read it again | — |
 | PW6803 | `device_value_sent` | a value the device keeps is written nowhere the browser sends: a navigation, an address, a form | — |
 | PW6804 | `device_keeps_its_own` | a signal the device keeps is assigned no session's, user's, organization's or secret's value | — |

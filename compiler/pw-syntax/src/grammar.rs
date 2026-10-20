@@ -306,7 +306,7 @@ pub const POLICY_KEYWORDS: &[&str] = &[
     "refers",
     "bounded",
     "migrate",
-    // Track `device-store` (ADR-XXXX): the version of a value the device
+    // Track `device-store` (ADR-0366): the version of a value the device
     // keeps, a clause only where its count follows on its line
     // (`COUNTED_HEADS`); its `migrate` is a table's word, for the same
     // thing: its change from the version released.
@@ -345,7 +345,7 @@ pub const POLICY_KEYWORDS: &[&str] = &[
     // ADR-0295: the declared error that means a page's address is another
     // address of the page, answered 308 or 307 there.
     "redirect_on",
-    // Track `todomvc` (ADR-XXXX): the signal a page binds to its address's
+    // Track `todomvc` (ADR-0367): the signal a page binds to its address's
     // fragment, and the forms the fragment takes: `fragment filter "/" =>
     // "all", "/active" => "active"`.
     "fragment",
@@ -2925,7 +2925,7 @@ impl<'a> P<'a> {
         // value, for what that body contains. A value written here is
         // refused, and kept in the tree, unless clauses follow it on the
         // lines below: **a signal the device keeps** (track `device-store`,
-        // ADR-XXXX), whose value is the default the device starts with and
+        // ADR-0366), whose value is the default the device starts with and
         // whose clauses say where it rests (`storage device "todos"`), whose
         // it is (`privacy Device`) and what two tabs' writes do (`conflict
         // last_write_wins`). What they must say is the checker's

@@ -140,7 +140,7 @@ fn the_corpus_writes_exactly_these_terms_in_policy_position() {
         // which is the list doing its job, not a new defect. `privacy` is a
         // `LabelCtor` and `Public` is a nullary one.
         ("privacy", "Public"),
-        // New 2026-10-20 (track `device-store`, ADR-XXXX): `privacy Device`
+        // New 2026-10-20 (track `device-store`, ADR-0366): `privacy Device`
         // on a module's signal the device keeps (A-054, R-108, R-109). A
         // nullary `LabelCtor`, as `Public` is; not an unchecked call: the
         // declaration rule reads it and refuses any other value (PW6805,

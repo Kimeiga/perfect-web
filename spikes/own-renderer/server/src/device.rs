@@ -1,5 +1,5 @@
 //! **A document of a page that holds values the device keeps** (track
-//! `device-store`, ADR-XXXX, decision 3).
+//! `device-store`, ADR-0366, decision 3).
 //!
 //! The host never has what the device keeps: it renders each one's declared
 //! default, as it renders any signal's first value (ADR-0130), and says in

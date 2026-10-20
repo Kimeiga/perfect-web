@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mutation controls for track `todomvc`'s Cypress acceptance (ADR-XXXX): the
+"""Mutation controls for track `todomvc`'s Cypress acceptance (ADR-0367): the
 official suite is vendored unchanged, a run is judged by what Cypress printed,
 and a suite that cannot run fails and is never skipped.
 

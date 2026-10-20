@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # **Two facts of the Cypress TodoMVC's own suite is run with** (track
-# `device-store`, ADR-XXXX), each shown with no app at all, by the Cypress
+# `device-store`, ADR-0366), each shown with no app at all, by the Cypress
 # `spikes/todomvc-cypress` pins (15.21.1, the version upstream's `^15.14.2`
 # resolves to):
 #

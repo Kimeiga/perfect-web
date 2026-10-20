@@ -1,4 +1,4 @@
-# ADR-XXXX: a test waits on an event, never on a timer
+# ADR-0365: a test waits on an event, never on a timer
 
 Status: proposed by track `flake-hunt` (2026-10-20) for the integrator; the
 local gates and the track's own runs are recorded below; not yet in a train.
@@ -505,3 +505,10 @@ Left in the sweep and not changed, by class:
    a grace of seconds, then `SIGKILL`. One shared function in place of the
    107 copies; the hosts no longer need it to be right, but a campaign's
    evidence would read better for it.
+
+## Numbered on train-12 (2026-10-20)
+
+- **Numbered ADR-0365** (the integrator's ruling of 2026-10-20: a train is
+  numbered before it is pushed, after master's ADR-0363, in train order),
+  merged from `06bdd3c5` (`track/flake-hunt`). `ADR-XXXX` reads `ADR-0365`
+  in the track's code, as in this file's name and title.

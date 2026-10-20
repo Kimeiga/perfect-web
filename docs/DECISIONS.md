@@ -3144,3 +3144,48 @@ downloads the owner's; train-11).
   never makes; 0379 (aarch64 Cranelift, a br_table of 256k targets) no
   emitted component reaches, a hostile one could on an aarch64 host; the
   engine's configuration stays.
+[ADR-0364](DECISIONS/ADR-0364-a-train-is-pre-verified-locally.md):
+a train is pre-verified here, in lanes, before it is pushed (track
+`preverify`; train-12).
+- `just preverify [BASE]` plans the recipes verify would run and runs them
+  in lanes of their own on this machine (a worktree, a target and ports
+  each, 12741-14740; the PostgreSQL shared), says a failure or a survivor
+  within 15 s of its being written, and records 179 tests and 242 of 242
+  mutants killed (`e14-preverify`).
+[ADR-0365](DECISIONS/ADR-0365-tests-wait-on-events.md):
+a test waits on an event, never on a timer (track `flake-hunt`; train-12).
+- The server's tests wait on the query runtime's events (`LIVE` at 30 ms: 41
+  of 662 failed, now 0 of 663), the Playwright specs on what the page says,
+  and every browser host ends with the runner that started it
+  (`serve-while-owned.sh`); the week's flakes ranked, and 293 of 293 mutants
+  of 19 scripts killed.
+[ADR-0366](DECISIONS/ADR-0366-device-local-storage.md):
+device-local storage: a module's signal the device keeps, read before it
+is shown, never sent (track `device-store`; train-12).
+- `storage device` with `privacy Device` and `conflict last_write_wins`; the
+  `Device` label follows the value to each way to the server
+  (PW6801-PW6808); versions with pure migrations; tabs agree; decision 7,
+  the browser computes from several values and inside a block it renders,
+  kept apart from a host's value by a test and three mutants (the
+  integrator's ruling 3).
+[ADR-0367](DECISIONS/ADR-0367-todomvc.md):
+TodoMVC in Pleris, held to its own spec and its own tests (track
+`todomvc`; train-12).
+- A page binds a signal to its address's fragment (PW6101-PW6106); the
+  platform declares a double press and a control's losing focus; an element
+  a block shows with `autofocus` takes focus; TodoMVC's official Cypress
+  suite is run unchanged and each test judged by what Cypress printed.
+[ADR-0368](DECISIONS/ADR-0368-todomvc-acceptance-means-passing.md):
+TodoMVC acceptance requires every official test to pass (the integrator's;
+train-12).
+- A judge that called a run of 3 of 29 a success was no acceptance;
+  acceptance is the unchanged official suite passing in full, on the Cypress
+  version TodoMVC pins (ruling 4 of 2026-10-20).
+[ADR-0369](DECISIONS/ADR-0369-hosts-share-one-database.md):
+hosts share one database: each hears every commit from the outbox, and a
+session is the database's (track `second-host`; train-12).
+- The outbox is a log each host reads by its own cursor, `NOTIFY` only
+  waking them; a command's idempotency is written with its writes; a session
+  is the database's, kept as its hash, with an idle and a lifetime expiry; a
+  page is numbered by its host's instance, and another host's page is
+  answered `another-host`.

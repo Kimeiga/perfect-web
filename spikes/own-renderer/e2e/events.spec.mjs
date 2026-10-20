@@ -77,7 +77,7 @@ test("the manifest says each part's event and modifiers", async ({ request }) =>
   ]);
 });
 
-// Track `todomvc` (ADR-XXXX): a double press and a control's losing focus.
+// Track `todomvc` (ADR-0367): a double press and a control's losing focus.
 test("a double press runs its own handler, given where the pointer was", async ({ page }) => {
   await ready(page);
   const word = page.locator("#word");

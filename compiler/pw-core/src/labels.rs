@@ -637,7 +637,7 @@ impl<'a> Labels<'a> {
                     .declaration_named(n)
                     .map(|s| s.label.join(&self.summary(s.definition)))
                     // A module's signal the device keeps is the device's
-                    // wherever it is read (track `device-store`, ADR-XXXX).
+                    // wherever it is read (track `device-store`, ADR-0366).
                     .or_else(|| self.sigs.signal_label(self.module, n))
                     .unwrap_or_else(Label::public),
             },

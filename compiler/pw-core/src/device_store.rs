@@ -1,4 +1,4 @@
-//! **A value the reader's device keeps** (track `device-store`, ADR-XXXX):
+//! **A value the reader's device keeps** (track `device-store`, ADR-0366):
 //! charter §9.1's fourth kind of state, as its first version builds it.
 //!
 //! ```text
@@ -85,7 +85,7 @@ impl Kept {
         })
     }
 
-    /// **The key a version is kept under** (ADR-XXXX, decision 4): the name
+    /// **The key a version is kept under** (ADR-0366, decision 4): the name
     /// itself at version 1, `name@v` from version 2.
     pub fn key(&self, version: u32) -> String {
         match version {
@@ -289,7 +289,7 @@ fn diagnostic(
 }
 
 const KEPT_EXPLAINED: &str = "A signal declared `privacy Device` belongs to this device and \
-     never leaves it (charter §7.8, ADR-XXXX): the browser keeps it, reads it and renders \
+     never leaves it (charter §7.8, ADR-0366): the browser keeps it, reads it and renders \
      what it decides, and no server is told it. Its label follows every value made from it \
      (ADR-0129).";
 
@@ -319,7 +319,7 @@ fn declaration(
             "device_signal_clauses",
             (at, declared()),
             message,
-            "A module's signal with a value is one the device keeps (ADR-XXXX): its clauses \
+            "A module's signal with a value is one the device keeps (ADR-0366): its clauses \
              say where it rests and under what name, whose it is, and what two tabs' writes \
              do, so that none of the three is a default nobody chose. The first version keeps \
              a value on the device alone, the device's own, the whole value written last \
@@ -549,7 +549,7 @@ fn versions(
             "What a device keeps outlives the code that wrote it. Each version is kept under \
              a key of its own, and a page reading an earlier one takes it to its own version \
              through the functions its declaration names, in order, each from one version to \
-             the next (ADR-XXXX, decision 4). A missing step, a step that performs something \
+             the next (ADR-0366, decision 4). A missing step, a step that performs something \
              or a step of the wrong type would leave a person's data unread.",
             repair,
         )
@@ -831,7 +831,7 @@ impl Flows<'_> {
                     foreign.join(" and ")
                 ),
                 "What the device keeps stays on it after the session it was read in has ended: \
-                 on a shared computer, the next person's (ADR-XXXX, decision 5). A session's, a \
+                 on a shared computer, the next person's (ADR-0366, decision 5). A session's, a \
                  user's or an organization's value belongs to that reader, and a secret never \
                  leaves the origin.",
                 "keep the device's own, or public data; a user's value kept on the device, \
@@ -1019,7 +1019,7 @@ impl Flows<'_> {
     }
 }
 
-/// **What a value the device keeps is, as its decoder reads it** (ADR-XXXX,
+/// **What a value the device keeps is, as its decoder reads it** (ADR-0366,
 /// decision 3): the browser's wire form of its type (`js_pure`), checked
 /// field by field before the value is used. An opaque type is its
 /// representation, and a case its wire name with its payload: none, one as
@@ -1039,7 +1039,7 @@ pub enum Schema {
     Cases { cases: Vec<(String, Vec<Schema>)> },
 }
 
-/// **A value the device keeps, as a page holds it** (ADR-XXXX): what the
+/// **A value the device keeps, as a page holds it** (ADR-0366): what the
 /// page's plan and its document carry for the runtime.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Held {

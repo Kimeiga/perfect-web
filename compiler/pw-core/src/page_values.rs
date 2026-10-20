@@ -187,7 +187,7 @@ pub struct Derived {
     pub expr: ExprId,
     /// Its inputs, each the name its expression reads it by and its type
     /// there: one, a query's value or a signal's; or several, each a value
-    /// the browser holds (track `device-store`, ADR-XXXX, decision 7).
+    /// the browser holds (track `device-store`, ADR-0366, decision 7).
     pub inputs: Vec<(String, ResolvedType)>,
     /// What it computes.
     pub result: ResolvedType,
@@ -275,7 +275,7 @@ pub struct Live {
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub derived: String,
     /// **Each value a computed part reads, by its path, where it reads
-    /// several** (track `device-store`, ADR-XXXX, decision 7): the function
+    /// several** (track `device-store`, ADR-0366, decision 7): the function
     /// is given each, in order. Empty where it reads one, at `path`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub paths: Vec<String>,
@@ -875,7 +875,7 @@ pub struct PageValues {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fragment: Option<crate::address_fragment::Binding>,
     /// **The values the device keeps that the page holds** (track
-    /// `device-store`, ADR-XXXX): each one's signal, the name and version it
+    /// `device-store`, ADR-0366): each one's signal, the name and version it
     /// is kept under, its tabs' policy and each version's form. The browser
     /// reads each before what it decides is shown; a host renders its
     /// declared default, since the device's never reaches it.
@@ -2602,7 +2602,7 @@ fn computed_part(
         })
         .ok_or_else(|| format!("part {part}'s value has no type the build knows"))
     };
-    // **From the values the browser holds** (track `device-store`, ADR-XXXX,
+    // **From the values the browser holds** (track `device-store`, ADR-0366,
     // decision 7): several signals, a value the device keeps among them, or
     // one inside a block the browser renders. The browser computes it, with
     // each, every time one changes, and before it renders the block that

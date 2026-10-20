@@ -1,5 +1,5 @@
 //! **A page binds a signal to its address's fragment** (track `todomvc`,
-//! ADR-XXXX; the integrator's ruling of 2026-10-14): `#/active` reaches no
+//! ADR-0367; the integrator's ruling of 2026-10-14): `#/active` reaches no
 //! server, so a page reads its fragment, and what it reads is a signal.
 //!
 //! ```text

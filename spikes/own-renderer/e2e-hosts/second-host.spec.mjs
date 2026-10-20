@@ -1,4 +1,4 @@
-// Track `second-host` (ADR-XXXX): two hosts of the feed on one PostgreSQL
+// Track `second-host` (ADR-0369): two hosts of the feed on one PostgreSQL
 // schema, in three engines, as two servers of one deployment are. The spec
 // starts each engine's two hosts, A and B, itself (`playwright.hosts.config.mjs`
 // says why): each a development server of its own on a port of its own, both

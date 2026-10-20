@@ -1,4 +1,4 @@
-//! **A value the reader's device keeps** (track `device-store`, ADR-XXXX):
+//! **A value the reader's device keeps** (track `device-store`, ADR-0366):
 //! a module's signal with `storage device "name"`, `privacy Device` and
 //! `conflict last_write_wins`, its versions and their migrations, its form,
 //! the `Device` label at each read and the sinks that keep it off the

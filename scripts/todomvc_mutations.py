@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Mutation controls for track `todomvc`: TodoMVC in Pleris, held to its own
-spec (ADR-XXXX), its todos on the device since track `device-store`
-(ADR-XXXX).
+spec (ADR-0366), its todos on the device since track `device-store`
+(ADR-0366).
 
 Each mutant undoes one thing the spec states:
 - the program (`examples/todomvc/app.pw`): the todos kept on the device, under

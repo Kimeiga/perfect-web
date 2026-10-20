@@ -1,11 +1,11 @@
-# ADR-XXXX: a train is pre-verified locally, before it is pushed
+# ADR-0364: a train is pre-verified locally, before it is pushed
 
 Status: proposed by track preverify for train-11 (or the train after it),
 unnumbered; the integrator numbers it. Date: 2026-10-20. Milestone: E14, the
 verification run's own harness (ADR-0245, ADR-0281, ADR-0290). Builds on the
-browser host map (`ADR-XXXX-browser-host-map.md`: the registry's stride and
+browser host map (`ADR-0356-browser-host-map.md`: the registry's stride and
 the hosts a run needs) and the allocator
-(`ADR-XXXX-mutants-run-in-parallel-slots.md`: `port_layout`, `port_for_slot`).
+(`ADR-0357-mutants-run-in-parallel-slots.md`: `port_layout`, `port_for_slot`).
 
 ## Corrections first
 
@@ -302,3 +302,12 @@ On the PC (WSL2, 32 threads, shared with ten-plus other workers), Python
   train's push, with `--recipes` for the ones that failed.
 - If the PC's other workers run lanes too, move the ports to one registry
   (the allocator's `port_layout` already reads the host registry's stride).
+
+## Numbered on train-12 (2026-10-20)
+
+- **Numbered ADR-0364** (the integrator's ruling of 2026-10-20: a train is
+  numbered before it is pushed, after master's ADR-0363, in train order),
+  merged from `7601cf12` (`track/preverify`). `ADR-XXXX` reads `ADR-0364` in
+  the track's code, recipe, tests and evidence (6 mentions in 4 files), as
+  in this file's name and title. Its two references to train-11's ADRs read
+  ADR-0356 and ADR-0357.

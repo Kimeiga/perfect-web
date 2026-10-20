@@ -1223,7 +1223,7 @@ pub fn lowered(
         signals.insert(name);
     }
     // **And each signal the device keeps that it, its layout or a view it
-    // composes names** (track `device-store`, ADR-XXXX): one value for the
+    // composes names** (track `device-store`, ADR-0366): one value for the
     // page, under the name it is declared with, its first value the
     // declaration's default, which the server renders and the browser
     // replaces with the device's.
@@ -2531,7 +2531,7 @@ fn lower_element(
         out.push(Chunk::Static(format!(" data-pw=\"{o}\"")));
     }
     // **What the device decides is not shown until the device is read**
-    // (track `device-store`, ADR-XXXX, decision 3): an element one of whose
+    // (track `device-store`, ADR-0366, decision 3): an element one of whose
     // attributes, or a text or block whose nearest element it is, reads a
     // signal the device keeps. The server renders the declared default; the
     // document's head keeps a marked element hidden while the document is
@@ -3190,7 +3190,7 @@ fn lower_block_at(
         let binding = each.binder.clone();
         // The list's path, read from the expression it is (ADR-0345): a
         // name, or fields read from one. Or **a list the browser computes**
-        // from the values it holds (track `device-store`, ADR-XXXX, decision
+        // from the values it holds (track `device-store`, ADR-0366, decision
         // 7), read by the path the compiler names, as a computed subject is
         // (ADR-0229); the plan says who computes it, and refuses one no one
         // does.

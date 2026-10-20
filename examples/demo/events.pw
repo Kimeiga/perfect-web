@@ -8,7 +8,7 @@
 // that event's record: what was typed, which key was pressed. A form's own
 // submission is stopped in the listener, before the handler's code loads.
 //
-// Track `todomvc` (ADR-XXXX): a double press is its own event, given where
+// Track `todomvc` (ADR-0367): a double press is its own event, given where
 // the pointer was, and a control's losing focus is its own, given the value
 // it held. Neither is a press: a single press runs the press's handler and
 // not the double press's.

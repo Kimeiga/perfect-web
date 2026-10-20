@@ -1,4 +1,4 @@
-ADR-XXXX - a train is pre-verified locally
+ADR-0364 - a train is pre-verified locally
 
 produced by: just e14-preverify
 commit: fd29aceb7a633d555bc85a4effb78e899ea06de2

@@ -1512,7 +1512,7 @@ function replaceBlock(id, html) {
   return replaceRangeAt(addressOf([], id), html) ?? [];
 }
 
-// --- a block rendered again keeps its nodes (track `device-store`, ADR-XXXX) --
+// --- a block rendered again keeps its nodes (track `device-store`, ADR-0366) --
 //
 // A block the browser renders again from its signals (ADR-0130) was replaced
 // whole until 2026-10-20: every node in it new each time a signal it reads
@@ -1894,7 +1894,7 @@ function followAutofocus() {
   life.signal.addEventListener("abort", () => observer.disconnect(), { once: true });
 }
 
-// --- values the device keeps (track `device-store`, ADR-XXXX) --------------
+// --- values the device keeps (track `device-store`, ADR-0366) --------------
 //
 // A module's signal declared `storage device "name"` and `privacy Device` is
 // the device's: the document says which ones the page holds, the name each
@@ -2579,7 +2579,7 @@ const bound = new WeakMap();
  */
 const DOM_EVENTS = {
   press: "click",
-  // Track `todomvc` (ADR-XXXX): a double press, and a control's losing focus.
+  // Track `todomvc` (ADR-0367): a double press, and a control's losing focus.
   dblclick: "dblclick",
   blur: "blur",
   input: "input",
@@ -2942,7 +2942,7 @@ function addressKey(address) {
  * rendered one does. Until 2026-10-03 no patch set an attribute: an Add button
  * kept the name of an item renamed since.
  *
- * **A checkbox's state follows the attribute** (track `todomvc`, ADR-XXXX).
+ * **A checkbox's state follows the attribute** (track `todomvc`, ADR-0367).
  * `checked` is an attribute only until a person has pressed the box: from
  * then on the property is the box's own, and the attribute no longer moves it.
  * A patch that unchecks the "toggle all" box, or checks it, is shown only if

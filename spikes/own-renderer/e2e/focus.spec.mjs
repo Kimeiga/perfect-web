@@ -1,5 +1,5 @@
 // An element a block shows with `autofocus` takes focus (track `todomvc`,
-// ADR-XXXX).
+// ADR-0367).
 //
 // HTML's `autofocus` runs when a page loads. `examples/demo/focus.pw` shows a
 // field after it has loaded, as TodoMVC shows its edit field when a person

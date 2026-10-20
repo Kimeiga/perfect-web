@@ -1,4 +1,4 @@
-ADR-XXXX - TodoMVC's own Cypress suite over TodoMVC on the device, and the Cypress it runs in
+ADR-0366 - TodoMVC's own Cypress suite over TodoMVC on the device, and the Cypress it runs in
 
 produced by: just e14-device-store-cypress
 commit: b3fe0365cf34681ff5dfba3797c933f12b37bee6

@@ -95,12 +95,12 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "0017_ratings",
         include_str!("../migrations/store/0017_ratings.sql"),
     ),
-    // Track `second-host` (ADR-XXXX): the outbox a log every host reads.
+    // Track `second-host` (ADR-0369): the outbox a log every host reads.
     (
         "0018_outbox_log",
         include_str!("../migrations/store/0018_outbox_log.sql"),
     ),
-    // Track `second-host` (ADR-XXXX): sessions and sign-ins kept.
+    // Track `second-host` (ADR-0369): sessions and sign-ins kept.
     (
         "0019_sessions",
         include_str!("../migrations/store/0019_sessions.sql"),
@@ -946,13 +946,13 @@ pub(crate) struct StorePg {
     faults: Faults,
     /// The statements its reads and commands ran (NEXT 4b).
     tally: Tally,
-    /// **This host's reader of the outbox** (ADR-XXXX): every other host's
+    /// **This host's reader of the outbox** (ADR-0369): every other host's
     /// commits, from its cursor; and its id, which its own rows carry.
     tail: crate::hosts::Tail,
     /// **Its sessions and sign-ins, kept where the hosts share them**
-    /// (ADR-XXXX).
+    /// (ADR-0369).
     sessions: Arc<crate::hosts::SessionsPg>,
-    /// **This host's instance on the database** (ADR-XXXX), which its page
+    /// **This host's instance on the database** (ADR-0369), which its page
     /// numbers carry.
     instance: u64,
     /// A test's schema, dropped with the layer.
@@ -983,7 +983,7 @@ impl StorePg {
         });
         let mut c = pool.take()?;
         migrate(c.client())?;
-        // **The outbox is every host's** (ADR-XXXX): a host just opened
+        // **The outbox is every host's** (ADR-0369): a host just opened
         // reads it from its highest id, and deletes nothing another host
         // has yet to read. Until then it deleted the outbox, a second host's
         // undelivered rows among it.
@@ -1099,7 +1099,7 @@ pub(crate) struct Staging<'a> {
     tally: Tally,
     txn: Option<usize>,
     /// The schema's outbox, which its rows are ordered in, and this host's
-    /// id, which they carry (ADR-XXXX).
+    /// id, which they carry (ADR-0369).
     outbox: &'a crate::hosts::Outbox,
     host: &'a str,
 }
@@ -1184,7 +1184,7 @@ impl Staging<'_> {
                     .map(|(name, values)| ("invalidation", name, values.clone())),
             )
             .collect();
-        // **Last, and in commit order** (ADR-XXXX): the outbox's lock, held
+        // **Last, and in commit order** (ADR-0369): the outbox's lock, held
         // to the commit's end, before its rows take their ids, so every host
         // reads them in the order the commits were made; and each host
         // listening woken at the commit. One statement.

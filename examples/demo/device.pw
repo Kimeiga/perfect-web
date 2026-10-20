@@ -4,7 +4,7 @@
 // @charter: §9.1
 // @milestone: E14
 //
-// Track `device-store` (ADR-XXXX): two values the device keeps, each a
+// Track `device-store` (ADR-0366): two values the device keeps, each a
 // module's signal the device provides. The browser keeps them in its own
 // storage, reads them before what they decide is shown, writes each change,
 // and tells every other tab of it; no server is told either.

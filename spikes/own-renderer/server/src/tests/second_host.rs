@@ -1,4 +1,4 @@
-//! **Hosts sharing one database** (ADR-XXXX, track `second-host`): two hosts
+//! **Hosts sharing one database** (ADR-0369, track `second-host`): two hosts
 //! in one process, each its own `Server` on a layer of its own opened on one
 //! schema, as two processes on one PostgreSQL are. Each test passes doing
 //! nothing without a database: `just e14-second-host` runs them.
@@ -112,10 +112,10 @@ fn frames(s: &Server, doc: &Doc) -> Vec<String> {
         .unwrap_or_default()
 }
 
-/// **A command through A is told to a page on B** (ADR-XXXX): B's reader
+/// **A command through A is told to a page on B** (ADR-0369): B's reader
 /// finds A's commit in the outbox, after its cursor, and tells B's session
 /// that reads what it dropped. Not before B reads it: nothing else carries a
-/// commit from one host to the other. Until ADR-XXXX the committing host
+/// commit from one host to the other. Until ADR-0369 the committing host
 /// consumed its rows, and B heard nothing.
 #[test]
 fn a_post_through_one_host_is_told_to_a_page_on_another() {
@@ -261,7 +261,7 @@ fn a_layer_listens_only_once_its_host_reads_the_outbox() {
 }
 
 /// **A host opening the database deletes nothing from its outbox**, in
-/// either layer: a row another host has yet to read stays. Until ADR-XXXX
+/// either layer: a row another host has yet to read stays. Until ADR-0369
 /// each opening deleted the outbox, so a host started, or restarted, beside
 /// a running one ate the rows that host had not read.
 #[test]
@@ -430,7 +430,7 @@ fn waits_for_the_lock_and_wakes(
 }
 
 /// **A commit through the feed waits for the outbox's lock, and wakes a
-/// waiting host at once** (ADR-XXXX): its rows take their ids in commit
+/// waiting host at once** (ADR-0369): its rows take their ids in commit
 /// order, and what a page on B waits for, of a commit through A, is the
 /// database's delivery, not a poll's period.
 #[test]
@@ -514,10 +514,10 @@ fn posted_by(s: &Server, session: &str, interaction: &str, text: &str) -> String
 }
 
 /// **A sign-in begun on one host completes on another, and its session holds
-/// on both** (ADR-XXXX): the sign-in under way is kept in the database, so
+/// on both** (ADR-0369): the sign-in under way is kept in the database, so
 /// the provider's callback completes it on whichever host it reaches; the
 /// session it opens is kept there by its id's hash, so each host's next
-/// request finds its reader. Until ADR-XXXX both were the first host's
+/// request finds its reader. Until ADR-0369 both were the first host's
 /// memory: the callback on B was refused, and a session made on A was no one
 /// on B.
 #[test]
@@ -673,9 +673,9 @@ fn a_session_signed_out_on_one_host_is_no_one_on_another() {
     assert_eq!(db.count("SELECT count(*) FROM sessions"), 0, "none kept");
 }
 
-/// **A restarted host keeps its readers signed in** (ADR-XXXX): a host
+/// **A restarted host keeps its readers signed in** (ADR-0369): a host
 /// started again on the database finds the session a sign-in made before.
-/// Until ADR-XXXX a restart signed everyone out.
+/// Until ADR-0369 a restart signed everyone out.
 #[test]
 fn a_restarted_host_keeps_its_readers_signed_in() {
     let Some(url) = database() else { return };
@@ -1225,7 +1225,7 @@ fn stores(url: &str, provider: &Arc<TestProvider>) -> Stores {
 }
 
 /// **A commit through the store waits for the outbox's lock, and wakes a
-/// waiting host at once**, as the feed's does (ADR-XXXX).
+/// waiting host at once**, as the feed's does (ADR-0369).
 #[test]
 fn a_store_commit_waits_for_the_outbox_lock_and_wakes_another_host() {
     let Some(url) = store_database() else { return };

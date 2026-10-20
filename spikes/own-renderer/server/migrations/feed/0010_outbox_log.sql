@@ -1,4 +1,4 @@
--- **The outbox is a log every host reads** (ADR-XXXX, track `second-host`):
+-- **The outbox is a log every host reads** (ADR-0369, track `second-host`):
 -- a commit's rows are kept once delivered, not deleted, so that each host on
 -- the database tells its own pages of every other host's commits. `id` is in
 -- commit order: a commit takes the outbox's lock before its rows take their

@@ -1,4 +1,4 @@
-// A signal bound to the address's fragment (track `todomvc`, ADR-XXXX).
+// A signal bound to the address's fragment (track `todomvc`, ADR-0367).
 //
 // `examples/demo/fragment.pw` binds the signal `tab` to its address's
 // fragment: `#/` is "overview", `#/specs` "specs", `#/reviews` "reviews".

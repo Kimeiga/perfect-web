@@ -4,7 +4,7 @@
 // @charter: §8.2
 // @milestone: E14
 //
-// Track `todomvc` (ADR-XXXX): HTML's `autofocus` runs once, when a page
+// Track `todomvc` (ADR-0367): HTML's `autofocus` runs once, when a page
 // loads. A page shows a field after it has loaded, when a person asks to edit
 // something, and the field that appears is expected to be the one they type
 // in (TodoMVC's spec: the edit field "should be focused"). What this shows, in

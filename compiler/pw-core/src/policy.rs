@@ -54,7 +54,7 @@ pub enum Domain {
     /// set is the domain's whole content — an unlisted word is an error, not
     /// an extension point.
     Word(&'static [&'static str]),
-    /// **Where a value rests** (track `device-store`, ADR-XXXX): `device` or
+    /// **Where a value rests** (track `device-store`, ADR-0366): `device` or
     /// `origin`, as a replicated value says it, and, for a signal the device
     /// keeps, the name it is kept under: `storage device "todos-pleris"`.
     /// What the name may be is `device_store`'s (PW6805).
@@ -434,7 +434,7 @@ pub fn domain_of(head: &str) -> Option<Domain> {
         "refers" => Domain::Reference,
         "bounded" => Domain::Count,
         "migrate" => Domain::Migration,
-        // Track `device-store` (ADR-XXXX): the version of a value the device
+        // Track `device-store` (ADR-0366): the version of a value the device
         // keeps; each earlier one is its `migrate`'s.
         "version" => Domain::Count,
         // An upload's (track `uploads`, ADR-0260): where its committed files

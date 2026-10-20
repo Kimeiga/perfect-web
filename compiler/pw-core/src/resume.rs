@@ -538,7 +538,7 @@ pub(crate) fn manifest_scope(hir: &Hir, decl: &Decl) -> Option<crate::privacy::L
 }
 
 /// **A capture of what the device keeps is written where the device is**
-/// (track `device-store`, ADR-XXXX): such a value exists only in the
+/// (track `device-store`, ADR-0366): such a value exists only in the
 /// browser, which renders the parts that read it, and writes their handlers'
 /// captures into the document it holds, on the device. The server writes a
 /// capture of one only at its declared default, a constant of the program's

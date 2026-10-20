@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""**A train is pre-verified here, before it is pushed** (ADR-XXXX).
+"""**A train is pre-verified here, before it is pushed** (ADR-0364).
 
 GitHub's `verify` (ADR-0245) runs the recipes a push touches, in shards, on
 4-vCPU runners, and train-10 lost two days to failures it found one at a

@@ -1,4 +1,4 @@
-// Track `second-host` (ADR-XXXX): the browser suite of hosts that share one
+// Track `second-host` (ADR-0369): the browser suite of hosts that share one
 // database, apart from the main suite (`playwright.config.mjs`). Its spec
 // starts its own hosts, two per engine, each a process of its own that it
 // stops and starts again, on a PostgreSQL schema of the engine's own: the

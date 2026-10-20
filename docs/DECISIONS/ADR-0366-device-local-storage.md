@@ -1,4 +1,4 @@
-# ADR-XXXX: device-local storage: a module's signal the device keeps, read before it is shown, never sent
+# ADR-0366: device-local storage: a module's signal the device keeps, read before it is shown, never sent
 
 Status: proposed by track `device-store` for the integrator's ruling; a
 design note (step 1) and then its first version (step 2), built in the same
@@ -729,3 +729,11 @@ The answers to the questions above, from the integrator's message of about
    version.
 6. **STATUS's generality is 62/62**: the integrator writes it at the
    merge.
+
+## Numbered on train-12 (2026-10-20)
+
+- **Numbered ADR-0366** (the integrator's ruling of 2026-10-20: a train is
+  numbered before it is pushed, after master's ADR-0363, in train order),
+  merged from `5d4280b0` (`track/device-store`). `ADR-XXXX` reads `ADR-0366`
+  in the track's code, recipes, tests, corpus and evidence (65 mentions in
+  36 files), as in this file's name and title.

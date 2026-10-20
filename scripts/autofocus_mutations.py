@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mutation controls for track `todomvc`'s `autofocus` (ADR-XXXX): an element
+"""Mutation controls for track `todomvc`'s `autofocus` (ADR-0367): an element
 a block shows with `autofocus`, after the page has loaded, takes focus as it
 appears (the runtime's `followAutofocus`), as TodoMVC's edit field does.
 

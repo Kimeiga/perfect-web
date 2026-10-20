@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mutation controls for track second-host (ADR-XXXX): hosts that share one
+"""Mutation controls for track second-host (ADR-0369): hosts that share one
 PostgreSQL database hear each other's commits from the outbox, answer each
 other's retries from the record a commit wrote, and keep their sessions in
 the database, by hash.

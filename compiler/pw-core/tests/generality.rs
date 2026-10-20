@@ -579,7 +579,7 @@ fn generality_is_reported_separately_from_conformance() {
     // `all_unbounded` and `migration_unstated` (ADR-0350, corpus C27).
     // PW0365's warning has its own witnesses too. 62 / 62 on 2026-10-20: the
     // device-store track's `device_value_to_a_command` and
-    // `device_value_keys_a_query` (ADR-XXXX, corpus C28); STATUS's figure is
+    // `device_value_keys_a_query` (ADR-0366, corpus C28); STATUS's figure is
     // the integrator's to move at the merge.
     assert_eq!(
         (general.len(), narrow.len(), untested.len()),

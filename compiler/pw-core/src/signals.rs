@@ -953,7 +953,7 @@ pub struct Provision {
     /// page that keys one by a signal reads it wherever it is declared.
     pub stale_work: BTreeMap<DefId, Option<String>>,
     /// **The module signals the device keeps** (track `device-store`,
-    /// ADR-XXXX): provided by the device, so no page or view needs to. One
+    /// ADR-0366): provided by the device, so no page or view needs to. One
     /// with a value of its own is the device's by its form, kept or refused
     /// at its declaration (PW6805), and is never also "not provided".
     pub device: BTreeSet<DefId>,

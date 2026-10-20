@@ -1,4 +1,4 @@
-# ADR-XXXX: TodoMVC in Pleris, held to its own spec and its own tests
+# ADR-0367: TodoMVC in Pleris, held to its own spec and its own tests
 
 Status: accepted under the owner's delegation of 2026-10-02 (a worker's, the
 integrator's to number and index). Date: 2026-10-14, closed 2026-10-15 with
@@ -686,3 +686,11 @@ Then what the build and the suite found:
   milestone's program and evidence are the ground of.
 - **A keyboard way to begin an edit**, where the spec has none.
 
+## Numbered on train-12 (2026-10-20)
+
+- **Numbered ADR-0367** (the integrator's ruling of 2026-10-20: a train is
+  numbered before it is pushed, after master's ADR-0363, in train order),
+  merged from `a8bab6a2` (`track/todomvc`, merged inside
+  `track/device-store`). `ADR-XXXX` reads `ADR-0367` in the track's code,
+  demo pages, recipes, tests and runtime (30 mentions in 20 files), as in
+  this file's name and title.

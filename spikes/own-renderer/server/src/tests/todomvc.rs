@@ -1,5 +1,5 @@
 //! **TodoMVC, built and served** (track `todomvc`, docs/PARALLEL.md, W7; its
-//! todos on the device since track `device-store`, ADR-XXXX): the page the
+//! todos on the device since track `device-store`, ADR-0366): the page the
 //! host renders before the device is read, what its document says the
 //! browser is to read, and that no host holds a todo. What the browser does
 //! with the device is the browser's suite's (`e2e/todomvc.spec.mjs`).

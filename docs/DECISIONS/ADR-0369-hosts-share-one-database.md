@@ -1,4 +1,4 @@
-# ADR-XXXX: hosts share one database: each hears every commit from the outbox, and a session is the database's
+# ADR-0369: hosts share one database: each hears every commit from the outbox, and a session is the database's
 
 Status: proposed by track `second-host` (`track/second-host`, first based on
 `track/bounded-statements` a59a18a3, merged with `origin/master` at train-9,
@@ -546,7 +546,7 @@ None open: the four of 2026-10-19 were ruled on 2026-10-20 (above).
   page's state is its host's: its stream, reaching another host, is told to
   reload, and its commands are answered there only from their committed
   records (a press that committed on the host that served it) or refused as
-  another host's page. Pages cannot yet move between hosts (ADR-XXXX)."
+  another host's page. Pages cannot yet move between hosts (ADR-0369)."
 - A page's number carries its host's instance in its high 20 bits (of 52):
   the protocol's cursor, a JSON number, carries it exactly.
 - A request on a kept session writes the session's use at most once a
@@ -637,3 +637,11 @@ rule that heavy runs go there:
   this track's table above then states every layer's total.
 - When pages can move between hosts (their state kept beyond the host),
   session affinity stops being a requirement.
+
+## Numbered on train-12 (2026-10-20)
+
+- **Numbered ADR-0369** (the integrator's ruling of 2026-10-20: a train is
+  numbered before it is pushed, after master's ADR-0363, in train order),
+  merged from `7a22c443` (`wip/second-host`, the track's head). `ADR-XXXX`
+  reads `ADR-0369` in the track's code, migrations, tests and evidence (79
+  mentions in 20 files), as in this file's name and title.

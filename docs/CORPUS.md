@@ -1155,7 +1155,7 @@ Generality at open:        60/60 invariants generality-tested
 
 ## C28: a value the reader's device keeps, 2026-10-20
 
-Opened because the specification changed (track `device-store`, ADR-XXXX:
+Opened because the specification changed (track `device-store`, ADR-0366:
 charter §9.1's fourth kind of state). A module's signal with a value and
 `storage device "name"`, `privacy Device` and `conflict last_write_wins` is
 kept in the reader's browser, read before what it decides is shown, and

@@ -61,12 +61,12 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "0009_schedules",
         include_str!("../migrations/feed/0009_schedules.sql"),
     ),
-    // Track `second-host` (ADR-XXXX): the outbox a log every host reads.
+    // Track `second-host` (ADR-0369): the outbox a log every host reads.
     (
         "0010_outbox_log",
         include_str!("../migrations/feed/0010_outbox_log.sql"),
     ),
-    // Track `second-host` (ADR-XXXX): sessions and sign-ins kept.
+    // Track `second-host` (ADR-0369): sessions and sign-ins kept.
     (
         "0011_sessions",
         include_str!("../migrations/feed/0011_sessions.sql"),
@@ -906,13 +906,13 @@ pub(crate) struct FeedPg {
     /// Each session's principal (track `identity`): whom a session writes
     /// as. Until the server hands its own, every session is its own guest.
     principals: std::sync::RwLock<Principals>,
-    /// **This host's reader of the outbox** (ADR-XXXX): every other host's
+    /// **This host's reader of the outbox** (ADR-0369): every other host's
     /// commits, from its cursor; and its id, which its own rows carry.
     tail: crate::hosts::Tail,
     /// **Its sessions and sign-ins, kept where the hosts share them**
-    /// (ADR-XXXX).
+    /// (ADR-0369).
     sessions: Arc<crate::hosts::SessionsPg>,
-    /// **This host's instance on the database** (ADR-XXXX), which its page
+    /// **This host's instance on the database** (ADR-0369), which its page
     /// numbers carry.
     instance: u64,
 }
@@ -950,7 +950,7 @@ impl FeedPg {
         }
         let mut c = pool.connect()?;
         migrate(&mut c)?;
-        // **The outbox is every host's** (ADR-XXXX): a host just opened
+        // **The outbox is every host's** (ADR-0369): a host just opened
         // reads it from its highest id, and deletes nothing another host
         // has yet to read. Until then it deleted the outbox, a second host's
         // undelivered rows among it.
@@ -1057,7 +1057,7 @@ pub(crate) struct Staging<'a> {
     leases: Option<crate::uploads::Leases>,
     released: Arc<Mutex<Vec<String>>>,
     /// The schema's outbox, which its rows are ordered in, and this host's
-    /// id, which they carry (ADR-XXXX).
+    /// id, which they carry (ADR-0369).
     outbox: &'a crate::hosts::Outbox,
     host: &'a str,
 }
@@ -1115,7 +1115,7 @@ impl crate::data::Staged for Staging<'_> {
                     .map(|(name, values)| ("invalidation", name, values.clone())),
             )
             .collect();
-        // **Last, and in commit order** (ADR-XXXX): the outbox's lock, held
+        // **Last, and in commit order** (ADR-0369): the outbox's lock, held
         // to the commit's end, before its rows take their ids, so every host
         // reads them in the order the commits were made; and each host
         // listening woken at the commit.
@@ -1213,7 +1213,7 @@ fn names_blob(c: &mut Client, key: &str) -> Result<bool, postgres::Error> {
 /// **What the outbox committed, read back**: what is delivered is what was
 /// committed, and nothing else. Its rows are kept for the other hosts on
 /// the database, which read them from their cursors, until they are trimmed
-/// (ADR-XXXX, `hosts.rs`); until then a delivery consumed them, and a second
+/// (ADR-0369, `hosts.rs`); until then a delivery consumed them, and a second
 /// host heard nothing.
 pub(crate) fn delivered(c: &mut Client, ids: &[i64]) -> Result<Outboxed, String> {
     let rows = c

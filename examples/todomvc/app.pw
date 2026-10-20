@@ -14,7 +14,7 @@
 // - **Persistence**: the todos are kept on the reader's device, in the
 //   browser's own storage, under TodoMVC's name for them, `todos-pleris`, a
 //   list of `{id, title, completed}`: `todos`, a signal the device keeps
-//   (track `device-store`, ADR-XXXX). No server holds them, or is told
+//   (track `device-store`, ADR-0366). No server holds them, or is told
 //   them: the page is the browser's to compute and to render, from what the
 //   device holds, and a second tab shows what the first wrote.
 // - **No todos**: `.main` and `.footer` are hidden, not absent, while the

@@ -107,7 +107,7 @@ pub(crate) fn compile_prepared(
 }
 
 /// **A page's module, with the migrations of the values the device keeps**
-/// (track `device-store`, ADR-XXXX) where it holds one at a later version:
+/// (track `device-store`, ADR-0366) where it holds one at a later version:
 /// the runtime loads them only where the device holds an earlier one.
 fn migrated(
     module: Result<String, String>,
@@ -124,7 +124,7 @@ fn migrated(
 }
 
 /// **Each value the device keeps that `page` holds, its steps from each
-/// earlier version to the next** (track `device-store`, ADR-XXXX): `export
+/// earlier version to the next** (track `device-store`, ADR-0366): `export
 /// const migrations`, by the signal, each step a function from the stored
 /// value's wire form to the next version's.
 fn migrations(cx: &Context<'_>, page: &str) -> Result<String, String> {

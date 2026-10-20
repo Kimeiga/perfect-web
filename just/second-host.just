@@ -5,7 +5,7 @@
 # `e14-<name>:`, writes `docs/evidence/E14/<name>.txt`, and is planned by the
 # verification run like any other (scripts/ci_plan.py reads this file too).
 
-# Track `second-host` (ADR-XXXX): hosts on one database hear each other's
+# Track `second-host` (ADR-0369): hosts on one database hear each other's
 # commits from the outbox, answer each other's retries from the record a
 # commit wrote, and keep their sessions in the database, by hash. The
 # server's two-host tests (two hosts in one process on one schema, the
@@ -27,7 +27,7 @@ e14-second-host:
     @cargo build --quiet --locked -p pw-dev-server
     @mkdir -p docs/evidence/E14
     @{ export PW_STORE_DATABASE_URL="${PW_STORE_DATABASE_URL:-$PW_FEED_DATABASE_URL}"; \
-       echo "ADR-XXXX - hosts share one database: each hears every commit from the outbox, and a session is the database's"; echo; \
+       echo "ADR-0369 - hosts share one database: each hears every commit from the outbox, and a session is the database's"; echo; \
        echo "produced by: just e14-second-host"; \
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
        echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \

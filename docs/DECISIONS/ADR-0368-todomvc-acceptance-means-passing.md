@@ -1,4 +1,4 @@
-# ADR-XXXX: TodoMVC acceptance requires every official test to pass
+# ADR-0368: TodoMVC acceptance requires every official test to pass
 
 Status: accepted by the integrator under the owner's delegation of
 2026-10-02, on the explicit takeover request, 2026-10-15. Milestone: E14.
@@ -40,3 +40,11 @@ semantics and the subsequent hook failure remain application obligations.
 Raw gate verdict, whole mutation output, commands and input hashes are in
 `docs/evidence/E14/todomvc-acceptance-gate.txt`. The application remains
 unfinished until its unchanged suite passes.
+
+## Numbered on train-12 (2026-10-20)
+
+- **Numbered ADR-0368** (the integrator's ruling of 2026-10-20: a train is
+  numbered before it is pushed, after master's ADR-0363, in train order),
+  merged from `a8bab6a2` (`track/todomvc`, merged inside
+  `track/device-store`). `ADR-XXXX` reads `ADR-0368` in this file alone, as
+  in this file's name and title.

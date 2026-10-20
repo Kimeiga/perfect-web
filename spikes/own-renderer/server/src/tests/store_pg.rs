@@ -128,7 +128,7 @@ fn on_postgres_the_database_provides_what_the_store_states() {
 /// **A cart's change commits with its event, in one transaction**
 /// (ADR-0208): the line's row and the outbox's are written by one
 /// transaction, and what was delivered is kept for the other hosts, the
-/// committing host's (ADR-XXXX).
+/// committing host's (ADR-0369).
 #[test]
 fn on_postgres_a_cart_change_commits_with_its_event_in_one_transaction() {
     let Some(url) = database() else { return };
@@ -157,7 +157,7 @@ fn on_postgres_a_cart_change_commits_with_its_event_in_one_transaction() {
         "written by the line's own transaction"
     );
     // Delivered, and kept for the other hosts on the database, which read
-    // them from their cursors (ADR-XXXX): until then they were consumed.
+    // them from their cursors (ADR-0369): until then they were consumed.
     let host = s.data.tail().expect("a shared database").host().to_string();
     assert_eq!(
         s.layer
@@ -321,7 +321,7 @@ fn on_postgres_eight_sessions_adding_five_times_each_commit_all_forty() {
         40,
         "all forty committed"
     );
-    // Each add's two rows kept for the other hosts (ADR-XXXX), each
+    // Each add's two rows kept for the other hosts (ADR-0369), each
     // commit's consecutive: its ids taken under the outbox's lock.
     assert_eq!(s.count("SELECT count(*) FROM outbox"), 80);
     assert_eq!(
@@ -495,7 +495,7 @@ fn on_postgres_a_second_hosts_commit_answers_what_the_first_committed() {
 /// a commit staged is consumed once delivered: after orders are placed and
 /// moved along, the materializer's outbox holds none, and the database's
 /// only what this host committed and read back, kept for the other hosts
-/// until it is trimmed (ADR-XXXX; named `..._the_outboxes_hold_nothing`
+/// until it is trimmed (ADR-0369; named `..._the_outboxes_hold_nothing`
 /// until the database's outbox became every host's log).
 #[test]
 fn on_postgres_an_order_keeps_its_lines_and_the_outboxes_hold_only_its_hosts_rows() {
@@ -543,7 +543,7 @@ fn on_postgres_an_order_keeps_its_lines_and_the_outboxes_hold_only_its_hosts_row
         "carts emptied"
     );
     // The database's outbox holds only what this host committed and read
-    // back, kept for the other hosts until it is trimmed (ADR-XXXX); the
+    // back, kept for the other hosts until it is trimmed (ADR-0369); the
     // materializer's holds nothing.
     let host = s.data.tail().expect("a shared database").host().to_string();
     assert_eq!(

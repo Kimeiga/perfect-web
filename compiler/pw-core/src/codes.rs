@@ -133,7 +133,7 @@ pub enum Owner {
     /// to its own spec and tests (docs/PARALLEL.md, W7's plan). A signal a
     /// page binds to its address's fragment.
     Todomvc,
-    /// The device-store track's codes, PW68xx (ADR-XXXX, a block asked of
+    /// The device-store track's codes, PW68xx (ADR-0366, a block asked of
     /// the integrator): a value the reader's device keeps, charter §9.1's
     /// fourth kind of state, and the `Device` label that keeps it there.
     DeviceStore,
@@ -955,7 +955,7 @@ codes! {
     SCHEDULE_TIME = "PW6503" / schedule_time / 1, Schedules,
         "a scheduled run's time is `at` an `Instant` or `after` a `Duration`";
 
-    // --- the device-store track (PW68xx; ADR-XXXX) ------------------------
+    // --- the device-store track (PW68xx; ADR-0366) ------------------------
     //
     // `signal todos: List<Todo> = []` at module level with `storage device
     // "todos-pleris"`, `privacy Device` and `conflict last_write_wins`: a

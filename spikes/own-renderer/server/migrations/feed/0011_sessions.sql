@@ -1,4 +1,4 @@
--- **Sessions and sign-ins kept where the hosts share them** (ADR-XXXX, track
+-- **Sessions and sign-ins kept where the hosts share them** (ADR-0369, track
 -- `second-host`): a session a sign-in opened, by its id's SHA-256 (the id
 -- itself, the cookie's value, is never written), and the principal it is; a
 -- sign-in under way, by its state's SHA-256, with its nonce and its PKCE

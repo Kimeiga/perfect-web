@@ -1,11 +1,11 @@
-# The device-store track's recipes (ADR-XXXX): a value the reader's device
+# The device-store track's recipes (ADR-0366): a value the reader's device
 # keeps, charter §9.1's fourth kind of state. The track adds its recipes here
 # and nowhere else; the root justfile imports this file, and its settings and
 # variables (`set shell`, `PATH`) apply here as there. An evidence recipe is
 # `e14-<name>:`, writes `docs/evidence/E14/<name>.txt`, and is planned by the
 # verification run like any other (scripts/ci_plan.py reads this file too).
 
-# Track `device-store` (ADR-XXXX): a module's signal the device keeps, its
+# Track `device-store` (ADR-0366): a module's signal the device keeps, its
 # clauses, versions and form, the `Device` label at each read and the sinks
 # that keep it off the server (PW6801-PW6808), what the browser computes for
 # a value it alone holds; the host's document of a page that holds one (the
@@ -18,7 +18,7 @@ e14-device-store:
     @bash spikes/own-renderer/todomvc.sh > /dev/null
     @cargo build --quiet --locked -p pw-dev-server -p kiokun-server
     @mkdir -p docs/evidence/E14
-    @{ echo "ADR-XXXX - a value the reader's device keeps"; echo; \
+    @{ echo "ADR-0366 - a value the reader's device keeps"; echo; \
        echo "produced by: just e14-device-store"; \
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
        echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
@@ -34,7 +34,7 @@ e14-device-store:
      } > docs/evidence/E14/device-store.txt
     @grep -E "^test result|passed|mutants killed|^---- |panicked at" docs/evidence/E14/device-store.txt
 
-# Track `device-store` (ADR-XXXX): TodoMVC's own Cypress suite, unchanged,
+# Track `device-store` (ADR-0366): TodoMVC's own Cypress suite, unchanged,
 # over TodoMVC on the device (spikes/todomvc-cypress/run.sh). Its acceptance
 # asks all 29 to pass, and is NOT met: the run says which pass and which do
 # not. The five that fail fail for any app under the Cypress the suite is run
@@ -48,7 +48,7 @@ e14-device-store-cypress:
     @cargo build --quiet --locked -p pw-dev-server
     @cd spikes/todomvc-cypress && pnpm exec cypress install > /dev/null
     @mkdir -p docs/evidence/E14
-    @{ echo "ADR-XXXX - TodoMVC's own Cypress suite over TodoMVC on the device, and the Cypress it runs in"; echo; \
+    @{ echo "ADR-0366 - TodoMVC's own Cypress suite over TodoMVC on the device, and the Cypress it runs in"; echo; \
        echo "produced by: just e14-device-store-cypress"; \
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
        echo "node: $(node --version)"; \

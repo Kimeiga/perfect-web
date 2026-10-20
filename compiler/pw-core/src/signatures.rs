@@ -174,7 +174,7 @@ pub struct Signatures {
     /// declared: what a body it is provided to reads and writes.
     signal_types: BTreeMap<DefId, TypeResolution>,
     /// **The module signals the device keeps** (track `device-store`,
-    /// ADR-XXXX): a read of one is the device's (`labels.rs`).
+    /// ADR-0366): a read of one is the device's (`labels.rs`).
     device: BTreeSet<DefId>,
 }
 
@@ -514,7 +514,7 @@ impl Signatures {
     }
 
     /// **Is `def` a module signal the device keeps?** (track
-    /// `device-store`, ADR-XXXX).
+    /// `device-store`, ADR-0366).
     pub fn kept_by_the_device(&self, def: DefId) -> bool {
         self.device.contains(&def)
     }

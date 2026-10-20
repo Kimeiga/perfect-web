@@ -4,7 +4,7 @@
 // @charter: §8.2
 // @milestone: E14
 //
-// Track `todomvc` (ADR-XXXX): `fragment tab "/" => "overview", ..` binds the
+// Track `todomvc` (ADR-0367): `fragment tab "/" => "overview", ..` binds the
 // signal `tab` to the page's address's fragment, which no server sees, and
 // names each form the fragment takes with the value the signal takes then.
 // What this shows, in each engine:

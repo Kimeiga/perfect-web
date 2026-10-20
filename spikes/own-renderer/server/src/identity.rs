@@ -280,7 +280,7 @@ struct PrincipalsInner {
     accounts: AtomicBool,
     sessions: RwLock<HashMap<String, Held>>,
     /// TRACK SEAM (second-host): **where sessions are kept beyond this
-    /// host's memory** (ADR-XXXX), the database the hosts share, where the
+    /// host's memory** (ADR-0369), the database the hosts share, where the
     /// data layer has one. `sessions` is then each request's copy of it.
     kept: OnceLock<Arc<dyn Kept>>,
     /// TRACK SEAM (second-host): **how long a session lives**, idle and in
@@ -291,7 +291,7 @@ struct PrincipalsInner {
 
 /// **A session's principal as this host holds it**, and when it was opened
 /// and last used here, by which a session in this host's memory alone
-/// expires (ADR-XXXX). Where sessions are kept beyond the host, the
+/// expires (ADR-0369). Where sessions are kept beyond the host, the
 /// database's clock decides, and this is each request's copy.
 #[derive(Debug)]
 struct Held {
@@ -398,7 +398,7 @@ impl SessionLifetimes {
 // TRACK SEAM (second-host): sessions kept where the hosts share them
 // ---------------------------------------------------------------------------
 
-/// **A secret as it is kept**: its SHA-256, never the secret (ADR-XXXX). A
+/// **A secret as it is kept**: its SHA-256, never the secret (ADR-0369). A
 /// session's id (128 bits from the operating system) and a sign-in's state
 /// (256) are past any guess, so a fast hash is enough: a copy of what is
 /// kept opens no session and completes no sign-in. A password, which a
@@ -409,7 +409,7 @@ pub(crate) fn kept_hash(secret: &str) -> Vec<u8> {
 }
 
 /// **Where a deployment keeps its sessions and its sign-ins under way**
-/// beyond one host's memory (ADR-XXXX, track `second-host`): the database
+/// beyond one host's memory (ADR-0369, track `second-host`): the database
 /// its hosts share, so that a host restarted, or another one, knows the
 /// reader a sign-in made, and a sign-in begun on one host completes on
 /// another. Each by its secret's [`kept_hash`].
@@ -487,7 +487,7 @@ impl Principals {
             None => false,
         };
         // TRACK SEAM (second-host): **a session past its lifetimes is signed
-        // out** (ADR-XXXX), here as where it is kept: it is no one, or its
+        // out** (ADR-0369), here as where it is kept: it is no one, or its
         // own guest in the guest model, from now on.
         if expired {
             self.close(session);
@@ -512,7 +512,7 @@ impl Principals {
     }
 
     /// TRACK SEAM (second-host): **how long its sessions live**, as the
-    /// deployment states them (ADR-XXXX), set where the host starts.
+    /// deployment states them (ADR-0369), set where the host starts.
     pub(crate) fn expire_after(&self, lifetimes: SessionLifetimes) {
         *self.0.lifetimes.write().expect("lifetimes") = lifetimes;
     }
@@ -526,7 +526,7 @@ impl Principals {
         self.0.sessions.write().expect("principals").remove(session);
     }
 
-    /// TRACK SEAM (second-host): **sessions kept in `kept`** (ADR-XXXX),
+    /// TRACK SEAM (second-host): **sessions kept in `kept`** (ADR-0369),
     /// handed once, when the server is built on a layer that has one.
     pub(crate) fn keep_in(&self, kept: Arc<dyn Kept>) {
         let _ = self.0.kept.set(kept);
@@ -538,7 +538,7 @@ impl Principals {
     }
 
     /// TRACK SEAM (second-host): **`session` as it is kept, read once for a
-    /// request** (ADR-XXXX): signed in on another host, or by this one
+    /// request** (ADR-0369): signed in on another host, or by this one
     /// before it restarted, it is signed in here; signed out anywhere, or
     /// past its lifetimes on the database's clock, it is no one here. One
     /// statement, in the accounts model where sessions are kept; nothing
@@ -869,7 +869,7 @@ impl Identity {
     /// `notifications`): the accounts model, a test's principal, so a test
     /// holds one user in two sessions and another user beside them. The
     /// flow itself is `tests/sign_in.rs`'s to hold. Kept where the hosts
-    /// keep sessions, as a sign-in's is (ADR-XXXX): a request reads its
+    /// keep sessions, as a sign-in's is (ADR-0369): a request reads its
     /// session from there, and would find no one.
     #[cfg(test)]
     pub fn signed_in_for_test(&self, session: &str, user: &str, name: &str) {
@@ -1086,7 +1086,7 @@ impl Identity {
         // held is its user's, never the next one's.
         let was_guest = self.principals.of(session).is_none_or(|p| p.is_guest());
         // TRACK SEAM (second-host): kept where the hosts share them, before
-        // the browser is answered (ADR-XXXX).
+        // the browser is answered (ADR-0369).
         if let Err(why) = self
             .principals
             .sign_out(session)
@@ -1117,7 +1117,7 @@ impl Identity {
     /// replayed, is no one; and a new session, so the browser is not left
     /// holding the old one.
     fn sign_out(&self, session: &str) -> Reply {
-        // TRACK SEAM (second-host): no one on any host (ADR-XXXX); a
+        // TRACK SEAM (second-host): no one on any host (ADR-0369); a
         // sign-out not kept is said, and the browser keeps its session.
         if let Err(why) = self.principals.sign_out(session) {
             return Reply::page(

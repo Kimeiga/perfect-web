@@ -157,7 +157,7 @@ pub(crate) trait DataLayer: Send + Sync {
         None
     }
 
-    /// **This host's reader of the other hosts' commits** (ADR-XXXX, track
+    /// **This host's reader of the other hosts' commits** (ADR-0369, track
     /// `second-host`), where the layer's database is shared: the outbox read
     /// from the host's cursor. A layer in memory is one host by definition,
     /// its data the process's, and has none.
@@ -174,7 +174,7 @@ pub(crate) trait DataLayer: Send + Sync {
     }
 
     /// **Where its sessions and sign-ins are kept beyond the host's memory**
-    /// (ADR-XXXX, track `second-host`): its database, where the hosts share
+    /// (ADR-0369, track `second-host`): its database, where the hosts share
     /// one, so a restarted host or another keeps a reader signed in. A layer
     /// in memory keeps them in the host's, as long as it runs.
     fn sessions(&self) -> Option<Arc<dyn crate::identity::Kept>> {
