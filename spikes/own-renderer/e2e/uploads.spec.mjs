@@ -16,7 +16,7 @@
 //   - an attached image removed is not posted.
 import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import { UPLOADS_PORTS } from "../playwright.config.mjs";
+import { UPLOADS_PORTS } from "../host-metadata.mjs";
 
 test.use({
   baseURL: async ({}, use, testInfo) => {

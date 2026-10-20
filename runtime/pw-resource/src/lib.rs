@@ -103,6 +103,13 @@ pub enum Trace {
     RequestDeduplicated {
         key: Key,
     },
+    /// **A read made alone** ([`Resources::fetch_cancellable_as_of`]; NEXT
+    /// 4c, track `render-merge`): its reader's snapshot is older than its
+    /// resource's last invalidation, so it is read from no cache, joins no
+    /// request and is joined by none, and its value is not kept.
+    RequestAlone {
+        key: Key,
+    },
     ServedFromCache {
         key: Key,
     },
@@ -373,6 +380,12 @@ struct State<V> {
     /// Reservations and results are kept for this runtime's lifetime.
     applied: HashMap<String, Arc<Completion<CommandResult>>>,
     trace: Vec<Trace>,
+    /// **How many invalidations so far** (NEXT 4c, track `render-merge`):
+    /// what a reader of a snapshot takes as its [`Resources::epoch`].
+    epoch: u64,
+    /// **Each resource's last invalidation**, by the epoch it made: one
+    /// entry per resource, never per key, so as many as the program has.
+    invalidated: HashMap<String, u64>,
 }
 
 impl<V> Default for State<V> {
@@ -383,7 +396,18 @@ impl<V> Default for State<V> {
             subscribers: HashMap::new(),
             applied: HashMap::new(),
             trace: Vec::new(),
+            epoch: 0,
+            invalidated: HashMap::new(),
         }
+    }
+}
+
+impl<V> State<V> {
+    /// `resource` invalidated now: a reader whose snapshot is older reads it
+    /// alone ([`Resources::fetch_cancellable_as_of`]).
+    fn stamp(&mut self, resource: &str) {
+        self.epoch += 1;
+        self.invalidated.insert(resource.to_string(), self.epoch);
     }
 }
 
@@ -510,7 +534,43 @@ impl<V: Clone> Resources<V> {
         key: &Key,
         load: impl FnMut(u32, &Cancellation<V>) -> Result<V, String>,
     ) -> Fetched<V> {
-        let fetched = self.fetch_from_origin(manifest, key, load);
+        let fetched = self.fetch_from_origin(manifest, key, load, None);
+        self.fallen_back(manifest, key, fetched)
+    }
+
+    /// **The invalidations so far** (NEXT 4c, track `render-merge`): what a
+    /// reader whose data is a snapshot takes before it takes the snapshot,
+    /// and fetches as of ([`Resources::fetch_cancellable_as_of`]).
+    pub fn epoch(&self) -> u64 {
+        self.state.lock().expect("state").epoch
+    }
+
+    /// **A fetch for a reader of a snapshot taken after `as_of`** (NEXT 4c,
+    /// track `render-merge`: a host's render). Where nothing invalidated
+    /// `key`'s resource since `as_of`, as [`Resources::fetch_cancellable`]:
+    /// the cache, a request running, or the origin, kept and shared; what
+    /// it hands the reader is then what its own snapshot holds, as far as
+    /// invalidations say. Where something did, the reader's snapshot may be
+    /// older than the change, and what the cache or a request running holds
+    /// newer: `load` runs here, for this reader alone, its value neither
+    /// taken from the cache nor shared nor kept, nothing but its timeout
+    /// stops it, and a request running goes on as it was. So a value read in
+    /// a snapshot older than an invalidation is never kept or handed to
+    /// another reader after it.
+    pub fn fetch_cancellable_as_of(
+        &self,
+        manifest: &Manifest,
+        key: &Key,
+        as_of: u64,
+        load: impl FnMut(u32, &Cancellation<V>) -> Result<V, String>,
+    ) -> Fetched<V> {
+        let fetched = self.fetch_from_origin(manifest, key, load, Some(as_of));
+        self.fallen_back(manifest, key, fetched)
+    }
+
+    /// `fetched`, or where its origin failed, the fallback its manifest
+    /// declares.
+    fn fallen_back(&self, manifest: &Manifest, key: &Key, fetched: Fetched<V>) -> Fetched<V> {
         // **The last value kept, where the origin failed** (ADR-0177): for
         // public data whose manifest declares it, and never for private
         // data, whatever a manifest says. A stopped read is not a failure.
@@ -534,48 +594,70 @@ impl<V: Clone> Resources<V> {
     }
 
     /// [`Resources::fetch_cancellable`], without a fallback: the cache, a
-    /// flight, or the origin.
+    /// flight, or the origin; or, for a reader of a snapshot older than its
+    /// resource's last invalidation (`as_of`), the origin alone
+    /// ([`Resources::fetch_cancellable_as_of`]).
     fn fetch_from_origin(
         &self,
         manifest: &Manifest,
         key: &Key,
         mut load: impl FnMut(u32, &Cancellation<V>) -> Result<V, String>,
+        as_of: Option<u64>,
     ) -> Fetched<V> {
         if manifest.resource != key.resource {
             return Fetched::Failed("manifest resource does not match the key".into());
         }
         let flight;
+        // A request of this reader's alone: from no cache, joining none and
+        // joined by none, and its value not kept.
+        let alone;
         {
             let mut st = self.state.lock().expect("state");
             let now = self.clock.now();
-            if let Some(entry) = st.cache.get(key) {
-                if entry.privacy != manifest.privacy {
-                    return Fetched::Failed("cache privacy does not match the manifest".into());
+            alone = as_of.is_some_and(|as_of| {
+                st.invalidated
+                    .get(&key.resource)
+                    .is_some_and(|&at| at > as_of)
+            });
+            if alone {
+                st.trace.push(Trace::RequestAlone { key: key.clone() });
+            } else {
+                if let Some(entry) = st.cache.get(key) {
+                    if entry.privacy != manifest.privacy {
+                        return Fetched::Failed("cache privacy does not match the manifest".into());
+                    }
+                    if !entry.expired && now.saturating_sub(entry.stored_at) < manifest.freshness {
+                        let value = entry.value.clone();
+                        st.trace.push(Trace::ServedFromCache { key: key.clone() });
+                        return Fetched::FromCache(value);
+                    }
                 }
-                if !entry.expired && now.saturating_sub(entry.stored_at) < manifest.freshness {
-                    let value = entry.value.clone();
-                    st.trace.push(Trace::ServedFromCache { key: key.clone() });
-                    return Fetched::FromCache(value);
+                if let Some(existing) = st.in_flight.get(key).cloned() {
+                    if existing.manifest != *manifest {
+                        return Fetched::Failed(
+                            "in-flight policy does not match the manifest".into(),
+                        );
+                    }
+                    if existing.completion.owner == thread::current().id() {
+                        return Fetched::Failed(
+                            "a request cannot synchronously join itself".into(),
+                        );
+                    }
+                    st.trace
+                        .push(Trace::RequestDeduplicated { key: key.clone() });
+                    drop(st);
+                    return Self::fetched(self.join_query(key, &existing), true);
                 }
-            }
-            if let Some(existing) = st.in_flight.get(key).cloned() {
-                if existing.manifest != *manifest {
-                    return Fetched::Failed("in-flight policy does not match the manifest".into());
-                }
-                if existing.completion.owner == thread::current().id() {
-                    return Fetched::Failed("a request cannot synchronously join itself".into());
-                }
-                st.trace
-                    .push(Trace::RequestDeduplicated { key: key.clone() });
-                drop(st);
-                return Self::fetched(self.join_query(key, &existing), true);
             }
             flight = Arc::new(Flight {
                 manifest: manifest.clone(),
                 started: now,
                 completion: Completion::new(),
             });
-            st.in_flight.insert(key.clone(), flight.clone());
+            // A request alone is not the key's: the one running stays it.
+            if !alone {
+                st.in_flight.insert(key.clone(), flight.clone());
+            }
         }
         let cancellation = Cancellation {
             flight: flight.clone(),
@@ -611,7 +693,7 @@ impl<V: Clone> Resources<V> {
             }
             match result {
                 Ok(value) => {
-                    if manifest.cacheable {
+                    if manifest.cacheable && !alone {
                         st.cache.insert(
                             key.clone(),
                             Entry {
@@ -860,6 +942,9 @@ impl<V: Clone> Resources<V> {
     /// value goes, and a flight for it loses the right to publish.
     pub fn invalidate_key(&self, key: &Key) {
         let mut st = self.state.lock().expect("state");
+        // Kept or not: a reader of an older snapshot may be about to fill it
+        // (NEXT 4c).
+        st.stamp(&key.resource);
         st.cache.remove(key);
         if let Some(flight) = st.in_flight.get(key).cloned() {
             let _ = Self::finish_locked(
@@ -892,6 +977,7 @@ impl<V: Clone> Resources<V> {
     /// `last_known_good` is still there to answer with if the origin fails.
     pub fn expire(&self, resource: &str) {
         let mut st = self.state.lock().expect("state");
+        st.stamp(resource);
         for (key, entry) in st.cache.iter_mut() {
             if key.resource == resource {
                 entry.expired = true;
@@ -909,6 +995,9 @@ impl<V: Clone> Resources<V> {
         mut names: impl FnMut(&str) -> bool,
     ) -> Vec<Key> {
         let mut st = self.state.lock().expect("state");
+        // Whatever it drops, none included: a reader of an older snapshot
+        // may be about to fill one (NEXT 4c).
+        st.stamp(resource);
         let mut dropped: Vec<Key> = st
             .cache
             .keys()
@@ -941,6 +1030,7 @@ impl<V: Clone> Resources<V> {
 
     pub fn invalidate(&self, resource: &str) {
         let mut st = self.state.lock().expect("state");
+        st.stamp(resource);
         st.cache.retain(|key, _| key.resource != resource);
         let obsolete: Vec<_> = st
             .in_flight

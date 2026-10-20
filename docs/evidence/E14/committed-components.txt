@@ -1,0 +1,29 @@
+Train-11 - every component the store's build emits is committed current
+
+produced by: just e14-committed-components
+commit: 320c52a44840a80423609ab476eb847c04de34a6
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39442025240 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+== the committed evidence (compiler/pw-core/tests/evidence_is_current.rs)
+
+test the_check_would_notice_a_change ... ok
+test the_committed_contracts_are_what_the_compiler_derives_now ... ok
+test the_committed_kiokun_build_is_what_the_compiler_builds_now ... ok
+test the_committed_handlers_are_what_the_compiler_emits_now ... ok
+test the_committed_components_are_what_the_compiler_builds_now ... ok
+test a_component_the_build_adds_fails_the_check_until_it_is_committed_current ... ok
+test the_committed_wit_is_what_the_compiler_emits_now ... ok
+test the_committed_page_plan_is_what_the_compiler_plans_now ... ok
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.70s
+
+== mutation controls (scripts/committed_components_mutations.py)
+
+baseline: 8 passed, 0 failed
+the build's components are not read: KILLED (2 of 8 tests fail)
+a component built and not committed passes: KILLED (1 of 8 tests fail)
+a component committed stale passes: KILLED (1 of 8 tests fail)
+a component committed that the build no longer emits passes: KILLED (1 of 8 tests fail)
+a kept few of the build's components are checked: KILLED (1 of 8 tests fail)
+5 of 5 mutants killed
+memory bound: no process was stopped

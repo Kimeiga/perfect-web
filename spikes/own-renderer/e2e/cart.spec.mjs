@@ -4,7 +4,7 @@
 // speculation reaches every part that reads it.
 import { writeFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
-import { MUTABLE_PORTS } from "../playwright.config.mjs";
+import { MUTABLE_PORTS } from "../host-metadata.mjs";
 
 test.use({
   baseURL: async ({}, use, testInfo) => {

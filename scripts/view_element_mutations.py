@@ -24,7 +24,7 @@ MUTANTS = [
     (
         "the rule is not run",
         CHECK,
-        "        per_unit.extend(view_elements(&workspace, &hirs, i, &u.hir));\n",
+        '        per_unit.extend(view_elements(workspace, hirs, i, &u.hir));\n',
         "",
     ),
     (

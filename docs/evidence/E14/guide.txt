@@ -1,8 +1,8 @@
 ADR-0343 (track guide) - a guide whose examples compile: every example of docs/guide checked, and the tutorial's app run in three engines
 
 produced by: just e14-guide
-commit: ddaeeb1dfba9630371b7dd5b127c23855d245c74
-ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39131257549 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 320c52a44840a80423609ab476eb847c04de34a6
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39442025240 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
@@ -10,21 +10,21 @@ playwright: Version 1.58.0
 == every example of the guide, through the pw binary (compiler/pw-cli/tests/guide.rs)
 
 test a_fence_is_read_as_commonmark_reads_it ... ok
-test a_gaps_build_output_belongs_to_the_gap_before_it ... ok
+test a_pages_file_blocks_are_its_program_in_order ... ok
 test a_page_is_held_to_the_directory_it_names ... ok
 test a_page_with_no_example_or_a_block_unseen_is_reported ... ok
-test a_pages_file_blocks_are_its_program_in_order ... ok
+test a_gaps_build_output_belongs_to_the_gap_before_it ... ok
 test a_program_differs_from_a_directory_by_a_file_or_a_byte ... ok
 test a_refused_examples_codes_are_read_from_its_output ... ok
-test an_unclosed_or_indented_fence_is_refused ... ok
 test an_info_string_says_what_a_block_is ... ok
+test an_unclosed_or_indented_fence_is_refused ... ok
 test shown_output_belongs_to_the_refused_example_before_it ... ok
 test a_pages_program_is_the_directory_it_names ... ok
 test the_reference_is_held_to_the_registry ... ok
 test the_diagnostic_reference_lists_every_registered_code ... ok
-test a_wrong_example_is_reported_and_a_right_one_is_not ... ok
 test every_example_in_the_guide_compiles_as_it_says ... ok
-test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.09s
+test a_wrong_example_is_reported_and_a_right_one_is_not ... ok
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.13s
 
 == the reference of codes, from the registry (scripts/guide_diagnostics.py)
 
@@ -36,83 +36,84 @@ test_a_pipe_in_a_cell_is_escaped (test_guide_diagnostics.Reading.test_a_pipe_in_
 test_a_retired_code_with_its_reason_continued_across_lines (test_guide_diagnostics.Reading.test_a_retired_code_with_its_reason_continued_across_lines) ... ok
 test_an_owner_without_a_title_is_written_from_its_name (test_guide_diagnostics.Reading.test_an_owner_without_a_title_is_written_from_its_name) ... ok
 test_each_entry_with_its_invariant_and_the_adrs_its_comment_cites (test_guide_diagnostics.Reading.test_each_entry_with_its_invariant_and_the_adrs_its_comment_cites) ... ok
-Ran 7 tests in 0.085s
+Ran 7 tests in 0.082s
 OK
 
 == the tutorial's app, examples/guestbook/*.pw, in three engines (e2e/guestbook.spec.mjs)
 
-  12 passed (7.6m)
+  12 passed (22.2s)
 
 == mutation controls (scripts/guide_mutations.py)
 
+Python frozen full IDs: ['test_guide_diagnostics.Current.test_every_registered_code_has_a_row', 'test_guide_diagnostics.Current.test_the_committed_page_is_what_the_registry_writes', 'test_guide_diagnostics.Reading.test_a_line_that_is_no_entry_is_refused_not_skipped', 'test_guide_diagnostics.Reading.test_a_pipe_in_a_cell_is_escaped', 'test_guide_diagnostics.Reading.test_a_retired_code_with_its_reason_continued_across_lines', 'test_guide_diagnostics.Reading.test_an_owner_without_a_title_is_written_from_its_name', 'test_guide_diagnostics.Reading.test_each_entry_with_its_invariant_and_the_adrs_its_comment_cites']; evidence /tmp/pw-guide-python-evidence-lmmnqkr3
 baseline: the guide's tests, 22 ran, 0 failed
 baseline: the guestbook in Chromium, 4 ran, 0 failed
-an example no longer type-checks: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail)
-an example is not as `pw fmt` writes it: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail)
-an example checks clean and `pw build` refuses it: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail)
-a refused example is refused no more: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail)
-a refused example is refused by another code: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail)
-output a page shows is not what `pw check` prints: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail)
-a block says nothing of what it is: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail)
-a block is in a language the guide is not written in: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail)
-a fence is indented: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail)
-a fence is never closed: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail)
-a page's files no longer check together: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail)
-the tutorial and the app differ by a byte: KILLED by a_pages_program_is_the_directory_it_names (1 of 22 tests fail)
-the tutorial builds a file the app does not have: KILLED by a_pages_program_is_the_directory_it_names (2 of 22 tests fail)
-a gap's build output is not what `pw build` prints: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail)
-a build gap is closed: the build accepts it: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail)
-a check gap is closed: the check refuses it: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail)
-a build gap shows no build output: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail)
-the reference has no row for a code: KILLED by test_the_committed_page_is_what_the_registry_writes, the_diagnostic_reference_lists_every_registered_code (2 of 22 tests fail)
-the reference gives a code another invariant: KILLED by test_the_committed_page_is_what_the_registry_writes, the_diagnostic_reference_lists_every_registered_code (2 of 22 tests fail)
-the reference has a row for a code the compiler lacks: KILLED by test_the_committed_page_is_what_the_registry_writes, the_diagnostic_reference_lists_every_registered_code (2 of 22 tests fail)
-a clean example need not check clean: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail)
-an example need not be as `pw fmt` writes it: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail)
-an example that parses is held to the format only where it is clean: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail)
-a clean example need not build: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail)
-a build gap may build: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail)
-a gap's build output need not be what is shown: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail)
-a refused example need not be refused: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail)
-a refusal's codes are compared as a subset of what is reported: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail)
-a refusal's codes are compared as a superset of what is reported: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail)
-output a page shows of a refusal need not be what is printed: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail)
-output a page shows keeps the closing count `pw check` prints: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail)
-a fence of another character closes a block: KILLED by an_unclosed_or_indented_fence_is_refused (1 of 22 tests fail)
-a closing fence may carry text: KILLED by an_unclosed_or_indented_fence_is_refused (1 of 22 tests fail)
-a shorter fence closes a block: KILLED by a_page_with_no_example_or_a_block_unseen_is_reported (1 of 22 tests fail)
-an indented fence is accepted: KILLED by an_unclosed_or_indented_fence_is_refused (1 of 22 tests fail)
-a fence never closed is accepted: KILLED by an_unclosed_or_indented_fence_is_refused (1 of 22 tests fail)
-two backticks are a fence: KILLED by a_fence_is_read_as_commonmark_reads_it (1 of 22 tests fail)
-an attribute a block does not take is skipped: KILLED by an_info_string_says_what_a_block_is (1 of 22 tests fail)
-an attribute may be given twice: KILLED by an_info_string_says_what_a_block_is (1 of 22 tests fail)
-a file may be outside the page's tree: KILLED by an_info_string_says_what_a_block_is (1 of 22 tests fail)
-a block may be a gap and a refusal: KILLED by an_info_string_says_what_a_block_is (1 of 22 tests fail)
-another language's block takes attributes: KILLED by an_info_string_says_what_a_block_is (1 of 22 tests fail)
-a language the guide is not written in passes: KILLED by an_info_string_says_what_a_block_is (1 of 22 tests fail)
-a page's pieces are joined with no blank line: KILLED by a_pages_file_blocks_are_its_program_in_order (2 of 22 tests fail)
-output belongs to any block before it: KILLED by shown_output_belongs_to_the_refused_example_before_it (1 of 22 tests fail)
-a build's output belongs to any block before it: KILLED by a_gaps_build_output_belongs_to_the_gap_before_it (1 of 22 tests fail)
-a build gap need not show what `pw build` prints: KILLED by a_gaps_build_output_belongs_to_the_gap_before_it (1 of 22 tests fail)
-a page with no example is accepted: KILLED by a_page_with_no_example_or_a_block_unseen_is_reported (1 of 22 tests fail)
-a Pleris block the reader of pages did not see goes unnoticed: KILLED by a_page_with_no_example_or_a_block_unseen_is_reported (1 of 22 tests fail)
-a page's pieces are not counted: KILLED by a_page_with_no_example_or_a_block_unseen_is_reported, every_example_in_the_guide_compiles_as_it_says (2 of 22 tests fail)
-the index is held to show Pleris: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail)
-a page's program is not compared with the directory it names: KILLED by a_page_is_held_to_the_directory_it_names (1 of 22 tests fail)
-a page that names a directory and builds nothing in it is accepted: KILLED by a_page_is_held_to_the_directory_it_names (1 of 22 tests fail)
-the directory a page names is read with its spaces: KILLED by a_page_is_held_to_the_directory_it_names (2 of 22 tests fail)
-a file the page lacks is not noticed: KILLED by a_program_differs_from_a_directory_by_a_file_or_a_byte (2 of 22 tests fail)
-trailing space is no difference: KILLED by a_program_differs_from_a_directory_by_a_file_or_a_byte (2 of 22 tests fail)
-a row's invariant is not compared with the registry's: KILLED by the_reference_is_held_to_the_registry (1 of 22 tests fail)
-a code with no row is not reported: KILLED by the_reference_is_held_to_the_registry (1 of 22 tests fail)
-a row for a code the compiler lacks is not reported: KILLED by the_reference_is_held_to_the_registry (1 of 22 tests fail)
-an ADR a comment cites twice is listed twice: KILLED by test_each_entry_with_its_invariant_and_the_adrs_its_comment_cites (1 of 22 tests fail)
-a comment is taken by the entry after the next: KILLED by test_each_entry_with_its_invariant_and_the_adrs_its_comment_cites (2 of 22 tests fail)
-a line that is no entry is skipped: KILLED by test_a_line_that_is_no_entry_is_refused_not_skipped (1 of 22 tests fail)
-a pipe in a cell ends it: KILLED by test_a_pipe_in_a_cell_is_escaped (2 of 22 tests fail)
-a retired code's reason loses its continuation: KILLED by test_a_retired_code_with_its_reason_continued_across_lines (2 of 22 tests fail)
-the retired codes are left out of the page: KILLED by test_the_committed_page_is_what_the_registry_writes (1 of 22 tests fail)
-the last code of each owner is left out of the page: KILLED by test_the_committed_page_is_what_the_registry_writes (2 of 22 tests fail)
+an example no longer type-checks: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust test failure)
+an example is not as `pw fmt` writes it: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust test failure)
+an example checks clean and `pw build` refuses it: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust test failure)
+a refused example is refused no more: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust test failure)
+a refused example is refused by another code: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust test failure)
+output a page shows is not what `pw check` prints: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust test failure)
+a block says nothing of what it is: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust test failure)
+a block is in a language the guide is not written in: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust test failure)
+a fence is indented: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust test failure)
+a fence is never closed: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust test failure)
+a page's files no longer check together: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust test failure)
+the tutorial and the app differ by a byte: KILLED by a_pages_program_is_the_directory_it_names (1 of 22 tests fail; Rust test failure)
+the tutorial builds a file the app does not have: KILLED by a_pages_program_is_the_directory_it_names (2 of 22 tests fail; Rust test failure)
+the closed title gap claims check still accepts it: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust test failure)
+a build gap is closed: the build accepts it: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust test failure)
+a check gap is closed: the check refuses it: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust test failure)
+the closed two-signal gap claims the wrong refusal: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust test failure)
+the reference has no row for a code: KILLED by test_the_committed_page_is_what_the_registry_writes, the_diagnostic_reference_lists_every_registered_code (2 of 22 tests fail; Rust test failure, Python body assertion)
+the reference gives a code another invariant: KILLED by test_the_committed_page_is_what_the_registry_writes, the_diagnostic_reference_lists_every_registered_code (2 of 22 tests fail; Rust test failure, Python body assertion)
+the reference has a row for a code the compiler lacks: KILLED by test_the_committed_page_is_what_the_registry_writes, the_diagnostic_reference_lists_every_registered_code (2 of 22 tests fail; Rust test failure, Python body assertion)
+a clean example need not check clean: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust test failure)
+an example need not be as `pw fmt` writes it: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust test failure)
+an example that parses is held to the format only where it is clean: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust test failure)
+a clean example need not build: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust test failure)
+a build gap may build: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust test failure)
+a gap's build output need not be what is shown: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust test failure)
+a refused example need not be refused: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust test failure)
+a refusal's codes are compared as a subset of what is reported: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust test failure)
+a refusal's codes are compared as a superset of what is reported: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust test failure)
+output a page shows of a refusal need not be what is printed: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust test failure)
+output a page shows keeps the closing count `pw check` prints: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust test failure)
+a fence of another character closes a block: KILLED by an_unclosed_or_indented_fence_is_refused (1 of 22 tests fail; Rust test failure)
+a closing fence may carry text: KILLED by an_unclosed_or_indented_fence_is_refused (1 of 22 tests fail; Rust test failure)
+a shorter fence closes a block: KILLED by a_page_with_no_example_or_a_block_unseen_is_reported (1 of 22 tests fail; Rust test failure)
+an indented fence is accepted: KILLED by an_unclosed_or_indented_fence_is_refused (1 of 22 tests fail; Rust test failure)
+a fence never closed is accepted: KILLED by an_unclosed_or_indented_fence_is_refused (1 of 22 tests fail; Rust test failure)
+two backticks are a fence: KILLED by a_fence_is_read_as_commonmark_reads_it (1 of 22 tests fail; Rust test failure)
+an attribute a block does not take is skipped: KILLED by an_info_string_says_what_a_block_is (1 of 22 tests fail; Rust test failure)
+an attribute may be given twice: KILLED by an_info_string_says_what_a_block_is (1 of 22 tests fail; Rust test failure)
+a file may be outside the page's tree: KILLED by an_info_string_says_what_a_block_is (1 of 22 tests fail; Rust test failure)
+a block may be a gap and a refusal: KILLED by an_info_string_says_what_a_block_is (1 of 22 tests fail; Rust test failure)
+another language's block takes attributes: KILLED by an_info_string_says_what_a_block_is (1 of 22 tests fail; Rust test failure)
+a language the guide is not written in passes: KILLED by an_info_string_says_what_a_block_is (1 of 22 tests fail; Rust test failure)
+a page's pieces are joined with no blank line: KILLED by a_pages_file_blocks_are_its_program_in_order (2 of 22 tests fail; Rust test failure)
+output belongs to any block before it: KILLED by shown_output_belongs_to_the_refused_example_before_it (1 of 22 tests fail; Rust test failure)
+a build's output belongs to any block before it: KILLED by a_gaps_build_output_belongs_to_the_gap_before_it (1 of 22 tests fail; Rust test failure)
+a build gap need not show what `pw build` prints: KILLED by a_gaps_build_output_belongs_to_the_gap_before_it (1 of 22 tests fail; Rust test failure)
+a page with no example is accepted: KILLED by a_page_with_no_example_or_a_block_unseen_is_reported (1 of 22 tests fail; Rust test failure)
+a Pleris block the reader of pages did not see goes unnoticed: KILLED by a_page_with_no_example_or_a_block_unseen_is_reported (1 of 22 tests fail; Rust test failure)
+a page's pieces are not counted: KILLED by a_page_with_no_example_or_a_block_unseen_is_reported, every_example_in_the_guide_compiles_as_it_says (2 of 22 tests fail; Rust test failure)
+the index is held to show Pleris: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust test failure)
+a page's program is not compared with the directory it names: KILLED by a_page_is_held_to_the_directory_it_names (1 of 22 tests fail; Rust test failure)
+a page that names a directory and builds nothing in it is accepted: KILLED by a_page_is_held_to_the_directory_it_names (1 of 22 tests fail; Rust test failure)
+the directory a page names is read with its spaces: KILLED by a_page_is_held_to_the_directory_it_names (2 of 22 tests fail; Rust test failure)
+a file the page lacks is not noticed: KILLED by a_program_differs_from_a_directory_by_a_file_or_a_byte (2 of 22 tests fail; Rust test failure)
+trailing space is no difference: KILLED by a_program_differs_from_a_directory_by_a_file_or_a_byte (2 of 22 tests fail; Rust test failure)
+a row's invariant is not compared with the registry's: KILLED by the_reference_is_held_to_the_registry (1 of 22 tests fail; Rust test failure)
+a code with no row is not reported: KILLED by the_reference_is_held_to_the_registry (1 of 22 tests fail; Rust test failure)
+a row for a code the compiler lacks is not reported: KILLED by the_reference_is_held_to_the_registry (1 of 22 tests fail; Rust test failure)
+an ADR a comment cites twice is listed twice: KILLED by test_each_entry_with_its_invariant_and_the_adrs_its_comment_cites (1 of 22 tests fail; Python body assertion)
+a comment is taken by the entry after the next: KILLED by test_each_entry_with_its_invariant_and_the_adrs_its_comment_cites (2 of 22 tests fail; Python body assertion)
+a line that is no entry is skipped: KILLED by test_a_line_that_is_no_entry_is_refused_not_skipped (1 of 22 tests fail; Python body assertion)
+a pipe in a cell ends it: KILLED by test_a_pipe_in_a_cell_is_escaped (2 of 22 tests fail; Python body assertion)
+a retired code's reason loses its continuation: KILLED by test_a_retired_code_with_its_reason_continued_across_lines (2 of 22 tests fail; Python body assertion)
+the retired codes are left out of the page: KILLED by test_the_committed_page_is_what_the_registry_writes (1 of 22 tests fail; Python body assertion)
+the last code of each owner is left out of the page: KILLED by test_the_committed_page_is_what_the_registry_writes (2 of 22 tests fail; Python body assertion)
 a signed entry does not clear the draft: KILLED by the spec (1 of 2 tests fail)
 Remove is offered on another reader's entry and not on one's own: KILLED by the spec (1 of 2 tests fail)
 a reader signed out is shown the signed-in half: KILLED by the spec (1 of 1 tests fail)
@@ -121,5 +122,5 @@ the entry can be removed before the server has it: KILLED by the spec (1 of 3 te
 the composer is shown to a reader signed out: KILLED by the checker (PW5048)
 Remove is shown to a reader signed out: KILLED by the checker (PW5048)
 the entries are not told of a signed entry: KILLED by the checker (PW5107)
-74 of 74 mutants killed
+74 of 74 mutants killed; 0 refused; 0 survived
 memory bound: no process was stopped

@@ -984,12 +984,22 @@ integrator's rulings of 2026-10-17):
   (`store.page.MenuLine`, `store.page.MenuSize`,
   `store.reviews.StoreRatings`) are what the compiler builds at the
   landing. Train-11 derives the list from the build.
-- Neither the planner nor the evidence fetch sees a change to a binary
-  file (`git diff -U0` gives it no `+++` line): a component's change
-  plans no recipe and stales no evidence, so the recipes that read one
-  are chosen by hand.
-- A failing browser run's trace survives only where no later Playwright
-  run in its shard clears `test-results/` first (NEXT).
+- The complete check (check-is-build, ADR-0361) refuses four accepted
+  programs, listed with their exact messages in
+  `examples/accepted/build-refusals.json`. Three use features the build does
+  not support yet: an element that mounts a resource (A-007), a page value
+  computed at build time from a workspace file (A-013), and `style:`
+  directives (A-018). One is a bug: the WIT generated for A-008 names an
+  item twice (`store-recommendations-recommendations-api`); NEXT queues it.
+- A binary file is planned by the lines that name it (ADR-0355); one a
+  program names only at run time, with its directory nowhere on the line,
+  is found only by the line that names the directory.
+- Seven recipes train-11's corpus gate reached have no evidence since it
+  (`e14-ids`, `e14-clause-heads`, `e14-opaque-value`,
+  `e14-resource-clauses`, `e10-callbacks`, `e10-members`, `e10-names`): the
+  next verify that plans them records it.
+- `stream_boot_mutations.py` runs only where Google Chrome is installed: on
+  CI's runners, not in the PC's WSL.
 
 **Findings about the evidence itself, fixed on train-10** (ADR-0344,
 ADR-0349): stale Python bytecode no longer decides a mutant's verdict; an

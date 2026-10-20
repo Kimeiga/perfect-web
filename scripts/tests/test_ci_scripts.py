@@ -290,6 +290,39 @@ class Plan(unittest.TestCase):
         other = plan.recipes_for({"spikes/own-renderer/README.md": [(1, 1)]}, 30, names)
         self.assertNotIn("e14-feed", other)
 
+    def test_the_modules_the_configuration_reads_are_its_own_and_plan_as_it_does(self) -> None:
+        # The host map (ADR-0356): the configuration plans each run's hosts
+        # with modules of its directory and the registry they read, found by
+        # following its imports; a change to any of them is a change to every
+        # suite run there, as a change to the configuration is.
+        found = plan.suite_configuration()
+        self.assertEqual(
+            sorted(found),
+            [
+                f"{plan.SUITE_DIRECTORY}/{name}"
+                for name in ("host-metadata.mjs", "host-plan-reporter.mjs", "host-plan.mjs", "host-registry.json", "playwright.config.mjs")
+            ],
+        )
+        names = plan.recipes()
+        body = plan.bodies()
+        under = sorted(n for n in names if plan.runs_browser_suite(body.get(n, "")))
+        for module in sorted(found - {plan.PLAYWRIGHT_CONFIG}):
+            planned = plan.recipes_for({module: [(1, 1)]}, 30, names)
+            self.assertEqual(sorted(set(under) - set(planned)), [], module)
+        # Followed through what each module imports or names beside itself,
+        # and not into what it only reads by a path of the tree.
+        with tempfile.TemporaryDirectory() as d:
+            root = pathlib.Path(d)
+            suite = root / plan.SUITE_DIRECTORY
+            suite.mkdir(parents=True)
+            (suite / "playwright.config.mjs").write_text('import { a } from "./a.mjs";\nimport { defineConfig } from "@playwright/test";\n')
+            (suite / "a.mjs").write_text('const b = await import("./b.mjs");\nconst data = new URL("./c.json", import.meta.url);\nreadFileSync("public/d.mjs");\n')
+            (suite / "b.mjs").write_text('export { a } from "./a.mjs";\n')
+            self.assertEqual(
+                sorted(plan.suite_configuration(root)),
+                [f"{plan.SUITE_DIRECTORY}/{name}" for name in ("a.mjs", "b.mjs", "c.json", "playwright.config.mjs")],
+            )
+
     def test_a_changed_spec_or_a_module_its_specs_import_plans_what_runs_them(self) -> None:
         # Track evidence-integrity-2: `e2e/accessibility-rules.mjs`, which
         # three specs import, planned nothing; and `e10-browser`, which runs
@@ -373,6 +406,87 @@ class Plan(unittest.TestCase):
             plan.recipes_for({"spikes/wasmtime-component/elsewhere.sh": [(1, 1)]}, 30, names),
             [],
         )
+
+    def test_a_changed_binary_is_named_where_a_line_names_it(self) -> None:
+        # Train-10's landing (2026-10-20): git diffs a binary with no `+++`
+        # line and no hunk, so 8c5618c8, which regenerated three of the
+        # store's components, planned no recipe and staled no evidence.
+        diff = (
+            b"diff --git a/d/x.wasm b/d/x.wasm\nindex 1..2 100644\n"
+            b"Binary files a/d/x.wasm and b/d/x.wasm differ\n"
+            b"diff --git a/n.bin b/n.bin\nnew file mode 100644\n"
+            b"Binary files /dev/null and b/n.bin differ\n"
+            b"diff --git a/g/o.bin b/g/o.bin\ndeleted file mode 100644\n"
+            b"Binary files a/g/o.bin and /dev/null differ\n"
+        )
+        self.assertEqual(plan.binaries(diff), ["d/x.wasm", "g/o.bin", "n.bin"])
+        self.assertEqual(plan.parsed(diff), {})
+        for line, named in [
+            ('std::fs::read(root().join("d/x.wasm"))', True),
+            ('let problems = components_against(&built, &root.join("d"));', True),
+            ('rm -f d/*.wasm; cp "$out"/components/*.wasm d/; \\', True),
+            ('let path = root().join(format!("d/{id}.wasm"));', True),
+            ('cmp "$out/$id.wasm" "d/$id.wasm"', True),
+            ("include_bytes!(\"../../d/${ID}.wasm\")", True),
+            # The controls: another file, a directory in it or beside it,
+            # another kind of file, another directory ending in its name.
+            ("d/y.wasm", False),
+            ('let dir = root.join("d/handlers");', False),
+            ("d/kiokun/x.wasm", False),
+            ("d/*/x.wasm", False),
+            ("d0/x.wasm", False),
+            ("dd/x.wasm", False),
+            ("d/*.json", False),
+        ]:
+            self.assertEqual(plan.names_binary(line, "d", "x.wasm"), named, line)
+
+    def test_a_changed_component_plans_the_recipes_whose_tests_read_it(self) -> None:
+        # On this tree: a committed component is read by `evidence_is_current`
+        # (whose scripts' recipes, e14-committed-components and others, run
+        # it), by pw-host's tests, by the server, and by e10-component's own
+        # lines, which write it.
+        names = plan.recipes()
+        component = "docs/evidence/E10/store.hours.CartHours.wasm"
+        readers = plan.read_by(component, None)
+        self.assertIn("compiler/pw-core/tests/evidence_is_current.rs", readers)
+        self.assertIn("runtime/pw-host/tests/display.rs", readers)
+        self.assertEqual([p for p in readers if p.startswith(plan.RECORDS)], [], "a record reads nothing")
+        planned = plan.recipes_for(plan.with_readers({}, [component], None), 30, names)
+        for recipe in ("e14-committed-components", "e10-component", "e14-last-known-good"):
+            self.assertIn(recipe, planned)
+        # The control: the component alone, as git's diff gave it, plans
+        # nothing (train-10's 72 recipes chosen by hand).
+        self.assertEqual(plan.recipes_for({component: []}, 30, names), [])
+
+    def test_a_binary_changed_in_a_range_or_the_tree_here_is_changed_where_it_is_read(self) -> None:
+        # `hunks`, end to end, on a git of its own: the range's and the
+        # tree's own changes, as the planner and the fetch's stale check ask.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+
+            def git(*args: str) -> str:
+                return subprocess.run(
+                    ["git", *args], cwd=root, check=True, capture_output=True, text=True
+                ).stdout.strip()
+
+            git("init", "-q")
+            git("config", "user.email", "toy@example.com")
+            git("config", "user.name", "toy")
+            (root / "d").mkdir()
+            (root / "d" / "x.bin").write_bytes(b"\x00one")
+            (root / "reader.rs").write_text('fn f() {}\nlet b = include_bytes!("d/x.bin");\n')
+            (root / "other.rs").write_text('let h = "d/handlers";\n')
+            git("add", "-A")
+            git("commit", "-q", "-m", "one")
+            first = git("rev-parse", "HEAD")
+            (root / "d" / "x.bin").write_bytes(b"\x00two")
+            expected = {"d/x.bin": [], "reader.rs": [(2, 2)]}
+            self.assertEqual(plan.hunks(first, None, root), expected)
+            git("commit", "-q", "-am", "two")
+            self.assertEqual(plan.hunks(first, "HEAD", root), expected)
+            # A text file's change is as it was: its own lines alone.
+            (root / "other.rs").write_text('let h = "d/handlers";\nlet i = 1;\n')
+            self.assertEqual(plan.hunks("HEAD", None, root), {"other.rs": [(2, 2)]})
 
     def test_a_recipe_in_an_imported_file_is_read_and_planned(self) -> None:
         # ADR-0253: a track's recipes live in a file the justfile imports.

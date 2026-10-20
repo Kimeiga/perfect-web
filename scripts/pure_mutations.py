@@ -106,8 +106,8 @@ MUTANTS = [
     (
         "a program that does not parse is compiled",
         LOWER,
-        "            units.iter().flat_map(syntax_errors).collect();",
-        "            Vec::new();",
+        "        if syntax.iter().any(|(_, ds)| !ds.is_empty()) {",
+        "        if false && syntax.iter().any(|(_, ds)| !ds.is_empty()) {",
     ),
     (
         "an operator after a name starts a policy",

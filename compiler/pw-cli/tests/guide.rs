@@ -396,6 +396,16 @@ fn codes_in(output: &str) -> BTreeSet<String> {
 /// **What is wrong with one example**, or nothing: checked in a directory
 /// of its own, its files written as the guide gives them.
 fn verdict(example: &Example, scratch: &Path) -> Option<String> {
+    verdict_with_build(example, scratch, build)
+}
+
+/// The same verdict with a build operation, so its tests can exercise a real
+/// output IO failure after semantic check succeeds. No compiler gap is faked.
+fn verdict_with_build(
+    example: &Example,
+    scratch: &Path,
+    build: impl Fn(&[&std::ffi::OsStr], &[PathBuf], &Path) -> (Option<i32>, String, String),
+) -> Option<String> {
     let _ = std::fs::remove_dir_all(scratch);
     for (name, src) in &example.files {
         let path = scratch.join(name);
@@ -810,7 +820,7 @@ fn a_wrong_example_is_reported_and_a_right_one_is_not() {
     let right = "module ok\n\nfn one() -> Int !{} {\n    1\n}\n";
     let mistyped = "module bad\n\nfn one() -> String !{} {\n    1\n}\n";
     let unformatted = "module ok\n\nfn one() -> Int !{} {\n  1\n}\n";
-    // Checks clean, and `pw build` refuses it (ADR-0137).
+    // A former build gap, now refused by check as PW6601 (ADR-0137).
     let unbuilt = "module titled\n\npage Counter() {\n    route \"/counter\"\n    cache private\n\n    \
                    signal count: Int = 0\n\n    view {\n        <title>Pressed {count}</title>\n        \
                    <button type=\"button\" on:press={() => count = count + 1}>Press</button>\n    }\n}\n";
@@ -826,6 +836,16 @@ fn a_wrong_example_is_reported_and_a_right_one_is_not() {
     let cases: Vec<(&str, Example, Option<&str>)> = vec![
         ("a right example", example(right, Expect::Clean), None),
         (
+            "a former build gap is now an explicit refusal",
+            example(unbuilt, fails(&["PW6601"], None)),
+            None,
+        ),
+        (
+            "a build gap closed by check is reported",
+            example(unbuilt, Expect::Gap(Gap::Build, None)),
+            Some("a gap is a program `pw check` passes"),
+        ),
+        (
             "a mistyped one",
             example(mistyped, Expect::Clean),
             Some("expected no diagnostics"),
@@ -836,8 +856,8 @@ fn a_wrong_example_is_reported_and_a_right_one_is_not() {
             Some("not as `pw fmt` writes it"),
         ),
         (
-            "one that checks and does not build",
-            example(unbuilt, Expect::Clean),
+            "a clean example whose artifact destination is unwritable",
+            example(right, Expect::Clean),
             Some("`pw build` refuses it"),
         ),
         (
@@ -885,8 +905,8 @@ fn a_wrong_example_is_reported_and_a_right_one_is_not() {
             None,
         ),
         (
-            "a build gap: checks, and does not build",
-            example(unbuilt, Expect::Gap(Gap::Build, None)),
+            "an operational build gap: the destination cannot be written",
+            example(right, Expect::Gap(Gap::Build, None)),
             None,
         ),
         (
@@ -905,8 +925,8 @@ fn a_wrong_example_is_reported_and_a_right_one_is_not() {
             Some("not as `pw fmt` writes it"),
         ),
         (
-            "a build gap whose build output is shown wrongly",
-            example(unbuilt, Expect::Gap(Gap::Build, shown_wrongly)),
+            "an operational build gap whose output is shown wrongly",
+            example(right, Expect::Gap(Gap::Build, shown_wrongly)),
             Some("output `pw build` no longer prints"),
         ),
         (
@@ -915,8 +935,8 @@ fn a_wrong_example_is_reported_and_a_right_one_is_not() {
             None,
         ),
         (
-            "a check gap that the build refuses says nothing of the build",
-            example(unbuilt, Expect::Gap(Gap::Check, None)),
+            "a check gap says nothing about an unwritable build destination",
+            example(right, Expect::Gap(Gap::Check, None)),
             None,
         ),
         (
@@ -932,7 +952,19 @@ fn a_wrong_example_is_reported_and_a_right_one_is_not() {
     ];
     let mut wrong = Vec::new();
     for (i, (what, e, expected)) in cases.iter().enumerate() {
-        let said = verdict(e, &scratch.join(i.to_string()));
+        let dir = scratch.join(i.to_string());
+        let said = if what.contains("destination") || what.contains("operational build gap") {
+            verdict_with_build(e, &dir, |names, packages, scratch| {
+                std::fs::write(
+                    scratch.join("build-out"),
+                    "an output file blocks the directory",
+                )
+                .unwrap();
+                build(names, packages, scratch)
+            })
+        } else {
+            verdict(e, &dir)
+        };
         let as_expected = match (&said, expected) {
             (None, None) => true,
             (Some(said), Some(sentence)) => said.contains(sentence),

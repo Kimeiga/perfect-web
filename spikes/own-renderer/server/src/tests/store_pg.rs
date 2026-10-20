@@ -699,9 +699,13 @@ fn on_postgres_the_stores_schema_is_its_own_beside_the_feeds() {
         url.clone(),
         format!("pw_store_test_{}_beside_feed", std::process::id()),
     );
-    let feed =
-        crate::feed_pg::FeedPg::open_with(&url, Some(&feed_schema.1), Isolation::Serializable)
-            .expect("the feed opened");
+    let feed = crate::feed_pg::FeedPg::open_with(
+        &url,
+        Some(&feed_schema.1),
+        Isolation::Serializable,
+        crate::feed_pg::RenderSeats::default(),
+    )
+    .expect("the feed opened");
     let s = served(&url);
     let tables = |schema: &str| -> Vec<String> {
         s.layer

@@ -1,0 +1,126 @@
+{
+  "source_sha256": "a2fe751498260a4ce443b4395174bbad25ead5c848fa2456e1f8d02026b4ea7d",
+  "canonical_producer_sha256": "902dfef3cf62b16eaa264f0cba52a1bc30bc25d9c7e6bf0718ae6a2beea8b662",
+  "canonical_protocol_sha256": "91e941dc2157d53292aa5a709c4c3f0d10210f61a2db23d9edcaeb1df691ee55",
+  "unit_level_native_evidence_only": true,
+  "project_source_mutation": false,
+  "private_fixture_finally_equality_asserted": true,
+  "records": [
+    {
+      "mode": "setup_error",
+      "campaign_status": 1,
+      "body_marker_present": false,
+      "result": {
+        "valid": false,
+        "reason": "producer refused execution",
+        "passed": [],
+        "assertion_failed": [],
+        "body_errors": [],
+        "executed": 0
+      },
+      "actual_child_status": 2,
+      "receipt_directory": "/tmp/pw-guide-python-evidence-rptdf39o/pw-guide-result-wyg6gpuf",
+      "main_output": "Python frozen full IDs: ['private_native.Native.test_required']; evidence /tmp/pw-guide-python-evidence-rptdf39o\nbaseline: the guide's tests, 2 ran, 0 failed\nnative intended mutation: REFUSED (invalid or stopped guide producer; no kill)\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n\ntest_required (private_native.Native) ... ERROR\n\n======================================================================\nERROR: test_required (private_native.Native)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/home/haki/code/pw-wt/check-is-build/scripts/unittest_producer.py\", line 202, in observed\n    return self.checked(callback(*args, **kwargs), label)\n  File \"/tmp/pw-guide-native-main-76ksnjx1/private_native.py\", line 6, in setUp\n    if MODE == \"setup_error\": raise OSError(\"actual setUp error\")\nOSError: actual setUp error\n\n----------------------------------------------------------------------\nRan 1 test in 0.000s\n\nFAILED (errors=1)\n\nPython structured receipt: /tmp/pw-guide-python-evidence-rptdf39o/pw-guide-result-wyg6gpuf\n{\"valid\": false, \"reason\": \"producer refused execution\", \"passed\": [], \"assertion_failed\": [], \"body_errors\": [], \"executed\": 0, \"report_sha256\": \"af356bacd22bd4be48dbdc86c995a6379aed0cd6d8d44c0ea9a26be162c82411\"}\n\n0 of 1 mutants killed; 1 refused; 0 survived\n"
+    },
+    {
+      "mode": "setup_assertion",
+      "campaign_status": 1,
+      "body_marker_present": false,
+      "result": {
+        "valid": false,
+        "reason": "producer refused execution",
+        "passed": [],
+        "assertion_failed": [],
+        "body_errors": [],
+        "executed": 0
+      },
+      "actual_child_status": 2,
+      "receipt_directory": "/tmp/pw-guide-python-evidence-u0ph_0ua/pw-guide-result-404unewr",
+      "main_output": "Python frozen full IDs: ['private_native.Native.test_required']; evidence /tmp/pw-guide-python-evidence-u0ph_0ua\nbaseline: the guide's tests, 2 ran, 0 failed\nnative intended mutation: REFUSED (invalid or stopped guide producer; no kill)\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n\ntest_required (private_native.Native) ... FAIL\n\n======================================================================\nFAIL: test_required (private_native.Native)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/home/haki/code/pw-wt/check-is-build/scripts/unittest_producer.py\", line 202, in observed\n    return self.checked(callback(*args, **kwargs), label)\n  File \"/tmp/pw-guide-native-main-baclc5ab/private_native.py\", line 7, in setUp\n    if MODE == \"setup_assertion\": raise AssertionError(\"actual setUp assertion\")\nAssertionError: actual setUp assertion\n\n----------------------------------------------------------------------\nRan 1 test in 0.000s\n\nFAILED (failures=1)\n\nPython structured receipt: /tmp/pw-guide-python-evidence-u0ph_0ua/pw-guide-result-404unewr\n{\"valid\": false, \"reason\": \"producer refused execution\", \"passed\": [], \"assertion_failed\": [], \"body_errors\": [], \"executed\": 0, \"report_sha256\": \"d68fea886b1a8129f3bc47e062d834d84db9724d720701d1c968a23eace7af2d\"}\n\n0 of 1 mutants killed; 1 refused; 0 survived\n"
+    },
+    {
+      "mode": "teardown_error",
+      "campaign_status": 1,
+      "body_marker_present": true,
+      "result": {
+        "valid": false,
+        "reason": "producer refused execution",
+        "passed": [],
+        "assertion_failed": [],
+        "body_errors": [],
+        "executed": 0
+      },
+      "actual_child_status": 2,
+      "receipt_directory": "/tmp/pw-guide-python-evidence-b0qfb33d/pw-guide-result-rmiqa5bo",
+      "main_output": "Python frozen full IDs: ['private_native.Native.test_required']; evidence /tmp/pw-guide-python-evidence-b0qfb33d\nbaseline: the guide's tests, 2 ran, 0 failed\nnative intended mutation: REFUSED (invalid or stopped guide producer; no kill)\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n\ntest_required (private_native.Native) ... ERROR\n\n======================================================================\nERROR: test_required (private_native.Native)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/home/haki/code/pw-wt/check-is-build/scripts/unittest_producer.py\", line 202, in observed\n    return self.checked(callback(*args, **kwargs), label)\n  File \"/tmp/pw-guide-native-main-mbn4lqj2/private_native.py\", line 9, in tearDown\n    if MODE == \"teardown_error\": raise OSError(\"actual tearDown error\")\nOSError: actual tearDown error\n\n----------------------------------------------------------------------\nRan 1 test in 0.000s\n\nFAILED (errors=1)\n\nPython structured receipt: /tmp/pw-guide-python-evidence-b0qfb33d/pw-guide-result-rmiqa5bo\n{\"valid\": false, \"reason\": \"producer refused execution\", \"passed\": [], \"assertion_failed\": [], \"body_errors\": [], \"executed\": 0, \"report_sha256\": \"3a2352535ead8b8df16a92217273849f4f6668662162b0eaf9babce46e915098\"}\n\n0 of 1 mutants killed; 1 refused; 0 survived\n"
+    },
+    {
+      "mode": "teardown_assertion",
+      "campaign_status": 1,
+      "body_marker_present": true,
+      "result": {
+        "valid": false,
+        "reason": "producer refused execution",
+        "passed": [],
+        "assertion_failed": [],
+        "body_errors": [],
+        "executed": 0
+      },
+      "actual_child_status": 2,
+      "receipt_directory": "/tmp/pw-guide-python-evidence-dak22qq6/pw-guide-result-pefptmjo",
+      "main_output": "Python frozen full IDs: ['private_native.Native.test_required']; evidence /tmp/pw-guide-python-evidence-dak22qq6\nbaseline: the guide's tests, 2 ran, 0 failed\nnative intended mutation: REFUSED (invalid or stopped guide producer; no kill)\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n\ntest_required (private_native.Native) ... FAIL\n\n======================================================================\nFAIL: test_required (private_native.Native)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/home/haki/code/pw-wt/check-is-build/scripts/unittest_producer.py\", line 202, in observed\n    return self.checked(callback(*args, **kwargs), label)\n  File \"/tmp/pw-guide-native-main-n54piw69/private_native.py\", line 10, in tearDown\n    if MODE == \"teardown_assertion\": raise AssertionError(\"actual tearDown assertion\")\nAssertionError: actual tearDown assertion\n\n----------------------------------------------------------------------\nRan 1 test in 0.000s\n\nFAILED (failures=1)\n\nPython structured receipt: /tmp/pw-guide-python-evidence-dak22qq6/pw-guide-result-pefptmjo\n{\"valid\": false, \"reason\": \"producer refused execution\", \"passed\": [], \"assertion_failed\": [], \"body_errors\": [], \"executed\": 0, \"report_sha256\": \"3448b78e4bb1656288941615b6492b7a68afacde00c602ee5ea321983cee448c\"}\n\n0 of 1 mutants killed; 1 refused; 0 survived\n"
+    },
+    {
+      "mode": "assertion",
+      "campaign_status": 0,
+      "body_marker_present": true,
+      "result": {
+        "valid": true,
+        "reason": "complete",
+        "passed": [],
+        "assertion_failed": [
+          "private_native.Native.test_required"
+        ],
+        "body_errors": [],
+        "executed": 1
+      },
+      "actual_child_status": 1,
+      "receipt_directory": "/tmp/pw-guide-python-evidence-xnu_dw_q/pw-guide-result-84i24bdb",
+      "main_output": "Python frozen full IDs: ['private_native.Native.test_required']; evidence /tmp/pw-guide-python-evidence-xnu_dw_q\nbaseline: the guide's tests, 2 ran, 0 failed\nnative intended mutation: KILLED by test_required (1 of 2 tests fail; Python body assertion)\n1 of 1 mutants killed; 0 refused; 0 survived\n"
+    },
+    {
+      "mode": "body_error",
+      "campaign_status": 0,
+      "body_marker_present": true,
+      "result": {
+        "valid": true,
+        "reason": "complete",
+        "passed": [],
+        "assertion_failed": [],
+        "body_errors": [
+          "private_native.Native.test_required"
+        ],
+        "executed": 1
+      },
+      "actual_child_status": 1,
+      "receipt_directory": "/tmp/pw-guide-python-evidence-evxaeuxu/pw-guide-result-pmyfgrjt",
+      "main_output": "Python frozen full IDs: ['private_native.Native.test_required']; evidence /tmp/pw-guide-python-evidence-evxaeuxu\nbaseline: the guide's tests, 2 ran, 0 failed\nnative intended mutation: KILLED by test_required (1 of 2 tests fail; Python body error)\n1 of 1 mutants killed; 0 refused; 0 survived\n"
+    },
+    {
+      "mode": "returned_coroutine",
+      "campaign_status": 1,
+      "body_marker_present": true,
+      "result": {
+        "valid": false,
+        "reason": "producer refused execution",
+        "passed": [],
+        "assertion_failed": [],
+        "body_errors": [],
+        "executed": 0
+      },
+      "actual_child_status": 2,
+      "receipt_directory": "/tmp/pw-guide-python-evidence-jyr6rxeb/pw-guide-result-eo1934ah",
+      "main_output": "Python frozen full IDs: ['private_native.Native.test_required']; evidence /tmp/pw-guide-python-evidence-jyr6rxeb\nbaseline: the guide's tests, 2 ran, 0 failed\nnative intended mutation: REFUSED (invalid or stopped guide producer; no kill)\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n\ntest_required (private_native.Native) ... ok\n\n----------------------------------------------------------------------\nRan 1 test in 0.000s\n\nOK\n\nPython structured receipt: /tmp/pw-guide-python-evidence-jyr6rxeb/pw-guide-result-eo1934ah\n{\"valid\": false, \"reason\": \"producer refused execution\", \"passed\": [], \"assertion_failed\": [], \"body_errors\": [], \"executed\": 0, \"report_sha256\": \"3f95c9a6a505da8c26f83e5026cc1a09a17b6c747c620d4f409ead1583f8fef3\"}\n\n0 of 1 mutants killed; 1 refused; 0 survived\n"
+    }
+  ]
+}

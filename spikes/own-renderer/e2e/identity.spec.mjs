@@ -19,7 +19,7 @@
 //     timeline; another user has no Delete for it;
 //   - sign-out forgets the session, and sign-in takes the password.
 import { expect, test } from "@playwright/test";
-import { IDENTITY_PORTS } from "../playwright.config.mjs";
+import { IDENTITY_PORTS } from "../host-metadata.mjs";
 
 test.use({
   baseURL: async ({}, use, testInfo) => {

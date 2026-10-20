@@ -158,17 +158,9 @@ fn the_check_would_notice_a_change() {
     );
 }
 
-/// **The committed E10 components are what the compiler builds now.**
-///
-/// `runtime/pw-host/tests/pleris_component.rs` and the development server run
-/// `docs/evidence/E10/<component id>.wasm` without linking the compiler, so the
-/// bytes they run must be these: a stale artifact would let them pass against
-/// a command the compiler no longer produces. Byte-for-byte, which also holds
-/// the build to determinism.
-#[test]
-fn the_committed_components_are_what_the_compiler_builds_now() {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let units: Vec<pw_core::check::Unit> = store_sources(&root)
+/// The store's sources as compilation units, in `store_sources`' order.
+fn units_of(sources: Vec<String>) -> Vec<pw_core::check::Unit> {
+    sources
         .into_iter()
         .enumerate()
         .map(|(i, src)| pw_core::check::Unit {
@@ -176,47 +168,151 @@ fn the_committed_components_are_what_the_compiler_builds_now() {
             hir: lower_file(&src, &parse_tree(&src).green),
             src,
         })
+        .collect()
+}
+
+/// **Every component a build emits, by id, with its bytes**: what `pw build`
+/// writes as `components/<id>.wasm`, a command's, a query's or a member's a
+/// page reads through, in the build's order. The list is the build's, never
+/// one kept beside it: kept by hand until train-11, it named 14 of the 20
+/// committed components, and three of the six it left out went stale with
+/// nothing to see it (`store.hours.StoreStatus`, `StoresOpen`, `CartHours`).
+fn built_components(built: &pw_core::build::Build) -> Vec<(String, Vec<u8>)> {
+    built
+        .components
+        .iter()
+        .filter_map(|(id, b)| match b {
+            pw_core::backend::component::Built::Component { compiled, .. } => {
+                Some((id.clone(), compiled.component.bytes.clone()))
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+/// **Each way the components committed in `dir` are not `built`**: one built
+/// and not committed, one committed with other bytes, and one committed that
+/// the build no longer emits. None where `dir` holds exactly the build's
+/// components, byte for byte.
+fn components_against(built: &[(String, Vec<u8>)], dir: &std::path::Path) -> Vec<String> {
+    let mut problems = Vec::new();
+    for (id, bytes) in built {
+        match std::fs::read(dir.join(format!("{id}.wasm"))) {
+            Err(_) => problems.push(format!("{id}: built, not committed")),
+            Ok(committed) if committed != *bytes => problems.push(format!(
+                "{id}: committed {} bytes, built {} now",
+                committed.len(),
+                bytes.len()
+            )),
+            Ok(_) => {}
+        }
+    }
+    let emitted: std::collections::BTreeSet<&str> =
+        built.iter().map(|(id, _)| id.as_str()).collect();
+    let mut committed: Vec<String> = std::fs::read_dir(dir)
+        .unwrap_or_else(|e| panic!("{}: {e}", dir.display()))
+        .filter_map(|e| {
+            let path = e.expect("entry").path();
+            let id = path
+                .file_name()?
+                .to_str()?
+                .strip_suffix(".wasm")?
+                .to_string();
+            Some(id)
+        })
         .collect();
-    // The store's queries since ADR-0125: the development server runs them to
-    // decide what the page shows.
+    committed.sort();
+    for id in committed {
+        if !emitted.contains(id.as_str()) {
+            problems.push(format!("{id}: committed, not built"));
+        }
+    }
+    problems
+}
+
+/// **The committed E10 components are what the compiler builds now**, every
+/// one the store's build emits, and no other.
+///
+/// `runtime/pw-host/tests/pleris_component.rs` and the development server run
+/// `docs/evidence/E10/<component id>.wasm` without linking the compiler, so the
+/// bytes they run must be these: a stale artifact would let them pass against
+/// a command the compiler no longer produces. Byte-for-byte, which also holds
+/// the build to determinism. `just e10-component` commits what the build
+/// emits, whole.
+#[test]
+fn the_committed_components_are_what_the_compiler_builds_now() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let built = pw_core::build::build(&units_of(store_sources(&root))).expect("the store builds");
+    let built = built_components(&built);
+    // Not nothing: the commands and queries the host's and the development
+    // server's tests run are among them.
     for id in [
         "store.page.add_to_cart",
-        "store.page.clear_cart",
         "store.page.Store",
-        "store.page.Menu",
-        "store.page.Cart",
-        // Whether the store reaches the reader's address (track
-        // `store-accounts`).
-        "store.page.Reach",
-        // The member function the page reads `cart.line_count` through: a
-        // user's cart's since track `store-accounts` (ADR-0318).
         "UserCarts.line_count",
-        // And the one a menu's row reads `item.price.display` through
-        // (ADR-0169).
-        "domain.display",
-        // A line's controls, and what the cart's lines read through
-        // (ADR-0172).
-        "store.page.increase_in_cart",
-        "store.page.decrease_in_cart",
-        "store.page.remove_from_cart",
-        "domain.count",
-        "domain.total",
-        "UserCarts.subtotal",
     ] {
-        let fresh = pw_core::backend::component::compile(&units, id)
-            .unwrap_or_else(|e| panic!("{id} compiles: {e}"));
-        let path = format!("docs/evidence/E10/{id}.wasm");
-        let committed = std::fs::read(root.join(&path))
-            .unwrap_or_else(|e| panic!("{path}: {e} — run `just e10-component`"));
-        assert!(
-            fresh.component.bytes == committed,
-            "{path} is stale ({} bytes committed, {} built now). Run `just e10-component` \
-             and commit the result, saying in the commit message what changed in the \
-             compiled command.",
-            committed.len(),
-            fresh.component.bytes.len()
-        );
+        assert!(built.iter().any(|(b, _)| b == id), "{id} is built");
     }
+    let problems = components_against(&built, &root.join("docs/evidence/E10"));
+    assert!(
+        problems.is_empty(),
+        "docs/evidence/E10's components are not the build's: {problems:?}. Run \
+         `just e10-component` and commit the result, saying in the commit message what \
+         changed in the compiled components."
+    );
+}
+
+/// **A component the build adds fails the check until it is committed
+/// current**: the store with one query more, built; its components but that
+/// one, committed: the check names it as not committed; committed with other
+/// bytes, as stale; committed as built, not at all. And one committed that the
+/// build no longer emits is named too.
+#[test]
+fn a_component_the_build_adds_fails_the_check_until_it_is_committed_current() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let mut sources = store_sources(&root);
+    let places = "public query Places() -> List<Place>\n";
+    let app = sources
+        .iter_mut()
+        .find(|s| s.contains(places))
+        .expect("the store's app declares `Places`");
+    app.push_str(
+        "\npublic query PlacesAgain() -> List<Place>\n    freshness   1.hours\n    \
+         consistency snapshot\n    cache       shared\n    concurrency one_per_key\n    \
+         timeout     2.seconds\n{\n    Addresses.places()\n}\n",
+    );
+    let built =
+        pw_core::build::build(&units_of(sources)).expect("the store and its query more build");
+    let built = built_components(&built);
+    let id = "store.page.PlacesAgain";
+    let bytes = built
+        .iter()
+        .find(|(b, _)| b == id)
+        .map(|(_, bytes)| bytes.clone())
+        .expect("the query more is a component the build emits");
+    let dir = tempfile::tempdir().expect("a directory");
+    for (other, bytes) in built.iter().filter(|(b, _)| b != id) {
+        std::fs::write(dir.path().join(format!("{other}.wasm")), bytes).expect("written");
+    }
+    assert_eq!(
+        components_against(&built, dir.path()),
+        vec![format!("{id}: built, not committed")]
+    );
+    std::fs::write(dir.path().join(format!("{id}.wasm")), b"stale").expect("written");
+    assert_eq!(
+        components_against(&built, dir.path()),
+        vec![format!(
+            "{id}: committed 5 bytes, built {} now",
+            bytes.len()
+        )]
+    );
+    std::fs::write(dir.path().join(format!("{id}.wasm")), &bytes).expect("written");
+    assert_eq!(components_against(&built, dir.path()), Vec::<String>::new());
+    std::fs::write(dir.path().join("store.page.Gone.wasm"), b"gone").expect("written");
+    assert_eq!(
+        components_against(&built, dir.path()),
+        vec!["store.page.Gone: committed, not built".to_string()]
+    );
 }
 
 /// **The committed page plan is what the compiler plans now** (ADR-0125).

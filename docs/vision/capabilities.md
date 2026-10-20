@@ -115,7 +115,8 @@ Checked against train-10 (`track/train-10`, 2026-10-17): `master` at
   secrets.
 - Queued in NEXT and not built: migrations across live deploys, secrets
   management, rate limiting and backups. Wasmtime's advisories of
-  2026-10-14 are fixed by 48.0.6 (0335).
+  2026-10-14 are fixed by 48.0.6 (0335), and those of 2026-10-19 by 48.0.7
+  (0363).
 
 **Interop**
 

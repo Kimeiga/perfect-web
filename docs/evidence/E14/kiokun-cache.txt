@@ -1,0 +1,25 @@
+ADR-0358 - Kiokun cache publication and reader lifetime
+
+produced by: just e14-kiokun-cache
+commit: 320c52a44840a80423609ab476eb847c04de34a6
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39442025240 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+
+running 10 tests
+..........
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 661 filtered out; finished in 2.30s
+
+baseline: 10 passed, 0 failed
+builders share one staging directory: KILLED (3 of 10 tests fail)
+failed and losing builders leave their own stages: KILLED (2 of 10 tests fail)
+failure cleanup removes other builders and winners: KILLED (3 of 10 tests fail)
+a delayed publisher replaces the complete winner: KILLED (2 of 10 tests fail)
+stored fingerprint is not compared to the input: KILLED (1 of 10 tests fail)
+stored FTS schema is not checked: KILLED (1 of 10 tests fail)
+the losing publisher skips SQLite winner validation: KILLED (1 of 10 tests fail)
+published connections are writable: KILLED (1 of 10 tests fail)
+a new version prunes live versions and builders: KILLED (4 of 10 tests fail)
+small inputs create disk cache artifacts: KILLED (1 of 10 tests fail)
+10 of 10 mutants killed
+memory bound: no process was stopped

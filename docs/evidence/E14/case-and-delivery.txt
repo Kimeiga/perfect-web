@@ -1,8 +1,8 @@
 ADR-0153, ADR-0154 - a case tested with {#match}, a command a page sends declared idempotent
 
 produced by: just e14-case-and-delivery
-commit: ddaeeb1dfba9630371b7dd5b127c23855d245c74
-ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39131257549 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 2b8a8b81bb410adbc3174edc6039dff29125c4c4
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39478386992 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the tests (compiler/pw-core/tests/case_and_delivery.rs)
@@ -13,12 +13,12 @@ test a_command_a_page_handler_calls_declares_idempotent_by ... ok
 test every_case_named_by_a_match_is_the_control ... ok
 test an_idempotent_command_and_one_no_handler_calls_are_the_controls ... ok
 test a_template_tests_a_case_with_match ... ok
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.43s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.60s
 
 == the store, the accepted corpus and the demos check as before
 
+accepted corpus: 42 programs, 38 with no error, 4 refused exactly as listed (examples/accepted/build-refusals.json: 4 entries)
 store: pw check: 56 file(s), no diagnostics
-accepted: pw check: 90 file(s), 0 error(s), 1 warning(s)
 demo: pw check: 60 file(s), no diagnostics
 
 == mutation controls (scripts/case_and_delivery_mutations.py)

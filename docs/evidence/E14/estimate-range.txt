@@ -1,8 +1,8 @@
 ADR-0180 - a delivery estimate is a range, and says when it was made
 
 produced by: just e14-estimate-range
-commit: 8c5618c86eeb62202be29b374661962175bfefb0
-ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39325789224 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 320c52a44840a80423609ab476eb847c04de34a6
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39442025240 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
@@ -13,11 +13,11 @@ test tests::a_failed_estimate_fills_its_region_and_the_page_is_served ... ok
 test tests::a_delivery_estimate_is_a_range ... ok
 test tests::a_session_s_estimate_is_its_estimator_s ... ok
 test tests::the_store_sends_its_slots_after_its_own_content ... ok
-test result: ok. 620 passed; 0 failed; 9 ignored; 0 measured; 0 filtered out; finished in 1218.12s
+test result: ok. 662 passed; 0 failed; 9 ignored; 0 measured; 0 filtered out; finished in 253.88s
 
 == the page, in three engines (e2e/slots.spec.mjs)
 
-  21 passed (4.9m)
+  21 passed (29.7s)
 
 == mutation controls (scripts/estimate_range_mutations.py)
 

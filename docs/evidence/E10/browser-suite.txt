@@ -1,8 +1,8 @@
 E10 - the store page, compiled commands and handlers, in browser engines: chromium firefox webkit
 
 produced by: just e10-browser "chromium firefox webkit" docs/evidence/E10/browser-suite.txt
-commit: 587657ff828b390e958e582f8ff3749f2b0d5af9
-ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39270030023 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 320c52a44840a80423609ab476eb847c04de34a6
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39442025240 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 playwright: Version 1.58.0
 
 == run 1 of 3
@@ -13,7 +13,7 @@ EVIDENCE interactive-wasm-bytes=57951 brotli=21284
 EVIDENCE  script 123838 gzip=39453 brotli=33353 http://127.0.0.1:3148/pw-runtime.mjs
 EVIDENCE  wasm 57951 gzip=24939 brotli=21284 http://127.0.0.1:3148/pw-resume.wasm
   20 skipped
-  1156 passed (17.4m)
+  1156 passed (23.8m)
 == run 2 of 3
 EVIDENCE static-route-script-bytes=0 wasm-bytes=0
 EVIDENCE renderer-wasm-bytes=386038 gzip=115553 brotli=91790
@@ -22,7 +22,7 @@ EVIDENCE interactive-wasm-bytes=57951 brotli=21284
 EVIDENCE  script 123838 gzip=39453 brotli=33353 http://127.0.0.1:3148/pw-runtime.mjs
 EVIDENCE  wasm 57951 gzip=24939 brotli=21284 http://127.0.0.1:3148/pw-resume.wasm
   20 skipped
-  1156 passed (16.9m)
+  1156 passed (22.9m)
 == run 3 of 3
 EVIDENCE static-route-script-bytes=0 wasm-bytes=0
 EVIDENCE interactive-script-bytes=123838 brotli=33353
@@ -31,4 +31,4 @@ EVIDENCE  script 123838 gzip=39453 brotli=33353 http://127.0.0.1:3148/pw-runtime
 EVIDENCE  wasm 57951 gzip=24939 brotli=21284 http://127.0.0.1:3148/pw-resume.wasm
 EVIDENCE renderer-wasm-bytes=386038 gzip=115553 brotli=91790
   20 skipped
-  1156 passed (16.7m)
+  1156 passed (23.1m)

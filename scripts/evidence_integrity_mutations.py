@@ -19,7 +19,10 @@ Each mutant undoes one piece:
    its staleness is read at the head and not in the tree here; and (the
    integrator's ruling 1 of 2026-10-17, train-10) a part's count held to its
    whole script's, a script's parts leaving a mutant to none or holding one
-   twice, or a part no recipe runs let be;
+   twice, or a part no recipe runs let be; and (2b, train-11, 2026-10-20) a
+   binary file's change is read as none: the diff's binaries not read, their
+   readers' lines not changes, a directory named whole, a placeholder, a
+   directory inside or ending in the binary's, or a record misread;
 3. a rejected fixture's `@rule` is its code as written
    (`checking_source.rs`): an alias, a retired code, a code its check does
    not report, or another code's invariant passes; R-004 names its alias
@@ -28,7 +31,7 @@ Each mutant undoes one piece:
    checked: checking is pathological (the program checked ten times over,
    as the ceiling is two and a half times CI's slowest runner's, some six
    and a half times the PC's), or the thread's clock reads nothing;
-5. a browser suite runs on what its recipe built (`playwright.config.mjs`,
+5. a browser suite runs on what its recipe built (`host-metadata.mjs`,
    the justfile): a `dist` that records no sources is served; `e14-signals`
    runs its suite on what was built before; `e14-slots`'s build failing
    leaves its suite to run;
@@ -62,7 +65,7 @@ CORPUS = ROOT / "compiler/pw-core/tests/checking_source.rs"
 R004 = ROOT / "examples/rejected/R-004-private-cart-in-shared-cache.pw"
 CHECK = ROOT / "compiler/pw-core/src/check.rs"
 LATENCY = ROOT / "compiler/pw-core/tests/check_latency.rs"
-CONFIG = ROOT / "spikes/own-renderer/playwright.config.mjs"
+METADATA = ROOT / "spikes/own-renderer/host-metadata.mjs"
 JUSTFILE = ROOT / "justfile"
 ADRS = ROOT / "scripts/unnumbered_adrs.py"
 RECIPE = ROOT / "just/evidence-integrity.just"
@@ -248,6 +251,65 @@ MUTANTS = [
         "            reach=lambda sha, head: set(plan.recipes_for(plan.hunks(sha, None), plan.NEAR, names)),\n",
         "            reach=lambda sha, head: set(plan.recipes_for(plan.hunks(sha, head), plan.NEAR, names)),\n",
     ),
+    # 2b. A binary's change planned by what reads it (train-11, 2026-10-20:
+    # train-10's regenerated components planned nothing).
+    (
+        "a binary file's change is read as no change",
+        "plan",
+        PLAN,
+        "    return with_readers(parsed(diff), binaries(diff), head, root)\n",
+        "    return parsed(diff)\n",
+    ),
+    (
+        "the diff's binary files are not read",
+        "plan",
+        PLAN,
+        "    return sorted({m.group(2) or m.group(1) for m in BINARY.finditer(text)})\n",
+        "    return []\n",
+    ),
+    (
+        "a changed binary's readers are not changes",
+        "plan",
+        PLAN,
+        "        for path, lines in read_by(binary, head, root).items():\n",
+        "        for path, lines in {}.items():\n",
+    ),
+    (
+        "a binary's directory named whole does not name it",
+        "plan",
+        PLAN,
+        "        if not rest:\n            return True\n",
+        "        if not rest:\n            continue\n",
+    ),
+    (
+        "a placeholder names no file",
+        "plan",
+        PLAN,
+        r'        pattern = re.sub(r"\$\{[^}]*\}|\$\w+|\{[^}]*\}|%[sd]", "*", rest)' + "\n",
+        "        pattern = rest\n",
+    ),
+    (
+        "a directory in the binary's names it",
+        "plan",
+        PLAN,
+        '        if "/" in rest:\n            continue\n',
+        '        if "/" in rest:\n            return True\n',
+    ),
+    (
+        "another directory ending in the binary's names it",
+        "plan",
+        PLAN,
+        r'    for m in re.finditer(r"(?<![\w.-])" + re.escape(directory) + r"(?![\w.-])(/[-\w.*?{}$%\[\]/]*)?", text):'
+        + "\n",
+        r'    for m in re.finditer(re.escape(directory) + r"(?![\w.-])(/[-\w.*?{}$%\[\]/]*)?", text):' + "\n",
+    ),
+    (
+        "a record reads a binary",
+        "plan",
+        PLAN,
+        "        if not number.isdigit() or path == binary or path.startswith(RECORDS):\n",
+        "        if not number.isdigit() or path == binary:\n",
+    ),
     # 3. The corpus's headers.
     (
         "a header's alias passes",
@@ -289,11 +351,11 @@ MUTANTS = [
         "checking is pathological: the program is checked ten times over",
         "latency",
         CHECK,
-        "    let mut held = check_units(&units);\n",
+        "    crate::program::validate_sources_with(files, released).diagnostics\n",
         "    for _ in 0..9 {\n"
-        "        let _ = check_units(&units);\n"
+        "        let _ = crate::program::validate_sources_with(files, released);\n"
         "    }\n"
-        "    let mut held = check_units(&units);\n",
+        "    crate::program::validate_sources_with(files, released).diagnostics\n",
     ),
     (
         "the checking thread's clock reads nothing",
@@ -306,9 +368,9 @@ MUTANTS = [
     (
         "a dist that records no sources is served",
         "builds",
-        CONFIG,
-        'if (!existsSync(new URL("./dist/sources.json", import.meta.url))) {\n',
-        "if (false) {\n",
+        METADATA,
+        '  if (!existsSync(resolve(directory, "sources.json"))) return problem(`${build.dist} is no whole build (sources.json is missing)`);\n',
+        '  if (!existsSync(resolve(directory, "sources.json"))) return null;\n',
     ),
     (
         "e14-signals runs its suite on what was built before",

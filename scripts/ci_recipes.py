@@ -10,6 +10,9 @@ bytes changed while it ran. Everything goes under `--out`:
     <out>/logs/<recipe>.log     what the recipe printed
     <out>/evidence/<path>       each file it wrote, at its own path
 
+Each recipe runs with `PW_RECIPE` set to its name, which a browser suite that
+fails keeps its output under (`kept-traces/`, `scripts/keep_traces.py`).
+
 Between recipes it frees what their builds leave behind (`prune`): a
 runner's disk is about 14 GB, and each mutant a recipe plants builds its
 tests again under a new hash. `free` is the disk left after.
@@ -54,8 +57,10 @@ def written(before: dict[str, str], after: dict[str, str]) -> list[str]:
 
 def prune(target: pathlib.Path) -> None:
     """Free what builds leave in `target`: the codegen units' object files,
-    the incremental cache, and each test binary but the newest of its name.
-    A later build rebuilds what it needs."""
+    every incremental cache (a profile's, and a target triple's: the mutation
+    scripts' builds are incremental where `verify.yml` asks,
+    `mutant_incremental.py`), and each test binary but the newest of its
+    name. A later build rebuilds what it needs."""
     deps = target / "debug" / "deps"
     if deps.is_dir():
         newest: dict[str, list[pathlib.Path]] = collections.defaultdict(list)
@@ -69,7 +74,9 @@ def prune(target: pathlib.Path) -> None:
                 old.unlink(missing_ok=True)
         for p in deps.glob("*.rcgu.o"):
             p.unlink(missing_ok=True)
-    shutil.rmtree(target / "debug" / "incremental", ignore_errors=True)
+    for pattern in ("*/incremental", "*/*/incremental"):
+        for cache in target.glob(pattern):
+            shutil.rmtree(cache, ignore_errors=True)
 
 
 def free() -> str:
@@ -131,8 +138,15 @@ def run(recipe: str, out: pathlib.Path) -> dict:
     beat.start()
     try:
         with open(out / "logs" / f"{recipe}.log", "w") as log:
+            # `PW_RECIPE` names the recipe to what it runs: a browser suite
+            # that fails keeps its output under it (`run_suite.sh`,
+            # `keep_traces.py`), where the next run does not clear it.
             status = subprocess.run(
-                ["just", recipe], cwd=ROOT, stdout=log, stderr=subprocess.STDOUT
+                ["just", recipe],
+                cwd=ROOT,
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                env={**os.environ, "PW_RECIPE": recipe},
             ).returncode
     finally:
         stop.set()

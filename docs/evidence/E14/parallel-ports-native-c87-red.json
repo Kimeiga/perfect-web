@@ -1,0 +1,29 @@
+{
+  "allocator_sha256": "c87d148cb8bb586bb94e47651de2d1f6354dfec2f42f58fb29f19a16d0935b7a",
+  "registry_sha256": "abcfc8d0df78aeee31456d1e8fb9f4fdd6983f9fc0e44371245a963779185f72",
+  "actual_allocator_stride": 200,
+  "registry_stride": 256,
+  "base": 55373,
+  "slot0_role": [
+    "reviews",
+    "chromium",
+    200
+  ],
+  "slot1_role": [
+    "base",
+    "shared",
+    0
+  ],
+  "actual_ports": [
+    55573,
+    55573
+  ],
+  "first_actual_bind": true,
+  "second_actual_bind": {
+    "bound": false,
+    "errno": 98,
+    "reason": "Address already in use"
+  },
+  "role_offset_pairs_that_collide": 6,
+  "scope": "unchanged env_of plus actual own exclusive loopback sockets; no project process launched, signalled or source edited"
+}

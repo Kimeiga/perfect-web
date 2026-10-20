@@ -48,8 +48,11 @@ MUTANTS = [
         "a regeneration tried again sends nothing",
         "server",
         SERVER,
-        "        if !existing {\n",
-        "        if !existing || invalidated.is_empty() {\n",
+        # Re-anchored by NEXT 4c's render merge (track `render-merge`): the
+        # documents told are taken where the entry exists, before the
+        # drain's render, and told after it.
+        "        let Some(told) = told else {\n",
+        "        let Some(told) = told.filter(|_| !invalidated.is_empty()) else {\n",
     ),
     (
         "the answer names the version that did not move",

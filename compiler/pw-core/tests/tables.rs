@@ -1410,3 +1410,34 @@ fn checking_with_no_release_is_checking() {
         format!("{:?}", check_sources_with(&files, None))
     );
 }
+
+#[test]
+fn full_validation_preserves_native_migration_unit_span_and_reason() {
+    let original = "module Notes\ntype Note = Note { id: String, text: String }\ntable Notes\n    row Note\n    key id\n";
+    let lock = released(original);
+    let after = original.replace(", text: String", "");
+    let files = program(&[("Notes.pw", &after)]);
+    let expected = pw_core::check::check_sources_with(&files, Some(&lock));
+    let actual = pw_core::program::validate_sources_with(&files, Some(&lock));
+    let migration = |found: &Vec<(String, Vec<pw_core::diagnostics::Diagnostic>)>| {
+        found
+            .iter()
+            .flat_map(|(path, ds)| {
+                ds.iter()
+                    .filter(|d| d.code == "PW0366")
+                    .map(move |d| (path.clone(), d.clone()))
+            })
+            .collect::<Vec<_>>()
+    };
+    let expected = migration(&expected);
+    assert!(!expected.is_empty(), "the changed schema must be refused");
+    assert_eq!(migration(&actual.diagnostics), expected);
+    assert!(
+        actual
+            .diagnostics
+            .iter()
+            .flat_map(|(_, ds)| ds)
+            .all(|d| d.code != "PW6601")
+    );
+    assert!(actual.into_build().is_err());
+}

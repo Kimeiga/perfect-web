@@ -1,0 +1,13 @@
+{
+  "history": "Whole85 naturally passed/restored, then an external postcheck incorrectly matched stopped inside the affirmative no-process-stopped sentence. No CI was launched. This is an observer predicate error; no project source, producer, process policy or native result changed.",
+  "whole_status": 0,
+  "whole_raw_sha256": "59b83e57dcd15363e7b03c001d4b20c23d156fbb7d06a9a40e3d702fb30bb434",
+  "native_test_commands": 86,
+  "assertion_controls": 80,
+  "body_error_controls": 12,
+  "error_only_controls": 5,
+  "memory_lines": [
+    "memory bound: no process was stopped"
+  ],
+  "ruling_before_observer_correction": "Require the exact canonical no-stop line, replay existing native receipts again, verify same2600 inputs/index, then fresh CI only. Do not rerun or relabel the completed whole."
+}

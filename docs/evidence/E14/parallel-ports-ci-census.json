@@ -1,0 +1,17 @@
+{
+  "successful_rust_target_summaries": 336,
+  "rust_summary_totals": {
+    "passed": 2882,
+    "failed": 0,
+    "ignored": 25,
+    "measured": 0,
+    "filtered_out": 0
+  },
+  "python_summary_lines": [
+    "Ran 320 tests in 18.886s"
+  ],
+  "python_verdict_lines": [
+    "OK (skipped=1)"
+  ],
+  "scope": "Census of the actual retained default CI raw output, not a distinct behavioral coverage claim."
+}

@@ -4,7 +4,7 @@
 // development provider (`PW_PAYMENTS=dev`), one host per engine; the reader
 // pays inside the frame, as on a provider's hosted fields.
 import { expect, test } from "@playwright/test";
-import { STORE_PAYMENTS_PORTS } from "../playwright.config.mjs";
+import { STORE_PAYMENTS_PORTS } from "../host-metadata.mjs";
 import { violations } from "./accessibility-rules.mjs";
 
 test.use({

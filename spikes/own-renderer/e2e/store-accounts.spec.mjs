@@ -14,7 +14,7 @@
 //     parameter to bust a cache, no load of the document, and the header
 //     not mounted again (the soft navigation, ADR-0306);
 import { expect, test } from "@playwright/test";
-import { STORE_ACCOUNTS_PORTS } from "../playwright.config.mjs";
+import { STORE_ACCOUNTS_PORTS } from "../host-metadata.mjs";
 
 test.use({
   baseURL: async ({}, use, testInfo) => {

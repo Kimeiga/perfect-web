@@ -1,0 +1,1360 @@
+[
+  {
+    "ordinal": 0,
+    "pid": 3288532,
+    "status": 0,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-h8zcm4dl/report.json",
+    "report_sha256": "5324daa641500471dc2f34b704d9198480d1a3de969c2fe3339b1af2b085c5a0",
+    "output_sha256": "ccea13147b771b48ffc67c7a5f704cddc43f3bc0c0fa0c97f16644d2d4229216",
+    "passed": 164,
+    "assertion_failed": [],
+    "body_errors": []
+  },
+  {
+    "ordinal": 1,
+    "pid": 3296108,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-adtid_7v/report.json",
+    "report_sha256": "54af0cb8cd0364ec158c589373d0bb3979ec808212c29ec049bbc0da02568d08",
+    "output_sha256": "d911365dec0ed6ba0da4faed523c7baa0365481e0f19570d96f1477a1df19aa9",
+    "passed": 159,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slots.Toy.test_a_run_stopped_from_outside_leaves_no_mutant_and_no_process",
+      "scripts.tests.test_mutation_slots.Toy.test_a_script_choosing_its_mutants_is_said_as_it_chose",
+      "scripts.tests.test_mutation_slots.Toy.test_a_second_run_waits_for_the_slots_the_first_holds",
+      "scripts.tests.test_mutation_slots.Toy.test_a_slots_red_baseline_is_said_as_the_script_says_it",
+      "scripts.tests.test_mutation_slots.Toy.test_the_tree_is_never_mutated_and_each_slot_is_its_own"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 2,
+    "pid": 3301220,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-4b206v8g/report.json",
+    "report_sha256": "02bb116d158a447af567535e9acf92760cf5a0c9a6e014e850c720ce1aa1def1",
+    "output_sha256": "8cce1bda8c1e82149cb32706a866f72c898b51dde2093d952b065d49e77cffca",
+    "passed": 158,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slots.Toy.test_a_run_stopped_from_outside_leaves_no_mutant_and_no_process",
+      "scripts.tests.test_mutation_slots.Toy.test_a_script_choosing_its_mutants_is_said_as_it_chose",
+      "scripts.tests.test_mutation_slots.Toy.test_a_second_run_waits_for_the_slots_the_first_holds",
+      "scripts.tests.test_mutation_slots.Toy.test_a_slots_red_baseline_is_said_as_the_script_says_it",
+      "scripts.tests.test_mutation_slots.Toy.test_slots_say_what_the_script_says_in_order",
+      "scripts.tests.test_mutation_slots.Toy.test_the_tree_is_never_mutated_and_each_slot_is_its_own"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 3,
+    "pid": 3332930,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-x8gbfht0/report.json",
+    "report_sha256": "f7285ec1ff5b6cef7ff484c61d96bb82dd310c9297a2c5f1f70dc56b67881766",
+    "output_sha256": "47efdc6803542203ca430ce874bf570d8dfa4b99f30ea15ce60bf0a45d309138",
+    "passed": 159,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slots.Pieces.test_narrowed_in_place_from_the_count_dealt",
+      "scripts.tests.test_mutation_slots.Toy.test_a_run_stopped_from_outside_leaves_no_mutant_and_no_process",
+      "scripts.tests.test_mutation_slots.Toy.test_a_second_run_waits_for_the_slots_the_first_holds",
+      "scripts.tests.test_mutation_slots.Toy.test_slots_say_what_the_script_says_in_order",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_ordinary_discovery_without_host_pidfd_apis_has_explicit_skips"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 4,
+    "pid": 3334290,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-ddf_eh08/report.json",
+    "report_sha256": "239080759264e67d3730a2fa45d9c4bd790de225c9a5580a8d41c4efb6c59360",
+    "output_sha256": "7610a8c982292e91109ec7bbb6571beba5a51a9970df9effda98d4b1624abe17",
+    "passed": 162,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slots.Pieces.test_narrowed_in_place_from_the_count_dealt",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_ordinary_discovery_without_host_pidfd_apis_has_explicit_skips"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 5,
+    "pid": 3335534,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-b9pkdmdr/report.json",
+    "report_sha256": "5c99847a6024d2441b11362a1c4c72f0f22a1ca5c0d1a9191083b941bba22ee9",
+    "output_sha256": "a09f42133a1a9ea48db77914ba73c113239b97a85510fe3c91d3c48d47bcab13",
+    "passed": 162,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slots.Pieces.test_slots_asked_for",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_ordinary_discovery_without_host_pidfd_apis_has_explicit_skips"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 6,
+    "pid": 3336439,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-5kb3vthl/report.json",
+    "report_sha256": "e1d14b050920a632524c0033dec9a7cbccf9f53d490df9282198d77af1d4e640",
+    "output_sha256": "2b2e0470b3f717179f5b223000b6e7b69a3524935b98406164c0e6a5d77c98c4",
+    "passed": 161,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slots.Pieces.test_a_slots_environment",
+      "scripts.tests.test_mutation_slots.Toy.test_the_tree_is_never_mutated_and_each_slot_is_its_own",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_ordinary_discovery_without_host_pidfd_apis_has_explicit_skips"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 7,
+    "pid": 3337350,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-x3rolg2g/report.json",
+    "report_sha256": "71937fe8ea7ff021fe739d1ade8d4c3e578950b05ab41f7e59be1dfd260c8795",
+    "output_sha256": "aa4c33e219cc3f3fe3fba9b124e11b7feded01fc4bd898adf84e3536043af543",
+    "passed": 163,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slots.Toy.test_the_tree_is_never_mutated_and_each_slot_is_its_own"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 8,
+    "pid": 3338377,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-ej1okb3w/report.json",
+    "report_sha256": "5ce97bf2250b8cea672e4204894075b0af44ec6050fd2b13620886b4ff728b45",
+    "output_sha256": "106746711a5c27c80a85f0566b615c39ae8ad34c522bfad2ce0943efb24a26a1",
+    "passed": 158,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slots.Pieces.test_a_slots_environment",
+      "scripts.tests.test_mutation_slots.Pieces.test_each_slots_reserved_ports_are_disjoint",
+      "scripts.tests.test_mutation_slots.PortRegistry.test_changed_registry_moves_every_slot",
+      "scripts.tests.test_mutation_slots.PortRegistry.test_whole_reserved_tcp_range_is_checked",
+      "scripts.tests.test_mutation_slots.Toy.test_the_tree_is_never_mutated_and_each_slot_is_its_own",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_ordinary_discovery_without_host_pidfd_apis_has_explicit_skips"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 9,
+    "pid": 3339401,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-64ytpout/report.json",
+    "report_sha256": "e1d14b050920a632524c0033dec9a7cbccf9f53d490df9282198d77af1d4e640",
+    "output_sha256": "dece9914d89600665b167e6e210eb2e52fdd58b23abc25fb5b72ce572ead653e",
+    "passed": 161,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slots.Pieces.test_a_slots_environment",
+      "scripts.tests.test_mutation_slots.Toy.test_the_tree_is_never_mutated_and_each_slot_is_its_own",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_ordinary_discovery_without_host_pidfd_apis_has_explicit_skips"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 10,
+    "pid": 3340438,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-ww21svue/report.json",
+    "report_sha256": "e1d14b050920a632524c0033dec9a7cbccf9f53d490df9282198d77af1d4e640",
+    "output_sha256": "5adc5b935553c2eec2f5e53aaf0833278e11d687d6243da2b8772703e571f4be",
+    "passed": 161,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slots.Pieces.test_a_slots_environment",
+      "scripts.tests.test_mutation_slots.Toy.test_the_tree_is_never_mutated_and_each_slot_is_its_own",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_ordinary_discovery_without_host_pidfd_apis_has_explicit_skips"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 11,
+    "pid": 3341346,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-u1_w9jbf/report.json",
+    "report_sha256": "08148a6080826ec8230e14b69ff96437a9660ad95521151a22c44e59e761af7a",
+    "output_sha256": "c63f8047489e518be02d718d09c6138215fa33825718c40c50fb79ea27f95c70",
+    "passed": 160,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slots.Pieces.test_dealt_once_each_slot_0_holding_every_suite",
+      "scripts.tests.test_mutation_slots.Toy.test_a_second_run_waits_for_the_slots_the_first_holds",
+      "scripts.tests.test_mutation_slots.Toy.test_slots_say_what_the_script_says_in_order",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_ordinary_discovery_without_host_pidfd_apis_has_explicit_skips"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 12,
+    "pid": 3342277,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-4xvtxknc/report.json",
+    "report_sha256": "57993f54cdabb4d07c13a7fd62389ebf4d6a7481f6787db371c21af918f1152f",
+    "output_sha256": "fc8af41ddd9844a07c35ac668d8eda9a076ec68b5ba3c5a80978bc86b7b3d348",
+    "passed": 163,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slots.Toy.test_a_script_choosing_its_mutants_is_said_as_it_chose"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 13,
+    "pid": 3343709,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-rqxyj3e2/report.json",
+    "report_sha256": "32888296ad7a52d294d2bccd1a1de0e729932cff87334bfe3ee3a3ed0ed8acbe",
+    "output_sha256": "591a9441fa03dfba206666c4ea773bb7b75413d1ac0dd5b7630af3c4b212fa05",
+    "passed": 162,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slots.Toy.test_a_second_run_waits_for_the_slots_the_first_holds",
+      "scripts.tests.test_mutation_slots.Toy.test_slots_say_what_the_script_says_in_order"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 14,
+    "pid": 3345245,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-leuk4xp4/report.json",
+    "report_sha256": "02bb116d158a447af567535e9acf92760cf5a0c9a6e014e850c720ce1aa1def1",
+    "output_sha256": "bb42a305073cb6d7e0182136d8a227e5d0cc3f14348af5242841e03fba71c1aa",
+    "passed": 158,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slots.Toy.test_a_run_stopped_from_outside_leaves_no_mutant_and_no_process",
+      "scripts.tests.test_mutation_slots.Toy.test_a_script_choosing_its_mutants_is_said_as_it_chose",
+      "scripts.tests.test_mutation_slots.Toy.test_a_second_run_waits_for_the_slots_the_first_holds",
+      "scripts.tests.test_mutation_slots.Toy.test_a_slots_red_baseline_is_said_as_the_script_says_it",
+      "scripts.tests.test_mutation_slots.Toy.test_slots_say_what_the_script_says_in_order",
+      "scripts.tests.test_mutation_slots.Toy.test_the_tree_is_never_mutated_and_each_slot_is_its_own"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 15,
+    "pid": 3352351,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-uwlpm10l/report.json",
+    "report_sha256": "244fa053bda1e87e86f6de71ae70c2d93100d3d3a7e444c5da54fb85b3c54f07",
+    "output_sha256": "04943d2a1337a466c43ea850e540263cc6986deae26417e66cd87fa4a004965d",
+    "passed": 163,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slots.Toy.test_a_slots_red_baseline_is_said_as_the_script_says_it"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 16,
+    "pid": 3353244,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-qtpuus0j/report.json",
+    "report_sha256": "f2a442ed449a1140e0ad3f91237a78bd7682e1a477e4b8f17e7e65f7fa33c13d",
+    "output_sha256": "c47935d9d8fbabcb85f637942a4ad72e661b2c5d8ef3bfbc112bb3e9fa5d6d41",
+    "passed": 162,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slots.Verdicts.test_a_slots_lines_are_each_mutants",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_ordinary_discovery_without_host_pidfd_apis_has_explicit_skips"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 17,
+    "pid": 3354117,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-0mv0zeqb/report.json",
+    "report_sha256": "f2a442ed449a1140e0ad3f91237a78bd7682e1a477e4b8f17e7e65f7fa33c13d",
+    "output_sha256": "fa7a3f427e59121b1dc7ef5a21c56316a2bdb01d5df911af3199c5c8af186ec6",
+    "passed": 162,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slots.Verdicts.test_a_slots_lines_are_each_mutants",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_ordinary_discovery_without_host_pidfd_apis_has_explicit_skips"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 18,
+    "pid": 3355072,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-d85_zeg_/report.json",
+    "report_sha256": "f54e2dd57c5ed1475f014f9c471ebf56e4d31cc85e3211b0995206dcf1b6fdf4",
+    "output_sha256": "d9f90991d361cfad196b315f8ae412e87a7089de9e93e4dfc12eae5bd5e798b1",
+    "passed": 162,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slots.Verdicts.test_each_shape_the_scripts_print",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_ordinary_discovery_without_host_pidfd_apis_has_explicit_skips"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 19,
+    "pid": 3356456,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-00jzfr08/report.json",
+    "report_sha256": "22f0b425af6e139138eac5b8e74a3396a830bc5e6e309d90c50dd03626ef8655",
+    "output_sha256": "ae01e5d83038d3169f5edca23da51f08626ab0e6d87bcc64e4d40bbb26860905",
+    "passed": 162,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slots.Verdicts.test_a_longer_description_is_not_a_shorter_ones",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_ordinary_discovery_without_host_pidfd_apis_has_explicit_skips"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 20,
+    "pid": 3357438,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-eh51ua8b/report.json",
+    "report_sha256": "d06ccb028172d9ee802ff92acc9b0b28c39c79b307d052cf71277bdc5225fe6d",
+    "output_sha256": "65c3000a81c0fdfa55a1f2e94b5eaa5b5dfb639ba81aaa09c7cde7497877d044",
+    "passed": 161,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slots.Toy.test_a_run_stopped_from_outside_leaves_no_mutant_and_no_process",
+      "scripts.tests.test_mutation_slots.Toy.test_a_second_run_waits_for_the_slots_the_first_holds",
+      "scripts.tests.test_mutation_slots.Toy.test_slots_say_what_the_script_says_in_order"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 21,
+    "pid": 3358293,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-f8pm2xre/report.json",
+    "report_sha256": "ca48e9bceb33892ba3ea0c544ffbb8279e8d493a6b67cd51d98fbd31a49d057d",
+    "output_sha256": "8a5d1f2fc1ac1fceed5209195987d3e2a47d7f7c57545dda9ce9f4893b52e42d",
+    "passed": 162,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slots.Pieces.test_the_bounds_line_counts_what_was_said",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_ordinary_discovery_without_host_pidfd_apis_has_explicit_skips"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 22,
+    "pid": 3359129,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-i4o9s49k/report.json",
+    "report_sha256": "ea26580bfd835a7eef85920d52dad534a36c158bff941dbe1ceab032c306a4af",
+    "output_sha256": "bc10369ab4a277f92c684e6ec33c655f464b34504bec5e2f928207e48a572fd4",
+    "passed": 163,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slots.Toy.test_slots_say_what_the_script_says_in_order"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 23,
+    "pid": 3360078,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-5wulxna4/report.json",
+    "report_sha256": "8aa0f3086c6c715526abd71ad7c5a63d2ba4b433eb30c698a9c0a09215ce35e5",
+    "output_sha256": "145b0a9dbc6bc82c32754a32b34506343b5e79e8843c0a67c782ff28dcabcbaf",
+    "passed": 160,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slots.Pieces.test_a_slot_is_brought_to_the_tree_by_content",
+      "scripts.tests.test_mutation_slots.Toy.test_a_run_stopped_from_outside_leaves_no_mutant_and_no_process",
+      "scripts.tests.test_mutation_slots.Toy.test_a_second_run_waits_for_the_slots_the_first_holds",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_ordinary_discovery_without_host_pidfd_apis_has_explicit_skips"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 24,
+    "pid": 3360889,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-gqh1neks/report.json",
+    "report_sha256": "774a2cf313c4aaf52a3ae211765426f0713bba4890aba727e59df6cdf85ffca6",
+    "output_sha256": "795dded006f0e1ee9b086aa2c8dc67609dd8ddfd55e19483e3cdb7d460a962cb",
+    "passed": 162,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slots.Pieces.test_a_slot_is_brought_to_the_tree_by_content",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_ordinary_discovery_without_host_pidfd_apis_has_explicit_skips"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 25,
+    "pid": 3362037,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-6g69vzcj/report.json",
+    "report_sha256": "a3ab3318a11cb6ada13ec3ee32fdc8fec49d1a2a003feca96609211a5598489e",
+    "output_sha256": "6c7395259458b16dda88d1c454067de8857cda020301cd0d70f98f99407018e2",
+    "passed": 161,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slots.Toy.test_the_tree_is_never_mutated_and_each_slot_is_its_own",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_ordinary_discovery_without_host_pidfd_apis_has_explicit_skips"
+    ],
+    "body_errors": [
+      "scripts.tests.test_mutation_slots.Pieces.test_a_slot_is_brought_to_the_tree_by_content"
+    ]
+  },
+  {
+    "ordinal": 26,
+    "pid": 3363605,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-p78vtzuv/report.json",
+    "report_sha256": "de21749903ac030f6174330b48187a17aa8224c5ae00592306c2178bf53378da",
+    "output_sha256": "9807b7f09673f0723ae9b1c45b0df27b5524077ee55f26fd02bb0029f6fa668a",
+    "passed": 162,
+    "assertion_failed": [
+      "scripts.tests.test_unittest_producer.ActualProducers.test_ordinary_discovery_without_host_pidfd_apis_has_explicit_skips"
+    ],
+    "body_errors": [
+      "scripts.tests.test_mutation_slots.Pieces.test_a_slot_is_brought_to_the_tree_by_content"
+    ]
+  },
+  {
+    "ordinal": 27,
+    "pid": 3364593,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-ygdlh1g_/report.json",
+    "report_sha256": "0deec2073a2e36fa4ddcc8e0785013000ec37b937b7ec388399acbe07a1c7cbe",
+    "output_sha256": "0079ceb26489b7222ddb64242ad3bb5baf4f2d5419fb29ddc0556147ae74ddd0",
+    "passed": 159,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slots.Toy.test_a_run_stopped_from_outside_leaves_no_mutant_and_no_process",
+      "scripts.tests.test_mutation_slots.Toy.test_a_script_choosing_its_mutants_is_said_as_it_chose",
+      "scripts.tests.test_mutation_slots.Toy.test_a_second_run_waits_for_the_slots_the_first_holds",
+      "scripts.tests.test_mutation_slots.Toy.test_slots_say_what_the_script_says_in_order",
+      "scripts.tests.test_mutation_slots.Toy.test_the_tree_is_never_mutated_and_each_slot_is_its_own"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 28,
+    "pid": 3371904,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-csjl8rtf/report.json",
+    "report_sha256": "a33b161ecd2674d2ef81f0f9942ac3772171cb6789a1e92a3f8a91d0fa677a00",
+    "output_sha256": "12558e18f8938dea9a7547ffa1172366e95ccadb4809e53e6066dcdc19c3359f",
+    "passed": 163,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slots.Toy.test_a_second_run_waits_for_the_slots_the_first_holds"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 29,
+    "pid": 3372741,
+    "status": 1,
+    "methods": 67,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-4xtqzgrp/report.json",
+    "report_sha256": "df4179926de14fd844478a9839c2a9cedce34b5c131d790df2861af4a9e31053",
+    "output_sha256": "13232e6fc2f24144c7b40cbaeac128a63971a22ea028acbf48f69f4585c4ad2e",
+    "passed": 66,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slot_processes.ReviewRegressions.test_handlers_are_installed_for_both_cancellation_signals"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 30,
+    "pid": 3372750,
+    "status": 1,
+    "methods": 67,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-_0yt871g/report.json",
+    "report_sha256": "6cf3246991f5103b3d76f5a61dbc7839aba669ff69b87a4cf1b980b35206ecf0",
+    "output_sha256": "d137b64863849b734dbf949d1620ad1172e898a976c0fbd5a6853c2689acb425",
+    "passed": 63,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slot_processes.Freeze.test_partial_scan_failure_still_kills_and_closes_every_pinned_child",
+      "scripts.tests.test_mutation_slot_processes.ReviewRegressions.test_failed_child_kill_does_not_skip_root_kill_close_or_reap",
+      "scripts.tests.test_mutation_slot_processes.ReviewRegressions.test_failed_close_does_not_skip_other_close_or_reap",
+      "scripts.tests.test_mutation_slot_processes.ReviewRegressions.test_failed_reap_does_not_skip_the_next_slots_cleanup"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 31,
+    "pid": 3372770,
+    "status": 1,
+    "methods": 67,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-zq3skzrm/report.json",
+    "report_sha256": "cd0ef10613defba2e459c7921c6aa1f227919705c9eba98cc74215ee54bc4d60",
+    "output_sha256": "596842baabdcd874553f8818f11f17ad3a9c696709327826f8689e743e2e40af",
+    "passed": 65,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slot_processes.Freeze.test_partial_scan_failure_still_kills_and_closes_every_pinned_child",
+      "scripts.tests.test_mutation_slot_processes.ReviewRegressions.test_failed_child_kill_does_not_skip_root_kill_close_or_reap"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 32,
+    "pid": 3372778,
+    "status": 1,
+    "methods": 67,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-s1_t_236/report.json",
+    "report_sha256": "4c2100d49712455be68fa092d17bb4653562b12f9f35ee0ab194a409a65c4221",
+    "output_sha256": "e2bc693dd7b03aff1be4b847c424aa39db1e84b3b2efe3402167402a813b5cbd",
+    "passed": 66,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slot_processes.Identities.test_reuse_before_open_is_refused_without_any_signal"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 33,
+    "pid": 3372822,
+    "status": 1,
+    "methods": 67,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-5fj39rnl/report.json",
+    "report_sha256": "e77200a550ec66a05769f0cbccd04ae783d781e4bc0e0d1d606bbd02e7d5a291",
+    "output_sha256": "f4623dbcf08d956f8e37786974ea058db57d2e3acd23bbe011e7995333540f9b",
+    "passed": 65,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slot_processes.Identities.test_identity_read_exception_closes_open_descriptor",
+      "scripts.tests.test_mutation_slot_processes.Identities.test_reuse_while_opening_closes_the_untrusted_handle"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 34,
+    "pid": 3372865,
+    "status": 1,
+    "methods": 67,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-87spzcf6/report.json",
+    "report_sha256": "479cb119af16ea58f2357e2a8061683a67c4c88d549e46055fdfc7045caa897f",
+    "output_sha256": "817484e619ac7a484de885c6c5a95ec11eabdb0eeefcc67c836d38f058c74979",
+    "passed": 65,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slot_processes.Identities.test_exited_handle_does_not_fall_back_to_a_numeric_signal",
+      "scripts.tests.test_mutation_slot_processes.Identities.test_signals_use_the_pinned_handle_after_numeric_pid_reuse"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 35,
+    "pid": 3372867,
+    "status": 1,
+    "methods": 67,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-cpnkv7xp/report.json",
+    "report_sha256": "136d62b014e8ef89e5967b6cb23b30c60aafa1f29b3bb1322f5a5210a2eeccbd",
+    "output_sha256": "1a4dffcf128a7cb758ed63fa775e9dc764d252318ca79b9674e9f5581641788c",
+    "passed": 66,
+    "assertion_failed": [],
+    "body_errors": [
+      "scripts.tests.test_mutation_slot_processes.Identities.test_missing_pidfd_api_refuses_before_preparation_or_launch"
+    ]
+  },
+  {
+    "ordinal": 36,
+    "pid": 3372879,
+    "status": 1,
+    "methods": 67,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-xycah50i/report.json",
+    "report_sha256": "8cc390b921288a289e47eac286e669c0adb036d4aa04f8d9bc87c33610385fca",
+    "output_sha256": "7d43cece2ea0c7ef4a52dc567725d6f2898098f97b9a0e9cd6f4056be4b5ca2d",
+    "passed": 65,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slot_processes.ReviewRegressions.test_launch_signal_at_pin_handoff_is_deferred_until_registered",
+      "scripts.tests.test_mutation_slot_processes.ReviewRegressions.test_launch_signal_at_popen_handoff_is_deferred_until_registered"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 37,
+    "pid": 3372888,
+    "status": 1,
+    "methods": 67,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-egv6v70h/report.json",
+    "report_sha256": "6eec43864f14d38bbb9c3d62dee23d46f4270e570b7267fad2847d7b200b9df8",
+    "output_sha256": "f08b298be29d74e9c775c9604354a3954dda0e613dae7f034e983d92d7d433d1",
+    "passed": 66,
+    "assertion_failed": [],
+    "body_errors": [
+      "scripts.tests.test_mutation_slot_processes.ReviewRegressions.test_repeated_signal_during_cleanup_is_deferred"
+    ]
+  },
+  {
+    "ordinal": 38,
+    "pid": 3372890,
+    "status": 1,
+    "methods": 67,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-jgsjyr06/report.json",
+    "report_sha256": "51dfd20c2b10114725b1d67a5a4a8f5a2c02c03401521e74a6a708585680209d",
+    "output_sha256": "7f996078dde065296a07dcd0394db990257c98f8f30692c8cf2104349adf3fca",
+    "passed": 66,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slot_processes.ReviewRegressions.test_live_descendant_with_missing_identity_is_explicitly_refused"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 39,
+    "pid": 3373185,
+    "status": 1,
+    "methods": 67,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-p1go5swr/report.json",
+    "report_sha256": "fe60dd827cbe1ccf53d7ba9418f57e634bf08382064dbf664d4826dae840682b",
+    "output_sha256": "d28b5a7af6c7c04e5d328fe16f3c42ff4d7e6bd4a706d17f0133f6a197d80431",
+    "passed": 65,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slot_processes.ReviewRegressions.test_descendant_exit_is_confirmed_before_descriptor_close",
+      "scripts.tests.test_mutation_slot_processes.ReviewRegressions.test_exit_timeout_is_explicit_and_handles_still_close"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 40,
+    "pid": 3373187,
+    "status": 1,
+    "methods": 67,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-rkeah_wk/report.json",
+    "report_sha256": "5305a1c1e7ddc9ea1ab5408a17d1da019b55b56c7a7175ab5f6a406615765bcd",
+    "output_sha256": "15272394dea9288dcce26baef6c462486314a007be7697f283ee4e67a33c2503",
+    "passed": 66,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slot_processes.ReviewRegressions.test_unreadable_live_root_state_is_not_treated_as_exit"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 41,
+    "pid": 3373195,
+    "status": 1,
+    "methods": 67,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-gsvnkmfs/report.json",
+    "report_sha256": "362339334c8993d91fe72ced581e7ad11ec4b6d476c7ae8e5099ccb09ea453e2",
+    "output_sha256": "bc729ebff29c9fac911a01fc5537e91ca7ce2395a1f560f5db8201dd36c6571a",
+    "passed": 64,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_fresh_harness_loads_actual_local_validation_authority",
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_invalid_shared_outcome_contains_no_positive_evidence",
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_stops_unexpected_exits_and_exit_contradictions_refuse"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 42,
+    "pid": 3373220,
+    "status": 1,
+    "methods": 67,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-a5i40jh4/report.json",
+    "report_sha256": "969bfb794d2a84902b0bec07d9a642c6a9bba5cb27683947f9e9fdff1cf515b4",
+    "output_sha256": "38a65aa536815365980077a5d9552c38e91652061ac55c385bb3df2ac4c3991a",
+    "passed": 66,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_contradictory_method_partition_refuses"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 43,
+    "pid": 3373222,
+    "status": 1,
+    "methods": 67,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-5oy6lcub/report.json",
+    "report_sha256": "7656ecd810745ed60a088495995739f8a8912e450c6bbbe20049565bebe5dfc6",
+    "output_sha256": "b803745916d997487f2723b63bc40e92518b4e25e09af3d0ad641242741a8038",
+    "passed": 66,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_exact_start_finish_body_and_expected_inventories_are_required"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 44,
+    "pid": 3373234,
+    "status": 1,
+    "methods": 67,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-jru5g8zu/report.json",
+    "report_sha256": "310f49a061733bbb04561857121e8c65315768fa27bed6562f708287cfaa4e16",
+    "output_sha256": "adeaf1d48c7a7047d3a2f19c97ae893bc1876a82586fb8d460cdacf9ac997cb7",
+    "passed": 66,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_exact_start_finish_body_and_expected_inventories_are_required"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 45,
+    "pid": 3373245,
+    "status": 1,
+    "methods": 67,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-uybrdx7o/report.json",
+    "report_sha256": "d909b55afd4a4bbe5e6c5eb11245e3895a73df0f01ea78f32fc96435eb534e9b",
+    "output_sha256": "6413676fe4b83f8a2b6e6ce504b4cecd4d761ad033f93cde4810a9a9901e8bd4",
+    "passed": 66,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_missing_repeated_or_unfinished_body_refuses"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 46,
+    "pid": 3373249,
+    "status": 1,
+    "methods": 67,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-w_y7_b1a/report.json",
+    "report_sha256": "6047421fa9138bd5922cc8084e589643b714a07e72119af4badbe1ff645329e8",
+    "output_sha256": "f60f9d369cb2c354cc64e40ded51ab62323d86aea9aa48d55b3846518e6bdaa7",
+    "passed": 65,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_fixture_skip_and_nonbody_events_earn_no_kill",
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_missing_duplicate_contradictory_and_unknown_events_refuse"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 47,
+    "pid": 3373300,
+    "status": 1,
+    "methods": 67,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-xqso5m6c/report.json",
+    "report_sha256": "650a4fd6309996eb43c1fa298609094ef524a0b527052462f2501d432ac893f8",
+    "output_sha256": "86b31d2cbf372c3d09560f0c7b2fadaf99d46277240bc0a072e9e23e28d5ecfb",
+    "passed": 65,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_fixture_skip_and_nonbody_events_earn_no_kill",
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_invalid_shared_outcome_contains_no_positive_evidence"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 48,
+    "pid": 3373344,
+    "status": 1,
+    "methods": 67,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-6qg2i8ls/report.json",
+    "report_sha256": "b2dace86a1c6da756fa06a6597411dc8dea3bc4326b13d81e6ab53be195eaea3",
+    "output_sha256": "939baa889dce920ad8797a05cf8555901b801406810b546bb1be21fc240ed4ca",
+    "passed": 65,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_shared_outcome_keeps_assertions_errors_and_distinct_methods",
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_subtest_events_count_one_failed_method"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 49,
+    "pid": 3373346,
+    "status": 1,
+    "methods": 67,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-n4aq78qo/report.json",
+    "report_sha256": "21f9e5cc0b41164cc03b8875ea7a0952115f752b6dd06135d0a66157bb939dbf",
+    "output_sha256": "acfb571006b7eb38fee4240bb9e512bf4484ad9b5013c80960e4cbe26fe967c0",
+    "passed": 66,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_absent_partial_malformed_duplicate_and_unknown_protocol_refuse"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 50,
+    "pid": 3373371,
+    "status": 1,
+    "methods": 67,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-1xj0e2wh/report.json",
+    "report_sha256": "a1a171d232b192509f3003ac61dd5a6f0b605ff8216bc9805f83fe75acd6680e",
+    "output_sha256": "4099ff110905481db5f807ce2e760614097f57ea7db2dce6b53a9315c8549617",
+    "passed": 59,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_already_exited_root_explicitly_refuses_unproved_orphans",
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_existing_primary_cancel_keeps_identity_after_a_later_callback",
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_failed_exit_probe_still_runs_canonical_cleanup_and_closes_root",
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_producer_root_pin_precedes_the_only_reaper",
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_timeout_reuses_retained_cleanup_without_communicate_or_numeric_groups"
+    ],
+    "body_errors": [
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_cancellation_survives_stop_close_and_restore_failures",
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_output_close_failure_cannot_replace_primary_cancellation",
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_pending_cancel_diagnostics_retain_ordinary_primary_and_secondary_errors"
+    ]
+  },
+  {
+    "ordinal": 51,
+    "pid": 3373384,
+    "status": 1,
+    "methods": 67,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-3daprbu0/report.json",
+    "report_sha256": "95245decb40479efbb8014bd4b71d69f38850c98fabf0bde9d729bc1e9704d69",
+    "output_sha256": "226f90f7c2b2ba2dc37adde0231a992bcfaf38612f4b4b616918015c36424247",
+    "passed": 65,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_already_exited_root_explicitly_refuses_unproved_orphans",
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_failed_exit_probe_still_runs_canonical_cleanup_and_closes_root"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 52,
+    "pid": 3373393,
+    "status": 1,
+    "methods": 67,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-p7d_zm6m/report.json",
+    "report_sha256": "5a9480c517d91534ae398f734d6872967106c5255a8f0d502dceb04b29966cf2",
+    "output_sha256": "ee40efede9062d2df601ae0ac1499972bdd5953b7941f32474a4196788cc3b44",
+    "passed": 59,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_cancellation_survives_stop_close_and_restore_failures",
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_existing_primary_cancel_keeps_identity_after_a_later_callback",
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_missing_producer_pin_retains_record_for_canonical_fallback",
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_output_close_failure_cannot_replace_primary_cancellation",
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_producer_root_pin_precedes_the_only_reaper"
+    ],
+    "body_errors": [
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_already_exited_root_explicitly_refuses_unproved_orphans",
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_failed_exit_probe_still_runs_canonical_cleanup_and_closes_root",
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_timeout_reuses_retained_cleanup_without_communicate_or_numeric_groups"
+    ]
+  },
+  {
+    "ordinal": 53,
+    "pid": 3373413,
+    "status": 1,
+    "methods": 67,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-j41lfdnj/report.json",
+    "report_sha256": "8b4475a2f64f852aa58b4ed5d660015f0834d6a8247eb12edae55205b0648a18",
+    "output_sha256": "c7d14f11cb97585ab3114f8c357c54180449529bcd87289793eae9502408eb49",
+    "passed": 66,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_mocked_profile_blocks_creation_signals_and_close_globally"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 54,
+    "pid": 3373459,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-il8ymy7d/report.json",
+    "report_sha256": "df013aeeb2b720845e729d5a4340dba52455442dec86baa54f96157d798c5526",
+    "output_sha256": "5173c280bf25c6bc1e8fc2cf38c33323e3ac5af633bad4f47c7ac2484da94f77",
+    "passed": 160,
+    "assertion_failed": [
+      "scripts.tests.test_unittest_producer.ActualProducers.test_actual_assertion_is_one_failed_method",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_actual_unexpected_body_exception_is_one_failed_method",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_failed_subtest_followed_by_body_error_is_one_method",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_same_exception_reraised_from_teardown_still_refuses"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 55,
+    "pid": 3374510,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-pl3ewgf2/report.json",
+    "report_sha256": "987cb19073e90c9bbc43cbf0522b4c227c86725eb15a85ba74d103f7623457ae",
+    "output_sha256": "e0def0faf1e9f16024710b453c309150ca0d48492a57ffb8ba546c8363c9bebe",
+    "passed": 159,
+    "assertion_failed": [
+      "scripts.tests.test_unittest_producer.ActualProducers.test_actual_cleanup_error_is_refused",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_actual_teardown_error_is_refused_after_body",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_native_setup_assertion_cannot_claim_required_body",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_native_setup_oserror_cannot_claim_required_body",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_same_exception_reraised_from_teardown_still_refuses"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 56,
+    "pid": 3375691,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-u6nsq1ot/report.json",
+    "report_sha256": "ed3834de5e92cf2a5cbd455324d069c940dfa3b5a1d162a3ce2bc3e9727a2cd5",
+    "output_sha256": "7bf9d1c45d0b0fb4068ee8edb376b1edbd756abf2e22d501b89f5b8d2088c8b9",
+    "passed": 159,
+    "assertion_failed": [
+      "scripts.tests.test_unittest_producer.ActualProducers.test_failed_subtest_followed_by_body_error_is_one_method",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_fixture_subtest_failure_never_becomes_a_body_failure",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_multiple_failed_subtests_keep_distinct_method_count",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_stock_runner_outcome_and_genuine_bound_aliases_are_supported",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_successful_subtests_and_plain_method_are_real_passes"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 57,
+    "pid": 3376703,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-eq7ogazt/report.json",
+    "report_sha256": "d22f67452b70269f371e7ae9ae42a2cf61d322369a3f962b0de6d7c9ac6eafdd",
+    "output_sha256": "d2b676671fe05e9a237f682158abcd0d735217bfceb304276e036ca25b67ebe0",
+    "passed": 163,
+    "assertion_failed": [
+      "scripts.tests.test_unittest_producer.ActualProducers.test_actual_missing_import_runs_no_method_and_refuses"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 58,
+    "pid": 3377444,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-nkzscfh2/report.json",
+    "report_sha256": "ec9708fbe30fabd29a83bb40b63f71db6b0504df50e87939637a68b2f08a4948",
+    "output_sha256": "b2346e1931fcf7740fd0e76bd873e7d6fc8d8d9e7966c27e09671d5fd3fc486a",
+    "passed": 163,
+    "assertion_failed": [
+      "scripts.tests.test_unittest_producer.ActualProducers.test_actual_partial_positive_inventory_refuses"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 59,
+    "pid": 3378398,
+    "status": 1,
+    "methods": 67,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-2z1t0u67/report.json",
+    "report_sha256": "ac57a1757a55b6c372728637630aaa330162ad4a21de5f9ba3a50adb9b26de84",
+    "output_sha256": "12cfefd5e00454f5c7872fb19542a6638c6ed8a5fd9b3c5796a18387c14dae60",
+    "passed": 60,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_callback_cancel_restores_control_and_prevents_any_next_launch",
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_first_callback_during_normal_release_is_promoted_after_every_release"
+    ],
+    "body_errors": [
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_cancellation_survives_stop_close_and_restore_failures",
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_first_pending_exception_survives_a_later_installed_callback",
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_output_close_failure_cannot_replace_primary_cancellation",
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_pending_cancel_diagnostics_retain_ordinary_primary_and_secondary_errors",
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_secondary_cancellation_from_restored_handler_is_not_stringified"
+    ]
+  },
+  {
+    "ordinal": 60,
+    "pid": 3378406,
+    "status": 1,
+    "methods": 67,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-5ao8qv66/report.json",
+    "report_sha256": "7ad03924dbc52840c06034e7ee0c561684141d8e6f4d854eb6a362f939888ec1",
+    "output_sha256": "0d1a247a41e6c7c05de7c89192517b2e3681510fbeeaa8764491632d410933af",
+    "passed": 66,
+    "assertion_failed": [],
+    "body_errors": [
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_output_close_failure_cannot_replace_primary_cancellation"
+    ]
+  },
+  {
+    "ordinal": 61,
+    "pid": 3378412,
+    "status": 1,
+    "methods": 67,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-o81qfevm/report.json",
+    "report_sha256": "113417ce70a0cb590ed95b142dc33ffc992a926f98bba68c93198c113dc09804",
+    "output_sha256": "2bf4111c9081eddf10e70d24c4b6973a368c5138f24ed97e4fb5655764c6915b",
+    "passed": 64,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_callback_cancel_restores_control_and_prevents_any_next_launch",
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_first_callback_during_normal_release_is_promoted_after_every_release"
+    ],
+    "body_errors": [
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_pending_cancel_diagnostics_retain_ordinary_primary_and_secondary_errors"
+    ]
+  },
+  {
+    "ordinal": 62,
+    "pid": 3378460,
+    "status": 1,
+    "methods": 67,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-kbbfdazw/report.json",
+    "report_sha256": "0f6201fd0388f0f2d4b7fe93b7100d4401a24ec116d7860c930ee249057a045e",
+    "output_sha256": "71b5cec492a0054e2987ed875c53aa302f76d98843d9e4e1ede185c9b3fd7ca4",
+    "passed": 66,
+    "assertion_failed": [],
+    "body_errors": [
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_first_pending_exception_survives_a_later_installed_callback"
+    ]
+  },
+  {
+    "ordinal": 63,
+    "pid": 3378504,
+    "status": 1,
+    "methods": 67,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-vmlzqe3t/report.json",
+    "report_sha256": "0083bd531d2915478d348e32a43c9c4d536b59b50c150dbb0f71123143209fc6",
+    "output_sha256": "1765c8c89b75debbc5729b054de25794aab7df677010bc831a50078887f7bc3c",
+    "passed": 65,
+    "assertion_failed": [],
+    "body_errors": [
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_first_pending_exception_survives_a_later_installed_callback",
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_secondary_cancellation_from_restored_handler_is_not_stringified"
+    ]
+  },
+  {
+    "ordinal": 64,
+    "pid": 3378516,
+    "status": 1,
+    "methods": 67,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-5m4otbk0/report.json",
+    "report_sha256": "46207c3e5bd7cc3361ba0ae70937206687fee8863782d2e6ea92e9dc45e496b5",
+    "output_sha256": "98a13b85acef5440202a6489009e20f000eac23423ea8f5b42c86a704d5d0b74",
+    "passed": 62,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_callback_cancel_restores_control_and_prevents_any_next_launch",
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_first_callback_during_normal_release_is_promoted_after_every_release"
+    ],
+    "body_errors": [
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_first_pending_exception_survives_a_later_installed_callback",
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_pending_cancel_diagnostics_retain_ordinary_primary_and_secondary_errors",
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_secondary_cancellation_from_restored_handler_is_not_stringified"
+    ]
+  },
+  {
+    "ordinal": 65,
+    "pid": 3378525,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-pnz7aqyx/report.json",
+    "report_sha256": "69929cad22f8248e38d12e084254a9f51dd121096e01a3f655241fed080eabce",
+    "output_sha256": "bc231741287d675bc870d8d9406cc419b53d7b9faf27428ff047c537e0edc5ba",
+    "passed": 151,
+    "assertion_failed": [
+      "scripts.tests.test_unittest_producer.ActualProducers.test_deferred_class_setup_is_refused",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_deferred_class_teardown_is_refused",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_deferred_cleanup_is_refused",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_deferred_dynamic_class_cleanup_is_refused",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_deferred_dynamic_module_cleanup_is_refused",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_deferred_module_setup_is_refused",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_deferred_module_teardown_is_refused",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_deferred_setup_is_refused",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_deferred_teardown_is_refused",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_runtime_async_generator_body_is_refused",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_runtime_async_generator_setup_is_refused",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_runtime_coroutine_cleanup_is_refused",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_runtime_generator_result_is_closed_before_refusal"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 66,
+    "pid": 3379414,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-r9pdvrrz/report.json",
+    "report_sha256": "6495fd99d4e429b29760021ee5fff3658fd705da720fd7bb437db32afe673dcd",
+    "output_sha256": "abce23773458fc07861a5ec9a282966b57587c50fe6d762c32d627f9318ef35e",
+    "passed": 162,
+    "assertion_failed": [
+      "scripts.tests.test_unittest_producer.ActualProducers.test_runtime_async_generator_body_is_refused",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_runtime_async_generator_setup_is_refused"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 67,
+    "pid": 3380275,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-gakrzvlg/report.json",
+    "report_sha256": "ccf3584c2c5e66030fe1ba957f2d6ddcfb9f1f19bdb4bccd33fb4ee20522de4f",
+    "output_sha256": "aacfd632c0f20f7bc9c0c6ec9ce240955123c70f221bf0666e3dce77142a457a",
+    "passed": 162,
+    "assertion_failed": [
+      "scripts.tests.test_unittest_producer.ActualProducers.test_deferred_cleanup_is_refused",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_runtime_coroutine_cleanup_is_refused"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 68,
+    "pid": 3381129,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-8_8vha5b/report.json",
+    "report_sha256": "27d9d37184f1d78e18fd8e5f35682918cf4c8116cb852da10a302dd7d3ba0b98",
+    "output_sha256": "c2fb15849007527dc4ff81f2795dc44e9d805a3322b21059359dafd706cacd6a",
+    "passed": 162,
+    "assertion_failed": [
+      "scripts.tests.test_unittest_producer.ActualProducers.test_deferred_dynamic_class_cleanup_is_refused",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_deferred_dynamic_module_cleanup_is_refused"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 69,
+    "pid": 3381995,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-_xmg_75s/report.json",
+    "report_sha256": "fad7bd8e85413f95b8387e7bbe668b9e3eeae289fbbb7b41e72afea2924387ba",
+    "output_sha256": "13107bb08e989cb14f796a0030892507bd6a150bb7fefcf981bfb1a34f0da483",
+    "passed": 162,
+    "assertion_failed": [
+      "scripts.tests.test_unittest_producer.ActualProducers.test_deferred_class_setup_is_refused",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_deferred_class_teardown_is_refused"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 70,
+    "pid": 3382853,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-9kvv5ynm/report.json",
+    "report_sha256": "56c49ef31cfd8829f4abaa9db744ed5ea953278857123acad0240dfe16fbbc77",
+    "output_sha256": "30d805c4eb04994c1acc36426a4694bbe608efd85ee2e6230861c1b28d3a4de0",
+    "passed": 162,
+    "assertion_failed": [
+      "scripts.tests.test_unittest_producer.ActualProducers.test_deferred_module_setup_is_refused",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_deferred_module_teardown_is_refused"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 71,
+    "pid": 3383676,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-nuc_d6z9/report.json",
+    "report_sha256": "499c4208a0167bc372525b78f36c59d0cc44734d1707c0ccec61b6b33a6efb1e",
+    "output_sha256": "219c8f3d738ee6686b77516395b1c93c1eaa2103a475ca92ca5ebd1b813cc273",
+    "passed": 163,
+    "assertion_failed": [
+      "scripts.tests.test_unittest_producer.ActualProducers.test_synchronous_fixture_order_aliases_reentrant_cleanups_and_restoration"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 72,
+    "pid": 3385126,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-ky9cswr4/report.json",
+    "report_sha256": "e1ca1481483ee4395fe32401c67c0b17e06d7c067e08d5cb3e921679789658c2",
+    "output_sha256": "90a3c16cfc22d3f76269ad52fce6b1dbec7931587cf8da79cf0552a5f766a1d4",
+    "passed": 156,
+    "assertion_failed": [
+      "scripts.tests.test_unittest_producer.ActualProducers.test_actual_assertion_is_one_failed_method",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_actual_unexpected_body_exception_is_one_failed_method",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_failed_subtest_followed_by_body_error_is_one_method",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_multiple_failed_subtests_keep_distinct_method_count",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_stock_runner_outcome_and_genuine_bound_aliases_are_supported",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_stock_suite_and_genuine_bound_hook_alias_are_supported",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_successful_subtests_and_plain_method_are_real_passes",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_synchronous_fixture_order_aliases_reentrant_cleanups_and_restoration"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 73,
+    "pid": 3385940,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-truvzhxu/report.json",
+    "report_sha256": "9e87a4f881bca3947247c99967418d9bf1e7f2085bad3de84774e1ed6f9d2cf9",
+    "output_sha256": "a8322234a956729f6dc69dd56c3356b223e398636c9a97a22f8b6672f459888c",
+    "passed": 162,
+    "assertion_failed": [
+      "scripts.tests.test_unittest_producer.ActualProducers.test_runtime_coroutine_cleanup_is_refused",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_runtime_generator_result_is_closed_before_refusal"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 74,
+    "pid": 3386790,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-z99osfju/report.json",
+    "report_sha256": "28d2ad3c302c5dda7ba0dff7ee084c85ba94c7dc62c78ad50067eb15e8b7bc6b",
+    "output_sha256": "1069b402e2ab26273bd14317b9438ed2ec4213d6e2dfadd35f7d14fa6d49f560",
+    "passed": 156,
+    "assertion_failed": [
+      "scripts.tests.test_unittest_producer.ActualProducers.test_late_base_execution_hook_is_refused",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_late_dispatch_binding_changes_are_refused",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_late_module_registration_alias_is_refused",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_module_registration_alias_is_refused",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_outcome_canonical_constructor_and_alias_are_refused",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_runner_canonical_descriptors_and_aliases_are_refused",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_runner_execution_cannot_omit_required_fixture",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_suite_global_dispatch_helpers_are_refused"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 75,
+    "pid": 3387665,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-2kp14u2j/report.json",
+    "report_sha256": "e931942a0de2f7ee37f1d9bd59b0609181d80f35d73b0b1c3b9038a5cd2c676f",
+    "output_sha256": "91aa4291314c10cdcac18e1741b361e241b44aa9b8a79fba90e9e5ce6e5fbd98",
+    "passed": 162,
+    "assertion_failed": [
+      "scripts.tests.test_unittest_producer.ActualProducers.test_custom_suite_fixture_omission_is_refused",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_instance_suite_fixture_omission_is_refused"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 76,
+    "pid": 3388553,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-vo1g_zc9/report.json",
+    "report_sha256": "f3abe0f6b42e736705acc68e12c58f20f05fb70e9057a653889463f1e4553813",
+    "output_sha256": "f25eaf4a712a4326c45f226913f2e07864e94eb2d7e5e2d300b4d4fb489b5872",
+    "passed": 162,
+    "assertion_failed": [
+      "scripts.tests.test_unittest_producer.ActualProducers.test_custom_execution_refuses_before_loading_inventory",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_instance_cleanup_hook_is_refused"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 77,
+    "pid": 3389397,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-gk99__bu/report.json",
+    "report_sha256": "e998ee4789b079f5eb97f639e812e2c2a0cd0e73832583fd8e5ff65f83e819b9",
+    "output_sha256": "53c8d2c32d59814231015a11fb02f5b703e36a046d2b757bd9a61912e017bc33",
+    "passed": 162,
+    "assertion_failed": [
+      "scripts.tests.test_unittest_producer.ActualProducers.test_late_dispatch_binding_changes_are_refused",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_suite_global_dispatch_helpers_are_refused"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 78,
+    "pid": 3390182,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-_cp7xme8/report.json",
+    "report_sha256": "23e4566e506caa960d1d51d61b906e5d0dda789f4d639f5d5635f563a5e5d31c",
+    "output_sha256": "bb46239db736a0f46d51cae154f310c0f49ae647e653d40ebac5cbe08064cf1d",
+    "passed": 163,
+    "assertion_failed": [
+      "scripts.tests.test_unittest_producer.ActualProducers.test_runner_execution_cannot_omit_required_fixture"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 79,
+    "pid": 3391042,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-fxzoq3g7/report.json",
+    "report_sha256": "542ed10b45e0c97decd2fe06c630b2879292c57e810438e4b2cfad2906b48e29",
+    "output_sha256": "0b4cc3efe06ac73bc2cdcae8f62a46d857a3e2e2f952a225418d872b25371b1c",
+    "passed": 162,
+    "assertion_failed": [
+      "scripts.tests.test_unittest_producer.ActualProducers.test_suppressed_fixture_exception_without_callback_is_refused",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_suppressed_subtest_exception_without_callback_is_refused"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 80,
+    "pid": 3391916,
+    "status": 1,
+    "methods": 67,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-vm0397gg/report.json",
+    "report_sha256": "3e118fced9ff9dda827b53453dd696f5bd0d8ed337a3f7193a3302c9d5fe4307",
+    "output_sha256": "e0aa6565b8113efdfe87eecf921d199c05949ef66c7fd8222545bbd665e87f92",
+    "passed": 66,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_fresh_harness_loads_actual_local_validation_authority"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 81,
+    "pid": 3391964,
+    "status": 1,
+    "methods": 67,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-n9amht7e/report.json",
+    "report_sha256": "9a1f0cc30f67b90bad04c5319e0d4a92009450e813cd1ccb4fc5bb349db437ed",
+    "output_sha256": "12c3d809d885330497e4ccede08b83b881b2bae33db2e74c2e2bd4130078f578",
+    "passed": 66,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_shared_outcome_keeps_assertions_errors_and_distinct_methods"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 82,
+    "pid": 3392016,
+    "status": 1,
+    "methods": 67,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-arr_pw2i/report.json",
+    "report_sha256": "2c02b029e87a8b847d1db4c1a012933f1934ba01ce42710fba70b433da8ef29c",
+    "output_sha256": "6270be1b6bc6d614dc99b41dc4e3145170922c4b1107c7d0c944d2dd15f828cb",
+    "passed": 66,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slot_processes.ProducerResults.test_invalid_shared_outcome_contains_no_positive_evidence"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 83,
+    "pid": 3392186,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-e1symzz8/report.json",
+    "report_sha256": "5ce97bf2250b8cea672e4204894075b0af44ec6050fd2b13620886b4ff728b45",
+    "output_sha256": "0aff283568ca0d4ebea482710771360350ce1a675825776f583d3f77a029c21b",
+    "passed": 158,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slots.Pieces.test_a_slots_environment",
+      "scripts.tests.test_mutation_slots.Pieces.test_each_slots_reserved_ports_are_disjoint",
+      "scripts.tests.test_mutation_slots.PortRegistry.test_changed_registry_moves_every_slot",
+      "scripts.tests.test_mutation_slots.PortRegistry.test_whole_reserved_tcp_range_is_checked",
+      "scripts.tests.test_mutation_slots.Toy.test_the_tree_is_never_mutated_and_each_slot_is_its_own",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_ordinary_discovery_without_host_pidfd_apis_has_explicit_skips"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 84,
+    "pid": 3394555,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-moo1euxz/report.json",
+    "report_sha256": "d80ea5c5dffa8aeb6ab74b83c13877ca3afa80243d6b05409868317aaa0707fb",
+    "output_sha256": "214b1bedda588b817c60b7455fab678c912b7b9053546d8bfe3e319abfdc7b2b",
+    "passed": 161,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slots.PortRegistry.test_invalid_later_slot_refuses_before_tree_preparation",
+      "scripts.tests.test_mutation_slots.PortRegistry.test_whole_reserved_tcp_range_is_checked",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_ordinary_discovery_without_host_pidfd_apis_has_explicit_skips"
+    ],
+    "body_errors": []
+  },
+  {
+    "ordinal": 85,
+    "pid": 3395443,
+    "status": 1,
+    "methods": 164,
+    "report": "/tmp/parallel-instrument-wh45c80y/producer-c9htpmne/report.json",
+    "report_sha256": "7b3cc528e85a78b6ae3b6d56ed97114b23b7d978c65f52eb49fe4872d8f4c87e",
+    "output_sha256": "2e87495e4671ed05004c93043f6831bb628963b3300acddbe930e0536e000a88",
+    "passed": 162,
+    "assertion_failed": [
+      "scripts.tests.test_mutation_slots.PortRegistry.test_invalid_later_slot_refuses_before_tree_preparation",
+      "scripts.tests.test_unittest_producer.ActualProducers.test_ordinary_discovery_without_host_pidfd_apis_has_explicit_skips"
+    ],
+    "body_errors": []
+  }
+]

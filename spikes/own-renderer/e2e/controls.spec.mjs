@@ -5,7 +5,7 @@
 // The store's delay is one per server, as the store is one value for every
 // reader, so this suite has a server per engine.
 import { expect, test } from "@playwright/test";
-import { MUTABLE_PORTS } from "../playwright.config.mjs";
+import { MUTABLE_PORTS } from "../host-metadata.mjs";
 
 test.use({
   baseURL: async ({}, use, testInfo) => {

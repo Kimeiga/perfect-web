@@ -22,9 +22,7 @@ MUTANTS = [
     (
         "the rule does not run",
         CHECK,
-        "        per_unit.extend(handlers_run_in_the_browser(\n"
-        "            &inference, &ontology, &workspace, &hirs, i, &u.hir,\n"
-        "        ));\n",
+        '        per_unit.extend(handlers_run_in_the_browser(\n            inference, &ontology, workspace, hirs, i, &u.hir,\n        ));\n',
         "",
     ),
     (

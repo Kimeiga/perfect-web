@@ -12,10 +12,38 @@ use std::collections::BTreeSet;
 /// Operations by their key, `store:data/carts#add`.
 pub(crate) type Ops = BTreeMap<String, HostFn>;
 
+/// **One render's snapshot of a layer** (NEXT 4c, track `render-merge`):
+/// the layer's own value, which the host holds for the render and hands back
+/// with each query's reads ([`DataLayer::reads_in`]), and drops when the
+/// render ends. What it holds is the layer's to say: the store as one moment
+/// left it, or a read transaction.
+pub(crate) type Snapshot = Box<dyn std::any::Any + Send + Sync>;
+
 pub(crate) trait DataLayer: Send + Sync {
     /// **The operations a query reads through, for one session.** Nothing a
     /// query does commits.
     fn reads(&self, session: &str, stopped: Option<Stopped>) -> Ops;
+
+    /// **One render's snapshot** (NEXT 4c, track `render-merge`): what every
+    /// read of one render reads, asked for where the render begins and given
+    /// up where it ends, so the render sees one state of the data whatever
+    /// commits meanwhile: in memory, the data as it is when asked; on
+    /// PostgreSQL, a seat among a bounded few, waited for while every one is
+    /// taken, whose read transaction's snapshot is its first statement's
+    /// (PostgreSQL 18, 13.2.2). By default none, and each query of a render
+    /// reads as [`DataLayer::reads`] does: a layer whose data never changes
+    /// (kiokun's files) needs none.
+    fn snapshot(&self) -> Option<Snapshot> {
+        None
+    }
+
+    /// **The operations one query of a render reads through**, as
+    /// [`DataLayer::reads`] makes them for one session, every one reading
+    /// `snapshot`, which this layer's [`DataLayer::snapshot`] took (NEXT 4c).
+    /// By default [`DataLayer::reads`].
+    fn reads_in(&self, _snapshot: &Snapshot, session: &str, stopped: Option<Stopped>) -> Ops {
+        self.reads(session, stopped)
+    }
 
     /// **A command's writes, staged until its transaction commits.** The
     /// staging holds whatever the layer needs held from the call to the
@@ -73,6 +101,13 @@ pub(crate) trait DataLayer: Send + Sync {
     #[cfg(test)]
     fn execute_for_test(&self, sql: &str) -> Result<(), String> {
         Err(format!("this layer runs no SQL: {sql}"))
+    }
+
+    /// **The connections this layer's renders read in** (NEXT 4c's tests):
+    /// a database's layer's, and none in memory.
+    #[cfg(test)]
+    fn renders_for_test(&self) -> Option<Arc<crate::feed_pg::Renders>> {
+        None
     }
 
     fn provides(&self) -> Result<Provided, String> {
@@ -168,6 +203,73 @@ pub(crate) trait Staged {
         _scheduled: &[crate::schedules::Scheduled],
     ) -> Result<Option<Outboxed>, String> {
         Ok(None)
+    }
+}
+
+/// **The guard of a layer's writes** (ADR-0218, ADR-0352): one command of
+/// this host at a time, from its `begin` to its staging's drop, and each
+/// scheduler write (`Runs::ran`, `Runs::retry`) between two commands, never
+/// inside one. The std mutex, as `lock` returns it.
+///
+/// In a test's build a taker that finds the guard held tells the test first,
+/// if the test asked ([`Writes::tell_on_wait`]), and then waits. A guard's
+/// test waits for that report: "held at the guard" is a fact the guard can
+/// state, where "has not returned yet" is a silence that a slow write makes
+/// too.
+pub(crate) struct Writes(Mutex<()>);
+
+impl Writes {
+    pub(crate) fn new() -> Writes {
+        Writes(Mutex::new(()))
+    }
+
+    /// The guard, once whoever holds it lets go.
+    pub(crate) fn lock(&self) -> std::sync::LockResult<std::sync::MutexGuard<'_, ()>> {
+        #[cfg(test)]
+        match self.0.try_lock() {
+            Ok(guard) => return Ok(guard),
+            Err(std::sync::TryLockError::Poisoned(poisoned)) => return Err(poisoned),
+            // Held: a test that asked is told, and this thread then waits.
+            Err(std::sync::TryLockError::WouldBlock) => WAITING.with(|tell| {
+                if let Some(tell) = &*tell.borrow() {
+                    tell();
+                }
+            }),
+        }
+        self.0.lock()
+    }
+}
+
+#[cfg(test)]
+thread_local! {
+    /// What this thread's test asked to be told when it finds a write guard
+    /// held ([`Writes::tell_on_wait`]).
+    static WAITING: std::cell::RefCell<Option<Box<dyn Fn()>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(test)]
+impl Writes {
+    /// **A test's: `tell` is called on this thread each time it finds a
+    /// layer's write guard held**, just before it waits for the guard, until
+    /// the returned [`Telling`] is dropped. Only this thread's own waits are
+    /// told, so a test that spawns the write it watches hears that write and
+    /// no other.
+    pub(crate) fn tell_on_wait(tell: impl Fn() + 'static) -> Telling {
+        WAITING.with(|waiting| *waiting.borrow_mut() = Some(Box::new(tell)));
+        Telling
+    }
+}
+
+/// A test's request to be told of a wait for a write guard, until it is
+/// dropped ([`Writes::tell_on_wait`]).
+#[cfg(test)]
+pub(crate) struct Telling;
+
+#[cfg(test)]
+impl Drop for Telling {
+    fn drop(&mut self) {
+        WAITING.with(|waiting| *waiting.borrow_mut() = None);
     }
 }
 

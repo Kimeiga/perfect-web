@@ -102,6 +102,10 @@ impl Build {
     ///                               (ADR-0300), written last
     /// ```
     pub fn write(&self, dir: &std::path::Path) -> Result<Vec<String>, String> {
+        let refused = self.refusals();
+        if !refused.is_empty() {
+            return Err(format!("nothing written: {}", refused.join("; ")));
+        }
         // **The build is named by what it built** (ADR-0300): FNV-1a, the
         // resume artifacts' own hash, over each file written, its path and
         // its bytes, in the order written.
@@ -281,90 +285,99 @@ impl Build {
     /// finished: a page would render a button whose handler cannot load, or a
     /// host would be asked for a component that does not exist.
     pub fn refusals(&self) -> Vec<String> {
-        let handlers = self.handlers.iter().filter_map(|h| match &h.module {
-            crate::backend::wasm::Encoding::Encoded(_) => None,
-            other => Some(format!("a handler in `{}`: {other}", h.declaration)),
-        });
-        let components = self.components.iter().filter_map(|(id, b)| match b {
-            Built::Refused(why) => Some(format!("`{id}`: {why}")),
-            _ => None,
-        });
-        // A placeholder is only a refusal once something depends on it: a
-        // component whose contract imports one would call a body nobody wrote.
+        self.support_refusals()
+            .into_iter()
+            .map(|r| r.message)
+            .collect()
+    }
+
+    pub(crate) fn support_refusals(&self) -> Vec<crate::program::Refusal> {
+        use crate::program::{Refusal, Stage};
+        let mut out = Vec::new();
+        for h in &self.handlers {
+            if !matches!(h.module, crate::backend::wasm::Encoding::Encoded(_)) {
+                out.push(Refusal::new(
+                    Stage::Handler,
+                    &h.declaration,
+                    format!("a handler in `{}`: {}", h.declaration, h.module),
+                ));
+            }
+        }
         let placeholders: Vec<&str> = self
             .components
             .iter()
             .filter(|(_, b)| matches!(b, Built::Placeholder))
             .map(|(id, _)| id.as_str())
             .collect();
-        let depended = self.contracts.iter().flat_map(|c| {
-            c.imports
+        for (id, built) in &self.components {
+            if let Built::Refused(why) = built {
+                out.push(Refusal::new(Stage::Component, id, format!("`{id}`: {why}")));
+            }
+        }
+        for c in &self.contracts {
+            for target in c
+                .imports
                 .iter()
                 .filter(|i| i.kind == crate::contract::ImportKind::Component)
                 .filter_map(|i| i.interface.strip_prefix("pw:app/"))
                 .filter(|target| placeholders.contains(target))
-                .map(|target| {
+            {
+                out.push(Refusal::new(
+                    Stage::Placeholder,
+                    &c.component_id,
                     format!(
                         "`{}` depends on `{target}`, whose body is a placeholder (`todo`)",
                         c.component_id
-                    )
-                })
-                .collect::<Vec<_>>()
-        });
-        // A declared optimistic clause the browser cannot execute is a
-        // declaration that silently does nothing (ADR-0120).
-        let speculations = self.speculations.iter().filter_map(|s| match &s.module {
-            crate::backend::wasm::Encoding::Encoded(_) => None,
-            other => Some(format!("`{}`'s speculations: {other}", s.page)),
-        });
-        // A value computed from a signal the browser could not compute
-        // (ADR-0227) would stay at its first value.
-        let computed = self.computed.iter().filter_map(|c| {
-            c.module
-                .as_ref()
-                .err()
-                .map(|why| format!("`{}`'s computed values: {why}", c.page))
-        });
-        // A graph edge naming nothing never fires (`pw emit-graph`'s rule).
-        let dangling = self
-            .graph
-            .dangling
-            .iter()
-            .map(|d| format!("a graph edge from `{}` names nothing: `{}`", d.from, d.name));
-        // An event part with no code is a button that does nothing when
-        // pressed (ADR-0134). Every handler a checked program writes has
-        // code since ADR-0199, a lambda, or a function or a command named,
-        // and anything else is refused when checked; this is the backstop.
-        let inert = self.templates.iter().flat_map(|t| {
-            t.manifest()
+                    ),
+                ));
+            }
+        }
+        for s in &self.speculations {
+            if !matches!(s.module, crate::backend::wasm::Encoding::Encoded(_)) {
+                out.push(Refusal::new(
+                    Stage::Speculation,
+                    &s.page,
+                    format!("`{}`'s speculations: {}", s.page, s.module),
+                ));
+            }
+        }
+        for c in &self.computed {
+            if let Err(why) = &c.module {
+                out.push(Refusal::new(
+                    Stage::Computed,
+                    &c.page,
+                    format!("`{}`'s computed values: {why}", c.page),
+                ));
+            }
+        }
+        for d in &self.graph.dangling {
+            out.push(Refusal::new(
+                Stage::Graph,
+                &d.from,
+                format!("a graph edge from `{}` names nothing: `{}`", d.from, d.name),
+            ));
+        }
+        for t in &self.templates {
+            for p in t
+                .manifest()
                 .into_iter()
                 .filter(|p| p.kind == "event" && p.value.is_empty())
-                .map(move |p| {
-                    format!(
-                        "`{}`: element {} handles an event with no code to run: write its \
-                         handler as a lambda, `on:press={{() => ..}}` (ADR-0134)",
-                        t.path,
-                        p.owner.map(|o| o.0).unwrap_or_default()
-                    )
-                })
-        });
-        // A page whose values no plan states would be rendered by a host
-        // guessing them (ADR-0125).
-        let pages = self.pages.iter().filter_map(|p| {
-            p.plan
-                .as_ref()
-                .err()
-                .map(|why| format!("`{}`'s values: {why}", p.page))
-        });
-        handlers
-            .chain(components)
-            .chain(depended)
-            .chain(speculations)
-            .chain(computed)
-            .chain(dangling)
-            .chain(inert)
-            .chain(pages)
-            .collect()
+            {
+                out.push(Refusal::new(Stage::Event, &t.path, format!(
+                    "`{}`: element {} handles an event with no code to run: write its handler as a lambda, `on:press={{() => ..}}` (ADR-0134)",
+                    t.path, p.owner.map(|o| o.0).unwrap_or_default())));
+            }
+        }
+        for p in &self.pages {
+            if let Err(why) = &p.plan {
+                out.push(Refusal::new(
+                    Stage::Page,
+                    &p.page,
+                    format!("`{}`'s values: {why}", p.page),
+                ));
+            }
+        }
+        out
     }
 
     /// The contracts whose bodies are placeholders nothing depends on: listed
@@ -383,101 +396,168 @@ pub fn build(units: &[Unit]) -> Result<Build, String> {
     build_with(units, None)
 }
 
-/// **Build a checked program, held to the schema released** (track
-/// `tables`, ADR-0338): `released` is the `schema.lock` its deployment
-/// holds, and a change from it that loses or reinterprets data with no
-/// `migrate` stating it builds nothing (PW0366).
+/// Historical inspection API with the same accepted schema plan as full
+/// executable validation. A partial plan retains its backend refusals;
+/// CLI build requires the complete Validation::into_build proof.
 pub fn build_with(
     units: &[Unit],
     released: Option<&crate::tables::Schema>,
 ) -> Result<Build, String> {
-    // The gate every backend shares: `js::compile` and `compile_all` each
-    // refuse an unchecked program, through `lower::Checked`.
-    let handlers = js::compile(units)?;
-    let components = crate::backend::component::compile_all(units)?;
-    let modules = crate::backend::js_pure::modules(units)?;
+    crate::program::validate_with(units, released).inspect()
+}
 
-    let hirs: Vec<&crate::hir::Hir> = units.iter().map(|u| &u.hir).collect();
-    let ws = crate::resolve::Workspace::build(&hirs);
-    let sigs = crate::signatures::Signatures::build(&ws, &hirs);
-    let contracts = crate::contract::contracts(&hirs, &sigs, &ws);
-    let (wit, _) = crate::wit::package(&hirs, &ws, &contracts).map_err(|e| format!("WIT: {e}"))?;
-    // The tables, and the program held to the schema released (PW0366).
-    let (tables, schema, refused) = crate::tables::tables_json(&hirs, &ws, &sigs, released);
-    let refused: Vec<String> = refused
-        .iter()
-        .filter(|(_, d)| d.is_error())
-        .map(|(unit, d)| format!("{}: [{}] {}", units[*unit].path, d.code, d.message))
-        .collect();
-    if !refused.is_empty() {
-        return Err(format!(
-            "the program is held to the schema released, and {} change(s) are not stated:\n  {}",
-            refused.len(),
-            refused.join("\n  ")
-        ));
-    }
-
-    let sources: Vec<&str> = units.iter().map(|u| u.src.as_str()).collect();
-    let templates = templates(&hirs, &sources, &sigs);
-    // Each layout alone (ADR-0303), which no template holds where no page
-    // names it.
-    let layouts = crate::template_ir::layouts(&hirs, &sigs, &crate::template_ir::Handlers::new());
-    // A part the renderer refuses is a template that fails every render.
-    // `pw emit-template` refuses one; until 2026-09-26 `pw build` wrote it
-    // (ADR-0073).
-    let blocked: Vec<String> = templates
-        .iter()
-        .chain(&layouts)
-        .flat_map(|t| {
-            t.blocked().into_iter().filter_map(move |b| match b {
-                crate::template_ir::Part::Blocked { reason, at } => {
-                    Some(format!("{}: `{at}`: {reason}", t.path))
-                }
-                _ => None,
-            })
+pub(crate) fn prepare(
+    checked: &crate::backend::lower::Checked<'_>,
+    tables: crate::tables::TablesJson,
+    schema: crate::tables::Schema,
+) -> Result<Build, Vec<crate::program::Refusal>> {
+    use crate::program::{Refusal, Stage};
+    fn stage<T: Default>(result: Result<T, String>, kind: Stage, refused: &mut Vec<Refusal>) -> T {
+        result.unwrap_or_else(|why| {
+            refused.push(Refusal::new(kind, "", why));
+            T::default()
         })
-        .collect();
-    if !blocked.is_empty() {
-        return Err(format!(
-            "a template part the renderer cannot render: {}",
-            blocked.join("; ")
-        ));
     }
-
-    let graph = crate::graph::Graph::build(&hirs, &ws);
-    let speculations = crate::backend::speculation::compile(units)?;
-    let computed = crate::backend::computed::compile(units)?;
-    let mut pages = crate::page_values::pages(&hirs, &ws, &sigs);
-    // Each page's signals' first values (ADR-0130), which the backend
-    // computes, into the plan the server renders from. A page whose signals
-    // did not compile has no plan: the server would render it guessing.
-    for compiled in crate::backend::signals::compile(units)? {
+    let cx = checked.context();
+    let (hirs, ws, sigs, contracts) = (cx.hirs, cx.ws, cx.sigs, cx.contracts);
+    let mut early = Vec::new();
+    let handlers = stage(
+        crate::backend::js::compile_checked(checked),
+        Stage::Handler,
+        &mut early,
+    );
+    let sources = checked.sources();
+    let templates = templates(hirs, &sources, sigs);
+    let layouts = crate::template_ir::layouts(hirs, sigs, &crate::template_ir::Handlers::new());
+    for t in templates.iter().chain(&layouts) {
+        for blocked in t.blocked() {
+            if let crate::template_ir::Part::Blocked { reason, at } = blocked {
+                early.push(
+                    Refusal::new(
+                        Stage::Template,
+                        &t.path,
+                        format!(
+                            "a template part the renderer cannot render: {}: `{at}`: {reason}",
+                            t.path
+                        ),
+                    )
+                    .at(at),
+                );
+            }
+        }
+    }
+    // A failed WIT or template stage must not erase independent page, handler,
+    // speculation or signal refusals. Only WIT-dependent encoders are skipped.
+    let prepared =
+        match crate::wit::package_prepared(hirs, ws, contracts, sigs, &checked.pages().derived) {
+            Ok((wit, worlds)) => {
+                match crate::backend::component::with_package(checked, &wit, &worlds, |p| {
+                    Ok((
+                        crate::backend::component::compile_prepared(p),
+                        crate::backend::js_pure::modules_prepared(p),
+                        crate::backend::computed::compile_prepared(checked, p),
+                    ))
+                }) {
+                    Ok((components, modules, computed)) => {
+                        Some((wit, components, modules, computed))
+                    }
+                    Err(why) => {
+                        let owner = why
+                            .declaration(&wit, &worlds)
+                            .map(|def| {
+                                crate::contract::component_id(
+                                    hirs[def.unit],
+                                    crate::hir::DeclId(def.decl),
+                                )
+                            })
+                            .unwrap_or_default();
+                        early.push(Refusal::new(Stage::Wit, &owner, why.message));
+                        None
+                    }
+                }
+            }
+            Err(error) => {
+                early.push(Refusal::wit(error, hirs));
+                None
+            }
+        };
+    let (wit, components, modules, computed) = match prepared {
+        Some((wit, components, modules, computed)) => (
+            wit,
+            stage(components, Stage::Component, &mut early),
+            modules.unwrap_or_else(|why| {
+                early.push(why);
+                Vec::new()
+            }),
+            stage(computed, Stage::Computed, &mut early),
+        ),
+        None => (
+            String::new(),
+            Vec::new(),
+            Vec::new(),
+            stage(
+                crate::backend::computed::compile_checked(checked),
+                Stage::Computed,
+                &mut early,
+            ),
+        ),
+    };
+    let graph = crate::graph::Graph::build(hirs, ws);
+    let speculations = stage(
+        crate::backend::speculation::compile_with_handlers(checked, &handlers),
+        Stage::Speculation,
+        &mut early,
+    );
+    let mut pages = checked.pages().pages.clone();
+    for compiled in stage(
+        crate::backend::signals::compile_checked(checked),
+        Stage::Signal,
+        &mut early,
+    ) {
         let Some(planned) = pages.iter_mut().find(|p| p.page == compiled.page) else {
+            if let Err(why) = compiled.signals {
+                early.push(Refusal::new(
+                    Stage::Signal,
+                    &compiled.page,
+                    format!("`{}`'s signals: {why}", compiled.page),
+                ));
+            }
             continue;
         };
         match (compiled.signals, &mut planned.plan) {
             (Ok(signals), Ok(plan)) => plan.signals = signals,
             (Err(why), plan @ Ok(_)) => *plan = Err(format!("its signals: {why}")),
-            (_, Err(_)) => {}
+            (Err(why), Err(_)) => early.push(Refusal::new(
+                Stage::Signal,
+                &compiled.page,
+                format!("`{}`'s signals: {why}", compiled.page),
+            )),
+            (Ok(_), Err(_)) => {}
         }
     }
-    Ok(Build {
+    let build = Build {
         templates,
         handlers,
         components,
         modules,
-        contracts,
+        contracts: contracts.to_vec(),
         wit,
         graph,
         speculations,
         computed,
         pages,
-        sources: crate::check::source_clauses(&hirs),
-        uploads: crate::uploads::upload_clauses(&hirs),
-        predicates: crate::predicates::words_of(&hirs),
+        sources: crate::check::source_clauses(hirs),
+        uploads: crate::uploads::upload_clauses(hirs),
+        predicates: crate::predicates::words_of(hirs),
         tables,
         schema,
-    })
+    };
+    if early.is_empty() {
+        Ok(build)
+    } else {
+        early.extend(build.support_refusals());
+        Err(early)
+    }
 }
 
 /// **The template IR, with every event part's handler identity**: what

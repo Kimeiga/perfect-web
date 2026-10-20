@@ -33,7 +33,7 @@
 //   - a post shown before the server answers waits: nothing on it links or
 //     acts until the server's row stands in its place (ADR-0275).
 import { expect, test } from "@playwright/test";
-import { FEED_PORTS } from "../playwright.config.mjs";
+import { FEED_PORTS } from "../host-metadata.mjs";
 
 test.use({
   baseURL: async ({}, use, testInfo) => {

@@ -338,16 +338,16 @@ page About() {
 `pw check` runs the compiler's checks. `pw build` goes on to the page's
 templates, and refuses some programs `pw check` passes. So a clean check is
 not yet a program that runs: build it, as the [tutorial](tutorial.md) does.
-`pw build` prints its refusals as lines that begin `pw:`, with no code.
+`pw check` and `pw build` both report PW6601 for programs the executable backends cannot support.
 
-The examples below distinguish remaining gaps from a refusal the compiler
-now makes. The test that compiles this guide holds each gap: when the
-compiler closes one, that test fails on the example, and this page is updated.
+The examples below distinguish semantic refusals from executable support
+limits. Check and build share complete executable-program validation; each
+example states the exact diagnostic that refuses it.
 
 A `<title>` cannot read a signal, because the browser does not render the
 title again (ADR-0137):
 
-```pw gap=build
+```pw fails=PW6601
 module shop.titled
 
 page Counter() {
@@ -363,14 +363,10 @@ page Counter() {
 }
 ```
 
-```text pw-build
-pw: refused: `shop.titled.Counter`'s values: part 1 is a title part the signal `count` decides, which the browser does not render again (ADR-0137)
-pw: 1 refusal(s); nothing written
-```
 
 A part of a page cannot compute a value from two signals (ruling 0073-a):
 
-```pw gap=build
+```pw fails=PW6601
 module shop.sum
 
 page Sum() {
@@ -391,10 +387,6 @@ page Sum() {
 }
 ```
 
-```text pw-build
-pw: refused: `shop.sum.Sum`'s values: part 0 computes a value from `a` and `b`, and a host computes one from one value (ruling 0073-a)
-pw: 1 refusal(s); nothing written
-```
 
 Effects in an `{#each}` head are checked just as they are elsewhere in
 the view (ADR-0345). This view claims `!{}` and calls a database read in its
@@ -417,10 +409,10 @@ view Menu() !{} {
 }
 ```
 
-A pure call in the list still passes `pw check`, but the renderer reads
-the list by path and `pw build` refuses the computed list:
+A pure call in the list passes semantic analysis, but the renderer reads
+the list by path. Both `pw check` and `pw build` refuse it with PW6601:
 
-```pw gap=build
+```pw fails=PW6601
 module shop.computed_head
 
 type Item = Item { name: String }
@@ -438,9 +430,6 @@ view Menu() !{} {
 }
 ```
 
-```text pw-build
-pw: a template part the renderer cannot render: shop.computed_head.Menu: `{#each items() as item (item.name)}`: `{#each}` reads its list by path, and `items()` is computed
-```
 
 And an `<img>` with no `alt` is not refused, though an `<input>` with no
 label is (PW5014):

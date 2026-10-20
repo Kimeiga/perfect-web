@@ -1,0 +1,38 @@
+
+running 5 tests
+
+thread 'kiokun::search::cache_tests::a_failed_builder_cleans_itself_without_touching_another_builders_stage' (1259133) panicked at spikes/own-renderer/server/src/kiokun/search/cache_tests.rs:226:5:
+assertion `left == right` failed: a failed builder leaves none of its own files
+  left: ["/tmp/.tmpkjgCKX/cache/kiokun-search-e4439eb82db42ddef7a7734e.building", "/tmp/.tmpkjgCKX/cache/kiokun-search-1d29f404d1d256672c518f0f.building"]
+ right: ["/tmp/.tmpkjgCKX/cache/kiokun-search-e4439eb82db42ddef7a7734e.building"]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'kiokun::search::cache_tests::builders_of_one_digest_do_not_unlink_an_open_sqlite' (1259135) panicked at spikes/own-renderer/server/src/kiokun/search/cache_tests.rs:114:5:
+first real SQLite builder: disk I/O error
+kiokun::search::cache_tests::builders_of_one_digest_do_not_unlink_an_open_sqlite --- FAILED
+kiokun::search::cache_tests::a_failed_builder_cleans_itself_without_touching_another_builders_stage --- FAILED
+
+thread 'kiokun::search::cache_tests::an_open_reader_keeps_its_path_and_identity_after_another_version_publishes' (1259134) panicked at spikes/own-renderer/server/src/kiokun/search/cache_tests.rs:43:44:
+the published SQLite path remains live: Os { code: 2, kind: NotFound, message: "No such file or directory" }
+kiokun::search::cache_tests::an_open_reader_keeps_its_path_and_identity_after_another_version_publishes --- FAILED
+
+thread 'kiokun::search::cache_tests::a_delayed_builder_reuses_the_same_digest_winners_file' (1259132) panicked at spikes/own-renderer/server/src/kiokun/search/cache_tests.rs:139:10:
+the delayed builder reuses the published winner: "No such file or directory (os error 2)"
+kiokun::search::cache_tests::a_delayed_builder_reuses_the_same_digest_winners_file --- FAILED
+
+thread 'kiokun::search::cache_tests::publishing_another_digest_does_not_unlink_a_live_builder' (1259139) panicked at spikes/own-renderer/server/src/kiokun/search/cache_tests.rs:159:5:
+other digest's real SQLite builder: disk I/O error
+kiokun::search::cache_tests::publishing_another_digest_does_not_unlink_a_live_builder --- FAILED
+
+failures:
+
+failures:
+    kiokun::search::cache_tests::a_delayed_builder_reuses_the_same_digest_winners_file
+    kiokun::search::cache_tests::a_failed_builder_cleans_itself_without_touching_another_builders_stage
+    kiokun::search::cache_tests::an_open_reader_keeps_its_path_and_identity_after_another_version_publishes
+    kiokun::search::cache_tests::builders_of_one_digest_do_not_unlink_an_open_sqlite
+    kiokun::search::cache_tests::publishing_another_digest_does_not_unlink_a_live_builder
+
+test result: FAILED. 0 passed; 5 failed; 0 ignored; 0 measured; 575 filtered out; finished in 0.57s
+
+error: test failed, to rerun pass `-p pw-dev-server --bin pw-dev-server`
