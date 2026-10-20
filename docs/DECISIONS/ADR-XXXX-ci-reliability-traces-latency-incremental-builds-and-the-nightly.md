@@ -120,28 +120,32 @@ file alone (`scripts/ci_plan.py` as `recipes_for` reads a file's hunks):
   browser recipe among them. The helper's behaviour differs only on a run
   that failed, but the planner cannot see that, so any change to it
   re-verifies every browser recipe.
-- **`.github/workflows/verify.yml` alone plans one: `e14-ci-diagnostics`**,
-  by this track's two upload mutants. A workflow is no recipe's input; a
-  recipe is planned by it only where one of its mutants is anchored within
-  30 lines of a changed line (a change near the plan job's `--stale` case
-  would plan `e14-evidence-integrity`, as before).
-- `scripts/mutation_baseline.py` plans three, by mutants anchored near the
-  hunk (`e14-ci-diagnostics`, `e14-derived-outside`,
-  `e14-evidence-integrity`); `check_latency.rs` two (`e14-ci-diagnostics`,
-  `e14-evidence-integrity`); `ci_recipes.py`, `keep_traces.py`, the
+- **`.github/workflows/verify.yml` alone plans three**: `e14-ci-diagnostics`
+  (this track's upload, incremental and nightly mutants), and
+  `e14-dealt-by-time` and `e14-evidence-integrity`, whose mutants of the plan
+  step's `--stale` case are anchored within 30 lines of the nightly's edit
+  (it plans one only for the upload edit, which is further). A workflow is no
+  recipe's input; a recipe is planned by it only where one of its mutants is
+  anchored within 30 lines of a changed line. Both ran whole after the edit
+  (section Acceptance).
+- `scripts/mutation_baseline.py` plans four, by mutants anchored near the
+  hunks (`e14-ci-diagnostics`, `e14-derived-outside`,
+  `e14-evidence-integrity`, `e14-mutation-bound`); `check_latency.rs` two
+  (`e14-ci-diagnostics`, `e14-evidence-integrity`); `ci_recipes.py`,
+  `keep_traces.py`, `mutant_incremental.py`, `nightly_skip.py`, the
   `.gitignore`s and the recipe file plan this track's recipe alone.
-- **Together, against train-10's head (`8c5618c8`): 92 recipes in 33
-  shards**, 91 in 32 with `--current` (`ci_plan.py --shards 9 --changed
-  8c5618c8 HEAD --current`, which leaves out `e14-ci-diagnostics`, its
-  evidence current). **Against `master`, which is where a track's push
-  measures from (`git merge-base origin/master`): 177 in 39**, since
-  train-10's own changes count there, `--current` leaving out `e14-tables`.
-  So a push of this branch starts a verify of 177 recipes (43 jobs: the
-  plan, three browsers, 39 shards), hours of runners repeating train-10's
-  dispatches. The integrator may cancel it (train-6's
-  and train-10's precedent) and dispatch what the change reaches:
-  `e14-ci-diagnostics e14-evidence-integrity e14-evidence-integrity-2
-  e14-derived-outside e10-browser`.
+- **Together, against train-10's head (`8c5618c8`): 94 recipes in 33
+  shards**, 93 with `--current` (`ci_plan.py --shards 9 --changed 8c5618c8
+  HEAD --current`, which leaves out `e14-ci-diagnostics`, its evidence
+  current). **Against `master`, which is where a track's push measures from
+  (`git merge-base origin/master`): 177 in 39**, since train-10's own changes
+  count there, `--current` leaving out `e14-tables`. So a push of this branch
+  starts a verify of 177 recipes (43 jobs: the plan, three browsers, 39
+  shards), hours of runners repeating train-10's dispatches. The integrator
+  may cancel it (train-6's and train-10's precedent) and dispatch what the
+  changes reach: `e14-ci-diagnostics e14-evidence-integrity
+  e14-evidence-integrity-2 e14-derived-outside e14-dealt-by-time
+  e14-mutation-bound e10-browser`.
 
 ## 2. `check_latency` bounds the fastest check
 
@@ -433,10 +437,15 @@ the repository's own suite needs its builds, and is the verify run's.)
 - Rule on the ceiling for the complete-validation checker (800 ms a thousand
   lines; ARM would measure 640 to 930), or on a calibration loop with
   per-architecture constants, once `check-is-build` lands.
-- A push of this branch plans 177 recipes in 39 shards (92 against
+- A push of this branch plans 177 recipes in 39 shards (93 against
   train-10's head): cancel it and dispatch `e14-ci-diagnostics
   e14-evidence-integrity e14-evidence-integrity-2 e14-derived-outside
-  e10-browser`, or merge first.
+  e14-dealt-by-time e14-mutation-bound e10-browser`, or merge first.
+- When this lands on `master`, the first nightly after a verified landing
+  shows `skip: <sha> was verified by the push's run <id>` in its plan job and
+  its run's summary, and runs nothing; Sunday's shows `run: the weekly full
+  run`. Read the first few; the saving (691 runner-hours a week, 27% of our
+  CI) is read from the week after.
 
 ## Questions for the integrator
 
@@ -449,27 +458,42 @@ the repository's own suite needs its builds, and is the verify run's.)
 3. Should `e9-latency`'s wording ("Median of 7 runs") say that the ceiling
    bounds the fastest of them? (Its evidence is the Mac's, `LOCAL_ONLY`;
    unchanged here.)
+4. A skipped nightly skips its three browser jobs with its shards (they ran
+   at that commit in the run that passed). Keep them as a daily signal
+   instead (3 jobs of about 45)? One line of the plan step.
+5. `PW_MUTANT_INCREMENTAL` is on in CI's recipe step only. The recipes'
+   `CARGO_INCREMENTAL=0` stand locally (the Mac's disk, 2026-09-24), so a
+   local `just e14-...` builds its mutants as it did. Should the PC's
+   too, with the same cap?
 
 ## Acceptance
 
 - **Tests.** `scripts/tests/test_keep_traces.py` (11), `test_run_suite.py`
-  (16, 8 new), `test_mutation_baseline.py` (26, 8 new), `check_latency.rs`
-  (11, 9 new, none timed); `just evidence-gates` passes whole.
-- **Every mutation script the change reaches, run whole** (the tree at
-  `e438f689`; the last two in clones of it, so as not to wait for the first
-  three): `ci_diagnostics_mutations.py` 38 of 38 (25 + 13),
-  `derived_outside_mutations.py` 10 of 10, `mutation_bound_mutations.py`
-  16 of 16, `evidence_integrity_2_mutations.py` 35 of 35 (`run_suite.sh`'s
-  anchors and `test_run_suite.py`), `evidence_integrity_mutations.py` 42 of
-  42 (`mutation_baseline.py`'s and `check_latency.rs`'s). The memory bound
-  stopped nothing; `mutation_anchors.py` finds 3,317 mutants in 274 scripts,
-  each matching once, after each.
-- **`just e14-ci-diagnostics`** records them (`docs/evidence/E14/ci-diagnostics.txt`,
-  at `e438f689`); its evidence of record is the next train's run.
-- **`just ci`** on `24c11117` (the code of `e438f689` and its recorded
-  evidence), 00:46 to 02:08Z on the PC at loads of 40 to 90: `ci: OK`;
-  evidence-gates 292 tests (2 skipped), case-check 2,876 paths, anchors
-  3,317 mutants in 274 scripts, 346 test binaries with 3,074 tests passed,
-  none failed, 25 ignored (train-10's 3,065 and this track's 9), mutant
-  programs 301 judged in 12. Its own `check_latency` ran at a load of 55 to
-  62: the fastest of seven 229.5 ms a thousand lines, the median 245.4.
+  (16, 8 new), `test_mutation_baseline.py` (26, 8 new),
+  `test_mutant_incremental.py` (18, three on the real cargo),
+  `test_nightly_skip.py` (21), `check_latency.rs` (11, 9 new, none timed);
+  `just evidence-gates` passes whole at the head: 331 tests (2 skipped).
+- **Every mutation script the changes reach, run whole**, each on the tree
+  named (clones of it, so as not to wait for one another): this track's
+  `ci_diagnostics_mutations.py` 69 of 69 (25 + 13 + 16 + 15, the findings in
+  order) at `a17cf246`, and as `e14-ci-diagnostics` at that commit;
+  `derived_outside_mutations.py` 10 of 10, `mutation_bound_mutations.py` 16
+  of 16 and `dealt_by_time_mutations.py` 54 of 54 at `a17cf246` (the first two
+  by `mutation_baseline.py`'s hunks, the third by the plan step's, which sit
+  within 30 lines of its mutants' anchors); `evidence_integrity_mutations.py`
+  42 of 42 (the checker run ten times over fails 1 of its 11 tests, the thread's clock reading nothing 2 of 11) at `a17cf246`; and `evidence_integrity_2_mutations.py`
+  35 of 35 at `e438f689` (`run_suite.sh` and `test_run_suite.py` have not
+  changed since). The memory bound stopped nothing; `mutation_anchors.py`
+  finds 3,348 mutants in 274 scripts, each matching once, after each.
+- **`just ci`** on `df112643` (this track's first four findings' code),
+  02:50 to 04:13Z on the PC at loads of 40 to 90: `ci: OK`; evidence-gates
+  307 tests (2 skipped), case-check 2,878 paths, anchors 3,332 mutants in 274
+  scripts, 346 test binaries with 3,074 tests passed, none failed, 25
+  ignored, mutant programs 301 judged in 12. Its own `check_latency` ran
+  with the fastest of seven at 176.1 ms a thousand lines, the median 198.0.
+  The commits since touch no Rust (a fix to `mutant_incremental.py`, the
+  nightly skip, the ADR and the evidence): evidence-gates (331 tests),
+  case-check, anchors and `cargo fmt --check` ran again on the head.
+- **GitHub's `ci` on `dd9b2dc3`** (the first two findings, pushed
+  2026-10-20): `licenses and advisories`, `ubuntu-24.04` and
+  `ubuntu-24.04-arm` all succeeded.
