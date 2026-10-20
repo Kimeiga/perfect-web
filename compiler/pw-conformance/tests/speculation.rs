@@ -70,7 +70,7 @@ fn the_stores_transitions_run_and_its_parts_read_the_result() {
     // The store's page, and its cart's own page (ADR-0190): each presses a
     // command that speculates.
     let pages: Vec<&str> = compiled.iter().map(|c| c.page.as_str()).collect();
-    assert_eq!(pages, ["store.page.StorePage", "store.page.CartPage"]);
+    assert_eq!(pages, ["store.page.StorePage~ui", "store.page.CartPage~ui"]);
     let of = |page: &str| {
         let c = compiled
             .iter()
@@ -83,15 +83,15 @@ fn the_stores_transitions_run_and_its_parts_read_the_result() {
     };
     // The cart page adds nothing: it changes, removes and clears.
     assert_eq!(
-        of("store.page.CartPage").commands,
+        of("store.page.CartPage~ui").commands,
         [
             "store.page.decrease_in_cart",
             "store.page.increase_in_cart",
             "store.page.remove_from_cart"
         ]
     );
-    let m = of("store.page.StorePage");
-    assert_eq!(m.page, "store.page.StorePage");
+    let m = of("store.page.StorePage~ui");
+    assert_eq!(m.page, "store.page.StorePage~ui");
     assert_eq!(
         m.commands,
         [
@@ -214,7 +214,7 @@ fn a_speculated_value_read_inside_a_block_is_refused_by_name() {
     .expect("the store still checks");
     let store = compiled
         .iter()
-        .find(|c| c.page == "store.page.StorePage")
+        .find(|c| c.page == "store.page.StorePage~ui")
         .expect("the store's module");
     match &store.module {
         Encoding::Unsupported { construct, .. } => {

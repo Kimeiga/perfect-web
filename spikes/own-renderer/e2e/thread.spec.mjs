@@ -80,7 +80,7 @@ test("a button in an instance sends its own comment, at any depth", async ({ pag
   });
   // Bound in the view's instances, by the view's template.
   const log = await page.evaluate(() => window.__pw.log.join("\n"));
-  expect(log).toMatch(/attached demo\.thread\.Thread:\d+ to 5 instance\(s\)/);
+  expect(log).toMatch(/attached demo\.thread\.Thread~ui:\d+ to 5 instance\(s\)/);
 
   // Three deep, so a handler bound only at the top, or to the first
   // comment's button, fails.

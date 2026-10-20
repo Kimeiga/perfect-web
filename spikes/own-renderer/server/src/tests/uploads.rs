@@ -136,12 +136,12 @@ fn attached_and_posted(s: &Server) {
     let thread = page(
         s,
         "b",
-        "feed.app.PostPage",
+        "feed.app.PostPage~ui",
         &Params::from([("id".to_string(), id)]),
     );
     assert!(thread.contains(&shown), "{thread}");
     // The author's lease is ended.
-    let mine = page(s, "a", "feed.app.Home", &Params::new());
+    let mine = page(s, "a", "feed.app.Home~ui", &Params::new());
     assert!(!mine.contains("attached-image"), "{mine}");
     assert_eq!((blobs(s, "staged"), blobs(s, "blobs")), (0, 1));
 
@@ -168,7 +168,7 @@ fn an_image_attached_is_posted_with_its_post_and_served() {
 fn none_attached(s: &Server) {
     let answered = post_image(s, "a", "No picture", "Nothing", "i-1");
     assert!(!answered.committed, "{:?}", answered.result);
-    assert!(!page(s, "b", "feed.app.Home", &Params::new()).contains("No picture"));
+    assert!(!page(s, "b", "feed.app.Home~ui", &Params::new()).contains("No picture"));
     let answered = s
         .command_answered(
             "feed.app.post",
@@ -178,7 +178,7 @@ fn none_attached(s: &Server) {
         )
         .expect("runs");
     assert!(answered.committed);
-    let home = page(s, "b", "feed.app.Home", &Params::new());
+    let home = page(s, "b", "feed.app.Home~ui", &Params::new());
     assert!(
         home.contains("Words alone") && !home.contains("class=\"photo\""),
         "{home}"

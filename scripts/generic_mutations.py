@@ -75,8 +75,8 @@ MUTANTS = [
     (
         "a type takes a query's place in the world",
         WIT,
-        "            if matches!(d.kind, DeclKind::Type | DeclKind::Opaque) {",
-        "            if matches!(d.kind, DeclKind::Type | DeclKind::Opaque) && false {",
+        "                Some(crate::resolve::Namespace::Term | crate::resolve::Namespace::Ui)",
+        "                Some(crate::resolve::Namespace::Term | crate::resolve::Namespace::Ui | crate::resolve::Namespace::Type)",
     ),
 ]
 

@@ -771,7 +771,7 @@ fn an_order_for_a_time_awaiting_its_payment_is_swept() {
         assert!(choose(s, Some(four), "four").committed);
         assert!(place(s, "again").committed);
         let (html, _, _, _) = s
-            .serve_document_settled("a", "store.page.OrderPage", &Params::new(), &[])
+            .serve_document_settled("a", "store.page.OrderPage~ui", &Params::new(), &[])
             .expect("served");
         let page_url = html
             .split("src=\"")

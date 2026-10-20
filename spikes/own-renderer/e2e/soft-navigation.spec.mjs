@@ -159,7 +159,7 @@ test("a page of another layout, or none, is loaded whole", async ({ page }) => {
     document.querySelector("main").append(a);
   });
   await page.locator("#elsewhere").click();
-  await expect(page).toHaveURL(/demo\.dialog\.DialogPage$/);
+  await expect(page).toHaveURL(/demo\.dialog\.DialogPage~ui$/);
   await page.waitForLoadState("load");
   expect(await page.evaluate(() => window.__kept ?? false)).toBe(false);
 });
