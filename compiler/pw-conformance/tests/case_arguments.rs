@@ -226,7 +226,7 @@ fn handlers(
         .unwrap_or_else(|e| panic!("builds: {e}"))
         .handlers
         .into_iter()
-        .filter(|h| h.declaration == "v.P")
+        .filter(|h| h.declaration == "v.P~ui")
         .map(|h| h.module)
         .collect()
 }
