@@ -38,6 +38,11 @@ async function stopped(request) {
   return (await (await request.get("/bench/calls")).json()).category_stopped;
 }
 
+/** How many reads of a category the host has begun. */
+async function started(request) {
+  return (await (await request.get("/bench/calls")).json()).category;
+}
+
 test("a changed key's old read is stopped, and its answer never shown (test 7)", async ({
   page,
   request,
@@ -62,9 +67,12 @@ test("a changed key's old read is stopped, and its answer never shown (test 7)",
       characterData: true,
     });
   });
+  const begun = await started(request);
   await tab(page, "Hot").click();
-  // Hot's read is under way.
-  await page.waitForTimeout(300);
+  // Hot's read is under way: the host has begun it, however long that takes
+  // (a pause of 300 ms was a guess a loaded machine outran, and Cold then
+  // aborted a request the host had not yet read).
+  await expect.poll(() => started(request)).toBeGreaterThan(begun);
   await tab(page, "Cold").click();
   await expect(browsed(page)).toHaveText(["Cold Brew"]);
   // Hot's request aborted in the browser, and its read stopped on the host.
@@ -98,9 +106,10 @@ test("leaving the page stops its read (test 8)", async ({ page, request }) => {
   await slow(request, "hot", 2000);
   const before = await stopped(request);
   await ready(page);
+  const begun = await started(request);
   await tab(page, "Hot").click();
-  // Hot's read is under way.
-  await page.waitForTimeout(300);
+  // Hot's read is under way: the host has begun it (see above).
+  await expect.poll(() => started(request)).toBeGreaterThan(begun);
   await page.goto("about:blank");
   // The host found the request gone, and let go of its read.
   await expect.poll(() => stopped(request), { timeout: 3_000 }).toBeGreaterThan(before);

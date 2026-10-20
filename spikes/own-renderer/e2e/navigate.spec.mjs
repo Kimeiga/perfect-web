@@ -170,12 +170,18 @@ test("a press made before the navigation is answered first, its answer first", a
 test("a press made while the page leaves is not taken", async ({ page }) => {
   await oneEspresso(page);
   // The order's page is slow to come: the cart stays, leaving, meanwhile,
-  // its next page being fetched to be shown in its layout.
+  // its next page being fetched to be shown in its layout. It comes when the
+  // press below has been made, however long that takes: a hold of 500 ms was
+  // a window that a click of Firefox's, under load, missed (the page was
+  // swapped under it, its button detached, and the click retried for the
+  // test's thirty seconds).
   let asked;
   const requested = new Promise((r) => (asked = r));
+  let made;
+  const pressMade = new Promise((r) => (made = r));
   await page.route("**/order", async (route) => {
     asked();
-    await new Promise((r) => setTimeout(r, 500));
+    await pressMade;
     await route.continue();
   });
   const cleared = [];
@@ -185,6 +191,7 @@ test("a press made while the page leaves is not taken", async ({ page }) => {
   await page.getByRole("button", { name: "Place order" }).click();
   await requested;
   await page.locator("#clear-cart").click();
+  made();
   await page.waitForURL(/\/order$/);
   // The page was leaving: the press sent nothing.
   expect(cleared).toEqual([]);

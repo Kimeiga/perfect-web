@@ -743,7 +743,12 @@ class Recipes(unittest.TestCase):
         with contextlib.redirect_stdout(said):
             beat = threading.Thread(target=recipes.heartbeat, args=("e14-x", stop, 0.05))
             beat.start()
-            time.sleep(0.3)
+            # Until the first beat is heard, however long a loaded machine
+            # takes to run the thread (a sleep of 0.3 s was a silence that
+            # machine made too), and no longer than thirty seconds.
+            deadline = time.monotonic() + 30
+            while not said.getvalue() and time.monotonic() < deadline:
+                time.sleep(0.01)
             stop.set()
             beat.join()
         lines = [l for l in said.getvalue().splitlines() if l.startswith("  [e14-x, ")]
