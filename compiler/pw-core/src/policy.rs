@@ -155,6 +155,12 @@ pub enum Domain {
     /// declaration's parameters, and charter §8.2 checks every internal link
     /// against the set of these.
     RoutePattern,
+    /// **A signal bound to the address's fragment, and the forms it takes**
+    /// (track `todomvc`): `fragment filter "/" => "all", "/active" =>
+    /// "active"`. A signal of the page, then each form the fragment takes
+    /// and the value the signal takes with it, each a quoted literal. Read
+    /// and held by `address_fragment::check`.
+    Fragment,
     /// A declaration this program defines, named for attribution:
     /// `attributes_forced_layout_to VendorMap`.
     DeclRef,
@@ -365,6 +371,8 @@ pub fn domain_of(head: &str) -> Option<Domain> {
         // ADR-0040: the operation the compiler supplies, by its name.
         "intrinsic" => Domain::Str,
         "route" => Domain::RoutePattern,
+        // Track `todomvc`: a page's fragment, bound to one of its signals.
+        "fragment" => Domain::Fragment,
         "layout" => Domain::LayoutRef,
         "not_found_on" => Domain::CaseRef,
         // ADR-0295: `redirect_on KiokunError.Moved permanent`, a case and how
@@ -655,6 +663,8 @@ pub fn declared_by(head: &str) -> Option<(&'static [crate::hir::DeclKind], &'sta
         "revision" => (&[K::Page], "a page"),
         // A page's address, or where a form posts an upload (track `uploads`).
         "route" => (&[K::Page, K::Upload], "a page or an upload"),
+        // A page's address's fragment, bound to a signal (track `todomvc`).
+        "fragment" => (&[K::Page], "a page"),
         // The layout a page is shown in (ADR-0303): a page's, and not a
         // layout's, which names none.
         "layout" => (&[K::Page], "a page"),
@@ -1188,6 +1198,7 @@ mod tests {
         "invoked_by",
         "placement",
         "route",
+        "fragment",
         "layout",
         "not_found_on",
         "redirect_on",

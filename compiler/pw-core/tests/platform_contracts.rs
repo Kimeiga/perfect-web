@@ -493,7 +493,11 @@ fn the_trusted_platform_contract_is_hashed() {
     // `OrderStatus` gains `Scheduled(ScheduledFor)`, and its `OrderError`
     // `NotOffered(Instant)` and `Scheduled`. Accepted by the integrator,
     // 2026-10-15 (the hash did not move for the ruling).
-    const EXPECTED: u64 = 0xfc57_c926_be38_b1d5;
+    // 2026-10-14, merged 2026-10-20 (track `device-store`): `events`
+    // declares `dblclick`, a double press, read as a press is, and `blur`, a
+    // control's losing focus, with a `BlurEvent` holding the value it held
+    // (track `todomvc`: an edit begun by a double press and saved on blur).
+    const EXPECTED: u64 = 0x27e5_b533_8728_97f1;
     eprintln!(
         "  platform contract: {} files, hash {hash:#018x}",
         names.len()

@@ -1,0 +1,176 @@
+[2686236:1014/221930.305558:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Failed to connect to socket /run/user/1000/bus: No such file or directory
+[2686236:1014/221930.305669:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Failed to connect to socket /run/user/1000/bus: No such file or directory
+[2686236:1014/221930.305697:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Failed to connect to socket /run/user/1000/bus: No such file or directory
+[2686236:1014/221930.305708:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Failed to connect to socket /run/user/1000/bus: No such file or directory
+[2686236:1014/221930.305723:ERROR:dbus/object_proxy.cc:590] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: 
+
+DevTools listening on ws://127.0.0.1:40389/devtools/browser/bcc2abaf-287f-4460-810d-f8b3ca19de54
+[2686677:1014/221930.424717:WARNING:ui/gfx/linux/gpu_memory_buffer_support_x11.cc:49] dri3 extension not supported.
+[2686677:1014/221930.448228:WARNING:sandbox/policy/linux/sandbox_linux.cc:415] InitializeSandbox() called with multiple threads in process gpu-process.
+Warning: The allowCypressEnv configuration option is enabled. This allows any browser code to read values from Cypress.env(). This is insecure and will be removed in a future major version.
+
+1. Replace Cypress.env() calls with cy.env() (for sensitive values) or Cypress.expose() (for public configuration)
+2. Set allowCypressEnv: false in your Cypress configuration to disable Cypress.env()
+
+Learn more: https://on.cypress.io/cypress-env-migration
+
+
+================================================================================
+
+  (Run Starting)
+
+  ┌────────────────────────────────────────────────────────────────────────────────────────────────┐
+  │ Cypress:        15.14.2                                                                        │
+  │ Browser:        Electron 138 (headless)                                                        │
+  │ Node Version:   v22.21.1 (/home/user/.nvm/versions/node/v22.21.1/bin/node)                     │
+  │ Specs:          1 found (spec.cy.js)                                                           │
+  │ Searched:       cypress/e2e/**/*.cy.js                                                         │
+  └────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────
+                                                                                                    
+  Running:  spec.cy.js                                                                      (1 of 1)
+[2686236:1014/221937.796358:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Failed to connect to socket /run/user/1000/bus: No such file or directory
+[2686236:1014/221945.310666:INFO:CONSOLE:521] "framework %s has %d issue(s) page/todomvc.app.Todos 0", source: http://127.0.0.1:7684/__cypress/tests?p=cypress/e2e/spec.cy.js (521)
+[2686236:1014/221945.312075:INFO:CONSOLE:673] "Running tests %d time(s) 1", source: http://127.0.0.1:7684/__cypress/tests?p=cypress/e2e/spec.cy.js (673)
+
+
+  TodoMVC - page/todomvc.app.Todos
+    When page is initially opened
+      ✓ should focus on the todo input field (837ms)
+    No Todos
+      ✓ starts with nothing (479ms)
+      ✓ should hide #main and #footer (571ms)
+    New Todo
+[2686236:1014/221953.099036:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Failed to connect to socket /run/user/1000/bus: No such file or directory
+[2686236:1014/221953.099063:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Failed to connect to socket /run/user/1000/bus: No such file or directory
+[2686236:1014/221953.099075:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Failed to connect to socket /run/user/1000/bus: No such file or directory
+      1) should allow me to add todo items
+[2686236:1014/221958.402450:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Failed to connect to socket /run/user/1000/bus: No such file or directory
+[2686236:1014/221958.402495:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Failed to connect to socket /run/user/1000/bus: No such file or directory
+[2686236:1014/221958.402515:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Failed to connect to socket /run/user/1000/bus: No such file or directory
+      2) should clear text input field when an item is added
+[2686236:1014/221958.872776:INFO:CONSOLE:609] "Uncaught SecurityError: Failed to read the 'length' property from 'Storage': Access is denied for this document.", source: http://127.0.0.1:7684/__cypress/tests?p=cypress/e2e/spec.cy.js (609)
+[2686236:1014/221958.932936:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Failed to connect to socket /run/user/1000/bus: No such file or directory
+[2686236:1014/221958.932974:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Failed to connect to socket /run/user/1000/bus: No such file or directory
+[2686236:1014/221958.932992:ERROR:dbus/bus.cc:408] Failed to connect to the bus: Failed to connect to socket /run/user/1000/bus: No such file or directory
+      3) "before each" hook for "should append new items to the bottom of the list"
+
+
+  3 passing (14s)
+  3 failing
+
+  1) TodoMVC - page/todomvc.app.Todos
+       New Todo
+         should allow me to add todo items:
+     AssertionError: Timed out retrying after 4000ms: expected setItem to have been called at least once, but it was never called
+      at checkItemSaved (webpack://pw-todomvc-cypress/./cypress/e2e/spec.cy.js:387:9)
+      at Context.eval (webpack://pw-todomvc-cypress/./cypress/e2e/spec.cy.js:564:8)
+
+  2) TodoMVC - page/todomvc.app.Todos
+       New Todo
+         should clear text input field when an item is added:
+     CypressError: `cy.then()` timed out after waiting `4000ms`.
+
+Your callback function returned a promise that never resolved.
+
+The callback function was:
+
+storage => {
+    return new Cypress.Promise((resolve, reject) => {
+      const checkItems = () => {
+        if (storage.length < 1) {
+          return setTimeout(checkItems, 0);
+        }
+        if (Object.keys(storage).some(key => {
+          const text = storage.getItem(key);
+          // assuming it is an array
+          try {
+            const items = JSON.parse(text);
+            return items.length === n;
+          } catch (e) {
+            // ignore
+            return;
+          }
+        })) {
+          return resolve();
+        }
+        setTimeout(checkItems, 0);
+      };
+      checkItems();
+    });
+  }
+
+https://on.cypress.io/then
+      at <unknown> (http://127.0.0.1:7684/__cypress/runner/cypress_runner.js:122968:75)
+      at tryCatcher (http://127.0.0.1:7684/__cypress/runner/cypress_runner.js:1777:23)
+      at <unknown> (http://127.0.0.1:7684/__cypress/runner/cypress_runner.js:4156:41)
+      at tryCatcher (http://127.0.0.1:7684/__cypress/runner/cypress_runner.js:1777:23)
+      at Promise._settlePromiseFromHandler (http://127.0.0.1:7684/__cypress/runner/cypress_runner.js:1489:31)
+      at Promise._settlePromise (http://127.0.0.1:7684/__cypress/runner/cypress_runner.js:1546:18)
+      at Promise._settlePromise0 (http://127.0.0.1:7684/__cypress/runner/cypress_runner.js:1591:10)
+      at Promise._settlePromises (http://127.0.0.1:7684/__cypress/runner/cypress_runner.js:1667:18)
+      at _drainQueueStep (http://127.0.0.1:7684/__cypress/runner/cypress_runner.js:2377:12)
+      at _drainQueue (http://127.0.0.1:7684/__cypress/runner/cypress_runner.js:2370:9)
+      at Async._drainQueues (http://127.0.0.1:7684/__cypress/runner/cypress_runner.js:2386:5)
+      at Async.drainQueues (http://127.0.0.1:7684/__cypress/runner/cypress_runner.js:2256:14)
+
+  3) TodoMVC - page/todomvc.app.Todos
+       New Todo
+         "before each" hook for "should append new items to the bottom of the list":
+     Error: Cannot determine what kind of selectors this app uses.
+
+Because this error occurred during a `before each` hook we are skipping the remaining tests in the current suite: `TodoMVC - page/todomvc.app....`
+      at Context.eval (webpack://pw-todomvc-cypress/./cypress/e2e/spec.cy.js:513:16)
+      at getRet (http://127.0.0.1:7684/__cypress/runner/cypress_runner.js:122944:20)
+      at tryCatcher (http://127.0.0.1:7684/__cypress/runner/cypress_runner.js:1777:23)
+      at Promise.attempt.Promise.try (http://127.0.0.1:7684/__cypress/runner/cypress_runner.js:4285:29)
+      at Context.thenFn (http://127.0.0.1:7684/__cypress/runner/cypress_runner.js:122955:66)
+      at Context.then (http://127.0.0.1:7684/__cypress/runner/cypress_runner.js:123206:21)
+      at wrapped (http://127.0.0.1:7684/__cypress/runner/cypress_runner.js:146482:19)
+      at <unknown> (http://127.0.0.1:7684/__cypress/runner/cypress_runner.js:152513:15)
+      at tryCatcher (http://127.0.0.1:7684/__cypress/runner/cypress_runner.js:1777:23)
+
+
+
+
+  (Results)
+
+  ┌────────────────────────────────────────────────────────────────────────────────────────────────┐
+  │ Tests:        29                                                                               │
+  │ Passing:      3                                                                                │
+  │ Failing:      3                                                                                │
+  │ Pending:      0                                                                                │
+  │ Skipped:      23                                                                               │
+  │ Screenshots:  3                                                                                │
+  │ Video:        false                                                                            │
+  │ Duration:     13 seconds                                                                       │
+  │ Spec Ran:     spec.cy.js                                                                       │
+  └────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+  (Screenshots)
+
+  -  /home/user/code/pw-wt/todomvc/spikes/todomvc-cypress/cypress/screenshots/spec.cy     (1280x720)
+     .js/TodoMVC - pagetodomvc.app.Todos -- New Todo -- should allow me to add todo i               
+     tems (failed).png                                                                              
+  -  /home/user/code/pw-wt/todomvc/spikes/todomvc-cypress/cypress/screenshots/spec.cy     (1280x720)
+     .js/TodoMVC - pagetodomvc.app.Todos -- New Todo -- should clear text input field               
+      when an item is added (failed).png                                                            
+  -  /home/user/code/pw-wt/todomvc/spikes/todomvc-cypress/cypress/screenshots/spec.cy     (1280x720)
+     .js/TodoMVC - pagetodomvc.app.Todos -- should append new items to the bottom of                
+     the list -- before each hook (failed).png                                                      
+
+
+================================================================================
+
+  (Run Finished)
+
+
+       Spec                                              Tests  Passing  Failing  Pending  Skipped  
+  ┌────────────────────────────────────────────────────────────────────────────────────────────────┐
+  │ ✖  spec.cy.js                               00:13       29        3        3        -       23 │
+  └────────────────────────────────────────────────────────────────────────────────────────────────┘
+    ✖  1 of 1 failed (100%)                     00:13       29        3        3        -       23  
+

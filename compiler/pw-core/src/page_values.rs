@@ -770,6 +770,12 @@ pub struct PageValues {
     /// the template reads the answer as `SignedIn~holds`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub predicates: Vec<String>,
+    /// **The signal the page binds to its address's fragment** (track
+    /// `todomvc`), and each form the fragment takes with the value the
+    /// signal takes then: the browser keeps the two in step, and a host
+    /// renders the signal's first value, since it never sees a fragment.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fragment: Option<crate::address_fragment::Binding>,
 }
 
 fn public_scope() -> String {
@@ -2347,6 +2353,7 @@ fn plan(
             scope: crate::resume::page_scope(hir, decl).to_string(),
             layout,
             predicates: asked.into_iter().collect(),
+            fragment: crate::address_fragment::declared(decl),
         },
         members,
         computed,

@@ -265,6 +265,9 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
             out.extend(navigations(&workspace, &u.hir, i, &sigs));
             // ADR-0311: and a page's canonical address is a page's.
             out.extend(canonical_addresses(&workspace, &hirs, i, &sigs));
+            // Track `todomvc` (ADR-XXXX): a page binds a signal to its
+            // address's fragment (PW61xx).
+            out.extend(crate::address_fragment::check(&hirs, i));
             // ADR-0303: a page is shown in its layout.
             out.extend(crate::layouts::check(&hirs, &workspace, i));
             // ADR-0243's amendment: markup is no operand.

@@ -299,7 +299,7 @@ test("native missing malformed partial stale receipts and unknown selected decla
       assert.deepEqual(records(fixture.bodies), []);
     } finally { rmSync(fixture.root, { recursive: true, force: true }); }
   }
-  for (const mode of ["unknown-file", "unknown-project", "unknown-role", "reserved-todomvc"]) {
+  for (const mode of ["unknown-file", "unknown-project", "unknown-role"]) {
     const fixture = nativeFixture();
     try {
       let args = ["--project=chromium"];
@@ -308,7 +308,7 @@ test("native missing malformed partial stale receipts and unknown selected decla
         args.push("unknown.spec.mjs");
       } else if (mode === "unknown-project") args = ["--project=unregistered"];
       else {
-        writeFileSync(join(fixture.root, "e2e/page-policy.spec.mjs"), 'import{test}from"@playwright/test";test("unknown",{annotation:{type:"pw-host",description:"' + (mode === 'reserved-todomvc' ? 'todomvc' : 'unregistered') + '"}},()=>{});');
+        writeFileSync(join(fixture.root, "e2e/page-policy.spec.mjs"), 'import{test}from"@playwright/test";test("unknown",{annotation:{type:"pw-host",description:"unregistered"}},()=>{});');
         args.push("page-policy.spec.mjs");
       }
       const result = await native(fixture, args);

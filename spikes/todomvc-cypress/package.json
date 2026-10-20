@@ -1,0 +1,7 @@
+{
+  "name": "pw-todomvc-cypress",
+  "private": true,
+  "type": "module",
+  "//": "TodoMVC's official Cypress suite (github.com/tastejs/todomvc, MIT), vendored byte for byte and run unchanged against TodoMVC in Pleris (track todomvc, W7). Cypress 15.21.1 is the last 15.x (the spec reads Cypress.env(), which 16 may drop): that repository's own lockfile pins 15.14.2, whose dependency tree carries six advisories (uuid, qs, extract-zip) that 15.21.1's does not. pnpm 10 does not run Cypress's install script: `pnpm exec cypress install` fetches the binary (see UPSTREAM.md).",
+  "devDependencies": { "cypress": "15.21.1" }
+}

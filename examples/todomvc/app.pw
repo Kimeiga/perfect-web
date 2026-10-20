@@ -1,0 +1,383 @@
+// @corpus: reference
+// @id: TODOMVC
+// @category: a reference app everyone knows: TodoMVC, held to its own spec
+// @milestone: E14
+//
+// TodoMVC (https://todomvc.com): the owner's "something people are familiar
+// with" (docs/PARALLEL.md, W7's plan), held to TodoMVC's own spec
+// (`app-spec.md`) and its own official tests (the Cypress suite, run
+// unchanged). Its markup and class names are the template's, and its
+// stylesheets are TodoMVC's own (`todomvc-app-css`, `todomvc-common`), so the
+// official tests' selectors find what they look for.
+//
+// What the spec states, and where this states it:
+// - **No todos**: `.main` and `.footer` are hidden, not absent, while the
+//   list is empty (`hidden={board.total == 0}`).
+// - **New todo**: Enter adds it, `title_of` trims it and refuses it where
+//   nothing is left, the input is cleared once the todo is added, and it has
+//   `autofocus`.
+// - **Mark all as complete**: `toggle_all`, whose checkbox is checked when
+//   there are todos and none is active, so it follows each one.
+// - **Item**: a checkbox that toggles it (`toggle`), a double press on its
+//   label that begins editing, a `.destroy` button.
+// - **Editing**: the field shows the title, focused; Enter and blur save it,
+//   Escape leaves it as it was, and a title trimmed to nothing destroys the
+//   todo (`save_edit`).
+// - **Counter**: the number in a `<strong>`, `item left` or `items left`.
+// - **Clear completed**: `.clear-completed`, hidden where none is completed.
+// - **Routing**: `#/`, `#/active` and `#/completed`, the address's fragment
+//   bound to the `filter` signal, which keys the page's read: the model
+//   filters, and the browser shows what the model says.
+// - **Persistence**: the framework's own, which the spec allows in place of
+//   `localStorage`: a session's todos, kept by the host. The device-local
+//   version waits for charter §9.1's fourth kind of state.
+//
+// The editing mode is the page's signal, never the model's: `editing` names
+// the todo being edited, the browser holds it (so it is not persisted, as the
+// spec says), and it keys the read, so the model says which row shows its
+// field. A signal read inside a loop's row is not built yet (ADR-0137).
+
+module todomvc.app
+
+import List
+import String
+import context.{ current_session }
+import capability.{ Session, SessionId }
+import events.{ BlurEvent, InputEvent, KeyEvent }
+
+opaque type TodoId = String
+opaque type InteractionId = String
+
+// **A todo's title** (ADR-0225's idiom): something, and at most 1000
+// characters. Every construction is shown to hold it at build, and the host
+// holds a browser's to it.
+opaque type Title = String where String.length(value) >= 1 & String.length(value) <= 1000
+
+// **A draft as a title, or none**, as the spec asks: trimmed, and nothing
+// left of it is no todo.
+fn title_of(draft: String) -> Option<Title> !{} {
+    let trimmed = String.trim(draft)
+    if String.length(trimmed) >= 1 & String.length(trimmed) <= 1000 {
+        Some(Title(trimmed))
+    } else {
+        None
+    }
+}
+
+// A todo as the host keeps it.
+type Todo = Todo { id: TodoId, title: String, completed: Bool }
+
+// **A todo as the list shows it**: whether its field is shown, which the
+// model says by the page's `editing`.
+type Row = Row { id: String, title: String, completed: Bool, editing: Bool }
+
+// **What the page shows**: the todos its filter shows, and how many there are
+// of each kind, which the footer, the toggle-all and the clear button read.
+type Board = Board { rows: List<Row>, total: Int, left: Int, done: Int }
+
+type TodoError =
+    | NotFound
+    | Full
+
+event TodosChanged(session: Session<SessionId>)
+
+// **What the todos' store guarantees** (ADR-0207): a session's todos, in the
+// host's memory, under its lock: a command's writes commit as one, and a
+// read is of the latest.
+source TodoData
+    holds        Todo
+    transactions serializable
+    reads        strong
+    changes      none
+
+fn todos_of(s: Session<SessionId>) -> List<Todo> !{ database.read<Todo> }
+    host "todomvc:data/todos#all"
+
+fn add_todo(s: Session<SessionId>, title: Title) -> Result<Todo, TodoError> !{ database.write<Todo> }
+    host "todomvc:data/todos#add"
+
+fn complete(s: Session<SessionId>, id: TodoId, done: Bool) -> Result<Todo, TodoError> !{ database.write<Todo> }
+    host "todomvc:data/todos#complete"
+
+fn complete_all(s: Session<SessionId>, done: Bool) -> Int !{ database.write<Todo> }
+    host "todomvc:data/todos#complete-all"
+
+fn retitle(s: Session<SessionId>, id: TodoId, title: Title) -> Result<Todo, TodoError> !{ database.write<Todo> }
+    host "todomvc:data/todos#retitle"
+
+fn remove(s: Session<SessionId>, id: TodoId) -> Result<TodoId, TodoError> !{ database.write<Todo> }
+    host "todomvc:data/todos#remove"
+
+fn remove_completed(s: Session<SessionId>) -> Int !{ database.write<Todo> }
+    host "todomvc:data/todos#remove-completed"
+
+// --- the model: what the filters show, and how many there are -------------
+
+// **Whether a filter shows a todo**: `active`, `completed`, and everything
+// else, which is `all`.
+fn shown(t: Todo, filter: String) -> Bool !{} {
+    if filter == "active" {
+        !t.completed
+    } else if filter == "completed" {
+        t.completed
+    } else {
+        true
+    }
+}
+
+fn row_of(t: Todo, editing: String) -> Row !{} {
+    Row { id: t.id.value, title: t.title, completed: t.completed, editing: t.id.value == editing }
+}
+
+// **The board**: the todos the filter shows, each as a row, and the counts of
+// all of them, which no filter changes.
+fn board_of(todos: List<Todo>, filter: String, editing: String) -> Board !{} {
+    let left = List.length(List.filter(todos, (t) => !t.completed))
+    Board {
+        rows: List.map(List.filter(todos, (t) => shown(t, filter)), (t) => row_of(t, editing)),
+        total: List.length(todos),
+        left: left,
+        done: List.length(todos) - left,
+    }
+}
+
+// **The session's board** for a filter, and the todo being edited: private,
+// and read again for a new key, as a search's is (ADR-0152). The model
+// filters (the spec: "filtered on a model level"), and says which row is
+// edited.
+session query Board(session: Session<SessionId>, filter: String, editing: String) -> Board
+    freshness      0.seconds
+    consistency    read_your_writes
+    cache          private
+    key            session, filter, editing
+    invalidates_on TodosChanged(session)
+    concurrency    one_per_key
+    on_key_change  cancel
+    timeout        2.seconds
+{
+    board_of(todos_of(session), filter, editing)
+}
+
+// --- the commands ---------------------------------------------------------
+
+// **A todo added**, at the bottom of the list.
+command add(title: Title) -> Result<Todo, TodoError>
+    idempotent_by InteractionId
+    emits         TodosChanged(current_session())
+{
+    add_todo(current_session(), title)
+}
+
+// **A todo completed, or not**: the other of what it is.
+command toggle(id: TodoId) -> Result<Todo, TodoError>
+    idempotent_by InteractionId
+    emits         TodosChanged(current_session())
+{
+    match List.find(todos_of(current_session()), (t) => t.id == id) {
+        Some(t) => complete(current_session(), id, !t.completed),
+        None => Err(NotFound),
+    }
+}
+
+// **Every todo completed**, or, where every one is, none: the toggle-all's
+// state after a press is what it was not.
+command toggle_all() -> Result<Int, TodoError>
+    idempotent_by InteractionId
+    emits         TodosChanged(current_session())
+{
+    Ok(complete_all(current_session(), List.any(todos_of(current_session()), (t) => !t.completed)))
+}
+
+// **An edit saved**: the todo titled as written, trimmed, or destroyed where
+// nothing is left (the spec: "if it's empty the todo should instead be
+// destroyed").
+command save_edit(id: TodoId, text: String) -> Result<TodoId, TodoError>
+    idempotent_by InteractionId
+    emits         TodosChanged(current_session())
+{
+    match title_of(text) {
+        Some(title) => match retitle(current_session(), id, title) {
+            Ok(t) => Ok(t.id),
+            Err(e) => Err(e),
+        },
+        None => remove(current_session(), id),
+    }
+}
+
+command destroy(id: TodoId) -> Result<TodoId, TodoError>
+    idempotent_by InteractionId
+    emits         TodosChanged(current_session())
+{
+    remove(current_session(), id)
+}
+
+command clear_completed() -> Result<Int, TodoError>
+    idempotent_by InteractionId
+    emits         TodosChanged(current_session())
+{
+    Ok(remove_completed(current_session()))
+}
+
+// --- what the page computes from what it holds ----------------------------
+
+// **The counter's words**: `1 item left`, `2 items left`, `0 items left`.
+fn items_left(n: Int) -> String !{} {
+    if n == 1 {
+        "item left"
+    } else {
+        "items left"
+    }
+}
+
+// **The filter link of the page's filter** is `selected`.
+fn selected(filter: String, mine: String) -> String !{} {
+    if filter == mine {
+        "selected"
+    } else {
+        ""
+    }
+}
+
+fn row_class(completed: Bool, editing: Bool) -> String !{} {
+    if completed & editing {
+        "completed editing"
+    } else if completed {
+        "completed"
+    } else if editing {
+        "editing"
+    } else {
+        ""
+    }
+}
+
+session page Todos() {
+    route     "/"
+    placement origin
+    cache     private
+    // The address's fragment, which no server sees, is the filter: `#/` shows
+    // every todo, and a fragment that is none of these does too.
+    fragment  filter "/" => "all", "/active" => "active", "/completed" => "completed"
+
+    signal filter: String = "all"
+    // The todo being edited, by its id, or none; and what its field holds.
+    signal editing: String = ""
+    signal edit_text: String = ""
+    signal draft: String = ""
+    let board = query Board(current_session(), filter, editing)
+
+    view {
+        <title>TodoMVC: Pleris</title>
+        <link rel="stylesheet" href="/todomvc-base.css" />
+        <link rel="stylesheet" href="/todomvc-app.css" />
+        <link rel="stylesheet" href="/todomvc-pleris.css" />
+        <section class="todoapp">
+            <header class="header">
+                <h1>todos</h1>
+                <input class="new-todo" placeholder="What needs to be done?" aria-label="New todo" autofocus
+                    bind:value={draft}
+                    on:keydown={(e: KeyEvent) => if e.key == "Enter" {
+                        match title_of(draft) {
+                            // Cleared at once, as the spec says, so what is
+                            // typed next is not lost to the answer; and given
+                            // back where the todo was not added, if nothing
+                            // has been typed since.
+                            Some(title) => {
+                                let typed = draft
+                                draft = ""
+                                match add(title) {
+                                    Ok(_) => draft = draft,
+                                    Err(_) => if draft == "" {
+                                        draft = typed
+                                    } else {
+                                        draft = draft
+                                    },
+                                }
+                            },
+                            None => draft = draft,
+                        }
+                    }} />
+            </header>
+            <section class="main" hidden={board.total == 0}>
+                <input id="toggle-all" class="toggle-all" type="checkbox" checked={board.left == 0 & board.total > 0}
+                    on:press={() => match toggle_all() {
+                        Ok(_) => draft = draft,
+                        Err(_) => draft = draft,
+                    }} />
+                <label for="toggle-all">Mark all as complete</label>
+                <ul class="todo-list">
+                    {#each board.rows as row (row.id)}
+                        <li class={row_class(row.completed, row.editing)}>
+                            <div class="view">
+                                <input class="toggle" type="checkbox" aria-label="Completed" checked={row.completed}
+                                    on:press={resumable(captures = { row }) => match toggle(TodoId(row.id)) {
+                                        Ok(_) => draft = draft,
+                                        Err(_) => draft = draft,
+                                    }} />
+                                <label on:dblclick={resumable(captures = { row }) => {
+                                    edit_text = row.title
+                                    editing = row.id
+                                }}>{row.title}</label>
+                                <button class="destroy" type="button" aria-label="Delete"
+                                    on:press={resumable(captures = { row }) => match destroy(TodoId(row.id)) {
+                                        Ok(_) => draft = draft,
+                                        Err(_) => draft = draft,
+                                    }}></button>
+                            </div>
+                            {#if row.editing}
+                                <input class="edit" aria-label="Edit" autofocus value={row.title}
+                                    on:input={(e: InputEvent) => edit_text = e.value}
+                                    // Saved, the edit is over unless another todo has
+                                    // been begun since: a double press on one begins
+                                    // it by leaving this field, and the answer to this
+                                    // save must not end that edit.
+                                    on:keydown={(e: KeyEvent) => if e.key == "Enter" {
+                                        let saved = editing
+                                        match save_edit(TodoId(saved), edit_text) {
+                                            Ok(_) => if editing == saved {
+                                                editing = ""
+                                            } else {
+                                                editing = editing
+                                            },
+                                            Err(_) => editing = editing,
+                                        }
+                                    } else if e.key == "Escape" {
+                                        editing = ""
+                                    }}
+                                    on:blur={(e: BlurEvent) => if editing != "" {
+                                        let saved = editing
+                                        match save_edit(TodoId(saved), edit_text) {
+                                            Ok(_) => if editing == saved {
+                                                editing = ""
+                                            } else {
+                                                editing = editing
+                                            },
+                                            Err(_) => editing = editing,
+                                        }
+                                    }} />
+                            {/if}
+                        </li>
+                    {/each}
+                </ul>
+            </section>
+            <footer class="footer" hidden={board.total == 0}>
+                <span class="todo-count"><strong>{board.left}</strong> {items_left(board.left)}</span>
+                <ul class="filters">
+                    <li><a class={selected(filter, "all")} href="#/">All</a></li>
+                    <li><a class={selected(filter, "active")} href="#/active">Active</a></li>
+                    <li><a class={selected(filter, "completed")} href="#/completed">Completed</a></li>
+                </ul>
+                <button class="clear-completed" type="button" hidden={board.done == 0}
+                    on:press={() => match clear_completed() {
+                        Ok(_) => draft = draft,
+                        Err(_) => draft = draft,
+                    }}>Clear completed</button>
+            </footer>
+        </section>
+        <footer class="info">
+            <p>Double-click to edit a todo</p>
+            <p>Created with Pleris</p>
+            <p>Part of <a href="https://todomvc.com">TodoMVC</a></p>
+            <p>Styled by <a href="https://github.com/tastejs/todomvc-app-css">todomvc-app-css</a>, Sindre Sorhus, CC BY 4.0</p>
+        </footer>
+    }
+}

@@ -338,6 +338,10 @@ pub const POLICY_KEYWORDS: &[&str] = &[
     // ADR-0295: the declared error that means a page's address is another
     // address of the page, answered 308 or 307 there.
     "redirect_on",
+    // Track `todomvc` (ADR-XXXX): the signal a page binds to its address's
+    // fragment, and the forms the fragment takes: `fragment filter "/" =>
+    // "all", "/active" => "active"`.
+    "fragment",
     // The layout a page is shown in: `layout StoreLayout`. A clause only
     // where a name follows on its line (`at_policy_head`): `layout.measure`
     // is an effect's path, and a body may begin with one.

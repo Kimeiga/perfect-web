@@ -171,8 +171,8 @@ test("unknown selected spec, project, role and conflicting declarations refuse",
   for (const annotations of [[], [{ type: "pw-host", description: "unknown" }], [{ type: "pw-host", description: "base" }, { type: "pw-host", description: "feed" }]]) {
     assert.throws(() => rolesForTest("page-policy.spec.mjs", "chromium", annotations), /host annotation|host role/);
   }
-  // TodoMVC's ports are kept for its app, which is not on this branch.
-  assert.throws(() => rolesForTest("page-policy.spec.mjs", "chromium", [{ type: "pw-host", description: "todomvc" }]), /todomvc is reserved/);
+  // TodoMVC's hosts serve its spec, its app on this branch (track `todomvc`).
+  assert.deepEqual(rolesForTest("todomvc.spec.mjs", "firefox"), ["todomvc"]);
   assert.deepEqual(rolesForTest("signals.spec.mjs", "chromium"), ["base"]);
   assert.deepEqual(rolesForTest("page-policy.spec.mjs", "webkit", [{ type: "pw-host", description: "payments" }]), ["payment-provider", "payments"]);
 });

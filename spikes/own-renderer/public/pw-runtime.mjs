@@ -1640,6 +1640,72 @@ async function flushSignals() {
   window.__pw.signals = Object.fromEntries(signals);
 }
 
+// --- the address's fragment, bound to a signal (track `todomvc`) ------------
+//
+// A page that states `fragment filter "/" => "all", "/active" => "active"`
+// binds the signal to its address's fragment, which no server sees: the
+// document says which signal and each form the fragment takes with the value
+// the signal takes then (`parts.fragment`). The signal follows the fragment:
+// at start, and on each `hashchange`, a link's or the back button's. A
+// fragment that is no form, or none, is the signal's first value, the page's
+// declared default, which the server rendered. The address is the signal's
+// only writer: the compiler refuses a handler that assigns it (PW6105), so
+// the two cannot differ.
+
+/** The value the signal takes at the address's fragment now. */
+function fragmentValue(binding) {
+  const form = location.hash.slice(1);
+  return binding.forms.find((f) => f.form === form)?.value ?? firstValues.get(binding.signal);
+}
+
+/** The signal set to what the fragment says, held and rendered as any
+ * signal's change is: the parts that read it, and a query it keys. */
+function followFragment(binding) {
+  const value = fragmentValue(binding);
+  if (signals.get(binding.signal) === value) return;
+  log.push(`fragment ${location.hash || "(none)"} -> ${binding.signal} ${JSON.stringify(value)}`);
+  setSignal(binding.signal, value, null);
+}
+
+/** The signal follows the fragment, from now: once it is read at start. */
+function bindFragment(binding) {
+  followFragment(binding);
+  addEventListener("hashchange", () => followFragment(binding), { signal: life.signal });
+}
+
+// --- `autofocus` on an element a block shows (track `todomvc`) --------------
+//
+// HTML runs `autofocus` when a page loads, and ignores it on an element put
+// in later. A page shows fields after it has loaded, as TodoMVC shows its
+// edit field when a person asks to edit a todo ("the edit field should be
+// focused"): the field they asked for is the one they type in. So an element
+// that arrives with `autofocus`, in a block a signal renders or in a patch
+// from the server, takes focus as it arrives, each time it arrives. What the
+// page was served with is left alone: the browser focused that. (A modal
+// dialog's `autofocus` element is the one `showModal` focuses (ADR-0141): it
+// is already focused by the time this looks.)
+
+/** The element, among `nodes` and what they hold, that asks for focus. */
+function autofocusIn(nodes) {
+  for (const node of nodes) {
+    if (node.nodeType !== Node.ELEMENT_NODE) continue;
+    const asking = node.matches("[autofocus]") ? [node] : [...node.querySelectorAll("[autofocus]")];
+    const found = asking.find((el) => el.isConnected);
+    if (found) return found;
+  }
+  return null;
+}
+
+/** Whatever is put into the page from now on, one change at a time. */
+function followAutofocus() {
+  const observer = new MutationObserver((records) => {
+    const el = autofocusIn(records.flatMap((r) => [...r.addedNodes]));
+    if (el && document.activeElement !== el) el.focus();
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+  life.signal.addEventListener("abort", () => observer.disconnect(), { once: true });
+}
+
 // --- ADR-0152: a key a page changes ---------------------------------------
 //
 // A page's query given a signal is read again, for the new key, when the
@@ -2045,6 +2111,9 @@ const bound = new WeakMap();
  */
 const DOM_EVENTS = {
   press: "click",
+  // Track `todomvc` (ADR-XXXX): a double press, and a control's losing focus.
+  dblclick: "dblclick",
+  blur: "blur",
   input: "input",
   change: "change",
   keydown: "keydown",
@@ -2060,9 +2129,11 @@ const DOM_EVENTS = {
 function eventRecord(name, e) {
   switch (name) {
     case "press":
+    case "dblclick":
       return { x: Math.round(e.clientX ?? 0), y: Math.round(e.clientY ?? 0) };
     case "input":
     case "change":
+    case "blur":
       return { value: String(e.target?.value ?? "") };
     case "keydown":
       return { key: String(e.key ?? "") };
@@ -2327,6 +2398,10 @@ async function attach() {
   // A page whose values are its signals alone listens for nothing
   // (ADR-0130): no resource of its changes on the server.
   if (parts.listens !== false) subscribe();
+  // The signal a page binds to its address's fragment follows it from here.
+  if (parts.fragment) bindFragment(parts.fragment);
+  // What a block shows from here on, with `autofocus`, takes focus.
+  followAutofocus();
   window.__pw.signals = Object.fromEntries(signals);
   window.__pw.ready = true;
   document.documentElement.dataset.pwReady = "1";
@@ -2394,6 +2469,15 @@ function addressKey(address) {
  * platform's own parser reads it, so a patched attribute means what a
  * rendered one does. Until 2026-10-03 no patch set an attribute: an Add button
  * kept the name of an item renamed since.
+ *
+ * **A checkbox's state follows the attribute** (track `todomvc`, ADR-XXXX).
+ * `checked` is an attribute only until a person has pressed the box: from
+ * then on the property is the box's own, and the attribute no longer moves it.
+ * A patch that unchecks the "toggle all" box, or checks it, is shown only if
+ * the property is set as well, as a signal-set attribute already does
+ * (`setAttributePart`). Until then a box a person had pressed stayed as they
+ * left it, whatever the page said it was. (An option's `selected` is the same
+ * and is not set here: no page has needed it yet, and none tests it.)
  */
 function setAttributeAt(address, op) {
   const part = (parts.parts ?? []).find((p) => p.id === address.part);
@@ -2403,6 +2487,7 @@ function setAttributeAt(address, op) {
   if (!element) return false;
   if (op.op === "remove_attribute") {
     element.removeAttribute(op.name);
+    if (op.name === "checked" && "checked" in element) element.checked = false;
     return true;
   }
   const parsed = document.createElement("template");
@@ -2411,6 +2496,7 @@ function setAttributeAt(address, op) {
   // A value set again, the same, is a change all the same, and a control's
   // name changed is said again where it has focus (ADR-0182).
   if (element.getAttribute(op.name) !== value) element.setAttribute(op.name, value);
+  if (op.name === "checked" && "checked" in element) element.checked = true;
   return true;
 }
 

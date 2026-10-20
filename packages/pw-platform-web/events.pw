@@ -29,9 +29,22 @@ type ChangeEvent = ChangeEvent { value: String }
 // what a `<form method="dialog">`'s button gave it.
 type CloseEvent = CloseEvent { value: String }
 
+// A control lost focus (track `todomvc`, ADR-XXXX): the value it held then,
+// which an edit is saved from where it was begun and not ended by a key
+// (TodoMVC saves on blur). It does not bubble, so it is the element's own.
+type BlurEvent = BlurEvent { value: String }
+
 fn submit(event: SubmitEvent) -> () !{} { () }
 
 fn press(event: PressEvent) -> () !{} { () }
+
+// A double press (track `todomvc`, ADR-XXXX), read as a press is: where the
+// pointer was. The two presses of the pair are presses still, and run the
+// handlers an element has for them.
+fn dblclick(event: PressEvent) -> () !{} { () }
+
+// A control lost focus (track `todomvc`, ADR-XXXX).
+fn blur(event: BlurEvent) -> () !{} { () }
 
 fn input(event: InputEvent) -> () !{} { () }
 

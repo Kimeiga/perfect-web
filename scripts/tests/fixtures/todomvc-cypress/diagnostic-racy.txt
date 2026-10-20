@@ -1,0 +1,114 @@
+Warning: The allowCypressEnv configuration option is enabled. This allows any browser code to read values from Cypress.env(). This is insecure and will be removed in a future major version.
+
+1. Replace Cypress.env() calls with cy.env() (for sensitive values) or Cypress.expose() (for public configuration)
+2. Set allowCypressEnv: false in your Cypress configuration to disable Cypress.env()
+
+Learn more: https://on.cypress.io/cypress-env-migration
+
+
+================================================================================
+
+  (Run Starting)
+
+  ┌────────────────────────────────────────────────────────────────────────────────────────────────┐
+  │ Cypress:        15.14.2                                                                        │
+  │ Browser:        Electron 138 (headless)                                                        │
+  │ Node Version:   v22.21.1 (/home/user/.nvm/versions/node/v22.21.1/bin/node)                     │
+  │ Specs:          1 found (spec.cy.js)                                                           │
+  │ Searched:       cypress/e2e/**/*.cy.js                                                         │
+  └────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────
+                                                                                                    
+  Running:  spec.cy.js                                                                      (1 of 1)
+
+
+  TodoMVC - puremvc
+    When page is initially opened
+      ✓ should focus on the todo input field (794ms)
+    No Todos
+      ✓ starts with nothing (586ms)
+      ✓ should hide #main and #footer (514ms)
+    New Todo
+      ✓ should allow me to add todo items (1405ms)
+      ✓ should clear text input field when an item is added (1110ms)
+      ✓ should append new items to the bottom of the list (2213ms)
+      ✓ should trim text input (1166ms)
+      ✓ should show #main and #footer when items added (1130ms)
+    Mark all as completed
+      ✓ should allow me to mark all items as completed (2019ms)
+      ✓ should allow me to clear the complete state of all items (1948ms)
+      1) complete all checkbox should update state when items are completed / cleared
+    Item
+      ✓ should allow me to mark items as complete (1501ms)
+      ✓ should allow me to un-mark items as complete (1553ms)
+      ✓ should allow me to edit an item (2416ms)
+    Editing
+      ✓ should hide other controls when editing (1979ms)
+      ✓ should save edits on blur (3056ms)
+      ✓ should trim entered text (2354ms)
+      ✓ should remove the item if an empty text string was entered (1968ms)
+      ✓ should cancel edits on escape (2359ms)
+    Counter
+      ✓ should display the current number of todo items (1198ms)
+    Clear completed button
+      ✓ should display the correct text (1736ms)
+      ✓ should remove completed items when clicked (1954ms)
+      ✓ should be hidden when there are no items that are completed (1861ms)
+    Persistence
+      - should persist its data
+    Routing
+      ✓ should allow me to display active items (2467ms)
+      ✓ should respect the back button (2460ms)
+      ✓ should allow me to display completed items (1895ms)
+      ✓ should allow me to display all items (2051ms)
+      ✓ should highlight the currently applied filter (1817ms)
+
+
+  27 passing (58s)
+  1 pending
+  1 failing
+
+  1) TodoMVC - puremvc
+       Mark all as completed
+         complete all checkbox should update state when items are completed / cleared:
+     AssertionError: Timed out retrying after 4000ms: expected '<input#toggle-all.toggle-all>' not to be 'checked'
+      at Context.eval (webpack://pw-todomvc-cypress/./cypress/e2e/spec.cy.js:712:36)
+
+
+
+
+  (Results)
+
+  ┌────────────────────────────────────────────────────────────────────────────────────────────────┐
+  │ Tests:        29                                                                               │
+  │ Passing:      27                                                                               │
+  │ Failing:      1                                                                                │
+  │ Pending:      1                                                                                │
+  │ Skipped:      0                                                                                │
+  │ Screenshots:  1                                                                                │
+  │ Video:        false                                                                            │
+  │ Duration:     58 seconds                                                                       │
+  │ Spec Ran:     spec.cy.js                                                                       │
+  └────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+  (Screenshots)
+
+  -  /home/user/code/pw-wt/todomvc/spikes/todomvc-cypress/cypress/screenshots/spec.cy     (1280x720)
+     .js/TodoMVC - puremvc -- Mark all as completed -- complete all checkbox should u               
+     pdate state when items are completed  cleared (failed).png                                     
+
+
+================================================================================
+
+  (Run Finished)
+
+
+       Spec                                              Tests  Passing  Failing  Pending  Skipped  
+  ┌────────────────────────────────────────────────────────────────────────────────────────────────┐
+  │ ✖  spec.cy.js                               00:58       29       27        1        1        - │
+  └────────────────────────────────────────────────────────────────────────────────────────────────┘
+    ✖  1 of 1 failed (100%)                     00:58       29       27        1        1        -  
+

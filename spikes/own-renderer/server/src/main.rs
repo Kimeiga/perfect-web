@@ -725,6 +725,8 @@ mod materializations;
 mod messages;
 // TRACK SEAM (kiokun): kiokun's dictionary, read (docs/PARALLEL.md, W6).
 mod kiokun;
+// TRACK SEAM (todomvc): a session's todos (docs/PARALLEL.md, W7).
+mod todomvc;
 // ADR-0304: the platform's clock, and what a value read by it holds until.
 mod clock;
 // ADR-0305: a page's commands run in the order it sent them.
@@ -1484,6 +1486,17 @@ impl Server {
             #[cfg(not(test))]
             let kiokun = kiokun::KiokunData::new()?;
             (Arc::new(store::StoreData::new()), Arc::new(kiokun))
+        } else if contracts
+            .iter()
+            .flat_map(|c| &c.imports)
+            .any(|i| i.interface.starts_with("todomvc:"))
+        {
+            // TRACK SEAM (todomvc): a session's todos, in memory, where the
+            // program imports `todomvc:data/…` (docs/PARALLEL.md, W7).
+            (
+                Arc::new(store::StoreData::new()),
+                Arc::new(todomvc::TodoData::new()),
+            )
         } else {
             #[cfg(test)]
             let store = store.unwrap_or_else(store::layer_for_tests);
@@ -10054,6 +10067,10 @@ fn serve_file(server: &Server, stream: &mut TcpStream, route: &str) {
         // A stylesheet the build ships, which a page's policy allows from
         // this origin, and which a browser applies only as `text/css`.
         Some("css") => "text/css; charset=utf-8",
+        // TRACK SEAM (todomvc): a drawing the build ships, which the page's
+        // stylesheet draws a checkbox with (`img-src 'self'`, ADR-0333): a
+        // browser draws an image only as `image/svg+xml`, under `nosniff`.
+        Some("svg") => "image/svg+xml",
         _ => "application/octet-stream",
     };
     match std::fs::read(&path) {
@@ -10132,6 +10149,18 @@ fn signal_manifest(
     (signals, live, blocks)
 }
 
+/// **The signal a page binds to its address's fragment** (track `todomvc`,
+/// ADR-XXXX), as its plan states it: the signal and each form the fragment
+/// takes with the value the signal takes then, carried in the document's
+/// manifest. The browser keeps the signal in step with `location.hash`; this
+/// host renders the signal's first value, since a request carries no
+/// fragment.
+fn with_fragment(manifest: &mut serde_json::Value, plan: &serde_json::Value) {
+    if let Some(binding) = plan.get("fragment").filter(|f| !f.is_null()) {
+        manifest["fragment"] = binding.clone();
+    }
+}
+
 /// Each signal's first value, set into a rendering environment (ADR-0130).
 fn with_signals(mut env: Env, plan: &serde_json::Value) -> Env {
     for s in plan["signals"].as_array().into_iter().flatten() {
@@ -10201,6 +10230,8 @@ fn signal_document(
         "listens": false,
     });
     let mut manifest = manifest;
+    // The signal it binds to its address's fragment (track `todomvc`).
+    with_fragment(&mut manifest, plan);
     // What it computes from its signals (ADR-0227).
     if let Some(module) = computed_module(plan) {
         manifest["computed"] = serde_json::Value::String(module);
@@ -10381,6 +10412,8 @@ fn document(
         manifest["live"] = live;
         manifest["blocks"] = serde_json::Value::Object(blocks);
     }
+    // The signal it binds to its address's fragment (track `todomvc`).
+    with_fragment(&mut manifest, plan);
     // What it computes from them (ADR-0227).
     if let Some(module) = computed_module(plan) {
         manifest["computed"] = serde_json::Value::String(module);
@@ -14137,6 +14170,13 @@ public query Store(",
     // TRACK SEAM (kiokun): kiokun.com's word page, served from kiokun's
     // files (docs/PARALLEL.md, W6).
     mod kiokun;
+
+    // TRACK SEAM (todomvc): a page's fragment binding reaches its document
+    // (docs/PARALLEL.md, W7).
+    mod address_fragment;
+
+    // TRACK SEAM (todomvc): TodoMVC, built and served (docs/PARALLEL.md, W7).
+    mod todomvc;
 
     // TRACK SEAM (store-search): the store's search page, served (W9).
     mod store_search;

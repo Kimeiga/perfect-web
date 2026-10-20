@@ -212,8 +212,7 @@
         "firefox": 141,
         "webkit": 142
       },
-      "build": "todomvc",
-      "reserved": true
+      "build": "todomvc"
     },
     "store-accounts": {
       "offsets": {
@@ -387,6 +386,16 @@
     "feed.spec.mjs": {
       "roles": [
         "feed"
+      ]
+    },
+    "focus.spec.mjs": {
+      "roles": [
+        "base"
+      ]
+    },
+    "fragment.spec.mjs": {
+      "roles": [
+        "base"
       ]
     },
     "guestbook.spec.mjs": {
@@ -610,6 +619,11 @@
     "thread.spec.mjs": {
       "roles": [
         "base"
+      ]
+    },
+    "todomvc.spec.mjs": {
+      "roles": [
+        "todomvc"
       ]
     },
     "transport.spec.mjs": {
