@@ -16,10 +16,18 @@ Each mutant undoes one piece:
    recipe's, or what was last run is no browser run (a mutant's, kept after
    all), or the harness's suite is not looked at; a recipe runs without its
    name; an upload step drops `kept-traces/`, or git does not ignore it;
-2. (the checker's latency, in the second commit.)
+2. the checker's latency ceiling bounds the fastest of several checks
+   (`check_latency.rs`): the ceiling is raised, or counted in the wrong
+   unit; it bounds the median, or the fastest of the wall clock, and not the
+   fastest CPU time; a quiet machine is waited on, or none is, or the waiting
+   does not end with its window or with its most checks; fewer than seven
+   checks are taken; the ratio of the slow path to the clean is of the
+   medians; the control (a check that happened) reads the median, or nothing.
+   (The checker made pathological, and the clock that reads nothing, are
+   `evidence_integrity_mutations.py`'s, which run the measurement itself.)
 
-Each runs the suite that holds it: `scripts/tests/`'s, by `unittest`. At
-least one test must fail.
+Each runs the suite that holds it: `scripts/tests/`'s, by `unittest`, or
+`pw-core`'s statistic tests, by `cargo test`. At least one test must fail.
 
 Run from the repository root; `just e14-ci-diagnostics` records the output.
 The sources are restored after every mutant, whatever happens.
@@ -40,6 +48,7 @@ RECIPES = ROOT / "scripts/ci_recipes.py"
 VERIFY = ROOT / ".github/workflows/verify.yml"
 IGNORE = ROOT / ".gitignore"
 RENDERER_IGNORE = ROOT / "spikes/own-renderer/.gitignore"
+LATENCY = ROOT / "compiler/pw-core/tests/check_latency.rs"
 
 # (what, suite, file, anchor, replacement)
 MUTANTS = [
@@ -227,6 +236,98 @@ MUTANTS = [
         "kept-traces/\n",
         "",
     ),
+    # 2. The latency ceiling bounds the fastest of several checks.
+    (
+        "the ceiling is raised to 1.6 s a thousand lines",
+        "latency",
+        LATENCY,
+        "const CEILING_PER_THOUSAND_LINES: Duration = Duration::from_millis(800);\n",
+        "const CEILING_PER_THOUSAND_LINES: Duration = Duration::from_millis(1600);\n",
+    ),
+    (
+        "a thousand lines is counted the wrong way round",
+        "latency",
+        LATENCY,
+        "    cpu.mul_f64(1000.0 / lines as f64)\n",
+        "    cpu.mul_f64(lines as f64 / 1000.0)\n",
+    ),
+    (
+        "the ceiling bounds the median again",
+        "latency",
+        LATENCY,
+        "    fits(cost.fastest, lines)\n",
+        "    fits(cost.cpu, lines)\n",
+    ),
+    (
+        "the fastest is the median",
+        "latency",
+        LATENCY,
+        '        fastest: runs.iter().map(|r| r.cpu).min().expect("a run"),\n',
+        "        fastest: median(runs.iter().map(|r| r.cpu).collect()),\n",
+    ),
+    (
+        "the fastest is of the wall clock",
+        "latency",
+        LATENCY,
+        '        fastest: runs.iter().map(|r| r.cpu).min().expect("a run"),\n',
+        '        fastest: runs.iter().map(|r| r.wall).min().expect("a run"),\n',
+    ),
+    (
+        "a quiet machine is waited on too",
+        "latency",
+        LATENCY,
+        "        let waiting = enough.is_some_and(|enough| !enough(fastest));\n",
+        "        let waiting = enough.is_some();\n",
+    ),
+    (
+        "no machine is waited for",
+        "latency",
+        LATENCY,
+        "        if !waiting || runs.len() >= MAX_RUNS || spent >= WINDOW {\n",
+        "        if true {\n",
+    ),
+    (
+        "the waiting does not end with its window",
+        "latency",
+        LATENCY,
+        "        if !waiting || runs.len() >= MAX_RUNS || spent >= WINDOW {\n",
+        "        if !waiting || runs.len() >= MAX_RUNS {\n",
+    ),
+    (
+        "the waiting does not end with its most checks",
+        "latency",
+        LATENCY,
+        "        if !waiting || runs.len() >= MAX_RUNS || spent >= WINDOW {\n",
+        "        if !waiting || spent >= WINDOW {\n",
+    ),
+    (
+        "fewer than seven checks are taken",
+        "latency",
+        LATENCY,
+        "const MIN_RUNS: usize = 7;\n",
+        "const MIN_RUNS: usize = 3;\n",
+    ),
+    (
+        "the slow path is judged against the clean at their medians",
+        "latency",
+        LATENCY,
+        "    rejected.fastest < clean.fastest * 5\n",
+        "    rejected.cpu < clean.cpu * 5\n",
+    ),
+    (
+        "the control reads the median of the checks",
+        "latency",
+        LATENCY,
+        "    cost.fastest > Duration::from_micros(200)\n",
+        "    cost.cpu > Duration::from_micros(200)\n",
+    ),
+    (
+        "the control is lifted",
+        "latency",
+        LATENCY,
+        "    cost.fastest > Duration::from_micros(200)\n",
+        "    true\n",
+    ),
 ]
 
 UNITTEST = [sys.executable, "-m", "unittest"]
@@ -234,6 +335,12 @@ SUITES = {
     "helper": UNITTEST + ["scripts/tests/test_run_suite.py"],
     "keep": UNITTEST + ["scripts/tests/test_keep_traces.py"],
     "baseline": UNITTEST + ["scripts/tests/test_mutation_baseline.py"],
+    # The statistic's tests, which run no check: no timing in them.
+    "latency": [
+        "cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "check_latency", "--",
+        "the_ceiling_is_800", "the_ceiling_bounds", "the_fastest_is_of", "a_quiet_machine",
+        "a_loaded_machine", "the_waiting", "a_checker_made_slow", "a_clock_that", "producing_diagnostics",
+    ],
 }
 
 # How long one command may run. Past the bound it is killed with everything
@@ -244,14 +351,17 @@ BOUND = 1800
 def counted(out):
     """(built, passed, failed) as a suite's output says: `unittest`'s `Ran`
     and `OK (...)` or `FAILED (...)` lines (a skipped test neither passed nor
-    failed)."""
+    failed), or cargo's `test result:` lines."""
     ran = [int(n) for n in re.findall(r"^Ran (\d+) tests? in", out, re.M)]
-    if not ran:
+    if ran:
+        ended = re.findall(r"^(?:OK|FAILED) \((.*)\)$", out, re.M)
+        failed = sum(int(n) for line in ended for n in re.findall(r"(?:failures|errors)=(\d+)", line))
+        skipped = sum(int(n) for line in ended for n in re.findall(r"skipped=(\d+)", line))
+        return True, sum(ran) - failed - skipped, failed
+    found = re.findall(r"test result: \w+\. (\d+) passed; (\d+) failed", out)
+    if not found:
         return False, 0, 0
-    ended = re.findall(r"^(?:OK|FAILED) \((.*)\)$", out, re.M)
-    failed = sum(int(n) for line in ended for n in re.findall(r"(?:failures|errors)=(\d+)", line))
-    skipped = sum(int(n) for line in ended for n in re.findall(r"skipped=(\d+)", line))
-    return True, sum(ran) - failed - skipped, failed
+    return True, sum(int(p) for p, _ in found), sum(int(f) for _, f in found)
 
 
 def run_tests(suite):

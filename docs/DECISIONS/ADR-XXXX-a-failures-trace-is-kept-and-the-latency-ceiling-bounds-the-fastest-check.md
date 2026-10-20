@@ -137,3 +137,70 @@ Measured with `scripts/ci_plan.py` on this track's first two commits
   and train-10's precedent) and dispatch what the change reaches:
   `e14-ci-diagnostics e14-evidence-integrity e14-evidence-integrity-2
   e14-derived-outside e10-browser`.
+
+## 2. `check_latency` bounds the fastest check
+
+- **Cause.** ADR-0344's finding 4 moved the ceiling from the wall clock to
+  the checking thread's CPU time, and noted that CPU time "is not free of
+  load either" (about 1.5 times). This track measured how not, one
+  6,568-line check at a time (a probe of the same call, thread CPU time and
+  the CPU it ran on, 15 to 20 checks in a row): 0.94 s alone; 1.7 to 2.2 s
+  beside a looping workspace build; 1.7 to 2.0 s beside 64 busy loops, and
+  drifting by up to 2 times within 30 seconds as other workers' builds
+  start and stop. The PC is an i9-13900K, SMT and efficiency cores under
+  Hyper-V; a thread's CPU time counts the sibling's contention, the slower
+  core and the host's, as well as its own work. The test took the median of
+  seven consecutive checks, ten to thirty seconds of it, so the drift of
+  those seconds was taken whole. For train-10's checker that is far from
+  800 ms a thousand lines (143 to 330 measured); for the
+  complete-validation checker of track `check-is-build` (2.0 to 2.9 times
+  the work, its notes) it was 508 to 809 at loads of 21 to 55, and the
+  integrator reported three of five local `just ci` runs failing at 40 to
+  80.
+- **Fix.** The ceiling is unchanged: 800 ms of the thread's CPU time a
+  thousand lines (a test pins the number, so a raise is a visible change to
+  a test). It bounds the fastest of at least seven checks, not their median:
+  a machine's load only adds to a check's time, so the fastest is the
+  least moved, and a checker that is slow itself is as slow in its fastest
+  check as in its slowest. Where the fastest so far is over the ceiling,
+  more checks are taken, until one is within it, or 40 have been taken, or
+  their wall clocks add up to four minutes (`sample`): a quiet machine takes
+  exactly seven, as before, and a machine that quiets down is waited for.
+  The slow path's ratio to the clean (5) is of the fastest of both; the
+  control (a check that happened, more than 200 microseconds of CPU time)
+  is of the fastest. The medians are still printed, with the fastest and
+  the number of checks, so that CI's logs go on saying what the runners
+  measure; a failure says the load average.
+- **Hardware counts: not available** (the corrections): the statistic is
+  time. **Not the other fixes:** a calibration loop on the same thread (a
+  new unit, calibrated on a machine not at hand: the ARM runner), pinning
+  to a performance core (privileged and not portable), waiting for the load
+  average to fall (it lags a minute, and a busy loop never falls), skipping
+  the test under load (a gate that passes where it cannot measure), and
+  raising the ceiling (ruled out).
+- **Claimed.** Nine tests that run no check (`the_ceiling_is_800_ms_...`
+  through `a_clock_that_reads_nothing_...`), on checks that cost what a
+  script says: the ceiling is 800 and is per thousand lines; six checks of
+  seven stretched past it and one not pass, by the fastest, though their
+  median fails; the fastest is of CPU time, not wall; a quiet machine is
+  asked seven times and no more; a machine that quiets down after ten
+  stretched checks is waited for, to the first that fits; the waiting ends
+  with the window or the most checks; **the checker made ten times slower
+  fails however many checks are waited for**; a clock that reads nothing,
+  or once among real readings, is refused by the control; the slow path is
+  judged at the fastest of both. 13 mutation controls on them
+  (`ci_diagnostics_mutations.py`), killed; and `evidence_integrity_mutations.py`'s
+  two on the measurement itself (the checker run ten times over; the
+  thread's clock reading nothing) still killed by the real tests.
+  **The proof, at load** (the numbers below).
+- **Not claimed.** That the ceiling is proof against any load: a machine
+  loaded through the whole of a measurement (four minutes) with every check
+  stretched past the ceiling still fails it, and a sustained 2 times over
+  an expensive checker is the ceiling's margin to carry (train-10's
+  checker: 800 against 143 to 330 on the PC, 321 on ARM; the
+  complete-validation checker is 2.0 to 2.9 times that, which is the
+  integrator's to rule on: ARM would measure 640 to 930). That CPU time is
+  the work. That `e9-latency`'s wording ("median of 7 runs") changed: it
+  prints the medians still, and the fastest beside them. The real
+  measurement's assertion lines are tested through `fast_enough` and
+  `happened`, not mutated in place.
