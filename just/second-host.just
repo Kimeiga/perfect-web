@@ -22,6 +22,7 @@ e14-second-host:
        echo "e14-second-host: refused, it needs PW_FEED_DATABASE_URL (a throwaway PostgreSQL database)"; \
        exit 1; \
      fi
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
     @bash spikes/own-renderer/feed.sh > /dev/null
     @cargo build --quiet --locked -p pw-dev-server
     @mkdir -p docs/evidence/E14
