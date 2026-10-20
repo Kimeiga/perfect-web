@@ -49,6 +49,7 @@ import 'just/ci-diagnostics.just'
 import 'just/fuzz-floor.just'
 import 'just/check-is-build.just'
 import 'just/guide-producer.just'
+import 'just/effect-convergence.just'
 
 default:
     @just --list

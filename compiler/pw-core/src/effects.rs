@@ -351,7 +351,12 @@ impl<'a> Inference<'a> {
         for (unit, id, _, _, types) in &typed {
             self.lexicals.insert((*unit, *id), types.lexical().clone());
         }
-        for _ in 0..8 {
+        // Each known row only grows, and every effect string comes from
+        // a finite source row/signature or another known row: propagation
+        // never synthesizes new effect strings. Continue until that finite
+        // union stabilizes. A fixed sweep limit silently erased effects
+        // behind deeper caller-first helper chains (and their contracts).
+        loop {
             let mut changed = false;
             for (unit, id, body, implemented, types) in &typed {
                 if !*implemented {
