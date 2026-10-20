@@ -1101,3 +1101,29 @@ the complete unchanged 50+8 rosters and fresh default CI before any checkpoint.
   `ADR-XXXX` reads `ADR-0361` in its validation index's scope
   (`docs/evidence/E14/check-is-build-validation-index.json`), as in this
   file's name and title.
+
+## The build's refusals, one list (the coordinator's ruling, 2026-10-20)
+
+Train-11's verify 39442025240 (at 320c52a4) failed five recipes on one
+conflict the merge did not show: they ran `pw check` on
+`examples/accepted/*.pw` and required it clean, and the complete check
+refuses four accepted programs with PW6601 ("pw check: 90 file(s), 4
+error(s)"). This corrects the census's "nothing newly refused" for the
+accepted corpus. A-007 (an element that mounts a resource), A-013 (a page
+value computed at build time from a workspace file) and A-018 (`style:`
+directives) use features the build does not support yet; A-008 is a bug:
+the WIT the build generates names an item twice,
+`store-recommendations-recommendations-api` (NEXT queues it). The programs
+stay as they are. The build's refusals are stated in one list,
+`examples/accepted/build-refusals.json`: each program, its exact message,
+its stage, the text its span names, and why. Every corpus check reads it:
+`compiler/pw-cli/tests/check_build_corpus.rs`, and
+`scripts/accepted_corpus.py`, which every recipe that checked the accepted
+corpus now runs (twelve places in the justfile and
+`just/bounded-checker.just`). A corpus check passes only where every
+program not listed reports no error and each listed one is refused with
+exactly its message, and it prints the list's size
+(`scripts/tests/test_accepted_corpus.py` holds the comparison, with the
+controls of an unlisted error, a missing refusal and a message changed by
+one character).
+

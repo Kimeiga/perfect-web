@@ -984,6 +984,13 @@ integrator's rulings of 2026-10-17):
   (`store.page.MenuLine`, `store.page.MenuSize`,
   `store.reviews.StoreRatings`) are what the compiler builds at the
   landing. Train-11 derives the list from the build.
+- The complete check (check-is-build, ADR-0361) refuses four accepted
+  programs, listed with their exact messages in
+  `examples/accepted/build-refusals.json`. Three use features the build does
+  not support yet: an element that mounts a resource (A-007), a page value
+  computed at build time from a workspace file (A-013), and `style:`
+  directives (A-018). One is a bug: the WIT generated for A-008 names an
+  item twice (`store-recommendations-recommendations-api`); NEXT queues it.
 - Neither the planner nor the evidence fetch sees a change to a binary
   file (`git diff -U0` gives it no `+++` line): a component's change
   plans no recipe and stales no evidence, so the recipes that read one

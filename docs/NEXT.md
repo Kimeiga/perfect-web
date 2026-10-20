@@ -39,6 +39,14 @@ The next executable tasks, in order, with acceptance criteria. Charter §3.4.
     here.
   - Its scripts and traces are beside the report.
 
+- **A-008's generated WIT names an item twice** (a small track; train-11's
+  verify 39442025240, ADR-0361): the complete check refuses
+  `examples/accepted/A-008-streamed-public-recommendations.pw` with "the
+  generated WIT does not parse: duplicate item named
+  `store-recommendations-recommendations-api`". Find where the WIT
+  generator names a streamed public query's interface, make the names
+  unique, and take A-008 off `examples/accepted/build-refusals.json`, with a
+  test and its control.
 - **Every committed component held to the compiler, its list derived
   from the build** (train-10's landing; train-11). `evidence_is_current`
   lists 14 of the 20 by hand, and three went stale unseen on train-10
