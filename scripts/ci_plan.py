@@ -523,6 +523,57 @@ def names_module(text: str, module: str) -> bool:
     return re.search(rf"(?<![\w:]){re.escape(module)}::", text) is not None
 
 
+def root_test_packages(changed: dict[str, list[tuple[int, int]]]) -> set[str]:
+    """Crate-root test modules have no `main::` or `lib::` namespace.
+    Reach every consumer of their package's tests, including bare filters."""
+    packages = set()
+    for path, lines in changed.items():
+        if pathlib.Path(path).name not in {"main.rs", "lib.rs"} or not test_modules({path: lines}):
+            continue
+        for directory in (ROOT / path).parents:
+            manifest = directory / "Cargo.toml"
+            if manifest.is_file():
+                section = re.search(r"(?ms)^\[package\]\s*\n(.*?)(?=^\[|\Z)", manifest.read_text())
+                name = re.search(r"(?m)^name\s*=\s*['\"]([^'\"]+)['\"]", section[1]) if section else None
+                if name:
+                    packages.add(name[1])
+                break
+            if directory == ROOT:
+                break
+    return packages
+
+
+def names_package_tests(text: str, packages: set[str]) -> bool:
+    """Package selectors in shell commands and literal Python argument lists.
+    A workspace test consumer is conservatively a consumer of every package."""
+    if not packages or not re.search(r"\bcargo\b", text) or not re.search(r"\btest\b", text):
+        return False
+    if re.search(r"(?<![\w-])--workspace(?![\w-])", text):
+        return True
+    return any(
+        re.search(rf"(?<![\w-])(?:-p|--package)(?:[\s'\",]+|=)['\"]?{re.escape(package)}(?![\w-])", text)
+        for package in packages
+    )
+
+
+def names_python_tests(text: str, changed: dict[str, list[tuple[int, int]]]) -> bool:
+    """Explicit Python test paths, unittest module selectors, or discovery names."""
+    for path in changed:
+        if not path.startswith("scripts/tests/") or not path.endswith(".py"):
+            continue
+        module = path[:-3].replace("/", ".")
+        if re.search(rf"(?<![\w./-]){re.escape(path)}(?![\w./-])", text):
+            return True
+        if re.search(rf"(?<![\w.]){re.escape(module)}(?!\w)", text):
+            return True
+        directory, name = path.rsplit("/", 1)
+        if re.search(rf"(?<![\w./-]){re.escape(directory)}(?![\w./-])", text) and re.search(
+            rf"(?<![\w./-]){re.escape(name)}(?![\w./-])", text
+        ):
+            return True
+    return False
+
+
 def touched_scripts(changed: dict[str, list[tuple[int, int]]], near: int) -> set[str]:
     """The mutation scripts a change reaches: the script itself, a mutant
     within `near` lines of a changed line, or a test file it runs, a Rust
@@ -531,6 +582,7 @@ def touched_scripts(changed: dict[str, list[tuple[int, int]]], near: int) -> set
     which planned nothing until train-6's fix to one."""
     tests = {pathlib.Path(p).stem for p in changed if "/tests/" in p and p.endswith(".rs")}
     modules = test_modules(changed)
+    packages = root_test_packages(changed)
     specs = changed_specs(changed)
     out = set()
     for path in sorted((ROOT / "scripts").glob("*_mutations.py")):
@@ -543,6 +595,9 @@ def touched_scripts(changed: dict[str, list[tuple[int, int]]], near: int) -> set
             f'"--test", "{t}"' in text or f"--test {t}" in text or f"tests::{t}::" in text
             for t in tests
         ):
+            out.add(path.name)
+            continue
+        if names_package_tests(text, packages) or names_python_tests(text, changed):
             out.add(path.name)
             continue
         # A source's own test module, by its filter.
@@ -658,6 +713,7 @@ def recipes_for(changed: dict[str, list[tuple[int, int]]], near: int, names: lis
     specs = changed_specs(changed)
     tests = {pathlib.Path(p).stem for p in changed if "/tests/" in p and p.endswith(".rs")}
     modules = test_modules(changed)
+    packages = root_test_packages(changed)
     every_spec = any(p.startswith(f"{SUITE_DIRECTORY}/e2e/") and p.endswith(".mjs") for p in changed)
     configuration = suite_configuration()
     out = {
@@ -676,6 +732,8 @@ def recipes_for(changed: dict[str, list[tuple[int, int]]], near: int, names: lis
         or any(f"tests::{t}::" in body.get(name, "") for t in tests)
         # Or a source's own test module, by its filter.
         or any(names_module(body.get(name, ""), m) for m in modules)
+        or names_package_tests(body.get(name, ""), packages)
+        or names_python_tests(body.get(name, ""), changed)
         # A recipe whose own script changed, or reads what changed.
         or reads_what_changed(body.get(name, ""), changed)
     }
