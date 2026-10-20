@@ -1,4 +1,4 @@
-# ADR-XXXX: a failure's trace is kept, and the latency ceiling bounds the fastest check
+# ADR-XXXX: a failure's trace is kept, the latency ceiling bounds the fastest check, a mutant is built incrementally, and the nightly does not repeat a verified head
 
 Status: proposed by track `ci-diagnostics` (2026-10-19) for the integrator;
 local gates and the track's recipe recorded below; not yet in a train.
@@ -6,8 +6,9 @@ Date: 2026-10-19 to 2026-10-20. Milestone: E14; the evidence's own harness (ADR-
 ADR-0281, ADR-0344, ADR-0349).
 Track `ci-diagnostics`, on `8c5618c8` (`track/train-10`'s head), not on
 `master` `32757966` (the first correction).
-Amends ADR-0349's `scripts/run_suite.sh` and ADR-0344's section 4
-(`check_latency`).
+Amends ADR-0349's `scripts/run_suite.sh`, ADR-0344's section 4
+(`check_latency`), and `verify.yml` (ADR-0245, ADR-0281): its recipe step and
+its nightly.
 
 ## Corrections first
 
@@ -243,6 +244,152 @@ file alone (`scripts/ci_plan.py` as `recipes_for` reads a file's hunks):
   measurement's assertion lines are tested through `fast_enough` and
   `happened`, not mutated in place.
 
+## 3. A mutation script's mutants are built incrementally
+
+- **Cause.** Each mutant undoes one line, so its build redoes, compiled
+  incrementally, what the line reaches, and a crate whole when not. The
+  integrator measured a one-line `pw-core` mutant's test binaries at 21 to 23
+  s with incremental compilation on and 33 to 37 s off (the PC, load 37), 1.6
+  times as quick; train-9's verify ran 1,391 mutants. It was off for two
+  reasons, neither about mutants: 104 recipe lines say `CARGO_INCREMENTAL=0
+  python3 scripts/..._mutations.py` since 2026-09-24, when the Mac's disk
+  filled (STATUS: the incremental cache was 3.6 GB), and `verify.yml` sets it
+  for every job.
+- **What `Swatinem/rust-cache` does with `target/*/incremental`.** The
+  workflow uses `@v2`, which is `v2.9.2` (commit `6323deb1`, 2026-08-06); its
+  README and source, read through the API:
+  - README, "Cache Details": "Before being persisted, the cache is cleaned of:
+    ... Incremental build artifacts. ..." and "For this reason, this action
+    automatically sets `CARGO_INCREMENTAL=0` to disable incremental
+    compilation, so that the Rust compiler doesn't waste time creating the
+    additional artifacts required for incremental builds."
+  - `src/cleanup.ts`, `cleanProfileTarget`: `let keepProfile = new
+    Set(["build", ".fingerprint", "deps"]); await rmExcept(profileDir,
+    keepProfile);` A profile directory keeps those three and loses the rest,
+    `incremental` among them, before the cache is saved. `src/restore.ts:30`:
+    `core.exportVariable("CARGO_INCREMENTAL", 0);`.
+  - So the saved cache never holds incremental artifacts, whatever the
+    recipes' builds left (and only shard 0 saves: `save-if`); the action's
+    zero is for the builds it caches, the `Build` step's, which keep it; and
+    the recipe step is free to differ.
+- **Fix.** `PW_MUTANT_INCREMENTAL=1`, set on `verify.yml`'s `Recipes` step
+  alone, makes `scripts/mutation_baseline.py` (which every mutation script
+  imports first) remove `CARGO_INCREMENTAL` from the script's environment and
+  so from what it starts, its recipe's `CARGO_INCREMENTAL=0` with it
+  (`scripts/mutant_incremental.py`). No recipe line is edited, so none is
+  planned for one (104 would have been). The `Build` steps, the browser jobs
+  and a recipe's own commands outside its mutation scripts keep the
+  workflow's zero.
+- **Removed, not set to 1.** `CARGO_INCREMENTAL=1` forces incremental
+  compilation for every profile, the `browser` profile's wasm among them
+  (`run.sh --profile browser`: opt-level `z`, LTO), whose size a browser spec
+  gates; removed, cargo's defaults apply: incremental for the dev and test
+  profiles, which are a mutant's rebuilds, never for a release-like one. The
+  real cargo shows it, on a probe crate with such a profile
+  (`test_mutant_incremental.py`, `CargosDefaults`): removed, a dev build is
+  incremental and a `browser` build is not; a zero makes neither; a one makes
+  the `browser` build incremental too. (The speed-up below was measured with
+  the variable at 1; for the dev and test profiles of its builds that is
+  cargo's default.)
+- **Disk.** A runner has about 14 GB free and 25 GB more once what its image
+  ships is removed (`verify.yml`). Measured on the PC, with debug info (CI's
+  workflow sets it off, so its caches are smaller):
+  `metadata_mutations.py`, whole, with incremental on: the target 2.91 GiB at
+  its peak, 1.33 GiB of it incremental, against 1.60 GiB with it off. The
+  widest crate graph any one script builds (that script's, and `pw-conformance`'s
+  29 test targets, `pw-host` with its engine, the wasm crates, `pw-cli`,
+  `pw-syntax`, `pw-time`, `pw-materialize`, `pw-resume`, `kiokun-server`,
+  `corpus-check` and the server) took the target to 8.38 GiB, 2.18 GiB of it
+  incremental (the largest: `pw-core`'s three, 414 + 404 + 238 MiB, and the
+  server's two, 332 + 114). No script builds `pw-core`'s 230 test targets at
+  once: of 465 cargo test commands in the 274 scripts, the broad ones
+  (`cargo test -p <crate>`, no `--test`) are of `pw-cli` (4 targets),
+  `pw-render` (16), `pw-host` (12), `pw-conformance` (29), `pw-render-wasm`
+  and a few smaller. Bounded all the same: after each cargo command a script
+  ran, `mutant_incremental.bounded()` removes every incremental cache
+  (`target/*/incremental`, a triple's `target/*/*/incremental`) if together
+  they hold more than 6 GiB (`PW_INCREMENTAL_MAX_MIB`), and
+  `ci_recipes.prune` now removes a triple's as well as the profile's,
+  between recipes (it removed only `target/debug/incremental`).
+- **The speed-up, on one real script, whole, the same kills both ways.**
+  `metadata_mutations.py` (34 mutants, three lanes: a `pw-core` test, the
+  renderer's, two of the server's), run from a clone of this track's head, one
+  with `CARGO_INCREMENTAL=0`, one with `1`, at once, on the PC beside the
+  other workers (load 30 to 66):
+
+  | | off | on |
+  |---|---|---|
+  | mutants killed | 34 of 34 | 34 of 34 |
+  | verdict lines | the same 34 | the same 34 |
+  | the whole script | 2,513 s | 1,658 s (**1.52 times** as quick) |
+  | the baseline (three cold builds) | 249 s | 256 s |
+  | the 34 mutants | 2,264 s, 66.6 s each | 1,402 s, 41.2 s each (**1.61 times**) |
+  | target at its peak | 1.60 GiB | 2.91 GiB (1.33 GiB incremental) |
+  | the memory bound | no process stopped | no process stopped |
+
+- **Not claimed.** A run on a GitHub runner: its speed-up, its disk and its
+  4 vCPUs are not measured here; the numbers are the PC's. That every script
+  is as much quicker: a script of few mutants gains little (the baseline
+  costs the same), one whose mutants reach a crate's every function more
+  than one that reaches a line. That incremental compilation cannot change a
+  verdict: the same 34 of 34 verdicts is one script's, and the 69 mutation
+  controls of this track ran with it on in CI-shaped environments only as
+  tests (the verify run is the evidence). The release-like profiles are not
+  built incrementally, so the wasm bytes the browser suites load are as they
+  were.
+
+## 4. The nightly does not repeat a verified head
+
+- **Cause.** In the seven days to 2026-10-20 the nightly `verify` (`on:
+  schedule`) used 691 runner-hours, about 100 a night and 27% of all the CI
+  there was, and re-verified the same head of `master` on 2026-10-18 and
+  2026-10-19 (it has been `32757966` since 2026-10-17).
+- **How the skip decides.** One query of the GitHub API,
+  `GET /repos/{repo}/actions/workflows/verify.yml/runs?head_sha=<GITHUB_SHA>&status=success`
+  (`gh api`, with the workflow's `GH_TOKEN`; the plan job has `actions:
+  read`): the nightly is skipped where one of the runs it returns is of a
+  **push or a schedule**, a landing train's own run or an earlier nightly's.
+  It is the rule `verified_base.py` already holds a push to `master` to
+  (ADR-0281, amended 2026-10-13: `COVERING = ("push", "schedule")`, imported,
+  not copied). A `workflow_dispatch`'s run is not one, since it runs the
+  recipes it names; a run that failed, was cancelled or is still going is not
+  one either, since `status=success` leaves it out. **Any error runs the
+  nightly in full** (the API unreachable, a reply that is no JSON, no `gh`).
+- **What a skip does.** The plan step (`verify.yml`) writes `shards=[]` and
+  `browsers=false`, so no recipe shard and no browser job runs (the browser
+  suites ran at that commit in the run that passed), and says in its log and
+  in the run's summary which run it stands on: `skip: 32757966 was verified by
+  the push's run <id> (<url>); Sunday's schedule verifies it in full`. The
+  summary job reports "0 recipes, 0 failed" and passes.
+- **The weekly full run.** `verify.yml` has two schedules, `17 6 * * 1-6` and
+  `17 6 * * 0`; the plan step is told which fired (`github.event.schedule`)
+  and Sunday's (`WEEKLY` in `scripts/nightly_skip.py`, held to the workflow's
+  string by a test) never asks: it runs every recipe whatever has passed, so
+  that slow drift (a dependency's new advisory, a test that fails one run in
+  twenty) is met within a week.
+- **The override.** `workflow_dispatch` never asks: with no recipes named it
+  runs every one, as before; a test holds that only the schedule's branch
+  of the plan step calls the script.
+- **Claimed.** `test_nightly_skip.py` (21): the decision on the API's
+  answers (a push's success skips, a schedule's skips, a dispatch's does not,
+  a failure, a cancellation or none does not, the weekly never, any other
+  schedule asks, any error runs it, and the events are `verified_base.py`'s);
+  the command line against a stand-in `gh` (the query asked, the exit status
+  skip, run or misuse, an API that fails or answers nonsense); the schedules;
+  and the plan step run, as the runner runs it, on stand-ins for the API and
+  the planner, for each of a skipped nightly (outputs, summary and log), an
+  unverified one, Sunday's, one whose API fails, and a dispatch with and
+  without recipes. 15 mutation controls.
+- **Not claimed.** The saving: it is read from next week's runs (when
+  `master` does not move, six nights of seven lose their recipe shards). That
+  a skip is the same as a full run: it is the integrator's rule, a verified
+  head not verified again. A head verified by a *track's* push at that exact
+  commit counts (the landing train's own run), and so does a skipped
+  nightly's own success at it: each stands on the run it names, which must
+  have been real once. A red Sunday does not stop the weekdays' skips at that
+  head (the weekly's failure is the signal; the next push re-verifies). The
+  nightly's browser suites are skipped with its shards (3 jobs of about 45).
+
 ## End to end, with a real Playwright
 
 `scripts/run_suite.sh --runs 3` on a toy spec that fails its first and
@@ -267,6 +414,16 @@ the repository's own suite needs its builds, and is the verify run's.)
   a shard that the kill already explains.
 - **A hardware instruction count, a calibration loop, pinning to a core,
   skipping under load, a higher ceiling**: section 2.
+- **`CARGO_INCREMENTAL=1` for the recipe step**: forces it for every profile,
+  the browser wasm's too (section 3). **`CARGO_INCREMENTAL=${PW_...:-0}` in
+  the 104 recipe lines**: 104 recipes planned for one changed line each, and
+  a conflict for every track that adds a recipe beside one.
+- **Keeping incremental off and building mutants in a larger cache**: the cap
+  and the prune bound the disk, which was the reason it was off.
+- **Skipping the nightly by the date of `master`'s last commit, or by a
+  stored file**: the API says what ran, at that commit, and a file would be
+  one more thing to keep true. **A status check on the commit**: `verify` sets
+  none; the runs are the record (`verified_base.py` reads them the same way).
 
 ## Next
 
