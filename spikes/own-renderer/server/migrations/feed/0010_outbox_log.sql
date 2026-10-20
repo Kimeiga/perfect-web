@@ -17,3 +17,9 @@ CREATE TABLE outbox_trimmed (
     through bigint NOT NULL
 );
 INSERT INTO outbox_trimmed (through) VALUES (0);
+
+-- **Each host's instance** (the integrator's ruling 1 of 2026-10-20 on this
+-- track): a number each host takes as it opens the layer, put in the high bits
+-- of every page number it gives, so that no two hosts on the database number
+-- a page alike and none takes another's page for its own.
+CREATE SEQUENCE host_instances;

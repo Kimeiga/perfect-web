@@ -11,7 +11,10 @@ CREATE TABLE sessions (
     handle  text NOT NULL,
     name    text NOT NULL,
     issuer  text NOT NULL,
-    opened  timestamptz NOT NULL DEFAULT clock_timestamp()
+    opened  timestamptz NOT NULL DEFAULT clock_timestamp(),
+    -- When it was last used, by which it expires idle (the integrator's
+    -- ruling 2 of 2026-10-20 on this track); `opened` by its lifetime.
+    seen    timestamptz NOT NULL DEFAULT clock_timestamp()
 );
 
 CREATE TABLE sign_ins (

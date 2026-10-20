@@ -389,6 +389,18 @@ const PAGE_NOT_HELD: (&str, &str) = (
     "This page is out of date. Reload it to go on.",
 );
 
+/// TRACK SEAM (second-host): **a command from a page another host served**
+/// (ADR-XXXX, the integrator's ruling 1 of 2026-10-20): its number is in
+/// another host's instance. A press that committed there is answered from
+/// its record first ([`Server::kept_answer`]); any other is refused, as the
+/// page's, never as one out of date: a deployment routes a page's requests
+/// to the host that holds it (session affinity), and a reload asks a host
+/// again.
+const ANOTHER_HOST: (&str, &str) = (
+    "another-host",
+    "This page is served by another host. Reload it to go on.",
+);
+
 /// `{"cursor":..,"frames":[reload]}`: the batch a forgotten subscriber gets.
 fn reload_batch(cursor: u64) -> String {
     let frame = StreamFrame::Recovery {
@@ -862,9 +874,15 @@ struct Server {
     /// a change derived outside the table against one is pushed only while
     /// it is still the one shown (`Arc::ptr_eq`, ADR-0296).
     shown: Mutex<BTreeMap<Doc, Arc<Shown>>>,
-    /// **The next document's number** (ADR-0161), server-wide and from one,
-    /// so a document's cursor is never zero.
+    /// **The next document's number** (ADR-0161), server-wide and from
+    /// [`Server::first_page`], so a document's cursor is never zero.
     documents: std::sync::atomic::AtomicU64,
+    /// TRACK SEAM (second-host): **this host's first page number**
+    /// (ADR-XXXX, the integrator's ruling 1 of 2026-10-20): its instance on
+    /// the database it shares in the high bits, so no two hosts number a
+    /// page alike, and a page another host served is told apart from one
+    /// this host no longer holds. One, its data in its memory.
+    first_page: u64,
     /// **Each document's parameters** (ADR-0162), as its address gave them:
     /// which store it shows. Registered with its subscriber, before it is
     /// read, and forgotten with it.
@@ -1645,6 +1663,8 @@ impl Server {
                     .as_str()
                     .is_some_and(notifications::is_current_user)
             });
+        // TRACK SEAM (second-host): its pages numbered in its instance.
+        let first_page = hosts::first_page(data.instance());
         Server {
             cart_by_reader,
             build_id,
@@ -1668,7 +1688,8 @@ impl Server {
             origin: std::sync::OnceLock::new(),
             payments: std::sync::OnceLock::new(),
             shown: Mutex::new(BTreeMap::new()),
-            documents: std::sync::atomic::AtomicU64::new(1),
+            documents: std::sync::atomic::AtomicU64::new(first_page),
+            first_page,
             params: Mutex::new(BTreeMap::new()),
             pages: Mutex::new(BTreeMap::new()),
             answers: Mutex::new(BTreeMap::new()),
@@ -3015,10 +3036,12 @@ impl Server {
     /// **Why a command from `document` is not `session`'s to send** (track
     /// `store-accounts`, Q3), or nothing where it is: a document this host
     /// served to another session, whose reader signed in or out in another
-    /// tab since, or one it no longer holds, forgotten while idle or served
-    /// by a host before this one. Document numbers are the host's own, one
-    /// per document served, so one names one session's document. The words
-    /// are the platform's, as ADR-0302's for a page out of date.
+    /// tab since, or one it no longer holds, forgotten while idle; or one
+    /// another host served (track `second-host`, its instance in the
+    /// number's high bits). Document numbers are each host's own, one per
+    /// document served and apart from every other host's on its database,
+    /// so one names one session's document. The words are the platform's,
+    /// as ADR-0302's for a page out of date.
     fn stale_document(&self, session: &str, document: u64) -> Option<(&'static str, &'static str)> {
         // No document: a page the host did not serve, or no page.
         if document == 0 {
@@ -3028,6 +3051,8 @@ impl Server {
         match pages.keys().find(|(_, n)| *n == document) {
             Some((shown_to, _)) if shown_to == session => None,
             Some(_) => Some(ANOTHER_READER),
+            // TRACK SEAM (second-host): a page another host served.
+            None if hosts::another_hosts(document, self.first_page) => Some(ANOTHER_HOST),
             None => Some(PAGE_NOT_HELD),
         }
     }
@@ -3070,10 +3095,10 @@ impl Server {
             // which committed there, is answered from the record its commit
             // wrote with its writes, as this host's memory answers its own;
             // nothing runs. One never committed has no record, and is
-            // refused as before. Each host numbers its pages from one, so
-            // the number another host's page carries may name a page this
-            // host showed another session: the press is looked for under
-            // the request's own session first, then the page's, as above.
+            // refused as before. It is looked for under the request's own
+            // session first (a page another host served, which this one
+            // never showed), then the page's (one this host showed a session
+            // whose reader signed in or out since, as above).
             let mut owners = vec![session];
             if session != shown_to {
                 owners.push(shown_to.as_str());
@@ -7868,13 +7893,17 @@ fn main() {
         Ok("connection") => feed_pg::Isolation::ConnectionDefault,
         _ => feed_pg::Isolation::Serializable,
     };
-    // TRACK SEAM (second-host): the schema the feed's tables are in, where
-    // the deployment names one (`PW_FEED_SCHEMA`, ADR-XXXX): the hosts of
-    // one deployment name the one they share, and a test run one of its
-    // own; the connection's own search path otherwise, as before.
-    let feed_schema = std::env::var("PW_FEED_SCHEMA")
-        .ok()
-        .filter(|s| !s.is_empty());
+    // TRACK SEAM (second-host): the schema a test run's hosts keep the
+    // feed's tables in (`PW_FEED_SCHEMA`, ADR-XXXX): a test's setting, not a
+    // deployment's (the integrator's ruling 4 of 2026-10-20), honored only
+    // for a development deployment on this machine and refused at start for
+    // any other; the connection's own search path otherwise, as before.
+    let feed_schema = identity::Deployment::from_env(port)
+        .and_then(|d| hosts::test_schema(std::env::var("PW_FEED_SCHEMA").ok().as_deref(), &d))
+        .unwrap_or_else(|e| {
+            eprintln!("pw dev server: {e}");
+            std::process::exit(1);
+        });
     let feed = match std::env::var("PW_FEED_DATABASE_URL") {
         Ok(url) if !url.is_empty() => {
             match feed_pg::FeedPg::open_with(&url, feed_schema.as_deref(), isolation) {
@@ -7931,6 +7960,21 @@ fn main() {
             eprintln!("pw dev server: {e}");
             std::process::exit(1);
         });
+    // TRACK SEAM (second-host): **how long a session lives** (ADR-XXXX, the
+    // integrator's ruling 2 of 2026-10-20), the deployment's to say
+    // (`PW_SESSION_IDLE`, `PW_SESSION_LIFETIME`, in seconds; fourteen days
+    // and sixty where it says nothing), refused at start where it cannot be
+    // read.
+    match identity::SessionLifetimes::stated(
+        std::env::var("PW_SESSION_IDLE").ok().as_deref(),
+        std::env::var("PW_SESSION_LIFETIME").ok().as_deref(),
+    ) {
+        Ok(lifetimes) => server.identity.principals().expire_after(lifetimes),
+        Err(e) => {
+            eprintln!("pw dev server: {e}");
+            std::process::exit(1);
+        }
+    }
     // NEXT 6c: the deployment's payments, as its configuration states them,
     // refused at start where they may not run.
     match payments::configure(

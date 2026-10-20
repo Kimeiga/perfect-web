@@ -130,6 +130,14 @@ pub(crate) trait DataLayer: Send + Sync {
         None
     }
 
+    /// **This host's instance on the database it shares** (track
+    /// `second-host`, the integrator's ruling 1 of 2026-10-20), which every
+    /// page number it gives carries, so that hosts number their pages apart.
+    /// A layer in memory is one host by definition, and has none.
+    fn instance(&self) -> Option<u64> {
+        None
+    }
+
     /// **Where its sessions and sign-ins are kept beyond the host's memory**
     /// (ADR-XXXX, track `second-host`): its database, where the hosts share
     /// one, so a restarted host or another keeps a reader signed in. A layer

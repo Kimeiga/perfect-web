@@ -135,6 +135,67 @@ pub(crate) struct Tail {
     between: Mutex<Option<Box<dyn FnOnce() + Send>>>,
 }
 
+/// **`PW_FEED_SCHEMA`, a test's setting** (the integrator's ruling 4 of
+/// 2026-10-20 on this track): the schema a test run's hosts keep the feed's
+/// tables in, honored only for a development deployment on this machine, as
+/// the development identity provider is, and refused for any other, whose
+/// tables are where its connection's search path says.
+pub(crate) fn test_schema(
+    schema: Option<&str>,
+    deployment: &crate::identity::Deployment,
+) -> Result<Option<String>, String> {
+    match schema.filter(|s| !s.is_empty()) {
+        None => Ok(None),
+        Some(s) if deployment.development && deployment.loopback() => Ok(Some(s.to_string())),
+        Some(_) => Err(
+            "PW_FEED_SCHEMA is a test's setting, for a development deployment on this \
+             machine, and this deployment is not one"
+                .to_string(),
+        ),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Pages numbered apart on every host (the integrator's ruling 1, 2026-10-20)
+// ---------------------------------------------------------------------------
+
+/// **How many low bits of a page's number its host counts its pages in**:
+/// the bits above them name the host's instance, and the whole stays below
+/// JavaScript's exact integers (2^53), as the runtime reads the number.
+const PAGE_COUNT_BITS: u32 = 32;
+
+/// **How many instances page numbers tell apart**: 2^20 - 1, from one.
+const PAGE_INSTANCES: u64 = (1 << 20) - 1;
+
+/// **A host's instance, taken from the database it shares** as it opens a
+/// layer: the next of the schema's `host_instances`, so no two hosts on one
+/// database have one alike, until a million hosts' starts have gone by.
+pub(crate) fn instance(c: &mut Client) -> Result<u64, String> {
+    let n: i64 = c
+        .query_one("SELECT nextval('host_instances')", &[])
+        .map_err(pg)?
+        .get(0);
+    Ok((u64::try_from(n).unwrap_or(1).max(1) - 1) % PAGE_INSTANCES + 1)
+}
+
+/// **A host's first page number**: its instance in the high bits, so that a
+/// page another host on the database served never has a number this one
+/// gives, and none is taken for another's (a page of a session's on A
+/// numbered as one of its pages on B was taken for B's own); 1 where the
+/// host has no instance, its data in its memory, one host.
+pub(crate) fn first_page(instance: Option<u64>) -> u64 {
+    instance.map_or(0, |i| i << PAGE_COUNT_BITS) | 1
+}
+
+/// **Whether `page` is another host's**: its number in another host's
+/// instance than the one this host's `first` page is in. A number in no
+/// instance (one no host on a database gives) is no other host's: it is a
+/// page this host does not hold.
+pub(crate) fn another_hosts(page: u64, first: u64) -> bool {
+    let (theirs, mine) = (page >> PAGE_COUNT_BITS, first >> PAGE_COUNT_BITS);
+    theirs != 0 && theirs != mine
+}
+
 /// **The outbox's highest id**, read on `c`, a connection searching its
 /// schema: where a reader opened now starts.
 pub(crate) fn highest(c: &mut Client) -> Result<i64, String> {
@@ -406,6 +467,13 @@ pub(crate) struct SessionsPg {
 /// a waiter waits only on statements in flight.
 pub(crate) const SESSION_CONNECTIONS: usize = 8;
 
+/// **How long a kept session's use goes unrecorded**: a minute, or a
+/// quarter of its idle time where that is shorter, so a session in use is
+/// recorded well inside its idle time, and writes at most once a minute.
+pub(crate) fn touched_after(lifetimes: &crate::identity::SessionLifetimes) -> std::time::Duration {
+    std::time::Duration::from_secs(60).min(lifetimes.idle / 4)
+}
+
 /// **A connection taken for one statement**, given back when dropped,
 /// whatever the statement did.
 struct Taken<'a> {
@@ -510,11 +578,32 @@ impl crate::identity::Kept for SessionsPg {
         self.ran.load(std::sync::atomic::Ordering::SeqCst)
     }
 
-    fn session(&self, hash: &[u8]) -> Result<Option<crate::identity::Principal>, String> {
+    /// One statement (the integrator's ruling 2 of 2026-10-20): the session
+    /// alive by both lifetimes on the database's clock; its use recorded
+    /// where the last was more than [`touched_after`] ago, so a session in
+    /// use writes at most that often; and one past either lifetime deleted,
+    /// signed out cleanly wherever it is read next.
+    fn session(
+        &self,
+        hash: &[u8],
+        lifetimes: &crate::identity::SessionLifetimes,
+    ) -> Result<Option<crate::identity::Principal>, String> {
+        let absolute = lifetimes.absolute.as_secs_f64();
+        let idle = lifetimes.idle.as_secs_f64();
+        let touch = touched_after(lifetimes).as_secs_f64();
         self.with(|c| {
             Ok(c.query_opt(
-                "SELECT user_id, handle, name, issuer FROM sessions WHERE hash = $1",
-                &[&hash],
+                "WITH live AS (SELECT user_id, handle, name, issuer, seen FROM sessions \
+                     WHERE hash = $1 \
+                     AND opened > clock_timestamp() - make_interval(secs => $2) \
+                     AND seen > clock_timestamp() - make_interval(secs => $3)), \
+                 touched AS (UPDATE sessions SET seen = clock_timestamp() WHERE hash = $1 \
+                     AND EXISTS (SELECT 1 FROM live \
+                         WHERE seen < clock_timestamp() - make_interval(secs => $4))), \
+                 gone AS (DELETE FROM sessions WHERE hash = $1 \
+                     AND NOT EXISTS (SELECT 1 FROM live)) \
+                 SELECT user_id, handle, name, issuer FROM live",
+                &[&hash, &absolute, &idle, &touch],
             )?
             .map(|r| crate::identity::Principal {
                 user: r.get(0),

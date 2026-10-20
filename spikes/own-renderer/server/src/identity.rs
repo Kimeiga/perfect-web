@@ -278,11 +278,50 @@ struct PrincipalsInner {
     /// The accounts model: a session is signed in only where a sign-in put
     /// it in `sessions`. Otherwise every session is its own guest.
     accounts: AtomicBool,
-    sessions: RwLock<HashMap<String, Principal>>,
+    sessions: RwLock<HashMap<String, Held>>,
     /// TRACK SEAM (second-host): **where sessions are kept beyond this
     /// host's memory** (ADR-XXXX), the database the hosts share, where the
     /// data layer has one. `sessions` is then each request's copy of it.
     kept: OnceLock<Arc<dyn Kept>>,
+    /// TRACK SEAM (second-host): **how long a session lives**, idle and in
+    /// all (the integrator's ruling 2 of 2026-10-20 on this track), as the
+    /// deployment states them.
+    lifetimes: RwLock<SessionLifetimes>,
+}
+
+/// **A session's principal as this host holds it**, and when it was opened
+/// and last used here, by which a session in this host's memory alone
+/// expires (ADR-XXXX). Where sessions are kept beyond the host, the
+/// database's clock decides, and this is each request's copy.
+#[derive(Debug)]
+struct Held {
+    principal: Principal,
+    opened: std::time::Instant,
+    /// Milliseconds after `opened` it was last used.
+    seen: std::sync::atomic::AtomicU64,
+}
+
+impl Held {
+    fn new(principal: Principal) -> Held {
+        Held {
+            principal,
+            opened: std::time::Instant::now(),
+            seen: std::sync::atomic::AtomicU64::new(0),
+        }
+    }
+
+    /// Past its lifetime, or idle past its idle time, now.
+    fn expired(&self, lifetimes: &SessionLifetimes) -> bool {
+        let age = self.opened.elapsed();
+        let seen = Duration::from_millis(self.seen.load(Ordering::SeqCst));
+        age > lifetimes.absolute || age.saturating_sub(seen) > lifetimes.idle
+    }
+
+    /// Used now.
+    fn touch(&self) {
+        let age = u64::try_from(self.opened.elapsed().as_millis()).unwrap_or(u64::MAX);
+        self.seen.store(age, Ordering::SeqCst);
+    }
 }
 
 impl std::fmt::Debug for PrincipalsInner {
@@ -291,7 +330,67 @@ impl std::fmt::Debug for PrincipalsInner {
             .field("accounts", &self.accounts)
             .field("sessions", &self.sessions)
             .field("kept", &self.kept.get().is_some())
+            .field("lifetimes", &self.lifetimes)
             .finish()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TRACK SEAM (second-host): how long a session lives
+// ---------------------------------------------------------------------------
+
+/// **How long a session lives** (the integrator's ruling 2 of 2026-10-20 on
+/// track second-host; OWASP's Session Management Cheat Sheet asks both): an
+/// idle timeout, past which a session unused is signed out, and an absolute
+/// lifetime, past which it is signed out however it is used. A deployment's
+/// settings (`PW_SESSION_IDLE`, `PW_SESSION_LIFETIME`, whole seconds),
+/// [`SessionLifetimes::default`]'s where it says nothing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct SessionLifetimes {
+    pub(crate) idle: Duration,
+    pub(crate) absolute: Duration,
+}
+
+/// A day.
+const DAY: Duration = Duration::from_secs(24 * 60 * 60);
+
+impl Default for SessionLifetimes {
+    /// Fourteen days idle and sixty in all, as the integrator ruled.
+    fn default() -> SessionLifetimes {
+        SessionLifetimes {
+            idle: DAY * 14,
+            absolute: DAY * 60,
+        }
+    }
+}
+
+impl SessionLifetimes {
+    /// **The lifetimes as the deployment states them**: `idle`, the value
+    /// of `PW_SESSION_IDLE`, and `absolute`, of `PW_SESSION_LIFETIME`, each
+    /// whole seconds, one at least, and its default where unset or empty.
+    /// Anything else is refused, by name, so a host does not start on a
+    /// setting it cannot read (as `PW_RENDER_SEATS` is).
+    pub(crate) fn stated(
+        idle: Option<&str>,
+        absolute: Option<&str>,
+    ) -> Result<SessionLifetimes, String> {
+        let mut stated = SessionLifetimes::default();
+        for (name, value, into) in [
+            ("PW_SESSION_IDLE", idle, &mut stated.idle),
+            ("PW_SESSION_LIFETIME", absolute, &mut stated.absolute),
+        ] {
+            if let Some(v) = value.filter(|v| !v.is_empty()) {
+                *into = match v.parse::<u64>() {
+                    Ok(n) if n >= 1 => Duration::from_secs(n),
+                    _ => {
+                        return Err(format!(
+                            "{name}={v} is not a count of seconds, one at least"
+                        ));
+                    }
+                };
+            }
+        }
+        Ok(stated)
     }
 }
 
@@ -315,8 +414,14 @@ pub(crate) fn kept_hash(secret: &str) -> Vec<u8> {
 /// reader a sign-in made, and a sign-in begun on one host completes on
 /// another. Each by its secret's [`kept_hash`].
 pub(crate) trait Kept: Send + Sync {
-    /// The principal of the session whose id hashes to `hash`, or none.
-    fn session(&self, hash: &[u8]) -> Result<Option<Principal>, String>;
+    /// The principal of the session whose id hashes to `hash`, or none: none
+    /// past `lifetimes` (the database's clock), and such a session signed
+    /// out where it is kept. Its use recorded.
+    fn session(
+        &self,
+        hash: &[u8],
+        lifetimes: &SessionLifetimes,
+    ) -> Result<Option<Principal>, String>;
     /// A session opened for `principal`.
     fn open(&self, hash: &[u8], principal: &Principal) -> Result<(), String>;
     /// A session closed: no one from now on.
@@ -372,8 +477,20 @@ impl Principals {
         if session.is_empty() {
             return None;
         }
-        if let Some(p) = self.0.sessions.read().expect("principals").get(session) {
-            return Some(p.clone());
+        let lifetimes = self.lifetimes();
+        let expired = match self.0.sessions.read().expect("principals").get(session) {
+            Some(held) if !held.expired(&lifetimes) => {
+                held.touch();
+                return Some(held.principal.clone());
+            }
+            Some(_) => true,
+            None => false,
+        };
+        // TRACK SEAM (second-host): **a session past its lifetimes is signed
+        // out** (ADR-XXXX), here as where it is kept: it is no one, or its
+        // own guest in the guest model, from now on.
+        if expired {
+            self.close(session);
         }
         (!self.0.accounts.load(Ordering::SeqCst)).then(|| Principal::guest(session))
     }
@@ -391,7 +508,18 @@ impl Principals {
             .sessions
             .write()
             .expect("principals")
-            .insert(session.to_string(), principal);
+            .insert(session.to_string(), Held::new(principal));
+    }
+
+    /// TRACK SEAM (second-host): **how long its sessions live**, as the
+    /// deployment states them (ADR-XXXX), set where the host starts.
+    pub(crate) fn expire_after(&self, lifetimes: SessionLifetimes) {
+        *self.0.lifetimes.write().expect("lifetimes") = lifetimes;
+    }
+
+    /// How long its sessions live.
+    pub(crate) fn lifetimes(&self) -> SessionLifetimes {
+        *self.0.lifetimes.read().expect("lifetimes")
     }
 
     fn close(&self, session: &str) {
@@ -411,10 +539,11 @@ impl Principals {
 
     /// TRACK SEAM (second-host): **`session` as it is kept, read once for a
     /// request** (ADR-XXXX): signed in on another host, or by this one
-    /// before it restarted, it is signed in here; signed out anywhere, it is
-    /// no one here. One statement, in the accounts model where sessions are
-    /// kept; nothing otherwise. A read that fails signs the request out:
-    /// it is no one rather than someone it may no longer be.
+    /// before it restarted, it is signed in here; signed out anywhere, or
+    /// past its lifetimes on the database's clock, it is no one here. One
+    /// statement, in the accounts model where sessions are kept; nothing
+    /// otherwise. A read that fails signs the request out: it is no one
+    /// rather than someone it may no longer be.
     pub fn refresh(&self, session: &str) {
         let Some(kept) = self.0.kept.get() else {
             return;
@@ -425,7 +554,7 @@ impl Principals {
         {
             return;
         }
-        match kept.session(&kept_hash(session)) {
+        match kept.session(&kept_hash(session), &self.lifetimes()) {
             Ok(Some(principal)) => self.open(session, principal),
             Ok(None) => self.close(session),
             Err(why) => {
@@ -1582,5 +1711,71 @@ mod tests {
         assert_eq!(identity.requires("OwnsPost", &[], "s-1", &host), Ok(false));
         assert_eq!(take_refusal().as_deref(), Some("SignedIn"));
         assert_eq!(take_refusal(), None);
+    }
+
+    /// **A session in this host's memory alone expires** (track
+    /// second-host, the integrator's ruling 2 of 2026-10-20), by the host's
+    /// clock: idle past its idle time, or past its lifetime however it was
+    /// used, it is no one in the accounts model, its own guest in the guest
+    /// model, and forgotten; used within its idle time it holds, and its use
+    /// is recorded.
+    #[test]
+    fn a_session_in_memory_alone_expires_idle_and_past_its_lifetime() {
+        let principals = Principals::default();
+        principals.set_accounts(true);
+        principals.expire_after(SessionLifetimes {
+            idle: Duration::from_secs(50),
+            absolute: Duration::from_secs(200),
+        });
+        let ada = Principal {
+            user: "ada".to_string(),
+            handle: "@ada".to_string(),
+            name: "Ada".to_string(),
+            issuer: "https://id.example.test".to_string(),
+        };
+        // Opened `opened_ago` seconds ago, last used `seen_after` seconds
+        // after it was opened.
+        let held = |opened_ago: u64, seen_after: u64| Held {
+            principal: ada.clone(),
+            opened: std::time::Instant::now()
+                .checked_sub(Duration::from_secs(opened_ago))
+                .expect("the host has run that long"),
+            seen: std::sync::atomic::AtomicU64::new(seen_after * 1000),
+        };
+        let put = |session: &str, h: Held| {
+            principals
+                .0
+                .sessions
+                .write()
+                .expect("principals")
+                .insert(session.to_string(), h);
+        };
+        put("idle", held(100, 0));
+        put("used", held(100, 90));
+        put("old", held(300, 299));
+        assert_eq!(principals.of("idle"), None, "idle past fifty seconds");
+        assert_eq!(
+            principals.of("old"),
+            None,
+            "past its two hundred, used a moment ago"
+        );
+        assert_eq!(
+            principals.of("used"),
+            Some(ada.clone()),
+            "used ten seconds ago"
+        );
+        let recorded = principals.0.sessions.read().expect("principals")["used"]
+            .seen
+            .load(Ordering::SeqCst);
+        assert!(recorded >= 100_000, "its use recorded now: {recorded} ms");
+        let held_now = principals.0.sessions.read().expect("principals").len();
+        assert_eq!(held_now, 1, "the expired ones forgotten");
+        principals.set_accounts(false);
+        put("idle-guest", held(100, 0));
+        assert_eq!(
+            principals.of("idle-guest"),
+            Some(Principal::guest("idle-guest")),
+            "its own guest in the guest model"
+        );
     }
 }

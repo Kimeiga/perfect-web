@@ -606,6 +606,9 @@ pub(crate) struct FeedPg {
     /// **Its sessions and sign-ins, kept where the hosts share them**
     /// (ADR-XXXX).
     sessions: Arc<crate::hosts::SessionsPg>,
+    /// **This host's instance on the database** (ADR-XXXX), which its page
+    /// numbers carry.
+    instance: u64,
 }
 
 impl FeedPg {
@@ -645,6 +648,7 @@ impl FeedPg {
         // undelivered rows among it.
         let outbox = crate::hosts::Outbox::current(&mut c)?;
         let highest = crate::hosts::highest(&mut c)?;
+        let instance = crate::hosts::instance(&mut c)?;
         pool.give(c);
         let host = crate::hosts::new_host();
         let sessions = Arc::new(crate::hosts::SessionsPg::new(url, &outbox.schema));
@@ -657,6 +661,7 @@ impl FeedPg {
             principals: std::sync::RwLock::new(Principals::default()),
             tail,
             sessions,
+            instance,
         })
     }
 }
@@ -1041,6 +1046,10 @@ impl crate::data::DataLayer for FeedPg {
 
     fn sessions(&self) -> Option<Arc<dyn crate::identity::Kept>> {
         Some(self.sessions.clone())
+    }
+
+    fn instance(&self) -> Option<u64> {
+        Some(self.instance)
     }
 
     fn identified_by(&self, principals: Principals) {

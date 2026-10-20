@@ -709,14 +709,69 @@ fn body_of(answer: &str) -> &str {
     answer.split_once("\r\n\r\n").map_or("", |(_, body)| body)
 }
 
+/// `session`'s post of `text`, pressed on the page numbered `page`, sent to
+/// `s` over HTTP as the browser sends it: its page named (`pw-document`) and
+/// its interaction (`pw-interaction`).
+fn pressed_on(s: &Server, session: &str, page: u64, interaction: &str, text: &str) -> String {
+    let body = serde_json::json!([text]).to_string();
+    exchanged(
+        s,
+        &format!(
+            "POST /command/feed.app.post HTTP/1.1\r\nHost: t\r\nCookie: pw-session={session}\r\n\
+             Sec-Fetch-Site: same-origin\r\npw-interaction: {interaction}\r\n\
+             pw-document: {page}\r\ncontent-type: application/json\r\n\
+             content-length: {}\r\n\r\n{body}",
+            body.len()
+        ),
+    )
+}
+
+/// How many posts say `text`.
+fn posts_saying(db: &Schema, text: &str) -> i64 {
+    db.sql()
+        .query_one("SELECT count(*) FROM posts WHERE text = $1", &[&text])
+        .expect("counted")
+        .get(0)
+}
+
+/// **Hosts on one database number their pages apart** (the integrator's
+/// ruling 1 of 2026-10-20): each host's numbers carry its instance, taken
+/// from the database as it opened its layer, so A's first page and B's never
+/// share a number, and each host tells the other's pages from its own. Each
+/// stays below JavaScript's exact integers (2^53), as the runtime reads it.
+/// Until then every host numbered its pages from one, and B took A's page
+/// of a session for its own page of that session.
+#[test]
+fn hosts_on_one_database_number_their_pages_apart() {
+    let Some(url) = database() else { return };
+    let db = Schema::new(&url, "numbered");
+    let a = feed_host(&url, &db);
+    let b = feed_host(&url, &db);
+    let on_a = home(&a, "a").1;
+    let on_b = home(&b, "b").1;
+    assert_ne!(on_a, on_b, "apart");
+    assert!(
+        crate::hosts::another_hosts(on_a, b.first_page)
+            && crate::hosts::another_hosts(on_b, a.first_page),
+        "each another host's to the other"
+    );
+    assert!(
+        !crate::hosts::another_hosts(on_a, a.first_page),
+        "and its own to each"
+    );
+    for page in [on_a, on_b] {
+        assert!(page < 1 << 53, "{page} exact in JavaScript");
+    }
+}
+
 /// **A press made on a page one host served, sent again to another, is
-/// answered from what the first committed** (ADR-0325, across hosts): the
-/// request names its page by A's number, which on B is a page B showed
-/// another reader (each host numbers its pages from one), and B answers
-/// from the record A's commit wrote with its writes before it would refuse
-/// the page; nothing runs twice. A press on that page that never committed
-/// is still refused. Until then B refused the retry as a page not its
-/// reader's, though A had committed it.
+/// answered from what the first committed** (ADR-0325, across hosts, the
+/// integrator's ruling 1 of 2026-10-20): the request names its page by A's
+/// number, in A's instance, and B answers from the record A's commit wrote
+/// with its writes before it would refuse the page; nothing runs twice. A
+/// press on that page that never committed is refused as another host's
+/// page, never as one out of date. Until then B refused the retry, though A
+/// had committed it.
 #[test]
 fn a_press_on_one_hosts_page_sent_again_to_another_is_answered_from_its_record() {
     let Some(url) = database() else { return };
@@ -726,25 +781,10 @@ fn a_press_on_one_hosts_page_sent_again_to_another_is_answered_from_its_record()
     let b = feed_host_signing_in(&url, &db, &provider);
     let ada = super::sign_in::signed_in(&a, &provider, "s-came", "ada");
     let on_a = home(&a, &ada).1;
-    let on_b = home(&b, "grace").1;
-    assert_eq!(on_a, on_b, "both hosts number their pages from one");
     let text = "Pressed on A's page";
-    let body = serde_json::json!([text]).to_string();
-    let pressed = |s: &Server, interaction: &str| {
-        exchanged(
-            s,
-            &format!(
-                "POST /command/feed.app.post HTTP/1.1\r\nHost: t\r\nCookie: pw-session={ada}\r\n\
-                 Sec-Fetch-Site: same-origin\r\npw-interaction: {interaction}\r\n\
-                 pw-document: {on_a}\r\ncontent-type: application/json\r\n\
-                 content-length: {}\r\n\r\n{body}",
-                body.len()
-            ),
-        )
-    };
-    let first = pressed(&a, "i-1");
+    let first = pressed_on(&a, &ada, on_a, "i-1", text);
     assert!(first.contains("\"committed\":true"), "{first}");
-    let again = pressed(&b, "i-1");
+    let again = pressed_on(&b, &ada, on_a, "i-1", text);
     assert!(again.starts_with("HTTP/1.1 202"), "{again}");
     // What A committed, and its result: a kept answer carries no basis of
     // values, on one host as on two.
@@ -754,18 +794,289 @@ fn a_press_on_one_hosts_page_sent_again_to_another_is_answered_from_its_record()
     };
     assert_eq!(answer(&again), answer(&first), "A's answer");
     assert_eq!(answer(&again).0, serde_json::json!(true));
-    assert_eq!(
-        db.count("SELECT count(*) FROM posts WHERE text = 'Pressed on A''s page'"),
-        1,
-        "posted once"
-    );
-    let never = pressed(&b, "i-2");
+    assert_eq!(posts_saying(&db, text), 1, "posted once");
+    let never = pressed_on(&b, &ada, on_a, "i-2", text);
     assert!(never.starts_with("HTTP/1.1 403"), "{never}");
+    assert!(never.contains("\"refused\":\"another-host\""), "{never}");
+    assert_eq!(posts_saying(&db, text), 1, "and nothing ran");
+}
+
+/// **A press on a page another host served, which committed nowhere, is
+/// refused as that host's page** (the integrator's ruling 1 of 2026-10-20):
+/// ada has a page on each host; her press on A's page, sent to B, is refused
+/// 403 `another-host`, in the platform's words, and nothing runs, where B
+/// once took it for its own page of hers (both numbered from one) and ran
+/// it. The controls: the same press sent to A runs, as one on B's own page
+/// does on B; one on a page B gave and no longer holds, or one numbered in
+/// no host's instance, is a page out of date, as before.
+#[test]
+fn a_press_on_another_hosts_page_that_committed_nowhere_is_refused_as_that_hosts() {
+    let Some(url) = database() else { return };
+    let db = Schema::new(&url, "another_host");
+    let provider = Arc::new(TestProvider::default());
+    let a = feed_host_signing_in(&url, &db, &provider);
+    let b = feed_host_signing_in(&url, &db, &provider);
+    let ada = super::sign_in::signed_in(&a, &provider, "s-came", "ada");
+    // What B's request for her page does first.
+    b.identity.principals().refresh(&ada);
+    let on_a = home(&a, &ada).1;
+    let on_b = home(&b, &ada).1;
+    let refused = pressed_on(&b, &ada, on_a, "i-1", "Pressed on A's page, sent to B");
+    assert!(refused.starts_with("HTTP/1.1 403"), "{refused}");
+    assert!(
+        refused.contains("\"refused\":\"another-host\"")
+            && refused
+                .contains("\"says\":\"This page is served by another host. Reload it to go on.\""),
+        "{refused}"
+    );
     assert_eq!(
-        db.count("SELECT count(*) FROM posts WHERE text = 'Pressed on A''s page'"),
-        1,
+        posts_saying(&db, "Pressed on A's page, sent to B"),
+        0,
         "and nothing ran"
     );
+    // The controls.
+    let on_its_host = pressed_on(&a, &ada, on_a, "i-1", "Pressed on A's page, sent to B");
+    assert!(on_its_host.contains("\"committed\":true"), "{on_its_host}");
+    let own = pressed_on(&b, &ada, on_b, "i-2", "Pressed on B's page, on B");
+    assert!(own.contains("\"committed\":true"), "{own}");
+    b.pages.lock().expect("pages").remove(&(ada.clone(), on_b));
+    for page in [on_b, 7] {
+        let gone = pressed_on(&b, &ada, page, "i-3", "Pressed on a page B does not hold");
+        assert!(gone.starts_with("HTTP/1.1 403"), "{page}: {gone}");
+        assert!(
+            gone.contains("\"refused\":\"out-of-date\""),
+            "{page}: {gone}"
+        );
+    }
+}
+
+/// Whether `session`'s post of `text` through `s` committed, over HTTP.
+fn posts(s: &Server, session: &str, interaction: &str, text: &str) -> bool {
+    posted_by(s, session, interaction, text).contains("\"committed\":true")
+}
+
+/// Whether `session`'s post through `s` was refused for `SignedIn`: it is
+/// no one there.
+fn refused_as_no_one(s: &Server, session: &str, interaction: &str) -> bool {
+    let answer = posted_by(s, session, interaction, "A post by no one");
+    answer.starts_with("HTTP/1.1 403") && answer.contains("SignedIn")
+}
+
+/// **A session idle past its idle time is signed out on every host** (the
+/// integrator's ruling 2 of 2026-10-20: fourteen days where the deployment
+/// says nothing), by the database's clock and cleanly: its row is gone, and
+/// each host's next request finds no one. The control: idle thirteen days,
+/// it holds.
+#[test]
+fn a_session_idle_past_its_idle_time_is_signed_out_on_every_host() {
+    let Some(url) = database() else { return };
+    let db = Schema::new(&url, "idle");
+    let provider = Arc::new(TestProvider::default());
+    let a = feed_host_signing_in(&url, &db, &provider);
+    let b = feed_host_signing_in(&url, &db, &provider);
+    let ada = super::sign_in::signed_in(&a, &provider, "s-came", "ada");
+    db.sql()
+        .batch_execute("UPDATE sessions SET seen = clock_timestamp() - interval '13 days'")
+        .expect("idle thirteen days");
+    assert!(posts(&b, &ada, "i-1", "Idle thirteen days"), "it holds");
+    db.sql()
+        .batch_execute("UPDATE sessions SET seen = clock_timestamp() - interval '15 days'")
+        .expect("idle fifteen days");
+    assert!(refused_as_no_one(&b, &ada, "i-2"), "signed out on B");
+    assert_eq!(
+        db.count("SELECT count(*) FROM sessions"),
+        0,
+        "cleanly: its row is gone"
+    );
+    assert!(refused_as_no_one(&a, &ada, "i-3"), "and on A");
+}
+
+/// **A session past its lifetime is signed out however it is used** (the
+/// integrator's ruling 2 of 2026-10-20: sixty days where the deployment says
+/// nothing), on every host, its row gone. The control: opened fifty-nine
+/// days ago and used now, it holds.
+#[test]
+fn a_session_past_its_lifetime_is_signed_out_however_it_is_used() {
+    let Some(url) = database() else { return };
+    let db = Schema::new(&url, "lifetime");
+    let provider = Arc::new(TestProvider::default());
+    let a = feed_host_signing_in(&url, &db, &provider);
+    let b = feed_host_signing_in(&url, &db, &provider);
+    let ada = super::sign_in::signed_in(&a, &provider, "s-came", "ada");
+    db.sql()
+        .batch_execute("UPDATE sessions SET opened = clock_timestamp() - interval '59 days'")
+        .expect("opened fifty-nine days ago");
+    assert!(
+        posts(&b, &ada, "i-1", "Opened fifty-nine days ago"),
+        "it holds"
+    );
+    db.sql()
+        .batch_execute(
+            "UPDATE sessions SET opened = clock_timestamp() - interval '61 days', \
+             seen = clock_timestamp()",
+        )
+        .expect("opened sixty-one days ago, used now");
+    assert!(refused_as_no_one(&b, &ada, "i-2"), "signed out on B");
+    assert_eq!(
+        db.count("SELECT count(*) FROM sessions"),
+        0,
+        "its row is gone"
+    );
+    assert!(refused_as_no_one(&a, &ada, "i-3"), "and on A");
+}
+
+/// **A session in use is recorded as used**, on the database's clock, at
+/// most once a minute: idle thirteen days, one request makes it used now, so
+/// it holds fourteen days more; a request a moment later writes nothing.
+#[test]
+fn a_session_in_use_is_recorded_as_used_at_most_once_a_minute() {
+    let Some(url) = database() else { return };
+    let db = Schema::new(&url, "used");
+    let provider = Arc::new(TestProvider::default());
+    let a = feed_host_signing_in(&url, &db, &provider);
+    let b = feed_host_signing_in(&url, &db, &provider);
+    let ada = super::sign_in::signed_in(&a, &provider, "s-came", "ada");
+    db.sql()
+        .batch_execute("UPDATE sessions SET seen = clock_timestamp() - interval '13 days'")
+        .expect("idle thirteen days");
+    let cookie = format!("pw-session={ada}");
+    assert!(get(&b, "/", &cookie).starts_with("HTTP/1.1 200"));
+    assert_eq!(
+        db.count(
+            "SELECT count(*) FROM sessions WHERE seen > clock_timestamp() - interval '1 minute'"
+        ),
+        1,
+        "used now"
+    );
+    let seen = || -> String {
+        db.sql()
+            .query_one("SELECT seen::text FROM sessions", &[])
+            .expect("read")
+            .get(0)
+    };
+    let before = seen();
+    assert!(get(&b, "/", &cookie).starts_with("HTTP/1.1 200"));
+    assert_eq!(seen(), before, "not written again within the minute");
+}
+
+/// **A deployment states how long its sessions live**, or its host is
+/// refused at start (the integrator's ruling 2 of 2026-10-20; read as
+/// `PW_RENDER_SEATS` is): `PW_SESSION_IDLE` and `PW_SESSION_LIFETIME`, whole
+/// seconds, one at least; fourteen days and sixty where unset or empty. And
+/// a host holds its sessions to them: idle two hours, a session holds by the
+/// defaults, and is signed out where the idle time is one hour.
+#[test]
+fn a_deployment_states_how_long_its_sessions_live() {
+    use crate::identity::SessionLifetimes;
+    let day = std::time::Duration::from_secs(86_400);
+    let defaults = SessionLifetimes {
+        idle: day * 14,
+        absolute: day * 60,
+    };
+    assert_eq!(SessionLifetimes::stated(None, None), Ok(defaults));
+    assert_eq!(SessionLifetimes::stated(Some(""), Some("")), Ok(defaults));
+    assert_eq!(
+        SessionLifetimes::stated(Some("3600"), Some("86400")),
+        Ok(SessionLifetimes {
+            idle: std::time::Duration::from_secs(3600),
+            absolute: day,
+        })
+    );
+    for (idle, lifetime, named) in [
+        (Some("0"), None, "PW_SESSION_IDLE"),
+        (Some("an hour"), None, "PW_SESSION_IDLE"),
+        (None, Some("0"), "PW_SESSION_LIFETIME"),
+        (None, Some("-1"), "PW_SESSION_LIFETIME"),
+    ] {
+        let refused = SessionLifetimes::stated(idle, lifetime).expect_err("refused");
+        assert!(refused.contains(named), "{refused}");
+    }
+    let Some(url) = database() else { return };
+    let db = Schema::new(&url, "lifetimes");
+    let provider = Arc::new(TestProvider::default());
+    let a = feed_host_signing_in(&url, &db, &provider);
+    let b = feed_host_signing_in(&url, &db, &provider);
+    let ada = super::sign_in::signed_in(&a, &provider, "s-came", "ada");
+    let idle_two_hours = "UPDATE sessions SET seen = clock_timestamp() - interval '2 hours'";
+    db.sql().batch_execute(idle_two_hours).expect("idle");
+    assert!(posts(&b, &ada, "i-1", "Idle two hours, by the defaults"));
+    b.identity.principals().expire_after(SessionLifetimes {
+        idle: std::time::Duration::from_secs(3600),
+        absolute: day * 60,
+    });
+    db.sql().batch_execute(idle_two_hours).expect("idle");
+    assert!(refused_as_no_one(&b, &ada, "i-2"), "one hour idle allowed");
+}
+
+/// **Signing in gives a new session, on every host** (the integrator's
+/// ruling 2 of 2026-10-20; OWASP's session fixation defence): the session the
+/// browser came with, which another could have set, is no one on either
+/// host; and signing in again as another user, a change of whom the session
+/// is, gives another, and the one before it is no one on either host. A
+/// sign-out gives a new one too (ADR-0258), and its old one is no one on any
+/// host (`a_session_signed_out_on_one_host_is_no_one_on_another`).
+#[test]
+fn signing_in_rotates_the_session_on_every_host() {
+    let Some(url) = database() else { return };
+    let db = Schema::new(&url, "rotated");
+    let provider = Arc::new(TestProvider::default());
+    let a = feed_host_signing_in(&url, &db, &provider);
+    let b = feed_host_signing_in(&url, &db, &provider);
+    let came = "s-set-by-someone-else";
+    let ada = super::sign_in::signed_in(&a, &provider, came, "ada");
+    assert_ne!(ada, came, "a new session");
+    for (host, i) in [(&a, "i-1"), (&b, "i-2")] {
+        assert!(
+            refused_as_no_one(host, came, i),
+            "the one it came with is no one"
+        );
+    }
+    assert!(posts(&b, &ada, "i-3", "Ada on B"));
+    let grace = super::sign_in::signed_in(&a, &provider, &ada, "grace");
+    assert_ne!(grace, ada, "another, signing in as another user");
+    for (host, i) in [(&a, "i-4"), (&b, "i-5")] {
+        assert!(refused_as_no_one(host, &ada, i), "ada's is no one now");
+    }
+    assert!(posts(&b, &grace, "i-6", "Grace on B"));
+    assert_eq!(
+        db.count("SELECT count(*) FROM posts WHERE author = 'grace'"),
+        1,
+        "grace's post"
+    );
+}
+
+/// **`PW_FEED_SCHEMA` is a test's setting** (the integrator's ruling 4 of
+/// 2026-10-20): honored for a development deployment on this machine, which
+/// a test run's hosts are, and refused for a production one or one served
+/// from elsewhere, whose tables are where its connection's search path says.
+#[test]
+fn the_feeds_schema_is_a_tests_setting() {
+    use crate::identity::Deployment;
+    let dev = Deployment::development(3143);
+    assert_eq!(
+        crate::hosts::test_schema(Some("pw_e2e"), &dev),
+        Ok(Some("pw_e2e".to_string()))
+    );
+    assert_eq!(crate::hosts::test_schema(None, &dev), Ok(None));
+    assert_eq!(crate::hosts::test_schema(Some(""), &dev), Ok(None));
+    for deployment in [
+        Deployment {
+            development: false,
+            origin: "http://127.0.0.1:3143".to_string(),
+        },
+        Deployment {
+            development: true,
+            origin: "https://feed.example.com".to_string(),
+        },
+    ] {
+        let refused = crate::hosts::test_schema(Some("pw_e2e"), &deployment).expect_err("refused");
+        assert!(refused.contains("PW_FEED_SCHEMA"), "{refused}");
+        assert_eq!(
+            crate::hosts::test_schema(None, &deployment),
+            Ok(None),
+            "unset, nothing to refuse"
+        );
+    }
 }
 
 /// **A layer's sessions are read on a bounded few connections**, as the
