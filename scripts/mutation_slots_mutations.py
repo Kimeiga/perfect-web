@@ -389,6 +389,14 @@ MUTANTS += [
     ('suite global dispatch helpers are not frozen', PRODUCER, "    (unittest.suite, '_isnotsuite'), (unittest.suite, '_call_if_exists'),\n", ''),
     ('runner and Outcome execution descriptors are not frozen', PRODUCER, '                          (_STD_RUNNER, _RUNNER_HOOKS), (_STD_OUTCOME, _OUTCOME_HOOKS)):\n', '                          ):\n'),
     ('suppressed captured exceptions are accepted', PRODUCER, "        refusals = self.refusals + ['unmatched captured exception: ' + label for label in unmatched]\n", '        refusals = self.refusals\n'),
+    # Train-11: a subtest's own, killed by the suppressed-subtest test on
+    # every Python since its fixture keeps the failure from addSubTest (it
+    # filtered 3.10's _Outcome.errors, and on CI's 3.12 was refused for an
+    # AttributeError instead, killing nothing of this).
+    ("a suppressed subtest's captured exception is not unmatched", PRODUCER,
+     "            unmatched += [state['id'] + ' subtest' for item in state['subtests'].values()\n"
+     "                          if item['error'] is not None and not item['matched']]\n",
+     '            pass\n'),
     ('a cached protocol replaces actual local validation authority', HARNESS, 'strict_json = _protocol.strict_json\n', '_protocol = __import__("unittest_protocol")\nstrict_json = _protocol.strict_json\n'),
     ('body errors are relabelled as assertion failures', PROTOCOL, '                body_errors.add(identity)\n', '                assertion_failed.add(identity)\n'),
 ]

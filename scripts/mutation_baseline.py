@@ -266,8 +266,8 @@ def explain(out=None):
 # mutant and hundreds to a shard, and its trace says nothing that the kill
 # does not: they would swamp the artifact. `explain()` is called where the
 # baseline is red, before any mutant has run, and where a script stops at a
-# mutant's producer it refused (287 calls on train-11; the ten after no red
-# baseline's usual words are named in `tests/test_mutation_baseline.py`),
+# mutant's producer it refused (292 calls on train-11; the fourteen after no
+# red baseline's usual words are named in `tests/test_mutation_baseline.py`),
 # so what is kept is the output of the LAST command the script ran, and only
 # where that was a browser run that failed: a refused producer's call finds a
 # cargo command last, and keeps nothing.

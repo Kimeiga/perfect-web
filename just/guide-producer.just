@@ -1,0 +1,5 @@
+# Guide producer validity; separate from unchanged 74 guide program controls.
+e14-guide-producer:
+    @mkdir -p docs/evidence/E14
+    @{ set -eu; echo 'Guide producer validity'; echo; echo 'produced by: just --justfile just/guide-producer.just --working-directory . e14-guide-producer'; echo "commit: $(git rev-parse HEAD)"; if ! git diff --quiet HEAD -- scripts; then echo 'source state: tracked changes present'; fi; echo 'frozen source SHA256:'; sha256sum scripts/guide_mutations.py scripts/guide_python.py scripts/cargo_test_results.py scripts/unittest_producer.py scripts/unittest_protocol.py scripts/guide_producer_mutations.py scripts/tests/test_guide_producer_results.py; echo; python3 -B scripts/tests/test_guide_producer_results.py -v; echo; python3 -B scripts/guide_producer_mutations.py; } > docs/evidence/E14/guide-producer.txt 2>&1
+    @grep -E '^baseline:|mutants killed|^Ran |^OK$' docs/evidence/E14/guide-producer.txt

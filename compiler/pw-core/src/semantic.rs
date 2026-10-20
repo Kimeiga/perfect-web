@@ -87,7 +87,8 @@ impl Model {
     pub fn of(units: &[Unit]) -> Result<Model, String> {
         let mut warnings = BTreeSet::new();
         let mut errors = Vec::new();
-        for (path, diagnostics) in crate::check::check_units(units) {
+        let validation = crate::program::validate(units);
+        for (path, diagnostics) in &validation.diagnostics {
             for d in diagnostics {
                 let line = format!("{} {}", d.code, d.message);
                 if d.is_error() {
@@ -101,7 +102,7 @@ impl Model {
             errors.truncate(3);
             return Err(format!("it does not check: {}", errors.join("; ")));
         }
-        let build = crate::build::build(units)?;
+        let build = validation.into_build()?;
         let mut model = Model {
             warnings,
             ..Model::default()

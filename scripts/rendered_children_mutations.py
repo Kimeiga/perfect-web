@@ -29,7 +29,7 @@ MUTANTS = [
     (
         "the rule is not run",
         CHECK,
-        "        per_unit.extend(nesting(&workspace, &hirs, i, &u.hir));\n",
+        '        per_unit.extend(nesting(workspace, hirs, i, &u.hir));\n',
         "",
     ),
     (

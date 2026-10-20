@@ -26,16 +26,19 @@ browser tests below, in Chromium.
 
 Run from the repository root; `just e14-refusal` records the output of
 part 1 of `PARTS`, `just e14-refusal-2` part 2 (`--part i/2`; with no part,
-every mutant runs). The source is restored after every mutant, whatever
-happens.
+every mutant runs). Each completed attempt or handled SIGTERM restores its
+source in finally; externally interrupted runs require byte-verified
+recovery before another run.
 """
 
+from collections import Counter
 import os
 import pathlib
 import re
 import signal
 import subprocess
 import sys
+import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 PREDICATES = ROOT / "compiler/pw-core/src/predicates.rs"
@@ -116,7 +119,7 @@ MUTANTS = [
         "the build writes no words",
         "host",
         BUILD,
-        "        predicates: crate::predicates::words_of(&hirs),\n",
+        '        predicates: crate::predicates::words_of(hirs),\n',
         "        predicates: Default::default(),\n",
     ),
     (
@@ -320,11 +323,22 @@ def cargo_tests(suite):
     """(built, passed, failed) over the suite's tests."""
     out, code = bounded(CARGO[suite], cwd=ROOT)
     if code is None:
-        return True, 0, 1
+        return False, 0, 0
     found = re.findall(r"test result: \w+\. (\d+) passed; (\d+) failed", out)
     if not found:
         return False, 0, 0
-    return True, sum(int(p) for p, _ in found), sum(int(f) for _, f in found)
+    passed = sum(int(p) for p, _ in found)
+    failed = sum(int(f) for _, f in found)
+    valid = code == (101 if failed else 0) and passed + failed > 0
+    return valid, passed, failed
+
+
+class CompilerRefusal(tuple):
+    """Actual check diagnostics from a failed source-program build."""
+    def __new__(cls, codes):
+        result = super().__new__(cls, (False, 0, 0))
+        result.codes = frozenset(codes)
+        return result
 
 
 def browser_tests(_suite="browser"):
@@ -340,6 +354,12 @@ def browser_tests(_suite="browser"):
             text=True,
         )
         if built.returncode != 0:
+            # feed.sh stops at its actual CLI check; only the already named
+            # diagnostic set can earn this program mutant a checker kill.
+            output = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", built.stdout + built.stderr)
+            codes = set(re.findall(r"(?m)^error: \[(PW\d{4})\]", output))
+            if script == "feed.sh" and built.returncode == 1 and codes:
+                return CompilerRefusal(codes)
             return False, 0, 0
     server = subprocess.run(
         ["cargo", "build", "--quiet", "--locked", "-p", "pw-dev-server"],
@@ -349,19 +369,53 @@ def browser_tests(_suite="browser"):
     )
     if server.returncode != 0:
         return False, 0, 0
-    passed = failed = 0
+    # Preserve each original file/grep/project selection through Playwright's
+    # own --list/--test-list interface. Verify its exact selected multiset
+    # before sharing one startup; new/overlapping selections cannot disappear.
+    expected = []
     for spec in SPECS:
+        listed = listed_tests(spec)
+        if listed is None:
+            return False, 0, 0
+        expected.extend(listed)
+    with tempfile.TemporaryDirectory(prefix="pw-refusal-selection-") as directory:
+        selection = pathlib.Path(directory) / "tests.txt"
+        selection.write_text("\n".join(expected) + "\n")
+        batch = ["--test-list", str(selection), "--project=chromium"]
+        actual = listed_tests(batch)
+        if actual is None or Counter(expected) != Counter(actual):
+            print("FAIL: batched refusal selection differs from the original test multiset", flush=True)
+            return False, 0, 0
         out, code = bounded(
-            ["pnpm", "exec", "playwright", "test", *spec, "--reporter=line"],
+            ["bash", str(ROOT / "scripts/run_suite.sh"), "-C", ".", "--",
+             "pnpm", "exec", "playwright", "test", *batch, "--reporter=line"],
             cwd=ROOT / "spikes/own-renderer",
         )
-        if code is None:
-            failed += 1
-            continue
-        out = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", out)
-        passed += sum(int(n) for n in re.findall(r"(\d+) passed", out))
-        failed += sum(int(n) for n in re.findall(r"(\d+) failed", out))
-    return passed + failed > 0, passed, failed
+    if code is None:
+        return False, 0, 0
+    out = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", out)
+    passed = sum(int(n) for n in re.findall(r"(\d+) passed", out))
+    command_failed = sum(int(n) for n in re.findall(r"(\d+) failed", out))
+    failed = command_failed
+    complete = True
+    # Counts describe tests; run_suite owns producer status/no-test refusal.
+    if code != (1 if command_failed else 0):
+        complete = False
+    return complete and passed + failed > 0, passed, failed
+
+
+def listed_tests(spec):
+    """Playwright's own replayable selection rows, never an assertion result."""
+    out, code = bounded(
+        ["pnpm", "exec", "playwright", "test", *spec, "--list", "--reporter=list"],
+        cwd=ROOT / "spikes/own-renderer",
+    )
+    if code != 0:
+        return None
+    out = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", out)
+    rows = [line.strip() for line in out.splitlines()
+            if line.strip().startswith("[chromium]") and " › " in line]
+    return rows or None
 
 
 SUITES = {
@@ -401,6 +455,7 @@ def chosen(argv: list[str]) -> tuple[list, str]:
 
 def main():
     import mutation_baseline  # keeps what each command says, for a red baseline
+    watch = mutation_baseline.mutation_bound.start()
     # Stopped from outside, the source is still restored: SIGTERM raises
     # here, and the `finally` below runs.
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(1))
@@ -414,37 +469,50 @@ def main():
             continue
         built, passed, failed = run(suite)
         print(f"baseline ({suite}): {passed} passed, {failed} failed", flush=True)
-        if not built or failed or not passed:
+        if not built or failed or not passed or (watch is not None and watch.stopped):
             print("FAIL: the unmutated baseline is not green; no mutant can mean anything")
             mutation_baseline.explain()
             return 1
 
-    survivors = 0
+    survivors = refused = killed = 0
     for what, suite, path, anchor, replacement in picked:
         original = path.read_text()
         if original.count(anchor) != 1:
             print(f"{what}: ANCHOR NOT FOUND EXACTLY ONCE in {path.name}")
-            survivors += 1
+            refused += 1
             continue
         try:
             path.write_text(original.replace(anchor, replacement, 1))
-            built, passed, failed = SUITES[suite](suite)
+            result = SUITES[suite](suite)
+            built, passed, failed = result
         finally:
             path.write_text(original)
-        if not built:
-            verdict = "KILLED (does not build)"
+        stopped = watch is not None and bool(watch.stopped)
+        named = CHECKED.get(what, set())
+        if isinstance(result, CompilerRefusal) and result.codes and result.codes == named and not stopped:
+            verdict = f"KILLED (named checker refusal: {','.join(sorted(result.codes))})"
+            killed += 1
+        elif not built or passed + failed == 0 or stopped:
+            verdict = "REFUSED (invalid build, status, empty result or stopped producer)"
+            refused += 1
         elif failed:
             verdict = f"KILLED ({failed} of {passed + failed} tests fail)"
+            killed += 1
         else:
             verdict = "SURVIVED"
             survivors += 1
         print(f"{what} [{suite}]: {verdict}", flush=True)
     # The pages and the server are built again from the restored source.
     if any(m[1] == "browser" for m in picked):
-        browser_tests()
+        built, passed, failed = browser_tests()
+        print(f"restored (browser): {passed} passed, {failed} failed", flush=True)
+        if not built or failed or not passed or (watch is not None and watch.stopped):
+            print("FAIL: the restored browser suite is not green")
+            mutation_baseline.explain()
+            return 1
 
-    print(f"{len(picked) - survivors} of {len(picked)} mutants killed")
-    return 1 if survivors else 0
+    print(f"{killed} of {len(picked)} mutants killed; {refused} refused")
+    return 1 if survivors or refused else 0
 
 
 if __name__ == "__main__":

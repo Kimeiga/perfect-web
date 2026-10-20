@@ -1,0 +1,294 @@
+{
+  "scope": "Retained whole-campaign results across checkpoints; historical source/environment qualifications are in ADR-0361-check-is-build. This does not assert all campaigns ran at the final source commit.",
+  "tested_source_checkpoint": "d74e29ffe11cdbc382fcf99f4bcd892f28bc4bec",
+  "full_ci4": {
+    "head": "30f7e670f0b880153481bf7d83335e1ef1ae370d",
+    "manifest_sha256": "8d6f39d60798565e7065cdc875dd8475007ddf653829484b2e4e2df8f7f73ae8",
+    "source_paths_verified": 2289,
+    "all_input_copies": "/tmp/check-is-build-ci-inputs-1792142520914837955",
+    "original_untracked_probe_sha256": "230eab1aea7b2dadc5b9477fc046c73d5a6d72215831be0e7cf70415e6c1cb6f",
+    "probe_backup_absent": true,
+    "configured_host_count": 68,
+    "listener_samples_empty": 3,
+    "full_ci_exit": 0,
+    "outputs": {
+      "/tmp/check-is-build-ci4-green.log": {
+        "sha256": "64e85b9e91bc2c9e766140f6418456ef32e9579c82bab28134f6e72a1fc91455",
+        "bytes": 298674
+      },
+      "/tmp/check-is-build-ci4-launch-green.log": {
+        "sha256": "b794ceff082e2383daa98c247d80163a124bbba3b28de925a5aa000350f5d20a",
+        "bytes": 1742
+      }
+    }
+  },
+  "final_recipe": {
+    "head": "d74e29ffe11cdbc382fcf99f4bcd892f28bc4bec",
+    "exit": 0,
+    "source_and_probe_exact": true,
+    "load_after": "5.00 5.51 5.77 5/532 2111411",
+    "raw": "/tmp/check-is-build-final-recipe-raw.txt",
+    "raw_sha256": "5bd73722efcf7e1bd5223caf133d0f8d026a2e37f1a608435318194db688afa6",
+    "console": "/tmp/check-is-build-final-recipe-console.log",
+    "console_sha256": "00f33cc9bef22f37eb2d3a268f55a0ab27ad863acad5a4d9a5b530cb963d94ce",
+    "launch_receipt": "/tmp/check-is-build-final-recipe-launch.json",
+    "deployment_env_absent": true
+  },
+  "final_recipe_launch": {
+    "head": "d74e29ffe11cdbc382fcf99f4bcd892f28bc4bec",
+    "tracked_source_clean_at_start": true,
+    "original_probe_untracked_preserved": true,
+    "all_input_byte_copies": "/tmp/check-is-build-final-recipe-inputs-1792143201041758191",
+    "source_manifest": "/tmp/check-is-build-final-recipe-inputs-1792143201041758191/_source-manifest.json",
+    "source_manifest_sha256": "8d6f39d60798565e7065cdc875dd8475007ddf653829484b2e4e2df8f7f73ae8",
+    "deployment_env_absent": true,
+    "load_before": "6.10 6.83 6.19 4/567 2072814",
+    "command": [
+      "just",
+      "e14-check-is-build"
+    ]
+  },
+  "whole_campaigns": {
+    "scripts": 21,
+    "killed": 287,
+    "inventory": 287,
+    "unique_support_messages": [
+      "WIT: `generality.pressing_scheduler.Remind` and `generality.pressing_scheduler.remind` both mangle to `generality-pressing-scheduler-remind`",
+      "`generality.computed_value_pure.Clock`'s values: part 0 reads `now`, which no query binds",
+      "`generality.forbid_clock_ok.Now`'s values: part 0 reads `now`, which no query binds",
+      "`marketing.terms.Terms`'s values: part 0 computes a value that performs `build.input.read<WorkspaceFile>`, and a host computes only a value that performs nothing",
+      "a handler in `generality.artifact_agrees.Panel`: `a `todo` body` does not encode: the declaration is a placeholder",
+      "a handler in `generality.forbid_handler_ok.ProductCard`: `a `todo` body` does not encode: the declaration is a placeholder",
+      "a handler in `generality.handler_ok.Search`: `a handler that calls no command and changes no signal` does not encode: a handler reaches the server through a command and changes the page through a signal, and this one does neither, so pressing it would change nothing",
+      "a handler in `generality.inert_ok.AddButton`: `a `todo` body` does not encode: the declaration is a placeholder",
+      "a handler in `generality.resume_ok.Panel`: `a `todo` body` does not encode: the declaration is a placeholder",
+      "a handler in `generality.resume_public_ok.StoreCard`: `a `todo` body` does not encode: the declaration is a placeholder",
+      "a handler in `generality.schema_nameable.Panel`: `a `todo` body` does not encode: the declaration is a placeholder",
+      "a handler in `generality.task_scoped.ProductCard`: blocked upstream: `task.spawn` names no declaration this program contains",
+      "a template part the renderer cannot render: generality.independence_own.Table: `style:padding-inline`: `style:padding-inline` is a directive, and only `on:` directives are compiled",
+      "a template part the renderer cannot render: store.map_widget.StoreLocation: `<map resource={..}>`: an element that mounts a resource is not compiled",
+      "a template part the renderer cannot render: store.responsive_menu.ResponsiveMenu: `style:grid-template-columns`: `style:grid-template-columns` is a directive, and only `on:` directives are compiled",
+      "the generated WIT does not parse: duplicate item named `store-recommendations-recommendations-api`"
+    ],
+    "rows": [
+      {
+        "script": "one_checker",
+        "killed": 5,
+        "inventory": 5,
+        "raw": "/tmp/check-is-build-whole-one_checker.log",
+        "sha256": "e89e07742722ad532922d51ab8a0a42fc54485dda6a6b0493df43ba2feb2b9ff",
+        "baselines": [
+          "baseline: 21 passed, 0 failed"
+        ]
+      },
+      {
+        "script": "pure",
+        "killed": 16,
+        "inventory": 16,
+        "raw": "/tmp/check-is-build-whole-pure.log",
+        "sha256": "fbdaca764602881a67f1870b831d73e81208bc2d759690dcf8d58a05b7f03d05",
+        "baselines": [
+          "baseline: 117 passed, 0 failed"
+        ]
+      },
+      {
+        "script": "computed_signals",
+        "killed": 17,
+        "inventory": 17,
+        "raw": "/tmp/check-is-build-whole-computed_signals.log",
+        "sha256": "62888cabba6b7ebf7e3b044a05c90d1834c09847309ddaa2e005a1fdadeef61a",
+        "baselines": [
+          "baseline (browser): 66 passed, 0 failed",
+          "baseline (cargo): 14 passed, 0 failed"
+        ]
+      },
+      {
+        "script": "derived",
+        "killed": 3,
+        "inventory": 3,
+        "raw": "/tmp/check-is-build-whole-derived.log",
+        "sha256": "36670e284d5be082a8da33f870d5be04534a113435809431e57d78a330116ece",
+        "baselines": [
+          "baseline: 2 passed, 0 failed"
+        ]
+      },
+      {
+        "script": "handler_placement",
+        "killed": 4,
+        "inventory": 4,
+        "raw": "/tmp/check-is-build-whole-handler_placement.log",
+        "sha256": "18d2f60a85472ea361f1fb2f6337e6098c0e2ef980ef563d8fe290eada4d3f34",
+        "baselines": [
+          "baseline: 2 passed, 0 failed"
+        ]
+      },
+      {
+        "script": "block_clauses",
+        "killed": 13,
+        "inventory": 13,
+        "raw": "/tmp/check-is-build-whole-block_clauses.log",
+        "sha256": "07d3dce11a8d4e958a579b5e6d3088b0c73d0a068dd8aea706002d1157c9a0be",
+        "baselines": [
+          "baseline: 65 passed, 0 failed"
+        ]
+      },
+      {
+        "script": "policy_value",
+        "killed": 14,
+        "inventory": 14,
+        "raw": "/tmp/check-is-build-whole-policy_value.log",
+        "sha256": "88e2536d9fba56d5564b4041c0cbe40306bc4a3f4fc8554c1fc665efa740510d",
+        "baselines": [
+          "baseline: 11 passed, 0 failed"
+        ]
+      },
+      {
+        "script": "rendered_children",
+        "killed": 8,
+        "inventory": 8,
+        "raw": "/tmp/check-is-build-whole-rendered_children.log",
+        "sha256": "a260886ae9dabd01c76323d27d14c225929f91fb189ca530c4d54ee69087bd57",
+        "baselines": [
+          "baseline: 5 passed, 0 failed"
+        ]
+      },
+      {
+        "script": "view_element",
+        "killed": 6,
+        "inventory": 6,
+        "raw": "/tmp/check-is-build-whole-view_element.log",
+        "sha256": "ab8c6def1e3aedbb2128eb09c23f9e0fe30f9059275dc7939f92932ea8c897c7",
+        "baselines": [
+          "baseline: 4 passed, 0 failed"
+        ]
+      },
+      {
+        "script": "template_value",
+        "killed": 11,
+        "inventory": 11,
+        "raw": "/tmp/check-is-build-whole-template_value.log",
+        "sha256": "73b2b40a336b365f8c14ef9ccad650e58318f0fcf15d991b78af2c196c8eeb38",
+        "baselines": [
+          "baseline: 7 passed, 0 failed"
+        ]
+      },
+      {
+        "script": "signals",
+        "killed": 8,
+        "inventory": 8,
+        "raw": "/tmp/check-is-build-whole-signals.log",
+        "sha256": "9d777bf5034f5eaf9120ef3d62353bbef1c650c60e9f5b7219921af697748350",
+        "baselines": [
+          "baseline: 5 passed, 0 failed"
+        ]
+      },
+      {
+        "script": "speculation",
+        "killed": 5,
+        "inventory": 5,
+        "raw": "/tmp/check-is-build-whole-speculation.log",
+        "sha256": "8817e0aba9d10e65cf00ced3a68bbfaf5affe8acbde211507046cde6700e1aff",
+        "baselines": [
+          "baseline: 5 passed, 0 failed"
+        ]
+      },
+      {
+        "script": "page_speculation",
+        "killed": 4,
+        "inventory": 4,
+        "raw": "/tmp/check-is-build-whole-page_speculation.log",
+        "sha256": "f49f05673ec6725c9c7b48039a9be4efbbdd5a99d968e244cd71497aeccb96fd",
+        "baselines": [
+          "baseline: 2 passed, 0 failed"
+        ]
+      },
+      {
+        "script": "what_a_component_does",
+        "killed": 12,
+        "inventory": 12,
+        "raw": "/tmp/check-is-build-whole-what_a_component_does.log",
+        "sha256": "d839dd04ed3de7af80512bf5145cd36c89b90c4531ec83be5479b573a14b7c84",
+        "baselines": [
+          "baseline: 49 passed, 0 failed"
+        ]
+      },
+      {
+        "script": "wit_name",
+        "killed": 5,
+        "inventory": 5,
+        "raw": "/tmp/check-is-build-whole-wit_name.log",
+        "sha256": "f9085ac9edfc83b4a064d046085980d0ad3b3d5dc68a9a212d3103f622e8a120",
+        "baselines": [
+          "baseline: 4 passed, 0 failed"
+        ]
+      },
+      {
+        "script": "build_id",
+        "killed": 12,
+        "inventory": 12,
+        "raw": "/tmp/check-is-build-natural-whole-build_id12.log",
+        "sha256": "c5f24f0798c3d7a80e6d065378c58d2bec730e15e727277bee169bbc7aac80b9",
+        "baselines": [
+          "baseline (core): 2 passed, 0 failed",
+          "baseline (host): 2 passed, 0 failed",
+          "baseline (wasm): 1 passed, 0 failed",
+          "baseline (browser): 1 passed, 0 failed"
+        ]
+      },
+      {
+        "script": "refusal",
+        "killed": 30,
+        "inventory": 30,
+        "raw": "/tmp/check-is-build-natural-whole-refusal30.log",
+        "sha256": "4e92594565d67e8a5fe37643843ac15ace27e98da8969317932dde88bd92520a",
+        "baselines": [
+          "baseline (core): 7 passed, 0 failed",
+          "baseline (render): 6 passed, 0 failed",
+          "baseline (host): 25 passed, 0 failed",
+          "baseline (browser): 11 passed, 0 failed"
+        ]
+      },
+      {
+        "script": "guide",
+        "killed": 74,
+        "inventory": 74,
+        "raw": "/tmp/check-is-build-isolated-guide74.log",
+        "sha256": "261576d44b8b1596e18fb6de3061672af8fb3db24c70b9e2f6f4cfc712fdc10a",
+        "baselines": [
+          "baseline: the guide's tests, 22 ran, 0 failed",
+          "baseline: the guestbook in Chromium, 4 ran, 0 failed"
+        ]
+      },
+      {
+        "script": "check_is_build",
+        "killed": 35,
+        "inventory": 35,
+        "raw": "/tmp/check-is-build-stream-stage-whole-own35.log",
+        "sha256": "6e3cb3ff028223a280ed4b8ac9c536831d214c8586e1afc6bc6fd41c7a95c439",
+        "baselines": [
+          "baseline: 75 passed, 0 failed"
+        ]
+      },
+      {
+        "script": "kiokun_test_data",
+        "killed": 2,
+        "inventory": 2,
+        "raw": "/tmp/check-is-build-natural-whole-kiokun_test_data2.log",
+        "sha256": "07771c89ebf21374f110c134b63149efc650c0940df129beca67964e43050e7d",
+        "baselines": [
+          "baseline: 1 passed, 0 failed"
+        ]
+      },
+      {
+        "script": "stream",
+        "killed": 3,
+        "inventory": 3,
+        "raw": "/tmp/check-is-build-stream-stage-whole-stream3.log",
+        "sha256": "58736fa630f6f90499777ccafdef0121586f6f385f3f6af9752144a28ef99438",
+        "baselines": [
+          "baseline: 4 passed, 0 failed"
+        ]
+      }
+    ]
+  }
+}

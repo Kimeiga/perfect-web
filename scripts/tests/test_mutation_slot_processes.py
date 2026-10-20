@@ -12,6 +12,7 @@ import subprocess
 import sys
 import time
 import tempfile
+import threading
 import unittest
 from unittest.mock import Mock, call, patch
 
@@ -629,7 +630,7 @@ class ProducerResults(MockedProcesses):
         module, canonical, owner, log, context = self.execution(proc, identity)
         with patch.object(module, 'cleanup_module', return_value=canonical), \
              patch.object(module.subprocess, 'Popen', return_value=proc), \
-             patch.object(module.signal, 'signal'), patch('builtins.open', return_value=context):
+             patch.object(module.signal, 'signal'), patch.object(module, 'open', create=True, return_value=context):
             with self.assertRaisesRegex(RuntimeError, 'timed out'):
                 module.execute(['private mock'], Path('/unused/output'), {}, bound=1)
         canonical.require_pidfds.assert_called_once()
@@ -647,7 +648,7 @@ class ProducerResults(MockedProcesses):
         module, canonical, owner, _log, context = self.execution(proc, identity)
         with patch.object(module, 'cleanup_module', return_value=canonical), \
              patch.object(module.subprocess, 'Popen', return_value=proc), \
-             patch.object(module.signal, 'signal'), patch('builtins.open', return_value=context):
+             patch.object(module.signal, 'signal'), patch.object(module, 'open', create=True, return_value=context):
             with self.assertRaisesRegex(RuntimeError, 'previously orphaned descendants have unproved ownership'):
                 module.execute(['private mock'], Path('/unused/output'), {}, bound=1)
         owner.stop.assert_called_once()
@@ -661,7 +662,7 @@ class ProducerResults(MockedProcesses):
         module, canonical, owner, _log, context = self.execution(proc, identity)
         with patch.object(module, 'cleanup_module', return_value=canonical), \
              patch.object(module.subprocess, 'Popen', return_value=proc), \
-             patch.object(module.signal, 'signal'), patch('builtins.open', return_value=context):
+             patch.object(module.signal, 'signal'), patch.object(module, 'open', create=True, return_value=context):
             with self.assertRaisesRegex(RuntimeError, 'exit probe failed'):
                 module.execute(['private mock'], Path('/unused/output'), {}, bound=1)
         owner.stop.assert_called_once()
@@ -682,7 +683,7 @@ class ProducerResults(MockedProcesses):
             with patch.object(module, 'cleanup_module', return_value=canonical), \
                  patch.object(module.subprocess, 'Popen', return_value=proc), \
                  patch.object(module.signal, 'signal', side_effect=handler) as handlers, \
-                 patch('builtins.open', return_value=context), patch('builtins.print', side_effect=BrokenPipeError('diagnostic sink') if isinstance(cancellation, KeyboardInterrupt) else None) as reported:
+                 patch.object(module, 'open', create=True, return_value=context), patch('builtins.print', side_effect=BrokenPipeError('diagnostic sink') if isinstance(cancellation, KeyboardInterrupt) else None) as reported:
                 with self.assertRaises(type(cancellation)) as caught:
                     module.execute(['private mock'], Path('/unused/output'), {}, bound=1)
             self.assertIs(caught.exception, cancellation)
@@ -703,7 +704,7 @@ class ProducerResults(MockedProcesses):
             with patch.object(module, 'cleanup_module', return_value=canonical), \
                  patch.object(module.subprocess, 'Popen', return_value=proc), \
                  patch.object(module.signal, 'signal', return_value=signal.SIG_DFL), \
-                 patch('builtins.open', return_value=context), patch('builtins.print', side_effect=BrokenPipeError('diagnostic sink') if isinstance(cancellation, KeyboardInterrupt) else None) as reported:
+                 patch.object(module, 'open', create=True, return_value=context), patch('builtins.print', side_effect=BrokenPipeError('diagnostic sink') if isinstance(cancellation, KeyboardInterrupt) else None) as reported:
                 with self.assertRaises(type(cancellation)) as caught:
                     module.execute(['private mock'], Path('/unused/output'), {}, bound=1)
             self.assertIs(caught.exception, cancellation)
@@ -712,6 +713,51 @@ class ProducerResults(MockedProcesses):
             log.close.assert_called_once()
             context.__exit__.assert_not_called()
             self.assertIn('output close failure', reported.call_args[0][0])
+
+    def test_another_threads_open_meets_no_mocked_output(self):
+        # The flake (train-11, 2026-10-20): these tests patched the output's
+        # `open` in `builtins`, so every thread's `open` met the mock while one
+        # ran, and the memory bound's watcher, which reads /proc in a `with`,
+        # called the mock's `__exit__` now and then: the test above failed so
+        # once in a whole local run at load 110 and once on GitHub. Patched on
+        # the module alone, another thread's `open` is the real one whenever
+        # it runs: here a thread opens a file while execute's output is the
+        # mock, each step waiting on an event, never a timer (a wait's bound
+        # only fails the test).
+        proc, identity = Mock(), Mock()
+        inside, opened = threading.Event(), threading.Event()
+        seen = []
+
+        def reader():
+            inside.wait(60)
+            with open(os.devnull, 'rb') as handle:
+                seen.append(handle)
+            opened.set()
+
+        def waiting(**_kwargs):
+            inside.set()
+            if not opened.wait(60):
+                raise AssertionError('the other thread never opened its file')
+            return 0
+
+        proc.wait.side_effect = waiting
+        module, canonical, owner, log, context = self.execution(proc, identity)
+        other = threading.Thread(target=reader)
+        other.start()
+        try:
+            with patch.object(module, 'cleanup_module', return_value=canonical), \
+                 patch.object(module.subprocess, 'Popen', return_value=proc), \
+                 patch.object(module.signal, 'signal'), \
+                 patch.object(module, 'open', create=True, return_value=context):
+                self.assertEqual(module.execute(['private mock'], Path('/unused/output'), {}, bound=1), 0)
+        finally:
+            inside.set()
+            other.join(60)
+        self.assertEqual(len(seen), 1)
+        self.assertIsNot(seen[0], context)
+        self.assertTrue(seen[0].closed)
+        context.__exit__.assert_not_called()
+        log.close.assert_called_once()
 
     def test_campaign_restores_source_and_launches_no_next_control_after_cancel(self):
         module, _canonical, _owner, _log, _context = self.execution(Mock(), Mock())
@@ -754,7 +800,7 @@ class ProducerResults(MockedProcesses):
         canonical.pin.side_effect = pin
         with patch.object(module, 'cleanup_module', return_value=canonical), \
              patch.object(module.subprocess, 'Popen', return_value=proc), \
-             patch.object(module.signal, 'signal'), patch('builtins.open', return_value=context):
+             patch.object(module.signal, 'signal'), patch.object(module, 'open', create=True, return_value=context):
             self.assertEqual(module.execute(['private mock'], Path('/unused/output'), {}, bound=1), 0)
         self.assertEqual(events, ['pin', 'wait'])
         owner.stop.assert_not_called()
@@ -765,7 +811,7 @@ class ProducerResults(MockedProcesses):
         module, canonical, owner, _log, context = self.execution(proc, None)
         with patch.object(module, 'cleanup_module', return_value=canonical), \
              patch.object(module.subprocess, 'Popen', return_value=proc), \
-             patch.object(module.signal, 'signal'), patch('builtins.open', return_value=context):
+             patch.object(module.signal, 'signal'), patch.object(module, 'open', create=True, return_value=context):
             with self.assertRaisesRegex(RuntimeError, 'cannot pin'):
                 module.execute(['private mock'], Path('/unused/output'), {}, bound=1)
         owner.stop.assert_called_once()
@@ -808,7 +854,7 @@ class ProducerResults(MockedProcesses):
             module, canonical, owner, log, context, callbacks, released, handler = values
             with patch.object(module, 'cleanup_module', return_value=canonical), \
                  patch.object(module.subprocess, 'Popen', return_value=proc), \
-                 patch.object(module.signal, 'signal', side_effect=handler), patch('builtins.open', return_value=context):
+                 patch.object(module.signal, 'signal', side_effect=handler), patch.object(module, 'open', create=True, return_value=context):
                 with self.assertRaises(SystemExit) as caught:
                     module.execute(['private mock'], Path('/unused/output'), {}, bound=1)
             self.assertEqual(caught.exception.code, 1)
@@ -829,7 +875,7 @@ class ProducerResults(MockedProcesses):
             return value
         with patch.object(module, 'cleanup_module', return_value=canonical), \
              patch.object(module.subprocess, 'Popen', return_value=proc), \
-             patch.object(module.signal, 'signal', side_effect=restored), patch('builtins.open', return_value=context):
+             patch.object(module.signal, 'signal', side_effect=restored), patch.object(module, 'open', create=True, return_value=context):
             with self.assertRaises(KeyboardInterrupt) as caught:
                 module.execute(['private mock'], Path('/unused/output'), {}, bound=1)
         self.assertIs(caught.exception, first)
@@ -844,7 +890,7 @@ class ProducerResults(MockedProcesses):
         log.close.side_effect = first
         with patch.object(module, 'cleanup_module', return_value=canonical), \
              patch.object(module.subprocess, 'Popen', return_value=proc), \
-             patch.object(module.signal, 'signal', side_effect=handler), patch('builtins.open', return_value=context):
+             patch.object(module.signal, 'signal', side_effect=handler), patch.object(module, 'open', create=True, return_value=context):
             with self.assertRaises(KeyboardInterrupt) as caught:
                 module.execute(['private mock'], Path('/unused/output'), {}, bound=1)
         self.assertIs(caught.exception, first)
@@ -859,7 +905,7 @@ class ProducerResults(MockedProcesses):
         module, canonical, owner, log, context, callbacks, released, handler = values
         with patch.object(module, 'cleanup_module', return_value=canonical), \
              patch.object(module.subprocess, 'Popen', return_value=proc), \
-             patch.object(module.signal, 'signal', side_effect=handler), patch('builtins.open', return_value=context):
+             patch.object(module.signal, 'signal', side_effect=handler), patch.object(module, 'open', create=True, return_value=context):
             with self.assertRaises(SystemExit) as caught:
                 module.execute(['private mock'], Path('/unused/output'), {}, bound=1)
         self.assertIs(caught.exception, primary)
@@ -876,7 +922,7 @@ class ProducerResults(MockedProcesses):
         with patch.object(module, 'cleanup_module', return_value=canonical), \
              patch.object(module.subprocess, 'Popen', return_value=proc), \
              patch.object(module.signal, 'signal', side_effect=handler), \
-             patch('builtins.open', return_value=context), patch('builtins.print') as reported:
+             patch.object(module, 'open', create=True, return_value=context), patch('builtins.print') as reported:
             with self.assertRaises(SystemExit):
                 module.execute(['private mock'], Path('/unused/output'), {}, bound=1)
         self.assertIn('primary timeout', reported.call_args[0][0])
@@ -901,7 +947,7 @@ class ProducerResults(MockedProcesses):
              patch.object(module, 'run_tests', side_effect=run), \
              patch.object(module, 'cleanup_module', return_value=canonical), \
              patch.object(module.subprocess, 'Popen', return_value=proc) as launched, \
-             patch.object(module.signal, 'signal', side_effect=handler), patch('builtins.open', return_value=context):
+             patch.object(module.signal, 'signal', side_effect=handler), patch.object(module, 'open', create=True, return_value=context):
             with self.assertRaises(SystemExit):
                 module.main()
         self.assertEqual(len(calls), 2)

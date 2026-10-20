@@ -21,10 +21,12 @@ The source is restored after every mutant, whatever happens.
 
 import os
 import pathlib
-import re
 import signal
 import subprocess
 import sys
+
+import cargo_test_results
+import mutation_source
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CHECK = ROOT / "compiler/pw-core/src/check.rs"
@@ -71,7 +73,7 @@ MUTANTS = [
     (
         "the contract reads the keywords alone",
         CONTRACT,
-        "                    .join(&reads.holds(def)),\n",
+        "                    .join(&privacy.holds(def)),\n",
         ",\n",
     ),
     (
@@ -97,23 +99,32 @@ def run_tests():
         TESTS, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
         start_new_session=True,
     )
+    stopped = False
     try:
         out, _ = p.communicate(timeout=BOUND)
     except subprocess.TimeoutExpired:
         os.killpg(p.pid, signal.SIGKILL)
         out, _ = p.communicate()
-    results = re.findall(r"test result: \w+\. (\d+) passed; (\d+) failed", out)
-    if not results:
+        stopped = True
+    result = cargo_test_results.parse(p.returncode, out)
+    valid = not stopped and result.valid
+    if not valid:
         return False, 0, 0
-    return True, sum(int(a) for a, _ in results), sum(int(b) for _, b in results)
+    return True, result.passed, result.failed
+
+
+def observed_tests(watch):
+    built, passed, failed = run_tests()
+    return built and not (watch is not None and watch.stopped), passed, failed
 
 
 def main():
     import mutation_baseline  # keeps what each command says, for a red baseline
+    watch = mutation_baseline.mutation_bound.start()
     # Stopped from outside, the source is still restored: a stop is an
     # exception here, which the `finally` below meets.
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
-    built, passed, failed = run_tests()
+    built, passed, failed = observed_tests(watch)
     print(f"baseline: {passed} passed, {failed} failed", flush=True)
     if not built or failed or not passed:
         print("FAIL: the unmutated baseline is not green; no mutant can mean anything")
@@ -127,14 +138,13 @@ def main():
             print(f"{what}: ANCHOR NOT FOUND EXACTLY ONCE in {path.name}")
             survivors += 1
             continue
-        try:
-            path.write_text(original.replace(anchor, replacement, 1))
-            built, passed, failed = run_tests()
-        finally:
-            path.write_text(original)
+        with mutation_source.changed(path, original, original.replace(anchor, replacement, 1)):
+            built, passed, failed = observed_tests(watch)
         if not built:
-            verdict = "KILLED (does not build)"
-        elif failed:
+            print(f"{what}: INVALID RESULT (campaign fails; not a kill)", flush=True)
+            mutation_baseline.explain()
+            return 1
+        if failed:
             verdict = f"KILLED ({failed} of {passed + failed} tests fail)"
         else:
             verdict = "SURVIVED"

@@ -291,7 +291,7 @@ fn time_check(
 ) -> Cost {
     sample(enough, || {
         let (start, start_cpu) = (Instant::now(), thread_cpu());
-        let results = pw_core::check::check_sources(files);
+        let results = pw_core::check::check_program_sources(files);
         // Consume the result, so nothing above can be optimized away and the
         // measurement is of work that actually happened.
         let n: usize = results.iter().map(|(_, d)| d.len()).sum();

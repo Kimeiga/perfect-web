@@ -211,14 +211,14 @@ class ActualProducers(unittest.TestCase):
                 'suite=loader.discover("scripts/tests",pattern="test_mutation_slot*.py"); '
                 'suite.addTests(loader.loadTestsFromName("scripts.tests.test_unittest_producer")); '
                 'result=unittest.TextTestRunner(verbosity=1).run(suite); '
-                'assert result.testsRun==164 and len(result.skipped)==81, (result.testsRun,len(result.skipped)); '
-                'assert result.testsRun-len(result.skipped)==83; '
-                'print("ordinary discovery: 164 methods, 83 passed, 81 explicit Linux skips"); '
+                'assert result.testsRun==165 and len(result.skipped)==81, (result.testsRun,len(result.skipped)); '
+                'assert result.testsRun-len(result.skipped)==84; '
+                'print("ordinary discovery: 165 methods, 84 passed, 81 explicit Linux skips"); '
                 'sys.exit(0 if result.wasSuccessful() else 1)')
         output = self.folder / 'nonlinux-discovery.txt'
         status = harness.execute([sys.executable, '-B', '-c', code], output, self.env, bound=30)
         self.assertEqual(status, 0, output.read_text())
-        self.assertIn('83 passed, 81 explicit Linux skips', output.read_text())
+        self.assertIn('84 passed, 81 explicit Linux skips', output.read_text())
 
     def test_preexisting_report_is_never_reused(self):
         report = self.folder / 'report.json'; report.write_text('old bytes')
@@ -553,9 +553,15 @@ atexit.register(verify)
         self.assertTrue(any('unmatched captured exception' in reason for reason in __import__('json').loads(text)['refusals']))
 
     def test_suppressed_subtest_exception_without_callback_is_refused(self):
-        source = ('class Filter(list):\n def append(self,item):\n'
-                  '  if not isinstance(item[0],unittest.case._SubTest): super().append(item)\n'
-                  'class Case(unittest.TestCase):\n def setUp(self): self._outcome.errors=Filter(self._outcome.errors)\n'
+        # The subtest's failure is kept from the result's `addSubTest`, which
+        # every Python's unittest calls with it: 3.10 from `_Outcome.errors`,
+        # 3.11 and later from the part executor (they have no `errors`, so a
+        # filter of it, as this fixture was until train-11, raised in setUp on
+        # CI's Python 3.12 and was refused for that instead).
+        source = ('class Case(unittest.TestCase):\n def setUp(self):\n  result=self._outcome.result\n'
+                  '  add=result.addSubTest\n'
+                  '  def suppressed(test,subtest,err):\n   if err is None: add(test,subtest,err)\n'
+                  '  result.addSubTest=suppressed\n'
                   ' def test_body(self):\n  with self.subTest(): self.fail("suppressed subtest")\n  self.fail("body")\n')
         result, status, text, log = self.direct_fixture(source)
         self.assertEqual(result, (False, 0, 0), log.read_text())

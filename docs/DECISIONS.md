@@ -3123,3 +3123,16 @@ train-11).
 - `llvm-profdata` is found through the toolchain's sysroot (`llvm-tools` in
   `rust-toolchain.toml`); a target that covers no region fails the run;
   `e14-fuzz-floor` records E9C's evidence.
+[ADR-0361](DECISIONS/ADR-0361-check-is-build.md):
+check and build validate one executable program (track `check-is-build`;
+train-11).
+- `pw check` and `pw build` share one complete validation, the backends a
+  build runs, D1 tables composed in; the accepted corpus's four backend gaps
+  are refused by both (PW6601); the check's cost is held to the unchanged
+  800 ms ceiling by its fastest of seven or more runs.
+[ADR-0362](DECISIONS/ADR-0362-guide-producer-validity.md):
+guide mutation kills require valid producer outcomes (track
+`guide-producer-validity`; train-11).
+- The guide's Cargo, Python and browser producers are each validated before
+  a mutant counts as killed; an empty, inconsistent or stopped result is
+  refused, not a kill.
