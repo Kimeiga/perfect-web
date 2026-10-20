@@ -646,3 +646,94 @@ fn a_value_computed_from_the_devices_inside_a_hosts_block_is_refused_by_name() {
     );
     assert_eq!(refusals(&top), "", "{top}");
 }
+
+/// **Decision 7 lifts two refusals of ruling 0073-a for the browser's values
+/// alone** (the integrator's ruling 3 on this track, 2026-10-20): a value
+/// computed from several values, and a value computed inside a block a signal
+/// decides, a block's computed `{#each}` list among them. Each still fires,
+/// in the words it has always used, where a value a host holds is read: a
+/// query's, beside the value the device keeps or alone. And each is built
+/// from the browser's values alone, below. The ADR names each refusal, its
+/// reason and these cases.
+#[test]
+fn a_value_a_host_holds_is_still_refused_where_decision_7_lifts_the_refusals() {
+    let rest = "public query Likes() -> Int !{} {\n    3\n}\n\n\
+        public query More() -> Int !{} {\n    4\n}\n\n\
+        public query Pinned() -> List<Note> !{} {\n    []\n}\n\n\
+        fn total(notes: List<Note>, likes: Int) -> Int !{} {\n    List.length(notes) + likes\n}\n\n\
+        fn sum(likes: Int, more: Int) -> Int !{} {\n    likes + more\n}\n\n\
+        fn plus_one(likes: Int) -> Int !{} {\n    likes + 1\n}\n\n\
+        fn merged(notes: List<Note>, pinned: List<Note>) -> List<Note> !{} {\n    List.concat(notes, pinned)\n}\n\n\
+        fn only(pinned: List<Note>) -> List<Note> !{} {\n    pinned\n}\n\n\
+        fn left(notes: List<Note>, shown: String) -> Int !{} {\n    List.length(visible(notes, shown))\n}\n\n\
+        fn visible(notes: List<Note>, shown: String) -> List<Note> !{} {\n    if shown == \"all\" {\n        notes\n    } else {\n        []\n    }\n}";
+    // The queries' values are a host's: the page is rendered with them.
+    let signals = "signal shown: String = \"all\"\n    let likes = query Likes()\n    let more = query More()\n    let pinned = query Pinned()";
+    // A block the device's value decides, which the browser renders again.
+    let decides = "{#if List.length(notes) > 0}";
+    let several = |names: &str| {
+        format!(
+            "computes a value from {names}, and a host computes one from one value (ruling 0073-a)"
+        )
+    };
+    let inside = "computes a value inside a block a signal decides, and the browser, which \
+                  renders that block again, computes none yet (ruling 0073-a)";
+    let cases: Vec<(String, String)> = vec![
+        // From several values, a host's among them.
+        (
+            "<p id=\"total\">{total(notes, likes)}</p>".to_string(),
+            several("`notes` and `likes`"),
+        ),
+        (
+            "<p id=\"total\">{sum(likes, more)}</p>".to_string(),
+            several("`likes` and `more`"),
+        ),
+        // Inside a block a signal decides, from a host's value.
+        (
+            [decides, "<p id=\"total\">{total(notes, likes)}</p>{/if}"].concat(),
+            inside.to_string(),
+        ),
+        (
+            [decides, "<p id=\"total\">{plus_one(likes)}</p>{/if}"].concat(),
+            inside.to_string(),
+        ),
+        // And the list such a block reads.
+        (
+            [
+                decides,
+                "<ul>{#each merged(notes, pinned) as n (n.id)}<li>{n.text}</li>{/each}</ul>{/if}",
+            ]
+            .concat(),
+            "`{#each}` reads its list by path, and `merged(notes, pinned)` is computed".to_string(),
+        ),
+        (
+            [
+                decides,
+                "<ul>{#each only(pinned) as n (n.id)}<li>{n.text}</li>{/each}</ul>{/if}",
+            ]
+            .concat(),
+            "`{#each}` reads its list by path, and `only(pinned)` is computed".to_string(),
+        ),
+    ];
+    for (markup, why) in &cases {
+        let src = program(KEPT, signals, markup, rest);
+        clean(&src);
+        let said = refusals(&src);
+        assert!(said.contains(why.as_str()), "{markup}: {said}");
+    }
+    // The controls: each shape from the browser's values alone builds.
+    let signals = "signal shown: String = \"all\"";
+    for markup in [
+        "<p id=\"left\">{left(notes, shown)}</p>".to_string(),
+        [decides, "<p id=\"left\">{left(notes, shown)}</p>{/if}"].concat(),
+        [
+            decides,
+            "<ul>{#each visible(notes, shown) as n (n.id)}<li>{n.text}</li>{/each}</ul>{/if}",
+        ]
+        .concat(),
+    ] {
+        let src = program(KEPT, signals, &markup, rest);
+        clean(&src);
+        assert_eq!(refusals(&src), "", "{markup}");
+    }
+}

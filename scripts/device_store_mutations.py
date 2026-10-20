@@ -305,6 +305,31 @@ MUTANTS = [
         "        for (i, (_, input)) in f.params.iter().enumerate() {\n",
         "        for (i, (_, input)) in f.params.iter().enumerate().take(1) {\n",
     ),
+    # --- what decision 7 lifts, for the browser's values alone (the
+    # integrator's ruling 3, 2026-10-20): each refusal it lifts still fires
+    # where a host's value is read, held by
+    # `a_value_a_host_holds_is_still_refused_where_decision_7_lifts_the_refusals`.
+    (
+        "a value from a browser value and a host's together is built as the browser's",
+        "core",
+        PLAN,
+        "            .all(|(_, read)| signals.iter().any(|s| *s == root_of(read)));\n",
+        "            .any(|(_, read)| signals.iter().any(|s| *s == root_of(read)));\n",
+    ),
+    (
+        "a value a host computes inside a block a signal decides is let through",
+        "core",
+        PLAN,
+        "                    .any(|v| v.starts_with('#') && !computed.contains_key(v))\n",
+        "                    .any(|v| v.starts_with('#') && false)\n",
+    ),
+    (
+        "a list computed from a host's value is built as the browser's",
+        "core",
+        TEMPLATE,
+        "            && (browsers.is_empty() || !browsers.iter().all(|(name, _)| ctx.signals.contains(name)))\n",
+        "            && browsers.is_empty()\n",
+    ),
     # --- the host -------------------------------------------------------------
     (
         "the root does not say it is reading the device",
