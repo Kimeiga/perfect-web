@@ -4,7 +4,7 @@ Pleris is built by many parallel agent sessions under a strict process, and the
 project has grown a private dialect on top of an unfamiliar language. This page
 is the bridge. For each word it says what the word means *in this project*, the
 standard software-engineering term if there is one (marked ≈), and where it is
-defined. Checked against `master` at `39e953eb` (train-10 landed, 2026-10-20).
+defined. Checked against `master` at `115895de` (train-11 landed, 2026-10-20).
 
 ## Start here
 
@@ -141,7 +141,7 @@ branch, and the entry should gain a link when the ADR is numbered.
 *Project term.* ≈ foreign function declaration / WIT import. A function with no body bound to an operation the host provides: `fn load(id: Int) -> Store !{ database.read<Store> } host "shop:data/stores#get"`. The string is `namespace:package/interface#operation` in WIT's identifier rules; the effect row is the operation's contract. [ADR-0262], [guide: host bindings].
 
 ### host map
-*Project term.* ≈ test-fixture dependency map. Not on master (track `browser-host-map`). A registry of which development-server hosts each browser spec needs, so a Playwright run starts only the hosts its selected tests need instead of all of them; without it `e14-refusal` outgrew a CI job's time limit. [KNOWN_LIMITATIONS.md] ("the browser host map (train-11)").
+*Project term.* ≈ test-fixture dependency map. A registry of which development-server hosts each browser spec needs, so a Playwright run starts only the hosts its selected tests need instead of all of them; without it `e14-refusal` outgrew a CI job's time limit. [ADR-0356](DECISIONS/ADR-0356-browser-host-map.md).
 
 ### ID prefixes
 *Project term.* `A-nnn`, `R-nnn`: accepted and rejected corpus fixtures. `E<n>`, `P<n>`, `RQ-<n>`: milestones, public proofs, risk experiments. `R<n>`: charter risks. `T01`..`T12`: benchmark tasks. `W<n>`: workers. `C1`..: corpus versions. `D0`..`D5` are two unrelated schemes: ADR-0338's data-layer steps (D1 tables, D2 memory adapter) and ADR-0339's document-app steps (D1 replicated text, D2 device store). [ADR-0338], [ADR-0339].
@@ -243,7 +243,7 @@ branch, and the entry should gain a link when the ADR is numbered.
 *Standard, used narrowly here.* A program in `examples/rejected/` (`R-nnn-*.pw`) that must be refused. Its header `// @rule: PWnnnn` names the code `pw check` reports, and it must be refused for that rule only (a wrong-reason catch fails the corpus). [CORPUS.md], [ADR-0344].
 
 ### render merge
-*Project term.* ≈ request-scoped read de-duplication (DataLoader per request). Not on master (track `render-merge`). One snapshot per page render: its host calls run in one read transaction and each identical call is made once. Host-side only; no program changes. [ADR-0337], [ARCHITECTURE.md].
+*Project term.* ≈ request-scoped read de-duplication (DataLoader per request). One snapshot per page render: its host calls run in one read transaction and each identical call is made once. Host-side only; no program changes. [ADR-0354](DECISIONS/ADR-0354-a-render-reads-each-call-once.md).
 
 ### requires
 *Project term (keyword).* ≈ precondition / authorization check. A `command` clause naming a [predicate](#predicate) the server checks before the body runs: `requires SignedIn`. A refusal is answered 403 and the page shows the predicate's words where the button was. [guide: commands], [ADR-0302].
@@ -273,7 +273,7 @@ branch, and the entry should gain a link when the ADR is numbered.
 *Standard (Solid, Svelte), used narrowly here.* Ephemeral local UI state, written by handlers and read where the browser reads it again, with no server round trip. [ADR-0130], [guide: signals].
 
 ### slots
-*Project term.* Three senses. (1) *Mutation slots* (not on master, track `parallel-mutants`): `PW_MUTANT_SLOTS=N` runs a script's mutants in N parallel copies of the tree, each with its own cargo target, ports and temp directory. (2) *Worker slots*: how many [workers](#worker) run at once, bounded by disk and usage. (3) A layout's `<slot />`. [PARALLEL.md], [guide: layouts].
+*Project term.* Three senses. (1) *Mutation slots* ([ADR-0357](DECISIONS/ADR-0357-mutants-run-in-parallel-slots.md)): `PW_MUTANT_SLOTS=N` runs a script's mutants in N parallel copies of the tree, each with its own cargo target, ports and temp directory. (2) *Worker slots*: how many [workers](#worker) run at once, bounded by disk and usage. (3) A layout's `<slot />`. [PARALLEL.md], [guide: layouts].
 
 ### source
 *Project term.* ≈ a declared consistency contract for a data store. A `source` declaration states what the database behind some types guarantees (`holds`, `transactions`, `reads`, `changes`, `sets`). Not a source file. [ADR-0207], [guide: sources].

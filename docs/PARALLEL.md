@@ -84,15 +84,16 @@ rulings below.
 - **A worker never edits the four status documents.** What it would write
   there goes in its ADR: what was done, what is claimed and not, and what to
   do next.
-- **Rebase on `master` before pushing**, and push only the track's branch:
-  never `master`, never another branch, no release, no PR unless the owner
-  asks for one.
+- **Merge current `origin/master` before publishing a track**; never rebase a
+  pushed branch. Push only the assigned track or its `wip/` branch, after the
+  gates below. Workers never push `master` or another track; releases and
+  PRs require the owner's authorization.
 - **Every push is checked**: `ci` runs on every branch, and `verify` runs on
   a track's branch the recipes its commits changed since `master`
   (`scripts/ci_plan.py --changed <merge base> <head>`, ADR-0253). A track is
   ready to merge when both are green at its head.
 - **A merge is small**: the integrator merges a track when a piece of it is
-  done and green, rebasing it onto `master`, numbering its ADRs, writing the
+  done and green, merging current `master`, numbering its ADRs, writing the
   status documents, and running the chain.
 
 ## The integrator's working rules
@@ -101,9 +102,13 @@ Each learned from a correction logged below, and written here on
 2026-10-14, when the work moved to another machine, so that no machine's
 session notes alone keep them:
 
-- **Push only on green**: `just ci > log 2>&1 && git push`, never `;` (a
-  `;` pushed a red track on 2026-10-12). A gate in a `&&` chain is never
-  piped: `gate | tail && commit` commits on a failed gate.
+- **Publish a track or `master` only on green at that exact commit**:
+  `just ci > log 2>&1 && git push`, or a successful GitHub `ci` at that SHA.
+  Work in progress may go to the assigned `wip/<track>` to obtain hosted
+  checks; expensive verification belongs on GitHub (owner, 2026-10-20).
+  Never use `;` between a gate and a push (a `;` pushed a red track on
+  2026-10-12). A gate in a `&&` chain is never piped: `gate | tail && commit`
+  commits on a failed gate. Wait for required verification before merging.
 - **Merge, resolve, fetch, then number** (ADR-0281's fourth rule):
   numbering an ADR rewrites lines that recipes read.
 - **Run whole each mutation script whose code or tests a change reaches**:
