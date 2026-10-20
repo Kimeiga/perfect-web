@@ -58,11 +58,33 @@
 //!
 //! Exit status: 0 clean, 1 a finding, 2 the run measured nothing (or was
 //! called wrongly).
+//!
+//! # A campaign
+//!
+//! ```text
+//! pw-fuzz [--iterations N] [--seconds S] [--hang S] [--only TARGET[,TARGET...]]
+//! ```
+//!
+//! `--iterations` and `--seconds` bound each target: the first one reached
+//! ends it, and one input always runs. `--only` runs the named targets alone,
+//! so that a process for each can run side by side.
+//!
+//! While it runs, each target says on stderr where it has got to every 30
+//! seconds (executions, covered regions, findings, executions a second), and
+//! each finding as it is found, with the file the input was saved in:
+//! `target/fuzz/<target>/finding-<n>.bin`, which
+//! `pw-fuzz-harness <target> <file>` runs again. A finding is a panic, an abort,
+//! or an input still running after `--hang` seconds (60; a hang, and the
+//! process is killed). The same failure at the same place is one finding,
+//! however many inputs reach it.
 
 use std::collections::BTreeSet;
 use std::ffi::{OsStr, OsString};
+use std::fs::File;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
 
 #[cfg(test)]
 mod tests;
@@ -74,9 +96,17 @@ const PROFDATA: &str = "llvm-profdata";
 /// is not the one wanted.
 const BIN_DIR_ENV: &str = "PW_LLVM_BIN_DIR";
 
-const USAGE: &str = "usage: pw-fuzz [--iterations N]";
+/// An input still running after this is a finding: a hang.
+const HANG: Duration = Duration::from_secs(60);
+
+/// How often a target says where it has got to.
+const SAY_EVERY: Duration = Duration::from_secs(30);
+
+const USAGE: &str =
+    "usage: pw-fuzz [--iterations N] [--seconds S] [--hang S] [--only TARGET[,TARGET...]]";
 
 /// One fuzz target: a name, and the harness binary that runs one input.
+#[derive(Debug)]
 struct Target {
     name: &'static str,
     /// Seeds, from the deployment matrix and the corpus.
@@ -108,20 +138,38 @@ fn main() {
 struct Options {
     /// Executions per target.
     iterations: usize,
+    /// Wall-clock seconds per target, as well: a target's run ends at
+    /// whichever comes first.
+    seconds: Option<u64>,
+    /// Seconds an input may run before it is a finding: a hang.
+    hang: Option<u64>,
+    /// The targets to run; all of them when empty.
+    only: Vec<String>,
 }
 
 fn options(args: &[String]) -> Result<Options, String> {
-    let mut options = Options { iterations: 2000 };
+    let mut options = Options {
+        iterations: 2000,
+        seconds: None,
+        hang: None,
+        only: Vec::new(),
+    };
     let mut args = args.iter();
     while let Some(flag) = args.next() {
+        let mut value = |wants: &str| {
+            args.next()
+                .map(String::as_str)
+                .ok_or_else(|| format!("{flag} wants {wants}\n{USAGE}"))
+        };
         match flag.as_str() {
-            "--iterations" => {
-                let value = args
-                    .next()
-                    .ok_or_else(|| format!("{flag} wants a count\n{USAGE}"))?;
-                options.iterations = value
-                    .parse()
-                    .map_err(|_| format!("{flag} wants a whole number, not {value:?}\n{USAGE}"))?;
+            "--iterations" => options.iterations = whole(flag, value("a count")?)?,
+            "--seconds" => options.seconds = Some(whole(flag, value("a number of seconds")?)?),
+            "--hang" => options.hang = Some(whole(flag, value("a number of seconds")?)?),
+            "--only" => {
+                options.only = value("target names, separated by commas")?
+                    .split(',')
+                    .map(String::from)
+                    .collect();
             }
             other => return Err(format!("unknown argument {other:?}\n{USAGE}")),
         }
@@ -129,9 +177,16 @@ fn options(args: &[String]) -> Result<Options, String> {
     Ok(options)
 }
 
+/// A whole number, or an error naming the `flag` that wanted it.
+fn whole<T: std::str::FromStr>(flag: &str, text: &str) -> Result<T, String> {
+    text.parse()
+        .map_err(|_| format!("{flag} wants a whole number, not {text:?}\n{USAGE}"))
+}
+
 fn run(args: &[String]) -> Result<i32, String> {
     let options = options(args)?;
     let root = repo_root();
+    let targets = chosen(targets(&root), &options.only)?;
 
     // Before anything slow is built: can the coverage be read at all?
     let profdata = llvm_tool(&root, PROFDATA)?;
@@ -141,16 +196,68 @@ fn run(args: &[String]) -> Result<i32, String> {
 
     // Build the instrumented harness once. Every target runs through it, with
     // the target name as its first argument.
-    eprintln!("building the instrumented harness...");
+    say("building the instrumented harness...");
     let harness = build_instrumented(&root, &work);
 
     campaign(
         &harness,
         &work,
-        &targets(&root),
+        &targets,
         &profdata,
-        options.iterations,
+        &limits_of(&options),
+        &mut say,
     )
+}
+
+/// What ends a target's run, as the command line asked.
+fn limits_of(options: &Options) -> Limits {
+    Limits {
+        execs: options.iterations,
+        time: options.seconds.map(Duration::from_secs),
+        hang: options.hang.map_or(HANG, Duration::from_secs),
+        say_every: SAY_EVERY,
+    }
+}
+
+/// The targets named, or all of them when none is.
+fn chosen(all: Vec<Target>, only: &[String]) -> Result<Vec<Target>, String> {
+    if only.is_empty() {
+        return Ok(all);
+    }
+    if let Some(unknown) = only
+        .iter()
+        .find(|n| !all.iter().any(|t| t.name == n.as_str()))
+    {
+        let known: Vec<&str> = all.iter().map(|t| t.name).collect();
+        return Err(format!(
+            "no target {unknown:?}; the targets are {}\n{USAGE}",
+            known.join(", ")
+        ));
+    }
+    Ok(all
+        .into_iter()
+        .filter(|t| only.iter().any(|n| n == t.name))
+        .collect())
+}
+
+/// One line on stderr, written whole: processes appending to one log do not
+/// split each other's lines.
+fn say(line: &str) {
+    let mut bytes = line.as_bytes().to_vec();
+    bytes.push(b'\n');
+    let _ = std::io::stderr().write_all(&bytes);
+}
+
+/// What ends a target's run, and how it reports on the way.
+struct Limits {
+    /// Executions.
+    execs: usize,
+    /// Wall-clock time. One input always runs, whatever this is.
+    time: Option<Duration>,
+    /// An input still running after this is a finding: a hang.
+    hang: Duration,
+    /// How often a target says where it has got to.
+    say_every: Duration,
 }
 
 /// Fuzz every target, print the report, and say how the process should end:
@@ -160,12 +267,13 @@ fn campaign(
     work: &Path,
     targets: &[Target],
     profdata: &Path,
-    budget: usize,
+    limits: &Limits,
+    say: &mut dyn FnMut(&str),
 ) -> Result<i32, String> {
     let mut report = String::new();
     let mut outcomes = Vec::new();
     for t in targets {
-        let outcome = fuzz_one(harness, work, t, profdata, budget)?;
+        let outcome = fuzz_one(harness, work, t, profdata, limits, say)?;
         report.push_str(&format!(
             "  {:28} {:>7} execs  {:>6} covered regions  {} finding(s)\n",
             t.name,
@@ -310,7 +418,8 @@ fn fuzz_one(
     work: &Path,
     target: &Target,
     profdata: &Path,
-    budget: usize,
+    limits: &Limits,
+    say: &mut dyn FnMut(&str),
 ) -> Result<Outcome, String> {
     let dir = work.join(target.name);
     let _ = std::fs::remove_dir_all(&dir);
@@ -322,14 +431,37 @@ fn fuzz_one(
         target.seeds.clone()
     };
     let mut seen_regions: BTreeSet<u64> = BTreeSet::new();
-    let mut findings = Vec::new();
+    let mut findings: Vec<String> = Vec::new();
+    // What failed and where, not the input that showed it: one panic reached
+    // by a thousand inputs of as many lengths is one finding.
+    let mut failures: BTreeSet<String> = BTreeSet::new();
     let mut rng = Rng(0x5EED_1234);
     let mut execs = 0usize;
+    let began = Instant::now();
+    let mut said = began;
+    let stderr = dir.join("stderr.txt");
 
     // Every seed first, so the corpus starts from known-interesting inputs.
     let mut queue: Vec<Vec<u8>> = corpus.clone();
+    say(&format!(
+        "[{}] starting with {} seed(s)",
+        target.name,
+        queue.len()
+    ));
 
-    while execs < budget {
+    while execs < limits.execs && (execs == 0 || limits.time.is_none_or(|t| began.elapsed() < t)) {
+        if said.elapsed() >= limits.say_every {
+            let line = progress(
+                target.name,
+                execs,
+                seen_regions.len(),
+                findings.len(),
+                began.elapsed(),
+            );
+            say(&line);
+            said = Instant::now();
+        }
+
         let input = match queue.pop() {
             Some(i) => i,
             None => {
@@ -344,31 +476,29 @@ fn fuzz_one(
         std::fs::write(&input_path, &input)
             .map_err(|e| format!("cannot write {}: {e}", input_path.display()))?;
 
-        let out = Command::new(harness)
-            .arg(target.name)
-            .arg(&input_path)
-            .env("LLVM_PROFILE_FILE", &profraw)
-            .output()
-            .map_err(|e| format!("cannot run {}: {e}", harness.display()))?;
-
-        // A crash is a finding. The harness returns 101 for a panic it caught
-        // and reported; anything else non-zero is an uncaught abort.
-        if !out.status.success() {
-            let why = String::from_utf8_lossy(&out.stderr);
-            let finding = format!(
-                "{} on {} bytes: {}",
-                if out.status.code() == Some(101) {
-                    "panic"
-                } else {
-                    "abort"
-                },
-                input.len(),
-                why.lines().next().unwrap_or("<no message>")
-            );
-            if !findings.contains(&finding) {
+        let run = Run {
+            harness,
+            target: target.name,
+            input: &input_path,
+            profraw: &profraw,
+            stderr: &stderr,
+            hang: limits.hang,
+        };
+        if let Some(failure) = run_input(&run)? {
+            // The profile of a run that did not survive is of no use, and a
+            // campaign that fails often would fill the disk with them.
+            let _ = std::fs::remove_file(&profraw);
+            if failures.insert(format!("{}: {}", failure.kind, failure.why)) {
                 let saved = dir.join(format!("finding-{}.bin", findings.len()));
                 std::fs::write(&saved, &input)
                     .map_err(|e| format!("cannot save {}: {e}", saved.display()))?;
+                let finding = format!("{} on {} bytes: {}", failure.kind, input.len(), failure.why);
+                let line = format!(
+                    "FINDING [{}] {finding} (saved: {})",
+                    target.name,
+                    saved.display()
+                );
+                say(&line);
                 findings.push(finding);
             }
             continue;
@@ -390,11 +520,103 @@ fn fuzz_one(
         }
     }
 
+    let line = progress(
+        target.name,
+        execs,
+        seen_regions.len(),
+        findings.len(),
+        began.elapsed(),
+    );
+    say(&format!("done {line}"));
     Ok(Outcome {
         execs,
         regions: seen_regions.len(),
         findings,
     })
+}
+
+/// Where a target has got to, as a line of a log.
+fn progress(
+    name: &str,
+    execs: usize,
+    regions: usize,
+    findings: usize,
+    elapsed: Duration,
+) -> String {
+    let rate = execs as f64 / elapsed.as_secs_f64().max(0.001);
+    format!(
+        "[{name}] {execs} execs, {regions} covered regions, {findings} finding(s), {rate:.1} execs/s, {}s",
+        elapsed.as_secs()
+    )
+}
+
+/// One run of the harness.
+struct Run<'a> {
+    harness: &'a Path,
+    target: &'a str,
+    input: &'a Path,
+    /// Where the harness is told to write its profile.
+    profraw: &'a Path,
+    /// Where its stderr goes.
+    stderr: &'a Path,
+    /// How long it may run.
+    hang: Duration,
+}
+
+/// A run that did not survive.
+struct Failure {
+    /// `panic` (the harness caught it, and exits 101), `abort` (any other way
+    /// to die) or `hang` (still running after [`Run::hang`], and killed).
+    kind: &'static str,
+    /// The first line the harness wrote to stderr.
+    why: String,
+}
+
+/// Run the harness once: `None` if it survived.
+fn run_input(run: &Run) -> Result<Option<Failure>, String> {
+    let log = File::create(run.stderr)
+        .map_err(|e| format!("cannot write {}: {e}", run.stderr.display()))?;
+    let mut child = Command::new(run.harness)
+        .arg(run.target)
+        .arg(run.input)
+        .env("LLVM_PROFILE_FILE", run.profraw)
+        .stdout(Stdio::null())
+        .stderr(log)
+        .spawn()
+        .map_err(|e| format!("cannot run {}: {e}", run.harness.display()))?;
+    let began = Instant::now();
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) if began.elapsed() >= run.hang => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Ok(Some(Failure {
+                    kind: "hang",
+                    why: format!("still running after {} s", run.hang.as_secs()),
+                }));
+            }
+            Ok(None) => std::thread::sleep(Duration::from_millis(1)),
+            Err(e) => return Err(format!("waiting for {}: {e}", run.harness.display())),
+        }
+    };
+    if status.success() {
+        return Ok(None);
+    }
+    // A crash is a finding. The harness returns 101 for a panic it caught and
+    // reported; anything else non-zero is an uncaught abort.
+    let mut head = Vec::new();
+    if let Ok(log) = File::open(run.stderr) {
+        let _ = log.take(8192).read_to_end(&mut head);
+    }
+    Ok(Some(Failure {
+        kind: if status.code() == Some(101) {
+            "panic"
+        } else {
+            "abort"
+        },
+        why: first_line(&head),
+    }))
 }
 
 /// Covered region hashes, from `llvm-profdata show` on one run's profile.

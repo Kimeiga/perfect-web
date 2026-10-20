@@ -99,3 +99,16 @@ fn an_argument_it_does_not_know_stops_it() {
         ran.stderr
     );
 }
+
+#[test]
+fn a_target_that_does_not_exist_stops_it_and_lists_the_ones_that_do() {
+    let ran = pw_fuzz("unknown-target", &["--only", "parser-to-hir,nope"], None);
+    assert_eq!(ran.status, Some(2), "{}{}", ran.stdout, ran.stderr);
+    assert!(ran.stderr.contains("no target \"nope\""), "{}", ran.stderr);
+    assert!(
+        ran.stderr
+            .contains("the targets are parser-to-hir, resolution-to-typing,"),
+        "{}",
+        ran.stderr
+    );
+}

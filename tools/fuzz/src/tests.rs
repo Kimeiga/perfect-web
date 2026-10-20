@@ -96,6 +96,7 @@ cp "$(dirname "$0")/probe-profile.txt" "$LLVM_PROFILE_FILE"
 case "$(head -c 5 "$2")" in
   PANIC) echo "thread 'main' panicked at stub.rs:1:1:" >&2; exit 101 ;;
   ABORT) echo "stub: aborted" >&2; exit 134 ;;
+  HANG*) exec sleep 120 ;;
 esac
 "#,
         );
@@ -154,6 +155,19 @@ fn target(name: &'static str, seeds: &[&str]) -> Target {
         seeds: seeds.iter().map(|s| s.as_bytes().to_vec()).collect(),
     }
 }
+
+/// `execs` inputs, no time limit, no hang within the hour, and nothing said
+/// on the way (an hour apart).
+fn limits(execs: usize) -> Limits {
+    Limits {
+        execs,
+        time: None,
+        hang: Duration::from_secs(3600),
+        say_every: Duration::from_secs(3600),
+    }
+}
+
+fn quiet(_: &str) {}
 
 // ---------------------------------------------------------------------------
 // Where the tool is
@@ -358,7 +372,8 @@ fn a_run_covers_what_its_profile_lists() {
         &work,
         &target("stub", &["fine"]),
         &stubs().join("profdata.sh"),
-        5,
+        &limits(5),
+        &mut quiet,
     )
     .unwrap();
     assert_eq!(outcome.execs, 5);
@@ -375,7 +390,8 @@ fn a_panic_is_a_finding_and_its_input_is_kept() {
         &work,
         &target("stub", &["PANIC with this"]),
         &stubs().join("profdata.sh"),
-        1,
+        &limits(1),
+        &mut quiet,
     )
     .unwrap();
     assert_eq!(outcome.findings.len(), 1, "{:?}", outcome.findings);
@@ -398,7 +414,8 @@ fn an_abort_is_a_finding() {
         &work,
         &target("stub", &["ABORT"]),
         &stubs().join("profdata.sh"),
-        1,
+        &limits(1),
+        &mut quiet,
     )
     .unwrap();
     assert_eq!(outcome.findings, ["abort on 5 bytes: stub: aborted"]);
@@ -413,7 +430,8 @@ fn a_run_that_cannot_be_measured_is_an_error_not_a_quiet_zero() {
         &work,
         &target("stub", &["fine"]),
         &stubs().join("profdata-fails.sh"),
-        3,
+        &limits(3),
+        &mut quiet,
     )
     .unwrap_err();
     assert!(why.contains("could not read"), "{why}");
@@ -423,10 +441,190 @@ fn a_run_that_cannot_be_measured_is_an_error_not_a_quiet_zero() {
         &work,
         &target("stub", &["fine"]),
         &stubs().join("profdata.sh"),
-        3,
+        &limits(3),
+        &mut quiet,
     )
     .unwrap_err();
     assert!(why.contains("cannot run /no/such/harness"), "{why}");
+}
+
+#[test]
+fn an_input_that_does_not_end_is_a_finding_and_is_killed() {
+    let _lock = one_at_a_time();
+    let work = scratch("run-hangs");
+    let began = Instant::now();
+    let outcome = fuzz_one(
+        &stubs().join("harness.sh"),
+        &work,
+        &target("stub", &["HANG it"]),
+        &stubs().join("profdata.sh"),
+        &Limits {
+            hang: Duration::from_secs(1),
+            ..limits(1)
+        },
+        &mut quiet,
+    )
+    .unwrap();
+    // The stand-in would sleep for two minutes.
+    assert!(
+        began.elapsed() < Duration::from_secs(100),
+        "{:?}",
+        began.elapsed()
+    );
+    assert_eq!(
+        outcome.findings,
+        ["hang on 7 bytes: still running after 1 s"]
+    );
+}
+
+#[test]
+fn one_failure_at_one_place_is_one_finding_whatever_the_input() {
+    let _lock = one_at_a_time();
+    let work = scratch("run-same-panic");
+    // Two lengths; the queue is taken from its end.
+    let outcome = fuzz_one(
+        &stubs().join("harness.sh"),
+        &work,
+        &target("stub", &["PANIC a", "PANIC bb"]),
+        &stubs().join("profdata.sh"),
+        &limits(2),
+        &mut quiet,
+    )
+    .unwrap();
+    assert_eq!(outcome.findings.len(), 1, "{:?}", outcome.findings);
+    assert_eq!(
+        std::fs::read(work.join("stub/finding-0.bin")).unwrap(),
+        b"PANIC bb"
+    );
+    assert!(!work.join("stub/finding-1.bin").exists());
+}
+
+#[test]
+fn a_run_that_failed_leaves_no_profile_behind() {
+    let _lock = one_at_a_time();
+    let work = scratch("run-no-profile");
+    // The stand-in leaves its profile before it fails, as the real one does.
+    fuzz_one(
+        &stubs().join("harness.sh"),
+        &work,
+        &target("stub", &["PANIC a", "fine", "ABORT"]),
+        &stubs().join("profdata.sh"),
+        &limits(3),
+        &mut quiet,
+    )
+    .unwrap();
+    let left: Vec<_> = std::fs::read_dir(work.join("stub"))
+        .unwrap()
+        .flatten()
+        .filter(|e| e.path().extension().is_some_and(|x| x == "profraw"))
+        .collect();
+    assert!(left.is_empty(), "{left:?}");
+}
+
+#[test]
+fn a_time_limit_ends_a_run_after_one_input() {
+    let _lock = one_at_a_time();
+    let work = scratch("run-time-limit");
+    let outcome = fuzz_one(
+        &stubs().join("harness.sh"),
+        &work,
+        &target("stub", &["fine"]),
+        &stubs().join("profdata.sh"),
+        &Limits {
+            time: Some(Duration::ZERO),
+            ..limits(1000)
+        },
+        &mut quiet,
+    )
+    .unwrap();
+    assert_eq!(outcome.execs, 1);
+}
+
+#[test]
+fn a_time_limit_not_yet_reached_ends_nothing() {
+    let _lock = one_at_a_time();
+    let work = scratch("run-time-left");
+    let outcome = fuzz_one(
+        &stubs().join("harness.sh"),
+        &work,
+        &target("stub", &["fine"]),
+        &stubs().join("profdata.sh"),
+        &Limits {
+            time: Some(Duration::from_secs(3600)),
+            ..limits(4)
+        },
+        &mut quiet,
+    )
+    .unwrap();
+    assert_eq!(outcome.execs, 4);
+}
+
+#[test]
+fn a_target_says_where_it_has_got_to_and_what_it_found() {
+    let _lock = one_at_a_time();
+    let work = scratch("run-says");
+    let mut lines: Vec<String> = Vec::new();
+    fuzz_one(
+        &stubs().join("harness.sh"),
+        &work,
+        &target("stub", &["fine", "PANIC with this"]),
+        &stubs().join("profdata.sh"),
+        &Limits {
+            say_every: Duration::ZERO,
+            ..limits(2)
+        },
+        &mut |line: &str| lines.push(line.to_string()),
+    )
+    .unwrap();
+    assert_eq!(lines[0], "[stub] starting with 2 seed(s)", "{lines:?}");
+    assert!(
+        lines
+            .iter()
+            .any(|l| l.starts_with("[stub] ") && l.contains(" execs/s, ")),
+        "{lines:?}"
+    );
+    let found = lines
+        .iter()
+        .find(|l| l.starts_with("FINDING [stub] "))
+        .unwrap_or_else(|| panic!("{lines:?}"));
+    assert!(
+        found.starts_with(
+            "FINDING [stub] panic on 15 bytes: thread 'main' panicked at stub.rs:1:1: (saved: "
+        ),
+        "{found}"
+    );
+    assert!(found.ends_with("/stub/finding-0.bin)"), "{found}");
+    let done = lines.last().unwrap();
+    assert!(
+        done.starts_with("done [stub] 2 execs, 3 covered regions, 1 finding(s), "),
+        "{done}"
+    );
+}
+
+#[test]
+fn a_target_that_has_nothing_new_to_say_stays_quiet() {
+    let _lock = one_at_a_time();
+    let work = scratch("run-quiet");
+    let mut lines: Vec<String> = Vec::new();
+    fuzz_one(
+        &stubs().join("harness.sh"),
+        &work,
+        &target("stub", &["fine"]),
+        &stubs().join("profdata.sh"),
+        &limits(3),
+        &mut |line: &str| lines.push(line.to_string()),
+    )
+    .unwrap();
+    // It said that it began, and that it was done, and no more.
+    assert_eq!(lines.len(), 2, "{lines:?}");
+}
+
+#[test]
+fn progress_reads_as_executions_regions_findings_and_rate() {
+    assert_eq!(
+        progress("t", 90, 12, 1, Duration::from_secs(30)),
+        "[t] 90 execs, 12 covered regions, 1 finding(s), 3.0 execs/s, 30s"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -471,7 +669,8 @@ fn a_clean_run_ends_with_status_0() {
         &work,
         &[target("one", &["fine"]), target("two", &["fine"])],
         &stubs().join("profdata.sh"),
-        3,
+        &limits(3),
+        &mut quiet,
     );
     assert_eq!(status, Ok(0));
 }
@@ -486,7 +685,8 @@ fn a_finding_ends_the_run_with_status_1() {
         &work,
         &[target("one", &["fine", "PANIC with this"])],
         &stubs().join("profdata.sh"),
-        2,
+        &limits(2),
+        &mut quiet,
     );
     assert_eq!(status, Ok(1));
 }
@@ -500,7 +700,8 @@ fn a_run_that_executes_nothing_measured_nothing_and_fails() {
         &work,
         &[target("stub", &["fine"])],
         &stubs().join("profdata.sh"),
-        0,
+        &limits(0),
+        &mut quiet,
     )
     .unwrap_err();
     assert!(
@@ -520,7 +721,8 @@ fn a_target_whose_every_run_failed_measured_nothing_and_fails() {
         &work,
         &[target("stub", &["PANIC with this"])],
         &stubs().join("profdata.sh"),
-        1,
+        &limits(1),
+        &mut quiet,
     )
     .unwrap_err();
     assert!(
@@ -541,6 +743,60 @@ fn words(line: &str) -> Vec<String> {
 fn a_run_is_two_thousand_executions_a_target_unless_asked() {
     assert_eq!(options(&[]).unwrap().iterations, 2000);
     assert_eq!(options(&words("--iterations 7")).unwrap().iterations, 7);
+}
+
+#[test]
+fn seconds_and_the_targets_to_run_are_read() {
+    let read = options(&words("--seconds 7 --only a,b --iterations 9")).unwrap();
+    assert_eq!(read.iterations, 9);
+    assert_eq!(read.seconds, Some(7));
+    assert_eq!(read.only, ["a", "b"]);
+    let none = options(&[]).unwrap();
+    assert_eq!(none.seconds, None);
+    assert!(none.only.is_empty());
+}
+
+#[test]
+fn the_command_line_sets_the_limits() {
+    let read = options(&words("--iterations 9 --seconds 7 --hang 11")).unwrap();
+    assert_eq!(read.hang, Some(11));
+    let limits = limits_of(&read);
+    assert_eq!(limits.execs, 9);
+    assert_eq!(limits.time, Some(Duration::from_secs(7)));
+    assert_eq!(limits.hang, Duration::from_secs(11));
+    assert_eq!(limits.say_every, SAY_EVERY);
+
+    let defaults = limits_of(&options(&[]).unwrap());
+    assert_eq!(defaults.execs, 2000);
+    assert_eq!(defaults.time, None);
+    assert_eq!(defaults.hang, HANG);
+}
+
+fn named(names: &[&'static str]) -> Vec<Target> {
+    names.iter().map(|n| target(n, &[])).collect()
+}
+
+#[test]
+fn only_keeps_the_targets_named_and_all_when_none_is() {
+    let all = chosen(named(&["a", "b", "c"]), &[]).unwrap();
+    assert_eq!(all.len(), 3);
+    let kept = chosen(named(&["a", "b", "c"]), &["c".to_string(), "a".to_string()]).unwrap();
+    assert_eq!(kept.iter().map(|t| t.name).collect::<Vec<_>>(), ["a", "c"]);
+}
+
+#[test]
+fn only_refuses_a_target_that_does_not_exist() {
+    let why = chosen(named(&["a", "b"]), &["a".to_string(), "nope".to_string()]).unwrap_err();
+    assert!(why.contains("no target \"nope\""), "{why}");
+    assert!(why.contains("the targets are a, b"), "{why}");
+}
+
+#[test]
+fn a_flag_without_its_value_is_an_error() {
+    let why = options(&words("--seconds")).unwrap_err();
+    assert!(why.contains("--seconds wants a number of seconds"), "{why}");
+    let why = options(&words("--only")).unwrap_err();
+    assert!(why.contains("--only wants target names"), "{why}");
 }
 
 #[test]

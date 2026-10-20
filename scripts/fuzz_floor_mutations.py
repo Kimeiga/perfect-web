@@ -22,7 +22,19 @@ Each mutant undoes one piece:
    wrong targets or is not asked, a finding does not end the run with status
    1, the run's error ends with status 0, the checks before the build are
    skipped, an argument it does not know is ignored, a count that is no
-   number is the default;
+   number says nothing of it;
+4b. the campaign (an overnight run, one process a target): the time limit is
+   ignored, may end a run before its first input, or ends one it should not;
+   a target says where it is at every input, or never, and does not say a
+   finding, its start or its end; a failure is told from another by the
+   input's length, or every one is a finding of its own; the profile of a run
+   that failed, or survived, is kept (a campaign that fails often fills the
+   disk); an input that does not end is not killed, its limit is ignored, it
+   is called an abort, or a panic is told from an abort by another status;
+   `--seconds`, `--hang` and `--only` take their values and ignore them, or
+   the limits leave one out; `--only` names nothing, accepts a target that
+   does not exist, or a target not named runs; the progress line's rate or
+   time is in other units;
 5. `just doctor` names the component (`scripts/doctor.sh`): it does not look,
    it never finds it, it does not count it among the missing; and
    `rust-toolchain.toml` lists it.
@@ -234,11 +246,202 @@ MUTANTS = [
         "            _ => {}\n",
     ),
     (
-        "a count that is no number is the default",
+        "a count that is no number says nothing of it",
         "fuzz",
         FUZZ,
-        '                    .map_err(|_| format!("{flag} wants a whole number, not {value:?}\\n{USAGE}"))?;\n',
-        "                    .unwrap_or(2000);\n",
+        '        .map_err(|_| format!("{flag} wants a whole number, not {text:?}\\n{USAGE}"))\n',
+        "        .map_err(|_| USAGE.to_string())\n",
+    ),
+    # 4b. The campaign: what ends a run, what it says, what a finding is.
+    (
+        "the time limit is ignored",
+        "fuzz",
+        FUZZ,
+        "limits.time.is_none_or(|t| began.elapsed() < t)",
+        "true",
+    ),
+    (
+        "a time limit may end a run before its first input",
+        "fuzz",
+        FUZZ,
+        "(execs == 0 || limits.time.is_none_or(|t| began.elapsed() < t))",
+        "limits.time.is_none_or(|t| began.elapsed() < t)",
+    ),
+    (
+        "a time limit not yet reached ends the run",
+        "fuzz",
+        FUZZ,
+        "|t| began.elapsed() < t",
+        "|t| began.elapsed() >= t",
+    ),
+    (
+        "a target says where it is at every input",
+        "fuzz",
+        FUZZ,
+        "        if said.elapsed() >= limits.say_every {\n",
+        "        if true {\n",
+    ),
+    (
+        "a target never says where it is",
+        "fuzz",
+        FUZZ,
+        "        if said.elapsed() >= limits.say_every {\n",
+        "        if false {\n",
+    ),
+    (
+        "a finding is not said when it is found",
+        "fuzz",
+        FUZZ,
+        "                say(&line);\n                findings.push(finding);\n",
+        "                findings.push(finding);\n",
+    ),
+    (
+        "the end of a target is not said",
+        "fuzz",
+        FUZZ,
+        '    say(&format!("done {line}"));\n',
+        "",
+    ),
+    (
+        "the start of a target is not said",
+        "fuzz",
+        FUZZ,
+        '    say(&format!(\n        "[{}] starting with {} seed(s)",\n        target.name,\n        queue.len()\n    ));\n',
+        "",
+    ),
+    (
+        "a failure is told from another by the input's length too",
+        "fuzz",
+        FUZZ,
+        '            if failures.insert(format!("{}: {}", failure.kind, failure.why)) {\n',
+        '            if failures.insert(format!("{}: {} {}", failure.kind, failure.why, input.len())) {\n',
+    ),
+    (
+        "every failure is a finding of its own",
+        "fuzz",
+        FUZZ,
+        '            if failures.insert(format!("{}: {}", failure.kind, failure.why)) {\n',
+        '            if { failures.insert(format!("{}: {}", failure.kind, failure.why)); true } {\n',
+    ),
+    (
+        "the profile of a run that failed is kept",
+        "fuzz",
+        FUZZ,
+        "            // campaign that fails often would fill the disk with them.\n"
+        "            let _ = std::fs::remove_file(&profraw);\n",
+        "            // campaign that fails often would fill the disk with them.\n",
+    ),
+    (
+        "the profile of a run that survived is kept",
+        "fuzz",
+        FUZZ,
+        "            .collect::<Vec<_>>();\n        let _ = std::fs::remove_file(&profraw);\n",
+        "            .collect::<Vec<_>>();\n",
+    ),
+    (
+        "an input that does not end is not killed",
+        "fuzz",
+        FUZZ,
+        "                let _ = child.kill();\n",
+        "",
+    ),
+    (
+        "the hang limit is ignored",
+        "fuzz",
+        FUZZ,
+        "            Ok(None) if began.elapsed() >= run.hang => {\n",
+        "            Ok(None) if false => {\n",
+    ),
+    (
+        "a hang is called an abort",
+        "fuzz",
+        FUZZ,
+        '                    kind: "hang",\n',
+        '                    kind: "abort",\n',
+    ),
+    (
+        "a panic is told from an abort by another status",
+        "fuzz",
+        FUZZ,
+        "        kind: if status.code() == Some(101) {\n",
+        "        kind: if status.code() == Some(1) {\n",
+    ),
+    (
+        "--seconds takes its value and ignores it",
+        "fuzz",
+        FUZZ,
+        '            "--seconds" => options.seconds = Some(whole(flag, value("a number of seconds")?)?),\n',
+        '            "--seconds" => {\n                value("a number of seconds")?;\n            }\n',
+    ),
+    (
+        "--hang takes its value and ignores it",
+        "fuzz",
+        FUZZ,
+        '            "--hang" => options.hang = Some(whole(flag, value("a number of seconds")?)?),\n',
+        '            "--hang" => {\n                value("a number of seconds")?;\n            }\n',
+    ),
+    (
+        "--only splits its names at another character",
+        "fuzz",
+        FUZZ,
+        "                    .split(',')\n",
+        "                    .split(';')\n",
+    ),
+    (
+        "the limits leave out --seconds",
+        "fuzz",
+        FUZZ,
+        "        time: options.seconds.map(Duration::from_secs),\n",
+        "        time: None,\n",
+    ),
+    (
+        "the limits leave out --hang",
+        "fuzz",
+        FUZZ,
+        "        hang: options.hang.map_or(HANG, Duration::from_secs),\n",
+        "        hang: HANG,\n",
+    ),
+    (
+        "the limits leave out --iterations",
+        "fuzz",
+        FUZZ,
+        "        execs: options.iterations,\n",
+        "        execs: 2000,\n",
+    ),
+    (
+        "--only names nothing: every target runs",
+        "fuzz",
+        FUZZ,
+        "    if only.is_empty() {\n        return Ok(all);\n    }\n",
+        "    if true {\n        return Ok(all);\n    }\n",
+    ),
+    (
+        "a target that does not exist is accepted",
+        "fuzz",
+        FUZZ,
+        "        .find(|n| !all.iter().any(|t| t.name == n.as_str()))\n",
+        "        .find(|_| false)\n",
+    ),
+    (
+        "a target not named runs",
+        "fuzz",
+        FUZZ,
+        "        .filter(|t| only.iter().any(|n| n == t.name))\n",
+        "        .filter(|_| true)\n",
+    ),
+    (
+        "the rate is seconds an execution",
+        "fuzz",
+        FUZZ,
+        "    let rate = execs as f64 / elapsed.as_secs_f64().max(0.001);\n",
+        "    let rate = elapsed.as_secs_f64() / execs.max(1) as f64;\n",
+    ),
+    (
+        "the time is in minutes",
+        "fuzz",
+        FUZZ,
+        "        elapsed.as_secs()\n    )\n}\n",
+        "        elapsed.as_secs() / 60\n    )\n}\n",
     ),
     # 5. The doctor and the toolchain file.
     (

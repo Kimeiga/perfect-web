@@ -1,9 +1,10 @@
-"""`scripts/doctor.sh` and the rustup component the fuzzer's coverage needs
-(track fuzz-floor, 2026-10-20).
+"""`scripts/doctor.sh`, `rust-toolchain.toml` and the rustup component the
+fuzzer's coverage needs (track fuzz-floor, 2026-10-20).
 
-`llvm-tools` (`rust-toolchain.toml` lists it) is where `llvm-profdata` comes
-from, and `pw-fuzz` and its tests read coverage with it. `just doctor` says so
-on a machine without it, so that the first sign is not a test that fails.
+`llvm-tools` is where `llvm-profdata` comes from, and `pw-fuzz` and its tests
+read coverage with it. The toolchain file lists it, so that a fresh install
+(a CI runner's) has it; `just doctor` says so on a machine without it, so
+that the first sign is not a test that fails.
 
 The doctor is run with a stand-in `rustup` first on `PATH` that lists the
 components it is told to; the rest of what the doctor checks is the machine's
