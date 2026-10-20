@@ -282,12 +282,16 @@ fn settings_from_1(old: SettingsV1) -> Settings !{} { .. }
   finds, at boot or by a `storage` event, a version of its value newer than
   its own keeps showing what it has, writes nothing more of it, and says so:
   "This page is out of date. Reload to keep your changes."
-- **The released versions are held to** (the tables' `schema.lock`,
-  ADR-0350, applied here): `pw build` writes `device.lock`, each value's
-  name, version and the canonical form of its type; a build given the
-  released lock refuses a value whose type changed at the same version
-  (PW6806): a changed type with no new version and migration is a person's
-  data unread after the next deploy.
+- **The released versions are held to, in a later version** (the tables'
+  `schema.lock`, ADR-0350, applied here): `pw build` would write
+  `device.lock`, each value's name, version and the canonical form of its
+  type, and a build given the released lock would refuse a value whose type
+  changed at the same version: a changed type with no new version and
+  migration is a person's data unread after the next deploy. The first
+  version does not build it (Not claimed); until it does, the decoder refuses
+  such a value at read, keeps it aside and shows the default (decision 3), so
+  nothing is misread, though the person's data is unread until a migration
+  is written.
 
 ### 5. Device-only data never crosses to the server
 
@@ -317,6 +321,15 @@ fn settings_from_1(old: SettingsV1) -> Settings !{} { .. }
   clearing at sign-out (D1) are for.
 - **Held at run time too**: the browser tests record every request each page
   makes and find no stored value in any of them (Acceptance).
+- **A handler's capture of one is written where the device is.** A resume
+  manifest may hold a captured value only where its label fits the document
+  it lands in (PW5007). A device value exists only in the browser, which
+  renders the parts that read it and writes their handlers' captures into the
+  document it holds, on the device; the server writes a capture of one only
+  at its declared default, a constant of the program's own text. So `Device`
+  is no restriction on that document (`resume.rs`, `written_by_its_device`);
+  every other label is one, as before. TodoMVC's row handlers capture their
+  `row`, made from its todos (`resumable(captures = { row })`).
 
 ### 6. Several tabs
 
@@ -343,12 +356,33 @@ track builds the two steps TodoMVC needs:
   values among them): one function, an argument for each; the host computes
   the first render from their first values, the browser every render after.
 - **Inside a block the browser renders, a computed value is the browser's**,
-  including the block's `{#each}` list: computed before the block renders, and
-  read by its path, as a computed hole is (ADR-0226).
+  including the block's `{#each}` list where every value its function reads
+  is a signal: computed before the block renders, and read by its path, as a
+  computed hole is (ADR-0226). The block is rendered again for each value a
+  computed part inside it reads.
+- **Inside a block a host decides, it is refused by name**, since the browser
+  does not render that block again and the value would stay its first:
+  "computes a value from the signals `notes` and `shown` inside a block a
+  value other than a signal decides, which the browser does not render again
+  (ruling 0073-a)".
 
 Rows stay read by path: a list's function makes the rows whole (`Row { id,
-title, completed, class, editing }`), so no value is computed inside a row.
-A block is rendered again whole, as today.
+title, completed, class, editing }`), so no value is computed inside a row
+(refused by name, as before; a row's item is typed from the list the device
+keeps, so the refusal is this one and not a type the build lacks).
+
+- **A block rendered again keeps its nodes.** The browser replaced such a
+  block whole each time a signal it reads changed, so a row was another
+  element after each press: focus, a hover, what assistive technology held
+  and a test's handle on a row were lost, and TodoMVC's own tests 12 and 13,
+  which hold a todo's `<li>` across its toggle, failed once its list was the
+  browser's to render. Now the new rendering is morphed into the old: a node
+  of the same kind (its tag, `data-pw` and `id`) is kept and its attributes
+  and text set; a keyed list's row is matched by its key's anchor and kept,
+  moved or removed; only what is new is inserted and only what is gone
+  removed; a control's `checked` and `value` follow the rendering where it
+  changed them (ADR-0142); and a modal dialog that goes is closed first, its
+  focus given back (ADR-0141).
 
 ### 8. How the Docs app and the encrypted messages build on it
 
@@ -378,7 +412,7 @@ rule, which the first version does not offer.
 | PW6803 | a device value is written where the browser sends it: a navigation, an address, a form |
 | PW6804 | a device signal is assigned a session's, user's, organization's or secret's value |
 | PW6805 | a device signal's clauses: `storage device "name"` (one name a program), `privacy Device`, `conflict last_write_wins`, at module level, with a value |
-| PW6806 | a device signal's versions: a pure migration for each earlier version, chained by type; the released lock's type at its version |
+| PW6806 | a device signal's versions: a pure migration for each earlier version, chained by type, the last to the declared type |
 | PW6807 | a device signal's type has a device form |
 | PW6808 | a device signal is provided by the device: no `provide` gives it |
 
@@ -449,7 +483,10 @@ rule, which the first version does not offer.
 - **An opaque type's `where` predicate held on read**: refused by PW6807
   until the decoder runs it.
 - **A value computed inside a row** of a browser-rendered list, and a list
-  rendered again row by row: decision 7's later steps.
+  rendered again row by row (a block is rendered again whole, then morphed):
+  decision 7's later steps.
+- **`device.lock`** (decision 4): a type changed at the same version is not
+  refused by the build; the decoder refuses it at read.
 - **Every channel off the device.** The browser's own history and sync (a
   page's title, its address), extensions, a person's copy and paste, timing,
   and a foreign component mounted with a device value (ADR-0075's mount, not
@@ -457,6 +494,67 @@ rule, which the first version does not offer.
 - **Safari's seven days and storage pressure**: said, not prevented.
 - **The web's code delivery** (NEXT's E2EE item): the server that serves the
   code that reads the store could serve other code.
+
+## The first version, built (2026-10-20)
+
+Recorded by `just e14-device-store` (`docs/evidence/E14/device-store.txt`)
+and `just e14-device-store-cypress` (`docs/evidence/E14/device-store-cypress.txt`).
+
+- **The compiler** (`compiler/pw-core/tests/device_store.rs`, 13 tests):
+  each of PW6801 to PW6808 refused with its control clean, each refusal
+  naming where its value is the device's (charter §16.3); a device value
+  reaches PW6801 directly, through a helper's body, a branch, a page's
+  signal it was assigned to and a call it decides; PW6802 through the
+  page's signal a query is keyed by; PW6803 at a link, an image's address
+  and a form's control; PW6804 from a session's captured value. Decision
+  7's values build, and are refused by name inside a row and inside a
+  host's block. The corpus gains A-054, R-108 (PW6801) and R-109 (PW6802)
+  (C28; the enforcement table 89 of 89), and the generality witnesses
+  `device_value_to_a_command` and `device_value_keys_a_query` (62 of 62).
+- **The host** (`tests::todomvc::`, 4 tests): TodoMVC's document renders
+  the declared default, marks and hides what the device decides while the
+  device is read, names what the device keeps in its manifest, and no host
+  holds a todo: TodoMVC's host layer (`server/src/todomvc.rs`) is gone.
+- **The browser, three engines**: the demo (`e2e/device-store.spec.mjs`
+  over `examples/demo/device.pw`, 13 tests, 39 of 39) and TodoMVC
+  (`e2e/todomvc.spec.mjs`, 50 tests, 150 of 150); and the whole browser
+  suite, since the block morph (decision 7) is every signal block's: 1391
+  of its 1416 passed and 22 skipped as their specs say, and the 3 that
+  failed are the finding below, one test in each engine, which a page that
+  keeps nothing on the device never reaches (`readDevice` returns at once).
+- **The store's limit, measured**: `localStorage` holds 5,242,880 UTF-16
+  code units an origin in Chromium, Firefox and WebKit (Playwright 1.58's
+  builds): the Storage Standard's 5 × 2^20, counted in code units, not
+  bytes. MDN's 10 MiB sentence is not what these engines do.
+- **A finding the demo's tests made**: the runtime set each value as it
+  read it; reading the next one yielded, the render the first had begun
+  started and was no longer the one the mark waited for, and an earlier
+  value's part was shown at its default for as long as its computing took
+  (in each engine: "what the device decides stays hidden until it is
+  rendered at the device's value"). Each value is now read first and all
+  are set at once, in one render the mark waits for.
+- **TodoMVC's own Cypress suite, unchanged**: 24 of 29 pass (3 before
+  this track). The acceptance (all 29) is not met. The five that fail, fail
+  for any app under the Cypress the suite is run with (15.21.1, which
+  upstream's `^15.14.2` resolves to), each shown with no app at all
+  (`spikes/todomvc-cypress-probes`):
+  - tests 4 and 9 (a hook), and 10 and 11, which the failed hook skips:
+    `checkItemSaved` calls `.invoke('reset')` on a spy, and a spy has
+    `resetHistory` and no `reset` (the probe prints `reset:undefined
+    resetHistory:function`; Sinon removed it in 5.0.1, and Cypress has
+    bundled a Sinon after it since 4.0.0);
+  - test 24, the persistence test: it aliases each todo its `createTodo`
+    command found, a command ending in `.then()`, and reads the alias again
+    after `cy.reload()`, which Cypress cannot do ("Cypress cannot requery
+    the page after commands such as `cy.should()`"), on a static page too;
+    an alias `cy.get` made is read again, the probe's control.
+  Before the morph, tests 12 and 13 failed as well: they hold a todo's
+  `<li>` across its toggle, and a block replaced whole made it another
+  element.
+- **The mutation controls** (`scripts/device_store_mutations.py`): each
+  rule, each step of the build, the host and the runtime, and TodoMVC's
+  morph undone in turn, each to be killed by the track's own tests, the
+  count in the evidence.
 
 ## Questions for the integrator
 
@@ -471,3 +569,19 @@ rule, which the first version does not offer.
 3. **Decision 7 lifts two of ruling 0073-a's refusals** for browser-held
    values only. Taken meanwhile: built in this track, in commits of their
    own, each with its tests and mutants.
+4. **TodoMVC's official acceptance, as the correction of 2026-10-16 states
+   it (all 29 pass, Cypress exits 0), cannot be met by any app under any
+   Cypress since 4.0.0** (The first version, built): the spec resets its
+   spy with `.invoke('reset')`, and a spy has had no `reset` since Cypress
+   4.0.0 took Sinon from 3.2.0 to 8.1.1 (Cypress's changelog) and Sinon
+   5.0.1 removed it (Sinon's `CHANGES.md`: deprecated in 4.1.4). Upstream's
+   own `package.json` asks `^15.14.2`. How should the acceptance be stated:
+   as the 24 of 29 with the five named and shown, against the suite with
+   its spy's call corrected upstream, or otherwise? Taken meanwhile:
+   nothing reclassified; the count and the probes are recorded, and the
+   acceptance stays unmet.
+5. **`device.lock`** (decision 4) is not built. Taken meanwhile: Not
+   claimed; the decoder refuses a changed type at read.
+6. **The published generality figure** moved from 60/60 to 62/62 (this
+   track's two invariants, corpus C28): `tests/generality.rs` holds it, and
+   STATUS's "generality is 60/60" is the integrator's to move.
