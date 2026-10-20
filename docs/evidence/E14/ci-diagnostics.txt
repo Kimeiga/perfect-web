@@ -1,7 +1,7 @@
-Track ci-diagnostics - a failure's trace is kept, and the checker's latency is measured under load
+Track ci-diagnostics - a failure's trace is kept, the checker's latency is measured under load, a mutant's build is incremental, and the nightly does not repeat a verified head
 
 produced by: just e14-ci-diagnostics
-commit: e438f689ed9051887f87e769fb48a4abaac6e4d9
+commit: a17cf2467e4ab90b3f97a4071ed30e5c281d410c
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 python: Python 3.10.12
 
@@ -60,35 +60,86 @@ test_a_mutants_browser_run_is_not_kept (scripts.tests.test_mutation_baseline.Kee
 test_a_red_baselines_failed_browser_run_is_kept_apart (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun) ... ok
 test_the_benchmark_harness_run_is_kept_under_its_own_directory (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun) ... ok
 test_what_an_earlier_recipe_left_is_not_kept (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun) ... ok
-Ran 53 tests in 15.096s
+Ran 53 tests in 6.790s
 OK
 
 == 2. check_latency's ceiling bounds the fastest of seven or more checks, not their median (compiler/pw-core/tests/check_latency.rs): the statistic on checks that cost what a script says, then the measurement itself
 
-load: 61.08 59.97 67.53 44/815 110629
-test the_fastest_is_of_the_threads_cpu_time_not_of_the_wall_clock ... ok
-test the_ceiling_bounds_the_fastest_check_not_the_median ... ok
-test a_loaded_machine_is_waited_on_while_it_may_quiet_down ... ok
-test the_waiting_ends_with_the_window_or_the_most_checks ... ok
+load: 30.26 40.44 47.88 32/2976 3166435
 test a_checker_made_slow_is_not_let_through_by_the_waiting ... ok
-test the_ceiling_is_800_ms_a_thousand_lines_and_a_check_is_judged_by_it ... ok
-test producing_diagnostics_is_judged_at_the_fastest_of_both ... ok
 test a_clock_that_reads_nothing_is_refused_by_the_control ... ok
 test a_quiet_machine_is_asked_for_seven_checks_and_no_more ... ok
-check-latency reject 2389.10 ms   (cpu 2388.28 ms; clean 1971.12 ms, cpu 1970.95 ms; the fastest of 7 and 7 checks, which the ratio bounds: cpu 2073.94 ms, clean cpu 1671.36 ms)
+test a_loaded_machine_is_waited_on_while_it_may_quiet_down ... ok
+test producing_diagnostics_is_judged_at_the_fastest_of_both ... ok
+test the_ceiling_bounds_the_fastest_check_not_the_median ... ok
+test the_ceiling_is_800_ms_a_thousand_lines_and_a_check_is_judged_by_it ... ok
+test the_fastest_is_of_the_threads_cpu_time_not_of_the_wall_clock ... ok
+test the_waiting_ends_with_the_window_or_the_most_checks ... ok
+check-latency reject 1752.38 ms   (cpu 1752.34 ms; clean 3901.13 ms, cpu 3196.65 ms; the fastest of 7 and 7 checks, which the ratio bounds: cpu 1612.11 ms, clean cpu 2684.20 ms)
 test a_rejected_program_is_not_measurably_slower_than_a_clean_one ... ok
 test the_whole_program_and_one_edit_are_both_measured has been running for over 60 seconds
-check-latency cold   3734.22 ms   (cpu 2346.75 ms; 6568 lines, cpu 357.30 ms a thousand lines; the fastest of 7 checks, which the ceiling bounds: cpu 1998.22 ms, 304.24 ms a thousand lines)
-check-latency edit   4946.79 ms   (cpu 2688.58 ms; 56 files, no query system: an edit costs a full check)
+check-latency cold   2961.61 ms   (cpu 2676.03 ms; 6568 lines, cpu 407.43 ms a thousand lines; the fastest of 7 checks, which the ceiling bounds: cpu 2429.20 ms, 369.85 ms a thousand lines)
+check-latency edit   2373.76 ms   (cpu 2370.95 ms; 56 files, no query system: an edit costs a full check)
 test the_whole_program_and_one_edit_are_both_measured ... ok
-test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 97.84s
-load: 66.39 59.56 66.45 76/897 131124
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 83.12s
+load: 42.90 41.47 47.56 43/3236 3198706
+
+== 3. a mutant's builds are incremental where the run asks, and the caches are bounded (scripts/mutant_incremental.py, mutation_baseline.py, ci_recipes.py, verify.yml)
+
+test_a_mutation_script_and_what_it_starts_have_cargos_defaults_when_asked (scripts.tests.test_mutant_incremental.Asked) ... ok
+test_asked_it_removes_a_recipes_own_zero_leaving_cargos_defaults (scripts.tests.test_mutant_incremental.Asked) ... ok
+test_not_asked_it_leaves_the_environment_as_the_recipe_has_it (scripts.tests.test_mutant_incremental.Asked) ... ok
+test_the_run_asks_with_one (scripts.tests.test_mutant_incremental.Asked) ... ok
+test_a_command_that_is_no_cargos_removes_nothing (scripts.tests.test_mutant_incremental.Bounded) ... mutant_incremental: the incremental caches held 0 MiB, past 0; removed
+test_a_mutation_scripts_cargo_command_removes_the_caches_past_the_limit (scripts.tests.test_mutant_incremental.Bounded) ... mutant_incremental: the incremental caches held 0 MiB, past 0; removed
+test_both_a_profiles_and_a_triples_caches_are_found (scripts.tests.test_mutant_incremental.Bounded) ... ok
+test_past_the_limit_every_cache_is_removed_and_the_rest_stays (scripts.tests.test_mutant_incremental.Bounded) ... mutant_incremental: the incremental caches held 0 MiB, past 0; removed
+test_the_limit_is_the_environments_where_it_names_one (scripts.tests.test_mutant_incremental.Bounded) ... ok
+test_where_the_run_did_not_ask_nothing_is_removed (scripts.tests.test_mutant_incremental.Bounded) ... ok
+test_within_the_limit_nothing_is_removed (scripts.tests.test_mutant_incremental.Bounded) ... ok
+test_a_one_makes_a_browser_build_incremental_too_which_is_why_it_is_not_set (scripts.tests.test_mutant_incremental.CargosDefaults) ... ok
+test_a_zero_makes_neither_incremental (scripts.tests.test_mutant_incremental.CargosDefaults) ... ok
+test_with_the_variable_removed_a_dev_build_is_incremental_and_a_browser_build_is_not (scripts.tests.test_mutant_incremental.CargosDefaults) ... ok
+test_every_cache_is_removed_between_recipes_a_triples_among_them (scripts.tests.test_mutant_incremental.Pruned) ... ok
+test_no_recipe_line_is_edited_for_it (scripts.tests.test_mutant_incremental.Workflow) ... ok
+test_the_recipes_step_asks_and_no_other_does (scripts.tests.test_mutant_incremental.Workflow) ... ok
+test_the_workflows_own_zero_stands_for_every_other_build (scripts.tests.test_mutant_incremental.Workflow) ... ok
+Ran 18 tests in 16.819s
+OK
+
+== 4. the nightly is skipped where master's head has a successful run, never on Sunday's, and the override stands (scripts/nightly_skip.py, verify.yml)
+
+test_an_api_that_fails_or_answers_nonsense_runs_it (scripts.tests.test_nightly_skip.AsksTheApi) ... ok
+test_it_asks_for_the_heads_successful_runs_of_verify (scripts.tests.test_nightly_skip.AsksTheApi) ... ok
+test_its_exit_status_says_skip_run_or_misuse (scripts.tests.test_nightly_skip.AsksTheApi) ... ok
+test_a_dispatchs_run_does_not_verify_the_head (scripts.tests.test_nightly_skip.Decides) ... ok
+test_a_pushs_run_that_succeeded_at_the_head_skips_the_nightly (scripts.tests.test_nightly_skip.Decides) ... ok
+test_a_run_that_did_not_succeed_does_not_verify_it (scripts.tests.test_nightly_skip.Decides) ... ok
+test_an_earlier_nightlys_run_skips_it_too (scripts.tests.test_nightly_skip.Decides) ... ok
+test_an_error_runs_the_nightly_never_skips_it (scripts.tests.test_nightly_skip.Decides) ... ok
+test_any_other_schedule_is_asked (scripts.tests.test_nightly_skip.Decides) ... ok
+test_no_run_at_the_head_runs_the_nightly (scripts.tests.test_nightly_skip.Decides) ... ok
+test_the_events_that_verify_a_head_are_the_ones_a_push_to_master_trusts (scripts.tests.test_nightly_skip.Decides) ... ok
+test_the_first_covering_run_among_others_is_the_one_named (scripts.tests.test_nightly_skip.Decides) ... ok
+test_the_weekly_run_is_never_skipped (scripts.tests.test_nightly_skip.Decides) ... ok
+test_a_dispatch_is_planned_whatever_has_passed (scripts.tests.test_nightly_skip.PlanStep) ... ok
+test_a_nightly_at_a_head_a_run_succeeded_at_plans_nothing_and_says_why (scripts.tests.test_nightly_skip.PlanStep) ... ok
+test_a_nightly_at_a_head_none_has_is_planned_in_full (scripts.tests.test_nightly_skip.PlanStep) ... ok
+test_a_nightly_whose_api_fails_is_planned_in_full (scripts.tests.test_nightly_skip.PlanStep) ... ok
+test_sundays_nightly_is_planned_in_full_though_the_head_was_verified (scripts.tests.test_nightly_skip.PlanStep) ... ok
+test_only_the_nightly_asks (scripts.tests.test_nightly_skip.Workflow) ... ok
+test_the_plan_step_hands_the_schedule_that_fired_to_the_script (scripts.tests.test_nightly_skip.Workflow) ... ok
+test_the_schedules_are_weekdays_and_sunday_and_sunday_is_the_scripts_weekly (scripts.tests.test_nightly_skip.Workflow) ... ok
+Ran 21 tests in 0.789s
+OK
 
 == mutation controls (scripts/ci_diagnostics_mutations.py)
 
 baseline (helper): 16 passed, 0 failed
 baseline (keep): 11 passed, 0 failed
 baseline (baseline): 26 passed, 0 failed
+baseline (incremental): 18 passed, 0 failed
+baseline (nightly): 21 passed, 0 failed
 baseline (latency): 9 passed, 0 failed
 a failed run keeps nothing [helper]: KILLED (7 of 16 tests fail)
 only the last run's output is kept [helper]: KILLED (2 of 16 tests fail)
@@ -128,5 +179,36 @@ fewer than seven checks are taken [latency]: KILLED (3 of 9 tests fail)
 the slow path is judged against the clean at their medians [latency]: KILLED (1 of 9 tests fail)
 the control reads the median of the checks [latency]: KILLED (1 of 9 tests fail)
 the control is lifted [latency]: KILLED (1 of 9 tests fail)
-38 of 38 mutants killed
+a run that asks for incremental builds is not heard [incremental]: KILLED (6 of 18 tests fail)
+every run is taken to ask [incremental]: KILLED (4 of 18 tests fail)
+a recipe's own zero wins over the run's word [incremental]: KILLED (2 of 18 tests fail)
+the run's word forces incremental builds for every profile [incremental]: KILLED (2 of 18 tests fail)
+the script never starts it [incremental]: KILLED (1 of 18 tests fail)
+the caches are never looked at after a command [incremental]: KILLED (1 of 18 tests fail)
+the caches are never removed [incremental]: KILLED (3 of 18 tests fail)
+the caches are removed whatever they hold [incremental]: KILLED (1 of 18 tests fail)
+a target triple's caches are missed [incremental]: KILLED (5 of 18 tests fail)
+a command that is no cargo's is looked at [incremental]: KILLED (1 of 18 tests fail)
+the caches are removed where the run did not ask [incremental]: KILLED (1 of 18 tests fail)
+the limit is not the environment's [incremental]: KILLED (2 of 18 tests fail)
+the limit is a hundred times as much [incremental]: KILLED (1 of 18 tests fail)
+the recipes' prune leaves a target triple's caches [incremental]: KILLED (1 of 18 tests fail)
+the Recipes step does not ask for incremental builds [incremental]: KILLED (1 of 18 tests fail)
+every build of the workflow is incremental [incremental]: KILLED (1 of 18 tests fail)
+the weekly run is skipped too [nightly]: KILLED (3 of 21 tests fail)
+every schedule is taken for the weekly [nightly]: KILLED (12 of 21 tests fail)
+a dispatch's run verifies the head [nightly]: KILLED (3 of 21 tests fail)
+a run that did not succeed verifies the head [nightly]: KILLED (1 of 21 tests fail)
+an error skips the nightly [nightly]: KILLED (3 of 21 tests fail)
+no run at the head skips the nightly [nightly]: KILLED (4 of 21 tests fail)
+the API is asked for every run, not the successful ones [nightly]: KILLED (1 of 21 tests fail)
+Sunday's schedule is dropped [nightly]: KILLED (1 of 21 tests fail)
+the weekday schedule fires on Sunday too [nightly]: KILLED (1 of 21 tests fail)
+the plan step is not told which schedule fired [nightly]: KILLED (1 of 21 tests fail)
+the nightly never asks [nightly]: KILLED (6 of 21 tests fail)
+a skipped nightly plans its shards [nightly]: KILLED (1 of 21 tests fail)
+a skipped nightly runs its browser suites [nightly]: KILLED (1 of 21 tests fail)
+a skipped nightly says nothing in the run's summary [nightly]: KILLED (1 of 21 tests fail)
+a dispatch asks too [nightly]: KILLED (2 of 21 tests fail)
+69 of 69 mutants killed
 memory bound: no process was stopped
