@@ -563,6 +563,7 @@ fn on_postgres_the_two_layers_answer_alike() {
                 Estimator {
                     delay_ms: 0,
                     fail: None,
+                    ..Estimator::default()
                 },
             );
     }

@@ -221,6 +221,30 @@ impl Default for Subscriber {
 }
 
 impl Subscriber {
+    /// **When a page that has just been served, or subscribed, asked**
+    /// (ADR-0297): now. In a test build, an hour on: a test serves a document
+    /// and then drives the server by calls, with no page left to ask again,
+    /// so [`LIVE`] was three seconds of the machine's wall clock between its
+    /// serve and its commit, and a slow machine (CI's, a loaded one) ran
+    /// them out: the document was passed by, nothing was derived for it, and
+    /// the test failed for its machine's speed (a burst of posts, a message,
+    /// the page and command counts). A page "asks without pause"
+    /// (ADR-0297), which is the premise of every such test. A test of the
+    /// window itself sets `seen` to the instant it means
+    /// (`a_document_no_page_asks_for_is_told_when_one_asks`), and one of
+    /// the idle limit builds its subscribers (`Subscriber::at`) at the
+    /// instant it means.
+    fn asked_at() -> std::time::Instant {
+        #[cfg(test)]
+        {
+            std::time::Instant::now() + std::time::Duration::from_secs(60 * 60)
+        }
+        #[cfg(not(test))]
+        {
+            std::time::Instant::now()
+        }
+    }
+
     /// A document's subscriber, its sequence starting at the document's
     /// cursor (ADR-0161): every frame for it comes after the document.
     fn at(cursor: u64) -> Subscriber {
@@ -311,6 +335,31 @@ struct Keyed {
     reads: BTreeMap<String, KeyRead>,
 }
 
+/// **A `keep` read's turn on its binding** (ADR-0152), once the read before
+/// it lets go. In a test's build a read that finds the turn held tells the
+/// test first, if the test asked (`tell_when_a_turn_waits`), and then waits:
+/// "waiting for the read before it" is a fact the turn can state, where "has
+/// not returned yet" is a silence that a slow read makes too.
+fn held_turn(turn: &Mutex<()>) -> std::sync::MutexGuard<'_, ()> {
+    #[cfg(test)]
+    if let Err(std::sync::TryLockError::WouldBlock) = turn.try_lock() {
+        TURN_WAITING.with(|tell| {
+            if let Some(tell) = &*tell.borrow() {
+                tell();
+            }
+        });
+    }
+    turn.lock().expect("turn")
+}
+
+#[cfg(test)]
+std::thread_local! {
+    /// What this thread's test asked to be told when a `keep` read finds its
+    /// binding's turn held (`tell_when_a_turn_waits`).
+    static TURN_WAITING: std::cell::RefCell<Option<Box<dyn Fn()>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
 /// **One binding's reads** (ADR-0152).
 #[derive(Default)]
 struct KeyRead {
@@ -360,6 +409,11 @@ type Stopped = Arc<dyn Fn() -> bool + Send + Sync>;
 struct Categories {
     slow: Option<String>,
     delay_ms: u64,
+    /// **Held until a test releases it**, or until the read is stopped, as
+    /// the recommender is (ADR-0223): a test that needs the slow read in
+    /// flight while it does something else holds it, rather than outwaiting
+    /// a delay it guesses, which a slow machine outlasted.
+    gate: Option<Arc<Gate>>,
 }
 
 /// How many times a document is read, at most (ADR-0151): each attempt but
@@ -609,23 +663,123 @@ impl Default for Recommender {
 /// **A gate a held source waits at** (ADR-0223): closed until opened, and
 /// waited at for ten seconds at most, so a test that never opens it holds no
 /// thread for good.
+///
+/// A test that holds a source at a gate, rather than outwaiting a delay it
+/// guesses, waits for the gate's own report that a read is held there
+/// (`held`), and lets the source go when the event it waits for has come.
+/// "A source that has not answered" is then a fact the test sets, where a
+/// delay was a silence a slow machine made too.
 #[derive(Debug, Default)]
 struct Gate {
-    open: Mutex<bool>,
-    opened: std::sync::Condvar,
+    state: Mutex<GateState>,
+    changed: std::sync::Condvar,
+}
+
+#[derive(Debug, Default)]
+struct GateState {
+    open: bool,
+    /// How many reads wait at the gate now: what a test asks (`held`).
+    #[cfg_attr(not(test), allow(dead_code))]
+    waiting: usize,
+    /// How many times a read waiting at the gate has asked whether it was
+    /// stopped: what a test asks (`polled`), to know a read it let go of has
+    /// been asked, and was not stopped.
+    #[cfg_attr(not(test), allow(dead_code))]
+    polls: u64,
 }
 
 impl Gate {
     fn open(&self) {
-        *self.open.lock().expect("gate") = true;
-        self.opened.notify_all();
+        self.state.lock().expect("gate").open = true;
+        self.changed.notify_all();
     }
 
     fn wait(&self) {
-        let open = self.open.lock().expect("gate");
-        let _ = self
-            .opened
-            .wait_timeout_while(open, std::time::Duration::from_secs(10), |open| !*open);
+        self.wait_for(None);
+    }
+
+    /// **Waits at the gate until it is opened, or until `stopped` says the
+    /// read is wanted no more** (a read's cancellation is a predicate, not a
+    /// signal, so it is asked every ten milliseconds), ten seconds at most.
+    /// Whether it was stopped.
+    fn wait_unless(&self, stopped: &dyn Fn() -> bool) -> bool {
+        self.wait_for(Some(stopped))
+    }
+
+    fn wait_for(&self, stopped: Option<&dyn Fn() -> bool>) -> bool {
+        let until = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        let mut state = self.state.lock().expect("gate");
+        state.waiting += 1;
+        self.changed.notify_all();
+        // A read that was stopped is stopped, whether or not the gate has
+        // opened since: it is not read on.
+        let was_stopped = loop {
+            if let Some(stopped) = stopped {
+                let is_stopped = stopped();
+                state.polls += 1;
+                self.changed.notify_all();
+                if is_stopped {
+                    break true;
+                }
+            }
+            if state.open {
+                break false;
+            }
+            let left = until.saturating_duration_since(std::time::Instant::now());
+            if left.is_zero() {
+                break false;
+            }
+            let slice = match stopped {
+                Some(_) => left.min(std::time::Duration::from_millis(10)),
+                None => left,
+            };
+            state = self.changed.wait_timeout(state, slice).expect("gate").0;
+        };
+        state.waiting -= 1;
+        self.changed.notify_all();
+        was_stopped
+    }
+
+    /// **A test's: how many times a read waiting at the gate has asked
+    /// whether it was stopped.**
+    #[cfg(test)]
+    fn polls(&self) -> u64 {
+        self.state.lock().expect("gate").polls
+    }
+
+    /// **A test's: returns once the reads waiting at the gate have asked,
+    /// `polls` times in all, whether they were stopped**, ten seconds at most
+    /// (then it fails, saying so): a read let go of, asked twice since, and
+    /// still waiting, was not stopped.
+    #[cfg(test)]
+    fn polled(&self, polls: u64) {
+        let state = self.state.lock().expect("gate");
+        let (state, timeout) = self
+            .changed
+            .wait_timeout_while(state, std::time::Duration::from_secs(10), |state| {
+                state.polls < polls
+            })
+            .expect("gate");
+        drop(state);
+        assert!(!timeout.timed_out(), "the gate was not asked {polls} times");
+    }
+
+    /// **A test's: returns once `reads` reads wait at the gate**, ten seconds
+    /// at most (then it fails, saying so).
+    #[cfg(test)]
+    fn held(&self, reads: usize) {
+        let state = self.state.lock().expect("gate");
+        let (state, timeout) = self
+            .changed
+            .wait_timeout_while(state, std::time::Duration::from_secs(10), |state| {
+                state.waiting < reads
+            })
+            .expect("gate");
+        drop(state);
+        assert!(
+            !timeout.timed_out(),
+            "{reads} read(s) never reached the gate"
+        );
     }
 }
 
@@ -686,6 +840,9 @@ struct Estimator {
     /// `declared`: the query's declared error. Anything else: the call itself
     /// fails, as an estimator that is down does.
     fail: Option<String>,
+    /// **Held until a test releases it**, as the recommender is (ADR-0223),
+    /// then answered after `delay_ms`.
+    gate: Option<Arc<Gate>>,
     // What it estimates, the least minutes a delivery takes and the most
     // (ADR-0180), is the store's data (track `store-pg`): set through
     // `store:host/estimates#set`.
@@ -696,6 +853,7 @@ impl Default for Estimator {
         Estimator {
             delay_ms: 400,
             fail: None,
+            gate: None,
         }
     }
 }
@@ -5487,7 +5645,7 @@ impl Server {
         let waiting = queue
             .entry(doc.clone())
             .or_insert_with(|| Subscriber::at(doc.1));
-        waiting.seen = std::time::Instant::now();
+        waiting.seen = Subscriber::asked_at();
         waiting.pushed
     }
 
@@ -5514,7 +5672,7 @@ impl Server {
         // read includes it.
         waiting.frames.clear();
         waiting.behind = false;
-        waiting.seen = std::time::Instant::now();
+        waiting.seen = Subscriber::asked_at();
         // What it speculates on, as it was read (ADR-0222).
         let entries = self.speculated_entries(doc, &self.page_of(doc), &shown);
         self.shown
@@ -6162,7 +6320,7 @@ impl Server {
         // the latest when its turn comes is dropped unread. The browser
         // sends each read at once, so the server knows the latest while the
         // one before it still runs, and never applies that one.
-        let _turn = keep.then(|| turn.lock().expect("turn"));
+        let _turn = keep.then(|| held_turn(&turn));
         if keep && self.superseded(session, binding, seq, document, false) {
             return Ok(KeyOutcome::Superseded);
         }
@@ -8760,6 +8918,7 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
             *server.store.faults().categories.lock().expect("categories") = Categories {
                 slow: param("slow"),
                 delay_ms: param("delay").and_then(|d| d.parse().ok()).unwrap_or(0),
+                gate: None,
             };
             respond_json(&mut stream, 200, &session, fresh, "{}");
         }
@@ -10941,6 +11100,20 @@ public query Store(",
         path: &str,
         session: Option<&str>,
     ) -> Vec<(std::time::Duration, String)> {
+        fetched_stepwise(s, path, session, |_| {})
+    }
+
+    /// [`fetched_as`], **telling `heard` all the response has carried so far
+    /// each time a chunk of it arrives**, before the next is read: a test
+    /// that holds a source at a gate lets it go when the response shows what
+    /// it waits for (an event), where a delay it guessed was a silence a slow
+    /// machine made too.
+    fn fetched_stepwise(
+        s: &Server,
+        path: &str,
+        session: Option<&str>,
+        mut heard: impl FnMut(&str),
+    ) -> Vec<(std::time::Duration, String)> {
         let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
         let at = listener.local_addr().expect("address");
         std::thread::scope(|scope| {
@@ -10990,25 +11163,45 @@ public query Store(",
                     let text =
                         String::from_utf8(pending.drain(..whole).collect()).expect("decoded above");
                     chunks.push((started.elapsed(), text));
+                    let so_far: String = chunks.iter().map(|(_, c)| c.as_str()).collect();
+                    heard(&so_far);
                 }
             }
             chunks
         })
     }
 
-    /// When the response had first carried `text`, and everything it carried.
-    fn arrived(
-        chunks: &[(std::time::Duration, String)],
-        text: &str,
-    ) -> Option<std::time::Duration> {
-        let mut so_far = String::new();
-        for (at, chunk) in chunks {
-            so_far.push_str(chunk);
-            if so_far.contains(text) {
-                return Some(*at);
-            }
+    /// **The recommender, held at a gate** a test lets it go through
+    /// (ADR-0223): the gate.
+    fn hold_recommender(s: &Server) -> Arc<Gate> {
+        let gate = Arc::new(Gate::default());
+        *s.store.faults().recommender.lock().expect("recommender") = Recommender {
+            delay_ms: 0,
+            fail: None,
+            gate: Some(gate.clone()),
+        };
+        gate
+    }
+
+    /// **A program whose budgets are a minute**, for a test whose subject is
+    /// not a budget: a source held at a gate for the test to hear what comes
+    /// first must not have its wait ended by a budget a slow machine ran out
+    /// before the test let it go.
+    fn patient(app: &str) -> String {
+        let mut out: Vec<String> = app
+            .lines()
+            .map(|line| match line.trim_start().strip_prefix("timeout") {
+                Some(rest) if rest.trim_end().ends_with(".seconds") => {
+                    let indent = &line[..line.len() - line.trim_start().len()];
+                    format!("{indent}timeout       60.seconds")
+                }
+                _ => line.to_string(),
+            })
+            .collect();
+        if app.ends_with('\n') {
+            out.push(String::new());
         }
-        None
+        out.join("\n")
     }
 
     fn recommend(s: &Server, delay_ms: u64, fail: Option<&str>) {
@@ -11036,22 +11229,32 @@ public query Store(",
 
     #[test]
     fn a_streamed_region_follows_its_document_in_the_same_response() {
-        let s = served_from(with_recommendations, None);
-        recommend(&s, 400, None);
-        let chunks = fetched(&s, "/StorePage.html");
+        // The recommender is held at a gate, and let go when the response
+        // shows the document, its region pending, and its runtime started:
+        // what had come by then is a fact the test sets, where a delay of 400
+        // ms, and bounds of 300 ms on the document and 350 on the arm, were
+        // silences a slow machine made too. (The budget is a minute: it is
+        // not the subject.)
+        let s = served_from(|app| patient(&with_recommendations(app)), None);
+        let recommender = hold_recommender(&s);
+        let mut document: Option<String> = None;
+        let chunks = fetched_stepwise(&s, "/StorePage.html", None, |so_far| {
+            if document.is_none()
+                && so_far.contains("<?start name=")
+                && so_far.contains("import(\"/pw-runtime.mjs\")")
+            {
+                document = Some(so_far.to_string());
+                recommender.open();
+            }
+        });
         let whole: String = chunks.iter().map(|(_, c)| c.as_str()).collect();
-        // The document first, its region pending, and its runtime started.
-        let shell = arrived(&chunks, "<?start name=").expect("a pending region");
-        let runtime = arrived(&chunks, "import(\"/pw-runtime.mjs\")").expect("the runtime");
-        let filled = arrived(&chunks, "<template for=").expect("the region's arm");
-        assert!(shell < std::time::Duration::from_millis(300), "{shell:?}");
+        // The document first, its region pending, and its runtime started:
+        // the source was held until they were heard, so the region's arm,
+        // which it fills, could not have come with them.
+        let shell = document.expect("a pending region and the runtime came");
         assert!(
-            runtime < std::time::Duration::from_millis(300),
-            "{runtime:?}"
-        );
-        assert!(
-            filled >= std::time::Duration::from_millis(350),
-            "{filled:?}"
+            !shell.contains("<template for="),
+            "the region's arm came with the document: {shell}"
         );
         assert!(
             !whole.contains("content-length"),
@@ -11077,14 +11280,20 @@ public query Store(",
     #[test]
     fn a_region_past_its_budget_is_given_the_host_s_failure_when_its_budget_is_spent() {
         let s = served_from(with_recommendations, None);
-        // Three seconds of a one-second budget.
-        recommend(&s, 3000, None);
+        // The recommender is held at a gate for the whole response, past a
+        // one-second budget: the response ends because the budget was spent,
+        // not because the source answered (it cannot have), which a bound of
+        // 2.5 s on a source of 3 s measured with the machine's speed.
+        let recommender = hold_recommender(&s);
         let chunks = fetched(&s, "/StorePage.html");
-        let ended = chunks.last().expect("an answer").0;
         let whole: String = chunks.iter().map(|(_, c)| c.as_str()).collect();
         let arm = &whole[whole.find("<template for=").expect("arm")..];
         assert!(arm.contains("Unavailable"), "{arm}");
-        assert!(ended < std::time::Duration::from_millis(2500), "{ended:?}");
+        assert!(
+            !arm.contains("Cortado"),
+            "the held recommender answered: {arm}"
+        );
+        recommender.open();
     }
 
     #[test]
@@ -11159,6 +11368,7 @@ public query Store(",
                 Estimator {
                     delay_ms: 0,
                     fail: fail.map(str::to_string),
+                    ..Estimator::default()
                 },
             );
         // What it estimates is the session's data (track `store-pg`).
@@ -11515,75 +11725,125 @@ public query Store(",
         );
     }
 
-    /// How long a keyed read took, in milliseconds, and what came of it.
-    type Timed = (u128, Result<KeyOutcome, String>);
-
-    /// Hot is read, slow, and Cold asked for 150 ms later: how long each
-    /// read took, what came of each, and how many reads of a category were
-    /// stopped.
-    fn hot_then_cold(s: &Server) -> (Timed, Timed, u64) {
+    /// **The menu's `hot` category, held at a gate** (ADR-0223): a read of it
+    /// stays in flight until a test lets it go, or until it is stopped. A
+    /// test that needs a slow read in flight while it does something else
+    /// holds it, rather than outwaiting a delay it guesses: Hot's read took
+    /// a second, and what the test did meanwhile took as long as the machine
+    /// made it.
+    fn hold_hot(s: &Server) -> Arc<Gate> {
+        let gate = Arc::new(Gate::default());
         *s.store.faults().categories.lock().expect("categories") = Categories {
             slow: Some("hot".to_string()),
-            delay_ms: 1_000,
+            delay_ms: 0,
+            gate: Some(gate.clone()),
         };
-        let (_, cursor) = s.serve_document("a");
-        let timed = |seq, key: &str| {
-            let started = std::time::Instant::now();
-            let outcome = s.read_keyed("a", "browsing", seq, cursor, &category(key), STAYED);
-            (started.elapsed().as_millis(), outcome)
-        };
-        let (hot, cold) = std::thread::scope(|scope| {
-            let hot = scope.spawn(|| timed(1, "hot"));
-            std::thread::sleep(std::time::Duration::from_millis(150));
-            let cold = scope.spawn(|| timed(2, "cold"));
-            (hot.join().expect("hot"), cold.join().expect("cold"))
-        });
-        let stopped = s
-            .store
+        gate
+    }
+
+    /// How many reads of a category were stopped part way.
+    fn stopped_reads(s: &Server) -> u64 {
+        s.store
             .faults()
             .category_stopped
-            .load(std::sync::atomic::Ordering::SeqCst);
-        (hot, cold, stopped)
+            .load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    /// **A test's: `tell` is called on this thread each time a `keep` read
+    /// finds its binding's turn held**, just before it waits for the read
+    /// before it, until the returned guard is dropped.
+    fn tell_when_a_turn_waits(tell: impl Fn() + 'static) -> TurnTelling {
+        TURN_WAITING.with(|waiting| *waiting.borrow_mut() = Some(Box::new(tell)));
+        TurnTelling
+    }
+
+    struct TurnTelling;
+
+    impl Drop for TurnTelling {
+        fn drop(&mut self) {
+            TURN_WAITING.with(|waiting| *waiting.borrow_mut() = None);
+        }
     }
 
     #[test]
     fn under_cancel_a_newer_key_stops_the_old_keys_read() {
         let s = served_from_patches(|app| app.to_string(), &[BROWSE_SETUP, BROWSE_CANCEL]);
-        let ((hot_ms, hot), (cold_ms, cold), stopped) = hot_then_cold(&s);
+        // Hot's read is held at a gate that is never opened here: it ends
+        // only by being stopped, which is what is asserted.
+        let hot_gate = hold_hot(&s);
+        let (_, cursor) = s.serve_document("a");
+        let (hot, cold) = std::thread::scope(|scope| {
+            let hot =
+                scope.spawn(|| s.read_keyed("a", "browsing", 1, cursor, &category("hot"), STAYED));
+            // Hot's read is in flight, held, before Cold is asked for.
+            hot_gate.held(1);
+            let cold = s.read_keyed("a", "browsing", 2, cursor, &category("cold"), STAYED);
+            (hot.join().expect("hot"), cold)
+        });
         assert_eq!(hot, Ok(KeyOutcome::Superseded));
         assert_eq!(cold, Ok(KeyOutcome::Applied));
         // Stopped part way, not read to its end.
-        assert_eq!(stopped, 1);
-        assert!(hot_ms < 700, "Hot's read took {hot_ms} ms");
-        assert!(cold_ms < 500, "Cold's read took {cold_ms} ms");
+        assert_eq!(stopped_reads(&s), 1);
         assert_eq!(browsed(&s, "a"), ["Cold Brew"]);
     }
 
     #[test]
     fn under_supersede_the_old_keys_read_runs_on_unshown() {
         let s = served_from_patches(|app| app.to_string(), &[BROWSE_SETUP, BROWSE_SUPERSEDE]);
-        let ((hot_ms, hot), (cold_ms, cold), stopped) = hot_then_cold(&s);
+        let hot_gate = hold_hot(&s);
+        let (_, cursor) = s.serve_document("a");
+        let (hot, cold) = std::thread::scope(|scope| {
+            let hot =
+                scope.spawn(|| s.read_keyed("a", "browsing", 1, cursor, &category("hot"), STAYED));
+            hot_gate.held(1);
+            // Cold is not kept waiting for Hot, whose read is still held.
+            let cold = s.read_keyed("a", "browsing", 2, cursor, &category("cold"), STAYED);
+            // Hot's read is let go of, and runs to its end, unshown.
+            hot_gate.open();
+            (hot.join().expect("hot"), cold)
+        });
         assert_eq!(hot, Ok(KeyOutcome::Superseded));
         assert_eq!(cold, Ok(KeyOutcome::Applied));
-        assert_eq!(stopped, 0);
-        assert!(hot_ms >= 900, "Hot's read took {hot_ms} ms");
-        assert!(cold_ms < 500, "Cold's read took {cold_ms} ms");
+        assert_eq!(stopped_reads(&s), 0);
         assert_eq!(browsed(&s, "a"), ["Cold Brew"]);
     }
 
     #[test]
     fn under_keep_the_new_key_is_read_after_the_old_one_ends() {
         let s = served_from_patches(|app| app.to_string(), &[BROWSE_SETUP]);
-        let ((hot_ms, hot), (cold_ms, cold), stopped) = hot_then_cold(&s);
+        let hot_gate = hold_hot(&s);
+        let (_, cursor) = s.serve_document("a");
+        let (waits, waiting) = std::sync::mpsc::channel();
+        let (hot, cold) = std::thread::scope(|scope| {
+            let hot =
+                scope.spawn(|| s.read_keyed("a", "browsing", 1, cursor, &category("hot"), STAYED));
+            hot_gate.held(1);
+            let s = &s;
+            let cold = scope.spawn(move || {
+                let _telling = tell_when_a_turn_waits(move || {
+                    let _ = waits.send(());
+                });
+                s.read_keyed("a", "browsing", 2, cursor, &category("cold"), STAYED)
+            });
+            // Cold's read found Hot's turn held, and waits for Hot's read,
+            // which is held: it cannot end before Hot's does.
+            waiting
+                .recv_timeout(MUST_HAPPEN)
+                .expect("Cold's read never waited for Hot's");
+            assert!(!cold.is_finished(), "Cold's read ended before Hot's");
+            hot_gate.open();
+            (hot.join().expect("hot"), cold.join().expect("cold"))
+        });
         // Hot's read ends, and is not shown: Cold was asked for meanwhile.
         assert_eq!(hot, Ok(KeyOutcome::Superseded));
         assert_eq!(cold, Ok(KeyOutcome::Applied));
-        assert_eq!(stopped, 0);
-        assert!(hot_ms >= 900, "Hot's read took {hot_ms} ms");
-        // Cold waited for it.
-        assert!(cold_ms >= 700, "Cold's read took {cold_ms} ms");
+        assert_eq!(stopped_reads(&s), 0);
         assert_eq!(browsed(&s, "a"), ["Cold Brew"]);
     }
+
+    /// How long a test waits for an event that must come, at most: a bound
+    /// on a hang, never on the speed of the machine.
+    const MUST_HAPPEN: std::time::Duration = std::time::Duration::from_secs(10);
 
     #[test]
     fn a_flight_another_reader_waits_for_is_not_stopped() {
@@ -11598,10 +11858,14 @@ public query Store(",
             s.read_keyed("b", "browsing", 1, b, &category("hot"), STAYED),
             Ok(KeyOutcome::Applied)
         );
-        *s.store.faults().categories.lock().expect("categories") = Categories {
-            slow: Some("hot".to_string()),
-            delay_ms: 1_000,
-        };
+        // Hot is held at a gate, so its flight is in flight for as long as
+        // the steps below take, however long that is. (Hot's read took a
+        // second: the nightly of 2026-10-11 saw `a` move on before `b` had
+        // joined, and train-3's, train-11's and bounded-race's `just ci`
+        // saw the flight stopped, at loads of 20 to 50, when the steps took
+        // longer than that second and the command's read began a flight of
+        // its own, which nobody held when it was let go.)
+        let hot_gate = hold_hot(&s);
         let (_, a) = s.serve_document("a");
         // Each read that joined another's flight, as the query runtime traces it.
         let joined = || {
@@ -11614,14 +11878,12 @@ public query Store(",
         let before = joined();
         std::thread::scope(|scope| {
             let hot = scope.spawn(|| s.read_keyed("a", "browsing", 1, a, &category("hot"), STAYED));
-            std::thread::sleep(std::time::Duration::from_millis(100));
+            // `a`'s read is in flight, held at the gate, before `b`'s
+            // command asks for the same one.
+            hot_gate.held(1);
             let command = scope.spawn(|| s.command(ADD, "b", &add("espresso", 1), false));
             // Until `b`'s read has joined `a`'s flight, whichever began it.
-            // Until 2026-10-11 the test waited 100 ms for it, and on a loaded
-            // runner `a` moved on first: the flight was stopped with nobody
-            // else holding it, which is what it should do then (the nightly
-            // of 2026-10-11, e14-last-known-good's baseline).
-            let until = std::time::Instant::now() + std::time::Duration::from_secs(10);
+            let until = std::time::Instant::now() + MUST_HAPPEN;
             while joined() == before {
                 assert!(
                     std::time::Instant::now() < until,
@@ -11633,25 +11895,29 @@ public query Store(",
                 s.read_keyed("a", "browsing", 2, a, &category("cold"), STAYED),
                 Ok(KeyOutcome::Applied)
             );
+            // `a` has let go; the flight is `b`'s still. Hot's read, held,
+            // has been asked twice since whether it is stopped, and is not:
+            // asked here, with the gate closed, because once Hot's flight
+            // ends the read `b`'s page makes again may begin a flight of its
+            // own and let it go at once, and whether that one's source sees
+            // it is the machine's timing (it is not the flight asked about).
+            let asked = hot_gate.polls();
+            hot_gate.polled(asked + 2);
+            assert_eq!(
+                stopped_reads(&s),
+                0,
+                "the flight was stopped; the runtime traced {:#?}",
+                s.queries.trace()
+            );
+            hot_gate.open();
             assert_eq!(hot.join().expect("hot"), Ok(KeyOutcome::Superseded));
             command
                 .join()
                 .expect("command")
                 .expect("the command commits");
         });
-        // Read to its end, for `b`: nothing was stopped, and `b`'s page was
-        // not told to read itself again. A failure says what the query
-        // runtime traced: train-3's `just ci` of 2026-10-13 saw it stopped
-        // once, at a load of 20, and no run since has (NEXT, flaky tests).
-        assert_eq!(
-            s.store
-                .faults()
-                .category_stopped
-                .load(std::sync::atomic::Ordering::SeqCst),
-            0,
-            "the flight was stopped; the runtime traced {:#?}",
-            s.queries.trace()
-        );
+        // Read to its end, for `b`: its page was not told to read itself
+        // again.
         let queue = s.pending.lock().expect("pending");
         assert!(
             !queue[&latest(&queue, "b")]
@@ -11668,23 +11934,21 @@ public query Store(",
     #[test]
     fn a_browser_that_leaves_lets_go_of_its_read() {
         let s = served_from_patches(|app| app.to_string(), &[BROWSE_SETUP, BROWSE_CANCEL]);
-        *s.store.faults().categories.lock().expect("categories") = Categories {
-            slow: Some("hot".to_string()),
-            delay_ms: 1_000,
-        };
+        let hot_gate = hold_hot(&s);
         let (_, cursor) = s.serve_document("a");
-        let started = std::time::Instant::now();
-        let left = || started.elapsed() > std::time::Duration::from_millis(150);
-        let read = s.read_keyed("a", "browsing", 1, cursor, &category("hot"), &left);
+        // The browser leaves once its read is in flight, held at the gate.
+        let gone = std::sync::atomic::AtomicBool::new(false);
+        let left = || gone.load(std::sync::atomic::Ordering::SeqCst);
+        let read = std::thread::scope(|scope| {
+            let read =
+                scope.spawn(|| s.read_keyed("a", "browsing", 1, cursor, &category("hot"), &left));
+            hot_gate.held(1);
+            gone.store(true, std::sync::atomic::Ordering::SeqCst);
+            read.join().expect("read")
+        });
+        // The read ended with the gate still closed: stopped part way.
         assert_eq!(read, Ok(KeyOutcome::Superseded));
-        assert!(started.elapsed() < std::time::Duration::from_millis(700));
-        assert_eq!(
-            s.store
-                .faults()
-                .category_stopped
-                .load(std::sync::atomic::Ordering::SeqCst),
-            1
-        );
+        assert_eq!(stopped_reads(&s), 1);
         // Nothing it read is shown.
         assert_eq!(browsed(&s, "a"), ["Espresso", "Cortado", "Cold Brew"]);
     }
@@ -11705,11 +11969,20 @@ public query Store(",
             .unwrap_or(0)
     }
 
-    /// Eight documents served at once, each to its own session: how long
-    /// the eight took, and how many times the kitchen was asked.
-    fn eight_at_once(s: &Server) -> (std::time::Duration, u64) {
+    /// **The kitchen, held at a gate** (ADR-0223): a read of its prep time
+    /// stays in the kitchen until a test lets it go.
+    fn hold_kitchen(s: &Server) -> Arc<Gate> {
+        let gate = Arc::new(Gate::default());
+        *s.store.faults().kitchen_gate.lock().expect("kitchen") = Some(gate.clone());
+        gate
+    }
+
+    /// Eight documents served at once, each to its own session, with the
+    /// kitchen held at `kitchen`: `heard` is called with the pages in flight,
+    /// and says when the test has heard what it waits for, whereupon the
+    /// kitchen is let go. How many times the kitchen was asked.
+    fn eight_at_once(s: &Server, kitchen: &Gate, heard: impl FnOnce()) -> u64 {
         let before = prep_calls(s);
-        let started = std::time::Instant::now();
         std::thread::scope(|scope| {
             for i in 0..8 {
                 scope.spawn(move || {
@@ -11717,34 +11990,43 @@ public query Store(",
                     assert!(visible(&page).contains("Ready in 12 min"), "{page}");
                 });
             }
+            heard();
+            kitchen.open();
         });
-        (started.elapsed(), prep_calls(s) - before)
+        prep_calls(s) - before
     }
 
     #[test]
     fn pages_read_at_once_share_an_ask_their_query_says_is_one_per_key() {
         // ADR-0151: a document is read outside the subscriber table, so
-        // eight pages are read at once, and share the kitchen's answer.
+        // eight pages are read at once, and share the kitchen's answer. The
+        // kitchen is held at a gate until the first ask is in it and the
+        // other seven have joined it: shared is what the trace says, where
+        // a bound of 1.2 s on the eight pages measured the machine.
         let s = served_from_patches(|app| app.to_string(), &[PREP_SETUP, PREP_SHARED]);
-        let (took, asked) = eight_at_once(&s);
+        let kitchen = hold_kitchen(&s);
+        let joined = || {
+            s.queries
+                .trace()
+                .iter()
+                .filter(|t| matches!(t, pw_resource::Trace::RequestDeduplicated { .. }))
+                .count()
+        };
+        let asked = eight_at_once(&s, &kitchen, || {
+            kitchen.held(1);
+            until("seven pages joined the ask", || joined() >= 7);
+        });
         assert!(asked <= 2, "the kitchen was asked {asked} times");
-        // About one ask's time, where one after another took eight.
-        assert!(
-            took < std::time::Duration::from_millis(4 * KITCHEN_MS),
-            "{took:?}"
-        );
     }
 
     #[test]
     fn pages_read_at_once_each_ask_when_their_query_says_parallel() {
         let s = served_from_patches(|app| app.to_string(), &[PREP_SETUP]);
-        let (took, asked) = eight_at_once(&s);
+        let kitchen = hold_kitchen(&s);
+        // Asked at once, all the same: the eight reads are in the kitchen
+        // together, which one after another could not be.
+        let asked = eight_at_once(&s, &kitchen, || kitchen.held(8));
         assert_eq!(asked, 8);
-        // Asked at once, all the same.
-        assert!(
-            took < std::time::Duration::from_millis(4 * KITCHEN_MS),
-            "{took:?}"
-        );
     }
 
     #[test]
@@ -12760,7 +13042,10 @@ public query Store(",
 
     /// **A delay slows what it names** (charter §15.5, ADR-0174): a cart
     /// delay its own session's reads of the cart, and no other session's;
-    /// the store's delay every reader's store, when the store is read.
+    /// the store's delay every reader's store, when the store is read. What
+    /// a delay slows is what takes it: the delays taken are counted, and a
+    /// render that waited no delay is one that took none, where "took less
+    /// than a second" was a speed the machine set.
     #[test]
     fn a_delay_slows_what_it_names_and_nothing_else() {
         let s = rendering_server();
@@ -12769,6 +13054,12 @@ public query Store(",
             let started = std::time::Instant::now();
             s.render_store(session);
             started.elapsed()
+        };
+        let taken = || {
+            s.store
+                .faults()
+                .delays_taken
+                .load(std::sync::atomic::Ordering::SeqCst)
         };
         // The shared queries, read and kept.
         timed("warm");
@@ -12780,25 +13071,34 @@ public query Store(",
             .entry("slow".into())
             .or_default()
             .delay_ms = 1000;
+        let before = taken();
         assert!(timed("slow") >= second, "its own session's cart");
-        assert!(timed("quick") < second, "not another's");
+        assert!(taken() > before, "its own session's cart took the delay");
+        let before = taken();
+        timed("quick");
+        assert_eq!(taken(), before, "not another's");
 
         s.store
             .faults()
             .store_delay_ms
             .store(1000, std::sync::atomic::Ordering::SeqCst);
-        assert!(
-            timed("quick") < second,
+        timed("quick");
+        assert_eq!(
+            taken(),
+            before,
             "a store kept within its freshness is not read"
         );
         s.query_clock.0.advance(30_001);
         assert!(timed("quick") >= second, "read again, and slow");
+        assert!(taken() > before, "read again, and took the delay");
         s.store
             .faults()
             .store_delay_ms
             .store(0, std::sync::atomic::Ordering::SeqCst);
         s.query_clock.0.advance(30_001);
-        assert!(timed("quick") < second, "cleared");
+        let before = taken();
+        timed("quick");
+        assert_eq!(taken(), before, "cleared");
     }
 
     /// A request through [`handle`], as a page sends one: what came back,
@@ -13042,7 +13342,11 @@ public query Store(",
     /// first, and the order was refused as nothing to order.
     #[test]
     fn a_pages_command_here_before_the_one_it_follows_runs_after_it() {
-        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        let mut s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        // The clear waits for the order, which the test lets arrive once it
+        // has heard the clear wait: for a minute, not the two seconds a slow
+        // machine outwaited (the clear was then answered early, unrun).
+        s.order = order::Order::waiting(std::time::Duration::from_secs(60));
         let session = "ordered";
         let body = serde_json::json!([shown("espresso"), 1]).to_string();
         let added = posted(&s, &format!("/command/{ADD}"), session, "press-0", &body);
@@ -13058,7 +13362,7 @@ public query Store(",
                 let path = format!("/command/{CLEAR}");
                 posted_after(&s, &path, session, "press-2", "press-1", "[]")
             });
-            std::thread::sleep(std::time::Duration::from_millis(300));
+            until("the clear waiting for the order", || s.order.waits() >= 1);
             assert!(!clear.is_finished(), "the clear waits for the order");
             assert_eq!(
                 quantities(&s, session),
@@ -13092,11 +13396,13 @@ public query Store(",
         assert!(early.starts_with("HTTP/1.1 409"), "{early}");
         assert!(early.contains("\"early\":true"), "{early}");
         assert_eq!(quantities(&s, session), [], "nothing ran");
-        // What follows one answered early is answered early, at once.
-        let started = std::time::Instant::now();
+        // What follows one answered early is answered early, at once: it
+        // does not wait (a bound of 150 ms on the answer was a speed the
+        // machine set).
+        let waited = s.order.waits();
         let after = posted_after(&s, &path, session, "press-3", "press-2", &body);
         assert!(after.starts_with("HTTP/1.1 409"), "{after}");
-        assert!(started.elapsed() < std::time::Duration::from_millis(150));
+        assert_eq!(s.order.waits(), waited, "it did not wait");
         assert_eq!(quantities(&s, session), [], "nothing ran");
         let again = posted(&s, &path, session, "press-2", &body);
         assert!(again.contains("\"committed\":true"), "{again}");
@@ -13128,7 +13434,9 @@ public query Store(",
     /// ran, so it is not yet the one before.
     #[test]
     fn a_pages_command_after_one_closed_unrun_waits_for_it_sent_again() {
-        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        let mut s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+        // For a minute (see `a_pages_command_here_before_the_one_it_follows_runs_after_it`).
+        s.order = order::Order::waiting(std::time::Duration::from_secs(60));
         let session = "closed";
         let body = serde_json::json!([shown("espresso"), 1]).to_string();
         let added = posted(&s, &format!("/command/{ADD}"), session, "press-0", &body);
@@ -13156,7 +13464,7 @@ public query Store(",
                 let path = format!("/command/{CLEAR}");
                 posted_after(&s, &path, session, "press-2", "press-1", "[]")
             });
-            std::thread::sleep(std::time::Duration::from_millis(300));
+            until("the clear waiting for the order", || s.order.waits() >= 1);
             assert!(!clear.is_finished(), "the clear waits for the order");
             let placed = posted(&s, &place, session, "press-1", &to_place);
             assert!(placed.contains("\"$case\":\"ok\""), "placed: {placed}");
@@ -13165,14 +13473,42 @@ public query Store(",
         });
     }
 
+    /// Waits until `ready` holds, ten seconds at most (then it fails, saying
+    /// `what` never came): for an event a test's own thread cannot be told
+    /// of, as a subscriber's trail records it.
+    fn until(what: &str, mut ready: impl FnMut() -> bool) {
+        let deadline = std::time::Instant::now() + MUST_HAPPEN;
+        while !ready() {
+            assert!(std::time::Instant::now() < deadline, "never: {what}");
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+    }
+
+    /// Whether `doc`'s trail says `what` yet.
+    fn trail_says(s: &Server, doc: &Doc, what: &str) -> bool {
+        s.pending
+            .lock()
+            .expect("pending")
+            .get(doc)
+            .is_some_and(|waiting| waiting.trail.iter().any(|note| note.contains(what)))
+    }
+
     /// **A forced reconnect** (charter §15.5, ADR-0175): the session's open
     /// subscription ends at once; a new one is closed with no answer for the
     /// cut's window; and one after it is sent what was queued meanwhile.
+    ///
+    /// The test waits for what its steps need to have happened, not for
+    /// time: the stream is open when its trail says so, and it ended because
+    /// it was cut when its trail says that (a stream that was not cut ends by
+    /// itself after its passes, two seconds on). The window is an hour, which
+    /// the test ends itself: a window of 800 ms ran out between the steps
+    /// inside it on a slow machine.
     #[test]
     fn a_forced_reconnect_ends_a_subscription_and_refuses_new_ones_for_its_window() {
         let s = rendering_server();
         let session = "cut";
         let (_, document) = s.serve_document(session);
+        let doc: Doc = (session.to_string(), document);
         let ms = std::time::Duration::from_millis;
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
         let mut page = TcpStream::connect(listener.local_addr().expect("addr")).expect("connect");
@@ -13180,19 +13516,23 @@ public query Store(",
         std::thread::scope(|scope| {
             let open =
                 scope.spawn(|| stream_open(&s, &mut held, session, false, document, document));
-            std::thread::sleep(ms(100));
-            assert!(!open.is_finished(), "held open");
+            until("the stream open", || {
+                trail_says(&s, &doc, "stream opened since")
+            });
             // Through the control, as a test arms it.
-            let cut = std::time::Instant::now();
-            let armed = posted(&s, "/bench/reconnect?for=800", session, "cut-1", "");
+            let armed = posted(&s, "/bench/reconnect?for=3600000", session, "cut-1", "");
             assert!(armed.starts_with("HTTP/1.1 200"), "{armed}");
             open.join().expect("ended");
-            assert!(cut.elapsed() < ms(300), "it ended at once");
         });
+        assert!(
+            trail_says(&s, &doc, "stream cut off at pass"),
+            "it ended at once, cut off, not after its passes: {:?}",
+            s.pending.lock().expect("pending")[&doc].trail
+        );
         // What the server wrote before it ended: its end of the connection
         // closed, as `handle` closes it when the subscription returns.
         drop(held);
-        page.set_read_timeout(Some(ms(2000))).expect("timeout");
+        page.set_read_timeout(Some(ms(10_000))).expect("timeout");
         let mut written = String::new();
         let _ = page.read_to_string(&mut written);
         assert!(written.starts_with("HTTP/1.1 200"), "{written}");
@@ -13223,7 +13563,13 @@ public query Store(",
             "",
             "a new stream, inside the window: not even its head"
         );
-        std::thread::sleep(ms(800));
+        // The window ends.
+        s.connection_faults
+            .lock()
+            .unwrap()
+            .get_mut(session)
+            .expect("the session's faults")
+            .cut_until = None;
         let served = fetched_as(&s, &poll, Some(session))
             .into_iter()
             .map(|(_, c)| c)
@@ -13237,19 +13583,25 @@ public query Store(",
         // asks again is served at once.
         let session = "blip";
         let (_, document) = s.serve_document(session);
+        let doc: Doc = (session.to_string(), document);
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
         let _page = TcpStream::connect(listener.local_addr().expect("addr")).expect("connect");
         let (mut held, _) = listener.accept().expect("accept");
         std::thread::scope(|scope| {
             let open =
                 scope.spawn(|| stream_open(&s, &mut held, session, false, document, document));
-            std::thread::sleep(ms(100));
-            let cut = std::time::Instant::now();
+            until("the stream open", || {
+                trail_says(&s, &doc, "stream opened since")
+            });
             let armed = posted(&s, "/bench/reconnect?for=0", session, "blip-1", "");
             assert!(armed.starts_with("HTTP/1.1 200"), "{armed}");
             open.join().expect("ended");
-            assert!(cut.elapsed() < ms(300), "it ended at once");
         });
+        assert!(
+            trail_says(&s, &doc, "stream cut off at pass"),
+            "it ended at once, cut off: {:?}",
+            s.pending.lock().expect("pending")[&doc].trail
+        );
         let again = fetched_as(
             &s,
             &format!("/stream?doc={document}&since={document}"),
@@ -13263,20 +13615,25 @@ public query Store(",
         // A long poll held when the cut comes ends at once too, unanswered.
         let session = "cut-poll";
         let (_, document) = s.serve_document(session);
+        let doc: Doc = (session.to_string(), document);
         let poll = format!("/stream?doc={document}&since={document}");
+        // A pass of the poll marks its page as asking (`seen`): the poll is
+        // held in its loop once that has changed.
+        let asked = s.pending.lock().expect("pending")[&doc].seen;
         std::thread::scope(|scope| {
             let held = scope.spawn(|| fetched_as(&s, &poll, Some(session)));
-            std::thread::sleep(ms(100));
-            assert!(!held.is_finished(), "held");
-            let cut = std::time::Instant::now();
+            until("the poll held", || {
+                s.pending.lock().expect("pending")[&doc].seen != asked
+            });
             s.connection_faults
                 .lock()
                 .unwrap()
                 .entry(session.into())
                 .or_default()
-                .cut_from = Some(cut);
+                .cut_from = Some(std::time::Instant::now());
             let answered = held.join().expect("ended");
-            assert!(cut.elapsed() < ms(300), "it ended at once");
+            // A poll that ran its passes out answers an empty batch; this
+            // one ended with no answer at all.
             assert_eq!(
                 answered.iter().map(|(_, c)| c.as_str()).collect::<String>(),
                 "",
@@ -14516,11 +14873,23 @@ public query Store(",
             let pending = s.pending.lock().expect("pending");
             (latest(&pending, "b"), latest(&pending, "c"))
         };
-        let target = slow.clone();
+        // "b" takes its time: its document is derived only once "c" has been
+        // told (the trail says so), or ten seconds have passed. A delay of
+        // 400 ms was a silence "c"'s telling could be outwaited by on a slow
+        // machine, and the order then said nothing of the tellers.
+        let (target, quick_doc) = (slow.clone(), quick.clone());
         *s.deriving_hook.lock().expect("deriving") =
-            Some(Arc::new(move |_: &Server, doc: &Doc| {
+            Some(Arc::new(move |s: &Server, doc: &Doc| {
                 if *doc == target {
-                    std::thread::sleep(std::time::Duration::from_millis(400));
+                    let until = std::time::Instant::now() + std::time::Duration::from_secs(10);
+                    while std::time::Instant::now() < until
+                        && !s.pending.lock().expect("pending")[&quick_doc]
+                            .trail
+                            .iter()
+                            .any(|note| note.contains(" told at "))
+                    {
+                        std::thread::sleep(std::time::Duration::from_millis(1));
+                    }
                 }
             }));
         s.command_answered(
@@ -14531,9 +14900,10 @@ public query Store(",
         )
         .expect("runs");
         s.tell_waiting();
-        // "b" comes first in the order, and takes its time.
+        // "b" comes first in the order, and takes its time: "c" was told
+        // while it did (the milliseconds a note carries may tie).
         assert!(
-            told_ms(&s, &quick) < told_ms(&s, &slow),
+            told_ms(&s, &quick) <= told_ms(&s, &slow),
             "c told at {} ms, b at {} ms",
             told_ms(&s, &quick),
             told_ms(&s, &slow)
@@ -14579,6 +14949,37 @@ public query Store(",
         // Asked again, nothing more: it was told once.
         s.told_as_it_asks(&theirs);
         assert_eq!(sets_of(&s, &theirs).len(), 1);
+    }
+
+    /// **A test's page keeps asking, however long the test takes** (the
+    /// premise of every test that serves a document and later commits):
+    /// [`LIVE`] is three seconds of the machine's wall clock, which a test
+    /// of a slow machine outlasts between its serve and its commit, so a
+    /// test build dates the ask an hour on (`Subscriber::asked_at`). The
+    /// window itself is tested by setting `seen` to the instant meant.
+    #[test]
+    fn a_page_served_is_asking_for_as_long_as_a_test_takes() {
+        let s = served_feed();
+        s.serve_document_settled("a", "feed.app.Home", &Params::new(), &[])
+            .expect("served");
+        let doc = latest(&s.pending.lock().expect("pending"), "a");
+        let later = std::time::Instant::now() + 100 * LIVE;
+        assert!(
+            s.pending.lock().expect("pending")[&doc].live(later),
+            "a page served, {:?} on",
+            100 * LIVE
+        );
+        // As a page subscribed is.
+        let subscribed: Doc = ("a".to_string(), 9_999);
+        s.subscribed(&subscribed);
+        assert!(
+            s.pending.lock().expect("pending")[&subscribed].live(later),
+            "a page subscribed"
+        );
+        // And one aged to the instant the window is tested at is not.
+        let mut aged = Subscriber::at(1);
+        aged.seen = later - LIVE - std::time::Duration::from_millis(1);
+        assert!(!aged.live(later), "a page that has not asked for LIVE");
     }
 
     /// **A host serves the build it was given, by its name** (ADR-0300): on
@@ -16289,15 +16690,25 @@ public query Store(",
             scope.spawn(|| stream_open(&s, &mut held, session, false, document, document));
             s.command(ADD, session, &add_shown("espresso", 1), false)
                 .expect("runs");
-            std::thread::sleep(std::time::Duration::from_millis(300));
 
-            // The stream wrote the change to the connection ...
-            gone.set_read_timeout(Some(std::time::Duration::from_millis(500)))
+            // The stream wrote the change to the connection ... (read until
+            // it has: the bytes are the event, and ten seconds the most that
+            // is waited for them. A sleep of 300 ms and a read of 500 ms were
+            // a silence a slow machine made too.)
+            gone.set_read_timeout(Some(std::time::Duration::from_secs(10)))
                 .expect("timeout");
-            let mut written = vec![0; 1 << 16];
-            let n = gone.read(&mut written).unwrap_or(0);
-            let written = String::from_utf8_lossy(&written[..n]).to_string();
-            assert!(written.contains("\"frames\""), "{written}");
+            let mut written = String::new();
+            let mut buf = vec![0; 1 << 16];
+            while !written.contains("\"frames\"") {
+                let n = match gone.read(&mut buf) {
+                    // A stopped and continued process is interrupted in a read
+                    // that has a timeout: read on.
+                    Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                    read => read.expect("the stream wrote the change"),
+                };
+                assert!(n > 0, "the stream ended without the change: {written}");
+                written.push_str(&String::from_utf8_lossy(&buf[..n]));
+            }
 
             // ... which the page never read: its next request, from where it
             // was, is still sent it.
@@ -17658,6 +18069,15 @@ public query Store(",
         assert!(!harbor.contains("Small-batch"), "{harbor}");
     }
 
+    /// [`slot_patch`], for a page not yet whole: `None` while the slot's
+    /// section has not come to its end, and when the slot is not pending.
+    fn pending_patch(page: &str, label: &str) -> Option<String> {
+        let at = page.find(&format!("aria-label=\"{label}\""))?;
+        let section = &page[at..at + page[at..].find("</section>")?];
+        let name = &section[section.find("<?start name=\"")? + "<?start name=\"".len()..];
+        Some(format!("<template for=\"{}\">", &name[..name.find('"')?]))
+    }
+
     /// **The patch that fills a slot of the store** (ADR-0165): the opening
     /// of the `<template for>` its pending range names, if it is pending.
     fn slot_patch(page: &str, label: &str) -> Option<String> {
@@ -17722,6 +18142,7 @@ public query Store(",
                 Estimator {
                     delay_ms: 0,
                     fail: None,
+                    ..Estimator::default()
                 },
             );
         s.set_estimate("b", 15, Some(45)).expect("estimated");
@@ -17800,7 +18221,14 @@ public query Store(",
     fn what_a_shared_cache_keeps_holds_nothing_a_session_put_in_it() {
         let (alice, bob) = ("session-alice-shared-output", "session-bob-shared-output");
         let kept = |pressed: bool| -> (Vec<String>, Vec<String>) {
-            let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+            let mut s = served_from_patches_in("examples", |app| app.to_string(), &[]);
+            // Both hosts keep the same instant, noon in the stores' zone
+            // (America/Los_Angeles) on 2026-10-21, where each took the wall
+            // clock when it was built: minutes apart, and a store's status
+            // ("open until ..") is the next local midnight's, so a pair that
+            // straddled midnight there kept two values (found by this
+            // track's run at 07:00Z, 2026-10-20).
+            s.epoch = 1_792_609_200_000;
             recommend(&s, 0, None);
             for session in [alice, bob] {
                 for store in [STORE_ID, "48"] {
@@ -18114,8 +18542,16 @@ public query Store(",
     /// query answers, the estimate's first.
     #[test]
     fn the_store_sends_its_slots_after_its_own_content() {
-        let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
-        recommend(&s, 600, None);
+        // Each slot's source is held at a gate of its own, and let go when the
+        // response shows what it waits for: the document first, the estimate
+        // after it, the recommendations after that. What the response carries
+        // at each step is a fact the test sets, where delays of 200 and 600
+        // ms, and a bound of 150 on the document, were silences a slow
+        // machine made too (the budgets are a minute: they are not the
+        // subject).
+        let s = served_from_patches_in("examples", patient, &[]);
+        let recommendations = hold_recommender(&s);
+        let estimate_gate = Arc::new(Gate::default());
         s.store
             .faults()
             .estimators
@@ -18124,39 +18560,61 @@ public query Store(",
             .insert(
                 "a".to_string(),
                 Estimator {
-                    delay_ms: 200,
+                    delay_ms: 0,
                     fail: None,
+                    gate: Some(estimate_gate.clone()),
                 },
             );
         s.set_estimate("a", 30, None).expect("estimated");
-        let chunks = fetched_as(&s, "/stores/47", Some("a"));
-        let at =
-            |text: &str| arrived(&chunks, text).unwrap_or_else(|| panic!("never sent: {text}"));
-        let whole: String = chunks.iter().map(|(_, c)| c.as_str()).collect();
-        // The store's own content, and both slots pending, at once.
-        let shell = at("Finding recommendations");
-        assert!(shell < std::time::Duration::from_millis(150), "{shell:?}");
-        for own in [
+        let own = [
             "Blue Bottle",
             "Cold Brew",
             "id=\"cart-count\"",
             "Estimating delivery",
-        ] {
-            assert!(at(own) <= shell, "{own} came after the document");
-        }
-        // Then each arm, as its query answers: the estimate, then the
-        // recommendations.
-        let estimated = at(&slot_patch(&whole, "Delivery").expect("the estimate pending"));
-        let recommended = at(&slot_patch(&whole, "Recommendations").expect("pending"));
+            "Finding recommendations",
+        ];
+        // What had come when each source was let go, and each arm's patch.
+        let mut document: Option<(String, String, String)> = None;
+        let mut estimate_came: Option<String> = None;
+        let chunks = fetched_stepwise(&s, "/stores/47", Some("a"), |so_far| {
+            if document.is_none()
+                && own.iter().all(|text| so_far.contains(text))
+                && let (Some(delivery), Some(recs)) = (
+                    pending_patch(so_far, "Delivery"),
+                    pending_patch(so_far, "Recommendations"),
+                )
+            {
+                document = Some((so_far.to_string(), delivery, recs));
+                estimate_gate.open();
+            }
+            if let Some((_, delivery, _)) = &document
+                && estimate_came.is_none()
+                && so_far.contains(delivery)
+            {
+                estimate_came = Some(so_far.to_string());
+                recommendations.open();
+            }
+        });
+        let whole: String = chunks.iter().map(|(_, c)| c.as_str()).collect();
+        // The store's own content, and both slots pending, at once: with the
+        // document heard, neither source had been let go, so neither arm
+        // could have come with it.
+        let (shell, delivery, recommended) = document.expect("the document came");
         assert!(
-            estimated >= std::time::Duration::from_millis(200),
-            "{estimated:?}"
+            !shell.contains(&delivery) && !shell.contains(&recommended),
+            "an arm came with the document: {shell}"
+        );
+        // Then each arm, as its query answers: the estimate, with the
+        // recommendations still held, and then the recommendations.
+        let estimate_came = estimate_came.expect("the estimate's arm came");
+        assert!(
+            !estimate_came.contains(&recommended),
+            "the recommendations came with the estimate, held"
         );
         assert!(
-            recommended >= std::time::Duration::from_millis(600),
-            "{recommended:?}"
+            whole.contains(&recommended),
+            "the recommendations' arm came after"
         );
-        assert!(estimated < recommended, "{estimated:?} {recommended:?}");
         // A range, in words (ADR-0180).
         assert_eq!(slot(&whole, "Delivery"), "Delivery in 30 to 40 min");
         assert_eq!(slot(&whole, "Recommendations"), "Cortado Cold Brew");
@@ -18335,7 +18793,11 @@ public query Store(",
         let (mut held, _) = listener.accept().expect("accept");
         std::thread::scope(|scope| {
             scope.spawn(|| stream_open(&s, &mut held, session, false, document, applied));
-            std::thread::sleep(std::time::Duration::from_millis(100));
+            // The stream has opened, and acknowledged what the page applied,
+            // when its trail says so.
+            until("the stream open", || {
+                trail_says(&s, &doc, "stream opened since")
+            });
             let queue = s.pending.lock().expect("pending");
             assert!(
                 !queue[&doc].frames.iter().any(|(n, _)| *n <= applied),

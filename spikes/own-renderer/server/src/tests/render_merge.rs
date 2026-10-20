@@ -451,11 +451,16 @@ fn on_postgres_a_render_past_the_bound_waits_for_a_seat() {
     let mut seated: Vec<_> = (0..RENDER_CONNECTIONS)
         .map(|_| layer.snapshot().expect("a seat"))
         .collect();
+    let renders = layer.renders_for_test().expect("the database's renders");
     let (tx, rx) = std::sync::mpsc::channel();
     std::thread::scope(|scope| {
         let layer = &layer;
         scope.spawn(move || tx.send(read_in_a_render(layer)));
-        let early = rx.recv_timeout(Duration::from_millis(500));
+        // The render found every seat taken and waits for one: the seats say
+        // so (a pause of 500 ms and "it has not read yet" was a silence a
+        // slow read makes too).
+        wait_until(|| renders.waiting() >= 1, "the render waiting for a seat");
+        let early = rx.try_recv();
         seated.pop();
         let late = rx.recv_timeout(Duration::from_secs(20));
         assert!(early.is_err(), "a render past the bound waits: {early:?}");

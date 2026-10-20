@@ -63,7 +63,13 @@ MUTANTS = [
         "one whose named one is still running runs",
         "server",
         ORDER,
-        '                Some(Fate::Here) => fates = self.changed.wait(fates).expect("order"),\n',
+        # Re-anchored by track `flake-hunt`: the wait counts itself for a test
+        # (`Order::waits`), in a block.
+        "                Some(Fate::Here) => {\n"
+        "                    #[cfg(test)]\n"
+        "                    self.waits.fetch_add(1, std::sync::atomic::Ordering::SeqCst);\n"
+        '                    fates = self.changed.wait(fates).expect("order")\n'
+        "                }\n",
         "                Some(Fate::Here) => return Turn::Run,\n",
     ),
     (

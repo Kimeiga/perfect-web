@@ -46,6 +46,7 @@ fn no_delay(s: &Server, fail: Option<&str>) {
             Estimator {
                 delay_ms: 0,
                 fail: fail.map(str::to_string),
+                ..Estimator::default()
             },
         );
 }

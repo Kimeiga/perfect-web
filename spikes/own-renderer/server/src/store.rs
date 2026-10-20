@@ -95,6 +95,15 @@ pub(crate) struct Faults {
     /// How many reads of a category saw they were stopped, and ended early
     /// (E14, T07).
     pub(crate) category_stopped: Arc<AtomicU64>,
+    /// **The kitchen, held at a gate** (E14, T02; ADR-0223): a read of its
+    /// prep time waits there until a test lets it go. A test that needs to
+    /// know how many pages are asking the kitchen at once holds it, and hears
+    /// them arrive, rather than timing eight pages against a delay.
+    pub(crate) kitchen_gate: Mutex<Option<Arc<Gate>>>,
+    /// **How many delays were taken**, a cart's or the store's (ADR-0174):
+    /// a test hears from this that a delay was waited by what it names and
+    /// by nothing else, where the time a read took was the machine's too.
+    pub(crate) delays_taken: Arc<AtomicU64>,
 }
 
 impl Faults {
@@ -108,6 +117,8 @@ impl Faults {
             estimators: Mutex::new(BTreeMap::new()),
             categories: Mutex::new(Categories::default()),
             category_stopped: Arc::new(AtomicU64::new(0)),
+            kitchen_gate: Mutex::new(None),
+            delays_taken: Arc::new(AtomicU64::new(0)),
         }
     }
 }
@@ -569,6 +580,7 @@ fn reader_of<'v>(op: &str, args: &'v [Val]) -> Result<(&'v str, &'v [Val]), Stri
 /// no value, and the component that called it traps.
 pub(crate) fn faulted(
     cart_faults: &Arc<Mutex<BTreeMap<String, CartFaults>>>,
+    delays_taken: &Arc<AtomicU64>,
     session: &str,
     mut host: Ops,
 ) -> Ops {
@@ -587,6 +599,7 @@ pub(crate) fn faulted(
                 continue;
             };
             let faults = cart_faults.clone();
+            let delays = delays_taken.clone();
             let session = session.to_string();
             host.insert(
                 key,
@@ -608,6 +621,7 @@ pub(crate) fn faulted(
                             .unwrap_or_default()
                     };
                     if delay > 0 {
+                        delays.fetch_add(1, Ordering::SeqCst);
                         std::thread::sleep(std::time::Duration::from_millis(delay));
                     }
                     op(args)
@@ -628,6 +642,7 @@ pub(crate) fn faulted(
 pub(crate) fn reads(with: With, session: &str, faults: &Faults, stopped: Option<Stopped>) -> Ops {
     let mut ops = faulted(
         &faults.cart_faults,
+        &faults.delays_taken,
         session,
         unfaulted(with.clone(), session, faults),
     );
@@ -749,6 +764,10 @@ fn unfaulted(with: With, session: &str, faults: &Faults) -> Ops {
         "store:data/estimates#current".to_string(),
         Arc::new(move |args: &[Val]| {
             own_session("estimates#current", &this, args)?;
+            // Held until a test lets it go (ADR-0223), then slow.
+            if let Some(gate) = &estimator.gate {
+                gate.wait();
+            }
             std::thread::sleep(std::time::Duration::from_millis(estimator.delay_ms));
             match estimator.fail.as_deref() {
                 Some("declared") => return Ok(declared("location-unavailable")),
@@ -790,6 +809,10 @@ fn unfaulted(with: With, session: &str, faults: &Faults) -> Ops {
             let [Val::String(store), Val::String(reader)] = args else {
                 return Err(format!("user-estimates#for-store received {args:?}"));
             };
+            // Held until a test lets it go (ADR-0223), then slow.
+            if let Some(gate) = &estimator.gate {
+                gate.wait();
+            }
             std::thread::sleep(std::time::Duration::from_millis(estimator.delay_ms));
             match estimator.fail.as_deref() {
                 Some("declared") => return Ok(declared("location-unavailable")),
@@ -1132,6 +1155,7 @@ fn catalog(with: With, faults: &Faults, stopped: Option<Stopped>) -> Ops {
     // Charter §15.5's store delay (ADR-0174), and its origin failing once
     // (ADR-0177), as a test set them.
     let store_delay = faults.store_delay_ms.clone();
+    let store_delays = faults.delays_taken.clone();
     let store_fails = faults.store_fails_next.clone();
     let w = with.clone();
     ops.insert(
@@ -1153,6 +1177,7 @@ fn catalog(with: With, faults: &Faults, stopped: Option<Stopped>) -> Ops {
                 }
                 let delay = store_delay.load(Ordering::SeqCst);
                 if delay > 0 {
+                    store_delays.fetch_add(1, Ordering::SeqCst);
                     std::thread::sleep(std::time::Duration::from_millis(delay));
                 }
                 Ok(ok(store))
@@ -1259,6 +1284,7 @@ fn catalog(with: With, faults: &Faults, stopped: Option<Stopped>) -> Ops {
     );
     // How long the kitchen takes now (E14, T02), after [`KITCHEN_MS`]: a
     // slow source. The minutes are the ones it was asked with.
+    let kitchen_gate = faults.kitchen_gate.lock().expect("kitchen").clone();
     let w = with.clone();
     ops.insert(
         "store:data/kitchen#prep-minutes".to_string(),
@@ -1268,6 +1294,10 @@ fn catalog(with: With, faults: &Faults, stopped: Option<Stopped>) -> Ops {
                 let Some(minutes) = minutes.into_iter().next() else {
                     return Ok(not_found());
                 };
+                // Held until a test lets it go (ADR-0223), then slow.
+                if let Some(gate) = &kitchen_gate {
+                    gate.wait();
+                }
                 std::thread::sleep(std::time::Duration::from_millis(KITCHEN_MS));
                 Ok(ok(minutes))
             }
@@ -1301,6 +1331,15 @@ fn catalog(with: With, faults: &Faults, stopped: Option<Stopped>) -> Ops {
                     return Ok(not_found());
                 };
                 if categories.slow.as_deref() == Some(category.as_str()) {
+                    // Held until a test lets it go, or until nobody is waiting
+                    // for it: stopped part way, not read to its end.
+                    if let Some(gate) = &categories.gate {
+                        let nobody = || stopped.as_ref().is_some_and(|s| s());
+                        if gate.wait_unless(&nobody) {
+                            ended_early.fetch_add(1, Ordering::SeqCst);
+                            return Err("stopped: nobody is waiting for it".to_string());
+                        }
+                    }
                     let until = std::time::Instant::now()
                         + std::time::Duration::from_millis(categories.delay_ms);
                     while std::time::Instant::now() < until {
@@ -1734,7 +1773,7 @@ pub(crate) fn writes(
             other => Err(format!("menus#is-available received {other:?}")),
         }),
     );
-    ops = faulted(&faults.cart_faults, session, ops);
+    ops = faulted(&faults.cart_faults, &faults.delays_taken, session, ops);
     // TRACK SEAM (store-hours): a store's hours, the host's own write.
     ops.extend(crate::hours::host_writes(with.clone(), written.clone()));
     // TRACK SEAM (order-total): the checkout's writes, and the host's.

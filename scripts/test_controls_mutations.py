@@ -73,7 +73,9 @@ MUTANTS = [
         # over either layer's rows.
         # And by track store-accounts: each operation by the session and by
         # the reader's handle.
+        # And by track `flake-hunt`: the delays taken are counted.
         "                    if delay > 0 {\n"
+        "                        delays.fetch_add(1, Ordering::SeqCst);\n"
         "                        std::thread::sleep(std::time::Duration::from_millis(delay));\n"
         "                    }\n"
         "                    op(args)\n",

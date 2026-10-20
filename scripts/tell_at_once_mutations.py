@@ -72,13 +72,23 @@ MUTANTS = [
         "                std::mem::take(&mut waiting.stale)\n",
         "                std::mem::take(&mut waiting.stale)\n",
     ),
+    # Track `flake-hunt`: a test build's page asks for an hour, not for the
+    # three seconds of wall clock a slow machine outlasts between a serve and
+    # a commit (`Subscriber::asked_at`).
+    (
+        "a page served in a test build asks for LIVE only, as a slow machine ran it out",
+        "host",
+        SERVER,
+        "            std::time::Instant::now() + std::time::Duration::from_secs(60 * 60)\n",
+        "            std::time::Instant::now()\n",
+    ),
 ]
 
 COMMANDS = {
     "host": [
         "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--",
         "a_reader_is_told_while", "a_document_no_page_asks_for",
-        "a_telling_that_panics", "a_burst",
+        "a_telling_that_panics", "a_burst", "a_page_served_is_asking_for",
     ],
 }
 

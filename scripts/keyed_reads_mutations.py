@@ -84,7 +84,7 @@ MUTANTS = [
     (
         "keep's reads run at once",
         SERVER,
-        "        let _turn = keep.then(|| turn.lock().expect(\"turn\"));\n",
+        "        let _turn = keep.then(|| held_turn(&turn));\n",
         "        let _turn = keep.then(|| ());\n",
     ),
     (
