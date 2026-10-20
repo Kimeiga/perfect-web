@@ -226,26 +226,10 @@ pub(crate) fn wire_to_wire(function: &Function, program: &Program) -> Result<Str
     let mut e = Emitter::new(program, &none, &[]);
     let decode = e.decode("j", from)?;
     let encode = e.wire_value("r", &function.ret)?;
-    let before = e.prelude().join(
-        "
-
-",
-    );
+    let before = e.prelude().join("\n\n");
     Ok(format!(
-        "(() => {{
-{before}{}const f = {f};
-return (j) => {{
-  const r = f({decode});
-  return {encode};
-}};
-}})()",
-        if before.is_empty() {
-            ""
-        } else {
-            "
-
-"
-        }
+        "(() => {{\n{before}{}const f = {f};\nreturn (j) => {{\n  const r = f({decode});\n  return {encode};\n}};\n}})()",
+        if before.is_empty() { "" } else { "\n\n" }
     ))
 }
 

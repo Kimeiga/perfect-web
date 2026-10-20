@@ -97,11 +97,7 @@ fn migrations(cx: &Context<'_>, page: &str) -> Result<String, String> {
         }
     }
     let (unit, id) = found.ok_or_else(|| format!("no page `{page}`"))?;
-    let mut source = String::from(
-        "
-export const migrations = {
-",
-    );
+    let mut source = String::from("\nexport const migrations = {\n");
     for (signal, def) in crate::device_store::held_by(cx.hirs, cx.ws, cx.sigs, unit, id) {
         let Some(kept) =
             crate::resolve::declaration(cx.hirs, def).and_then(crate::device_store::Kept::of)
@@ -131,26 +127,18 @@ export const migrations = {
                 &program,
             )?);
         }
+        // The signal's name as a JSON string, a key no name can break.
         source.push_str(&format!(
-            "  {}: [
-{}
-  ],
-",
-            serde_json::Value::String(signal).to_string(),
+            "  {}: [\n{}\n  ],\n",
+            serde_json::Value::String(signal),
             steps
                 .iter()
                 .map(|s| format!("    {s}"))
                 .collect::<Vec<_>>()
-                .join(
-                    ",
-"
-                )
+                .join(",\n")
         ));
     }
-    source.push_str(
-        "};
-",
-    );
+    source.push_str("};\n");
     Ok(source)
 }
 
