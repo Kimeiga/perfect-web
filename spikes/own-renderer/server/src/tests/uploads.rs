@@ -98,21 +98,21 @@ fn attached_and_posted(s: &Server) {
     let png = fixture("six-by-four.png");
     let key = crate::blob::BlobKey::of(&png);
     let src = format!("/images/{}.png", key.hex());
-    let home = page(s, "a", "feed.app.Home", &Params::new());
+    let home = page(s, "a", "feed.app.Home~ui", &Params::new());
     assert!(home.contains("action=\"/uploads/post-image\""), "{home}");
     assert!(!home.contains("attached-image"), "nothing attached yet");
 
     let head = attach(s, "a", &png);
     assert!(head.starts_with("http/1.1 303"), "{head}");
     assert!(head.contains("location: /\r\n"), "{head}");
-    let home = page(s, "a", "feed.app.Home", &Params::new());
+    let home = page(s, "a", "feed.app.Home~ui", &Params::new());
     assert!(home.contains("class=\"attached-image\""), "{home}");
     assert!(
         home.contains("width=\"6\"") && home.contains("height=\"4\""),
         "{home}"
     );
     // Another reader sees none of it, and it is served to no one yet.
-    assert!(!page(s, "b", "feed.app.Home", &Params::new()).contains("attached-image"));
+    assert!(!page(s, "b", "feed.app.Home~ui", &Params::new()).contains("attached-image"));
     assert!(get(s, &src).0.starts_with("http/1.1 404"));
     assert_eq!((blobs(s, "staged"), blobs(s, "blobs")), (1, 0));
 
@@ -128,7 +128,7 @@ fn attached_and_posted(s: &Server) {
         "class=\"photo\" src=\"{src}\" width=\"6\" height=\"4\" \
          alt=\"Red to the right, green downward\">"
     );
-    let theirs = page(s, "b", "feed.app.Home", &Params::new());
+    let theirs = page(s, "b", "feed.app.Home~ui", &Params::new());
     assert!(theirs.contains(&shown), "{theirs}");
     // The newest post, first in the timeline, is the one just posted.
     let at = theirs.find("href=\"/post/").expect("a post's link") + "href=\"/post/".len();
@@ -198,7 +198,7 @@ fn discarded(s: &Server) {
         .command_answered("feed.app.discard_image", "a", &[], Some("i-1"))
         .expect("runs");
     assert!(answered.committed, "{:?}", answered.result);
-    assert!(!page(s, "a", "feed.app.Home", &Params::new()).contains("attached-image"));
+    assert!(!page(s, "a", "feed.app.Home~ui", &Params::new()).contains("attached-image"));
     assert_eq!((blobs(s, "staged"), blobs(s, "blobs")), (0, 0));
     let src = format!("/images/{}.gif", crate::blob::BlobKey::of(&gif).hex());
     assert!(get(s, &src).0.starts_with("http/1.1 404"));
@@ -230,7 +230,7 @@ fn a_command_that_does_not_commit_gives_its_claim_back() {
         .command_answered("feed.app.claim_and_refuse", "a", &[], Some("i-1"))
         .expect("runs");
     assert!(!refused.committed, "{:?}", refused.result);
-    assert!(page(&s, "a", "feed.app.Home", &Params::new()).contains("attached-image"));
+    assert!(page(&s, "a", "feed.app.Home~ui", &Params::new()).contains("attached-image"));
     assert_eq!(blobs(&s, "staged"), 1);
     assert!(post_image(&s, "a", "Still mine", "A gradient", "i-2").committed);
 }
@@ -298,7 +298,7 @@ fn what_is_not_an_image_is_refused_whatever_it_is_called() {
 
 /// The newest post's id, first in the home page's timeline.
 fn newest(s: &Server) -> String {
-    let home = page(s, "b", "feed.app.Home", &Params::new());
+    let home = page(s, "b", "feed.app.Home~ui", &Params::new());
     let at = home.find("href=\"/post/").expect("a post's link") + "href=\"/post/".len();
     home[at..at + home[at..].find('"').expect("its end")].to_string()
 }

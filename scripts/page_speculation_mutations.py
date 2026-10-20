@@ -29,7 +29,7 @@ MUTANTS = [
         "the store's manifest alone is read",
         SERVER,
         "        .filter(|p| p.extension().is_some_and(|x| x == \"json\"))\n",
-        "        .filter(|p| p.ends_with(\"store.page.StorePage.json\"))\n",
+        "        .filter(|p| p.ends_with(\"store.page.StorePage~ui.json\"))\n",
     ),
     (
         "a page is given the store's speculation",
@@ -44,7 +44,7 @@ MUTANTS = [
         "a module the store's manifest does not name is refused",
         SERVER,
         "                    .any(|s| s[\"module\"].as_str() == Some(m))\n",
-        "                    .any(|s| s[\"page\"] == \"store.page.StorePage\" && s[\"module\"].as_str() == Some(m))\n",
+        "                    .any(|s| s[\"page\"] == \"store.page.StorePage~ui\" && s[\"module\"].as_str() == Some(m))\n",
     ),
     (
         "a speculated value is sent to the store's documents alone",

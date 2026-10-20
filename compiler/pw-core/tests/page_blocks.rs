@@ -56,7 +56,7 @@ fn plan(change: impl Fn(&str) -> String) -> Result<pw_core::page_values::PageVal
     build(change)
         .pages
         .into_iter()
-        .find(|p| p.page == "store.page.StorePage")
+        .find(|p| p.page == "store.page.StorePage~ui")
         .expect("the store page")
         .plan
 }

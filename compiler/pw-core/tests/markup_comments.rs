@@ -45,7 +45,7 @@ fn rendered(markup: &str) -> String {
     let templates = pw_core::build::templates(&hirs, &[src.as_str()], &sigs);
     let page = templates
         .iter()
-        .find(|t| t.path == "t.P")
+        .find(|t| t.path == "t.P~ui")
         .expect("the page's template");
     page.chunks
         .iter()

@@ -102,7 +102,7 @@ fn plan_with(signals: &str, markup: &str) -> Result<PageValues, String> {
         .expect("builds")
         .pages
         .into_iter()
-        .find(|p| p.page == "t.P")
+        .find(|p| p.page == "t.P~ui")
         .expect("a page")
         .plan
 }

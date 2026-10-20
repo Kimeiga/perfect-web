@@ -96,7 +96,7 @@ fn a_store_page_is_told_at_the_closing_instant() {
     let closing = at(2027, 3, 1, 19, 0);
     clock_to(&s, closing - 30_000);
     let (html, _, _, _) = s
-        .serve_document_settled("a", "store.page.StorePage", &store_params("47"), &[])
+        .serve_document_settled("a", "store.page.StorePage~ui", &store_params("47"), &[])
         .expect("served");
     assert!(visible(&html).contains("Open until 7:00 pm"), "{html}");
     let doc = latest(&s.pending.lock().expect("pending"), "a");
@@ -219,7 +219,7 @@ fn a_day_the_clocks_go_forward() {
     let now = at(2027, 3, 14, 1, 30);
     clock_to(&s, now);
     let (html, _, _, _) = s
-        .serve_document_settled("a", "store.page.StorePage", &store_params("47"), &[])
+        .serve_document_settled("a", "store.page.StorePage~ui", &store_params("47"), &[])
         .expect("served");
     assert!(visible(&html).contains("Open until 3:00 am"), "{html}");
     let doc = latest(&s.pending.lock().expect("pending"), "a");

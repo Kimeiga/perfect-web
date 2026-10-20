@@ -28,7 +28,7 @@
       ]
     },
     {
-      "path": "kiokun.page.SearchPage",
+      "path": "kiokun.page.SearchPage~ui",
       "name": "SearchPage",
       "node": "page",
       "params": [
@@ -37,7 +37,7 @@
       ]
     },
     {
-      "path": "kiokun.page.WordPage",
+      "path": "kiokun.page.WordPage~ui",
       "name": "WordPage",
       "node": "page",
       "params": [

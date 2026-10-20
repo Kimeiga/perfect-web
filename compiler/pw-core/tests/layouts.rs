@@ -163,7 +163,7 @@ fn a_page_is_shown_in_its_layout_whose_parts_are_numbered_first() {
     let src = program(LAYOUT, PAGES);
     assert_eq!(reported(&[("t.pw", &src)]), Vec::<String>::new());
     let b = built(&[("t.pw", &src)]);
-    let (a, c) = (template(&b, "t.A"), template(&b, "t.B"));
+    let (a, c) = (template(&b, "t.A~ui"), template(&b, "t.B~ui"));
     // The layout's markup, before the slot and after it, is the same on both
     // pages, its parts 0 and 1 in both.
     let (a_before, a_page, a_after) = around(a);
@@ -198,7 +198,7 @@ fn a_page_is_shown_in_its_layout_whose_parts_are_numbered_first() {
     // Control: a page that names no layout is as before, with no slot.
     let bare = PAGES.replace("    layout Shell\n", "");
     let b = built(&[("t.pw", &program(LAYOUT, &bare))]);
-    let all = text(&template(&b, "t.A").chunks);
+    let all = text(&template(&b, "t.A~ui").chunks);
     assert!(!all.contains(pw_core::layouts::SLOT_START), "{all}");
     assert!(all.starts_with("<h1>{#0}</h1>"), "{all}");
 }
@@ -206,7 +206,7 @@ fn a_page_is_shown_in_its_layout_whose_parts_are_numbered_first() {
 #[test]
 fn its_plan_reads_the_layouts_bindings_under_names_no_source_writes() {
     let b = built(&[("t.pw", &program(LAYOUT, PAGES))]);
-    for page in ["t.A", "t.B"] {
+    for page in ["t.A~ui", "t.B~ui"] {
         let plan = plan(&b, page);
         // The layout's binding first, as its markup is rendered first, under
         // a name with `~`, which no identifier holds; the page's own `cart`
@@ -227,23 +227,23 @@ fn its_plan_reads_the_layouts_bindings_under_names_no_source_writes() {
         assert!(read.contains(&(1, "cart~Shell")), "{page}: {read:?}");
         // And the plan records the layout, the same for both pages.
         let layout = plan.layout.as_ref().expect("the layout is recorded");
-        assert_eq!(layout.path, "t.Shell");
+        assert_eq!(layout.path, "t.Shell~ui");
         assert_eq!((layout.parts, layout.elements), (2, 0));
     }
-    assert_eq!(plan(&b, "t.A").layout, plan(&b, "t.B").layout);
+    assert_eq!(plan(&b, "t.A~ui").layout, plan(&b, "t.B~ui").layout);
     // Its schema is the layout's own markup's: another markup, another one.
     let changed = LAYOUT.replace("Stores</a>", "Every store</a>");
     let other = built(&[("t.pw", &program(&changed, PAGES))]);
     assert_ne!(
-        plan(&other, "t.A").layout.as_ref().map(|l| &l.schema),
-        plan(&b, "t.A").layout.as_ref().map(|l| &l.schema)
+        plan(&other, "t.A~ui").layout.as_ref().map(|l| &l.schema),
+        plan(&b, "t.A~ui").layout.as_ref().map(|l| &l.schema)
     );
     // Control: a page that names none records none.
     let bare = PAGES.replace("    layout Shell\n", "");
     let b = built(&[("t.pw", &program(LAYOUT, &bare))]);
-    assert_eq!(plan(&b, "t.A").layout, None);
+    assert_eq!(plan(&b, "t.A~ui").layout, None);
     assert!(
-        plan(&b, "t.A")
+        plan(&b, "t.A~ui")
             .bindings
             .iter()
             .all(|b| !b.binding.contains('~'))
@@ -265,7 +265,7 @@ fn a_layouts_signal_and_handler_are_its_pages_under_its_name() {
     let src = program(MENU, PAGES);
     assert_eq!(reported(&[("t.pw", &src)]), Vec::<String>::new());
     let b = built(&[("t.pw", &src)]);
-    let (a, c) = (template(&b, "t.A"), template(&b, "t.B"));
+    let (a, c) = (template(&b, "t.A~ui"), template(&b, "t.B~ui"));
     // The handler's element says which signal it sets, as a composed view's
     // does (ADR-0144), and the same on both pages.
     let (a_before, ..) = around(a);
@@ -275,14 +275,14 @@ fn a_layouts_signal_and_handler_are_its_pages_under_its_name() {
     );
     assert_eq!(around(a).0, around(c).0);
     // The browser holds the signal by that name, at its first value.
-    let plan = plan(&b, "t.A");
+    let plan = plan(&b, "t.A~ui");
     let held: Vec<&str> = plan.signals.iter().map(|s| s.name.as_str()).collect();
     assert!(held.contains(&"open~Shell"), "{held:?}");
     // The handler is the layout's, one module whichever page holds it.
     let layout = b
         .handlers
         .iter()
-        .filter(|h| h.declaration.ends_with("Shell"))
+        .filter(|h| h.declaration.ends_with("Shell~ui"))
         .count();
     assert_eq!(
         layout,
@@ -509,14 +509,14 @@ fn a_page_reads_what_its_layout_reads_in_the_graph() {
         .graph
         .edges
         .iter()
-        .filter(|e| e.from == "t.C")
+        .filter(|e| e.from == "t.C~ui")
         .map(|e| e.to.as_str())
         .collect();
     assert!(reads.contains(&"store.page.Cart"), "{reads:?}");
     // Control: named in no layout, it reads nothing.
     let bare = about.replace("    layout Shell\n", "");
     let b = built(&[("t.pw", &program(LAYOUT, &bare))]);
-    assert!(!b.graph.edges.iter().any(|e| e.from == "t.C"));
+    assert!(!b.graph.edges.iter().any(|e| e.from == "t.C~ui"));
 }
 
 #[test]
@@ -572,8 +572,8 @@ fn a_layouts_computed_part_is_named_by_the_layout() {
             .find(|p| p.part == 1)
             .map(|p| p.path.clone())
     };
-    assert_eq!(path("t.A").as_deref(), Some("#t.Shell~1"));
-    assert_eq!(path("t.A"), path("t.B"));
+    assert_eq!(path("t.A~ui").as_deref(), Some("#t.Shell~ui~1"));
+    assert_eq!(path("t.A~ui"), path("t.B~ui"));
 }
 
 /// A module of views that need a signal provided: `Open` sets `drawer`.
@@ -622,7 +622,7 @@ fn a_layout_provides_what_its_views_need_and_its_page_provides_it_nothing() {
         "import context.{ current_user }\nimport ui.{ drawer, Open }\n",
     );
     let b = built(&[("ui.pw", UI), ("t.pw", &src)]);
-    let (before, ..) = around(template(&b, "t.A"));
+    let (before, ..) = around(template(&b, "t.A~ui"));
     assert!(
         before.contains("data-pw-signals=\"{&quot;drawer&quot;:&quot;drawer~Shell&quot;}\""),
         "{before}"
@@ -639,7 +639,7 @@ fn a_layouts_count_is_speculated_with_the_pages() {
     let store = b
         .speculations
         .iter()
-        .find(|s| s.page == "store.page.StorePage")
+        .find(|s| s.page == "store.page.StorePage~ui")
         .expect("the store's page speculates");
     let pw_core::backend::wasm::Encoding::Encoded(module) = &store.module else {
         panic!("{:?}", store.module);
@@ -688,6 +688,6 @@ fn a_layouts_count_is_speculated_with_the_pages() {
     assert!(
         !b.speculations
             .iter()
-            .any(|s| s.page == "store.page.OrderPage")
+            .any(|s| s.page == "store.page.OrderPage~ui")
     );
 }

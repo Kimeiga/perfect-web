@@ -139,21 +139,23 @@ fn a_value_the_template_computes_is_lifted_and_planned() {
     assert!(b.refusals().is_empty(), "{:?}", b.refusals());
     // The thread page's two counts: each read by the path the compiler
     // names, from the thread, by the function lifted out of the template.
-    let plan = plan_of(&b, "feed.app.PostPage");
+    let plan = plan_of(&b, "feed.app.PostPage~ui");
     for part in [1u32, 2] {
         let found = plan
             .parts
             .iter()
             .find(|p| p.part == part)
             .unwrap_or_else(|| panic!("part {part}: {:?}", plan.parts));
-        assert_eq!(found.path, format!("#feed.app.PostPage~{part}"));
+        assert_eq!(found.path, format!("#feed.app.PostPage~ui~{part}"));
         assert_eq!(found.binding, "thread");
         assert_eq!(
             found.steps,
-            [Step::Derived(format!("feed.app.PostPage.derived_{part}"))]
+            [Step::Derived(format!(
+                "feed.app.PostPage~ui.derived_{part}"
+            ))]
         );
         // A component of its own: it imports nothing, and needs nothing.
-        let id = format!("feed.app.PostPage.derived_{part}");
+        let id = format!("feed.app.PostPage~ui.derived_{part}");
         let contract = b
             .contracts
             .iter()
@@ -182,16 +184,16 @@ fn a_value_the_template_computes_is_lifted_and_planned() {
     let template = b
         .templates
         .iter()
-        .find(|t| t.path == "feed.app.PostPage")
+        .find(|t| t.path == "feed.app.PostPage~ui")
         .expect("the thread page's template");
     let chunks = format!("{:?}", template.chunks);
-    assert!(chunks.contains("\"#feed.app.PostPage~1\""), "{chunks}");
-    assert!(chunks.contains("\"#feed.app.PostPage~2\""), "{chunks}");
+    assert!(chunks.contains("\"#feed.app.PostPage~ui~1\""), "{chunks}");
+    assert!(chunks.contains("\"#feed.app.PostPage~ui~2\""), "{chunks}");
     // Control: the home page's host computes one value, whether its
     // composer is hidden, from what it asks of its reader, `SignedIn`
     // (ADR-0302, ADR-0307). What else it computes is from its draft, a
     // signal, which the browser computes (ADR-0227).
-    let home = plan_of(&b, "feed.app.Home");
+    let home = plan_of(&b, "feed.app.Home~ui");
     let computed: Vec<_> = home
         .parts
         .iter()
@@ -217,12 +219,15 @@ fn a_computed_attribute_is_a_value_the_host_sets() {
     assert_eq!(reported(&files), Vec::<String>::new());
     let b = build(&files);
     assert!(b.refusals().is_empty(), "{:?}", b.refusals());
-    let plan = plan_of(&b, "t.P");
+    let plan = plan_of(&b, "t.P~ui");
     assert_eq!(plan.derived.len(), 2, "{:?}", plan.derived);
     for d in &plan.derived {
-        assert_eq!(d.path, format!("#t.P~{}", d.part));
+        assert_eq!(d.path, format!("#t.P~ui~{}", d.part));
         assert_eq!(d.binding, "post");
-        assert_eq!(d.steps, [Step::Derived(format!("t.P.derived_{}", d.part))]);
+        assert_eq!(
+            d.steps,
+            [Step::Derived(format!("t.P~ui.derived_{}", d.part))]
+        );
         // Set again as any attribute that reads a query's value is.
         assert!(plan.attributes.contains(&d.part), "{:?}", plan.attributes);
     }
@@ -246,7 +251,7 @@ fn a_computed_attribute_is_a_value_the_host_sets() {
          <button type=\"button\" disabled={open}>Replies</button>",
     ));
     assert!(b.refusals().is_empty(), "{:?}", b.refusals());
-    assert!(plan_of(&b, "t.P").derived.is_empty());
+    assert!(plan_of(&b, "t.P~ui").derived.is_empty());
 }
 
 /// **A view composed in the page computes as the page does** (ADR-0136): its
@@ -257,13 +262,13 @@ fn a_view_composed_in_the_page_computes_from_the_pages_value() {
     assert_eq!(reported(&files), Vec::<String>::new());
     let b = build(&files);
     assert!(b.refusals().is_empty(), "{:?}", b.refusals());
-    let plan = plan_of(&b, "t.P");
+    let plan = plan_of(&b, "t.P~ui");
     let steps: Vec<(&str, &[Step])> = plan
         .parts
         .iter()
         .map(|p| (p.binding.as_str(), p.steps.as_slice()))
         .collect();
-    let derived = |n: u32| Step::Derived(format!("t.P.derived_{n}"));
+    let derived = |n: u32| Step::Derived(format!("t.P~ui.derived_{n}"));
     let [first, second] = [plan.parts[0].part, plan.parts[1].part];
     assert_eq!(
         steps,
@@ -332,7 +337,7 @@ fn what_a_host_does_not_compute_is_refused_by_name() {
     ] {
         let b = build(&page(markup));
         assert!(b.refusals().is_empty(), "{markup}: {:?}", b.refusals());
-        assert_eq!(plan_of(&b, "t.P").parts.len(), 1, "{markup}");
+        assert_eq!(plan_of(&b, "t.P~ui").parts.len(), 1, "{markup}");
     }
     // And inside a block a host renders, since ADR-0229: computed into what
     // the block is rendered with.
@@ -340,7 +345,7 @@ fn what_a_host_does_not_compute_is_refused_by_name() {
         "{#if post.pinned}<p>{counted(post.likes, \"a\", \"b\")}</p>{/if}",
     ));
     assert!(b.refusals().is_empty(), "{:?}", b.refusals());
-    assert_eq!(plan_of(&b, "t.P").derived.len(), 1);
+    assert_eq!(plan_of(&b, "t.P~ui").derived.len(), 1);
 }
 
 #[test]
@@ -378,12 +383,12 @@ fn a_view_that_contains_itself_computes_nothing_yet_and_a_speculated_value_is_co
     let home = b
         .speculations
         .iter()
-        .find(|s| s.page == "feed.app.Home")
+        .find(|s| s.page == "feed.app.Home~ui")
         .expect("the home page speculates");
     let pw_core::backend::wasm::Encoding::Encoded(module) = &home.module else {
         panic!("{:?}", home.module);
     };
-    let part = plan_of(&b, "feed.app.Home")
+    let part = plan_of(&b, "feed.app.Home~ui")
         .parts
         .iter()
         .find(|p| p.path.starts_with('#'))

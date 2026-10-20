@@ -12,7 +12,7 @@
 //   no fragment ignores its address's.
 import { expect, test } from "@playwright/test";
 
-const PAGE = "/page/demo.fragment.FragmentPage";
+const PAGE = "/page/demo.fragment.FragmentPage~ui";
 
 async function ready(page, hash = "") {
   await page.goto(PAGE + hash);
@@ -42,7 +42,7 @@ test("the server renders the first value, and the document names the binding", a
     ],
   });
   // The control: a page that binds none says none.
-  const bind = await (await request.get("/page/demo.bind.BindPage")).text();
+  const bind = await (await request.get("/page/demo.bind.BindPage~ui")).text();
   expect(bind).not.toContain('"fragment"');
 });
 
@@ -158,7 +158,7 @@ test("the signals it does not bind keep their values", async ({ page }) => {
 });
 
 test("a page that binds no fragment ignores its address's", async ({ page }) => {
-  await page.goto("/page/demo.bind.BindPage#/specs");
+  await page.goto("/page/demo.bind.BindPage~ui#/specs");
   await page.waitForFunction(() => document.documentElement.dataset.pwReady === "1");
   await expect(page.locator("#hello")).toHaveText("Hello, Ada");
   await page.evaluate(() => {

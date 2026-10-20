@@ -39,7 +39,7 @@ fn follow(s: &Server, session: &str, verb: &str, user: &str, interaction: &str) 
 /// **Following brings their posts into the timeline of those you follow,
 /// and unfollowing takes them out**; the timeline of everyone keeps them.
 fn follows_bring_their_posts(s: &Server) {
-    let page = |s: &Server| shown(s, "a", "feed.app.FollowingPage", &Params::new());
+    let page = |s: &Server| shown(s, "a", "feed.app.FollowingPage~ui", &Params::new());
     let before = page(s);
     assert!(
         before.contains("Follow someone to see their posts here."),
@@ -55,7 +55,7 @@ fn follows_bring_their_posts(s: &Server) {
     assert!(answered.committed, "{:?}", answered.result);
     assert!(!page(s).contains("Hello, feed."));
     // The control: everyone's timeline shows it throughout.
-    assert!(shown(s, "a", "feed.app.Home", &Params::new()).contains("Hello, feed."));
+    assert!(shown(s, "a", "feed.app.Home~ui", &Params::new()).contains("Hello, feed."));
     // And the reader's own posts are in its own, followed or not.
     let answered = s
         .command_answered(
@@ -79,7 +79,7 @@ fn following_brings_their_posts_into_your_timeline() {
 fn a_page_counts_follows(s: &Server) {
     let counts = |s: &Server, session: &str, id: &str| {
         let (html, _, _, _) = s
-            .serve_document_settled(session, "feed.app.ProfilePage", &of(id), &[])
+            .serve_document_settled(session, "feed.app.ProfilePage~ui", &of(id), &[])
             .expect("served");
         text_of(&html, "follow-counts")
     };
@@ -109,14 +109,14 @@ fn a_users_page_counts_who_follows_them() {
 /// **What the reader is to the user decides the button**: Follow, Unfollow,
 /// or none on the reader's own page.
 fn the_relation_is_the_readers(s: &Server) {
-    let page = |s: &Server, id: &str| shown(s, "a", "feed.app.ProfilePage", &of(id));
+    let page = |s: &Server, id: &str| shown(s, "a", "feed.app.ProfilePage~ui", &of(id));
     assert!(page(s, "u-ada").contains("Follow"));
     assert!(!page(s, "u-ada").contains("Unfollow"));
     let answered = follow(s, "a", "follow", "u-ada", "i-1");
     assert!(answered.committed, "{:?}", answered.result);
     assert!(page(s, "u-ada").contains("Unfollow"));
     // Another reader's is its own.
-    let theirs = shown(s, "b", "feed.app.ProfilePage", &of("u-ada"));
+    let theirs = shown(s, "b", "feed.app.ProfilePage~ui", &of("u-ada"));
     assert!(!theirs.contains("Unfollow"), "{theirs}");
     // The reader's own page, once it is someone: it follows.
     let mine = page(s, "u-a");
@@ -145,7 +145,7 @@ fn no_one_is_not_found(s: &Server) {
         );
     }
     let absent = s
-        .serve_document_settled("a", "feed.app.ProfilePage", &of("u-nobody"), &[])
+        .serve_document_settled("a", "feed.app.ProfilePage~ui", &of("u-nobody"), &[])
         .expect_err("no one");
     assert!(matches!(absent, Unread::NotFound(_)), "{absent:?}");
 }

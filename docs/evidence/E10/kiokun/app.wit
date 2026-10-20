@@ -22,12 +22,12 @@ interface kiokun-page-search-api {
     search: func(arg0: string) -> list<dictionary-search-hit>;
 }
 
-interface kiokun-page-search-page-api {
+interface kiokun-page-search-pageui-api {
     use pw:types/types.{dictionary-search-hit};
     search-page: func(arg0: string, arg1: list<dictionary-search-hit>);
 }
 
-interface kiokun-page-word-page-api {
+interface kiokun-page-word-pageui-api {
     use pw:types/types.{dictionary-entry};
     word-page: func(arg0: string, arg1: option<dictionary-entry>);
 }
@@ -52,12 +52,12 @@ world kiokun-page-search {
     export kiokun-page-search-api;
 }
 
-world kiokun-page-search-page {
-    export kiokun-page-search-page-api;
+world kiokun-page-search-pageui {
+    export kiokun-page-search-pageui-api;
 }
 
-world kiokun-page-word-page {
-    export kiokun-page-word-page-api;
+world kiokun-page-word-pageui {
+    export kiokun-page-word-pageui-api;
 }
 
 world shards-place {

@@ -464,7 +464,9 @@ class EveryCallOfExplain(unittest.TestCase):
     guide producer's red baseline), and train-12 one (the second host's: its
     mutant's producer refused, a build that failed or a run past its bound,
     whose output is what the refusal says, never a kill's), each read for
-    that."""
+    that. ADR-0373 adds the
+    WIT identity runner's refused Cargo producer: its last command cannot be
+    a mutant's browser run."""
 
     OTHERS = {
         ("bounded_statements_mutations.py", "REFUSED (invalid or stopped Cargo producer; no kill)"),
@@ -483,6 +485,7 @@ class EveryCallOfExplain(unittest.TestCase):
         ("second_host_mutations.py", "REFUSED (invalid or stopped producer; no kill)"),
         ("skipped_specs_mutations.py", "REFUSED (the tests errored or said no count; no kill)"),
         ("store_hours_mutations.py", "REFUSED (invalid or stopped Cargo producer; no kill)"),
+        ("wit_unique_mutations.py", "REFUSED (invalid or stopped Cargo producer; no kill)"),
     }
 
     def test_each_call_follows_a_red_baseline_or_one_of_those_named(self):

@@ -67,7 +67,7 @@ fn refused(src: &str) -> Vec<String> {
         .expect("builds")
         .refusals()
         .into_iter()
-        .filter(|r| r.contains("`t.P`"))
+        .filter(|r| r.contains("`t.P~ui`"))
         .collect()
 }
 

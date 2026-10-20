@@ -117,10 +117,10 @@ fn a_computed_hole_checks_and_does_not_build() {
         let v = built
             .templates
             .iter()
-            .find(|t| t.path == "t.V")
-            .expect("t.V");
+            .find(|t| t.path == "t.V~ui")
+            .expect("t.V~ui");
         assert!(
-            format!("{:?}", v.chunks).contains("\"#t.V~"),
+            format!("{:?}", v.chunks).contains("\"#t.V~ui~"),
             "{markup}: {:?}",
             v.chunks
         );
@@ -189,7 +189,10 @@ fn a_key_is_the_path_from_the_element() {
         let units = units(&view(markup));
         let hirs: Vec<&pw_core::hir::Hir> = units.iter().map(|u| &u.hir).collect();
         let templates = pw_core::template_ir::build(&hirs);
-        let v = templates.iter().find(|t| t.path == "t.V").expect("t.V");
+        let v = templates
+            .iter()
+            .find(|t| t.path == "t.V~ui")
+            .expect("t.V~ui");
         fn each(chunks: &[Chunk]) -> Option<Option<String>> {
             chunks.iter().find_map(|c| match c {
                 Chunk::Dynamic(Part::Each { key, .. }) => Some(key.clone()),
@@ -224,7 +227,10 @@ fn the_ir_blocks_a_computed_list_and_a_foreign_key() {
         let units = units(&view(markup));
         let hirs: Vec<&pw_core::hir::Hir> = units.iter().map(|u| &u.hir).collect();
         let templates = pw_core::template_ir::build(&hirs);
-        let v = templates.iter().find(|t| t.path == "t.V").expect("t.V");
+        let v = templates
+            .iter()
+            .find(|t| t.path == "t.V~ui")
+            .expect("t.V~ui");
         v.blocked()
             .into_iter()
             .filter_map(|p| match p {

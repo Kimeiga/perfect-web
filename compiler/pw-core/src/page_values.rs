@@ -1689,14 +1689,7 @@ fn plan(
             .ok_or_else(|| format!("`{}` has no body", decl.name))?,
     );
     let params: Vec<String> = decl.params.iter().map(|p| p.name.clone()).collect();
-    let page = {
-        let module = hir.module_of(id).unwrap_or_default();
-        if module.is_empty() {
-            decl.name.clone()
-        } else {
-            format!("{module}.{}", decl.name)
-        }
-    };
+    let page = crate::contract::component_id(hir, id);
 
     // The page's own signals, by name: a query given one is read again, for
     // the new key, when it changes (ADR-0152).

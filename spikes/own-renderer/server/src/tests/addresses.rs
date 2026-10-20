@@ -81,7 +81,12 @@ fn delivery(s: &Server, session: &str, store: &str) -> String {
 /// What the store's page shows the session, as text.
 fn store_page(s: &Server, session: &str, store: &str) -> String {
     let (html, ..) = s
-        .serve_document_settled(session, "store.page.StorePage", &store_params(store), &[])
+        .serve_document_settled(
+            session,
+            "store.page.StorePage~ui",
+            &store_params(store),
+            &[],
+        )
         .expect("served");
     visible(&html)
 }

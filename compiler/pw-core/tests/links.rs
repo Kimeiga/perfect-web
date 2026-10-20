@@ -107,7 +107,7 @@ fn a_link_html_allows_in_the_body_is_written_where_it_is() {
     let t = b
         .templates
         .iter()
-        .find(|t| t.path == "t.P")
+        .find(|t| t.path == "t.P~ui")
         .expect("the template");
     let body: String = t
         .chunks

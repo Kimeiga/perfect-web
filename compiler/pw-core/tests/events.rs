@@ -208,7 +208,7 @@ fn the_manifest_says_which_event_a_part_handles() {
     let t = b
         .templates
         .iter()
-        .find(|t| t.path == "t.P")
+        .find(|t| t.path == "t.P~ui")
         .expect("the page");
     let events: Vec<(String, Vec<String>)> = t
         .manifest()
@@ -256,7 +256,7 @@ fn an_element_s_handlers_are_lowered_last_and_together() {
     let t = b
         .templates
         .iter()
-        .find(|t| t.path == "t.P")
+        .find(|t| t.path == "t.P~ui")
         .expect("the page");
     let shape: Vec<String> = t
         .chunks

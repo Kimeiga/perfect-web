@@ -239,7 +239,7 @@ fn the_contract_places_it_where_the_checker_does() {
     let sigs = pw_core::signatures::Signatures::build(&ws, &hirs);
     let page = pw_core::contract::contracts(&hirs, &sigs, &ws)
         .into_iter()
-        .find(|c| c.component_id == "t.Built")
+        .find(|c| c.component_id == "t.Built~ui")
         .expect("the page's contract");
     // The session is read through `MyCart`, and the build world may not
     // hold one: the contract does not place it there.

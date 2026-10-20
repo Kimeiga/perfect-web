@@ -64,7 +64,7 @@ fn rendered(values: &[(&str, serde_json::Value)]) -> Result<String, pw_render::B
         .collect();
     let page = templates
         .iter()
-        .find(|t| t.path == "m.P")
+        .find(|t| t.path == "m.P~ui")
         .expect("the page");
     let compiled = pw_core::backend::signals::compile(&[u]).expect("checks");
     let first = compiled[0].signals.as_ref().expect("data");

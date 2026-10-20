@@ -79,6 +79,22 @@ pub struct Page {
     pub signals: BTreeSet<String>,
 }
 
+/// Review declarations share one map, so retain each resolver namespace.
+/// Component namespaces agree with contracts; the separate type-shape map
+/// and type references keep their existing paths (ADR-0373).
+fn declaration_path(hir: &crate::hir::Hir, id: crate::hir::DeclId) -> String {
+    use crate::resolve::Namespace;
+    let path = crate::contract::component_id(hir, id);
+    let suffix = match Namespace::of(hir.decl(id).kind) {
+        Some(Namespace::Type) => "~type",
+        Some(Namespace::Effect) => "~effect",
+        Some(Namespace::Event) => "~event",
+        Some(Namespace::Predicate) => "~predicate",
+        Some(Namespace::Term | Namespace::Ui) | None => "",
+    };
+    format!("{path}{suffix}")
+}
+
 impl Model {
     /// **The model of a program**, checked and built as `pw build` builds it,
     /// or why there is none: its errors, or what the build refused. A diff
@@ -119,12 +135,8 @@ impl Model {
                 if matches!(d.kind, DeclKind::Import) || d.name.is_empty() {
                     continue;
                 }
-                let module = hir.module_of(id).unwrap_or_default();
-                let path = if module.is_empty() {
-                    d.name.clone()
-                } else {
-                    format!("{module}.{}", d.name)
-                };
+                let path = crate::contract::component_id(hir, id);
+                let declaration_path = declaration_path(hir, id);
                 match d.kind {
                     DeclKind::Type if d.variants.is_some() => {
                         let cases = d
@@ -164,7 +176,7 @@ impl Model {
                     _ => {}
                 }
                 self.declarations.insert(
-                    path.clone(),
+                    declaration_path.clone(),
                     Declared {
                         kind: format!("{:?}", d.kind).to_lowercase(),
                         visibility: d.visibility.clone().unwrap_or_default(),
@@ -186,7 +198,8 @@ impl Model {
                         if let Expr::Keyword { keyword, .. } = body.expr(e)
                             && keyword.starts_with("unsafe")
                         {
-                            self.unsafe_uses.insert(format!("{path}: {keyword}"));
+                            self.unsafe_uses
+                                .insert(format!("{declaration_path}: {keyword}"));
                         }
                     }
                 }

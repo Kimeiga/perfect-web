@@ -19,7 +19,7 @@
 // - and the store's own limit, measured in each engine.
 import { expect, test } from "@playwright/test";
 
-const PAGE = "/page/demo.device.DevicePage";
+const PAGE = "/page/demo.device.DevicePage~ui";
 
 async function ready(page) {
   await page.goto(PAGE);
@@ -116,7 +116,7 @@ test("what the device decides stays hidden until it is rendered at the device's 
   // The runtime runs; what computes the count from the notes is held back.
   let release;
   const held = new Promise((resolve) => (release = resolve));
-  await page.route("**/computed/demo.device.DevicePage.mjs", async (route) => {
+  await page.route("**/computed/demo.device.DevicePage~ui.mjs", async (route) => {
     await held;
     await route.continue();
   });

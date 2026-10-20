@@ -74,7 +74,7 @@ const FIELD: &str = "<input type=\"text\" aria-label=\"Name\" bind:value={name} 
 fn plan(b: &pw_core::build::Build) -> pw_core::page_values::PageValues {
     b.pages
         .iter()
-        .find(|p| p.page == "t.P")
+        .find(|p| p.page == "t.P~ui")
         .expect("a plan")
         .plan
         .clone()
@@ -90,7 +90,7 @@ fn a_binding_is_a_value_and_a_handler() {
     let t = b
         .templates
         .iter()
-        .find(|t| t.path == "t.P")
+        .find(|t| t.path == "t.P~ui")
         .expect("the page");
     let manifest = t.manifest();
     assert!(

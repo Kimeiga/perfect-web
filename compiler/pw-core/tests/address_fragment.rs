@@ -95,7 +95,7 @@ fn plan(src: &str) -> pw_core::page_values::PageValues {
     build
         .pages
         .iter()
-        .find(|p| p.page == "t.P")
+        .find(|p| p.page == "t.P~ui")
         .expect("the page is planned")
         .plan
         .clone()

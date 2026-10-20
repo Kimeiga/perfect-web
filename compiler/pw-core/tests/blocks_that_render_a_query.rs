@@ -93,7 +93,7 @@ fn blocks_on(units: &[Unit], page: &str, kind: &str, value: &str) -> (Vec<u32>, 
 fn a_block_a_parameter_decides_that_renders_a_query_is_planned() {
     let (matches, planned) = blocks_on(
         &store(&same, &same),
-        "store.search.SearchPage",
+        "store.search.SearchPage~ui",
         "match",
         "q",
     );
@@ -113,7 +113,7 @@ fn a_block_a_parameter_decides_that_renders_a_query_is_planned() {
     };
     let (matches, planned) = blocks_on(
         &store(&same, &quiet),
-        "store.search.SearchPage",
+        "store.search.SearchPage~ui",
         "match",
         "q",
     );
@@ -167,7 +167,7 @@ fn a_block_the_readers_answer_decides_is_planned_where_it_renders_a_query() {
         let units = store(&cart_page(markup), &same);
         let (ifs, blocks) = blocks_on(
             &units,
-            "store.page.CartPage",
+            "store.page.CartPage~ui",
             "conditional",
             "SignedIn~holds",
         );
@@ -189,7 +189,7 @@ fn a_block_inside_one_is_rendered_with_it() {
     );
     let (ifs, blocks) = blocks_on(
         &units,
-        "store.page.CartPage",
+        "store.page.CartPage~ui",
         "conditional",
         "SignedIn~holds",
     );
@@ -211,13 +211,13 @@ fn the_cart_page_as_it_is_plans_what_it_did() {
     let plan = build
         .pages
         .iter()
-        .find(|p| p.page == "store.page.CartPage")
+        .find(|p| p.page == "store.page.CartPage~ui")
         .and_then(|p| p.plan.as_ref().ok())
         .expect("the cart's page, planned");
     let template = build
         .templates
         .iter()
-        .find(|t| t.path == "store.page.CartPage")
+        .find(|t| t.path == "store.page.CartPage~ui")
         .expect("its template");
     let mut subjects: Vec<String> = template
         .manifest()

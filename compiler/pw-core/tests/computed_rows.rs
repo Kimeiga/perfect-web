@@ -105,7 +105,7 @@ fn a_value_computed_in_a_row_is_each_rows() {
     let files = feed(&|s| s.to_string());
     assert_eq!(reported(&files), Vec::<String>::new());
     let b = build(&files).unwrap_or_else(|e| panic!("{e}"));
-    let plan = plan_of(&b, "feed.app.Home");
+    let plan = plan_of(&b, "feed.app.Home~ui");
     // The likes in words: a read of each row's item, by the steps to its
     // input, then its function, set in the row by the path the compiler
     // named from the item. Of the values the row computes from its item, it
@@ -116,7 +116,7 @@ fn a_value_computed_in_a_row_is_each_rows() {
     let template = b
         .templates
         .iter()
-        .find(|t| t.path == "feed.app.Home")
+        .find(|t| t.path == "feed.app.Home~ui")
         .expect("the home page's template");
     let chunks = format!("{:?}", template.chunks);
     let (_, likes) = chunks
@@ -139,19 +139,19 @@ fn a_value_computed_in_a_row_is_each_rows() {
     );
     let part: u32 = row
         .path
-        .strip_prefix("p.#feed.app.Home~")
+        .strip_prefix("p.#feed.app.Home~ui~")
         .and_then(|n| n.parse().ok())
         .unwrap_or_else(|| panic!("{}", row.path));
     assert_eq!(
         row.steps,
-        [Step::Derived(format!("feed.app.Home.derived_{part}"))]
+        [Step::Derived(format!("feed.app.Home~ui.derived_{part}"))]
     );
     // And the speculation computes it for each row it renders, from the
     // item: the like's transition counts the like in the timeline.
     let home = b
         .speculations
         .iter()
-        .find(|s| s.page == "feed.app.Home")
+        .find(|s| s.page == "feed.app.Home~ui")
         .expect("the home page speculates");
     let pw_core::backend::wasm::Encoding::Encoded(module) = &home.module else {
         panic!("{:?}", home.module);
@@ -161,7 +161,7 @@ fn a_value_computed_in_a_row_is_each_rows() {
         .split_once("rows: {")
         .unwrap_or_else(|| panic!("{}", module.source));
     assert!(
-        rows.contains(&format!("\"#feed.app.Home~{part}\": f")),
+        rows.contains(&format!("\"#feed.app.Home~ui~{part}\": f")),
         "{}",
         module.source
     );
@@ -177,7 +177,7 @@ fn from_a_field_of_the_item_in_a_block_and_in_a_loop_in_the_row() {
     );
     assert_eq!(reported(&files), Vec::<String>::new());
     let b = build(&files).unwrap_or_else(|e| panic!("{e}"));
-    let rows: Vec<(&str, &str, &[Step])> = plan_of(&b, "t.P")
+    let rows: Vec<(&str, &str, &[Step])> = plan_of(&b, "t.P~ui")
         .rows
         .iter()
         .map(|r| (r.collection.as_str(), r.path.as_str(), r.steps.as_slice()))
@@ -192,18 +192,18 @@ fn from_a_field_of_the_item_in_a_block_and_in_a_loop_in_the_row() {
     };
     // A view given a field of the item: the steps reach the field, then run
     // the view's function.
-    assert!(field.starts_with("p.#t.P~"), "{field}");
+    assert!(field.starts_with("p.#t.P~ui~"), "{field}");
     assert!(
         matches!(from_field, [Step::Field(a), Step::Field(o), Step::Derived(_)]
             if a == "author" && o == "open"),
         "{from_field:?}"
     );
     // In a block in the row, from the item whole.
-    assert!(block.starts_with("p.#t.P~"), "{block}");
+    assert!(block.starts_with("p.#t.P~ui~"), "{block}");
     assert!(matches!(whole, [Step::Derived(_)]), "{whole:?}");
     // In a loop in the row: the inner row's, through each outer item.
     assert_eq!(*inner, "posts.*.tags");
-    assert!(tag.starts_with("t.#t.P~"), "{tag}");
+    assert!(tag.starts_with("t.#t.P~ui~"), "{tag}");
     assert!(matches!(from_tag, [Step::Derived(_)]), "{from_tag:?}");
 }
 

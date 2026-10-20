@@ -168,7 +168,7 @@ fn an_open_search_page_is_told_of_a_menu_change() {
     let s = served();
     let params = Params::from([("q".to_string(), "flat white".to_string())]);
     let (html, _, _, _) = s
-        .serve_document_settled("a", "store.search.SearchPage", &params, &[])
+        .serve_document_settled("a", "store.search.SearchPage~ui", &params, &[])
         .expect("served");
     assert!(
         visible(&html).contains("No stores or dishes match"),
@@ -200,7 +200,7 @@ fn an_open_search_page_is_told_of_a_menu_change() {
 fn the_sentence_inside_its_arm_is_told_where_it_is() {
     let s = served();
     let params = Params::from([("q".to_string(), "flat white".to_string())]);
-    s.serve_document_settled("a", "store.search.SearchPage", &params, &[])
+    s.serve_document_settled("a", "store.search.SearchPage~ui", &params, &[])
         .expect("served");
     let doc = latest(&s.pending.lock().expect("pending"), "a");
     let before = sets_of(&s, &doc).len();
@@ -238,7 +238,7 @@ fn the_sentence_inside_its_arm_is_told_where_it_is() {
 #[test]
 fn a_menu_change_tells_the_stores_page_once() {
     let s = served();
-    s.serve_document_settled("c", "store.page.StorePage", &store_params("47"), &[])
+    s.serve_document_settled("c", "store.page.StorePage~ui", &store_params("47"), &[])
         .expect("served");
     let doc = latest(&s.pending.lock().expect("pending"), "c");
     let before = s.pending.lock().expect("pending")[&doc].frames.len();

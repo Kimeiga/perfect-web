@@ -70,7 +70,7 @@ fn events(b: &pw_core::build::Build) -> Vec<(String, Vec<String>)> {
     let t = b
         .templates
         .iter()
-        .find(|t| t.path == "t.P")
+        .find(|t| t.path == "t.P~ui")
         .expect("the page's template");
     let ir = serde_json::to_value(t).expect("serializes");
     let mut out = Vec::new();
@@ -227,7 +227,7 @@ fn an_event_part_with_no_code_is_refused_at_build() {
     let mut b = pw_core::build::build(&units(&src)).expect("builds");
     assert!(b.refusals().is_empty(), "{:?}", b.refusals());
     let mut blanked = 0;
-    for t in b.templates.iter_mut().filter(|t| t.path == "t.P") {
+    for t in b.templates.iter_mut().filter(|t| t.path == "t.P~ui") {
         for c in &mut t.chunks {
             if let pw_core::template_ir::Chunk::Dynamic(pw_core::template_ir::Part::Event {
                 handler,
@@ -243,7 +243,7 @@ fn an_event_part_with_no_code_is_refused_at_build() {
     assert!(
         b.refusals()
             .iter()
-            .any(|r| r.contains("`t.P`") && r.contains("no code to run")),
+            .any(|r| r.contains("`t.P~ui`") && r.contains("no code to run")),
         "{:?}",
         b.refusals()
     );

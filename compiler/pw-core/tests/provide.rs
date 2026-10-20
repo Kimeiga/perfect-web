@@ -85,7 +85,7 @@ fn build(page: &str) -> pw_core::build::Build {
 fn plan(b: &pw_core::build::Build) -> pw_core::page_values::PageValues {
     b.pages
         .iter()
-        .find(|p| p.page == "p.P")
+        .find(|p| p.page == "p.P~ui")
         .expect("a plan")
         .plan
         .clone()
@@ -97,7 +97,7 @@ fn markup(b: &pw_core::build::Build) -> String {
     let t = b
         .templates
         .iter()
-        .find(|t| t.path == "p.P")
+        .find(|t| t.path == "p.P~ui")
         .expect("the page");
     t.chunks
         .iter()
@@ -177,7 +177,11 @@ fn each_use_of_a_view_holds_its_own_signal() {
             "{html}"
         );
     }
-    let t = b.templates.iter().find(|t| t.path == "p.P").expect("page");
+    let t = b
+        .templates
+        .iter()
+        .find(|t| t.path == "p.P~ui")
+        .expect("page");
     let events: Vec<String> = t
         .manifest()
         .iter()

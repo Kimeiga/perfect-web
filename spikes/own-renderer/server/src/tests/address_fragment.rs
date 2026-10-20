@@ -10,7 +10,7 @@ use super::*;
 /// A page whose one block a signal decides.
 fn template() -> Template {
     serde_json::from_value(serde_json::json!({
-        "path": "demo.fragment.FragmentPage",
+        "path": "demo.fragment.FragmentPage~ui",
         "name": "FragmentPage",
         "params": [],
         "schema": "s",

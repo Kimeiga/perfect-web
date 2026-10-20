@@ -1,5 +1,5 @@
 {
-  "page": "kiokun.page.SearchPage",
+  "page": "kiokun.page.SearchPage~ui",
   "params": [
     "q",
     "hits"

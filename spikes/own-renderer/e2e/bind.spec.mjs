@@ -14,7 +14,7 @@
 // scripts off; typing sets its signal, and a handler sets it back.
 import { expect, test } from "@playwright/test";
 
-const PAGE = "/page/demo.bind.BindPage";
+const PAGE = "/page/demo.bind.BindPage~ui";
 
 async function ready(page) {
   await page.goto(PAGE);

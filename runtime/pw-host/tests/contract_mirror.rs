@@ -192,7 +192,7 @@ fn the_store_page_does_not_inherit_its_handlers_authority() {
     // properly: the page requires what IT performs, and not what its DEFERRED
     // HANDLER performs. A page requiring nothing at all would have satisfied
     // the old assertion without demonstrating any separation.
-    let page = find("store.page.StorePage");
+    let page = find("store.page.StorePage~ui");
     let names: Vec<String> = page
         .required_capabilities
         .iter()
@@ -275,7 +275,7 @@ fn the_real_contracts_drive_a_real_admission() {
     // The page reads the session to build a query key, so it runs where a
     // session provider exists. It was admitted on the laptop until 2026-08-10,
     // and that was a page whose `current_session()` call named nothing.
-    let page = find("store.page.StorePage");
+    let page = find("store.page.StorePage~ui");
     assert!(
         admit(&page, &topology, "origin-1", &[]).is_admitted(),
         "the page runs on a node that grants what it requires"
@@ -313,7 +313,7 @@ fn the_store_page_depends_on_components_without_acquiring_their_authority() {
     // Until 2026-08-10 this asserted the page held no host capability at all.
     // A component that requires nothing demonstrates no separation: it would
     // satisfy the claim whether or not authority propagated.
-    let page = find("store.page.StorePage");
+    let page = find("store.page.StorePage~ui");
 
     let deps: Vec<String> = page
         .imports

@@ -63,12 +63,12 @@ PORT="$(( ${PORT:-3141} + 143 ))"
 if [ "${DIAGNOSTIC:-}" = 1 ]; then
   MODE=diagnostic
   FRAMEWORK="puremvc"
-  BASE="http://127.0.0.1:$PORT/page/todomvc.app.Todos#"
+  BASE="http://127.0.0.1:$PORT/page/todomvc.app.Todos~ui#"
   OUT="${OUT:-/tmp/pw-todomvc-cypress-diagnostic.txt}"
   echo "cypress: the DIAGNOSTIC run (framework $FRAMEWORK, which the suite takes to keep nothing in localStorage): not the acceptance"
 else
   MODE=acceptance
-  FRAMEWORK="page/todomvc.app.Todos"
+  FRAMEWORK="page/todomvc.app.Todos~ui"
   BASE="http://127.0.0.1:$PORT"
   OUT="${OUT:-/tmp/pw-todomvc-cypress.txt}"
 fi

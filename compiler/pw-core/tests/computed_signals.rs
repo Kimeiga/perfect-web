@@ -137,7 +137,7 @@ fn a_value_computed_from_a_signal_is_the_browsers_and_its_first_the_hosts() {
     let files = feed();
     assert_eq!(reported(&files), Vec::<String>::new());
     let b = build(&files).unwrap_or_else(|e| panic!("{e}"));
-    let plan = plan_of(&b, "feed.app.Home");
+    let plan = plan_of(&b, "feed.app.Home~ui");
     // What is left, and the post button: each a part the browser sets from
     // the draft, by the component that computes it.
     let computed: Vec<(&str, &str, &str, &str)> = plan
@@ -199,7 +199,7 @@ fn a_value_computed_from_a_signal_is_the_browsers_and_its_first_the_hosts() {
     let module = b
         .computed
         .iter()
-        .find(|c| c.page == "feed.app.Home")
+        .find(|c| c.page == "feed.app.Home~ui")
         .expect("the home page's module");
     let source = module.module.as_ref().unwrap_or_else(|e| panic!("{e}"));
     for id in [text, button] {
@@ -212,7 +212,7 @@ fn a_value_computed_from_a_signal_is_the_browsers_and_its_first_the_hosts() {
     assert!(source.contains("BigInt(Array.from(v0).length)"), "{source}");
     // The thread page's, since its reply form (ADR-0231): its button's
     // `disabled`, from the reply's draft, alone.
-    let thread = plan_of(&b, "feed.app.PostPage");
+    let thread = plan_of(&b, "feed.app.PostPage~ui");
     let replied: Vec<(&str, &str)> = thread
         .live
         .iter()
@@ -241,7 +241,7 @@ fn an_attribute_and_a_views_field_of_a_signal_are_computed_as_well() {
     let files = page("<p title={shown(open)}>x</p>\n            <Opened open={panel.open} />");
     assert_eq!(reported(&files), Vec::<String>::new());
     let b = build(&files).unwrap_or_else(|e| panic!("{e}"));
-    let plan = plan_of(&b, "t.P");
+    let plan = plan_of(&b, "t.P~ui");
     let computed: Vec<(&str, &str, &str, &str)> = plan
         .live
         .iter()
@@ -268,7 +268,7 @@ fn an_attribute_and_a_views_field_of_a_signal_are_computed_as_well() {
     let source = b
         .computed
         .iter()
-        .find(|c| c.page == "t.P")
+        .find(|c| c.page == "t.P~ui")
         .and_then(|c| c.module.as_ref().ok())
         .expect("the page's module");
     assert_eq!(source.matches("(j) => f").count(), 2, "{source}");
@@ -277,13 +277,18 @@ fn an_attribute_and_a_views_field_of_a_signal_are_computed_as_well() {
     let source = b
         .computed
         .iter()
-        .find(|c| c.page == "t.P")
+        .find(|c| c.page == "t.P~ui")
         .and_then(|c| c.module.as_ref().ok())
         .expect("the page's module");
     assert!(source.contains("(j) => f0(BigInt(j))"), "{source}");
     // Control: the same values read as they are compute nothing.
     let b = build(&page("<p title={panel.label}>{open}</p>")).unwrap_or_else(|e| panic!("{e}"));
-    assert!(plan_of(&b, "t.P").live.iter().all(|l| l.derived.is_empty()));
+    assert!(
+        plan_of(&b, "t.P~ui")
+            .live
+            .iter()
+            .all(|l| l.derived.is_empty())
+    );
     assert!(b.computed.is_empty(), "{:?}", b.computed);
 }
 
@@ -318,11 +323,11 @@ fn what_the_browser_does_not_compute_yet_is_refused_by_name() {
     let b =
         build(&page("{#if open}<p>{shown(panel.open)}</p>{/if}")).unwrap_or_else(|e| panic!("{e}"));
     assert!(
-        plan_of(&b, "t.P")
+        plan_of(&b, "t.P~ui")
             .live
             .iter()
             .any(|l| l.kind == "value" && !l.derived.is_empty()),
         "{:?}",
-        plan_of(&b, "t.P").live
+        plan_of(&b, "t.P~ui").live
     );
 }

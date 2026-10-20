@@ -139,7 +139,7 @@ fn an_order_no_one_pays_is_taken_back_thirty_minutes_on() {
 fn an_order_swept_is_told_to_its_readers_open_page() {
     paying(|s, origin| {
         placed_awaiting(s);
-        s.serve_document_settled("a", "store.page.OrderPage", &Params::new(), &[])
+        s.serve_document_settled("a", "store.page.OrderPage~ui", &Params::new(), &[])
             .expect("served");
         let doc = latest(&s.pending.lock().expect("pending"), "a");
         origin.hold();

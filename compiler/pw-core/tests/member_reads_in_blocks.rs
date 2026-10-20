@@ -132,7 +132,7 @@ fn through_a_member(part: &pw_core::page_values::Part, member: &str) -> bool {
         .any(|s| matches!(s, Step::Member(id) if id.ends_with(&format!(".{member}"))))
 }
 
-const CART: &str = "store.page.CartPage";
+const CART: &str = "store.page.CartPage~ui";
 const HAS_LINES: &str =
     "fn has_lines(cart: UserCart) -> Bool !{} {\n    List.length(cart.lines) > 0\n}\n";
 const LINES_AGAIN: &str =

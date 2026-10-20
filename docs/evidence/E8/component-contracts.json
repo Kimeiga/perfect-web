@@ -1019,9 +1019,9 @@
     ]
   },
   {
-    "component_id": "store.page.AddressPage",
+    "component_id": "store.page.AddressPage~ui",
     "capability_mapping": 1,
-    "abi_schema": "770e51c96051ba77",
+    "abi_schema": "7a1b2fca3415f1ab",
     "required_capabilities": [
       {
         "family": "session",
@@ -1108,7 +1108,7 @@
           }
         },
         "component": {
-          "interface": "pw:app/store-page-address-page-api@0.1.0",
+          "interface": "pw:app/store-page-address-pageui-api@0.1.0",
           "function": "address-page"
         }
       }
@@ -1223,9 +1223,9 @@
     ]
   },
   {
-    "component_id": "store.page.CartPage",
+    "component_id": "store.page.CartPage~ui",
     "capability_mapping": 1,
-    "abi_schema": "f00a4fe14eeded6f",
+    "abi_schema": "439d4998a967f0e3",
     "required_capabilities": [
       {
         "family": "session",
@@ -1348,7 +1348,7 @@
           }
         },
         "component": {
-          "interface": "pw:app/store-page-cart-page-api@0.1.0",
+          "interface": "pw:app/store-page-cart-pageui-api@0.1.0",
           "function": "cart-page"
         }
       }
@@ -2076,9 +2076,9 @@
     ]
   },
   {
-    "component_id": "store.page.HomePage",
+    "component_id": "store.page.HomePage~ui",
     "capability_mapping": 1,
-    "abi_schema": "2c950586f6696763",
+    "abi_schema": "cdb05a0704baba79",
     "required_capabilities": [
       {
         "family": "session",
@@ -2141,7 +2141,7 @@
           }
         },
         "component": {
-          "interface": "pw:app/store-page-home-page-api@0.1.0",
+          "interface": "pw:app/store-page-home-pageui-api@0.1.0",
           "function": "home-page"
         }
       }
@@ -2473,9 +2473,9 @@
     ]
   },
   {
-    "component_id": "store.page.OrderPage",
+    "component_id": "store.page.OrderPage~ui",
     "capability_mapping": 1,
-    "abi_schema": "ba1334c5a2f7dee7",
+    "abi_schema": "9318dd4611ddf383",
     "required_capabilities": [
       {
         "family": "session",
@@ -2550,16 +2550,16 @@
           }
         },
         "component": {
-          "interface": "pw:app/store-page-order-page-api@0.1.0",
+          "interface": "pw:app/store-page-order-pageui-api@0.1.0",
           "function": "order-page"
         }
       }
     ]
   },
   {
-    "component_id": "store.page.OrderPage.derived_3",
+    "component_id": "store.page.OrderPage~ui.derived_3",
     "capability_mapping": 1,
-    "abi_schema": "23ce3b89fcf1ed87",
+    "abi_schema": "50fcaa56ff2746c3",
     "required_capabilities": [],
     "allowed_placements": [
       "origin"
@@ -2590,16 +2590,16 @@
           }
         },
         "component": {
-          "interface": "pw:app/store-page-order-page-derived-3-api@0.1.0",
+          "interface": "pw:app/store-page-order-pageui-derived-3-api@0.1.0",
           "function": "derived3"
         }
       }
     ]
   },
   {
-    "component_id": "store.page.OrderPage.derived_4",
+    "component_id": "store.page.OrderPage~ui.derived_4",
     "capability_mapping": 1,
-    "abi_schema": "d0f2f87eff133f23",
+    "abi_schema": "35902a69f1fed88f",
     "required_capabilities": [],
     "allowed_placements": [
       "origin"
@@ -2624,16 +2624,16 @@
           }
         },
         "component": {
-          "interface": "pw:app/store-page-order-page-derived-4-api@0.1.0",
+          "interface": "pw:app/store-page-order-pageui-derived-4-api@0.1.0",
           "function": "derived4"
         }
       }
     ]
   },
   {
-    "component_id": "store.page.OrderPage.derived_9",
+    "component_id": "store.page.OrderPage~ui.derived_9",
     "capability_mapping": 1,
-    "abi_schema": "e58a44b06458557f",
+    "abi_schema": "2cb19d3ca0c8c02b",
     "required_capabilities": [],
     "allowed_placements": [
       "origin"
@@ -2658,7 +2658,7 @@
           }
         },
         "component": {
-          "interface": "pw:app/store-page-order-page-derived-9-api@0.1.0",
+          "interface": "pw:app/store-page-order-pageui-derived-9-api@0.1.0",
           "function": "derived9"
         }
       }
@@ -3159,9 +3159,9 @@
     ]
   },
   {
-    "component_id": "store.page.StoreLayout",
+    "component_id": "store.page.StoreLayout~ui",
     "capability_mapping": 1,
-    "abi_schema": "b337b80a218b9741",
+    "abi_schema": "475d6ffccc4a3285",
     "required_capabilities": [
       {
         "family": "session",
@@ -3220,7 +3220,7 @@
           }
         },
         "component": {
-          "interface": "pw:app/store-page-store-layout-api@0.1.0",
+          "interface": "pw:app/store-page-store-layoutui-api@0.1.0",
           "function": "store-layout"
         }
       }
@@ -3289,9 +3289,9 @@
     ]
   },
   {
-    "component_id": "store.page.StorePage",
+    "component_id": "store.page.StorePage~ui",
     "capability_mapping": 1,
-    "abi_schema": "d803b26130c7cf49",
+    "abi_schema": "cedabeabae50d3d3",
     "required_capabilities": [
       {
         "family": "session",
@@ -3426,16 +3426,16 @@
           }
         },
         "component": {
-          "interface": "pw:app/store-page-store-page-api@0.1.0",
+          "interface": "pw:app/store-page-store-pageui-api@0.1.0",
           "function": "store-page"
         }
       }
     ]
   },
   {
-    "component_id": "store.page.TimePage",
+    "component_id": "store.page.TimePage~ui",
     "capability_mapping": 1,
-    "abi_schema": "881bdfdcf009c063",
+    "abi_schema": "011adc193398272d",
     "required_capabilities": [
       {
         "family": "session",
@@ -3506,7 +3506,7 @@
           }
         },
         "component": {
-          "interface": "pw:app/store-page-time-page-api@0.1.0",
+          "interface": "pw:app/store-page-time-pageui-api@0.1.0",
           "function": "time-page"
         }
       }
@@ -9959,9 +9959,9 @@
     ]
   },
   {
-    "component_id": "store.rate.RatePage",
+    "component_id": "store.rate.RatePage~ui",
     "capability_mapping": 1,
-    "abi_schema": "1404bdc0d0d7164e",
+    "abi_schema": "9d8a90cda0d38664",
     "required_capabilities": [
       {
         "family": "session",
@@ -10024,16 +10024,16 @@
           }
         },
         "component": {
-          "interface": "pw:app/store-rate-rate-page-api@0.1.0",
+          "interface": "pw:app/store-rate-rate-pageui-api@0.1.0",
           "function": "rate-page"
         }
       }
     ]
   },
   {
-    "component_id": "store.rate.RatePage.derived_10",
+    "component_id": "store.rate.RatePage~ui.derived_10",
     "capability_mapping": 1,
-    "abi_schema": "2ae23ec8232e911e",
+    "abi_schema": "5d15e0ddb0dbbc90",
     "required_capabilities": [],
     "allowed_placements": [
       "origin"
@@ -10050,16 +10050,16 @@
           }
         },
         "component": {
-          "interface": "pw:app/store-rate-rate-page-derived-10-api@0.1.0",
+          "interface": "pw:app/store-rate-rate-pageui-derived-10-api@0.1.0",
           "function": "derived10"
         }
       }
     ]
   },
   {
-    "component_id": "store.rate.RatePage.derived_12",
+    "component_id": "store.rate.RatePage~ui.derived_12",
     "capability_mapping": 1,
-    "abi_schema": "cb9ddb0f6c696f16",
+    "abi_schema": "777b73e8776c6e48",
     "required_capabilities": [],
     "allowed_placements": [
       "origin"
@@ -10076,16 +10076,16 @@
           }
         },
         "component": {
-          "interface": "pw:app/store-rate-rate-page-derived-12-api@0.1.0",
+          "interface": "pw:app/store-rate-rate-pageui-derived-12-api@0.1.0",
           "function": "derived12"
         }
       }
     ]
   },
   {
-    "component_id": "store.rate.RatePage.derived_14",
+    "component_id": "store.rate.RatePage~ui.derived_14",
     "capability_mapping": 1,
-    "abi_schema": "f63d360709db7cae",
+    "abi_schema": "bce7cc0f87231190",
     "required_capabilities": [],
     "allowed_placements": [
       "origin"
@@ -10102,16 +10102,16 @@
           }
         },
         "component": {
-          "interface": "pw:app/store-rate-rate-page-derived-14-api@0.1.0",
+          "interface": "pw:app/store-rate-rate-pageui-derived-14-api@0.1.0",
           "function": "derived14"
         }
       }
     ]
   },
   {
-    "component_id": "store.rate.RatePage.derived_16",
+    "component_id": "store.rate.RatePage~ui.derived_16",
     "capability_mapping": 1,
-    "abi_schema": "ae6bb979e0128dd6",
+    "abi_schema": "4d2e378809531838",
     "required_capabilities": [],
     "allowed_placements": [
       "origin"
@@ -10136,16 +10136,16 @@
           }
         },
         "component": {
-          "interface": "pw:app/store-rate-rate-page-derived-16-api@0.1.0",
+          "interface": "pw:app/store-rate-rate-pageui-derived-16-api@0.1.0",
           "function": "derived16"
         }
       }
     ]
   },
   {
-    "component_id": "store.rate.RatePage.derived_6",
+    "component_id": "store.rate.RatePage~ui.derived_6",
     "capability_mapping": 1,
-    "abi_schema": "baa963082a1877fc",
+    "abi_schema": "ad0d82ba6c96df8e",
     "required_capabilities": [],
     "allowed_placements": [
       "origin"
@@ -10162,16 +10162,16 @@
           }
         },
         "component": {
-          "interface": "pw:app/store-rate-rate-page-derived-6-api@0.1.0",
+          "interface": "pw:app/store-rate-rate-pageui-derived-6-api@0.1.0",
           "function": "derived6"
         }
       }
     ]
   },
   {
-    "component_id": "store.rate.RatePage.derived_8",
+    "component_id": "store.rate.RatePage~ui.derived_8",
     "capability_mapping": 1,
-    "abi_schema": "06baa34336c3aee4",
+    "abi_schema": "fcad6d72ac44d3a6",
     "required_capabilities": [],
     "allowed_placements": [
       "origin"
@@ -10188,7 +10188,7 @@
           }
         },
         "component": {
-          "interface": "pw:app/store-rate-rate-page-derived-8-api@0.1.0",
+          "interface": "pw:app/store-rate-rate-pageui-derived-8-api@0.1.0",
           "function": "derived8"
         }
       }
@@ -11115,9 +11115,9 @@
     ]
   },
   {
-    "component_id": "store.search.SearchPage",
+    "component_id": "store.search.SearchPage~ui",
     "capability_mapping": 1,
-    "abi_schema": "6f777e8ea6bc2c28",
+    "abi_schema": "72088bbacc31201e",
     "required_capabilities": [
       {
         "family": "session",
@@ -11182,7 +11182,7 @@
           }
         },
         "component": {
-          "interface": "pw:app/store-search-search-page-api@0.1.0",
+          "interface": "pw:app/store-search-search-pageui-api@0.1.0",
           "function": "search-page"
         }
       }

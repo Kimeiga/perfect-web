@@ -126,11 +126,11 @@ fn a_representation_is_read_by_the_opaque_values_path() {
     // page's parameter, a query's value, a `{#match}` arm's binding under a
     // computed subject, and a view's parameter.
     for (template, read) in [
-        ("feed.app.Home", "p.id"),
-        ("feed.app.PostPage", "id"),
-        ("feed.app.PostPage", "thread.id"),
-        ("feed.app.PostPage", "r.id"),
-        ("feed.app.Replies", "post.id"),
+        ("feed.app.Home~ui", "p.id"),
+        ("feed.app.PostPage~ui", "id"),
+        ("feed.app.PostPage~ui", "thread.id"),
+        ("feed.app.PostPage~ui", "r.id"),
+        ("feed.app.Replies~ui", "post.id"),
     ] {
         let read_by = paths(&b, template);
         assert!(
@@ -146,7 +146,7 @@ fn a_representation_is_read_by_the_opaque_values_path() {
     let thread = b
         .pages
         .iter()
-        .find(|p| p.page == "feed.app.PostPage")
+        .find(|p| p.page == "feed.app.PostPage~ui")
         .and_then(|p| p.plan.as_ref().ok())
         .expect("the thread page's plan");
     assert!(
@@ -185,7 +185,7 @@ fn a_records_field_named_value_is_a_field() {
     );
     assert_eq!(reported(&files), Vec::<String>::new());
     let b = build(&files).unwrap_or_else(|e| panic!("{e}"));
-    let read_by = paths(&b, "t.P");
+    let read_by = paths(&b, "t.P~ui");
     // The record's field is read as a field; an opaque type over another
     // opaque type is read by its own path, each `.value` its representation.
     assert!(read_by.contains(&"pair.value".to_string()), "{read_by:?}");
@@ -273,9 +273,9 @@ fn a_speculated_value_read_through_a_view_reads_its_representation() {
     let files = program(&[("t.pw", TALLY.to_string())]);
     assert_eq!(reported(&files), Vec::<String>::new());
     let b = build(&files).unwrap_or_else(|e| panic!("{e}"));
-    assert!(paths(&b, "t.P").contains(&"t.n".to_string()));
+    assert!(paths(&b, "t.P~ui").contains(&"t.n".to_string()));
     assert!(
-        b.speculations.iter().any(|s| s.page == "t.P"),
+        b.speculations.iter().any(|s| s.page == "t.P~ui"),
         "the page's speculation"
     );
 }

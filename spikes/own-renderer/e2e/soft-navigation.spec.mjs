@@ -52,7 +52,7 @@ test("a link to a page of the same layout keeps the layout, and shows the page",
   // The page's heading holds the focus: where the new content begins.
   await expect(page.getByRole("heading", { level: 1 })).toBeFocused();
   // And the runtime is the cart page's: its parts, its template.
-  expect(await page.evaluate(() => window.__pw.parts.template)).toBe("store.page.CartPage");
+  expect(await page.evaluate(() => window.__pw.parts.template)).toBe("store.page.CartPage~ui");
 });
 
 test("a change, then a link: the page read after it, and the header kept and right", async ({
@@ -154,7 +154,7 @@ test("a page of another layout, or none, is loaded whole", async ({ page }) => {
   await page.evaluate(() => {
     const a = document.createElement("a");
     a.id = "elsewhere";
-    a.href = "/page/demo.dialog.DialogPage";
+    a.href = "/page/demo.dialog.DialogPage~ui";
     a.textContent = "Elsewhere";
     document.querySelector("main").append(a);
   });

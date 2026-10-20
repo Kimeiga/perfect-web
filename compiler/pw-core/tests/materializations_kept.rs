@@ -146,7 +146,7 @@ fn a_page_that_reads_one_depends_on_it_and_binds_it() {
     let page = b
         .contracts
         .iter()
-        .find(|c| c.component_id == "store.page.StorePage")
+        .find(|c| c.component_id == "store.page.StorePage~ui")
         .expect("the store's page");
     assert!(
         page.imports.iter().any(|i| i.kind == ImportKind::Component
@@ -158,7 +158,7 @@ fn a_page_that_reads_one_depends_on_it_and_binds_it() {
     let plan = b
         .pages
         .iter()
-        .find(|p| p.page == "store.page.StorePage")
+        .find(|p| p.page == "store.page.StorePage~ui")
         .and_then(|p| p.plan.as_ref().ok())
         .expect("the store's page is planned");
     let plan = serde_json::to_value(plan).expect("a plan is JSON");

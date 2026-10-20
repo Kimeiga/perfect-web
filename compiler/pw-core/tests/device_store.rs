@@ -125,7 +125,7 @@ fn a_value_the_device_keeps_checks_and_its_page_holds_it() {
     let plan = b
         .pages
         .iter()
-        .find(|p| p.page == "t.P")
+        .find(|p| p.page == "t.P~ui")
         .and_then(|p| p.plan.as_ref().ok())
         .expect("a plan");
     let held = serde_json::to_value(&plan.device).expect("JSON");
@@ -539,7 +539,7 @@ fn the_browser_computes_from_several_values_and_a_list_in_its_block() {
     let plan = b
         .pages
         .iter()
-        .find(|p| p.page == "t.P")
+        .find(|p| p.page == "t.P~ui")
         .and_then(|p| p.plan.as_ref().ok())
         .expect("a plan");
     let live = serde_json::to_value(&plan.live).expect("JSON");
@@ -570,7 +570,7 @@ fn the_browser_computes_from_several_values_and_a_list_in_its_block() {
     let module = b
         .computed
         .iter()
-        .find(|m| m.page == "t.P")
+        .find(|m| m.page == "t.P~ui")
         .and_then(|m| m.module.as_ref().ok())
         .expect("a module");
     assert!(module.contains("(j0, j1) =>"), "{module}");

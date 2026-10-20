@@ -301,7 +301,7 @@ fn store_built_with(
 fn store_plan(b: &pw_core::build::Build) -> &pw_core::page_values::PageValues {
     b.pages
         .iter()
-        .find(|p| p.page == "store.page.StorePage")
+        .find(|p| p.page == "store.page.StorePage~ui")
         .map(|p| {
             p.plan
                 .as_ref()
@@ -312,7 +312,7 @@ fn store_plan(b: &pw_core::build::Build) -> &pw_core::page_values::PageValues {
 
 /// Each `{#each}` in the store page's template, as (collection, binding).
 fn store_loops(b: &pw_core::build::Build) -> Vec<(String, String)> {
-    loops(b, "store.page.StorePage")
+    loops(b, "store.page.StorePage~ui")
 }
 
 /// Each `{#each}` in the template at `path`, as (collection, binding).
@@ -515,7 +515,7 @@ fn a_loops_name_is_the_loops_beside_a_signal_of_its_spelling() {
     let t = b
         .templates
         .iter()
-        .find(|t| t.path == "store.page.StorePage")
+        .find(|t| t.path == "store.page.StorePage~ui")
         .expect("the store page's template");
     let markup = serde_json::to_string(&t.chunks).expect("chunks serialize");
     assert!(
@@ -540,7 +540,7 @@ fn a_views_loop_is_its_own_beside_a_page_binding_of_its_spelling() {
     // A view composed into the page (ADR-0136) reads its loop's `line`;
     // the page's `line` is a store, which has no quantity.
     let b = built_with(&[("t.pw", VIEWED)]);
-    let loops = loops(&b, "t.P");
+    let loops = loops(&b, "t.P~ui");
     assert!(
         loops.iter().any(|(c, b)| c == "cart.lines" && b != "line"),
         "{loops:?}"
@@ -579,8 +579,8 @@ fn a_layouts_loop_is_the_same_on_every_page() {
             .and_then(|p| p.layout.clone())
             .unwrap_or_else(|| panic!("`{page}` is shown in no layout"))
     };
-    assert_eq!(layout("t.A"), layout("t.B"));
-    for page in ["t.A", "t.B"] {
+    assert_eq!(layout("t.A~ui"), layout("t.B~ui"));
+    for page in ["t.A~ui", "t.B~ui"] {
         let loops = loops(&b, page);
         let laid: Vec<_> = loops
             .iter()

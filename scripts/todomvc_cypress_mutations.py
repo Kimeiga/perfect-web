@@ -284,14 +284,14 @@ MUTANTS = [
     (
         "run.sh names the acceptance's app as the diagnostic's",
         RUN,
-        '  FRAMEWORK="page/todomvc.app.Todos"\n',
+        '  FRAMEWORK="page/todomvc.app.Todos~ui"\n',
         '  FRAMEWORK="puremvc"\n',
     ),
     (
         "run.sh's diagnostic reaches the page without its fragment",
         RUN,
-        '  BASE="http://127.0.0.1:$PORT/page/todomvc.app.Todos#"\n',
-        '  BASE="http://127.0.0.1:$PORT/page/todomvc.app.Todos"\n',
+        '  BASE="http://127.0.0.1:$PORT/page/todomvc.app.Todos~ui#"\n',
+        '  BASE="http://127.0.0.1:$PORT/page/todomvc.app.Todos~ui"\n',
     ),
 ]
 

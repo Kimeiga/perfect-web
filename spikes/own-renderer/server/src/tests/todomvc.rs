@@ -6,7 +6,7 @@
 
 use super::*;
 
-const PAGE: &str = "todomvc.app.Todos";
+const PAGE: &str = "todomvc.app.Todos~ui";
 
 /// The program, built as `pw build` builds it, and served.
 fn served_todomvc() -> Served {

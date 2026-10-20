@@ -187,9 +187,9 @@
     ]
   },
   {
-    "component_id": "kiokun.page.SearchPage",
+    "component_id": "kiokun.page.SearchPage~ui",
     "capability_mapping": 1,
-    "abi_schema": "6f8cae31eed7bad7",
+    "abi_schema": "ba5a9d07a1d045b3",
     "required_capabilities": [],
     "allowed_placements": [
       "build",
@@ -209,16 +209,16 @@
           }
         },
         "component": {
-          "interface": "pw:app/kiokun-page-search-page-api@0.1.0",
+          "interface": "pw:app/kiokun-page-search-pageui-api@0.1.0",
           "function": "search-page"
         }
       }
     ]
   },
   {
-    "component_id": "kiokun.page.WordPage",
+    "component_id": "kiokun.page.WordPage~ui",
     "capability_mapping": 1,
-    "abi_schema": "1b44088df51a559f",
+    "abi_schema": "32105fb92c895af3",
     "required_capabilities": [],
     "allowed_placements": [
       "build",
@@ -238,7 +238,7 @@
           }
         },
         "component": {
-          "interface": "pw:app/kiokun-page-word-page-api@0.1.0",
+          "interface": "pw:app/kiokun-page-word-pageui-api@0.1.0",
           "function": "word-page"
         }
       }

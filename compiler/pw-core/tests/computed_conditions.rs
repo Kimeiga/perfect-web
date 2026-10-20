@@ -108,11 +108,11 @@ fn a_computed_condition_is_a_hosts_from_a_query_and_the_browsers_from_a_signal()
     let b = build(&files).unwrap_or_else(|e| panic!("{e}"));
     // The thread page's: a block a host renders, and again, its subject
     // computed into what it is rendered with.
-    let thread = plan_of(&b, "feed.app.PostPage");
+    let thread = plan_of(&b, "feed.app.PostPage~ui");
     let subject = thread
         .derived
         .iter()
-        .find(|d| d.path.starts_with("#feed.app.PostPage~"))
+        .find(|d| d.path.starts_with("#feed.app.PostPage~ui~"))
         .expect("the condition, the host's");
     assert!(thread.blocks.contains(&subject.part), "{:?}", thread.blocks);
     assert_eq!(subject.binding, "thread");
@@ -123,7 +123,7 @@ fn a_computed_condition_is_a_hosts_from_a_query_and_the_browsers_from_a_signal()
     );
     // The home page's: a block the browser renders again as the draft
     // changes, by its component, and the module's function.
-    let home = plan_of(&b, "feed.app.Home");
+    let home = plan_of(&b, "feed.app.Home~ui");
     let block = home
         .live
         .iter()
@@ -141,7 +141,7 @@ fn a_computed_condition_is_a_hosts_from_a_query_and_the_browsers_from_a_signal()
     let module = b
         .computed
         .iter()
-        .find(|c| c.page == "feed.app.Home")
+        .find(|c| c.page == "feed.app.Home~ui")
         .and_then(|c| c.module.as_ref().ok())
         .expect("the home page's module");
     assert!(
@@ -159,7 +159,7 @@ fn an_else_if_a_match_and_a_value_in_a_hosts_block_are_computed_too() {
     );
     assert_eq!(reported(&files), Vec::<String>::new());
     let b = build(&files).unwrap_or_else(|e| panic!("{e}"));
-    let plan = plan_of(&b, "t.P");
+    let plan = plan_of(&b, "t.P~ui");
     // The `{:else if}`'s, the `{#match}`'s and the value in the third block:
     // each the host's, in what the page is rendered with.
     let computed: Vec<u32> = plan.derived.iter().map(|d| d.part).collect();

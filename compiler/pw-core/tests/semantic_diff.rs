@@ -138,7 +138,7 @@ fn a_streamed_region_is_a_page_change() {
     let report = diff(&before, &after);
     assert_eq!(
         section(&report, "Pages"),
-        ["`store.page.StorePage` streams `store.page.Recommendations(id), streamed`"]
+        ["`store.page.StorePage~ui` streams `store.page.Recommendations(id), streamed`"]
     );
 }
 

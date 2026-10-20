@@ -98,7 +98,7 @@ fn plan(markup: &str) -> Result<PageValues, String> {
         .expect("builds")
         .pages
         .into_iter()
-        .find(|p| p.page == "t.P")
+        .find(|p| p.page == "t.P~ui")
         .expect("a page")
         .plan
 }
@@ -356,7 +356,7 @@ fn cart_speculation(build: &pw_core::build::Build) -> &pw_core::backend::specula
     build
         .speculations
         .iter()
-        .find(|s| s.page == "store.page.CartPage")
+        .find(|s| s.page == "store.page.CartPage~ui")
         .expect("the cart's page speculates")
 }
 

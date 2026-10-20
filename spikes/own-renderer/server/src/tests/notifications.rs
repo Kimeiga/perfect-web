@@ -25,8 +25,8 @@ fn told(s: &Server, doc: &Doc) -> String {
         .join("\n")
 }
 
-const HOME: &str = "feed.app.Home";
-const PAGE: &str = "feed.app.NotificationsPage";
+const HOME: &str = "feed.app.Home~ui";
+const PAGE: &str = "feed.app.NotificationsPage~ui";
 
 /// The accounts model: `alice` in two sessions, `bob` in one, and `nobody`,
 /// a session no one signed in to.

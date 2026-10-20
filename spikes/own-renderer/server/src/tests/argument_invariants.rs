@@ -302,7 +302,7 @@ fn a_pages_parameters_are_held_where_its_address_gives_them() {
         "/demo/invariants/%25FF".to_string(),
         format!("/demo/invariants/ab?note={}", "n".repeat(20)),
         format!("/demo/invariants/ab?note={twenty_emoji}"),
-        "/page/demo.invariants.InvariantsPage?code=ab&note=x".to_string(),
+        "/page/demo.invariants.InvariantsPage~ui?code=ab&note=x".to_string(),
     ] {
         let (status, body) = asked(&path);
         assert!(
@@ -351,7 +351,7 @@ fn a_pages_parameters_are_held_where_its_address_gives_them() {
             format!("parameter refused: value 2's `some` is 21 code points long, and {NOTE}"),
         ),
         (
-            "/page/demo.invariants.InvariantsPage?code=a&note=x".to_string(),
+            "/page/demo.invariants.InvariantsPage~ui?code=a&note=x".to_string(),
             format!("parameter refused: value 1 is 1 code points long, and {CODE}"),
         ),
     ] {

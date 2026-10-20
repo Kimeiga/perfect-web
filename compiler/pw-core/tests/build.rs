@@ -99,9 +99,9 @@ fn the_store_builds_every_artifact_from_source() {
             // a scheduled order is for, in words, between them. The frame's
             // numbered after the total's arms read their binding (track
             // `store-switch`, ADR-0330).
-            "store.page.OrderPage.derived_3",
-            "store.page.OrderPage.derived_4",
-            "store.page.OrderPage.derived_9",
+            "store.page.OrderPage~ui.derived_3",
+            "store.page.OrderPage~ui.derived_4",
+            "store.page.OrderPage~ui.derived_9",
             // What the order was charged (track `order-total`).
             "store.page.OrderTotal",
             // The places an address may name, and whether the store reaches
@@ -150,12 +150,12 @@ fn the_store_builds_every_artifact_from_source() {
             // The rate page's five stars' pressed state and the words said
             // of the stars chosen, each computed from the signal (track
             // `reviews`), and the rating sent.
-            "store.rate.RatePage.derived_10",
-            "store.rate.RatePage.derived_12",
-            "store.rate.RatePage.derived_14",
-            "store.rate.RatePage.derived_16",
-            "store.rate.RatePage.derived_6",
-            "store.rate.RatePage.derived_8",
+            "store.rate.RatePage~ui.derived_10",
+            "store.rate.RatePage~ui.derived_12",
+            "store.rate.RatePage~ui.derived_14",
+            "store.rate.RatePage~ui.derived_16",
+            "store.rate.RatePage~ui.derived_6",
+            "store.rate.RatePage~ui.derived_8",
             "store.rate.rate_order",
             // A store's ratings and reviews, the stores of the reader's order
             // to rate, and the rate page's store (track `reviews`).
@@ -179,7 +179,7 @@ fn the_store_builds_every_artifact_from_source() {
     assert!(
         b.components
             .iter()
-            .any(|(id, x)| id == "store.page.StorePage"
+            .any(|(id, x)| id == "store.page.StorePage~ui"
                 && matches!(
                     x,
                     Built::NoBody {
@@ -249,7 +249,7 @@ page Home() {
     println!("{refused:?}");
     assert_eq!(
         refused,
-        ["`shop.ui.Home` depends on `shop.ui.Count`, whose body is a placeholder (`todo`)"]
+        ["`shop.ui.Home~ui` depends on `shop.ui.Count`, whose body is a placeholder (`todo`)"]
     );
 
     // The control: the same program with the body written builds.

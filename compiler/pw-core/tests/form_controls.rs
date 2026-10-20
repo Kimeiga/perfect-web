@@ -69,7 +69,7 @@ fn rendered(src: &str) -> String {
         .collect();
     let page = templates
         .iter()
-        .find(|t| t.path == "t.P")
+        .find(|t| t.path == "t.P~ui")
         .expect("the page");
     // The lowered bind handler reads the platform's event record, just as
     // `reported` above does; compiling without those declarations would leave
@@ -165,7 +165,7 @@ fn the_browser_sets_a_textareas_value_in_place() {
     let plan = b
         .pages
         .iter()
-        .find(|p| p.page == "t.P")
+        .find(|p| p.page == "t.P~ui")
         .expect("the page")
         .plan
         .clone()
@@ -250,7 +250,7 @@ fn the_template_refuses_what_the_check_refuses() {
         let u = unit(&src);
         let t = pw_core::template_ir::build(&[&u.hir])
             .into_iter()
-            .find(|t| t.path == "t.P")
+            .find(|t| t.path == "t.P~ui")
             .expect("the page");
         let blocked: Vec<String> = t
             .chunks

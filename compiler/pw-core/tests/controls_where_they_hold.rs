@@ -189,7 +189,7 @@ fn planned(markup: &str) -> pw_core::page_values::PageValues {
     assert!(b.refusals().is_empty(), "{:#?}", b.refusals());
     b.pages
         .iter()
-        .find(|p| p.page == "t.P")
+        .find(|p| p.page == "t.P~ui")
         .and_then(|p| p.plan.as_ref().ok())
         .cloned()
         .expect("the page's plan")

@@ -139,11 +139,11 @@ fn placement_and_the_contract_read_the_same_thing() {
     // The invariant behind both controls. If these two ever disagree, one
     // semantic declaration has two answers about what it needs.
     assert!(
-        required(OVER_DECLARED, "app.Badge").is_empty(),
+        required(OVER_DECLARED, "app.Badge~ui").is_empty(),
         "the contract sees no capability either"
     );
     assert_eq!(
-        required(HONEST, "app.Badge"),
+        required(HONEST, "app.Badge~ui"),
         ["database.read<Stores>"],
         "and sees it when the body performs it"
     );

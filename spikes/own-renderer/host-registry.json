@@ -323,6 +323,9 @@
     "GUESTBOOK_PORTS": "guestbook"
   },
   "specs": {
+    "wit-unique.spec.mjs": {
+      "roles": ["base"]
+    },
     "accessibility.spec.mjs": {
       "roles": [
         "mutable:accessibility"

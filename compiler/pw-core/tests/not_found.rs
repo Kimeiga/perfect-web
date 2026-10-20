@@ -189,7 +189,7 @@ fn the_plan_carries_the_case_on_the_bindings_that_can_answer_it() {
         let planned = pw_core::page_values::pages(&hirs, &ws, &sigs);
         let plan = planned
             .iter()
-            .find(|p| p.page == "t.P")
+            .find(|p| p.page == "t.P~ui")
             .expect("a plan for P")
             .plan
             .as_ref()

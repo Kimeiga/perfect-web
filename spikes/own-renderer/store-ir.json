@@ -1,6 +1,6 @@
 [
   {
-    "path": "store.page.AddressPage",
+    "path": "store.page.AddressPage~ui",
     "name": "AddressPage",
     "params": [
       "id"
@@ -331,7 +331,7 @@
     ]
   },
   {
-    "path": "store.page.CartPage",
+    "path": "store.page.CartPage~ui",
     "name": "CartPage",
     "params": [],
     "schema": "82d34bd843fa637b",
@@ -1051,7 +1051,7 @@
     ]
   },
   {
-    "path": "store.page.HomePage",
+    "path": "store.page.HomePage~ui",
     "name": "HomePage",
     "params": [],
     "schema": "328fc906484af1c4",
@@ -1226,10 +1226,10 @@
     ]
   },
   {
-    "path": "store.page.OrderPage",
+    "path": "store.page.OrderPage~ui",
     "name": "OrderPage",
     "params": [],
-    "schema": "76bfe916e1abec1d",
+    "schema": "94e772a2b519ca9f",
     "chunks": [
       {
         "chunk": "static",
@@ -1338,7 +1338,7 @@
                             "value": {
                               "part": "text",
                               "id": 3,
-                              "value": "#store.page.OrderPage~3",
+                              "value": "#store.page.OrderPage~ui~3",
                               "context": "text"
                             }
                           },
@@ -1360,7 +1360,7 @@
                   "value": {
                     "part": "match",
                     "id": 4,
-                    "value": "#store.page.OrderPage~4",
+                    "value": "#store.page.OrderPage~ui~4",
                     "arms": [
                       {
                         "case": "to-pay",
@@ -1493,7 +1493,7 @@
         "value": {
           "part": "match",
           "id": 9,
-          "value": "#store.page.OrderPage~9",
+          "value": "#store.page.OrderPage~ui~9",
           "arms": [
             {
               "case": "some",
@@ -1704,7 +1704,7 @@
     ]
   },
   {
-    "path": "store.page.StorePage",
+    "path": "store.page.StorePage~ui",
     "name": "StorePage",
     "params": [
       "id"
@@ -2614,7 +2614,7 @@
     ]
   },
   {
-    "path": "store.page.TimePage",
+    "path": "store.page.TimePage~ui",
     "name": "TimePage",
     "params": [
       "day"
@@ -2832,12 +2832,12 @@
     ]
   },
   {
-    "path": "store.rate.RatePage",
+    "path": "store.rate.RatePage~ui",
     "name": "RatePage",
     "params": [
       "id"
     ],
-    "schema": "00075224d3a31ada",
+    "schema": "7a5142035bf93cda",
     "chunks": [
       {
         "chunk": "static",
@@ -2935,7 +2935,7 @@
           "id": 6,
           "owner": 1,
           "name": "aria-pressed",
-          "value": "#store.rate.RatePage~6",
+          "value": "#store.rate.RatePage~ui~6",
           "context": "attribute"
         }
       },
@@ -2961,7 +2961,7 @@
           "id": 8,
           "owner": 2,
           "name": "aria-pressed",
-          "value": "#store.rate.RatePage~8",
+          "value": "#store.rate.RatePage~ui~8",
           "context": "attribute"
         }
       },
@@ -2987,7 +2987,7 @@
           "id": 10,
           "owner": 3,
           "name": "aria-pressed",
-          "value": "#store.rate.RatePage~10",
+          "value": "#store.rate.RatePage~ui~10",
           "context": "attribute"
         }
       },
@@ -3013,7 +3013,7 @@
           "id": 12,
           "owner": 4,
           "name": "aria-pressed",
-          "value": "#store.rate.RatePage~12",
+          "value": "#store.rate.RatePage~ui~12",
           "context": "attribute"
         }
       },
@@ -3039,7 +3039,7 @@
           "id": 14,
           "owner": 5,
           "name": "aria-pressed",
-          "value": "#store.rate.RatePage~14",
+          "value": "#store.rate.RatePage~ui~14",
           "context": "attribute"
         }
       },
@@ -3063,7 +3063,7 @@
         "value": {
           "part": "text",
           "id": 16,
-          "value": "#store.rate.RatePage~16",
+          "value": "#store.rate.RatePage~ui~16",
           "context": "text"
         }
       },
@@ -3151,7 +3151,7 @@
     ]
   },
   {
-    "path": "store.search.SearchPage",
+    "path": "store.search.SearchPage~ui",
     "name": "SearchPage",
     "params": [
       "q"

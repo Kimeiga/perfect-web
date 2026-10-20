@@ -17,7 +17,7 @@
 import { chromium, expect, test } from "@playwright/test";
 import { MUTABLE_PORTS } from "../host-metadata.mjs";
 
-const PAGE = "/page/demo.streamed.StreamedPage?id=47";
+const PAGE = "/page/demo.streamed.StreamedPage~ui?id=47";
 
 test.use({
   baseURL: async ({}, use, testInfo) => {

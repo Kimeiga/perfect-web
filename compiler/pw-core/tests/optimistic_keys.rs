@@ -75,7 +75,7 @@ fn a_target_may_leave_a_key_unnamed() {
     let home = b
         .speculations
         .iter()
-        .find(|s| s.page == "feed.app.Home")
+        .find(|s| s.page == "feed.app.Home~ui")
         .expect("the home page speculates");
     let pw_core::backend::wasm::Encoding::Encoded(module) = &home.module else {
         panic!("{:?}", home.module);

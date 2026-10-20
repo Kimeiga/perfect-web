@@ -11,7 +11,7 @@
 // - one that is already focused, or is shown with the page, is left alone.
 import { expect, test } from "@playwright/test";
 
-const PAGE = "/page/demo.focus.FocusPage";
+const PAGE = "/page/demo.focus.FocusPage~ui";
 
 async function ready(page) {
   await page.goto(PAGE);

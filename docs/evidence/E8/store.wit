@@ -77,7 +77,7 @@ interface store-hours-stores-open-api {
     stores-open: func() -> list<store-hours-listed-store>;
 }
 
-interface store-page-address-page-api {
+interface store-page-address-pageui-api {
     use pw:types/types.{domain-store-id};
     address-page: func(arg0: domain-store-id);
 }
@@ -87,7 +87,7 @@ interface store-page-cart-api {
     cart: func(arg0: capability-user-id) -> result<user-carts-user-cart, domain-cart-error>;
 }
 
-interface store-page-cart-page-api {
+interface store-page-cart-pageui-api {
     cart-page: func();
 }
 
@@ -101,7 +101,7 @@ interface store-page-estimate-api {
     estimate: func(arg0: domain-store-id, arg1: capability-user-id) -> result<domain-delivery-estimate, domain-estimate-error>;
 }
 
-interface store-page-home-page-api {
+interface store-page-home-pageui-api {
     home-page: func();
 }
 
@@ -125,21 +125,21 @@ interface store-page-order-api {
     order: func(arg0: capability-user-id) -> result<option<domain-order-status>, domain-tracking-error>;
 }
 
-interface store-page-order-page-api {
+interface store-page-order-pageui-api {
     order-page: func();
 }
 
-interface store-page-order-page-derived-3-api {
+interface store-page-order-pageui-derived-3-api {
     use pw:types/types.{domain-order-status};
     derived3: func(arg0: option<domain-order-status>) -> string;
 }
 
-interface store-page-order-page-derived-4-api {
+interface store-page-order-pageui-derived-4-api {
     use pw:types/types.{domain-order-status, store-page-order-charge};
     derived4: func(arg0: option<domain-order-status>) -> store-page-order-charge;
 }
 
-interface store-page-order-page-derived-9-api {
+interface store-page-order-pageui-derived-9-api {
     use pw:types/types.{domain-order-status, domain-payment-page};
     derived9: func(arg0: option<domain-order-status>) -> option<domain-payment-page>;
 }
@@ -174,7 +174,7 @@ interface store-page-store-api {
     store: func(arg0: domain-store-id) -> result<domain-store, domain-store-error>;
 }
 
-interface store-page-store-layout-api {
+interface store-page-store-layoutui-api {
     store-layout: func();
 }
 
@@ -183,12 +183,12 @@ interface store-page-store-list-api {
     store-list: func() -> list<domain-store>;
 }
 
-interface store-page-store-page-api {
+interface store-page-store-pageui-api {
     use pw:types/types.{domain-store-id};
     store-page: func(arg0: domain-store-id);
 }
 
-interface store-page-time-page-api {
+interface store-page-time-pageui-api {
     time-page: func(arg0: option<string>);
 }
 
@@ -287,32 +287,32 @@ interface store-page-settle-payment-api {
     settle-payment: func(arg0: payments-settled) -> result<domain-order-status, domain-order-error>;
 }
 
-interface store-rate-rate-page-api {
+interface store-rate-rate-pageui-api {
     use pw:types/types.{domain-store-id};
     rate-page: func(arg0: domain-store-id);
 }
 
-interface store-rate-rate-page-derived-10-api {
+interface store-rate-rate-pageui-derived-10-api {
     derived10: func(arg0: s64) -> bool;
 }
 
-interface store-rate-rate-page-derived-12-api {
+interface store-rate-rate-pageui-derived-12-api {
     derived12: func(arg0: s64) -> bool;
 }
 
-interface store-rate-rate-page-derived-14-api {
+interface store-rate-rate-pageui-derived-14-api {
     derived14: func(arg0: s64) -> bool;
 }
 
-interface store-rate-rate-page-derived-16-api {
+interface store-rate-rate-pageui-derived-16-api {
     derived16: func(arg0: s64) -> string;
 }
 
-interface store-rate-rate-page-derived-6-api {
+interface store-rate-rate-pageui-derived-6-api {
     derived6: func(arg0: s64) -> bool;
 }
 
-interface store-rate-rate-page-derived-8-api {
+interface store-rate-rate-pageui-derived-8-api {
     derived8: func(arg0: s64) -> bool;
 }
 
@@ -341,7 +341,7 @@ interface store-search-search-api {
     search: func(arg0: option<string>, arg1: capability-user-id) -> store-search-search-shown;
 }
 
-interface store-search-search-page-api {
+interface store-search-search-pageui-api {
     search-page: func(arg0: option<string>);
 }
 
@@ -405,7 +405,7 @@ world store-hours-stores-open {
     export store-hours-stores-open-api;
 }
 
-world store-page-address-page {
+world store-page-address-pageui {
     import pw:host/principal;
     import store-page-add-address-api;
     import store-page-choose-address-api;
@@ -413,7 +413,7 @@ world store-page-address-page {
     import store-page-remove-address-api;
     import store-page-rename-address-api;
     import store-page-saved-addresses-api;
-    export store-page-address-page-api;
+    export store-page-address-pageui-api;
 }
 
 world store-page-cart {
@@ -421,7 +421,7 @@ world store-page-cart {
     export store-page-cart-api;
 }
 
-world store-page-cart-page {
+world store-page-cart-pageui {
     import pw:host/principal;
     import store-hours-cart-hours-api;
     import store-page-apply-promo-api;
@@ -435,7 +435,7 @@ world store-page-cart-page {
     import store-page-place-order-api;
     import store-page-remove-from-cart-api;
     import store-page-remove-promo-api;
-    export store-page-cart-page-api;
+    export store-page-cart-pageui-api;
 }
 
 world store-page-checkout {
@@ -453,11 +453,11 @@ world store-page-estimate {
     export store-page-estimate-api;
 }
 
-world store-page-home-page {
+world store-page-home-pageui {
     import pw:host/principal;
     import store-hours-stores-open-api;
     import store-page-cart-api;
-    export store-page-home-page-api;
+    export store-page-home-pageui-api;
 }
 
 world store-page-menu {
@@ -482,25 +482,25 @@ world store-page-order {
     export store-page-order-api;
 }
 
-world store-page-order-page {
+world store-page-order-pageui {
     import pw:host/principal;
     import store-page-cancel-order-api;
     import store-page-order-api;
     import store-page-order-total-api;
     import store-reviews-order-ratings-api;
-    export store-page-order-page-api;
+    export store-page-order-pageui-api;
 }
 
-world store-page-order-page-derived-3 {
-    export store-page-order-page-derived-3-api;
+world store-page-order-pageui-derived-3 {
+    export store-page-order-pageui-derived-3-api;
 }
 
-world store-page-order-page-derived-4 {
-    export store-page-order-page-derived-4-api;
+world store-page-order-pageui-derived-4 {
+    export store-page-order-pageui-derived-4-api;
 }
 
-world store-page-order-page-derived-9 {
-    export store-page-order-page-derived-9-api;
+world store-page-order-pageui-derived-9 {
+    export store-page-order-pageui-derived-9-api;
 }
 
 world store-page-order-total {
@@ -533,10 +533,10 @@ world store-page-store {
     export store-page-store-api;
 }
 
-world store-page-store-layout {
+world store-page-store-layoutui {
     import pw:host/principal;
     import store-page-cart-api;
-    export store-page-store-layout-api;
+    export store-page-store-layoutui-api;
 }
 
 world store-page-store-list {
@@ -544,7 +544,7 @@ world store-page-store-list {
     export store-page-store-list-api;
 }
 
-world store-page-store-page {
+world store-page-store-pageui {
     import pw:host/principal;
     import store-hours-store-status-api;
     import store-page-add-to-cart-api;
@@ -560,14 +560,14 @@ world store-page-store-page {
     import store-page-remove-from-cart-api;
     import store-page-store-api;
     import store-reviews-store-ratings-api;
-    export store-page-store-page-api;
+    export store-page-store-pageui-api;
 }
 
-world store-page-time-page {
+world store-page-time-pageui {
     import pw:host/principal;
     import store-page-choose-time-api;
     import store-page-times-offered-api;
-    export store-page-time-page-api;
+    export store-page-time-pageui-api;
 }
 
 world store-page-times-offered {
@@ -742,35 +742,35 @@ world store-page-settle-payment {
     export store-page-settle-payment-api;
 }
 
-world store-rate-rate-page {
+world store-rate-rate-pageui {
     import pw:host/principal;
     import store-rate-rate-order-api;
     import store-reviews-store-to-rate-api;
-    export store-rate-rate-page-api;
+    export store-rate-rate-pageui-api;
 }
 
-world store-rate-rate-page-derived-10 {
-    export store-rate-rate-page-derived-10-api;
+world store-rate-rate-pageui-derived-10 {
+    export store-rate-rate-pageui-derived-10-api;
 }
 
-world store-rate-rate-page-derived-12 {
-    export store-rate-rate-page-derived-12-api;
+world store-rate-rate-pageui-derived-12 {
+    export store-rate-rate-pageui-derived-12-api;
 }
 
-world store-rate-rate-page-derived-14 {
-    export store-rate-rate-page-derived-14-api;
+world store-rate-rate-pageui-derived-14 {
+    export store-rate-rate-pageui-derived-14-api;
 }
 
-world store-rate-rate-page-derived-16 {
-    export store-rate-rate-page-derived-16-api;
+world store-rate-rate-pageui-derived-16 {
+    export store-rate-rate-pageui-derived-16-api;
 }
 
-world store-rate-rate-page-derived-6 {
-    export store-rate-rate-page-derived-6-api;
+world store-rate-rate-pageui-derived-6 {
+    export store-rate-rate-pageui-derived-6-api;
 }
 
-world store-rate-rate-page-derived-8 {
-    export store-rate-rate-page-derived-8-api;
+world store-rate-rate-pageui-derived-8 {
+    export store-rate-rate-pageui-derived-8-api;
 }
 
 world store-rate-rate-order {
@@ -804,10 +804,10 @@ world store-search-search {
     export store-search-search-api;
 }
 
-world store-search-search-page {
+world store-search-search-pageui {
     import pw:host/principal;
     import store-search-search-api;
-    export store-search-search-page-api;
+    export store-search-search-pageui-api;
 }
 
 package pw:types {

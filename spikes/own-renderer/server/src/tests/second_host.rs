@@ -96,7 +96,7 @@ fn post(s: &Server, session: &str, text: &str, interaction: &str) -> Answered {
 /// `session`'s home page, served by `s`: its document.
 fn home(s: &Server, session: &str) -> Doc {
     let (html, _, _, _) = s
-        .serve_document_settled(session, "feed.app.Home", &Params::new(), &[])
+        .serve_document_settled(session, "feed.app.Home~ui", &Params::new(), &[])
         .expect("served");
     assert!(html.contains("Hello, feed."), "{html}");
     latest(&s.pending.lock().expect("pending"), session)
@@ -1241,7 +1241,7 @@ fn a_store_commit_waits_for_the_outbox_lock_and_wakes_another_host() {
     });
 }
 
-const CART: &str = "store.page.CartPage";
+const CART: &str = "store.page.CartPage~ui";
 
 /// **A reader's cart changed through one host is told to their page on
 /// another**: ada, signed in through A, reads her cart on B (her session

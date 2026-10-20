@@ -55,7 +55,7 @@ fn template(src: &str) -> Template {
     let b = pw_core::build::build(&units).expect("builds");
     b.templates
         .iter()
-        .find(|t| t.path == "t.P")
+        .find(|t| t.path == "t.P~ui")
         .expect("the template")
         .clone()
 }

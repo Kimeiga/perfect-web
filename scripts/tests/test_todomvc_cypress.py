@@ -446,7 +446,7 @@ class RunSh(unittest.TestCase):
         self.assertIn("acceptance: 3 of 29 passed; 4 failed (3 tests, 1 hook); 22 not run", r.stdout)
         self.assertIn("acceptance: FAILED:", r.stdout)
         calls = self.calls_text()
-        self.assertIn("run --env framework=page/todomvc.app.Todos --config baseUrl=http://127.0.0.1:%d --reporter spec" % self.port, calls)
+        self.assertIn("run --env framework=page/todomvc.app.Todos~ui --config baseUrl=http://127.0.0.1:%d --reporter spec" % self.port, calls)
         # The display of the machine is left out, and the browser's console is on.
         self.assertIn("env DISPLAY=unset WAYLAND_DISPLAY=unset ELECTRON_ENABLE_LOGGING=1", calls)
 
@@ -461,7 +461,7 @@ class RunSh(unittest.TestCase):
         self.assertIn("the DIAGNOSTIC run (framework puremvc", r.stdout)
         self.assertIn("diagnostic: 28 of 29 passed; 1 pending", r.stdout)
         self.assertIn(
-            "run --env framework=puremvc --config baseUrl=http://127.0.0.1:%d/page/todomvc.app.Todos# --reporter spec" % self.port,
+            "run --env framework=puremvc --config baseUrl=http://127.0.0.1:%d/page/todomvc.app.Todos~ui# --reporter spec" % self.port,
             self.calls_text(),
         )
 
