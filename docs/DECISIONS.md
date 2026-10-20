@@ -3075,3 +3075,51 @@ repair, track `legacy-hours-duplicates`; train-10).
   the second time with none; they are read by lookup now, the caller's
   order, duplicates and misses kept, on both layers. Two more controls,
   and a Cargo result that is no result is refused, not counted.
+[ADR-0354](DECISIONS/ADR-0354-a-render-reads-each-call-once.md):
+a render reads each call once, in one snapshot, in a bounded few seats
+(NEXT 4c, track `render-merge`; train-11).
+- One render's identical calls are made once and read as of one snapshot; on
+  PostgreSQL its reads take one of a deployment's seats (`PW_RENDER_SEATS`,
+  `PW_RENDER_SEAT_WAIT`: 8 and 30 s where unset, refused at start); the
+  table's and a turn's lock-order checks run in every debug build.
+[ADR-0355](DECISIONS/ADR-0355-the-committed-components-are-the-builds.md):
+the committed components are the build's, every one (the integrator's
+defect; train-11).
+- `evidence_is_current` holds `docs/evidence/E10/*.wasm` to exactly the
+  components the store's build emits (55; three were stale on train-10's
+  head), with a control; the planner and the evidence fetch read a binary
+  file's change by the lines that name it.
+[ADR-0356](DECISIONS/ADR-0356-browser-host-map.md):
+a browser run starts only the hosts its selected tests need (track
+`browser-host-map`; train-11).
+- A registry of the suite's hosts (stride 256), the selection asked of
+  Playwright itself, only its hosts started; a spec an optional build cannot
+  serve is left out and said, and a guard holds that each runs where its
+  build is made.
+[ADR-0357](DECISIONS/ADR-0357-mutants-run-in-parallel-slots.md):
+a mutation script's mutants run in parallel slots (track
+`parallel-instrument`; train-11).
+- `PW_MUTANT_SLOTS` deals a script's mutants among worktrees of their own,
+  their ports from the browser registry, and says what the script says in
+  order; off on CI for now (the integrator's ruling, 2026-10-20).
+[ADR-0358](DECISIONS/ADR-0358-kiokun-cache.md):
+a Kiokun search cache is published whole, and a reader keeps the version
+it opened (track `kiokun-cache`; train-11).
+- Each builder stages in a private directory and publishes a complete,
+  validated one; final connections are read-only; a builder cleans only its
+  own failures and losing stages.
+[ADR-0359](DECISIONS/ADR-0359-ci-reliability-traces-latency-incremental-builds-and-the-nightly.md):
+a failure's trace is kept, the latency ceiling bounds the fastest check, a
+mutant is built incrementally, and the nightly does not repeat a verified
+head (track `ci-diagnostics`; train-11).
+- `kept-traces/` (32 MiB in all) for each failing browser run and red
+  baseline; `check_latency` bounds the fastest of seven or more checks (800
+  ms a thousand lines); `PW_MUTANT_INCREMENTAL` on verify's recipe step; the
+  nightly skips a head a run passed at, its recipes and browsers, never on
+  Sunday.
+[ADR-0360](DECISIONS/ADR-0360-the-coverage-guided-fuzzer-measures-or-fails.md):
+the coverage-guided fuzzer measures, or it fails (track `fuzz-floor`;
+train-11).
+- `llvm-profdata` is found through the toolchain's sysroot (`llvm-tools` in
+  `rust-toolchain.toml`); a target that covers no region fails the run;
+  `e14-fuzz-floor` records E9C's evidence.

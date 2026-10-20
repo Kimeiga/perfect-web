@@ -1,4 +1,4 @@
-"""**The browser host map's own tests, in `just ci`** (ADR-XXXX).
+"""**The browser host map's own tests, in `just ci`** (ADR-0356).
 
 The host map (`spikes/own-renderer/host-registry.json`, `host-metadata.mjs`,
 `host-plan.mjs`) decides which development servers each browser run starts:

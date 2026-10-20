@@ -17,7 +17,7 @@
 # (`tools/fuzz`, `just fuzz`) reads its coverage with, from the toolchain's own
 # `lib/rustlib/<host>/bin/`. Nothing listed it, and the fuzzer looked for it at
 # one machine's own path, so everywhere else it measured nothing and reported
-# success (found 2026-10-20; track fuzz-floor, ADR-XXXX). The
+# success (found 2026-10-20; track fuzz-floor, ADR-0360). The
 # channel manifest names the component `llvm-tools-preview` and renames
 # `llvm-tools` to it, as it does `clippy` and `rustfmt`. A fresh install
 # fetches 39 MB more (x86_64; 31 MB on arm64) and unpacks 225 MB more.

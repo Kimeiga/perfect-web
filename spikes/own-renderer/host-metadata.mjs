@@ -1,4 +1,4 @@
-// **The browser suite's hosts, as data** (the host map, ADR-XXXX). Every host
+// **The browser suite's hosts, as data** (the host map, ADR-0356). Every host
 // a spec can reach, its port, its build and what it depends on are read from
 // `host-registry.json`; the specs import their ports from here, and the
 // config (`playwright.config.mjs`) starts only the hosts the selected tests

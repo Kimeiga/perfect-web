@@ -1,4 +1,4 @@
-# ADR-XXXX: the committed components are the build's, every one
+# ADR-0355: the committed components are the build's, every one
 
 Status: accepted, the integrator's ruling of 2026-10-19 (train-11), under the
 owner's delegation of 2026-10-02; applied by the integrator's delegate
@@ -103,3 +103,10 @@ named elsewhere) is found only by the line that names the directory; a line
 naming an ancestor as a whole (`docs/evidence`) does not name it; and a
 recipe whose own lines run a reader test without a mutation script is
 planned by that test's change only where the planner already plans it.
+
+## Numbered on train-11 (2026-10-20)
+
+- **Numbered ADR-0355** (the integrator's ruling of 2026-10-20: a train is
+  numbered before it is pushed, after master's ADR-0353, in train order),
+  merged from train-11's own commits. `ADR-XXXX` reads `ADR-0355` in
+  ADR-0356's cross-reference, as in this file's name and title.

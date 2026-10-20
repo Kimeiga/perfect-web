@@ -62,7 +62,7 @@ Arbitrary out-of-protocol concurrent empty-directory creation is not
 certified. No crash durability or additional-platform certification is
 claimed. Failed/lost builders clean only their own stage; killed stages
 and old published versions are retained and ignored. ADR0314's automatic
-stale deletion policy is explicitly superseded by ADR-XXXX-kiokun-cache.
+stale deletion policy is explicitly superseded by ADR-0358-kiokun-cache.
 
 ## Raw evidence SHA256
 

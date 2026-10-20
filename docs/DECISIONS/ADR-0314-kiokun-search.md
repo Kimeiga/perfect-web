@@ -81,7 +81,7 @@ kiokun.com in Pleris, step 2 (search).
      `resolveWordNavigationUrl`): it goes to the word's page instead of
      searching (Difference 26).
 4. **The index, cached** (B5; publication and retention amended
-   2026-10-16 by ADR-XXXX-kiokun-cache under the integrator's delegation):
+   2026-10-16 by ADR-0358-kiokun-cache under the integrator's delegation):
    the original flat-file path and automatic stale deletion below describe
    the initial implementation. The amended policy retains published
    versions while readers may hold them, builds privately, closes SQLite

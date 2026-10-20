@@ -432,7 +432,7 @@ def suite_configuration(root: pathlib.Path | None = None) -> set[str]:
     """The suite's configuration and every module of its directory it reads,
     as far as they go: what it imports (`from "./host-plan.mjs"`) and what
     those name beside themselves (`new URL("./host-registry.json",
-    import.meta.url)`). Since the host map (ADR-XXXX) the configuration plans
+    import.meta.url)`). Since the host map (ADR-0356) the configuration plans
     each run's hosts with `host-metadata.mjs`, `host-plan.mjs`, its reporter
     and the registry, so a change to any of them is a change to every suite."""
     root = root or ROOT

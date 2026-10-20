@@ -3,7 +3,7 @@
 # `e14-<name>:`, writes `docs/evidence/E14/<name>.txt`, and is planned by the
 # verification run like any other.
 
-# Track `fuzz-floor` (ADR-XXXX): the coverage-guided fuzzer (`tools/fuzz`, `just
+# Track `fuzz-floor` (ADR-0360): the coverage-guided fuzzer (`tools/fuzz`, `just
 # fuzz`) finds `llvm-profdata` in the active toolchain, not at one machine's
 # path, and fails, naming what is missing, where it measured nothing: it used
 # to report "0 covered regions ... 0 finding(s)" for every target and exit 0

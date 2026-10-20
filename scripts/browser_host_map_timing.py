@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""What the browser host map saves, measured (ADR-XXXX): the same Playwright
+"""What the browser host map saves, measured (ADR-0356): the same Playwright
 selection run through two trees, one before the host map and one after it,
 in turn, each run timed from its start to its exit.
 

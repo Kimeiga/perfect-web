@@ -1,4 +1,4 @@
-# ADR-XXXX: a mutation script's mutants run in parallel slots
+# ADR-0357: a mutation script's mutants run in parallel slots
 
 Status: proposed by track `parallel-mutants`, for the integrator's
 numbering. Date: 2026-10-15. Milestone: E14; the verification run's harness
@@ -747,3 +747,12 @@ the same bytes, which `mutation_slots.py` reads. Three resolutions:
 Not claimed by the merge: that a train's verification runs mutants in slots
 (`PW_MUTANT_SLOTS` is set by no workflow and no recipe, and the train's own
 whole runs ran each script in order).
+
+## Numbered on train-11 (2026-10-20)
+
+- **Numbered ADR-0357** (the integrator's ruling of 2026-10-20: a train is
+  numbered before it is pushed, after master's ADR-0353, in train order),
+  merged from `f6e8a14f` (`track/parallel-instrument`). `ADR-XXXX` reads
+  `ADR-0357` in `just/parallel-mutants.just` (its recipe's header line too),
+  `mutation_slots.py`, `mutation_slots_mutations.py`, and the header of its
+  two evidence files, as in this file's name and title.

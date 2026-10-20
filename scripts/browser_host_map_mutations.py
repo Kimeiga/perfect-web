@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mutation controls for the browser host map (ADR-XXXX).
+"""Mutation controls for the browser host map (ADR-0356).
 
 The host map starts only the hosts the selected tests need. Each mutant
 undoes one piece of it, and must be killed by the test named beside it, by

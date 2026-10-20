@@ -1,4 +1,4 @@
-# ADR-XXXX: a failure's trace is kept, the latency ceiling bounds the fastest check, a mutant is built incrementally, and the nightly does not repeat a verified head
+# ADR-0359: a failure's trace is kept, the latency ceiling bounds the fastest check, a mutant is built incrementally, and the nightly does not repeat a verified head
 
 Status: proposed by track `ci-diagnostics` (2026-10-19) for the integrator;
 local gates and the track's recipe recorded below; not yet in a train.
@@ -521,3 +521,11 @@ allocator's paragraph on slots and this track's on incremental builds; as the
 module is imported, the slots engage first (a run asked for slots ends there,
 and each slot's copy imports the module again), then the memory bound, then
 the incremental builds.
+
+## Numbered on train-11 (2026-10-20)
+
+- **Numbered ADR-0359** (the integrator's ruling of 2026-10-20: a train is
+  numbered before it is pushed, after master's ADR-0353, in train order),
+  merged from `54be8c66` (`track/ci-diagnostics`). `ADR-XXXX` reads
+  `ADR-0359` in `just/ci-diagnostics.just`, as in this file's name and
+  title.

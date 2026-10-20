@@ -4,7 +4,7 @@
 # evidence recipe is `e14-<name>:`, writes `docs/evidence/E14/<name>.txt`, and
 # is planned by the verification run like any other.
 
-# NEXT 4c (ADR-XXXX): the render merge's own tests and the served ones, the
+# NEXT 4c (ADR-0354): the render merge's own tests and the served ones, the
 # store in memory and on PostgreSQL, the feed on PostgreSQL
 # (render_merge.rs, tests/render_merge.rs): each identical call once; one
 # snapshot, and another render's read only where nothing invalidated it

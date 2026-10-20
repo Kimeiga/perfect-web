@@ -291,7 +291,7 @@ class Plan(unittest.TestCase):
         self.assertNotIn("e14-feed", other)
 
     def test_the_modules_the_configuration_reads_are_its_own_and_plan_as_it_does(self) -> None:
-        # The host map (ADR-XXXX): the configuration plans each run's hosts
+        # The host map (ADR-0356): the configuration plans each run's hosts
         # with modules of its directory and the registry they read, found by
         # following its imports; a change to any of them is a change to every
         # suite run there, as a change to the configuration is.

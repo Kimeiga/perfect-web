@@ -1,4 +1,4 @@
-# ADR-XXXX: the coverage-guided fuzzer measures, or it fails
+# ADR-0360: the coverage-guided fuzzer measures, or it fails
 
 Status: proposed by track `fuzz-floor` (2026-10-20) for the integrator; local
 gates and the track's recipe recorded below; not yet in a train.
@@ -206,3 +206,11 @@ seen on a runner (the first push's `ci` run is the proof).
    its tests (`cargo test --workspace` is every job's)?
 3. The generator's seed is fixed (`0x5EED_1234`): a second campaign repeats the
    first until it passes it. A `--seed` is three lines; not added.
+
+## Numbered on train-11 (2026-10-20)
+
+- **Numbered ADR-0360** (the integrator's ruling of 2026-10-20: a train is
+  numbered before it is pushed, after master's ADR-0353, in train order),
+  merged from `5b270753` (`track/fuzz-floor`). `ADR-XXXX` reads `ADR-0360`
+  in `just/fuzz-floor.just` and `rust-toolchain.toml`, as in this file's
+  name and title.

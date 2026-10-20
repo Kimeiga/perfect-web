@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Mutation controls for a mutation script's mutants run in parallel slots
-(`mutation_slots.py`, ADR-XXXX).
+(`mutation_slots.py`, ADR-0357).
 
 Each mutant undoes one thing the slots do: the tree never mutated (the
 script's loop run in the tree, or the tree's copy of the script run in a
