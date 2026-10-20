@@ -461,7 +461,9 @@ class EveryCallOfExplain(unittest.TestCase):
     kiokun-cache's, the render merge's, the skipped specs' guard's; and with
     check-is-build and guide-producer-validity build_id's and refusal's
     restored-suite checks, held_labels' refused producer, a cargo run, and the
-    guide producer's red baseline), each read for that."""
+    guide producer's red baseline), each read for that. ADR-0373 adds the
+    WIT identity runner's refused Cargo producer: its last command cannot be
+    a mutant's browser run."""
 
     OTHERS = {
         ("bounded_statements_mutations.py", "REFUSED (invalid or stopped Cargo producer; no kill)"),
@@ -478,6 +480,7 @@ class EveryCallOfExplain(unittest.TestCase):
         ("render_merge_mutations.py", "REFUSED (invalid or stopped Cargo producer; no kill)"),
         ("skipped_specs_mutations.py", "REFUSED (the tests errored or said no count; no kill)"),
         ("store_hours_mutations.py", "REFUSED (invalid or stopped Cargo producer; no kill)"),
+        ("wit_unique_mutations.py", "REFUSED (invalid or stopped Cargo producer; no kill)"),
     }
 
     def test_each_call_follows_a_red_baseline_or_one_of_those_named(self):
