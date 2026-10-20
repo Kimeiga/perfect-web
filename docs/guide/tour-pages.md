@@ -340,9 +340,9 @@ templates, and refuses some programs `pw check` passes. So a clean check is
 not yet a program that runs: build it, as the [tutorial](tutorial.md) does.
 `pw build` prints its refusals as lines that begin `pw:`, with no code.
 
-Each program below is a gap in the checks today. The test that compiles this
-guide holds each one: when the compiler closes a gap, that test fails on the
-example, and this page is updated.
+The examples below distinguish remaining gaps from a refusal the compiler
+now makes. The test that compiles this guide holds each gap: when the
+compiler closes one, that test fails on the example, and this page is updated.
 
 A `<title>` cannot read a signal, because the browser does not render the
 title again (ADR-0137):
@@ -396,13 +396,11 @@ pw: refused: `shop.sum.Sum`'s values: part 0 computes a value from `a` and `b`, 
 pw: 1 refusal(s); nothing written
 ```
 
-An `{#each}` reads its list by path, and a call in its head computes the
-list, so `pw build` refuses it. `pw check` does not, and it does not look in
-the head for effects either: this view says `!{}`, and its `{#each}` calls a
-function that reads the database. The same call anywhere else in the view is
-refused by `pw check` (PW0401, [why Pleris](why.md)):
+Effects in an `{#each}` head are checked just as they are elsewhere in
+the view (ADR-0345). This view claims `!{}` and calls a database read in its
+list, so `pw check` refuses it with PW0401:
 
-```pw gap=build
+```pw fails=PW0401
 module shop.head
 
 type Item = Item { name: String }
@@ -419,8 +417,29 @@ view Menu() !{} {
 }
 ```
 
+A pure call in the list still passes `pw check`, but the renderer reads
+the list by path and `pw build` refuses the computed list:
+
+```pw gap=build
+module shop.computed_head
+
+type Item = Item { name: String }
+
+fn items() -> List<Item> !{} {
+    [Item { name: "Tea" }]
+}
+
+view Menu() !{} {
+    <ul>
+        {#each items() as item (item.name)}
+            <li>{item.name}</li>
+        {/each}
+    </ul>
+}
+```
+
 ```text pw-build
-pw: a template part the renderer cannot render: shop.head.Menu: `{#each items() as item (item.name)}`: `{#each}` reads its list by path, and `items()` is computed
+pw: a template part the renderer cannot render: shop.computed_head.Menu: `{#each items() as item (item.name)}`: `{#each}` reads its list by path, and `items()` is computed
 ```
 
 And an `<img>` with no `alt` is not refused, though an `<input>` with no

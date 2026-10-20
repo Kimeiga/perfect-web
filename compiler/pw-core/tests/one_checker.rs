@@ -96,6 +96,9 @@ fn a_program_that_checks_builds() {
         // and its order read (track `reviews`).
         "examples/store/reviews.pw",
         "examples/store/rate.pw",
+        // And its scheduled orders, which its cart page and its page of times
+        // read (track `scheduled-orders`).
+        "examples/store/scheduled.pw",
     ]);
     if let Err(e) = build(&units(&files)) {
         panic!("the store does not build: {e}");

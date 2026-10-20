@@ -500,11 +500,25 @@ fn wit_resolved(ty: &ResolvedType, types: &Types, at: &str) -> Result<String, Wi
         .to_string());
     }
     let mapped = |index: usize| wit_resolved(ty.args().get(index).ok_or_else(bad)?, types, at);
+    // **A case of a `Result` that carries nothing** (track `tables`): WIT
+    // writes it `_`, as `result<_, e>`, and has no empty tuple, which
+    // wit-component refuses ("tuple type must have at least one type"). A
+    // command answering `Result<(), E>`, and a table's `insert`, did not
+    // build until 2026-10-15. The canonical ABI lays out `result<_, e>` as
+    // it would an empty tuple's, so only the text changes.
+    let unit = |index: usize| {
+        ty.args().get(index).and_then(ResolvedType::as_primitive) == Some(Primitive::Unit)
+    };
     if let Some(builtin) = ty.as_builtin() {
         return Ok(match builtin {
             Builtin::List => format!("list<{}>", mapped(0)?),
             Builtin::Option => format!("option<{}>", mapped(0)?),
-            Builtin::Result => format!("result<{}, {}>", mapped(0)?, mapped(1)?),
+            Builtin::Result => match (unit(0), unit(1)) {
+                (true, true) => "result".to_string(),
+                (true, false) => format!("result<_, {}>", mapped(1)?),
+                (false, true) => format!("result<{}>", mapped(0)?),
+                (false, false) => format!("result<{}, {}>", mapped(0)?, mapped(1)?),
+            },
             // In ascending key order, each key once (ADR-0057).
             Builtin::Map => format!("list<tuple<{}, {}>>", mapped(0)?, mapped(1)?),
             Builtin::Set => format!("list<{}>", mapped(0)?),

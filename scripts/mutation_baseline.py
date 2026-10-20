@@ -21,6 +21,17 @@ It keeps what `subprocess.Popen.communicate` returns, which
 that loading a script to read its mutants (`ci_plan.py`,
 `mutation_anchors.py`) needs nothing beside it.
 
+Imported, it first makes the script run its sources as they are (track
+evidence-integrity, finding 1). Python takes a cached `.pyc` for its source
+where the two agree in the source's size and its modification time in whole
+seconds, so a mutant of a Python source the same size as its anchor,
+restored within the second it was written in, left its bytecode to stand
+for the restored source in the next run: another mutant's, a baseline's, or
+`just ci`'s. From the import on, neither the script nor any process it
+starts writes bytecode, and the bytecode cached for each Python source its
+`MUTANTS` change is removed: writing none stops no reading, and bytecode
+left by an earlier run would still be read.
+
 Imported, it also bounds in memory every process the script starts from
 then on (`mutation_bound.py`, 2026-10-09): a mutant's test that holds more
 than the bound is stopped, the script's output says so, and its last line
@@ -28,9 +39,42 @@ says what the bound did, a kind of kill apart from a test's.
 """
 
 import collections
+import importlib.util
+import os
+import pathlib
 import re
 import subprocess
 import sys
+
+# No bytecode written from here on, by the script (`dont_write_bytecode`) or
+# by any process it starts, each of which inherits the environment's word.
+sys.dont_write_bytecode = True
+os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
+
+
+def forget_bytecode(mutants) -> list[pathlib.Path]:
+    """Remove the bytecode cached for each Python source `mutants` change:
+    each interpreter's in its `__pycache__`, and where this one would look
+    for it. The files removed."""
+    gone = []
+    for mutant in mutants:
+        path = mutant[-3] if isinstance(mutant, tuple) and len(mutant) >= 4 else None
+        if not isinstance(path, pathlib.Path) or path.suffix != ".py":
+            continue
+        found = set((path.parent / "__pycache__").glob(f"{path.stem}.*.pyc"))
+        found.add(pathlib.Path(importlib.util.cache_from_source(str(path))))
+        for pyc in sorted(found):
+            try:
+                pyc.unlink()
+            except FileNotFoundError:
+                continue
+            gone.append(pyc)
+    return gone
+
+
+# The script's own mutants: it imports this module first in its `main()`,
+# so its `MUTANTS` are read before any of them is written.
+forget_bytecode(getattr(sys.modules.get("__main__"), "MUTANTS", None) or [])
 
 import mutation_bound
 

@@ -1,0 +1,103 @@
+test_a_later_build_failure_cannot_hide_behind_a_test_result (test_bounded_mutation_results.RustResults) ... FAIL
+test_a_missing_result_is_no_assertion_failure (test_bounded_mutation_results.RustResults) ... FAIL
+test_a_stopped_process_cannot_earn_a_kill (test_bounded_mutation_results.RustResults) ... FAIL
+test_a_successful_summary_cannot_hide_a_failed_command (test_bounded_mutation_results.RustResults) ... FAIL
+test_an_actual_assertion_failure_earns_a_kill_and_restores_source (test_bounded_mutation_results.RustResults) ... ok
+test_an_invalid_build_is_refused_and_fails_the_campaign (test_bounded_mutation_results.RustResults) ... FAIL
+test_every_binary_in_one_command_contributes_its_result (test_bounded_mutation_results.RustResults) ... FAIL
+test_every_command_contributes_its_result (test_bounded_mutation_results.RustResults) ... ok
+
+======================================================================
+FAIL: test_a_later_build_failure_cannot_hide_behind_a_test_result (test_bounded_mutation_results.RustResults)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/pw-d1-results-red-nj1khrrl/scripts/tests/test_bounded_mutation_results.py", line 51, in test_a_later_build_failure_cannot_hide_behind_a_test_result
+    self.assertEqual(self.run_results(result(
+AssertionError: Tuples differ: (True, 3, 0) != (False, 0, 0)
+
+First differing element 0:
+True
+False
+
+- (True, 3, 0)
++ (False, 0, 0)
+
+======================================================================
+FAIL: test_a_missing_result_is_no_assertion_failure (test_bounded_mutation_results.RustResults)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/pw-d1-results-red-nj1khrrl/scripts/tests/test_bounded_mutation_results.py", line 40, in test_a_missing_result_is_no_assertion_failure
+    self.assertEqual(self.run_results(result("host disconnected\n", 1)), (False, 0, 0))
+AssertionError: Tuples differ: (True, 0, 1) != (False, 0, 0)
+
+First differing element 0:
+True
+False
+
+- (True, 0, 1)
++ (False, 0, 0)
+
+======================================================================
+FAIL: test_a_stopped_process_cannot_earn_a_kill (test_bounded_mutation_results.RustResults)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/pw-d1-results-red-nj1khrrl/scripts/tests/test_bounded_mutation_results.py", line 47, in test_a_stopped_process_cannot_earn_a_kill
+    self.assertEqual(self.run_results(result(
+AssertionError: Tuples differ: (True, 0, 1) != (False, 0, 0)
+
+First differing element 0:
+True
+False
+
+- (True, 0, 1)
++ (False, 0, 0)
+
+======================================================================
+FAIL: test_a_successful_summary_cannot_hide_a_failed_command (test_bounded_mutation_results.RustResults)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/pw-d1-results-red-nj1khrrl/scripts/tests/test_bounded_mutation_results.py", line 43, in test_a_successful_summary_cannot_hide_a_failed_command
+    self.assertEqual(self.run_results(result(
+AssertionError: Tuples differ: (True, 3, 0) != (False, 0, 0)
+
+First differing element 0:
+True
+False
+
+- (True, 3, 0)
++ (False, 0, 0)
+
+======================================================================
+FAIL: test_an_invalid_build_is_refused_and_fails_the_campaign (test_bounded_mutation_results.RustResults)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/pw-d1-results-red-nj1khrrl/scripts/tests/test_bounded_mutation_results.py", line 70, in test_an_invalid_build_is_refused_and_fails_the_campaign
+    self.assertEqual(status, 1, output)
+AssertionError: 0 != 1 : baseline: 1 passed, 0 failed
+a real assertion control: KILLED (does not build)
+1 of 1 mutants killed
+
+
+======================================================================
+FAIL: test_every_binary_in_one_command_contributes_its_result (test_bounded_mutation_results.RustResults)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/pw-d1-results-red-nj1khrrl/scripts/tests/test_bounded_mutation_results.py", line 30, in test_every_binary_in_one_command_contributes_its_result
+    self.assertEqual(self.run_results(result(
+AssertionError: Tuples differ: (True, 32, 0) != (True, 36, 1)
+
+First differing element 1:
+32
+36
+
+- (True, 32, 0)
+?         ^  ^
+
++ (True, 36, 1)
+?         ^  ^
+
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.005s
+
+FAILED (failures=6)

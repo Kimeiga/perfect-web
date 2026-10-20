@@ -347,7 +347,11 @@ fn the_store_states_its_source_and_asks_only_what_it_gives() {
     // `store-search`) once for each of the three it reads, the stores, their
     // menus and the reader's addresses (ADR-0308, amended). And the
     // checkout (track `order-total`) once for each of the three it reads,
-    // the carts, the stores and the orders, and what an order was charged.
+    // the carts, the stores and the orders, and what an order was charged;
+    // and (track `scheduled-orders`) the estimates and the reader's
+    // addresses, which a time chosen is held to the windows by. The page of
+    // times, once for each of the four it reads: the carts, the stores, the
+    // estimates and the addresses.
     assert_eq!(
         named("PW0344"),
         [
@@ -364,6 +368,12 @@ fn the_store_states_its_source_and_asks_only_what_it_gives() {
             "Checkout",
             "Checkout",
             "Checkout",
+            "Checkout",
+            "Checkout",
+            "TimesOffered",
+            "TimesOffered",
+            "TimesOffered",
+            "TimesOffered",
             "OrderTotal",
             // A store's hours (track `store-hours`): the stores' rows, and
             // for the cart's, the cart's too; the stores' ratings are read
@@ -408,6 +418,10 @@ fn the_store_states_its_source_and_asks_only_what_it_gives() {
             "choose_tip",
             "apply_promo",
             "remove_promo",
+            // The time the order is for (track `scheduled-orders`), and the
+            // order sent to its stores by the clock.
+            "choose_time",
+            "send_to_store",
             "add_address",
             // A rating given (track `reviews`).
             "rate_order"
@@ -432,6 +446,10 @@ fn the_store_states_its_source_and_asks_only_what_it_gives() {
         "choose_tip",
         "apply_promo",
         "remove_promo",
+        // The time the order is for, and the order sent to its stores by the
+        // clock (track `scheduled-orders`).
+        "choose_time",
+        "send_to_store",
         // A reader's addresses (track `store-accounts`).
         "add_address",
         "rename_address",
@@ -447,5 +465,8 @@ fn the_store_states_its_source_and_asks_only_what_it_gives() {
     // takes an order back, three times each; and the clock's sweep (the
     // scheduled-commands track), three times. Track `reviews`: the rating
     // command, three times, and its queries' nine more reads.
-    assert_eq!(found.len(), 75, "{found:#?}");
+    // scheduled-commands track), three times. Track `scheduled-orders`: the
+    // checkout's two more reads and the page of times' four, six; and the
+    // time chosen and the send, three times each.
+    assert_eq!(found.len(), 87, "{found:#?}");
 }

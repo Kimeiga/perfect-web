@@ -1,0 +1,15 @@
+baseline: 29 passed, 0 failed
+an order is placed without its lines: KILLED (5 of 29 tests fail)
+on PostgreSQL, an order's lines are not written: KILLED (6 of 29 tests fail)
+a commit commits without its events: KILLED (6 of 29 tests fail)
+a command's transaction is the connection's default: KILLED (23 of 29 tests fail)
+the isolation is answered, not measured: KILLED (1 of 29 tests fail)
+a refused commit is answered as committed: KILLED (1 of 29 tests fail)
+the outbox is not read back: KILLED (3 of 29 tests fail)
+a commit on PostgreSQL is not recorded in the materializer: KILLED (3 of 29 tests fail)
+a commit on PostgreSQL is recorded without its rows: KILLED (1 of 29 tests fail)
+the store's connections search more than its schema: KILLED (1 of 29 tests fail)
+a program may name one of the host's own operations: KILLED (2 of 29 tests fail)
+a command's delivered events stay in the materializer's outbox: KILLED (3 of 29 tests fail)
+12 of 12 mutants killed
+memory bound: no process was stopped

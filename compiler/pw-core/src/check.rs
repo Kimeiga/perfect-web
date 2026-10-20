@@ -237,6 +237,10 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
             // Track `uploads` (ADR-0260): an upload's clauses, its paths, and
             // the forms that post a file.
             out.extend(crate::uploads::check(&hirs, i));
+            // Track `tables` (ADR-0338): a table's declaration, and its rows
+            // reached only through the functions it gives (PW0361, PW0362,
+            // PW0365).
+            out.extend(crate::tables::check(&hirs, i, &workspace, &sigs));
             // NEXT 6c: a command the platform invokes, which no reader
             // presses (PW64xx).
             out.extend(crate::invoked::check(&hirs, i, &workspace, &sent));
@@ -1066,9 +1070,17 @@ fn unresolved_uses(
     // nothing by its name, as the name check reads it: until ADR-0226 it put
     // its module's name in scope here, so `String.nope(s)` was a local's
     // field and checked clean wherever `String` was imported.
+    // Nor does a table (track `tables`): its name is its module's, and
+    // `Shops.all` in `module Shops` is a call into the module, resolved
+    // below, not a field of a local.
     let declared: std::collections::BTreeSet<String> = hir
         .all_decls()
-        .filter(|(_, d)| d.kind != crate::hir::DeclKind::Import)
+        .filter(|(_, d)| {
+            !matches!(
+                d.kind,
+                crate::hir::DeclKind::Import | crate::hir::DeclKind::Table
+            )
+        })
         .map(|(_, d)| d.name.clone())
         .collect();
     for (decl_id, decl) in hir.all_decls() {
@@ -1271,7 +1283,19 @@ fn unresolved_uses(
                     // Several: the typer's, by the type expected where the
                     // call is written (ADR-0201).
                     if owners.is_empty() {
-                        out.push(unresolved_bare_call(hir, decl, body, id, &path));
+                        // In a table's own module, a read or a write it does
+                        // not give (track `tables`).
+                        match crate::tables::undeclared(
+                            workspace,
+                            hirs,
+                            unit,
+                            None,
+                            &path,
+                            body.expr_span(id),
+                        ) {
+                            Some(d) => out.push(d),
+                            None => out.push(unresolved_bare_call(hir, decl, body, id, &path)),
+                        }
                     }
                 }
                 continue;
@@ -1301,6 +1325,21 @@ fn unresolved_uses(
                 continue;
             }
             if workspace.resolve_path(unit, &path) != Resolution::Unresolved {
+                continue;
+            }
+            // A read or a write a table does not give (track `tables`):
+            // its own refusal, which names what it gives.
+            if let Some((head, member)) = path.rsplit_once('.')
+                && let Some(d) = crate::tables::undeclared(
+                    workspace,
+                    hirs,
+                    unit,
+                    Some(head),
+                    member,
+                    body.expr_span(id),
+                )
+            {
+                out.push(d);
                 continue;
             }
 
@@ -1506,7 +1545,9 @@ fn policy_value(
     use crate::policy::{Domain, ValueFault};
     use crate::resolve::Resolution;
     let decl = hir.decl(id);
-    let fault = match crate::policy::domain_of(head) {
+    // A table's `key` names its row's fields, which `tables::check` holds
+    // (track `tables`); a query's names its parameters.
+    let fault = match crate::policy::domain_on(head, decl.kind) {
         Some(domain @ (Domain::ParamRef | Domain::ParamList)) => value
             .split(',')
             .map(str::trim)
@@ -3015,18 +3056,27 @@ fn sessions_stay_on_the_server(
         // latency, 2026-10-13).
         let mut types: Option<crate::values::BodyTypes> = None;
         for (_, node, _) in body.nodes.iter() {
-            let mut printed: Vec<ExprId> = match node {
-                Node::Interpolation(e) => vec![*e],
-                Node::Element { attrs, .. } => attrs
-                    .iter()
-                    .filter(|a| !matches!(a.namespace(), Some(("on", _))))
-                    .filter_map(|a| match a.value {
-                        crate::hir::AttrValue::Expr(e) => Some(e),
-                        _ => None,
-                    })
-                    .collect(),
-                _ => Vec::new(),
-            };
+            // What the node prints, by where each of its expressions is
+            // written (ADR-0345): a position this does not name is a compile
+            // error here, never one it skips.
+            let mut printed: Vec<ExprId> = node
+                .exprs()
+                .into_iter()
+                .filter(|(position, _)| match position {
+                    // Written as text, in the document or an attribute.
+                    crate::hir::Position::Hole => true,
+                    crate::hir::Position::Attribute => true,
+                    // Run when a person acts; what a block decides by; the
+                    // list the rows come from; and the key, which the
+                    // document holds as a keyed digest, never as itself.
+                    crate::hir::Position::Handler
+                    | crate::hir::Position::Subject
+                    | crate::hir::Position::Condition
+                    | crate::hir::Position::List
+                    | crate::hir::Position::Key => false,
+                })
+                .map(|(_, e)| e)
+                .collect();
             // A string with holes prints each hole.
             printed = printed
                 .into_iter()
@@ -3302,6 +3352,7 @@ pub(crate) fn described(kind: DeclKind) -> &'static str {
         DeclKind::Task => "a task",
         DeclKind::Event => "an event",
         DeclKind::Source => "a data source",
+        DeclKind::Table => "a table",
         DeclKind::Upload => "an upload",
         DeclKind::Predicate => "a predicate",
         DeclKind::Effect => "an effect",
@@ -7717,6 +7768,18 @@ fn to_exhaust_pattern(
 /// whatever the parser said, and its syntax errors were not reported: a
 /// test's program with a typo checked clean.
 pub fn check_sources(files: &[(String, String)]) -> Vec<(String, Vec<Diagnostic>)> {
+    check_sources_with(files, None)
+}
+
+/// **[`check_sources`], and the program held to the schema released**
+/// (track `tables`, ADR-0338, PW0366): `released` is the `schema.lock` a
+/// deployment holds it to, and each change from it that loses or
+/// reinterprets data with no `migrate` stating it is refused in the file of
+/// its table.
+pub fn check_sources_with(
+    files: &[(String, String)],
+    released: Option<&crate::tables::Schema>,
+) -> Vec<(String, Vec<Diagnostic>)> {
     let parsed: Vec<pw_syntax::Parse> = files
         .iter()
         .map(|(_, src)| pw_syntax::parse_tree(src))
@@ -7731,7 +7794,19 @@ pub fn check_sources(files: &[(String, String)]) -> Vec<(String, Vec<Diagnostic>
             hir: crate::lower::lower_file(src, &p.green),
         })
         .collect();
-    let mut checked = check_units(&units).into_iter();
+    let mut held = check_units(&units);
+    if released.is_some() {
+        let hirs: Vec<&Hir> = units.iter().map(|u| &u.hir).collect();
+        let ws = crate::resolve::Workspace::build(&hirs);
+        let sigs = Signatures::build(&ws, &hirs);
+        for (unit, d) in crate::tables::held_to(&hirs, &ws, &sigs, released).1 {
+            if let Some((_, found)) = held.get_mut(unit) {
+                found.push(d);
+                found.sort_by_key(|d| d.primary_span.start);
+            }
+        }
+    }
+    let mut checked = held.into_iter();
     files
         .iter()
         .zip(parsed)
@@ -9559,13 +9634,18 @@ fn loop_keys(hir: &Hir, id: crate::hir::DeclId, decl: &Decl, out: &mut Vec<Diagn
         else {
             continue;
         };
-        let (binding, Some(key), Some(key_span)) = (&each.binder, &each.key, &each.key_span) else {
+        let (binding, Some(read)) = (&each.binder, each.key) else {
             continue;
         };
-        let head = key.split('.').next().unwrap_or_default().trim();
-        if head == binding {
+        // A path from the row: in the key's scope, the row's name is the
+        // innermost binding of it (ADR-0345).
+        let from_row = crate::lexical::path_root(body, read)
+            .is_some_and(|root| matches!(body.expr(root), Expr::Name(n) if n == binding));
+        if from_row {
             continue;
         }
+        let key = each.written.key.clone().unwrap_or_default();
+        let key_span = body.expr_span(read);
         out.push(Diagnostic {
             code: crate::codes::LOOP_KEY.id,
             invariant: crate::codes::LOOP_KEY.invariant,

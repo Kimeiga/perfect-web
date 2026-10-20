@@ -2318,6 +2318,12 @@ a handler navigates after its command commits.
   leaves, answers each press made before it first, and loads the page's
   address, each value one encoded segment: read after the commit, never
   from a cache, with no cache-busting parameter and no reload.
+- Amended 2026-10-18: in WebKit, the two tests that navigated as soon as
+  the address changed (the chosen address's, the order page's audit) now
+  let the page it showed settle first. Their `goto` cancelled requests the
+  page had just started, which can crash WebKitGTK's network process (a
+  use-after-free in libsoup 3, reproduced on master). The corrections come
+  first: it was no flake, and no session's turn held across the estimate.
 [ADR-0281](DECISIONS/ADR-0281-a-merge-is-held-to-ci-s-verification-run.md):
 a merge is held to CI's verification run.
 - A branch is merged when its tip's `ci` and `verify` runs are green,
@@ -2404,7 +2410,10 @@ ADR-0249 and ADR-0278).
   345-minute limit, 10,350 s, half of it since 2026-10-11 (a branch ran its
   recipes up to twice their recorded seconds); a run takes more shards than
   it asks for where its own would (a track's 9 were dealt 21,900 s, and a
-  shard stopped at the limit throws the run away).
+  shard stopped at the limit throws the run away). Amended 2026-10-16
+  (train-10): of the deals that end as soon, the one whose shards of more
+  than one recipe go least past the ceiling; a long recipe alone in its
+  shard had hidden three PostgreSQL bundles dealt past it.
 [ADR-0291](DECISIONS/ADR-0291-a-hosts-record-is-written-as-the-program-names-its-fields.md):
 a host's record is written as the program names its fields (extends
 ADR-0172 to the host).
@@ -3007,10 +3016,62 @@ experience).
   generated from the registry, and each gap in the checks an example held
   open until the compiler closes it.
 
+[ADR-0344](DECISIONS/ADR-0344-evidence-integrity.md):
+six ways evidence could be wrong, or a gate fail for the wrong reason
+(track `evidence-integrity`; train-10).
+- Stale Python bytecode is discarded; evidence counts and corpus headers
+  are checked against their producers; latency bounds thread CPU time;
+  suites require complete builds; trains and master hold no unnumbered
+  ADR (amended 2026-10-17: a decision's path that evidence recorded
+  before its numbering is history). Reports are published atomically.
+[ADR-0345](DECISIONS/ADR-0345-each-head-effects.md):
+an `{#each}`'s list and key are expressions every walker of a view reads
+(track `each-head-effects`; train-10).
+- A loop's list and key are semantic expressions. One exhaustive
+  enumeration feeds view walkers; effects, privacy, signal and name checks
+  cover all seven positions.
+[ADR-0346](DECISIONS/ADR-0346-argument-invariants.md):
+a value from outside is held to its type's invariant at every boundary it
+crosses (track `argument-invariants`; train-10).
+- The host holds component arguments before predicates and execution,
+  page parameters at arrival, and invariants within maps and sets;
+  malformed path text is a 400.
+[ADR-0347](DECISIONS/ADR-0347-scheduled-orders.md):
+an order is placed for a time its reader chooses, and sent to its stores
+then (W9's, track `scheduled-orders`; train-10).
+- Paid orders are sent when preparation is due, with windows held to
+  every store's as-soon-as-possible admission rule at send time.
+[ADR-0348](DECISIONS/ADR-0348-a-set-read-keeps-each-keys-result.md):
+a set read keeps each key's result (train-10).
+- Set pairs can preserve each key's exact Result/Option, and are held to
+  the key by its name (track `pair-key-by-name`, ADR-0340's answers).
+[ADR-0349](DECISIONS/ADR-0349-evidence-integrity-2.md):
+a failed browser test fails its recipe, and five more rulings on the
+evidence (track `evidence-integrity-2`; train-10).
+- One browser-suite runner propagates failures; recipes and builds are
+  checked behaviorally; the planner follows suite configuration and helper
+  imports; mutation program checks cover every root; diagnostic evidence
+  is held current.
+[ADR-0350](DECISIONS/ADR-0350-tables-declare-an-apps-data.md):
+a table declares an app's data and gives its reads and writes (ADR-0338's
+D1, track `tables`; train-10).
+- Generated reads and writes, schema metadata and migration locks; the
+  bounded checker consumes generated pair metadata and source costs.
+  Runtime adapters (D2) are next.
+
 [ADR-0352](DECISIONS/ADR-0352-bounded-statements-wait-for-completed-payment.md):
 statement counts wait for the completed payment transaction.
 - Real delayed-webhook and staged PostgreSQL overlap witnesses establish the
   completion and same-instance write-order defects; exact success pins are
   retained. Strict Cargo producer classification refuses invalid/build/stopped
   evidence with source restoration and no next control. Local strict12/12 and
-  fresh CI pass; exact-head remote gates and landing remain pending.
+  fresh CI passed; verify 38909882781 green at the exact head; landed with
+  train-9.
+[ADR-0353](DECISIONS/ADR-0353-repeated-store-hours-preserve-each-occurrence.md):
+a repeated store keeps all of its opening hours (the integrator's local
+repair, track `legacy-hours-duplicates`; train-10).
+- PostgreSQL's `hours#for-stores` took a store's periods out of its maps
+  for the store's first occurrence, so a store asked for twice came back
+  the second time with none; they are read by lookup now, the caller's
+  order, duplicates and misses kept, on both layers. Two more controls,
+  and a Cargo result that is no result is refused, not counted.

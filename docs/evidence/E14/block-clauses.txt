@@ -1,8 +1,8 @@
 ADR-0247 - a clause written in a block is judged by its domain
 
 produced by: just e14-block-clauses
-commit: e2a4acd960c88144e3b40e7a6e9d9b8bd774ee1a
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38909882781 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: ddaeeb1dfba9630371b7dd5b127c23855d245c74
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39131257549 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the checker (compiler/pw-core/tests/block_clauses.rs)
@@ -10,26 +10,26 @@ rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 test a_length_is_a_count_and_a_css_unit ... ok
 test an_animations_preference_is_judged ... ok
 test a_handler_policys_clauses_are_judged ... ok
-test a_clause_in_a_resources_block_is_judged ... ok
 test a_subtrees_height_is_a_css_length ... ok
-test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.14s
+test a_clause_in_a_resources_block_is_judged ... ok
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.41s
 
 == a header's values, the names check, the corpus
 
-test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 62.23s
-test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
-test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.96s
-test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.64s
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 108.89s
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.42s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.94s
 
 == mutation controls (scripts/block_clauses_mutations.py)
 
-baseline: 65 passed, 0 failed
+baseline: 68 passed, 0 failed
 a clause the walk reads is not kept: KILLED (4 of 11 tests fail)
 a clause's value is its first statement: KILLED (1 of 11 tests fail)
 a clause's value keeps its layout: KILLED (1 of 11 tests fail)
 a clause is placed at its head alone: KILLED (4 of 11 tests fail)
 a clause written in a block is not judged: KILLED (4 of 11 tests fail)
-a policy heading a declaration is not judged: KILLED (8 of 60 tests fail)
+a policy heading a declaration is not judged: KILLED (8 of 63 tests fail)
 a clause is said to be a policy of its declaration: KILLED (1 of 11 tests fail)
 a length is not judged: KILLED (1 of 11 tests fail)
 a count with a fraction is not a count: KILLED (2 of 11 tests fail)

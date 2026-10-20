@@ -1103,6 +1103,37 @@ impl<'p, 'i> Reads<'p, 'i> {
         Self::text(src, &cx.body.expr_span(at))
     }
 
+    /// Generated many reads answer flat rows and can take composite records.
+    /// Their existing metadata supplies the pair and the key fields; a repair
+    /// describes regrouping rather than replacing each read with the batch.
+    fn generated_help(&self, read: DefId, place: &str) -> Option<String> {
+        let hir = self.hirs[read.unit];
+        let generated = hir.generated.get(&DeclId(read.decl))?;
+        let crate::tables::Wrote::Function { by, .. } = &generated.what else {
+            return None;
+        };
+        let set = *self.pairs.get(&read)?;
+        let table = &hir.decl(generated.table).name;
+        let many = self.decl_of(set);
+        let fields = by
+            .iter()
+            .map(|f| format!("`{f}`"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let input = if by.len() == 1 {
+            format!("scalar values for {fields}")
+        } else {
+            let record = many.params.first()?.ty.as_ref()?.args().first()?.written();
+            format!("key records of `{table}.{record}` with fields {fields}")
+        };
+        Some(format!(
+            "read them together, before the {place}, with `{table}.{}`: supply {input}; \
+             then give each turn its matching rows from the flat result (or no row for a \
+             missing key)",
+            many.name
+        ))
+    }
+
     /// **The help a read per element is given**: the set read, before the
     /// loop, where the keyed read names one; where it names none, that it
     /// has none and its source can declare one.
@@ -1119,6 +1150,13 @@ impl<'p, 'i> Reads<'p, 'i> {
         element: &str,
         reached: &Reached,
     ) -> String {
+        let place = match region.turn {
+            Turn::Recursion { .. } => "recursion",
+            _ => "loop",
+        };
+        if let Some(help) = self.generated_help(reached.read, place) {
+            return help;
+        }
         let keyed = &self.decl_of(reached.read).name;
         let Some(set) = self.pairs.get(&reached.read) else {
             return format!("`{keyed}` has no set read; its source can declare one");
@@ -1328,14 +1366,16 @@ impl<'p, 'i> Reads<'p, 'i> {
                 format!("one read per {}", self.key_name(reached)),
             ));
         }
-        let help = match self.pairs.get(&reached.read) {
-            Some(set) => format!(
-                "read them together, before the loop, with `{}`, and give each turn what it \
+        let help = self
+            .generated_help(reached.read, "loop")
+            .unwrap_or_else(|| match self.pairs.get(&reached.read) {
+                Some(set) => format!(
+                    "read them together, before the loop, with `{}`, and give each turn what it \
                  answers",
-                self.decl_of(*set).name
-            ),
-            None => format!("`{keyed}` has no set read; its source can declare one"),
-        };
+                    self.decl_of(*set).name
+                ),
+                None => format!("`{keyed}` has no set read; its source can declare one"),
+            });
         Diagnostic {
             code: codes::READ_PER_ELEMENT.id,
             invariant: codes::READ_PER_ELEMENT.invariant,
@@ -1440,6 +1480,27 @@ impl<'p, 'i> Reads<'p, 'i> {
         let mut pairs = BTreeMap::new();
         let mut faults = Vec::new();
         for (unit, hir) in self.hirs.iter().enumerate() {
+            // Generated pairs have the table declaration's shape, including
+            // flat prefix/index results and composite arguments. Handwritten
+            // pairs below still undergo the exact `set` shape check.
+            use crate::tables::Primitive;
+            for table in crate::tables::declared(hir) {
+                let functions = crate::tables::functions_of(hir, table.decl);
+                for (id, primitive, by) in &functions {
+                    let many = match primitive {
+                        Primitive::Get => Primitive::GetMany,
+                        Primitive::Prefix => Primitive::PrefixMany,
+                        Primitive::Index => Primitive::IndexMany,
+                        _ => continue,
+                    };
+                    if let Some((set, _, _)) = functions
+                        .iter()
+                        .find(|(_, p, fields)| *p == many && fields == by)
+                    {
+                        pairs.insert(Self::def(unit, *id), Self::def(unit, *set));
+                    }
+                }
+            }
             for (id, decl) in hir.all_decls() {
                 let Some(policy) = decl.policy("set") else {
                     continue;
@@ -1632,19 +1693,27 @@ impl<'p, 'i> Reads<'p, 'i> {
             .result()
             .filter(|t| t.as_builtin() == Some(Builtin::List))
             .and_then(|t| t.args().first());
-        let holds = |record: &ResolvedType, t: &ResolvedType| {
+        let holds = |record: &ResolvedType, t: &ResolvedType, field: Option<&str>| {
             record
                 .def_id()
                 .and_then(|d| self.sigs.type_decl(d))
                 .and_then(|t| t.record.as_ref())
                 .is_some_and(|fields| {
-                    fields
-                        .iter()
-                        .any(|(_, f)| f.resolved().is_some_and(|f| f.same_as(t)))
+                    fields.iter().any(|(name, f)| {
+                        field.is_none_or(|field| name.as_str() == field)
+                            && f.resolved().is_some_and(|f| f.same_as(t))
+                    })
                 })
         };
+        // ADR-0340's key-field ruling: an unrelated field of the key's
+        // type does not identify the row. Payload fields need only carry the
+        // result type; the key field also bears the key parameter's name.
+        let key_field = keyed.params.first().map(|p| p.name.as_str());
         let fits = answers.is_some_and(|e| {
-            (e.same_as(found) && holds(e, key)) || (holds(e, key) && holds(e, found))
+            // ADR-0348: keep the operation's exact Result/Option per named key,
+            // as well as the existing successful-value projection.
+            (e.same_as(found) && holds(e, key, key_field))
+                || (holds(e, key, key_field) && (holds(e, found, None) || holds(e, result, None)))
         });
         if !fits {
             return Err((

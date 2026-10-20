@@ -1,6 +1,9 @@
 # ADR-0352: statement counts wait for the completed payment transaction
 
-Status: accepted by the integrator; local source gates pass, exact-head remote gates pending. Date: 2026-10-16.
+Status: accepted by the integrator; local source gates passed, and its
+exact head's remote gates too: verify 38909882781 and ci 38909883157 at
+`e2a4acd9`, green; landed with train-9 (master `32757966`, 2026-10-17).
+Date: 2026-10-16.
 Track `train9-bounded-fix`, exact base `289068a65badb431c14548c3f9fa0db86c3fa19f`.
 Amends ADR-0336's test synchronization and ADR-0334's scheduled-state write
 ordering. Preserves exact count comparisons; the successful sweep settlement
@@ -318,3 +321,26 @@ on the same four exact raw paths while retaining all ordinary whitespace
 checks. This is line-ending classification, not trimming or permission for
 trailing spaces in source. The native baseline's separate blank-at-eof
 exception remains confined to0000.txt.
+
+
+## Verified and landed (2026-10-17)
+
+The exact head `e2a4acd9` passed GitHub's verify 38909882781 (45 jobs, 85
+recipes on 40 shards and the three engines, 1,391 of 1,391 mutants killed;
+`e14-bounded-statements` among them, its 12 controls killed) and its ci
+38909883157. Train-9 landed on it: master `32757966`, its evidence fetched
+at `e2a4acd9`. The pending gates named above are met; the earlier failed
+runs stay failed. Train-10, merging master, carries the completion barrier
+into its scheduled orders' four transactions (`after_payments`, 3 and 4
+outcomes) with every pin as measured.
+
+## A flake of its guard controls, fixed on train-10 (2026-10-17)
+
+`scheduled_transition_waits` gave an unguarded scheduler write 100 ms to
+return early, the only test that kills two of the guard controls: on
+train-10, "feed_pg.rs ran bypasses the command write guard" survived one
+whole run of two on the PC, and "store_pg.rs retry bypasses ..." survived
+the train's verify 39054436657 (12 of 13). A slow runner's unguarded write
+took longer than the window. Guarded, the write cannot end before the
+command does, however long the test waits: the window is two seconds now,
+the test no weaker, each of its four cases two seconds longer.

@@ -953,38 +953,22 @@ fn the_stores_loop_is_seen_and_refused_where_it_reads_per_element() {
 }
 
 #[test]
-fn the_stores_pair_and_its_sources_cost_are_the_integrators_to_add_together() {
-    // The annotations the ADR lists for the merge, applied here: `set
-    // hours_of_stores` on `hours_of`, and `sets one_call` on `StoreData`.
-    let paired = edited(
-        &store(),
-        "hours.pw",
-        "    host \"store:data/hours#for-store\"\n",
-        "    host \"store:data/hours#for-store\"\n    set  hours_of_stores\n",
-    );
-    // The pair alone: `StoreData` states no `sets`, so each set read of the
-    // hours warns, the design note's example.
+fn the_stores_pairs_and_source_cost_are_declared_together() {
+    // ADR-0348 integration: actual set pairs and the source's batching cost
+    // are now declared. Removing the cost reveals the hours' warnings; the
+    // estimate pair is removed in this control to isolate that exact rule.
+    let stated = store();
+    assert_eq!(bounded_in(&stated), Vec::<String>::new());
+    let paired = edited(&stated, "StoreData.pw", "    sets         one_call\n", "");
+    let paired = edited(&paired, "Addresses.pw", "    set  estimates_to\n", "");
     assert_eq!(
         bounded_in(&paired),
         [
             "hours.pw: PW0406 `StoresOpen` reads `Stores` once per store on `StoreData`, which cannot batch",
+            "scheduled.pw: PW0406 `checkout_shown` reads `Stores` once per store on `StoreData`, which cannot batch",
             "search.pw: PW0406 `Search` reads `Stores` once per store on `StoreData`, which cannot batch"
         ]
     );
-    let stated = edited(
-        &paired,
-        "StoreData.pw",
-        "    changes      none\n",
-        "    changes      none\n    sets         one_call\n",
-    );
-    let all: Vec<String> = check_sources(&stated)
-        .into_iter()
-        .flat_map(|(path, ds)| {
-            ds.into_iter()
-                .map(move |d| format!("{path}: {} {}", d.code, d.message))
-        })
-        .collect();
-    assert_eq!(all, Vec::<String>::new());
 }
 
 #[test]
@@ -1088,4 +1072,93 @@ fn a_known_read_is_known_only_where_the_list_names_it() {
         refused,
         ["`search_reading` reads `ReadingHit` once for each element of `readings`"]
     );
+}
+
+#[test]
+fn a_set_pair_can_keep_each_keys_exact_result() {
+    let source = r#"
+module result_pair
+type StoreId = StoreId { value: Int }
+type Estimate = Estimate { minutes: Int }
+type Failure = Unavailable | NoCoverage
+type OtherFailure = Other
+type EstimateFor = EstimateFor { store: StoreId, estimate: Result<Estimate, Failure> }
+source Data
+    holds Estimates
+    transactions serializable
+    reads strong
+    changes none
+    sets one_call
+type Estimates = Estimates { count: Int }
+fn estimate_to(store: StoreId) -> Result<Estimate, Failure> !{ database.read<Estimates> }
+    host "pair:data/estimates#one"
+    set estimates_to
+fn estimates_to(stores: List<StoreId>) -> List<EstimateFor> !{ database.read<Estimates> }
+    host "pair:data/estimates#many"
+"#;
+    assert!(diagnostics(source).is_empty(), "{:?}", reported(source));
+    for wrong in [
+        source.replace(
+            "estimate: Result<Estimate, Failure>",
+            "estimate: Result<Estimate, OtherFailure>",
+        ),
+        source.replace(
+            "estimate: Result<Estimate, Failure>",
+            "estimate: Result<Int, Failure>",
+        ),
+        source.replace("store: StoreId, estimate:", "store: String, estimate:"),
+        source.replace("store: StoreId, estimate:", "other: StoreId, estimate:"),
+    ] {
+        let found = bounded(&wrong);
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert!(found[0].starts_with("PW0407"), "{found:?}");
+    }
+    let option = source.replace("Result<Estimate, Failure>", "Option<Estimate>");
+    assert!(diagnostics(&option).is_empty(), "{:?}", reported(&option));
+}
+
+#[test]
+fn a_set_pairs_key_field_is_named_as_the_key_parameter() {
+    let source = r#"
+module key_name
+type Price = Price { item: Int, cents: Int }
+type PriceOf = PriceOf { item: Int, price: Price }
+source Ledger
+    holds Price
+    transactions serializable
+    reads strong
+    changes none
+    sets one_call
+fn price_of(item: Int) -> Result<Price, String> !{ database.read<Price> }
+    host "keys:data/prices#one"
+    set prices_of
+fn prices_of(items: List<Int>) -> List<PriceOf> !{ database.read<Price> }
+    host "keys:data/prices#many"
+"#;
+    assert!(diagnostics(source).is_empty(), "{:?}", reported(source));
+    for fields in ["other: Int, price: Price", "item: Bool, price: Price"] {
+        let wrong = source.replace("item: Int, price: Price", fields);
+        let found = diagnostics(&wrong);
+        assert_eq!(
+            found.iter().map(|d| d.code).collect::<Vec<_>>(),
+            ["PW0407"],
+            "{fields}: {found:?}"
+        );
+    }
+    // The result may carry the named key itself. The similarly typed cents
+    // field cannot stand in when the actual key field has another name.
+    let direct = source.replace("-> List<PriceOf>", "-> List<Price>");
+    assert!(diagnostics(&direct).is_empty(), "{:?}", reported(&direct));
+    let wrong = direct.replace("Price { item: Int, cents:", "Price { other: Int, cents:");
+    assert_eq!(
+        diagnostics(&wrong)
+            .iter()
+            .map(|d| d.code)
+            .collect::<Vec<_>>(),
+        ["PW0407"]
+    );
+    // The nominal name of the parameter is the authority, not `item` by
+    // convention: a consistent rename remains a valid pair.
+    let renamed = source.replace("item: Int", "product: Int");
+    assert!(diagnostics(&renamed).is_empty(), "{:?}", reported(&renamed));
 }

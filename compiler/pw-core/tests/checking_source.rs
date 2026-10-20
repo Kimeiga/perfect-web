@@ -6,6 +6,25 @@
 
 use pw_core::check::check_sources;
 
+/// **One rejected fixture, checked as its own program** (`rejected_program`),
+/// held to the schema it names as released, where it names one (track
+/// `tables`, ADR-0338): `// @schema-lock: <file beside it>`. A change from a
+/// release is refused only against the release (PW0366).
+fn check_fixture(path: &std::path::Path) -> Vec<(String, Vec<pw_core::diagnostics::Diagnostic>)> {
+    let src = std::fs::read_to_string(path).expect("read");
+    let released = src
+        .lines()
+        .find_map(|l| l.trim().strip_prefix("// @schema-lock:"))
+        .map(|file| {
+            let lock = path.with_file_name(file.trim());
+            let text = std::fs::read_to_string(&lock)
+                .unwrap_or_else(|e| panic!("{}: {e}", lock.display()));
+            pw_core::tables::Schema::read(&text)
+                .unwrap_or_else(|e| panic!("{}: {e}", lock.display()))
+        });
+    pw_core::check::check_sources_with(&rejected_program(path), released.as_ref())
+}
+
 /// Declaration-level rules over one file, through the one parser.
 ///
 /// E6F: `rules::check` reads the HIR. Before, this went through a second
@@ -87,7 +106,7 @@ fn rejected_results() -> Vec<(String, String, Vec<pw_core::diagnostics::Diagnost
         .map(|p| {
             let name = p.file_name().unwrap().to_string_lossy().to_string();
             let src = std::fs::read_to_string(&p).expect("read");
-            let results = check_sources(&rejected_program(&p));
+            let results = check_fixture(&p);
             let diags = results
                 .into_iter()
                 .find(|(n, _)| *n == name)
@@ -144,8 +163,33 @@ fn no_accepted_corpus_file_reports_a_body_level_error() {
         if !path.starts_with("A-") {
             continue;
         }
+        // An accepted program may deliberately exercise a warning. Hold it
+        // to exactly the warnings it names; an error never counts as one.
+        let src = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../examples/accepted")
+                .join(path),
+        )
+        .expect("accepted source");
+        let mut expected: Vec<&str> = src
+            .lines()
+            .filter_map(|l| l.trim().strip_prefix("// @expect-warning:"))
+            .map(str::trim)
+            .collect();
+        let mut actual = Vec::new();
         for d in diags {
-            bad.push(format!("{path}: [{}] {}", d.code, d.message));
+            if d.severity == pw_core::diagnostics::Severity::Warning {
+                actual.push(d.code);
+            } else {
+                bad.push(format!("{path}: [{}] {}", d.code, d.message));
+            }
+        }
+        expected.sort();
+        actual.sort();
+        if expected != actual {
+            bad.push(format!(
+                "{path}: expected warnings {expected:?}, got {actual:?}"
+            ));
         }
     }
     assert!(
@@ -404,7 +448,7 @@ fn a_caught_file_conveys_every_fact_its_expect_error_lines_declare() {
     let mut missing = Vec::new();
 
     for p in corpus_dir("rejected") {
-        let results = check_sources(&rejected_program(&p));
+        let results = check_fixture(&p);
         let path = p.file_name().unwrap().to_string_lossy().to_string();
         let diags = &results
             .iter()
@@ -447,7 +491,7 @@ const PARTIALLY_ENFORCED: &[(&str, &str)] = &[];
 fn corpus_enforcement_is_reported_as_three_numbers_not_one() {
     // "19/44 enforced" hides the difference between a red diagnostic, the
     // *right* red diagnostic, and the whole declared invariant being checked.
-    use pw_core::diagnostics::canonical_code;
+    // A header's code is read as written (track evidence-integrity-2).
     let (mut errored, mut declared_code, mut fully) = (0, 0, 0);
     let mut total = 0;
 
@@ -467,7 +511,7 @@ fn corpus_enforcement_is_reported_as_three_numbers_not_one() {
         let want = src
             .lines()
             .find_map(|l| l.trim().strip_prefix("// @rule:"))
-            .map(|r| canonical_code(r.trim()));
+            .map(str::trim);
         if !want.is_some_and(|w| codes.contains(&w)) {
             continue;
         }
@@ -535,7 +579,6 @@ fn semantic_coverage_of_the_rejected_corpus_does_not_regress() {
 
 #[test]
 fn every_body_level_rejection_matches_its_declared_rule() {
-    use pw_core::diagnostics::canonical_code;
     let mut mismatches = Vec::new();
     let mut checked = 0;
 
@@ -552,7 +595,8 @@ fn every_body_level_rejection_matches_its_declared_rule() {
             continue;
         };
         checked += 1;
-        let want = canonical_code(rule);
+        // As written: an old number is not what `pw check` reports.
+        let want = rule;
         let got: Vec<&str> = diags.iter().map(|d| d.code).collect();
         if !got.contains(&want) {
             mismatches.push(format!("{path}: declares {want}, got {got:?}"));
@@ -582,7 +626,8 @@ fn the_structured_concurrency_rules_run_on_real_bodies() {
     };
 
     // R-013: `task.spawn(detached)` with no durable capability. The file
-    // declares PW0311, which aliases to the invariant's canonical code.
+    // declares PW2002, the invariant's code (it said PW0311, an alias, until
+    // track evidence-integrity held each header to its code as written).
     let (src, d) = find("R-013", "PW2002");
     let src = &src;
     // The primary span is the offending argument, the related span is where the
@@ -683,19 +728,26 @@ fn an_unmodelled_capability_family_never_manufactures_a_placement_error() {
     );
 }
 
-/// The per-fixture enforcement table, written to `docs/evidence/E2D/`.
+/// The per-fixture enforcement table, written to `docs/evidence/E2D/`, and
+/// held to what the corpus checks now.
 ///
 /// The charter requires a gate claim to be backed by a file a recorded command
 /// produced. The obvious way to produce it — a separate reporting binary — was
 /// rejected: it would need its own copy of "the library, plus the accepted
 /// modules a fixture imports, plus the fixture", and a second copy of that is
 /// how a reported number drifts from an enforced one. This is the same code
-/// path the ratchet asserts on, so the file cannot disagree with the test.
+/// path the ratchet asserts on.
 ///
-/// Run with `just evidence-corpus`.
+/// Written only when asked (`just evidence-corpus`), it drifted all the same:
+/// recorded on 2026-08-07, it said 46 of 46 fixtures enforce their invariant
+/// of a corpus of 74, with a column of old numbers the corpus no longer
+/// wrote, until track evidence-integrity-2 (the integrator's ruling 2,
+/// 2026-10-15). Now, unless asked to write it, the test holds the committed
+/// file to the table it computes, as `evidence_is_current.rs` holds the WIT:
+/// staleness is a failure with its repair in the message. A header's code is
+/// read as written: no old number is translated (ruling 1).
 #[test]
-fn corpus_enforcement_table_is_written_when_asked() {
-    use pw_core::diagnostics::canonical_code;
+fn the_committed_enforcement_table_is_what_the_corpus_checks_now() {
     let mut rows: Vec<String> = Vec::new();
     let (mut caught, mut total) = (0, 0);
 
@@ -715,14 +767,13 @@ fn corpus_enforcement_table_is_written_when_asked() {
             .find_map(|l| l.trim().strip_prefix("// @rule:"))
             .map(|r| r.trim().to_string())
             .unwrap_or_else(|| "-".to_string());
-        let canonical = canonical_code(&declared);
         let category = src
             .lines()
             .find_map(|l| l.trim().strip_prefix("// @category:"))
             .unwrap_or("")
             .trim();
 
-        let verdict = if codes.iter().any(|c| c == canonical) {
+        let verdict = if codes.contains(&declared) {
             caught += 1;
             "enforced".to_string()
         } else if codes.is_empty() {
@@ -731,20 +782,18 @@ fn corpus_enforcement_table_is_written_when_asked() {
             format!("WRONG REASON ({})", codes.join(" "))
         };
         let id = &name[..5];
-        let alias = if canonical == declared {
-            String::new()
-        } else {
-            format!(" (declared {declared})")
-        };
         rows.push(format!(
-            "{id}  {verdict:<24}  {canonical}{alias}\n       {category}"
+            "{id}  {verdict:<24}  {declared}\n       {category}"
         ));
     }
 
     let mut report = String::new();
     report.push_str(
         "corpus enforcement — every rejected fixture, checked as its own program\n\
-         (the shared library, the accepted modules it imports, and the fixture)\n\n",
+         (the shared library, the accepted modules it imports, and the fixture)\n\n\
+         produced by: just evidence-corpus\n\
+         held to the corpus by: compiler/pw-core/tests/checking_source.rs\n\
+         (the_committed_enforcement_table_is_what_the_corpus_checks_now)\n\n",
     );
     report.push_str(&format!(
         "{caught}/{total} enforce their declared invariant\n\n"
@@ -754,13 +803,21 @@ fn corpus_enforcement_table_is_written_when_asked() {
         report.push('\n');
     }
 
-    if std::env::var("PW_WRITE_EVIDENCE").is_err() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../docs/evidence/E2D/corpus-enforcement.txt");
+    if std::env::var("PW_WRITE_EVIDENCE").is_ok() {
+        std::fs::create_dir_all(path.parent().expect("a directory")).expect("evidence dir");
+        std::fs::write(&path, &report).expect("write evidence");
+        eprintln!("wrote docs/evidence/E2D/corpus-enforcement.txt");
         return;
     }
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/evidence/E2D");
-    std::fs::create_dir_all(&dir).expect("evidence dir");
-    std::fs::write(dir.join("corpus-enforcement.txt"), &report).expect("write evidence");
-    eprintln!("wrote docs/evidence/E2D/corpus-enforcement.txt");
+    let committed = std::fs::read_to_string(&path).unwrap_or_default();
+    assert!(
+        committed == report,
+        "docs/evidence/E2D/corpus-enforcement.txt is not what the corpus checks now \
+         ({caught}/{total} enforce their declared invariant): run `just evidence-corpus` \
+         and commit the file"
+    );
 }
 
 /// The three-way agreement the architect asked for after `PW0323`.
@@ -776,7 +833,7 @@ fn corpus_enforcement_table_is_written_when_asked() {
 #[test]
 fn a_fixtures_declared_symbol_matches_the_symbol_it_is_caught_by() {
     use pw_core::codes::lookup;
-    use pw_core::diagnostics::{UNREGISTERED, canonical_code};
+    use pw_core::diagnostics::UNREGISTERED;
     let mut wrong = Vec::new();
     let mut checked = 0;
 
@@ -794,7 +851,7 @@ fn a_fixtures_declared_symbol_matches_the_symbol_it_is_caught_by() {
         let want = src
             .lines()
             .find_map(|l| l.trim().strip_prefix("// @rule:"))
-            .map(|r| canonical_code(r.trim()))
+            .map(str::trim)
             .and_then(lookup);
         match want {
             Some(c) if c.symbol == declared => {}
@@ -836,6 +893,115 @@ fn a_fixtures_declared_symbol_matches_the_symbol_it_is_caught_by() {
         checked,
         rejected_results().len(),
         "every rejected fixture must be checked"
+    );
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
+
+/// What is wrong with a rejected fixture's `@rule` and `@invariant`, read as
+/// written, against the codes its check reports (track evidence-integrity,
+/// finding 3).
+///
+/// The tests above read a header's number through a translation of the old
+/// numbers until 2026-10-15, so a number the registry had retired into an
+/// alias still passed: R-004 said `PW0100` where the code is `PW5001`, R-024
+/// `PW0322` where it is `PW5010`, and forty fixtures in all named a number
+/// `pw check` never prints. A header is what a reader looks up, so it says
+/// the code itself; and since track evidence-integrity-2 (ruling 1) nothing
+/// translates an old number: the list is read here only to say, in the
+/// refusal, which code an old number became.
+fn header_problems(name: &str, src: &str, reported: &[&str]) -> Vec<String> {
+    use pw_core::codes::{RETIRED, lookup};
+    use pw_core::diagnostics::DEPRECATED_ALIASES;
+    let header = |key: &str| {
+        src.lines()
+            .find_map(|l| l.trim().strip_prefix(key))
+            .map(str::trim)
+    };
+    let Some(rule) = header("// @rule:") else {
+        return vec![format!("{name}: no `// @rule:` line")];
+    };
+    if let Some((_, code)) = DEPRECATED_ALIASES.iter().find(|(alias, _)| *alias == rule) {
+        return vec![format!(
+            "{name}: @rule {rule} is a retired number, an alias of {code}, \
+             which is what `pw check` reports"
+        )];
+    }
+    if RETIRED.iter().any(|(id, _)| *id == rule) {
+        return vec![format!("{name}: @rule {rule} is a retired code")];
+    }
+    let Some(code) = lookup(rule) else {
+        return vec![format!("{name}: @rule {rule} is no registered code")];
+    };
+    let mut out = Vec::new();
+    let invariant = header("// @invariant:");
+    if invariant != Some(code.symbol) {
+        out.push(format!(
+            "{name}: @invariant {invariant:?}, and {rule} is `{}`",
+            code.symbol
+        ));
+    }
+    if !reported.contains(&rule) {
+        out.push(format!(
+            "{name}: @rule {rule}, and its check reports {reported:?}"
+        ));
+    }
+    out
+}
+
+#[test]
+fn a_fixtures_header_is_held_to_its_code_as_written() {
+    let src = |rule: &str, invariant: &str| {
+        format!("// @corpus: rejected\n// @rule: {rule}\n// @invariant: {invariant}\nmodule m\n")
+    };
+    let problems = |rule: &str, invariant: &str, reported: &[&str]| {
+        header_problems("R-0", &src(rule, invariant), reported).join("\n")
+    };
+    // The control: the code its check reports, and that code's invariant.
+    assert_eq!(
+        problems("PW5001", "private_in_shared_cache", &["PW5001"]),
+        ""
+    );
+    // As R-004's was: a number retired into an alias of the code reported.
+    assert!(
+        problems("PW0100", "private_in_shared_cache", &["PW5001"]).contains("an alias of PW5001"),
+        "an alias passed"
+    );
+    // A code its check does not report, another code's invariant, a code no
+    // one registered, and one retired.
+    assert!(
+        problems("PW5001", "private_in_shared_cache", &["PW5004"]).contains("its check reports"),
+        "a code not reported passed"
+    );
+    assert!(
+        problems("PW5001", "unsafe_audit_incomplete", &["PW5001"]).contains("@invariant"),
+        "another code's invariant passed"
+    );
+    assert!(
+        problems("PW9999", "private_in_shared_cache", &["PW9999"]).contains("no registered code"),
+        "an unknown code passed"
+    );
+    assert!(
+        problems("PW5102", "private_in_shared_cache", &["PW5102"]).contains("retired code"),
+        "a retired code passed"
+    );
+}
+
+/// **Every rejected fixture's `@rule` is a code `pw check` reports for it,
+/// as written, and its `@invariant` is that code's** (track
+/// evidence-integrity, finding 3): the fixture checked as its own program,
+/// by `check_sources`, which `pw check` runs.
+#[test]
+fn every_rejected_fixtures_rule_is_a_code_its_check_reports() {
+    let all = rejected_results();
+    let mut wrong = Vec::new();
+    for (name, src, diags) in &all {
+        let reported: Vec<&str> = diags.iter().map(|d| d.code).collect();
+        wrong.extend(header_problems(name, src, &reported));
+    }
+    assert!(
+        all.len() >= 44,
+        "expected the full rejected corpus, saw {}",
+        all.len()
     );
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }

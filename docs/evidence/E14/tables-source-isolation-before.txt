@@ -1,0 +1,61 @@
+   Compiling pw-core v0.0.0 (/home/haki/code/pw-wt/tables/compiler/pw-core)
+    Finished `test` profile [unoptimized] target(s) in 0.89s
+     Running tests/tables.rs (target/debug/deps/tables-136098dea2c9ef5f)
+
+running 1 test
+test source_ambiguity_is_not_an_alternate_copy_of_the_own_module ... FAILED
+
+failures:
+
+---- source_ambiguity_is_not_an_alternate_copy_of_the_own_module stdout ----
+
+thread 'source_ambiguity_is_not_an_alternate_copy_of_the_own_module' (4022363) panicked at compiler/pw-core/tests/tables.rs:1240:9:
+a cloned module is not an extra database: [
+    Diagnostic {
+        code: "PW0361",
+        invariant: "a table's row is a record declared beside it, in the module of its name, and its key, order, indexes and references name the row's fields, each of a type every adapter keys a row by",
+        reason: "table_malformed",
+        detector: DeclarationRule,
+        severity: Error,
+        message: "`TodoData` names 2 source declarations: `Todos`'s database cannot be identified by this bare name",
+        primary_span: 163..168,
+        related: [
+            Related {
+                span: 270..384,
+                label: "source `Todos.TodoData`",
+                file: None,
+                unit: Some(
+                    22,
+                ),
+            },
+            Related {
+                span: 270..384,
+                label: "source `Todos.TodoData`",
+                file: Some(
+                    "sibling.pw",
+                ),
+                unit: Some(
+                    23,
+                ),
+            },
+        ],
+        explanation: Some(
+            "A table is the program's statement of its data: its row is a record type declared beside it, in the module of its name, whose functions are its reads and writes; its key, order and indexes name the row's fields, each of a type every adapter keys a row by (an `Int`, a `String`, a `Bool`, an opaque type over one, or cases that carry no value); and a reference names a table keyed by the field's type.",
+        ),
+        repairs: [
+            Repair {
+                description: "name each source distinctly; the host seam needs qualified source identity before duplicate names can be accepted",
+                replacement: None,
+            },
+        ],
+    },
+]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    source_ambiguity_is_not_an_alternate_copy_of_the_own_module
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 33 filtered out; finished in 0.06s
+
+error: test failed, to rerun pass `-p pw-core --test tables`

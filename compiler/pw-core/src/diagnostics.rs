@@ -228,17 +228,30 @@ impl Diagnostic {
     }
 }
 
-/// Deprecated code aliases, kept only while the corpus migrates.
+/// The old numbers: each number the corpus wrote for an invariant before one
+/// invariant got one code, with the code it is now. A reference, never a
+/// translation.
 ///
 /// Architect migration rule: if the corpus already declares one code as
 /// canonical, preserve it; mark the other a deprecated alias; have every
 /// detector emit the canonical code; remove the alias before diagnostic-code
 /// stability is publicly promised.
 ///
-/// Two permanent codes for one invariant would be wrong. Aliasing during a
-/// migration is fine.
+/// The corpus migrated on 2026-10-15 (track evidence-integrity): each
+/// rejected fixture's `@rule` is the code `pw check` reports, which never
+/// printed these numbers. The same day the integrator ruled (track
+/// evidence-integrity-2, ruling 1) that nothing translates through this
+/// list where a code is compared: a test, `corpus-check` or a gate reads a
+/// code as written, so an old number in a header is an unregistered code.
+/// The list stays only where it is printed: the guide's reference of codes
+/// (`scripts/guide_diagnostics.py`, track guide, reads this constant by its
+/// name and form, and its test `guide.rs` counts a row for each), and a
+/// refused header's message (`checking_source.rs`). The
+/// registry's tests hold it: no old number is a registered or retired code,
+/// and each names a registered one (`codes.rs`); nothing else reads it
+/// (`no_comparison_translates_an_old_number`).
 pub const DEPRECATED_ALIASES: &[(&str, &str)] = &[
-    // (alias as written in the corpus, canonical invariant code)
+    // (alias as the corpus wrote it until 2026-10-15, canonical invariant code)
     ("PW0326", "PW2004"), // a resource cannot outlive the scope that owns it
     ("PW0311", "PW2002"),
     // Not consumed on a path, and consumed somewhere the scope cannot see.
@@ -269,7 +282,7 @@ pub const DEPRECATED_ALIASES: &[(&str, &str)] = &[
     // R-006: a secret reaching a sink declared `Public`.
     ("PW0304", "PW5006"), // a secret cannot be rendered to the browser
     ("PW0303", "PW5004"), // a shared cache key must carry every partition
-    // R-004 declares PW0100, which `rules.rs` also uses for this invariant —
+    // R-004 declared PW0100, which `rules.rs` also used for this invariant —
     // the charter §16.3 worked example. The scope graph and the label algebra
     // reach the same conclusion by different routes, so one code, not two.
     ("PW0100", "PW5001"),
@@ -327,25 +340,79 @@ pub const DEPRECATED_ALIASES: &[(&str, &str)] = &[
 /// rejects.
 pub const UNREGISTERED: &str = "<unregistered>";
 
-/// Resolve a corpus-declared code to the canonical invariant code.
-pub fn canonical_code(declared: &str) -> &str {
-    DEPRECATED_ALIASES
-        .iter()
-        .find(|(alias, _)| *alias == declared)
-        .map(|(_, canonical)| *canonical)
-        .unwrap_or(declared)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    /// Track evidence-integrity-2, the integrator's ruling 1: no comparison of
+    /// a code translates an old number. Until 2026-10-15 a function of this
+    /// module did, for the corpus's tests and `codes::rule_status`, so a
+    /// fixture whose header named a number `pw check` never prints passed.
+    /// The old numbers are read only where they are printed: this module, the
+    /// registry's own tests of the list (`codes.rs`), and a refused header's
+    /// message (`checking_source.rs`); each Rust source of the workspace that
+    /// names the list is one of those, and none names that function.
     #[test]
-    fn an_alias_resolves_to_its_canonical_invariant() {
-        assert_eq!(canonical_code("PW0326"), "PW2004");
-        assert_eq!(canonical_code("PW0100"), "PW5001");
-        // A code with no alias is its own canonical form.
-        assert_eq!(canonical_code("PW0312"), "PW0312");
+    fn no_comparison_translates_an_old_number() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let allowed = [
+            "compiler/pw-core/src/diagnostics.rs",
+            "compiler/pw-core/src/codes.rs",
+            "compiler/pw-core/tests/checking_source.rs",
+            // Track guide's test of the reference page, which counts a row for
+            // each old number (on its branch until it lands).
+            "compiler/pw-cli/tests/guide.rs",
+        ];
+        let mut readers = Vec::new();
+        let mut translators = Vec::new();
+        let mut seen = 0;
+        let mut stack = vec![root.clone()];
+        while let Some(dir) = stack.pop() {
+            for entry in std::fs::read_dir(&dir).expect("read dir").flatten() {
+                let path = entry.path();
+                let name = entry.file_name();
+                let name = name.to_string_lossy();
+                if path.is_dir() {
+                    if !matches!(
+                        name.as_ref(),
+                        "target" | "node_modules" | ".git" | ".toolchain"
+                    ) {
+                        stack.push(path);
+                    }
+                    continue;
+                }
+                if path.extension().is_none_or(|x| x != "rs") {
+                    continue;
+                }
+                seen += 1;
+                let text = std::fs::read_to_string(&path).unwrap_or_default();
+                let rel = path
+                    .strip_prefix(&root)
+                    .unwrap_or(&path)
+                    .to_string_lossy()
+                    .replace('\\', "/");
+                if text.contains(concat!("canonical", "_code")) {
+                    translators.push(rel.clone());
+                }
+                if text.contains(concat!("DEPRECATED", "_ALIASES"))
+                    && !allowed.contains(&rel.as_str())
+                {
+                    readers.push(rel);
+                }
+            }
+        }
+        assert!(
+            seen > 100,
+            "read {seen} Rust sources: the walk found nothing"
+        );
+        assert!(
+            translators.is_empty(),
+            "an old number is translated where a code is compared: {translators:?}"
+        );
+        assert!(
+            readers.is_empty(),
+            "the old numbers are read outside where they are printed: {readers:?}"
+        );
     }
 
     #[test]

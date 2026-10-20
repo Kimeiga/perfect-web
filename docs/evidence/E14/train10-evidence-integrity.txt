@@ -1,0 +1,190 @@
+ADR-0349 train-10 integration, 2026-10-16 UTC
+Merge base9010d860; worker3adbfe44; remaining train tracks not yet merged.
+Full assembled CI, GitHub verification and quiet-host e9 latency pending.
+
+Integration changes: reviews/guide/argument/scheduling suites use the same
+failure-propagating helper. Guide builds main dist and its tutorial plus
+both servers. Behavioral stubs include guestbook/unittest output. The
+planner expects scheduling's real accessibility helper import. Generated
+code reference requires current registered corpus rules. Guide updates
+now require the each-head effect refusal and logical-operator help, while
+retaining the actual pure computed-list build gap. Corpus report79/79.
+
+First integrated Python run:223 tests,3 failures,2 skips. The failures
+were2 guide stand-in control runs stopping before a suite and1 stale
+expected importer set. Corrected below; no failing run is a pass.
+An initial own mutation run was stopped with source restoration after
+discovering a count-specific corpus anchor. The final control alters a
+stable R001 report row, so additions do not require changing a total.
+The complete restarted35-control run below is the result of record.
+
+Environment: offline dependencies, CARGO_BUILD_JOBS=4, RUST_TEST_THREADS=4,
+CARGO_TARGET_DIR=/home/haki/code/pw-wt/train-10/target.
+Reproduce: python3 scripts/suite_status.py
+Reproduce: python3 -m unittest discover -s scripts/tests -p 'test_*.py'
+Reproduce: just evidence-corpus
+Reproduce: cargo test --locked --offline -p pw-cli --test guide
+Reproduce: cargo test --locked --offline -p pw-core --lib -- no_comparison_translates_an_old_number an_old_number_is_no_registered_rule
+Reproduce: PYTHONDONTWRITEBYTECODE=1 python3 scripts/evidence_integrity_2_mutations.py
+Python223=221passed+2intentional skips; guide15passed; strict-code2passed.
+Behavioral injection:143 suite failures across91recipes;203 build failures
+across88recipes. All propagated. Static scan96Playwright+2bench,0refused.
+
+SHA256 of integrated inputs:
+6aaf7b298aec45b1658455fd0f35256b109896a1dea15dec620002e992bd8161  scripts/run_suite.sh
+ffe2f45d11bf0143b15a1fecdaf670f208dc9859c59e7f6336e59ca8d8b2ef62  scripts/suite_status.py
+8a913d41a585fe85155b4cd05370428bdd8674b95b76b9520d0f7806b59950ca  scripts/ci_plan.py
+c09d036a73e50c167289a9c9afc142f46462961fa0b9985e4dea0b6a14bb90ee  scripts/tests/test_builds_before_suites.py
+a0dfe94519f00ab4a859e826ae265d4c3d4a75556080922a82544896e6922c47  scripts/tests/test_ci_scripts.py
+68437e46b5af013f520db4f30f0a0f67c2c4d0348fee3739c668c10bd356a9f8  scripts/evidence_integrity_2_mutations.py
+469bd51c4bbf50aa0483d0a9a50b03f27df08482853cb02bb417a6c72d1f2b46  scripts/guide_diagnostics.py
+2d30175c5754fb6efbd0202ea2ba465d89b6588f1b89d03b22ed9b422e5af119  justfile
+27bef3056d7ca6f7da80efb5fe87160dc4e04c4ea4d38cd796dd4d8dc9f8b76f  just/guide.just
+704ee23f96b651a5b1c93d89a825d7610c0d7f8c30299fc92fd737401a0259b5  just/reviews.just
+2339015aa7c85d12206125ce39dbaea8918bec4b852d212d148f209fbaa26d7c  just/argument-invariants.just
+73e2c1670355b8a6bcfc52fc13b96e0319ab491d8ed4c6eecc47d0a29ddb9405  just/scheduled-orders.just
+ac288200cd54c0beb14cb632da25986b1bb92c370e1c24725ace52b4a1d524bf  compiler/pw-core/src/codes.rs
+2e3ade68e86815a21e325e1222f1f97282a857c578901add588ca7516dfe4b48  compiler/pw-core/src/diagnostics.rs
+084e48c1dd35f3b4e92c7419b6b441e61e0f91618b5bbe6a7b33d5814dfc1b89  compiler/pw-core/tests/checking_source.rs
+636c1c4e7f0fe9cece930ac637b188590fc3f1ea31f355d6b6f4cdbc6ba5278a  docs/evidence/E2D/corpus-enforcement.txt
+
+--- Raw output: codex-train10-ei2-python.log ---
+
+builds before suites: 88 recipes run the browser suite that serves `dist`; 203 builds before their suites, each failed in turn
+.........ci_plan: e14-one's evidence not read, so it is planned: no git
+..ci_plan: e10-attribute-case is current, recorded at aaaaaaaa
+......................................................ci_plan: e10-attribute-case's evidence is stale, so it is planned
+.....................................s...........kiokun_app_source: src/lib/new.ts is not in 79e77ab65e449e559b193d0e45cce161908cfe69
+.............usage: kiokun_oracle_fixture.py ANSWERS OUT COMMAND KIOKUN_COMMIT PLERIS_COMMIT NODE
+.........................................................................................
+suite status: 96 `playwright test` in the recipes' lines, 96 run by `scripts/run_suite.sh` with their status their recipe's; 2 `bench.mjs controls`; 0 refused
+.
+suites fail their recipes: 91 recipes run a browser suite; 143 suite runs, each failed in turn
+.....s
+----------------------------------------------------------------------
+Ran 223 tests in 117.682s
+
+OK (skipped=2)
+the app: /tmp/tmpvo751pd5 at 3447396f6be8395f9a2942c3db891b4b7d6890f3, its committed tree
+the inventory: inventory.md
+routes: 4 (3 pages, 1 endpoints)
+marked: 1 built, 2 partial, 1 missing
+features: 0, marked 0 built, 0 partial, 0 missing
+inventory: OK
+the app: /tmp/tmpvo751pd5 at 3447396f6be8395f9a2942c3db891b4b7d6890f3, its committed tree
+the inventory: inventory.md
+routes: 4 (3 pages, 1 endpoints)
+marked: 1 built, 1 partial, 1 missing
+features: 0, marked 0 built, 0 partial, 0 missing
+PROBLEM: /[word] (page) is not in the inventory
+inventory: 1 problem(s)
+fixture: /tmp/tmp5epdalem/fixture.json: 1 answers, named {}
+memory bound: no process was stopped
+
+--- Raw output: train10-ei2-gates.log ---
+wrote docs/guide/diagnostics.md
+mutation anchors: 3204 mutants in 271 scripts, each matching once
+suite status: 96 `playwright test` in the recipes' lines, 96 run by `scripts/run_suite.sh` with their status their recipe's; 2 `bench.mjs controls`; 0 refused
+   Compiling pw-core v0.0.0 (/home/haki/code/pw-wt/train-10/compiler/pw-core)
+   Compiling pw-cli v0.0.0 (/home/haki/code/pw-wt/train-10/compiler/pw-cli)
+    Finished `dev` profile [unoptimized] target(s) in 3.91s
+running 1 test
+wrote docs/evidence/E2D/corpus-enforcement.txt
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 19 filtered out; finished in 12.15s
+
+79/79 enforce their declared invariant
+   Compiling pw-cli v0.0.0 (/home/haki/code/pw-wt/train-10/compiler/pw-cli)
+    Finished `test` profile [unoptimized] target(s) in 0.81s
+     Running tests/guide.rs (target/debug/deps/guide-171ef653322e12f7)
+
+running 15 tests
+test a_fence_is_read_as_commonmark_reads_it ... ok
+test a_page_is_held_to_the_directory_it_names ... ok
+test a_page_with_no_example_or_a_block_unseen_is_reported ... ok
+test a_gaps_build_output_belongs_to_the_gap_before_it ... ok
+test a_pages_file_blocks_are_its_program_in_order ... ok
+test a_program_differs_from_a_directory_by_a_file_or_a_byte ... ok
+test a_refused_examples_codes_are_read_from_its_output ... ok
+test an_info_string_says_what_a_block_is ... ok
+test an_unclosed_or_indented_fence_is_refused ... ok
+test shown_output_belongs_to_the_refused_example_before_it ... ok
+test a_pages_program_is_the_directory_it_names ... ok
+test the_reference_is_held_to_the_registry ... ok
+test the_diagnostic_reference_lists_every_registered_code ... ok
+test every_example_in_the_guide_compiles_as_it_says ... ok
+test a_wrong_example_is_reported_and_a_right_one_is_not ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.46s
+
+   Compiling pw-core v0.0.0 (/home/haki/code/pw-wt/train-10/compiler/pw-core)
+    Finished `test` profile [unoptimized] target(s) in 14.55s
+     Running unittests src/lib.rs (target/debug/deps/pw_core-8fdc69580bdb9fc5)
+
+running 2 tests
+test codes::tests::an_old_number_is_no_registered_rule ... ok
+test diagnostics::tests::no_comparison_translates_an_old_number ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 185 filtered out; finished in 0.05s
+
+
+--- Raw output: codex-train10-ei2-mutants.log ---
+baseline (helper): 8 passed, 0 failed
+baseline (history): 3 passed, 0 failed
+baseline (gate): 6 passed, 0 failed
+baseline (recipes): 2 passed, 0 failed
+baseline (plan): 75 passed, 0 failed
+baseline (programs): 9 passed, 0 failed
+baseline (core): 187 passed, 0 failed
+baseline (corpus): 1 passed, 0 failed
+baseline (latency): 1 passed, 0 failed
+the helper exits 0 whatever the suite did [helper]: KILLED (5 failure reports in 8 tests run)
+the helper stops at the first failed run [helper]: KILLED (1 failure reports in 8 tests run)
+the helper passes a run that passed no test [helper]: KILLED (1 failure reports in 8 tests run)
+the helper keeps no failed count [helper]: KILLED (2 failure reports in 8 tests run)
+a recipe swallows its suite again, read by the gate [gate]: KILLED (1 failure reports in 6 tests run)
+a recipe swallows its suite again, run with stand-ins [recipes]: KILLED (1 failure reports in 2 tests run)
+the benchmark's controls are swallowed again [gate]: KILLED (1 failure reports in 6 tests run)
+the gate reads no `||` after a suite [gate]: KILLED (6 failure reports in 6 tests run)
+the gate reads no condition [gate]: KILLED (3 failure reports in 6 tests run)
+the gate reads no group or loop that holds a suite [gate]: KILLED (5 failure reports in 6 tests run)
+the gate reads no `set +e` [gate]: KILLED (1 failure reports in 6 tests run)
+the gate reads no `-` line [gate]: KILLED (1 failure reports in 6 tests run)
+the gate reads no shell without `-e` [gate]: KILLED (1 failure reports in 6 tests run)
+the gate lets a suite outside the helper be [gate]: KILLED (1 failure reports in 6 tests run)
+the gate reads no `bench.mjs` [gate]: KILLED (2 failure reports in 6 tests run)
+the gate has no floor [gate]: KILLED (2 failure reports in 6 tests run)
+the historical report is read as another failed suite [history]: KILLED (1 failure reports in 3 tests run)
+a zero run count with leading zeros passes [helper]: KILLED (2 failure reports in 8 tests run)
+a parameter's default stops a recipe's header again [plan]: KILLED (3 failure reports in 75 tests run)
+the benchmark's controls get no browsers [plan]: KILLED (1 failure reports in 75 tests run)
+a change to the configuration plans nothing by it [plan]: KILLED (1 failure reports in 75 tests run)
+a mutation script's suite does not count [plan]: KILLED (1 failure reports in 75 tests run)
+a changed e2e module reaches no spec [plan]: KILLED (1 failure reports in 75 tests run)
+a recipe that runs every spec is planned by none [plan]: KILLED (1 failure reports in 75 tests run)
+the programs are the old list again [programs]: KILLED (2 failure reports in 9 tests run)
+a mutant in no program is let be [programs]: KILLED (1 failure reports in 9 tests run)
+a library's mutant is checked only in its own program [programs]: KILLED (1 failure reports in 9 tests run)
+a fixture's directory is one program [programs]: KILLED (1 failure reports in 9 tests run)
+a tie between sources is resolved [programs]: KILLED (1 failure reports in 9 tests run)
+a fixture's own directory is a source of its imports [programs]: KILLED (1 failure reports in 9 tests run)
+the registry translates an old number again [core]: KILLED (1 failure reports in 187 tests run)
+the corpus's test translates an old number again [core]: KILLED (1 failure reports in 187 tests run)
+the committed table drifts from what the corpus checks [corpus]: KILLED (1 failure reports in 1 tests run)
+e9-latency names macbook.md wherever it runs [latency]: KILLED (1 failure reports in 1 tests run)
+e9-latency records no load [latency]: KILLED (1 failure reports in 1 tests run)
+35 of 35 mutants killed
+memory bound: no process was stopped
+
+Final precommit checks (after the complete mutation run):
+Reproduce: just lint
+Workspace all-target Clippy and pw-host engine all-target Clippy: exit0.
+Reproduce: just case-check
+case-check: OK (2751 paths)
+Reproduce: just evidence-gates
+----------------------------------------------------------------------
+Ran 223 tests in 129.675s
+
+OK (skipped=2)
+
+Mutation anchors:3204 in271 scripts, each matching once.

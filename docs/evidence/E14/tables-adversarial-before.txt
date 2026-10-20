@@ -1,0 +1,65 @@
+   Compiling pw-core v0.0.0 (/home/haki/code/pw-wt/tables/compiler/pw-core)
+    Finished `test` profile [unoptimized] target(s) in 0.74s
+     Running tests/tables.rs (target/debug/deps/tables-136098dea2c9ef5f)
+
+running 30 tests
+test a_table_gives_each_read_and_write_with_its_type_and_effect ... ok
+test a_three_field_key_gives_a_read_by_each_proper_prefix ... ok
+test every_keyed_read_has_its_set_form ... ok
+test a_bound_gives_all_and_no_bound_none ... ok
+test pw0361_a_source_name_cannot_hide_another_database ... FAILED
+test a_clause_on_another_declaration_is_no_tables ... ok
+test pw0361_generated_composite_records_have_one_shape_each ... FAILED
+test the_control_checks_clean_and_reads_each_clause ... ok
+test pw0361_a_table_is_declared_in_the_module_of_its_name ... ok
+test checking_with_no_release_is_checking ... ok
+test the_corpus_fixtures_that_name_a_release_are_held_to_it ... ok
+test pw0364_all_reads_only_a_bounded_table ... ok
+test pw0361_its_row_is_a_record_declared_beside_it ... ok
+test pw0361_a_reference_names_a_table_keyed_by_its_fields_type ... ok
+test a_bound_is_a_count_and_each_clause_its_grammar ... ok
+test pw0362_its_rows_are_reached_only_through_its_functions ... ok
+test pw0361_its_order_and_indexes_name_its_rows_fields ... ok
+test generic_fields_project_their_arguments_recursively_and_a_change_is_destructive ... FAILED
+test a_lock_changed_by_hand_is_no_release ... ok
+test tables_json_states_each_table_its_functions_and_their_order ... ok
+test its_imports_are_the_platforms_and_its_program_builds ... ok
+test pw0361_its_key_names_its_rows_fields_of_types_every_adapter_keys ... ok
+test a_program_held_to_its_release_is_refused_where_it_is_checked_and_built ... ok
+test a_dropped_field_is_refused_without_its_migrate_and_planned_with_it ... ok
+test pw0365_every_reference_across_sources_is_warned_and_builds ... ok
+test an_additive_change_is_planned ... ok
+test a_program_with_no_table_has_no_tables_file ... ok
+test a_rename_is_refused_without_its_migrate_and_planned_with_it ... ok
+test a_change_no_migrate_states_is_refused ... ok
+test a_type_changed_or_a_field_added_with_no_value_is_refused_unless_backfilled ... ok
+
+failures:
+
+---- pw0361_a_source_name_cannot_hide_another_database stdout ----
+
+thread 'pw0361_a_source_name_cannot_hide_another_database' (2770140) panicked at compiler/pw-core/tests/tables.rs:838:5:
+[]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- pw0361_generated_composite_records_have_one_shape_each stdout ----
+
+thread 'pw0361_generated_composite_records_have_one_shape_each' (2770142) panicked at compiler/pw-core/tests/tables.rs:854:5:
+[]
+
+---- generic_fields_project_their_arguments_recursively_and_a_change_is_destructive stdout ----
+
+thread 'generic_fields_project_their_arguments_recursively_and_a_change_is_destructive' (2770137) panicked at compiler/pw-core/tests/tables.rs:868:5:
+assertion `left == right` failed
+  left: Record([StoredField { name: "value", stored: Option(List(Recursive("T"))) }])
+ right: Record([StoredField { name: "value", stored: Option(List(Int { at_least: None, at_most: None })) }])
+
+
+failures:
+    generic_fields_project_their_arguments_recursively_and_a_change_is_destructive
+    pw0361_a_source_name_cannot_hide_another_database
+    pw0361_generated_composite_records_have_one_shape_each
+
+test result: FAILED. 27 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.05s
+
+error: test failed, to rerun pass `-p pw-core --test tables`

@@ -1,7 +1,7 @@
 // @corpus: rejected
 // @id: R-025
 // @category: browser-only API on origin
-// @rule: PW0323
+// @rule: PW5005
 // @invariant: declared_placement_cannot_grant
 // @charter: §7.3, §7.9
 // @milestone: 5

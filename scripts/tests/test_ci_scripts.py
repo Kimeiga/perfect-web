@@ -105,8 +105,69 @@ class Plan(unittest.TestCase):
         self.assertEqual(len(plan.plan(["a", "b"], {}, 16)), 2)
         # And nothing to run plans no shard: a change that touches no recipe
         # (run 37914111273 failed its plan instead, ADR-0290's first week).
-        self.assertEqual(plan.plan([], {}, 9), [])
-        self.assertEqual(plan.plan([], {}, 9, {}, {"d1"}), [])
+        for database in (frozenset(), {"d1"}):
+            with self.subTest(database=database):
+                try:
+                    empty = plan.plan([], {}, 9, database=database)
+                except ValueError as error:
+                    self.fail(f"An empty recipe selection must return no shards: {error}")
+                self.assertEqual(empty, [])
+
+    def test_a_recipe_recorded_past_a_jobs_limit_is_refused_before_any_shard(self) -> None:
+        # The integrator's ruling 2 (train-10): verify 39054436657 stopped
+        # `e14-refusal`, alone in its shard, at the 345-minute limit after
+        # 20,507 s. A plan that knows a recipe's seconds refuses it then, not
+        # a run hours in. Its shard's setup counts, and a note in the seconds
+        # kept (`_lower_bounds`) is no recipe.
+        import contextlib
+        import io
+
+        self.assertEqual(plan.past_the_limit(["a"], {"a": plan.LIMIT - 100}, {"a": (True, True)}), [("a", plan.LIMIT - 100)])
+        self.assertEqual(plan.past_the_limit(["a"], {"a": plan.LIMIT - 100}, {"a": (False, False)}), [])
+        self.assertEqual(plan.past_the_limit(["a"], {}, {"a": (True, True)}), [])
+        names = ["e10-affine-bindings", "e10-attribute-case"]
+        real, argv = plan.SECONDS, sys.argv
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                plan.SECONDS = pathlib.Path(d) / "seconds.json"
+                sys.argv = ["ci_plan.py", *names]
+                for recorded, refused in ((plan.LIMIT, True), (plan.LIMIT - 1_000, False)):
+                    plan.SECONDS.write_text(json.dumps({
+                        "_lower_bounds": {names[0]: "stopped at the limit"},
+                        names[0]: recorded,
+                        names[1]: 100,
+                    }))
+                    out, err = io.StringIO(), io.StringIO()
+                    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                        try:
+                            code = plan.main()
+                        except TypeError as error:
+                            self.fail(f"a note in the seconds kept is read as a recipe's: {error}")
+                    if refused:
+                        self.assertEqual(code, 1, err.getvalue())
+                        self.assertIn(f"{names[0]} is recorded at {recorded} s", err.getvalue())
+                        self.assertNotIn("shards=", out.getvalue())
+                    else:
+                        self.assertEqual(code, 0, err.getvalue())
+                        self.assertIn("shards=", out.getvalue())
+        finally:
+            plan.SECONDS, sys.argv = real, argv
+
+    def test_a_recipe_that_skips_without_a_database_is_dealt_beside_one(self) -> None:
+        # Found at train-10's verify (39054436657): `e14-scheduled-orders`
+        # says it skipped and writes no evidence where no database is named,
+        # NEEDS_DATABASE did not hold it, and its shard had none: the run
+        # recorded nothing of ADR-0347 and passed. Every recipe of that kind,
+        # read from the justfile's every part, is dealt beside a database.
+        skips = [
+            name
+            for name, body in plan.bodies().items()
+            if "skipped, PW_STORE_DATABASE_URL is not set" in body
+            or "skipped, PW_FEED_DATABASE_URL is not set" in body
+        ]
+        self.assertIn("e14-scheduled-orders", skips)
+        self.assertGreaterEqual(len(skips), 10, skips)
+        self.assertEqual(sorted(set(skips) - set(plan.NEEDS_DATABASE)), [])
 
     def test_a_measurement_of_the_machine_is_not_planned(self) -> None:
         self.assertIn("e10-close-bench", plan.LOCAL_ONLY)
@@ -201,6 +262,55 @@ class Plan(unittest.TestCase):
             plan.touched_scripts({"spikes/own-renderer/e2e/nothing.spec.mjs": [(1, 1)]}, 30),
         )
 
+    def test_a_change_to_the_suites_configuration_plans_every_recipe_that_runs_a_suite_under_it(self) -> None:
+        # The integrator's ruling 7 (2026-10-15): every spec runs under
+        # `playwright.config.mjs`, its hosts and its checks of the builds; a
+        # change to it planned only a recipe whose mutant's anchor sat near.
+        names = plan.recipes()
+        body = plan.bodies()
+        planned = plan.recipes_for({plan.PLAYWRIGHT_CONFIG: [(100, 100)]}, 30, names)
+        under = sorted(n for n in names if plan.runs_browser_suite(body.get(n, "")))
+        self.assertGreater(len(under), 80)
+        self.assertEqual(sorted(set(under) - set(planned)), [])
+        for name in (
+            "e14-feed",  # its own lines, by the helper
+            "e14-keepalive",  # two suites in its lines
+            "e14-resume-gate",  # a suite in a loop
+            "e10-browser",  # every spec, three runs
+            "e14-speculated-values",  # only by its mutation script
+        ):
+            self.assertIn(name, planned, name)
+        # The benchmark harness's suite runs under its own configuration,
+        # and a recipe that runs no browser is not planned.
+        self.assertNotIn("e14-contract", planned)
+        self.assertNotIn("e8-wit", planned)
+        self.assertFalse(plan.runs_browser_suite(body["e14-contract"]))
+        self.assertTrue(plan.runs_browser_suite(body["e14-contract"], "benchmarks/harness"))
+        # The control: another file of the spike plans none of them by this.
+        other = plan.recipes_for({"spikes/own-renderer/README.md": [(1, 1)]}, 30, names)
+        self.assertNotIn("e14-feed", other)
+
+    def test_a_changed_spec_or_a_module_its_specs_import_plans_what_runs_them(self) -> None:
+        # Track evidence-integrity-2: `e2e/accessibility-rules.mjs`, which
+        # three specs import, planned nothing; and `e10-browser`, which runs
+        # every spec, was planned by none.
+        names = plan.recipes()
+        rules = {"spikes/own-renderer/e2e/accessibility-rules.mjs": [(1, 1)]}
+        self.assertEqual(
+            plan.changed_specs(rules),
+            {"accessibility.spec.mjs", "payments.spec.mjs", "store-search.spec.mjs", "scheduled-orders.spec.mjs"},
+        )
+        planned = plan.recipes_for(rules, 30, names)
+        for name in ("e14-accessibility", "e14-titles", "e14-payments", "e14-store-search", "e14-scheduled-orders", "e10-browser"):
+            self.assertIn(name, planned, name)
+        self.assertNotIn("e14-feed", planned)
+        feed = plan.recipes_for({"spikes/own-renderer/e2e/feed.spec.mjs": [(1, 1)]}, 30, names)
+        self.assertIn("e10-browser", feed)
+        self.assertTrue(plan.runs_every_spec(plan.bodies()["e10-browser"]))
+        self.assertFalse(plan.runs_every_spec(plan.bodies()["e14-feed"]))
+        # The control: a module no spec imports reaches no spec.
+        self.assertEqual(plan.changed_specs({"spikes/own-renderer/e2e/nothing.mjs": [(1, 1)]}), set())
+
     def test_a_recipe_is_planned_where_its_script_reads_what_changed(self) -> None:
         # W8's finding, 2026-10-12: holds' merge changed the benchmark's
         # baseline store, and no verify planned `e14-diffs`, whose script
@@ -284,6 +394,34 @@ class Plan(unittest.TestCase):
             text = (root / "just/t.just").read_text().splitlines()
             self.assertEqual(plan.recipes_at(text, [(3, 3)], ["e14-track"]), {"e14-track"})
             self.assertEqual(plan.recipes_at(text, [(1, 1)], ["e14-track"]), set())
+
+    def test_a_recipe_whose_parameters_have_defaults_is_read(self) -> None:
+        # Track evidence-integrity-2: a header's default stopped the header's
+        # pattern until 2026-10-15, and `e10-browser`, `e10-close-bench` and
+        # `e14-harness` had no body: nothing they run planned them, and a
+        # shard dealt one set up neither browsers nor the build.
+        with tempfile.TemporaryDirectory() as d:
+            root = pathlib.Path(d)
+            (root / "justfile").write_text(
+                'set shell := ["bash", "-euo", "pipefail", "-c"]\nexport PATH := "x:" + env_var(\'PATH\')\n'
+                "toolchain_bin := justfile_directory()\n\n"
+                'e10-browser engines="chromium firefox" out="docs/evidence/E10/a:b.txt":\n'
+                "    bash scripts/run_suite.sh -- pnpm exec playwright test e2e/a.spec.mjs\n\n"
+                'e14-harness TASK="T08" *rest:\n    node bench.mjs controls --task {{TASK}}\n\n'
+                "evidence-fetch run *flags: e14-harness\n    python3 scripts/evidence_fetch.py {{run}}\n"
+            )
+            body = plan.bodies(root)
+            self.assertEqual(sorted(body), ["e10-browser", "e14-harness", "evidence-fetch"])
+            self.assertIn("e2e/a.spec.mjs", body["e10-browser"])
+            self.assertEqual(plan.needs(body["e10-browser"]), (True, True))
+            # The benchmark's controls grade each stack in a browser.
+            self.assertEqual(plan.needs(body["e14-harness"]), (True, True))
+            text = (root / "justfile").read_text().splitlines()
+            self.assertEqual(plan.recipes_at(text, [(6, 6)], ["e10-browser"]), {"e10-browser"})
+        # And the repository's: every recipe `just` knows has its body.
+        known = plan.recipes()
+        self.assertEqual([n for n in known if n not in plan.bodies()], [])
+        self.assertIn("e2e/performance.spec.mjs", plan.bodies()["e10-close-bench"])
 
     def test_a_recipe_run_against_a_database_is_a_shard_of_its_own(self) -> None:
         out = subprocess.run(
@@ -446,6 +584,40 @@ class Plan(unittest.TestCase):
         for shard in dealt:
             if shard["recipes"] != ["long"]:
                 self.assertLessEqual(plan.ends([shard], costs), plan.CEILING)
+
+    def test_a_long_singleton_does_not_hide_a_database_shard_past_the_ceiling(self) -> None:
+        # More database shards cannot shorten the long singleton, but can
+        # prevent a different, splittable shard exceeding ADR-0290's ceiling.
+        costs = {"long": 100000, "d1": 6000, "d2": 6000}
+        db = {"d1", "d2"}
+        for asked in (2, 3, 4, plan.MOST):
+            with self.subTest(asked=asked):
+                dealt = plan.planned(list(costs), costs, asked, database=db)
+                self.assertEqual(len(dealt), 3)
+                self.assertEqual(sorted(s["recipes"] for s in dealt), [["d1"], ["d2"], ["long"]])
+
+    def test_a_long_database_singleton_does_not_hide_its_other_database_shard(self) -> None:
+        costs = {"ordinary": 6000, "long-db": 100000, "d1": 6000, "d2": 6000}
+        dealt = plan.planned(list(costs), costs, 3, database={"long-db", "d1", "d2"})
+        self.assertEqual(len(dealt), 4)
+        for shard in dealt:
+            if shard["recipes"] != ["long-db"]:
+                self.assertLessEqual(plan.ends([shard], costs), plan.CEILING)
+
+    def test_the_ceiling_tie_counts_database_setup(self) -> None:
+        # The recipes total 10,000: plain setup fits, browser setup does not.
+        costs = {"long": 100000, "d1": 5000, "d2": 5000}
+        db = {"d1", "d2"}
+        self.assertEqual(len(plan.planned(list(costs), costs, 3, database=db)), 2)
+        browsers = {"d1": (True, True)}
+        dealt = plan.planned(list(costs), costs, 3, browsers, db)
+        self.assertEqual(len(dealt), 3)
+        self.assertEqual([s["recipes"] for s in dealt if s["database"]], [["d1"], ["d2"]])
+
+    def test_a_safe_database_bundle_keeps_the_fewest_database_shards(self) -> None:
+        costs = {"long": 100000, "d1": 1200, "d2": 1200}
+        dealt = plan.planned(list(costs), costs, 3, database={"d1", "d2"})
+        self.assertEqual([s["recipes"] for s in dealt], [["long"], ["d1", "d2"]])
 
     def test_main_deals_a_run_within_the_ceiling(self) -> None:
         # The workflow's own call: four recipes of 8,000 s asked for in two
@@ -649,13 +821,17 @@ class Fetch(unittest.TestCase):
             "docs/evidence/E14/feed.txt": "e14-feed",
         })
         moved = {"e14-diffs"}
-        self.assertIn("reads what changed", fetch.verdict("e14-diffs", moved, []))
+        reason = fetch.verdict("e14-diffs", moved, [])
+        self.assertIsInstance(reason, str, "A moved recipe must return a refusal reason")
+        self.assertIn("reads what changed", reason)
         self.assertIsNone(fetch.verdict("e14-feed", moved, []))
         # Skipped, where another run records it: neither copied nor refused.
         self.assertEqual(fetch.verdict("e14-diffs", moved, ["e14-diffs"]), "skipped")
         self.assertEqual(fetch.verdict("e14-feed", set(), ["e14-feed"]), "skipped")
         # A file no recipe of the run says it wrote is no one's evidence.
-        self.assertIn("no recipe", fetch.verdict(None, set(), []))
+        reason = fetch.verdict(None, set(), [])
+        self.assertIsInstance(reason, str, "An unowned file must return a refusal reason")
+        self.assertIn("no recipe", reason)
 
     def test_what_changed_since_a_run_is_the_planners_against_the_tree_here(self) -> None:
         # A push plans by `ci_plan.py`'s rule; a fetch reads the same, from
@@ -724,9 +900,32 @@ class Fetch(unittest.TestCase):
 
     def test_the_seconds_kept_are_each_a_recipes(self) -> None:
         kept = json.loads(fetch.SECONDS.read_text())
-        self.assertGreater(len(kept), 100)
-        self.assertTrue(all(plan.EVIDENCE_RECIPE.match(r) and isinstance(s, int) and s >= 0 for r, s in kept.items()))
+        notes = {k: v for k, v in kept.items() if k.startswith("_")}
+        seconds = {k: v for k, v in kept.items() if not k.startswith("_")}
+        self.assertGreater(len(seconds), 100)
+        self.assertTrue(all(plan.EVIDENCE_RECIPE.match(r) and isinstance(s, int) and s >= 0 for r, s in seconds.items()))
         self.assertEqual(list(kept), sorted(kept))
+        # The one note: the recipes whose seconds are lower bounds, each kept
+        # with its seconds, and why (the integrator's ruling 2, train-10).
+        self.assertLessEqual(set(notes), {"_lower_bounds"})
+        for recipe, why in notes.get("_lower_bounds", {}).items():
+            self.assertIn(recipe, seconds)
+            self.assertIsInstance(why, str)
+
+    def test_a_recipe_run_to_its_end_leaves_the_lower_bounds(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            path = pathlib.Path(d) / "seconds.json"
+            path.write_text(json.dumps({
+                "_lower_bounds": {"e14-a": "stopped at the limit", "e14-b": "stopped at the limit"},
+                "e14-a": 100,
+                "e14-b": 200,
+            }))
+            fetch.remember({"e14-a": 150}, path)
+            kept = json.loads(path.read_text())
+            self.assertEqual(kept["e14-a"], 150)
+            self.assertEqual(kept["_lower_bounds"], {"e14-b": "stopped at the limit"})
+            fetch.remember({"e14-b": 250}, path)
+            self.assertNotIn("_lower_bounds", json.loads(path.read_text()))
 
 class Summary(unittest.TestCase):
     def run_summary(self, shards: list[list[dict]], files: dict[str, str], planned: int) -> int:
@@ -923,6 +1122,108 @@ class CurrentEvidence(unittest.TestCase):
         self.assertTrue(all("--current" in line for line in pushes), pushes)
 
 
+class StaleEvidence(unittest.TestCase):
+    """Track evidence-integrity, finding 2: a train's push plans each recipe
+    whose committed evidence is stale at its head, whatever the train
+    changed. A push planned what its range reached, less what was current,
+    so evidence gone stale before the range was planned by none, and the
+    nightly keeps none: `docs/evidence/E10/privacy-by-resolution.txt` said
+    "4 of 4 mutants killed" for a week after its script's fourth mutant was
+    retired."""
+
+    HEAD, OLD = "h" * 40, "a" * 40
+    BODY = {
+        "e14-one": "@{ echo; } > docs/evidence/E14/one.txt\n",
+        "e14-two": "@{ echo; } > docs/evidence/E14/two.txt\n",
+        "e14-none": "@cargo test --locked\n",
+    }
+
+    def stale(self, texts: dict, reached: set = frozenset()) -> list:
+        def read(head: str, path: str) -> str | None:
+            m = plan.RECORDED_AT.search(texts.get(path) or "")
+            return m.group(1) if m else None
+
+        return plan.stale(
+            sorted(self.BODY),
+            self.HEAD,
+            body=self.BODY,
+            show=lambda head, path: texts.get(path),
+            read=read,
+            descends_from=lambda sha, head: True,
+            reach=lambda sha, head: set(reached),
+        )
+
+    def test_evidence_whose_reads_changed_since_its_commit_is_stale(self) -> None:
+        texts = {
+            "docs/evidence/E14/one.txt": f"commit: {self.OLD}\n",
+            "docs/evidence/E14/two.txt": f"commit: {self.OLD}\n",
+        }
+        self.assertEqual(self.stale(texts, reached={"e14-one"}), ["e14-one"])
+        # The control: nothing either reads changed since; current, both.
+        self.assertEqual(self.stale(texts), [])
+
+    def test_evidence_from_a_tree_with_changes_or_none_at_all_is_stale(self) -> None:
+        texts = {
+            "docs/evidence/E14/one.txt": f"commit: {self.OLD} + uncommitted changes\n",
+            "docs/evidence/E14/two.txt": f"commit: {self.OLD}\n",
+        }
+        self.assertEqual(self.stale(texts), ["e14-one"])
+        # The head holds none of its evidence: it records nothing.
+        del texts["docs/evidence/E14/one.txt"]
+        self.assertEqual(self.stale(texts), ["e14-one"])
+
+    def test_evidence_that_names_no_commit_is_not_judged(self) -> None:
+        # An artifact, or an older recipe's text: planned as before, by what
+        # changed, and never as stale; nor a recipe that writes none.
+        texts = {
+            "docs/evidence/E14/one.txt": "an artifact\n",
+            "docs/evidence/E14/two.txt": f"commit: {self.OLD}\n",
+        }
+        self.assertEqual(self.stale(texts, reached={"e14-one", "e14-two", "e14-none"}), ["e14-two"])
+
+    def test_main_plans_stale_evidence_only_where_asked(self) -> None:
+        import contextlib
+        import io
+
+        def planned(argv: list[str]) -> list[str]:
+            out = io.StringIO()
+            with mock.patch.object(sys, "argv", ["ci_plan.py", *argv]), contextlib.redirect_stdout(out):
+                self.assertEqual(plan.main(), 0)
+            shards = json.loads(out.getvalue().strip()[len("shards="):])
+            return sorted(r for s in shards for r in s["recipes"])
+
+        with mock.patch.object(plan, "changed_recipes", lambda *a: ["e10-affine-bindings"]), \
+                mock.patch.object(plan, "current", lambda n, head, near: {}), \
+                mock.patch.object(plan, "stale", lambda n, head, near: ["e10-attribute-case"]):
+            self.assertEqual(planned(["--changed", "b", "h", "--current"]), ["e10-affine-bindings"])
+            self.assertEqual(
+                planned(["--changed", "b", "h", "--current", "--stale"]),
+                ["e10-affine-bindings", "e10-attribute-case"],
+            )
+
+    def test_a_trains_push_plans_the_stale_evidence_and_another_tracks_does_not(self) -> None:
+        # The track's branch of the plan step, run as the workflow runs it,
+        # with `git` and `python3` answering for themselves.
+        workflow = (SCRIPTS.parent / ".github/workflows/verify.yml").read_text().splitlines()
+        start = next(i for i, l in enumerate(workflow) if 'if [ "${GITHUB_REF_NAME#track/}"' in l)
+        end = next(i for i in range(start, len(workflow)) if workflow[i].lstrip().startswith("elif "))
+        branch = "\n".join(l.strip() for l in workflow[start + 1 : end])
+
+        def plans(ref: str) -> str:
+            with tempfile.TemporaryDirectory() as d:
+                output = pathlib.Path(d) / "output"
+                script = (
+                    'git() { echo base; }\npython3() { echo "python3 $*"; }\n'
+                    f"GITHUB_REF_NAME={ref}\nGITHUB_SHA=head\nGITHUB_OUTPUT={output}\n{branch}\n"
+                )
+                subprocess.run(["bash", "-c", script], check=True, capture_output=True)
+                return output.read_text()
+
+        self.assertIn("--current --stale", plans("track/train-9"))
+        self.assertNotIn("--stale", plans("track/evidence-integrity"))
+        self.assertIn("--changed base head --current", plans("track/evidence-integrity"))
+
+
 class VerifiedBase(unittest.TestCase):
     """ADR-0281, amended 2026-10-13: a train verified at its head is not
     verified again when `master` moves to it."""
@@ -993,7 +1294,10 @@ class VerifiedBase(unittest.TestCase):
         def broken(_sha: str) -> list[dict]:
             raise RuntimeError("the API answered 403")
         with mock.patch("sys.stderr", new_callable=lambda: __import__("io").StringIO()) as err:
-            got = vbase.base(self.sha["before"], self.sha["evidence"], broken, self.root)
+            try:
+                got = vbase.base(self.sha["before"], self.sha["evidence"], broken, self.root)
+            except RuntimeError as error:
+                self.fail(f"A failing run provider must fall back to the previous commit: {error}")
         self.assertEqual(got, self.sha["before"])
         self.assertIn("the API answered 403", err.getvalue())
         # And a commit git does not know.

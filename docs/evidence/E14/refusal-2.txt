@@ -1,0 +1,22 @@
+ADR-0302 - a refusal is told where the press was: its mutation controls, part 2 of 2
+
+produced by: just e14-refusal-2
+commit: 587657ff828b390e958e582f8ff3749f2b0d5af9
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39270030023 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+node: v22.21.1
+playwright: Version 1.58.0
+
+== mutation controls, part 2 of 2 (scripts/refusal_mutations.py --part 2/2; part 1 is e14-refusal's)
+
+part 2 of 2: mutants 24 to 30 of 30
+baseline (browser): 11 passed, 0 failed
+the announcer says nothing [browser]: KILLED (1 of 6 tests fail)
+a second announcer is added beside the served one [browser]: KILLED (2 of 6 tests fail)
+a press keeps what its last was told [browser]: KILLED (1 of 6 tests fail)
+a press no answer came for is told it failed [browser]: KILLED (1 of 9 tests fail)
+a stale page's press is told nothing [browser]: KILLED (1 of 11 tests fail)
+a failed handler is told nothing [browser]: KILLED (1 of 11 tests fail)
+the feed's composer is shown to a reader signed out [browser]: KILLED (does not build)
+7 of 7 mutants killed
+memory bound: no process was stopped

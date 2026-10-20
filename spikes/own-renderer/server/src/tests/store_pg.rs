@@ -796,7 +796,7 @@ fn on_postgres_the_stores_schema_is_its_own_beside_the_feeds() {
 #[test]
 fn on_postgres_a_stated_change_feed_the_layer_cannot_deliver_is_refused() {
     let Some(url) = database() else { return };
-    const FEED: &str = "--- a/lib/StoreData.pw\n+++ b/lib/StoreData.pw\n@@ -34,3 +34,3 @@\n     transactions serializable\n     reads        strong\n-    changes      none\n+    changes      feed\n";
+    const FEED: &str = "--- a/lib/StoreData.pw\n+++ b/lib/StoreData.pw\n@@ -37,4 +37,4 @@\n     transactions serializable\n     reads        strong\n-    changes      none\n+    changes      feed\n     sets         one_call\n";
     let Err(why) = served_with(|app| app.to_string(), &[FEED], || StorePg::for_test(&url)) else {
         panic!("a change feed the layer cannot deliver was served");
     };

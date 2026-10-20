@@ -16,8 +16,9 @@
 # driven in three engines (e2e/guestbook.spec.mjs, built by guestbook.sh); and
 # the mutation controls of all three (scripts/guide_mutations.py).
 e14-guide:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
     @bash spikes/own-renderer/guestbook.sh > /dev/null
-    @cargo build --quiet --locked -p pw-dev-server
+    @cargo build --quiet --locked -p pw-dev-server -p kiokun-server
     @mkdir -p docs/evidence/E14
     @{ echo "ADR-0343 (track guide) - a guide whose examples compile: every example of docs/guide checked, and the tutorial's app run in three engines"; echo; \
        echo "produced by: just e14-guide"; \
@@ -30,9 +31,7 @@ e14-guide:
        python3 scripts/guide_diagnostics.py --check; \
        python3 -m unittest discover -s scripts/tests -p test_guide_diagnostics.py -v 2>&1 | grep -E '^(test_|Ran |OK|FAILED)'; \
        echo; echo "== the tutorial's app, examples/guestbook/*.pw, in three engines (e2e/guestbook.spec.mjs)"; echo; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/guestbook.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)"; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/guestbook.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/guide_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/guide_mutations.py; \
      } > docs/evidence/E14/guide.txt

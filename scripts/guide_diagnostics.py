@@ -217,7 +217,7 @@ def page():
         "## Old numbers",
         "",
         "Numbers the corpus's fixtures wrote before one invariant got one code. The",
-        "compiler never prints them; a fixture's `@rule` may still name one.",
+        "compiler never prints them; a fixture's `@rule` must name a current registered code.",
         "",
         "| Old number | Now | Symbol |",
         "|---|---|---|",

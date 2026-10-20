@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "hash": "6a8de2db237a106d",
+  "tables": [
+    {
+      "name": "Memos",
+      "source": null,
+      "fields": [
+        {
+          "name": "id",
+          "type": "MemoId",
+          "stored": {
+            "string": {}
+          }
+        },
+        {
+          "name": "body",
+          "type": "String",
+          "stored": {
+            "string": {}
+          }
+        }
+      ],
+      "key": [
+        "id"
+      ]
+    }
+  ]
+}

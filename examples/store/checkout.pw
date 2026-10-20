@@ -65,8 +65,10 @@ type PromoFound = PromoFound { promo: Promo, used: Bool }
 // **A store's lines in a cart.**
 type CartPart = CartPart { store: StoreId, lines: List<CartLine> }
 
-// **What the reader chose at checkout**: a tip, and the code applied.
-type Chosen = Chosen { tip: Tip, promo: Option<String> }
+// **What the reader chose at checkout**: a tip, and the code applied; and
+// (track `scheduled-orders`) the time the order is for, none for as soon as
+// possible.
+type Chosen = Chosen { tip: Tip, promo: Option<String>, when: Option<Instant> }
 
 fn fees_of_stores(stores: List<StoreId>) -> List<FeesOf> !{ database.read<Stores> }
     host "store:data/fees#for-stores"
@@ -287,9 +289,15 @@ type Priced = Priced {
     said: String,
     any: Bool,
     discount_said: String,
+    // Track `scheduled-orders`: the time chosen, none for as soon as
+    // possible, and what the page says of it, which the checkout words from
+    // its stores' hours (`store.scheduled`); none said where it is priced
+    // alone.
+    when: Option<Instant>,
+    when_said: String,
 }
 
-fn priced(parts: List<CartPart>, fees: List<FeesOf>, promo: Option<Promo>, code: Option<String>, tip: Tip, said: String) -> Priced !{} {
+fn priced(parts: List<CartPart>, fees: List<FeesOf>, promo: Option<Promo>, code: Option<String>, tip: Tip, said: String, when: Option<Instant>) -> Priced !{} {
     let charged = charged_of(parts, fees, promo, tip)
     let charges = summed(charged)
     Priced {
@@ -300,6 +308,8 @@ fn priced(parts: List<CartPart>, fees: List<FeesOf>, promo: Option<Promo>, code:
         said: said,
         any: List.length(parts) > 0,
         discount_said: display(minus(nothing(), charges.discount)),
+        when: when,
+        when_said: "",
     }
 }
 
@@ -319,9 +329,9 @@ fn priced_for(reader: User<UserId>) -> Result<Priced, PromoError> !{ database.re
     let fees = fees_of_stores(List.map(parts, p => p.store))
     let chosen = chosen_by(reader)
     match chosen.promo {
-        None => Ok(priced(parts, fees, None, None, chosen.tip, "")),
+        None => Ok(priced(parts, fees, None, None, chosen.tip, "", chosen.when)),
         Some(code) => match promo_for(promo_named(reader, code), parts) {
-            Ok(p) => Ok(priced(parts, fees, Some(p), Some(code), chosen.tip, "Code {code} applied.")),
+            Ok(p) => Ok(priced(parts, fees, Some(p), Some(code), chosen.tip, "Code {code} applied.", chosen.when)),
             Err(e) => Err(e),
         },
     }
@@ -335,7 +345,7 @@ fn shown_for(reader: User<UserId>) -> Priced !{ database.read<Carts>, database.r
         Err(e) => {
             let parts = parts_of_cart(reader)
             let chosen = chosen_by(reader)
-            priced(parts, fees_of_stores(List.map(parts, p => p.store)), None, None, chosen.tip, promo_said(e))
+            priced(parts, fees_of_stores(List.map(parts, p => p.store)), None, None, chosen.tip, promo_said(e), chosen.when)
         },
     }
 }

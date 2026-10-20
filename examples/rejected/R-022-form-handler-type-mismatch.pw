@@ -1,7 +1,7 @@
 // @corpus: rejected
 // @id: R-022
 // @category: form handler type mismatch
-// @rule: PW0320
+// @rule: PW0602
 // @invariant: handler_signature_mismatch
 // @charter: §8.2
 // @milestone: 3

@@ -1,0 +1,24 @@
+// @status: GENERAL
+// @invariant: forbidden_effect
+// @dimension: equivalent syntax — the read is a member of the loop's list, not a call
+//
+// Structurally different from R-080: nothing in the loop's head is a call.
+// `store.sections` reads a member, and a member read is a call of it
+// (ADR-0048), here one that reads the database. The view declares the
+// effect, which must not help. Until ADR-0345 a loop's head was text, and
+// this checked clean, and built.
+
+module generality.each_head_member
+
+import domain.{ Store, MenuSection }
+
+fn sections(store: Store) -> List<MenuSection> !{ database.read<MenuSection> }
+    host "store:data/menus#sections"
+
+view Sections(store: Store) !{ database.read<MenuSection> } {
+    <ul aria-label="Sections">
+        {#each store.sections as section (section.category.id)}
+            <li>{section.category.name}</li>
+        {/each}
+    </ul>
+}

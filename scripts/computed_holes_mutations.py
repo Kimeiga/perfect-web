@@ -156,8 +156,9 @@ MUTANTS = [
     (
         "an import's name is a local again",
         CHECK,
-        "        .filter(|(_, d)| d.kind != crate::hir::DeclKind::Import)\n",
-        "",
+        # Tables, like imports, are module heads rather than local values.
+        "                crate::hir::DeclKind::Import | crate::hir::DeclKind::Table\n",
+        "                crate::hir::DeclKind::Table\n",
     ),
     (
         "a module a path starts with is a term",

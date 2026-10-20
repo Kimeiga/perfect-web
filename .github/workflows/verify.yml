@@ -83,10 +83,15 @@ jobs:
               # keep most of the plan's 20 jobs; in more where 9 would end past
               # the planner's ceiling (ADR-0290, amended 2026-10-10). Less each
               # recipe whose committed evidence is current, here and on
-              # `master` (ADR-0281, amended 2026-10-13 (6)).
+              # `master` (ADR-0281, amended 2026-10-13 (6)). And a train's
+              # push, whose run's evidence its merge takes, plans each recipe
+              # whose committed evidence is stale, whatever the train changed,
+              # so that the run records it again (track evidence-integrity).
               if [ "${GITHUB_REF_NAME#track/}" != "$GITHUB_REF_NAME" ]; then
                 base=$(git merge-base origin/master "$GITHUB_SHA")
-                python3 scripts/ci_plan.py --shards 9 --changed "$base" "$GITHUB_SHA" --current >> "$GITHUB_OUTPUT"
+                stale=""
+                case "$GITHUB_REF_NAME" in track/train-*) stale="--stale" ;; esac
+                python3 scripts/ci_plan.py --shards 9 --changed "$base" "$GITHUB_SHA" --current $stale >> "$GITHUB_OUTPUT"
               # The chain's choice, from the newest commit pushed that a run
               # passed at: a train verified at its head is not verified again
               # when `master` moves to it (ADR-0281, amended 2026-10-13). A

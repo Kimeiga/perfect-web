@@ -24,7 +24,6 @@
 //! executable cannot. `docs/evidence/P0/readiness.txt` lists these in prose;
 //! this is the same list, run.
 
-use pw_core::check::check_sources;
 use std::collections::{BTreeMap, BTreeSet};
 
 fn library() -> Vec<(String, String)> {
@@ -117,7 +116,23 @@ fn symbols_for(w: &Witness) -> BTreeSet<&'static str> {
     let mut files = library();
     let leaf = w.name.rsplit('/').next().unwrap().to_string();
     files.push((leaf.clone(), w.src.clone()));
-    let diags = check_sources(&files)
+    // The schema it is held to as released, where it names one (track
+    // `tables`): `// @schema-lock: <file beside it>`.
+    let released = w
+        .src
+        .lines()
+        .find_map(|l| l.trim().strip_prefix("// @schema-lock:"))
+        .map(|file| {
+            let lock = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../examples/generality")
+                .join(w.name.rsplit_once('/').map_or("", |(dir, _)| dir))
+                .join(file.trim());
+            let text = std::fs::read_to_string(&lock)
+                .unwrap_or_else(|e| panic!("{}: {e}", lock.display()));
+            pw_core::tables::Schema::read(&text)
+                .unwrap_or_else(|e| panic!("{}: {e}", lock.display()))
+        });
+    let diags = pw_core::check::check_sources_with(&files, released.as_ref())
         .into_iter()
         .find(|(n, _)| *n == leaf)
         .map(|(_, d)| d)
@@ -559,12 +574,13 @@ fn generality_is_reported_separately_from_conformance() {
     // `schedule_names_no_clocked_command`, `scheduled_outside_a_command`
     // and `schedule_time`. 54 / 54 the same day: corpus C24, the five of
     // NEXT 6c's `invoked_by`, which no fixture exercised until then. 56 / 56
-    // on 2026-10-15: 4c's `read_per_element`, a read keyed by its loop's
-    // element, and `set_pair_shape`, a keyed read's `set` that does not fit
-    // it (track `bounded-checker`).
+    // on 2026-10-15: 4c's `read_per_element` and `set_pair_shape`. 60 / 60
+    // on 2026-10-16: tables' `table_malformed`, `data_not_declared`,
+    // `all_unbounded` and `migration_unstated` (ADR-0350, corpus C27).
+    // PW0365's warning has its own witnesses too.
     assert_eq!(
         (general.len(), narrow.len(), untested.len()),
-        (56, 0, 0),
+        (60, 0, 0),
         "the published figure moved. If that is intended, update
          docs/STATUS.md and docs/NEXT.md in the same commit — a number in a
          status report that no test holds is a number that drifts."

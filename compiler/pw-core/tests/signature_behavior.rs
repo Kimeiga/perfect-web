@@ -233,7 +233,8 @@ fn unit_and_empty_record_have_unit_abis_not_boolean_placeholders() {
     );
     assert!(wit.contains("type app-empty = tuple<>;"), "{wit}");
     assert!(wit.contains("option<tuple<>>"), "{wit}");
-    assert!(wit.contains("result<tuple<>, string>"), "{wit}");
+    assert!(wit.contains("result<_, string>"), "{wit}");
+    assert!(!wit.contains("result<tuple<>, string>"), "{wit}");
 }
 
 #[test]

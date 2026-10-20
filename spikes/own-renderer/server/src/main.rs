@@ -733,6 +733,9 @@ mod schedules;
 // TRACK SEAM (reviews): a store's ratings and reviews, given through a
 // delivered order.
 mod reviews;
+// TRACK SEAM (scheduled-orders): an order placed for a time its reader
+// chooses, sent to its stores when it is due (W9).
+mod scheduled_orders;
 // Track `second-host` (ADR-XXXX): hosts on one database hear each other's
 // commits.
 mod hosts;
@@ -5797,6 +5800,16 @@ impl Server {
     /// gives it (ADR-0162): among the pages this build planned with one.
     /// One route is one page's (PW0341), so the first is the only one.
     fn routed(&self, path: &str, query: &str) -> Option<Result<(String, Params), String>> {
+        // ADR-0309: malformed path text is a bad request before matching,
+        // so a failed decode cannot masquerade as a missing page.
+        if path
+            .split('/')
+            .any(|segment| path_decoded(segment).is_none())
+        {
+            return Some(Err(format!(
+                "`{path}`'s path is no text its route can read"
+            )));
+        }
         self.plans.iter().find_map(|(page, plan)| {
             let route = plan["route"].as_str()?;
             let mut params = route_params(route_path(route), path)?;
@@ -5805,7 +5818,9 @@ impl Server {
             Some(match query_params(route, query) {
                 Some(given) => {
                     params.extend(given);
-                    Ok((page.clone(), params))
+                    // TRACK SEAM (argument-invariants): each held to what
+                    // its type states, before anything reads it.
+                    held_params(plan, &params).map(|()| (page.clone(), params))
                 }
                 None => Err(format!("`{path}`'s query is no text its route can read")),
             })
@@ -9130,7 +9145,25 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
         // ADR-0148).
         ("GET", route) if route.starts_with("/page/") => {
             let path = route.trim_start_matches("/page/");
-            match server.page_params(path, query) {
+            // TRACK SEAM (argument-invariants): a parameter its type refuses
+            // is a request refused, 400 and why, as a routed page's is
+            // (ADR-0346); no such page, or one not given, is not found.
+            let params = server.page_params(path, query).map(|params| {
+                let held = held_params(server.plan_of(path), &params);
+                (params, held)
+            });
+            if let Ok((_, Err(why))) = &params {
+                respond(
+                    &mut stream,
+                    400,
+                    "text/plain; charset=utf-8",
+                    &session,
+                    fresh,
+                    why.as_bytes(),
+                );
+                return;
+            }
+            match params.map(|(params, _)| params) {
                 // One that binds a query as the store's is (ADR-0190).
                 Ok(params) if server.binds_a_query(path) => {
                     serve_bound(server, &mut stream, &session, fresh, path, params, query)
@@ -9843,6 +9876,34 @@ fn query_params(route: &str, query: &str) -> Option<Params> {
         out.insert(name, decoded(value)?);
     }
     Some(out)
+}
+
+/// TRACK SEAM (argument-invariants): **a page's parameters, held to the
+/// invariants their types state** (ADR-0346). An address is a browser's, so
+/// each parameter, as [`param_val`] gives it to the page, is decoded as an
+/// argument is (ADR-0179): one that breaks its type's invariant is refused,
+/// by name, before the page is rendered or a query reads it, never shown or
+/// read with. The plan states where (`bounded`, by each parameter's position
+/// in `params`); a page whose parameters' types state none has nothing to
+/// hold.
+fn held_params(plan: &serde_json::Value, params: &Params) -> Result<(), String> {
+    let Some(bounded) = plan.get("bounded") else {
+        return Ok(());
+    };
+    let bounded: Vec<pw_host::Bounded> = serde_json::from_value(bounded.clone()).map_err(|e| {
+        format!("the page's plan states its parameters' invariants unreadably: {e}")
+    })?;
+    let values = plan["params"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|p| {
+            let name = p.as_str().unwrap_or_default();
+            param_val(plan, name, params)
+                .ok_or_else(|| format!("the page's `{name}` is given no value"))
+        })
+        .collect::<Result<Vec<Val>, String>>()?;
+    pw_host::engine::holds(&bounded, &values).map_err(|why| format!("parameter refused: {why}"))
 }
 
 /// **A page parameter's value, as its document's address gave it**
@@ -14010,6 +14071,12 @@ public query Store(",
     // TRACK SEAM (reviews): a store's ratings and reviews, in memory and on
     // PostgreSQL where a database is named.
     mod reviews;
+    // TRACK SEAM (argument-invariants): a value from a browser held to its
+    // type's invariant where it arrives (ADR-0346).
+    mod argument_invariants;
+    // TRACK SEAM (scheduled-orders): an order placed for a time its reader
+    // chooses, and sent to its stores when it is due.
+    mod scheduled_orders;
     // Track `second-host` (ADR-XXXX): hosts sharing one database.
     mod second_host;
 
@@ -15758,13 +15825,14 @@ public query Store(",
             |app| {
                 // `add_to_cart`'s, the first command's. And what a cart's
                 // change would drop that it then says nothing of: the cart's
-                // hours (track `store-hours`) and its checkout (track
-                // `order-total`), which read the cart too.
+                // hours (track `store-hours`), its checkout (track
+                // `order-total`) and the times its stores offer (track
+                // `scheduled-orders`), which read the cart too.
                 let emits = "    emits         UserCartChanged(current_user())\n";
                 assert!(app.contains(emits), "the store's add_to_cart emits");
                 app.replacen(emits, "", 1).replacen(
                     "    invalidates   Cart(current_user())\n",
-                    "    invalidates   Cart(current_user()), CartHours(current_user()), Checkout(current_user())\n",
+                    "    invalidates   Cart(current_user()), CartHours(current_user()), Checkout(current_user()), TimesOffered(current_user(), _)\n",
                     1,
                 )
             },
@@ -15812,10 +15880,10 @@ public query Store(",
         // code's and the typed tip's bindings (track `order-total`); and the
         // order page's, an order awaiting its payment taken back (NEXT 6c);
         // and the rate page's, five stars chosen, the comment's binding and
-        // the rating sent (track `reviews`).
+        // the rating sent (track `reviews`), plus the page of times' two.
         assert_eq!(
             named.len(),
-            28,
+            30,
             "add_to_cart, clear_cart, a line's three (ADR-0172), place_order and an address's five: {named:?}"
         );
         assert_eq!(

@@ -1,0 +1,50 @@
+{
+  "actual_current_bounded_controls": 12,
+  "actual_current_hours_controls": 19,
+  "assertion_scope": "Every failed test in these31 controls was checked against its original named assertion, with the explicitly reviewed bounded helper call chains. No build/fixture/body errors, stops or historical outcomes earn a kill.",
+  "base": "e2a4acd960c88144e3b40e7a6e9d9b8bd774ee1a",
+  "bounded_closed_audit_sha256": "15118af02fcca22ced8c81e8c88e4c3e62e2080dea92a842aef9069e06c55d29",
+  "browser": {
+    "engines": [
+      "chromium",
+      "firefox",
+      "webkit"
+    ],
+    "passed": 36,
+    "qualification": "Actual native three-engine recipe outcome. API executable hash is not a claim about an unobserved default headless-shell path."
+  },
+  "commands": [
+    "just e14-store-hours",
+    "python3 -B scripts/bounded_statements_mutations.py",
+    "just ci"
+  ],
+  "execution_source_manifest_sha256": "85c5c3c3cf99afc1c5ddee9d375661803158de0686f601276ad58cb152d845ae",
+  "execution_source_paths": 2745,
+  "fresh_default_ci": {
+    "closed_audit_sha256": "b14a94ead5d33aaf24c8aa1343c54105f22b4f15f5b74766e1bdd72f2ffd9e3a",
+    "native_status": 0,
+    "python_passed": 189,
+    "python_run": 190,
+    "python_skipped": 1,
+    "raw": "repeated-store-hours-ci.txt",
+    "raw_sha256": "305d71c113bc10a80ef5580747844763f18dc0bba03e95b53ed95ce5bb463a80",
+    "rust_failed": 0,
+    "rust_ignored": 25,
+    "rust_passed": 2955
+  },
+  "hours_closed_audit_sha256": "ee9da1b22e90c2927895e38f5ca851166ddb45b7ca9f4713ae4c7d1b21c906df",
+  "produced_at": "2026-10-16T18:36:52.216260+00:00",
+  "qualification": "Local exact85c5 execution before these documentation/evidence result records. All executable source, tests and recipe bytes are unchanged by result recording. No D2/OneCall/wire-cost/full-assembly/remote/milestone-completion claim. Historical failed/older-source attempts remain separate.",
+  "recovery": {
+    "ci_archive_sha256": "37e18e293eb9c199b7e6d206f60af637e606b0221f2ef535d309604a252f8776",
+    "closed31_source_archive_sha256": "fd965443714fa994e94e367f9328bf981c6b6e1d35ba1bd5947f558e153340ff"
+  },
+  "regression": "The same real memory/PostgreSQL legacy set read preserves order, duplicate occurrences, misses and full weekly/special periods.",
+  "resources": {
+    "both_dictionary_variables_absent": true,
+    "jobs": 2,
+    "offline": true,
+    "private_port": 17201,
+    "test_threads": 2
+  }
+}

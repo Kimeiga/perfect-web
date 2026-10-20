@@ -169,3 +169,128 @@ half the limit, **10,350 s**. And `e14-kiokun-word` ran past 20,500 s by
 itself on `track/kiokun`: no ceiling holds a recipe longer than the limit,
 which is the mutation narrowing's (NEXT, infrastructure), W6's for that
 script.
+
+## Amended, 2026-10-16: a long singleton cannot hide another shard's ceiling
+
+A private replay of `e2a4acd960c88144e3b40e7a6e9d9b8bd774ee1a` found
+that `plan` minimized only the last shard's estimated finish. An irreducible
+long singleton held that finish fixed. Taking more database shards could
+therefore split an over-ceiling database bundle without changing the last
+finish, but the fewest-database-shards tie retained the bundle. `planned`
+kept asking for more shards up to forty without fixing it.
+
+The three-recipe counterexample is a 100,000-second ordinary recipe and two
+6,000-second database recipes: the singleton is allowed, but the shared
+12,042-second database shard is not. Three shards can keep both database
+recipes within 10,350 seconds. A pure replay of the frozen 285-recipe roster
+and its unchanged recorded costs likewise found three over-ceiling bundles
+in forty shards. The corrected plan takes thirty shards with none; both
+plans' estimated last finish is 19,320 seconds. These are plan estimates,
+not measured recipe outcomes or a claim that a future run will finish.
+
+- Keep the earliest estimated last finish as the first objective.
+- Among those deals, minimize the largest excess over `CEILING` in any
+  shard of more than one recipe, counting its setup. Allowed long
+  singletons contribute no excess to this tie.
+- Among equal scores, retain the fewest database shards. In particular,
+  every already-within-ceiling original tie keeps its original choice.
+- `planned` still asks for the fewest additional shards whose selected
+  deal is within the ceiling, up to `MOST`. This remains a deterministic
+  greedy planner, not a claim of globally optimal bin packing.
+
+The recipe selection, costs, `CEILING`, `MOST`, setup estimates, workflow
+deadline and PostgreSQL isolation are unchanged. The cancelled master
+nightly `38894164532` remains cancelled; progress in its log is not mutation
+evidence and is not used here to rewrite `ci_seconds.json`.
+
+Acceptance requires the new regressions failing against the original
+planner and passing after the change, the complete CI-script tests, all
+dealt-by-time controls with native results and original assertion witnesses,
+and fresh default `just ci`. No acceptance outcome is asserted by this ADR
+before those commands finish. Raw adoption records are retained separately.
+
+### Two retained controls assert their API contracts explicitly
+
+The retained control that removes `plan`'s early empty-list return raises
+`ValueError` from `max([])`. The old empty-selection test reported an ERROR
+before reaching `assertEqual`; that is not an original assertion kill.
+A private native contrast retained that error and showed the distinction.
+
+The same named test now calls the documented `plan([]) -> []` API under
+both database domains, catches only `ValueError` from that call, and uses
+an explicit `self.fail` assertion for violating that contract. Other
+ordinary exceptions remain errors: the private RuntimeError negative
+still reports ERROR. Native traceback context is retained. The control's
+source transformation and the selected test-method inventory are unchanged.
+The verified-base fallback test had the same issue: its intentionally
+broken provider raises RuntimeError, and the retained control that narrows
+the production exception handler let it escape before the fallback-value
+assertion. The test now catches only RuntimeError around that provider call
+and explicitly fails the documented fallback contract. The corrected
+implementation remains green, and a private unrelated TypeError remains
+an ERROR. The unknown-commit fallback check still runs on the green path.
+
+The new whole run must prove these explicit assertions; the old ERROR
+outcomes are never relabelled or credited retroactively. No fixture or
+arbitrary exception is blanket-converted, and neither control is removed.
+
+### Refusal tests state the nullable return contract before reading its text
+
+The first strict whole49 attempt stopped at retained control23: removing
+the moved-recipe rejection made `evidence_fetch.verdict` return None, and
+the old substring assertion raised TypeError. The actual native ERROR is
+retained as an error and earns no assertion-kill credit. A private native
+contrast found the same issue in retained control27, the unowned-file
+rejection. Both transformations and the complete49 roster remain unchanged.
+
+The original named test now asserts that each required rejection returns
+a string before inspecting that string. None remains the accepted return
+for an eligible unchanged recipe; skipped values and every existing
+content assertion stay unchanged. There is no exception handler or broad
+error conversion. The private corrected neighbour passes; each old None
+result becomes an explicit original `assertIsInstance` failure; an
+unrelated TypeError still reports ERROR. These assertions express the
+existing str-or-None public API contract and preserve the71-method suite.
+
+The stopped whole is never relabelled GREEN. A new complete49 run on the
+refined test source and a new defaultCI are required before integration.
+
+### Merged on train-10 (the integrator's delegate, 2026-10-17)
+
+Merged from `58e3797b` (`track/ci-planner-ceiling`, on train-9's
+`e2a4acd9`), with no conflict: train-10's own changes to `ci_plan.py`
+(stale evidence planned at a train's push, ADR-0344; publication by
+rename, ADR-0349) are in other functions. The track's own runs: its
+default `just ci` green, and `dealt_by_time_mutations.py` whole, 49 of 49
+killed. On the merge, `test_ci_scripts.py` passes 79 of 79. Train-9's
+verify (38909882781), dealt by the old rule, ran its longest shard for
+5 h 27 min of the 345 minutes. Its local `dealt-by-time.txt` is not
+taken: the file stays train-8's run's record until the train's verify
+records it again.
+
+### Amended at train-10's first verify (the integrator's ruling 2, 2026-10-17)
+
+Train-10's verify 39054436657 was dealt by seconds far below what its
+recipes took: shards 20 and 22 ran to the 345-minute limit and were
+stopped (e14-stream-ack had run 10,419 s against 3,120 recorded,
+e14-keepalive took 10,174 s against 3,072, e10-browser 4,045 s against
+282, recorded from runs whose `|| true` hid failing suites), and
+e14-refusal, alone in its shard, was stopped at 20,507 s.
+
+- **The plan refuses a recipe recorded past a job's limit** (`LIMIT`,
+  20,700 s, verify.yml's `timeout-minutes`), its shard's setup counted,
+  before any shard runs, naming it (`past_the_limit`): a six-hour run must
+  never be the first to find it. Such a recipe is split first (ADR-0302's
+  amendment).
+- **The run's seconds are kept, and what is only a floor says so.**
+  `ci_seconds.json` holds the 196 recipes it ran to their end
+  (`--times-only`), less `e14-scheduled-orders`' 0 (it skipped without a
+  database, ADR-0347's note); and `_lower_bounds`, a note naming each
+  recipe whose seconds are only what a stopped or failed run measured (or,
+  for the refusal's two new parts, what that run's mutants project), and
+  why. The plan deals them by those seconds; a fetch that records one run
+  to its end takes it out of the note.
+- **Held by** two tests in `test_ci_scripts.py` (82) and four controls in
+  `dealt_by_time_mutations.py` (54): a recipe past the limit planned, its
+  shard's setup not counted, a note read as a recipe's, a recorded run
+  keeping its lower bound.

@@ -16,7 +16,7 @@
 use pw_core::contract::{Capability, ComponentContract, contracts};
 use pw_core::hir::Hir;
 use pw_core::lower::lower_file;
-use pw_core::resolve::Workspace;
+use pw_core::resolve::{Namespace, Resolution, Workspace};
 use pw_core::signatures::Signatures;
 use pw_syntax::parse_tree;
 
@@ -129,5 +129,60 @@ fn read_carts(s: Int) -> Int !{ secret<Payments> } { s }
             .collect::<Vec<_>>(),
         ["database.read<Carts>"],
         "the decoy's `secret<Payments>` must not reach it"
+    );
+}
+
+#[test]
+fn a_qualified_own_module_path_keeps_this_units_identity_beside_a_namesake() {
+    let sources = [
+        "module Rows\nfn value() -> Int { 1 }\n",
+        "module Rows\nfn value() -> Int { 2 }\n",
+    ];
+    let hirs: Vec<Hir> = sources
+        .iter()
+        .map(|s| lower_file(s, &parse_tree(s).green))
+        .collect();
+    let refs: Vec<&Hir> = hirs.iter().collect();
+    let ws = Workspace::build(&refs);
+    assert_eq!(ws.errors.len(), 1, "the duplicate module is still refused");
+    for unit in 0..hirs.len() {
+        assert_eq!(ws.visible_module(unit, "Rows").expect("own").unit, unit);
+        assert!(ws.sees_module(unit, "Rows"));
+        let Resolution::Imported { def, .. } =
+            ws.resolve_path_in(unit, Namespace::Term, "Rows.value")
+        else {
+            panic!("the own-module path must resolve");
+        };
+        assert_eq!(
+            def.unit, unit,
+            "the last namesake must not supply its value"
+        );
+    }
+}
+
+#[test]
+fn a_sibling_module_is_visible_only_through_an_explicit_import() {
+    let sources = [
+        "module Sibling\nfn value() -> Int { 1 }\n",
+        "module Reader\nimport Sibling\n",
+        "module Stranger\n",
+    ];
+    let hirs: Vec<Hir> = sources
+        .iter()
+        .map(|s| lower_file(s, &parse_tree(s).green))
+        .collect();
+    let refs: Vec<&Hir> = hirs.iter().collect();
+    let ws = Workspace::build(&refs);
+    assert!(ws.errors.is_empty(), "{:?}", ws.errors);
+    assert_eq!(ws.visible_module(1, "Sibling").expect("imported").unit, 0);
+    assert!(matches!(
+        ws.resolve_path_in(1, Namespace::Term, "Sibling.value"),
+        Resolution::Imported { def, .. } if def.unit == 0
+    ));
+    assert!(ws.visible_module(2, "Sibling").is_none());
+    assert!(!ws.sees_module(2, "Sibling"));
+    assert_eq!(
+        ws.resolve_path_in(2, Namespace::Term, "Sibling.value"),
+        Resolution::Unresolved
     );
 }

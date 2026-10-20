@@ -3097,28 +3097,29 @@ fn lower_block_at(
         _ => None,
     };
     if let Some(each) = each {
-        let (binding, collection, key) = (each.binder.clone(), each.list.clone(), each.key.clone());
-        let written = collection.split('.').map(str::trim).all(|s| {
-            s.starts_with(|c: char| c.is_alphabetic() || c == '_')
-                && s.chars().all(|c| c.is_alphanumeric() || c == '_')
-        });
-        if !written {
+        let binding = each.binder.clone();
+        // The list's path, read from the expression it is (ADR-0345): a
+        // name, or fields read from one.
+        let Some(collection) = value_path(body, each.list) else {
             out.push(blocked(format!(
-                "`{{#each}}` reads its list by path, and `{collection}` is computed"
+                "`{{#each}}` reads its list by path, and `{}` is computed",
+                each.written.list
             )));
             return;
-        }
+        };
         // The key as the path from the element to it: `id` from `(item.id)`,
         // `r.id` from `(item.r.id)`, and empty from `(item)`. Until 2026-09-26
         // it was the key's last segment, so `(item.r.id)` keyed on `item.id`
         // (ADR-0073). A key whose head is another name is PW5021.
-        let key = match key {
+        let key = match each.key {
             None => None,
             Some(k) => {
-                let mut segments = k.split('.').map(str::trim);
+                let path = value_path(body, k).unwrap_or_default();
+                let mut segments = path.split('.');
                 if segments.next() != Some(binding.as_str()) {
                     out.push(blocked(format!(
-                        "a loop's key is `{binding}` or a field read from it, and this is `{k}`"
+                        "a loop's key is `{binding}` or a field read from it, and this is `{}`",
+                        each.written.key.clone().unwrap_or_default()
                     )));
                     return;
                 }

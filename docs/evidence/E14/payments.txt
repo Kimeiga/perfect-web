@@ -1,8 +1,8 @@
 NEXT 6c - a payment at the deployment's provider, settled only by the provider's word
 
 produced by: just e14-payments
-commit: 92fdd6e34743e33a80914939976125a9eb307842
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38559878637 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64, PostgreSQL 18.6)
+commit: 8c5618c86eeb62202be29b374661962175bfefb0
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39325789224 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64, PostgreSQL 18.6)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 postgres: 18.6 (Debian 18.6-1.pgdg13+2)
 
@@ -27,7 +27,7 @@ test payments::tests::signatures_are_compared_whole ... ok
 test payments::origin_tests::the_provider_can_send_twice_and_out_of_order ... ok
 test payments::origin_tests::a_card_paid_in_the_hosted_fields_is_told_to_the_host_signed ... ok
 test payments::answer_tests::a_provider_that_does_not_answer_in_time_is_not_reached ... ok
-test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 550 filtered out; finished in 0.11s
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 610 filtered out; finished in 0.10s
 
 == an order awaiting its payment, the store in memory (tests/store_payments.rs)
 
@@ -35,35 +35,35 @@ test tests::store_payments::a_payment_for_an_order_the_reader_has_not_placed_cha
 test tests::store_payments::a_card_declined_leaves_the_order_awaiting_and_the_payment_takes_another ... ok
 test tests::store_payments::a_code_an_order_taken_back_used_is_the_readers_again ... ok
 test tests::store_payments::a_card_paid_places_the_order_and_its_open_page_is_told ... ok
-test tests::store_payments::a_provider_that_cannot_be_reached_places_nothing ... ok
 test tests::store_payments::a_payment_paid_before_it_is_canceled_stands ... ok
 test tests::store_payments::a_providers_own_cancel_takes_the_order_back ... ok
 test tests::store_payments::a_reader_takes_back_an_order_awaiting_its_payment ... ok
+test tests::store_payments::a_provider_that_cannot_be_reached_places_nothing ... ok
 test tests::store_payments::a_session_opened_on_a_readers_behalf_is_no_browsers_to_present ... ok
 test tests::store_payments::a_readers_press_of_the_settling_command_is_not_a_command ... ok
-test tests::store_payments::an_order_no_longer_awaiting_its_payment_is_not_taken_back ... ok
 test tests::store_payments::an_order_awaits_its_payment_on_the_providers_page ... ok
-test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 557 filtered out; finished in 78.38s
+test tests::store_payments::an_order_no_longer_awaiting_its_payment_is_not_taken_back ... ok
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 617 filtered out; finished in 106.95s
 
 == the same, the store on PostgreSQL (PW_STORE_TEST_LAYER=postgres)
 
 test tests::store_payments::a_payment_for_an_order_the_reader_has_not_placed_changes_nothing ... ok
-test tests::store_payments::a_card_declined_leaves_the_order_awaiting_and_the_payment_takes_another ... ok
 test tests::store_payments::a_code_an_order_taken_back_used_is_the_readers_again ... ok
+test tests::store_payments::a_card_declined_leaves_the_order_awaiting_and_the_payment_takes_another ... ok
 test tests::store_payments::a_card_paid_places_the_order_and_its_open_page_is_told ... ok
-test tests::store_payments::a_provider_that_cannot_be_reached_places_nothing ... ok
-test tests::store_payments::a_providers_own_cancel_takes_the_order_back ... ok
 test tests::store_payments::a_payment_paid_before_it_is_canceled_stands ... ok
+test tests::store_payments::a_providers_own_cancel_takes_the_order_back ... ok
+test tests::store_payments::a_provider_that_cannot_be_reached_places_nothing ... ok
 test tests::store_payments::a_reader_takes_back_an_order_awaiting_its_payment ... ok
-test tests::store_payments::a_readers_press_of_the_settling_command_is_not_a_command ... ok
 test tests::store_payments::a_session_opened_on_a_readers_behalf_is_no_browsers_to_present ... ok
 test tests::store_payments::an_order_awaits_its_payment_on_the_providers_page ... ok
+test tests::store_payments::a_readers_press_of_the_settling_command_is_not_a_command ... ok
 test tests::store_payments::an_order_no_longer_awaiting_its_payment_is_not_taken_back ... ok
-test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 557 filtered out; finished in 79.07s
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 617 filtered out; finished in 106.60s
 
 == the reader pays in the provider's page, in three engines (e2e/payments.spec.mjs)
 
-  15 passed (5.6m)
+  15 passed (7.7m)
 
 == mutation controls (scripts/payments_mutations.py)
 

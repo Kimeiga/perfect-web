@@ -99,12 +99,21 @@ def timed(results: list[dict]) -> dict[str, int]:
 
 def remember(seconds: dict[str, int], path: pathlib.Path) -> int:
     """Keep `seconds` in `path`, over what it held for the same recipes;
-    every other recipe's as it was. How many it kept."""
+    every other recipe's as it was. How many it kept. A recipe run to its
+    end is measured, so it leaves `_lower_bounds`, the note of the recipes
+    whose seconds were only what a stopped run measured (the integrator's
+    ruling 2, train-10)."""
     try:
         kept = json.loads(path.read_text())
     except (OSError, ValueError):
         kept = {}
     kept.update(seconds)
+    bounds = kept.get("_lower_bounds")
+    if isinstance(bounds, dict):
+        for name in seconds:
+            bounds.pop(name, None)
+        if not bounds:
+            kept.pop("_lower_bounds")
     path.write_text(json.dumps(dict(sorted(kept.items())), indent=2) + "\n")
     return len(seconds)
 

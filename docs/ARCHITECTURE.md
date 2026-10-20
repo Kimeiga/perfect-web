@@ -53,12 +53,32 @@ entire charter contract. One semantic resource-entry identity has distinct stora
 and wire projections; one operation can require multiple capabilities, and two
 operations can share an authority without sharing an ABI.
 
-## Open end-to-end boundary
+## Compiled execution and remaining data-layer boundary
 
-E10-I requires `add_to_cart` compiled through the production Pleris component
-backend, executed through the E8 host, with no alternate Rust closure path.
-Host-layer tests and core Wasm validation are separate evidence and must not be
-combined into that unperformed integration claim. ADR-0023 records the boundary.
+E10 closed on 2026-10-02 by [ADR-0119](DECISIONS/ADR-0119-e10-closes-and-the-ai-benchmark-comes-next.md).
+Its recorded gate at `bff437c` builds the store without Koka or Marko,
+compares compiled execution with the oracle, and measures compiled component
+calls. The old paragraph here still called E10-I unperformed; that was stale.
+Those historical measurements are not new measurements of the current tree.
+
+App-specific host composites remain a separate deferred obligation
+(`E10-S10`, ADR-0119). The store and feed still use their Rust data layers.
+ADR-0338 accepts declarations of tables with generic per-database adapters;
+D1 declarations are being validated on a track, and D2 memory/D3 PostgreSQL
+adapters are not thereby implemented. ADR-0337's store statement-count tests
+are the current measured conformance starting point, not a finished common
+adapter suite. One render's shared snapshot and connection bound remain the
+unfinished render-merge track.
+
+## Current integration boundary (2026-10-15)
+
+E14 is active before E11-E13. Train-9 and train-10 state and test evidence
+are maintained in STATUS/PARALLEL; a local merge is not a verified landing.
+Train-10 integrates semantic each-header expressions (ADR-0345), invariant
+checks at component/page boundaries (ADR-0346), and scheduled-order set
+estimates (ADR-0347/0348). Generic-result effects, evidence failure propagation
+and table declarations each have isolated validation tracks. None of this
+establishes production readiness or the planned collaborative-docs runtime.
 
 ## Evidence and proposed extensions
 

@@ -1,7 +1,7 @@
 // @corpus: rejected
 // @id: R-032
 // @category: synchronous geometry read in ordinary code
-// @rule: PW3001
+// @rule: PW0401
 // @invariant: forbidden_effect
 // @charter: §7.5A
 // @milestone: 7

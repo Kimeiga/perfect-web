@@ -71,8 +71,8 @@ MUTANTS = [
     (
         "a computed list is read as a path",
         IR,
-        "        if !written {",
-        "        if false && !written {",
+        "        let Some(collection) = value_path(body, each.list) else {\n",
+        "        let Some(collection) = value_path(body, each.list).or(Some(each.written.list.clone())) else {\n",
     ),
     (
         "a key read from another name keys on the element",
@@ -89,8 +89,8 @@ MUTANTS = [
     (
         "a key's head is not read",
         CHECK,
-        "        if head == binding {",
-        "        if true || head == binding {",
+        "        if from_row {\n",
+        "        if true || from_row {\n",
     ),
     (
         "the renderer reads a key as one field",

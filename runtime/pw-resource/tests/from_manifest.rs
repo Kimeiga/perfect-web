@@ -236,15 +236,11 @@ fn every_accepted_corpus_resource_produces_a_manifest_the_schema_understands() {
         }
     }
 
-    // The accepted corpus declares exactly 13: five queries (two of them
-    // A-029's, a reply thread, since corpus C13, and one A-032's, a thread
-    // whose page computes its counts, since C16), a session query, five
-    // commands (three of them A-036's, a command the clock invokes and two
-    // that schedule and cancel its run, since C23), a subscription and a
-    // resource. Pinned, so a lowering that stopped recognising one of the
-    // five declaration kinds fails here rather than quietly shrinking the
-    // sample.
-    assert_eq!(total, 13, "expected every accepted resource declaration");
+    // The accepted corpus declares exactly 20 written resources: the 14
+    // through C26 (including A-038's loop query), plus A-050's four table
+    // queries and two commands. Generated functions are not manifests.
+    // Pin every declaration so a missing lowering cannot shrink the sample.
+    assert_eq!(total, 20, "expected every accepted resource declaration");
     assert!(
         unparsed.is_empty(),
         "{} policy value(s) the schema does not understand:\n{}",

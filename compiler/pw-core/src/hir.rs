@@ -160,6 +160,11 @@ pub enum DeclKind {
     /// `source StoreData` (ADR-0207): a database the program's effects name,
     /// and what it guarantees. Named by nothing a program writes.
     Source,
+    /// `table Todos` (track `tables`, ADR-0338): an app's data, declared: its
+    /// row, key, order, indexes, references and bound. Named by nothing a
+    /// program writes: its module, which has its name, holds the reads and
+    /// writes generated from it (`tables::generate`).
+    Table,
     /// `upload PostImage` (track `uploads`, ADR-0260): a file a form posts to
     /// its `route`, served once committed under `serves`, and its limits.
     /// Named by nothing a program writes; `pw build` writes it for the host.
@@ -1180,8 +1185,9 @@ pub enum Node {
         /// value relations and the privacy walks see it. `None` for `{#each}`,
         /// whose head is `each`.
         subject: Option<ExprId>,
-        /// An `{#each}`'s head, parsed once by the grammar (ADR-0242). `None`
-        /// for any other block, or a head that did not parse, whose error is
+        /// An `{#each}`'s head, parsed once by the grammar (ADR-0242), its
+        /// list and key expressions as `subject` is (ADR-0345). `None` for
+        /// any other block, or a head that did not parse, whose error is
         /// reported.
         each: Option<EachHead>,
         /// The closing marker as written, `{/if}`; empty when the block was
@@ -1201,20 +1207,155 @@ pub enum Node {
 }
 
 /// **An `{#each}`'s head** (ADR-0242): `menu as item (item.id)`, parsed once
-/// by the grammar. Each part as written and where, since what reads one reads
-/// it as text: the template IR the list and the key as paths, Marko writes
-/// them, and the names check reads the list's first name. Five places split
-/// the directive's text at ` as ` and `(` until then.
+/// by the grammar.
+///
+/// **Its list and its key are expressions in the body's arena** (ADR-0345),
+/// as an `{#if}`'s condition is: what the template evaluates when it renders,
+/// read by every walker of a view's expressions. Until 2026-10-15 they were
+/// text, which only the readers that split it read, so no effect, privacy,
+/// signal or value walk saw them: a view declared `!{}` read the database in
+/// `{#each items() as item}`, and in `{#each store.items as item}` through an
+/// effectful member, and checked clean.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EachHead {
-    pub list: String,
-    pub list_span: Span,
+    /// The list the rows are read from, read in the scope around the block.
+    pub list: ExprId,
     /// The name each row binds.
     pub binder: String,
     pub binder_span: Span,
-    /// What tells the rows apart, where it is written.
+    /// What tells the rows apart, read in the row's scope, where `binder`
+    /// is bound.
+    pub key: Option<ExprId>,
+    /// The list and the key as written, whitespace collapsed: what a
+    /// message quotes, and nothing else. What the head means is `list` and
+    /// `key`.
+    pub written: EachWritten,
+}
+
+/// [`EachHead::written`]: `menu` and `item.id` in `{#each menu as item
+/// (item.id)}`, for a message to quote.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EachWritten {
+    pub list: String,
     pub key: Option<String>,
-    pub key_span: Option<Span>,
+}
+
+/// Declares [`Position`] and [`Position::ALL`] from one list, so a position
+/// cannot be added to the one and left out of the other.
+macro_rules! positions {
+    ($($(#[$doc:meta])* $name:ident,)*) => {
+        /// **Where in markup an expression is written** (ADR-0345): every
+        /// position a [`Node`] holds one at, each its own variant.
+        /// [`Node::exprs`] is the one reading of them, and
+        /// [`Expr::Template`]'s `parts` are what it reads in a region, so
+        /// every walker of a body's expressions sees each position. A
+        /// position an analysis reads differently is a variant it matches,
+        /// without a wildcard.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        pub enum Position {
+            $($(#[$doc])* $name,)*
+        }
+
+        impl Position {
+            /// Every position, in the order declared.
+            pub const ALL: &'static [Position] = &[$(Position::$name,)*];
+        }
+    };
+}
+
+positions! {
+    /// `{e}` between tags: written as text.
+    Hole,
+    /// `name={e}` or `name="..{e}.."`: an element's attribute other than an
+    /// event's, or a component's argument.
+    Attribute,
+    /// `on:press={e}`: an event's handler, run when a person acts, not
+    /// while the view renders.
+    Handler,
+    /// `c` in `{#if c}`, `e` in `{#match e}`: what a block decides by.
+    Subject,
+    /// `c` in `{:else if c}`.
+    Condition,
+    /// `xs` in `{#each xs as x}`: the list the rows are read from.
+    List,
+    /// `k` in `{#each xs as x (k)}`: what tells the rows apart, read where
+    /// `x` is bound.
+    Key,
+}
+
+impl Node {
+    /// **Every expression this node holds, and where** (ADR-0345), in the
+    /// order written. One exhaustive reading: each variant and each field
+    /// named, and no wildcard, so a field that holds an expression cannot be
+    /// added without deciding here where it is. A node's children are their
+    /// own nodes, read on their own.
+    pub fn exprs(&self) -> Vec<(Position, ExprId)> {
+        match self {
+            Node::Element {
+                tag: _,
+                attrs,
+                children: _,
+                self_closing: _,
+            } => attrs
+                .iter()
+                .filter_map(|a| {
+                    let Attr {
+                        name: _,
+                        value,
+                        span: _,
+                    } = a;
+                    let position = match a.event() {
+                        Some(_) => Position::Handler,
+                        None => Position::Attribute,
+                    };
+                    match value {
+                        AttrValue::Expr(e) => Some((position, *e)),
+                        AttrValue::Static(_) | AttrValue::None => None,
+                    }
+                })
+                .collect(),
+            Node::Text(_) => Vec::new(),
+            Node::Interpolation(e) => vec![(Position::Hole, *e)],
+            Node::Block {
+                directive: _,
+                children: _,
+                subject,
+                each,
+                close: _,
+            } => {
+                let mut out: Vec<(Position, ExprId)> =
+                    subject.iter().map(|s| (Position::Subject, *s)).collect();
+                if let Some(EachHead {
+                    list,
+                    binder: _,
+                    binder_span: _,
+                    key,
+                    written: _,
+                }) = each
+                {
+                    out.push((Position::List, *list));
+                    out.extend(key.iter().map(|k| (Position::Key, *k)));
+                }
+                out
+            }
+            Node::Branch {
+                marker: _,
+                condition,
+                arm,
+            } => {
+                // An arm binds names, and holds no expression.
+                if let Some(TemplateArm {
+                    case: _,
+                    bindings: _,
+                }) = arm
+                {}
+                condition
+                    .iter()
+                    .map(|c| (Position::Condition, *c))
+                    .collect()
+            }
+        }
+    }
 }
 
 /// **A `{#match}` arm's marker** (ADR-0042, ADR-0061): the case it takes,
@@ -1274,6 +1415,11 @@ pub struct Hir {
     /// a clause's value, a string's hole, a block marker's expression — each
     /// span in the file. The checker reports them as it does the file's.
     pub syntax: Vec<pw_syntax::SyntaxError>,
+    /// **The declarations the compiler wrote, and what for** (track
+    /// `tables`, ADR-0338): each function and record a table's declaration
+    /// gives its module (`tables::generate`), by its id. A declaration not
+    /// here is the program's own.
+    pub generated: std::collections::BTreeMap<DeclId, crate::tables::Generated>,
 }
 
 impl Hir {

@@ -15,7 +15,9 @@ The recipes are `just`'s own list, kept where they record evidence
   (`body_inputs`), or that runs a shell script the range changed; and each
   recipe whose own lines changed; and with `--current`, as a push plans,
   less each recipe whose committed evidence is current at HEAD (`current`,
-  ADR-0281, amended 2026-10-13 (6));
+  ADR-0281, amended 2026-10-13 (6)); and with `--stale`, as a train's push
+  and master's plan, each recipe whose committed evidence is stale at HEAD,
+  whatever the range (`stale`, track evidence-integrity);
 - or those named.
 
 Each is dealt, the longest first, to the shard where it ends soonest
@@ -32,7 +34,7 @@ Prints, for `$GITHUB_OUTPUT`, `shards=<json>`, a list of `{"index": i,
 nothing is to run.
 
     python3 scripts/ci_plan.py --shards 17 --all
-    python3 scripts/ci_plan.py --shards 17 --changed BASE HEAD [--current]
+    python3 scripts/ci_plan.py --shards 17 --changed BASE HEAD [--current] [--stale]
     python3 scripts/ci_plan.py --shards 17 e14-feed e14-read-whole
 """
 
@@ -78,6 +80,15 @@ SETUP = {(False, False): 42, (False, True): 384, (True, False): 390, (True, True
 CEILING = 10_350
 MOST = 40
 
+# **A job's limit**, in seconds: verify.yml's `timeout-minutes`, 345. A
+# recipe recorded past it, with the setup of a shard that runs it, runs
+# whole in no shard: train-10's verify 39054436657 stopped `e14-refusal`,
+# alone in its shard, at the limit after 20,507 s, five and a half hours in,
+# and nothing of it was kept. So the plan refuses such a recipe before any
+# shard runs (`past_the_limit`), and its mutants are split across recipes
+# first (the integrator's ruling 2 of 2026-10-17).
+LIMIT = 20_700
+
 # Measurements of the machine they run on: a time, a load, a memory curve,
 # each naming its machine in a `host:` line. A shared runner's numbers are
 # not comparable from one run to the next, so these are recorded on the
@@ -112,6 +123,15 @@ LOCAL_ONLY = {
     "e14-kiokun-homophones",
     # And its deinflection against kiokun.com's own resolution.
     "e14-kiokun-deinflection",
+    # The benchmark harness's controls over a task's three stacks: each
+    # sandbox installs its stack's dependencies from this machine's pnpm
+    # store, offline by design (`bench.mjs`'s `sandbox`), and a runner's
+    # store holds no Next.js or SvelteKit. Planned on CI for the first time
+    # on train-10 (the planner reads a recipe with parameters since track
+    # evidence-integrity-2, which also stopped its `|| true`), it failed
+    # there at its first sandbox (verify 39054436657). Its Pleris stack runs
+    # on CI as `e14-pleris-controls`.
+    "e14-harness",
 }
 
 # Recipes run against a database (ADR-0246). Each is a shard of its own,
@@ -137,6 +157,13 @@ NEEDS_DATABASE = {
     "e14-scheduled",
     # Track `reviews`: a store's ratings, on PostgreSQL too.
     "e14-reviews",
+    # Track `scheduled-orders` (ADR-0347): without a database it says it
+    # skipped and writes no evidence, and train-10's verify (39054436657)
+    # dealt it where there was none, so the run recorded nothing of it.
+    "e14-scheduled-orders",
+    # Track `argument-invariants` (ADR-0346): a row on PostgreSQL held to
+    # its type's invariant, run where a database is named.
+    "e14-argument-invariants",
     # Track `second-host`: hosts that share one database.
     "e14-second-host",
 }
@@ -159,7 +186,18 @@ def recipes() -> list[str]:
 
 IMPORT = re.compile(r"""^import\??\s+(['"])(.+?)\1""")
 
-HEADER = re.compile(r"^([a-z0-9][a-z0-9-]*)\s*(?:[^:=]*)?:(?!=)")
+# **A recipe's header**: its name, its parameters, each with its default
+# where it has one, and its colon (not `:=`, an assignment's). Until
+# 2026-10-15 a parameter's default stopped it (`[^:=]*` before the colon),
+# so `e10-browser engines="..." out="..."`, `e10-close-bench RUNS="8"` and
+# `e14-harness TASK="T08"` had no body here: no change planned them by what
+# they run, and a shard dealt one set up neither browsers nor the build
+# (track evidence-integrity-2).
+HEADER = re.compile(
+    r"""^([a-z0-9][a-z0-9-]*)"""
+    r"""(?:\s+[$*+]?[A-Za-z_][A-Za-z0-9_-]*(?:=(?:"[^"]*"|'[^']*'|[^\s'":=]+))?)*"""
+    r"""\s*:(?!=)"""
+)
 
 
 def justfile_parts(root: pathlib.Path = ROOT) -> list[str]:
@@ -267,9 +305,75 @@ def parsed(diff: bytes) -> dict[str, list[tuple[int, int]]]:
     return out
 
 
-def changed_specs(changed: dict[str, list[tuple[int, int]]]) -> set[str]:
-    """The browser specs a change reaches, by file name: `pages.spec.mjs`."""
-    return {pathlib.Path(p).name for p in changed if p.endswith(".spec.mjs")}
+def changed_specs(changed: dict[str, list[tuple[int, int]]], root: pathlib.Path | None = None) -> set[str]:
+    """The browser specs a change reaches, by file name: `pages.spec.mjs`;
+    and each spec that imports a module of its own directory the change
+    reaches (`e2e/accessibility-rules.mjs`, which three specs import: until
+    2026-10-15 a change to it planned nothing, track evidence-integrity-2)."""
+    root = root or ROOT
+    out = {pathlib.Path(p).name for p in changed if p.endswith(".spec.mjs")}
+    for p in changed:
+        path = pathlib.Path(p)
+        if p.endswith(".spec.mjs") or path.suffix != ".mjs" or not (root / path.parent).is_dir():
+            continue
+        for spec in sorted((root / path.parent).glob("*.spec.mjs")):
+            try:
+                text = spec.read_text()
+            except OSError:
+                continue
+            if re.search(rf"""from\s+["']\./{re.escape(path.name)}["']""", text):
+                out.add(spec.name)
+    return out
+
+
+# **The browser suite's configuration** (the integrator's ruling 7,
+# 2026-10-15): every spec run from its directory runs under it, its hosts and
+# its checks of the builds, so a change to it plans each recipe that runs a
+# suite there, as a changed spec plans those that run it (ADR-0281). Until
+# then a change to it planned only a recipe whose mutant's anchor sat near
+# the change (track evidence-integrity's finding). The benchmark harness's
+# is under `benchmarks/`, whose changes plan each recipe that names it
+# (`body_inputs`).
+SUITE_DIRECTORY = "spikes/own-renderer"
+PLAYWRIGHT_CONFIG = f"{SUITE_DIRECTORY}/playwright.config.mjs"
+
+
+def suite_runs(body: str) -> list[tuple[str, str]]:
+    """Each browser suite a recipe's own lines run: (the directory it runs
+    from, its command), by `scripts/run_suite.sh` (from `spikes/own-renderer`
+    unless its `-C` names another directory) or after a `cd`."""
+    out = []
+    for line in body.replace("\\\n", " ").splitlines():
+        for options, command in re.findall(r"run_suite\.sh((?:\s+(?:-C|--runs)\s+\S+)*)\s+--\s+([^;]*)", line):
+            where = re.search(r"-C\s+(\S+)", options)
+            out.append(((where.group(1) if where else SUITE_DIRECTORY).rstrip("/"), command))
+        for directory, command in re.findall(r"cd\s+(\S+)\s+&&\s+([^;|)]*playwright\s+test[^;|)]*)", line):
+            out.append((directory.rstrip("/"), command))
+    return out
+
+
+def runs_browser_suite(body: str, directory: str = SUITE_DIRECTORY) -> bool:
+    """Whether a recipe runs a browser suite from `directory`, under its
+    configuration: in its own lines (`suite_runs`), or by a mutation script
+    it runs that runs Playwright and names the directory."""
+    if any(d == directory for d, _ in suite_runs(body)):
+        return True
+    for script in sorted(set(re.findall(r"scripts/([a-z0-9_]+_mutations\.py)", body))):
+        try:
+            text = (ROOT / "scripts" / script).read_text()
+        except OSError:
+            continue
+        if re.search(r'"playwright",\s*"test"|playwright\s+test', text) and re.search(
+            rf"""["']{re.escape(directory)}["']""", text
+        ):
+            return True
+    return False
+
+
+def runs_every_spec(body: str, directory: str = SUITE_DIRECTORY) -> bool:
+    """Whether a recipe's own lines run every spec of `directory`: a suite
+    run there that names no spec (`e10-browser`'s three full runs)."""
+    return any(d == directory and ".spec.mjs" not in command for d, command in suite_runs(body))
 
 
 def test_modules(changed: dict[str, list[tuple[int, int]]]) -> set[str]:
@@ -437,12 +541,18 @@ def recipes_for(changed: dict[str, list[tuple[int, int]]], near: int, names: lis
     specs = changed_specs(changed)
     tests = {pathlib.Path(p).stem for p in changed if "/tests/" in p and p.endswith(".rs")}
     modules = test_modules(changed)
+    every_spec = any(p.startswith(f"{SUITE_DIRECTORY}/e2e/") and p.endswith(".mjs") for p in changed)
     out = {
         name
         for name in names
         if any(f"scripts/{s}" in body.get(name, "") for s in scripts)
-        # A recipe that runs a browser spec the range changed (ADR-0281).
+        # A recipe that runs a browser spec the range changed (ADR-0281),
+        # by its name, or every spec of the suite.
         or any(s in body.get(name, "") for s in specs)
+        or (every_spec and runs_every_spec(body.get(name, "")))
+        # A recipe that runs a suite under the configuration the range
+        # changed (the integrator's ruling 7).
+        or (PLAYWRIGHT_CONFIG in changed and runs_browser_suite(body.get(name, "")))
         # And one that runs a server test module the range changed, by its
         # filter (train-6's finding).
         or any(f"tests::{t}::" in body.get(name, "") for t in tests)
@@ -466,13 +576,15 @@ def recipes_for(changed: dict[str, list[tuple[int, int]]], near: int, names: lis
 # and records no commit.
 RECORDED_AT = re.compile(r"^commit: ([0-9a-f]{40})[ \t]*$", re.M)
 
-# The evidence files a recipe's lines write: `} > docs/evidence/E14/x.txt`.
+# The evidence files a recipe writes directly or publishes after recording
+# beside its destination (ADR-0344). Both feed the same discovery authority.
 WRITES = re.compile(r">[ \t]*(docs/evidence/[\w./-]+\.txt)")
+PUBLISHES = re.compile(r'\bmv[ \t]+(?:"[^"\n]+"|[^ \t\r\n]+)[ \t]+(docs/evidence/[\w./-]+\.txt)')
 
 
 def evidence_files(body: str) -> list[str]:
     """The evidence files a recipe's lines write."""
-    return sorted(set(WRITES.findall(body)))
+    return sorted(set(WRITES.findall(body) + PUBLISHES.findall(body)))
 
 
 def recorded_at(head: str, path: str, root: pathlib.Path = ROOT) -> str | None:
@@ -534,6 +646,56 @@ def current(
     return out
 
 
+# **A file that names the commit it was recorded at**, whole or with changes
+# beside it: evidence the planner judges (`stale`). One that names none, an
+# artifact or an older recipe's text, is held to what made it by its own
+# test where one is (`evidence_is_current.rs`), and planned as before.
+NAMES_A_COMMIT = re.compile(r"^commit: [0-9a-f]{7,40}\b", re.M)
+
+
+def shown(head: str, path: str, root: pathlib.Path = ROOT) -> str | None:
+    """`path` as `head` holds it, or none where it holds no such file."""
+    out = subprocess.run(["git", "show", f"{head}:{path}"], cwd=root, capture_output=True)
+    if out.returncode != 0:
+        return None
+    return out.stdout.decode("utf-8", errors="replace")
+
+
+def stale(
+    names: list[str],
+    head: str,
+    near: int = NEAR,
+    body: dict[str, str] | None = None,
+    show: Callable[[str, str], str | None] | None = None,
+    **judge: Callable,
+) -> list[str]:
+    """**The recipes of `names` whose committed evidence is stale at
+    `head`** (track evidence-integrity, finding 2): each writes evidence,
+    every file of it, as `head` holds it, names the commit it was recorded
+    at or is missing, and it is not `current` (`judge` is `current`'s own
+    `read`, `descends_from` and `reach`).
+
+    A push plans what its range reaches, less what is current, so evidence
+    gone stale before the range was planned by no push; and the nightly,
+    which runs every recipe, keeps no evidence. So
+    `docs/evidence/E10/privacy-by-resolution.txt` said "4 of 4 mutants
+    killed" from 2026-10-07, when e0752896 retired the fourth from its
+    script, to this track; and 53 more recipes' evidence was stale at
+    master 22a0508e. A train's push and master's plan these too
+    (`--stale`), so the run whose evidence a merge takes records them
+    again."""
+    body = bodies() if body is None else body
+    show = show or shown
+    judged = []
+    for name in names:
+        files = evidence_files(body.get(name, ""))
+        texts = [show(head, f) for f in files]
+        if files and all(t is None or NAMES_A_COMMIT.search(t) for t in texts):
+            judged.append(name)
+    kept = current(judged, head, near, body, **judge)
+    return [n for n in judged if n not in kept]
+
+
 def joined(a: tuple[bool, bool], b: tuple[bool, bool]) -> tuple[bool, bool]:
     """What a shard sets up for two recipes: what either needs."""
     return (a[0] or b[0], a[1] or b[1])
@@ -570,9 +732,12 @@ def deal(
 
 def needs(body: str) -> tuple[bool, bool]:
     """What a recipe's shard must set up (ADR-0249): browsers, for one that
-    runs Playwright; the build, for one that runs it, or reads what it
-    makes: the servers, the store's pages, `pw` itself."""
-    browsers = "playwright" in body
+    runs Playwright, itself or by the benchmark's `bench.mjs`, whose
+    controls grade each stack in a browser (track evidence-integrity-2: a
+    control that fails now fails its recipe); the build, for one that runs
+    it, or reads what it makes: the servers, the store's pages, `pw`
+    itself."""
+    browsers = "playwright" in body or "bench.mjs" in body
     build = browsers or bool(re.search(r"run\.sh|feed\.sh|keyed-store\.sh|target/debug/", body))
     return browsers, build
 
@@ -590,8 +755,9 @@ def plan(
     The recipes of `database` run in shards of their own, each beside a
     PostgreSQL of its own (ADR-0278), and the others never there: a
     database's shard names it to each recipe it runs. They take as many
-    shards as make the run end soonest, the fewest where more would not;
-    the others are dealt into the rest, at least one where there are any.
+    shards as make the run end soonest; among ties, the least excess over
+    the ceiling in a multi-recipe shard, then the fewest database shards.
+    The others are dealt into the rest, at least one where there are any.
     Theirs are numbered after the others'."""
     need = need or {}
     # Nothing to run, no shard: a push that touches no recipe plans none
@@ -609,8 +775,15 @@ def plan(
         others = deal(rest, costs, left, need)
         theirs = deal(on_database, costs, beside, need)
         ends = max(end for _, _, end in others + theirs)
-        if best is None or ends < best[0]:
-            best = (ends, others, theirs)
+        # An allowed long singleton can fix the last finish while another
+        # shard can still be split below the ceiling. Break that tie before
+        # preferring fewer database shards (ADR-0290, 2026-10-16).
+        overflow = max(
+            [0] + [end - CEILING for recipes, _, end in others + theirs if len(recipes) > 1]
+        )
+        score = (ends, overflow)
+        if best is None or score < best[0]:
+            best = (score, others, theirs)
     out = []
     if best is not None:
         for dealt, on in ((best[1], False), (best[2], True)):
@@ -654,11 +827,33 @@ def planned(
 
 def measured(path: pathlib.Path | None = None) -> dict[str, float]:
     """Each recipe's seconds, as the last run that ran it to its end took
-    them (`SECONDS`); none where the file is missing or unreadable."""
+    them (`SECONDS`); none where the file is missing or unreadable. A key
+    that begins `_` is a note, not a recipe: `_lower_bounds` names the
+    recipes whose seconds are only what a run that stopped them, or that
+    never ran them whole, measured (the integrator's ruling 2, train-10);
+    the plan deals them by those seconds all the same."""
     try:
-        return {k: float(v) for k, v in json.loads((path or SECONDS).read_text()).items()}
+        return {
+            k: float(v)
+            for k, v in json.loads((path or SECONDS).read_text()).items()
+            if not k.startswith("_")
+        }
     except (OSError, ValueError, AttributeError):
         return {}
+
+
+def past_the_limit(
+    names: list[str], seconds: dict[str, float], need: dict[str, tuple[bool, bool]]
+) -> list[tuple[str, int]]:
+    """Each recipe of `names` whose recorded `seconds`, with the setup of a
+    shard that runs it (`SETUP`, by what it `need`s), end past `LIMIT`: no
+    shard can run it whole, and a run would find it out only when the limit
+    stops its shard, hours in."""
+    return [
+        (n, round(seconds[n]))
+        for n in names
+        if n in seconds and seconds[n] + SETUP[need.get(n, (False, False))] > LIMIT
+    ]
 
 
 def kind(body: str) -> str:
@@ -717,6 +912,9 @@ def main() -> int:
     # With `--changed`: less each recipe whose committed evidence is current
     # at HEAD (`current`), as a push plans.
     parser.add_argument("--current", action="store_true")
+    # With `--changed`: and each recipe whose committed evidence is stale at
+    # HEAD (`stale`), as a train's push and master's plan.
+    parser.add_argument("--stale", action="store_true")
     parser.add_argument("recipes", nargs="*")
     args = parser.parse_args()
     known = recipes()
@@ -734,14 +932,30 @@ def main() -> int:
             for name, sha in sorted(kept.items()):
                 print(f"ci_plan: {name} is current, recorded at {sha[:8]}", file=sys.stderr)
             names = [n for n in names if n not in kept]
+        if args.stale:
+            old = [n for n in stale(evidence, args.changed[1], args.near) if n not in names]
+            for name in old:
+                print(f"ci_plan: {name}'s evidence is stale, so it is planned", file=sys.stderr)
+            names = sorted(set(names) | set(old))
     elif args.all:
         names = evidence
     else:
         print("ci_plan: say --all, --changed BASE HEAD, or the recipes", file=sys.stderr)
         return 1
     body = bodies()
-    costs = estimated(names, body, measured())
+    seconds = measured()
     need = {n: needs(body.get(n, "")) for n in names}
+    too_long = past_the_limit(names, seconds, need)
+    for name, recorded in too_long:
+        print(
+            f"ci_plan: {name} is recorded at {recorded} s, past a job's limit of {LIMIT} s "
+            "with its shard's setup: no shard runs it whole; split its mutants across recipes "
+            "(train-10's e14-refusal) before it is planned",
+            file=sys.stderr,
+        )
+    if too_long:
+        return 1
+    costs = estimated(names, body, seconds)
     print("shards=" + json.dumps(planned(names, costs, args.shards, need, NEEDS_DATABASE)))
     return 0
 

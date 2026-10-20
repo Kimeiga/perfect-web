@@ -255,3 +255,89 @@ search).
   three engines.
 - **Mutants**: 14 planted; CI's verify is the record.
 - **Verify**: on the push of `track/store-hours`.
+
+
+## Deferred recipe-result correction (private proposal, 2026-10-16)
+
+The integrator requested a bounded review while the legacy hours source was
+frozen under CI. Private deterministic shell and real-Just contrasts against
+e2a4acd960c88144e3b40e7a6e9d9b8bd774ee1a show that the browser pipeline's
+`|| true` discards both its native failure and its missing-summary refusal.
+The existing root `bash -euo pipefail` cannot override that explicit exemption.
+A child returning 42 after a passing summary and a child returning 1 after a
+failed summary both allow the next mutation stage; native 0 with no matching
+summary also continues. The successful native-0 summary is the positive control.
+
+Proposed decision, pending the integrator's source-boundary approval: remove
+only this browser pipeline's `|| true`. Preserve selection, normalization,
+filtering, prerequisites and the following mutation stage. Extend only the
+legacy EvidenceGates.run_recipe private harness with optional hours-browser and
+hours-import-source seams, preserving its original 18-recipe roster and default
+behavior. The following mutation script and Cargo/browser commands in these
+regressions are private stand-ins. Assert exact producer argv/prefix, actual
+stand-in child status independently of Just's own failure status, and no next
+producer after any browser refusal. A suffix reversion must produce named test
+assertion failures. This proves shell/recipe failure propagation; it does not
+establish assertion-only Playwright outcome validity or amend EI's protocol.
+
+No project source, active CI, helper/import protocol, dependencies, production
+hours behavior, counts or bounds are changed by this private proposal. A source
+amendment must wait for the existing CI owner to finish and the integrator to
+approve its exact patch and subsequent applicable gates.
+
+
+## Accepted recipe-result ruling (2026-10-16)
+
+The integrator reviewed private patch2882b1589f60d82cf94bf671acb7a81a022e17065bbc34da12c31343e4d6a507
+and its actual canonical902d/91e9 old-recipe three-assertion refusal, corrected
+four-method success, suffix-reversion three-assertion refusal, and complete
+13-method success. The functional two-file recipe/legacy EvidenceGates change
+is accepted for adoption only after the active legacy-hours CIv2 naturally
+finishes GREEN and releases source. Preserve the private proposal/history above.
+
+Record this ruling FIRST, then adopt only the reviewed test9e17c188 while the
+actual recipe stays9ec74989. Require fresh exact four-method source-bound
+execution with precisely three named body assertions and one pass, no body
+errors or fixture refusals. Only after this causal RED may the recipee60128c6
+be adopted. Require its fresh four-method and full13-method GREEN receipts,
+complete source manifests and unchanged staged path/mode/blob/stage bindings.
+All other2742 source paths remain exact, including the current hours script
+0763ca6aec18c2980e10a4065605f2572940441242c8cd333f180af83d5e4f1a and its19
+controls. The earlier base's17 controls are historical, not the current roster.
+
+The complete19-hours/12-bounded-control proofs at manifest51984cba1365fcc1a1e17bfa6c9633561d4af02172f4464c5eb448a671840ff8
+remain historical exact-phase evidence; do not relabel them as later source
+proof. This adoption runs only private recipe stand-ins. Its original18-recipe
+roster/counts and nine original methods stay unchanged, with no EI dependency
+or helper/import protocol change, actual mutations, browser/build campaign,
+dependency downloads, process stopping, commit, or automatic newCI launch.
+
+Next gates are full Python discovery (190 methods only if actual collection
+confirms), static/anchor checks, the properly provisioned native three-engine
+hours recipe including the current19 controls and private PostgreSQL, and fresh
+same-source fullCI before any source/evidence checkpoint. Root owns their
+later launch and reviews their complete raw outcomes.
+
+## Current-source validation closed (2026-10-16)
+
+The production correction, current19 hours controls, complete12 bounded
+statements controls, and recipe failure-propagation repair now have fresh
+closed evidence. `just e14-store-hours` passed36 actual browser tests over
+Chromium, Firefox and WebKit; every current19 control failed at a checked
+original assertion. The separate full12 bounded-control run also passed
+with original named assertion witnesses and its reviewed helper call chains.
+The sources were restored after each whole, with all2745 source paths and
+staged semantic bindings unchanged. Ordinary errors/stops earned no kills.
+
+Fresh `just ci` returned native0/ci:OK on execution snapshot85c5c3c3:
+2955 Rust tests passed,25 ignored; Python190 run,189 passed,1 skipped.
+`docs/evidence/E14/repeated-store-hours-ci.txt` is its unchanged raw output;
+`repeated-store-hours-gates.json` binds the source manifest, exact closed
+proof/recovery hashes and qualifications. Reproduce with the three commands
+listed in STATUS using provisioned PostgreSQL and the pinned local tools.
+
+These result records were added after that exact execution. They change
+documentation/evidence only; the checked executable, test and recipe bytes
+remain identical. This closes the local repair gates, not remote verification,
+final train assembly, D2/provider-wide OneCall admission or wire-cost claims.
+Earlier incomplete/failed and51984-source evidence remains historical.

@@ -1,0 +1,18 @@
+// @status: GENERAL
+// @invariant: data_not_declared
+//
+// Structurally different from R-103 and R-104: a write, by hand, through a
+// binding of the app's own whose effect row names the table.
+
+module Stamps
+
+opaque type StampId = String
+
+type Stamp = Stamp { id: StampId, label: String }
+
+table Stamps
+    row Stamp
+    key id
+
+fn wipe() -> () !{ database.write<Stamps> }
+    host "app:data/stamps#wipe"

@@ -1,0 +1,15 @@
+   Compiling pw-core v0.0.0 (/home/haki/code/pw-wt/tables/compiler/pw-core)
+   Compiling pw-resource v0.0.0 (/home/haki/code/pw-wt/tables/runtime/pw-resource)
+    Finished `test` profile [unoptimized] target(s) in 10.31s
+     Running tests/from_manifest.rs (target/debug/deps/from_manifest-bb5ef0404342ba83)
+
+running 7 tests
+test a_policy_the_schema_cannot_read_is_reported_not_defaulted ... ok
+test a_declared_retry_bound_governs_how_many_attempts_run ... ok
+test a_declared_freshness_window_governs_the_runtime ... ok
+test a_session_query_is_never_in_public_cache_output ... ok
+test changing_the_declared_timeout_changes_late_result_acceptance ... ok
+test changing_the_source_changes_the_behaviour ... ok
+test every_accepted_corpus_resource_produces_a_manifest_the_schema_understands ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s

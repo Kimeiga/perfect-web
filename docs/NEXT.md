@@ -2,12 +2,76 @@
 
 The next executable tasks, in order, with acceptance criteria. Charter §3.4.
 
-Train-9 landing gate, 2026-10-16: ADR-0352's completion/write-order fix and
-strict result producer pass local whole12 and fresh default CI. Push the
-reviewed train-9 head under the existing owner authorization, require both
-GitHub `ci` and `verify` at that exact head, then fetch only its green evidence
-and land. The failed38863242953 run cannot satisfy this gate. Keep the older
-neighbor whole/native-status and inventory-scope qualifications in the receipt.
+## Integration follow-ups, 2026-10-16
+
+- D1's local compiler integration gate is green (ADR-0350), on train-10.
+  Integrate the completed generic-result effect repair and cache
+  publication repair on train-11, preserving canonical expression types
+  and generated bounded-read pairs; run the combined regression tests,
+  applicable whole scripts and full CI.
+- Continue D2's common memory adapter and TodoMVC integration. Preserve
+  exact Result/Option answers, table ordering, atomic overflow/rollback and
+  measured source-cost admission. A declared one_call promise is not an
+  optimistic provider override; legacy cost conformance remains explicit.
+- Complete guide producer exit validation and browser host/port isolation.
+  Preserve the recorded negative witnesses, reject invalid producers and
+  keep the remaining restored-browser cleanup gaps visible. Quiet-host E9
+  (the check's latency recorded on a quiet machine) remains to be recorded.
+
+- After the browser host map (train-11): revisit `e14-refusal`'s split in
+  two (ADR-0302's amendment), and deal any script's mutants across shards
+  (the parallel slots' allocator, `PW_MUTANT_PICK`). `e14-harness` runs on
+  CI only once a runner's store holds its stacks' dependencies; it is
+  local until then.
+
+- **WebKitGTK's network process crashes on a navigation that cancels a
+  page's just-started requests** (ADR-0280's amendment of 2026-10-18;
+  KNOWN_LIMITATIONS). It is a use-after-free in libsoup 3.x. It reproduces
+  with this program's server, master's included (3 of 750 navigations in a
+  60-line script), and not with a plain Python server serving the same
+  paths (0 of 1,200).
+  - A track of its own: find what in our server's traffic trips it, and
+    whether a newer Playwright WebKit build changes it.
+  - Until then, in WebKit, the two specs that navigated right after a soft
+    navigation let the page settle first.
+  - The owner has an upstream report to file (the handoff's
+    `tracks/train-10-webkit/upstream-report.md`); nothing is posted from
+    here.
+  - Its scripts and traces are beside the report.
+
+- **Every committed component held to the compiler, its list derived
+  from the build** (train-10's landing; train-11). `evidence_is_current`
+  lists 14 of the 20 by hand, and three went stale unseen on train-10
+  while 107 server tests ran them (regenerated before it landed). With a
+  control that leaves one out. And the planner and the evidence fetch
+  read a binary file's change (`git diff -U0` gives none a `+++` line),
+  so a component's change plans the recipes whose tests read it.
+- **A Chromium timeout in `scheduled-orders.spec.mjs`, open** (train-10's
+  third verify, 39131257549: `e10-browser` run 2 of 3, the test "an order
+  for a time is paid now...", `page.waitForURL` past the test's 30 s).
+  Once in about 12 Chromium runs of the test on CI, in no other engine,
+  and in none of 40 on the PC; the dispatch after it passed. The spec now
+  names its own failure in the run's log: its step, where the page was,
+  the runtime's and the host's last lines (`pw-record`). At its next
+  failure, read those lines and find the cause; it is not re-run until it
+  passes.
+- **A failing browser run's trace is lost when a passing run follows**
+  (train-10's finding). CI keeps a failing test's trace in
+  `spikes/own-renderer/test-results/` and uploads that directory once, at
+  the shard's end; `run_suite.sh --runs N` and every later Playwright run
+  in the shard clear it first. Keep each failing run's output outside it,
+  and upload it too (a small track).
+
+- ADR-0347: split scheduling's when_said from Checkout so an estimator
+  outage degrades that line alone; offer delivery-streamed times. The
+  current chosen-time checkout and times page both wait on the estimator.
+- ADR-0348: the scheduled estimate N+1 is repaired by a set operation;
+  continue the common per-adapter conformance suite and composite migration.
+
+Train-9 landing gate, 2026-10-16: met. GitHub's `verify` 38909882781 and
+`ci` 38909883157 passed at the exact head `e2a4acd9` (85 recipes, 1,391 of
+1,391 mutants killed); its evidence was fetched and train-9 landed
+2026-10-17, master `32757966`. The failed 38863242953 run stays failed.
 
 
 Integration follow-up, 2026-10-16: reproduce Kiokun search-cache publication

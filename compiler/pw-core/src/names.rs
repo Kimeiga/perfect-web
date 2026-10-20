@@ -733,26 +733,22 @@ impl Walk<'_> {
                 if let Some(s) = subject {
                     self.expr(s);
                 }
+                // The list, in the scope around the block, as any expression
+                // is (ADR-0345): until 2026-10-15 it was text, its first name
+                // looked up where it was a path, and a computed list's names
+                // were read by nothing.
                 let mut scope = BTreeSet::new();
-                if let Some((collection, binding)) =
-                    each.as_ref().map(|e| (e.list.clone(), e.binder.clone()))
-                {
-                    // A list written as a path starts with a name. A computed
-                    // one, `same(xs)`, is not a name: until 2026-09-26 it was
-                    // reported as one that does not resolve, and the build now
-                    // refuses it for what it is (ADR-0074).
-                    let segments: Vec<&str> = collection.split('.').map(str::trim).collect();
-                    let written = segments.iter().all(|s| {
-                        s.starts_with(|c: char| c.is_alphabetic() || c == '_')
-                            && s.chars().all(|c| c.is_alphanumeric() || c == '_')
-                    });
-                    let head = segments[0];
-                    if written && !self.bound(head) && !self.resolves(head) {
-                        self.found.push((self.body.node_span(id), head.to_string()));
-                    }
-                    scope.insert(binding);
+                let mut key = None;
+                if let Some(each) = &each {
+                    self.expr(each.list);
+                    scope.insert(each.binder.clone());
+                    key = each.key;
                 }
                 self.scoped(scope, |w| {
+                    // The key, in the row's scope: `item` in `(item.id)`.
+                    if let Some(k) = key {
+                        w.expr(k);
+                    }
                     // Each `{:Some(x)}` arm binds for the nodes after it, up
                     // to the next marker; a condition is read in the block's
                     // scope, not the arm before it.

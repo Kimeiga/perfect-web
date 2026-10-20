@@ -69,6 +69,9 @@ pub const DECL_STARTERS: &[&str] = &[
     "event",
     // ADR-0207: a data source, and what it guarantees.
     "source",
+    // Track `tables` (ADR-0338, D1): an app's data, declared: a table's row,
+    // key, order and indexes, from which its reads and writes are generated.
+    "table",
     // Track `uploads` (ADR-0260): a file a form posts, and its limits.
     "upload",
     // ADR-0302: a predicate a command `requires`, and the words a refusal
@@ -150,6 +153,8 @@ pub const RESOURCE_NOUNS: &[&str] = &[
     // ADR-0207: what a database the program's effects name guarantees:
     // `source StoreData  holds Carts, Orders  transactions serializable`.
     "source",
+    // Track `tables` (ADR-0338, D1): `table Todos  row Todo  key id`.
+    "table",
     // Track `uploads` (ADR-0260): `upload PostImage  route "/uploads/post-image"
     // serves "/images"  max_bytes 5_000_000  types png, jpeg`.
     "upload",
@@ -237,9 +242,15 @@ pub const STMT_CLAUSE_KEYWORDS: &[&str] =
 
 /// **Clause heads that are also words a body may begin with**: each heads a
 /// clause only where a name follows it on its line. `layout StoreLayout` is a
-/// page's clause and `layout.measure` an effect's path; `set hours_of_stores`
-/// and `sets one_call` are clauses (4c) and `set.size()` a call.
-const NAMED_HEADS: &[&str] = &["layout", "set", "sets"];
+/// page's clause and `layout.measure` an effect's path. `set` and `sets`
+/// take names; a table's clauses take their named fields. A call `set.size()`
+/// or `row.word`, or a binding `unique` alone on its line, is not a clause.
+const NAMED_HEADS: &[&str] = &[
+    "layout", "set", "sets", "row", "order", "index", "unique", "refers", "migrate",
+];
+
+/// A table's bounded clause takes a literal count on its line.
+const COUNTED_HEADS: &[&str] = &["bounded"];
 
 pub const POLICY_KEYWORDS: &[&str] = &[
     // E8's effect ontology: `capability database.read<T>` and
@@ -281,6 +292,18 @@ pub const POLICY_KEYWORDS: &[&str] = &[
     // begin with.
     "sets",
     "set",
+    // Track `tables` (ADR-0338, D1): a table's row, its order, its indexes,
+    // its references, its bound, and its change from the schema released.
+    // Its `key` is the clause a query's cache key is written with. Each is a
+    // clause only where its value follows on its line (`NAMED_HEADS`,
+    // `COUNTED_HEADS`).
+    "row",
+    "order",
+    "index",
+    "unique",
+    "refers",
+    "bounded",
+    "migrate",
     // Track `uploads` (ADR-0260): where an upload's committed files are
     // served, and its limits, each a literal.
     "serves",
@@ -1301,7 +1324,22 @@ impl<'a> P<'a> {
             _ => {
                 self.start(K::ErrorExpr);
                 let found = self.found();
-                self.error("PW0009", format!("expected an expression, found {found}"));
+                let current = self.nth(0);
+                let previous = self.pos.checked_sub(1).and_then(|p| self.toks.get(p));
+                let next = self.nth(1);
+                let doubled_logical = matches!(current.kind, Kind::Amp | Kind::Pipe)
+                    && (previous.is_some_and(|p| {
+                        p.kind == current.kind && p.span.end == current.span.start
+                    }) || (next.kind == current.kind && current.span.end == next.span.start));
+                if doubled_logical {
+                    self.error_help(
+                        "PW0009",
+                        format!("expected an expression, found {found}"),
+                        "Pleris writes `&` for and and `|` for or; write one operator",
+                    );
+                } else {
+                    self.error("PW0009", format!("expected an expression, found {found}"));
+                }
                 self.bump();
                 self.finish();
                 return;
@@ -2523,13 +2561,15 @@ impl<'a> P<'a> {
     /// **A head the parser knows, here.** `layout` is one only where a name
     /// follows it on its line, `layout StoreLayout`: the word is also an
     /// effect family's, and `layout.measure` written first in a body is not
-    /// a clause. So are `set` and `sets` (4c), names a body may begin with:
-    /// `set.size()` is no clause.
+    /// a clause. Named heads require a name on their line (`NAMED_HEADS`),
+    /// and `bounded` requires a count (`COUNTED_HEADS`). `set.size()` is a call.
     fn at_policy_head(&self) -> bool {
         self.at(Kind::Ident)
             && POLICY_KEYWORDS.contains(&self.cur_text())
             && (!NAMED_HEADS.contains(&self.cur_text())
                 || (self.nth_is(1, Kind::Ident) && !self.nth_starts_line(1)))
+            && (!COUNTED_HEADS.contains(&self.cur_text())
+                || (self.nth_is(1, Kind::Int) && !self.nth_starts_line(1)))
     }
 
     fn policies(&mut self, in_block: bool) {
@@ -4116,6 +4156,57 @@ mod tests {
     }
 
     #[test]
+    fn doubled_logical_operators_name_the_pleris_spelling() {
+        for expression in ["a && b", "a || b", "a&&b", "a||b", "&& b", "|| b"] {
+            let parsed = parse_expr(expression, "the expression");
+            assert_lossless(expression, &parsed);
+            assert!(
+                parsed.errors.iter().any(|e| e.code == "PW0009"
+                    && e.help.as_deref()
+                        == Some("Pleris writes `&` for and and `|` for or; write one operator")),
+                "{expression}: {:?}",
+                parsed.errors
+            );
+        }
+        // No textual ban: the valid spellings, strings, markup and comments
+        // retain their own meaning. Separated stray operators get no advice
+        // about a doubled token the programmer did not write.
+        for expression in [
+            "a & b",
+            "a | b",
+            "(a & b) | c",
+            "\"&& ||\"",
+            "<p>&& ||</p>",
+            "a & // && ||\nb",
+        ] {
+            let parsed = parse_expr(expression, "the expression");
+            assert_lossless(expression, &parsed);
+            assert!(parsed.ok(), "{expression}: {:?}", parsed.errors);
+            assert!(
+                !parsed.errors.iter().any(|e| e
+                    .help
+                    .as_deref()
+                    .is_some_and(|h| h.contains("Pleris writes"))),
+                "{expression}: {:?}",
+                parsed.errors
+            );
+        }
+        for expression in ["a & & b", "a | | b", "a &\n& b", "a | // comment\n| b"] {
+            let parsed = parse_expr(expression, "the expression");
+            assert_lossless(expression, &parsed);
+            assert!(!parsed.ok());
+            assert!(
+                !parsed.errors.iter().any(|e| e
+                    .help
+                    .as_deref()
+                    .is_some_and(|h| h.contains("Pleris writes"))),
+                "{expression}: {:?}",
+                parsed.errors
+            );
+        }
+    }
+
+    #[test]
     fn or_and_and_mixed_without_parentheses_is_refused() {
         // ADR-0322: `|` and `&` have no precedence between them. Until
         // 2026-10-12 they were one power, left to right, and `a | b & c` was
@@ -4307,6 +4398,82 @@ mod tests {
             assert!(
                 inner.contains(&want.to_string()),
                 "missing {want:?} in {inner:?}"
+            );
+        }
+    }
+
+    /// **A table and its clauses** (track `tables`, ADR-0338): one
+    /// declaration, each clause a policy of it, and the word heads clauses
+    /// only where their value follows on the line.
+    #[test]
+    fn a_table_declaration_reads_each_clause() {
+        let src = "module Todos\n\ntable Todos\n    row     Todo\n    key     owner, id\n    \
+                   order   added\n    index   by_list on list\n    unique  by_slug on slug\n    \
+                   refers  owner to Users\n    bounded 500\n    \
+                   migrate title renamed from name\n\nfn after() -> Int !{} {\n    1\n}\n";
+        let p = parse_ok(src);
+        assert_lossless(src, &p);
+        let heads: Vec<String> = texts(&p, K::Policy)
+            .iter()
+            .map(|t| t.split_whitespace().next().unwrap_or_default().to_string())
+            .collect();
+        assert_eq!(
+            heads,
+            [
+                "row", "key", "order", "index", "unique", "refers", "bounded", "migrate"
+            ],
+            "{:?}",
+            texts(&p, K::Policy)
+        );
+        assert_eq!(
+            p.green
+                .descendants()
+                .filter(|n| n.kind() == K::ResourceDecl)
+                .count(),
+            1,
+            "one table"
+        );
+        assert_eq!(
+            p.green
+                .descendants()
+                .filter(|n| n.kind() == K::FnDecl)
+                .count(),
+            1,
+            "the function after it is a declaration of its own"
+        );
+    }
+
+    /// The control: a table's word heads are names a body may begin with,
+    /// a clause only where a name (or, for `bounded`, a count) follows on
+    /// its line (`NAMED_HEADS`, `COUNTED_HEADS`).
+    #[test]
+    fn a_tables_words_are_still_names_in_a_policy_block() {
+        for (head, rest) in [
+            ("row", ".word"),
+            ("order", ".total"),
+            ("index", " + 1"),
+            ("unique", ""),
+            ("bounded", ".count"),
+        ] {
+            let src = format!(
+                "materialize M() {{\n    regenerate on_invalidation\n    {head}{rest}\n}}\n"
+            );
+            let p = parse_tree(&src);
+            assert_lossless(&src, &p);
+            assert!(
+                !texts(&p, K::Policy).iter().any(|t| t.starts_with(head)),
+                "`{head}{rest}` read as a clause: {:?}",
+                texts(&p, K::Policy)
+            );
+        }
+        // And each is a clause where its value follows.
+        for clause in ["row Todo", "order added", "bounded 5"] {
+            let src = format!("materialize M() {{\n    {clause}\n}}\n");
+            let p = parse_tree(&src);
+            assert!(
+                texts(&p, K::Policy).iter().any(|t| t.trim() == clause),
+                "`{clause}` is no clause: {:?}",
+                texts(&p, K::Policy)
             );
         }
     }

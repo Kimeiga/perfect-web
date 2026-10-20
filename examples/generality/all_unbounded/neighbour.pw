@@ -1,0 +1,21 @@
+// @status: NEIGHBOUR
+// @invariant: all_unbounded
+// @dimension: valid neighbour — the same bare call, of a table that states its bound
+//
+// A rule that refused `all()` rather than `all()` of an unbounded table would
+// refuse this.
+
+module Tokens
+
+opaque type TokenId = String
+
+type Token = Token { id: TokenId, value: Int }
+
+table Tokens
+    row     Token
+    key     id
+    bounded 20
+
+fn every() -> List<Token> !{ database.read<Tokens> } {
+    all()
+}

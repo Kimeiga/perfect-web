@@ -1,7 +1,7 @@
 // @corpus: rejected
 // @id: R-008
 // @category: ambient null assumption
-// @rule: PW0306
+// @rule: PW0600
 // @invariant: option_used_as_value
 // @charter: §7.1, §7.10
 // @milestone: 2

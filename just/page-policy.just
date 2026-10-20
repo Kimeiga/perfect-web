@@ -35,9 +35,7 @@ e14-page-policy:
        bash spikes/own-renderer/feed.sh > /dev/null 2>&1; \
        bash spikes/own-renderer/kiokun-site.sh > /dev/null 2>&1; \
        cargo build --quiet --locked -p pw-dev-server -p kiokun-server; \
-       (cd spikes/own-renderer && pnpm exec playwright test e2e/page-policy.spec.mjs --reporter=line 2>&1) \
-         | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' \
-         | grep -E "^ +[0-9]+\) |Error:|^ +[0-9]+ (passed|failed|flaky|skipped|interrupted|did not run)" || true; \
+       bash scripts/run_suite.sh -- pnpm exec playwright test e2e/page-policy.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/page_policy_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/page_policy_mutations.py; \
      } > docs/evidence/E14/page-policy.txt

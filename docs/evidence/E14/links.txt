@@ -1,8 +1,8 @@
 ADR-0189 - a <link> is written where HTML allows it
 
 produced by: just e14-links
-commit: e2a4acd960c88144e3b40e7a6e9d9b8bd774ee1a
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38909882781 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: ddaeeb1dfba9630371b7dd5b127c23855d245c74
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39131257549 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the rule (compiler/pw-core/tests/links.rs)
@@ -13,23 +13,24 @@ test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 == the corpus at C12 (corpus-check, generality.rs, checking_source.rs)
 
-accepted: 37 files
-accepted: 37/37 charter §16 categories covered
-rejected: 78 files
-rejected: 78/78 charter §16 categories covered
+accepted: 42 files
+accepted: 42/42 charter §16 categories covered
+rejected: 87 files
+rejected: 87/87 charter §16 categories covered
 corpus-check: OK
 test a_caught_file_conveys_every_fact_its_expect_error_lines_declare ... ok
 test every_rejected_fixture_emits_only_its_own_defect ... ok
+test every_rejected_fixtures_rule_is_a_code_its_check_reports ... ok
 test every_diagnostic_carries_what_charter_16_3_requires has been running for over 60 seconds
 test every_diagnostic_carries_what_charter_16_3_requires ... ok
-test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 131.56s
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 160.37s
 test generality_is_reported_separately_from_conformance ... ok
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 124.04s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 154.97s
 
 == every program the repository checks
 
-pw check: 85 file(s), no diagnostics
-pw check: 66 file(s), no diagnostics
+pw check: 90 file(s), 0 error(s), 1 warning(s)
+pw check: 68 file(s), no diagnostics
 pw check: 27 file(s), no diagnostics
 pw check: 43 file(s), no diagnostics
 

@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 """Mutation controls for NEXT 4b (W9): a read is a bounded number of
-statements on PostgreSQL. Seven controls restore loops that read a store
-at a time, each of which the store ran until 4b:
+statements on PostgreSQL. Eight controls restore loops that read a store
+at a time: seven the store ran until 4b, and one ADR-0348's set estimates
+replaced:
 
 - the layer (`store_pg.rs`): the items' stores scanned store by store, every
   store's menu read; the stores' hours read a store at a time;
 - the operations: `hours#for-stores` reading each store's hours alone; the
   search's reach reading each store it found alone; `checkout#parts`,
   `hours#for-cart` and the order's reach (`cart_reaches`) finding each line's
-  store by scanning every store's menu.
+  store by scanning every store's menu; and `user-estimates#for-stores`
+  reading each store's coverage alone (ADR-0348).
 
 Five more restore premature payment-count completion or remove one of
-the store/feed scheduled-state write guards (ADR-XXXX completion correction).
+the store/feed scheduled-state write guards (ADR-0352's completion
+correction).
 Each must fail a real delayed-provider or real PostgreSQL transaction test.
 
 A mutant must fail `tests::bounded_statements::`, the store's operations
@@ -40,6 +43,13 @@ STORE_RS = SRC / "store.rs"
 
 # (what, suite, file, anchor, replacement)
 MUTANTS = [
+    (
+        "set estimates read coverage once per store again",
+        "postgres",
+        STORE_RS,
+        "                let coverage = coverage_of(r, &stores, reader)?;\n",
+        "                let coverage = stores.iter().map(|store| Ok((store.clone(), coverage(r, store, reader)?))).collect::<Result<BTreeMap<_, _>, String>>()?;\n",
+    ),
     (
         "PostgreSQL's items' stores are scanned store by store",
         "postgres",

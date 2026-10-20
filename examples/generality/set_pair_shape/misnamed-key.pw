@@ -1,0 +1,18 @@
+// @status: GENERAL
+// @invariant: set_pair_shape
+// @dimension: an unrelated field with the key's type cannot identify the key
+//
+// The keyed result is present, and a field has the key's type, but the
+// wrapper calls it something else. A bare type match would accept this.
+
+module generality.misnamed_key
+
+type Price = Price { item: Int, cents: Int }
+type PriceOf = PriceOf { other: Int, price: Price }
+
+fn price_of(item: Int) -> Result<Price, String> !{ database.read<Price> }
+    host "generality:data/misnamed-prices#one"
+    set  prices_of
+
+fn prices_of(items: List<Int>) -> List<PriceOf> !{ database.read<Price> }
+    host "generality:data/misnamed-prices#many"

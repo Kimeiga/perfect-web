@@ -1,0 +1,22 @@
+// @status: NEIGHBOUR
+// @invariant: refers_across_sources
+// @dimension: valid neighbour — the same reference held within one source
+//
+// A self-reference stays within its table's source.
+
+module Answers
+
+opaque type AnswerId = String
+
+type Answer = Answer { id: AnswerId, author: Option<AnswerId>, text: String }
+
+table Answers
+    row    Answer
+    key    id
+    refers author to Answers
+
+source AnswerData
+    holds        Answers
+    transactions serializable
+    reads        strong
+    changes      none

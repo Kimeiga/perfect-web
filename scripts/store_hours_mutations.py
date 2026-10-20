@@ -12,7 +12,8 @@ Each mutant undoes one piece:
   day after; a time in the evening said "am"; a store open the day round
   not said so; the home page's stores kept past a change to their hours;
   overlapping periods joined only where one ends as the next starts;
-- the command (`examples/store/app.pw`): an order placed whatever the hours;
+- the command (`place_order`, its hold in `examples/store/scheduled.pw` since
+  track `scheduled-orders`): an order placed whatever the hours;
 - the layers: memory's hours not written; memory's hours held in the
   order a set lists them, not as PostgreSQL returns them; a weekday past 7
   not refused; PostgreSQL's special date written a day late; PostgreSQL's
@@ -29,14 +30,18 @@ The source is restored after every mutant, whatever happens.
 
 import os
 import pathlib
-import re
 import signal
 import subprocess
 import sys
 
+from cargo_test_results import parse as cargo_result
+
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 HOURS_PW = ROOT / "examples/store/hours.pw"
 APP = ROOT / "examples/store/app.pw"
+# Track `scheduled-orders`: `place_order` holds an order for as soon as
+# possible to the hours there (`held_to`).
+SCHEDULED_PW = ROOT / "examples/store/scheduled.pw"
 HOURS_RS = ROOT / "spikes/own-renderer/server/src/hours.rs"
 STORE_DATA = ROOT / "spikes/own-renderer/server/src/store.rs"
 
@@ -67,8 +72,8 @@ MUTANTS = [
         "the cut-off is ignored",
         "server",
         HOURS_PW,
-        "        Open(o) => if clock.passed(o.last_order) {\n",
-        "        Open(o) => if false {\n",
+        "        Some(s) => !passed_as_of(when, s.last_order),\n",
+        "        Some(s) => true,\n",
     ),
     (
         "the cut-off is not borrowed from the day before a midnight closing",
@@ -81,12 +86,8 @@ MUTANTS = [
         "a store is open before it opens",
         "server",
         HOURS_PW,
-        "    let all = spans(h, zone, today)\n"
-        "    match List.find(all, s => clock.passed(s.opens) & !clock.passed(s.closes)) {\n"
-        "        Some(s) => OpenState.Open(",
-        "    let all = spans(h, zone, today)\n"
-        "    match List.find(all, s => !clock.passed(s.closes)) {\n"
-        "        Some(s) => OpenState.Open(",
+        "    List.find(all, s => passed_as_of(when, s.opens) & !passed_as_of(when, s.closes))\n",
+        "    List.find(all, s => !passed_as_of(when, s.closes))\n",
     ),
     (
         "the day after is said tomorrow",
@@ -130,9 +131,9 @@ MUTANTS = [
     (
         "an order is placed whatever the hours",
         "server",
-        APP,
-        "    match closed_in(hours_of_cart(current_user())) {\n",
-        "    match closed_in(List.take(hours_of_cart(current_user()), 0)) {\n",
+        SCHEDULED_PW,
+        "            Some(closing) => Some(OrderError.Closed(closing)),\n",
+        "            Some(closing) => None,\n",
     ),
     (
         "memory's hours are not written",
@@ -169,6 +170,20 @@ MUTANTS = [
         "             WHERE store = $1 ORDER BY weekday, opens_minute\",\n",
         "             WHERE store = $1\",\n",
     ),
+    (
+        "PostgreSQL consumes weekly periods after the first occurrence",
+        "postgres",
+        HOURS_RS,
+        "                    weekly: weekly.get(s).cloned().unwrap_or_default(),\n",
+        "                    weekly: weekly.remove(s).unwrap_or_default(),\n",
+    ),
+    (
+        "PostgreSQL consumes special periods after the first occurrence",
+        "postgres",
+        HOURS_RS,
+        "                    special: special.get(s).cloned().unwrap_or_default(),\n",
+        "                    special: special.remove(s).unwrap_or_default(),\n",
+    ),
 ]
 
 TESTS = [
@@ -202,16 +217,15 @@ def cargo_tests(suite):
     """(built, passed, failed) over the suite's tests."""
     cmd, env = CARGO[suite]
     out, code = bounded(cmd, env)
-    if code is None:
-        return True, 0, 1
-    found = re.findall(r"test result: \w+\. (\d+) passed; (\d+) failed", out)
-    if not found:
+    result = cargo_result(code, out)
+    if not result.valid:
         return False, 0, 0
-    return True, sum(int(p) for p, _ in found), sum(int(f) for _, f in found)
+    return True, result.passed, result.failed
 
 
 def main():
     import mutation_baseline  # keeps what each command says, for a red baseline
+    watch = mutation_baseline.mutation_bound.start()
     # Stopped from outside, the source is still restored: SIGTERM raises
     # here, and the `finally` below runs.
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(1))
@@ -221,7 +235,7 @@ def main():
     for suite in CARGO:
         built, passed, failed = cargo_tests(suite)
         print(f"baseline ({suite}): {passed} passed, {failed} failed", flush=True)
-        if not built or failed or not passed:
+        if not built or failed or not passed or watch.stopped:
             print("FAIL: the unmutated baseline is not green; no mutant can mean anything")
             mutation_baseline.explain()
             return 1
@@ -238,9 +252,11 @@ def main():
             built, passed, failed = cargo_tests(suite)
         finally:
             path.write_text(original)
-        if not built:
-            verdict = "KILLED (does not build)"
-        elif failed:
+        if not built or watch.stopped:
+            print(f"{what} [{suite}]: REFUSED (invalid or stopped Cargo producer; no kill)", flush=True)
+            mutation_baseline.explain()
+            return 1
+        if failed:
             verdict = f"KILLED ({failed} of {passed + failed} tests fail)"
         else:
             verdict = "SURVIVED"

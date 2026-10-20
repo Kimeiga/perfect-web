@@ -1,7 +1,7 @@
 // @corpus: rejected
 // @id: R-033
 // @category: geometry read during render
-// @rule: PW3002
+// @rule: PW0401
 // @invariant: forbidden_effect
 // @charter: §7.4, §7.5A
 // @milestone: 7

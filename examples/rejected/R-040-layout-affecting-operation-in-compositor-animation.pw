@@ -1,7 +1,7 @@
 // @corpus: rejected
 // @id: R-040
 // @category: layout-affecting operation in compositor animation
-// @rule: PW3006
+// @rule: PW0401
 // @invariant: forbidden_effect
 // @charter: §7.5A
 // @milestone: 7

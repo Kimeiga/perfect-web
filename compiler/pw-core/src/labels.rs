@@ -356,16 +356,14 @@ impl<'a> Labels<'a> {
                 }
             }
 
-            // A template's names: an `{#each}` block's by its collection, a
-            // `{#match}` arm's by the block's subject.
-            let eaches: Vec<_> = me
-                .types
-                .lexical()
-                .each_blocks()
-                .map(|(n, c, h)| (n, c.to_string(), h))
-                .collect();
-            for (n, collection, head) in eaches {
-                let l = me.collection_label(&collection, head);
+            // A template's names: an `{#each}` block's by its list, a
+            // `{#match}` arm's by the block's subject. The list is an
+            // expression (ADR-0345), labelled as any value is: until
+            // 2026-10-15 it was text, public unless its first name was a
+            // local's, so `{#each [key] as k}` rendered a secret unseen.
+            let eaches: Vec<_> = me.types.lexical().each_blocks().collect();
+            for (n, list, _) in eaches {
+                let l = me.label(body, list);
                 if !l.is_public() {
                     me.bindings
                         .entry(Binder::Each(n))
@@ -615,32 +613,6 @@ impl<'a> Labels<'a> {
     /// label, for the diagnostic's origin span.
     pub fn origin(&self, use_: ExprId) -> Option<&(Label, Span)> {
         self.bindings.get(&self.types.lexical().binder(use_)?)
-    }
-
-    /// The label of a collection a `{#each}` directive names, as written: its
-    /// first name's binding's, and each field read from it on top, as a
-    /// field read is labelled.
-    fn collection_label(&self, collection: &str, head: Option<Binder>) -> Label {
-        let Some(b) = head else {
-            return Label::public();
-        };
-        let mut l = self
-            .bindings
-            .get(&b)
-            .map(|(l, _)| l.clone())
-            .unwrap_or_else(Label::public);
-        let mut ty = self.types.binding(b).cloned();
-        for field in collection.split('.').skip(1) {
-            let Some(sig) = ty
-                .as_ref()
-                .and_then(|t| self.sigs.member_in(self.module, t, field.trim()))
-            else {
-                break;
-            };
-            l = l.join(&sig.label);
-            ty = sig.result().cloned();
-        }
-        l
     }
 
     /// The label of a value.

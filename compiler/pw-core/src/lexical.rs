@@ -70,9 +70,10 @@ pub struct Lexical {
     /// `Point { x }`: a record's shorthand field, by the record and the
     /// field's position, and the binding its name means.
     shorthand: BTreeMap<(ExprId, usize), Binder>,
-    /// `{#each xs as x}`: the collection as the directive writes it, and the
-    /// binding its first name means where a local's does.
-    each: BTreeMap<NodeId, (String, Option<Binder>)>,
+    /// `{#each xs as x}`: the list, an expression in the body (ADR-0345),
+    /// and the binding its first name means where the list is a path from a
+    /// local's value.
+    each: BTreeMap<NodeId, (ExprId, Option<Binder>)>,
     /// A `{#match}` arm's marker, and the expression its block matches.
     arm_subject: BTreeMap<NodeId, ExprId>,
     /// A nested declaration's bindings around it: the declaration that binds
@@ -193,12 +194,12 @@ impl Lexical {
         self.shorthand.get(&(record, field)).copied()
     }
 
-    /// Every `{#each}` block: the collection as written, and the binding its
-    /// first name means where a local's does.
-    pub fn each_blocks(&self) -> impl Iterator<Item = (NodeId, &str, Option<Binder>)> {
-        self.each
-            .iter()
-            .map(|(n, (collection, head))| (*n, collection.as_str(), *head))
+    /// Every `{#each}` block: its list, an expression in the body
+    /// (ADR-0345), and the binding the list's first name means where the
+    /// list is a path from a local's value, `cart` in `cart.lines`. `None`
+    /// for a list computed by a call, or one read from a declaration.
+    pub fn each_blocks(&self) -> impl Iterator<Item = (NodeId, ExprId, Option<Binder>)> + '_ {
+        self.each.iter().map(|(n, (list, head))| (*n, *list, *head))
     }
 
     /// Every `{#match}` arm's marker, and the expression its block matches.
@@ -534,16 +535,18 @@ impl Walk<'_> {
                         self.expr(*s, scope);
                     }
                     let inner = scope.len();
-                    if let Some((name, collection)) =
-                        each.as_ref().map(|e| (e.binder.clone(), e.list.clone()))
-                    {
-                        let head = collection
-                            .split(['.', '('])
-                            .next()
-                            .map(str::trim)
-                            .and_then(|h| find(scope, h));
-                        self.out.each.insert(*n, (collection, head));
-                        scope.push((name, Binder::Each(*n)));
+                    if let Some(each) = each {
+                        // The list, in the scope around the block; the key,
+                        // in the row's, where `item` in `(item.id)` is the
+                        // row (ADR-0345).
+                        self.expr(each.list, scope);
+                        let head = path_root(self.body, each.list)
+                            .and_then(|root| self.out.uses.get(&root).copied());
+                        self.out.each.insert(*n, (each.list, head));
+                        scope.push((each.binder.clone(), Binder::Each(*n)));
+                        if let Some(key) = each.key {
+                            self.expr(key, scope);
+                        }
                     }
                     let (children, own) = (children.clone(), *own);
                     self.markup(&children, own, stream, scope);
@@ -566,5 +569,15 @@ impl Walk<'_> {
             }
         }
         scope.truncate(depth);
+    }
+}
+
+/// **The name a path starts from**: `cart` in `cart.lines`, the name itself
+/// for a name, and `None` for anything computed.
+pub fn path_root(body: &Body, e: ExprId) -> Option<ExprId> {
+    match body.expr(e) {
+        Expr::Name(_) => Some(e),
+        Expr::Field { base, .. } => path_root(body, *base),
+        _ => None,
     }
 }

@@ -1,7 +1,7 @@
 // @corpus: rejected
 // @id: R-030
 // @category: private data in resume manifest
-// @rule: PW0328
+// @rule: PW5007
 // @invariant: private_in_resume_manifest
 // @charter: §8.5, §7.8
 // @milestone: 7

@@ -1082,3 +1082,73 @@ Generality at open:        56/56 invariants generality-tested
 | `read_per_element` | a GENERAL witness, a generic callback with a match arm's key, a function named as the callback, and another module's read, pair and source, and a NEIGHBOUR one, a key no element's and a callback applied once | new invariant |
 | `set_pair_shape` | a GENERAL witness, a set form that drops a reader the keyed read passes along, and another module's set form of another source, and a NEIGHBOUR one, the shapes a set form may take | new invariant |
 | `undeclared_effect` | changed: its three witnesses read by a parameter, not per element | its invariant kept |
+
+## C26: what a loop's head reads, 2026-10-15
+
+Opened because the corpus did not specify a rule the language holds, and
+the checker did not hold it there. A view's effect row is empty (charter
+§7.4), and an `{#each}`'s list and key are what the view evaluates while
+it renders, as a text hole, an attribute or an `{#if}`'s condition is.
+They were text no walker of a view's expressions read (ADR-0242's "not
+claimed"), so a database read in a loop's list checked clean, where the
+same call anywhere else in the view was `PW0401`; written as a member of
+the store it built too (ADR-0345, the each-head-effects track). No
+invariant is retired; no fixture changed.
+
+```text
+Corpus version:            C26
+Accepted programs:         38
+Rejected programs:         79
+Charter categories:        38/38 accepted, 79/79 rejected
+Generality at open:        56/56 invariants generality-tested
+```
+
+| Fixture | Change | Kind |
+|---|---|---|
+| A-038 | added: a page's loop over the value of a query it names, the query reading the database | new category, `a loop over a query's value` |
+| R-080 | added: a view's loop over `Stores.list()`, which reads the database (`PW0401` at the list) | new category |
+| `forbidden_effect` | two GENERAL witnesses, a loop's list read through a member that reads the database and a nested loop's key that does, and a NEIGHBOUR one, the list read through a pure member | new witnesses |
+| `secret_to_browser` | a GENERAL witness, a loop over a list computed from secrets, each rendered | new witness |
+
+## C27: an app's data, declared as tables, 2026-10-15
+
+Opened because the specification changed (track `tables`, ADR-0338's D1;
+C25 is track `bounded-checker`'s). A program declares its data: `table T`
+in `module T`, its `row` a record declared beside it, its `key`, `order`,
+`index` and `unique` the row's fields, its `refers` to other tables, its
+`bounded`, and its `migrate` from the schema released. Its reads and writes
+are the functions the declaration gives the module, and nothing else
+reaches its rows. Five codes: a malformed table (`PW0361`), a table's rows
+reached otherwise than through its functions (`PW0362`), `all()` of a table
+with no bound (`PW0364`), a warning for any reference across sources (`PW0365`), and a change from the schema released that loses
+or reinterprets data with no `migrate` (`PW0366`). A fixture of `PW0366`
+names the schema it is held to as released, `// @schema-lock: <file>`,
+beside it. No published invariant is retired. The unpublished D1 fixtures were corrected before integration: PW0365 is a warning, not a refusal; A-052 names it with @expect-warning, and the harness compares exactly those warning codes.
+
+```text
+Corpus version:            C27
+Accepted programs:         42
+Rejected programs:         87
+Charter categories:        42/42 accepted, 87/87 rejected
+Generality at open:        60/60 invariants generality-tested
+```
+
+| Fixture | Change | Kind |
+|---|---|---|
+| A-050 | added: a table keyed by two fields, indexed and bounded, read by its key, a prefix, an index and whole, and written, only through its functions | new category |
+| A-051 | added: a table that refers to itself, in one source | new category |
+| A-052 | added: a reference to a table another source holds, accepted with its explicit PW0365 warning | new category |
+| A-053 | added: a field renamed, one dropped and one backfilled from the schema released, each stated | new category |
+| R-100 | added: a table keyed by a `List` (`PW0361`) | new category |
+| R-101 | added: an index on a field its row does not have (`PW0361`) | new category |
+| R-102 | added: `all()` of a table with no `bounded` (`PW0364`) | new category |
+| R-103 | added: a read by an index the table does not declare (`PW0362`) | new category |
+| R-104 | added: a table's rows read through a `host` binding of the app's own (`PW0362`) | new category |
+| R-105 | added: a reference whose field holds no key of its target (`PW0361`) | new category |
+| R-106 | added: a field dropped from the schema released, unstated (`PW0366`) | new category |
+| R-107 | added: a field renamed from the schema released, unstated (`PW0366`) | new category |
+| `table_malformed` | a GENERAL witness, a reference whose field holds no key of the table it names, and a NEIGHBOUR one, the same reference by the key's type | new invariant |
+| `data_not_declared` | a GENERAL witness, a write by a binding of the app's own, and a NEIGHBOUR one, a function with a body over a read the table gives | new invariant |
+| `all_unbounded` | a GENERAL witness, `all()` called bare in the table's own module, and a NEIGHBOUR one, the same call of a bounded table | new invariant |
+| `refers_across_sources` | a GENERAL witness, the referring table in no source, and a NEIGHBOUR one, a self-reference within one source | new invariant |
+| `migration_unstated` | a GENERAL witness, a field's type changed, and a NEIGHBOUR one, the same change `backfilled with` a value | new invariant |

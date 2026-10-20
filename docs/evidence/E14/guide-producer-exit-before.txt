@@ -1,0 +1,13 @@
+Immutable source: /tmp/codex-d1-final-fixture-input-backup/inputs/scripts/guide_mutations.py
+SHA256: 57aa44cdd5f3ca8f774b73ce224be5454988cb331da71c173802c724943ccca5
+Cargo status -9; apparent assertion failure accepted=True, ran=8, failed=1
+Cargo status 137; apparent assertion failure accepted=True, ran=8, failed=1
+Cargo status 0; apparent assertion failure accepted=True, ran=8, failed=1
+Cargo status 101; apparent assertion failure accepted=True, ran=8, failed=1
+Browser status -9; apparent assertion failure accepted=True, ran=1, failed=1
+Browser status 137; apparent assertion failure accepted=True, ran=1, failed=1
+Browser status 0; apparent assertion failure accepted=True, ran=1, failed=1
+Browser status 1; apparent assertion failure accepted=True, ran=1, failed=1
+Named checker status -9; current rule branch accepts=True
+Named checker status 137; current rule branch accepts=True
+Named checker status 1; current rule branch accepts=True

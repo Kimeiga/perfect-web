@@ -1,0 +1,22 @@
+// @status: NEIGHBOUR
+// @invariant: forbidden_effect
+//
+// `each-head-member.pw`'s neighbour: the same loop over a member of the
+// store, a pure one. A loop's head performs what its expressions perform,
+// and nothing more: a member read is no effect of its own.
+
+module generality.each_pure_member
+
+import domain.{ Store, MenuSection }
+
+fn sections(store: Store) -> List<MenuSection> !{} {
+    []
+}
+
+view Sections(store: Store) !{} {
+    <ul aria-label="Sections">
+        {#each store.sections as section (section.category.id)}
+            <li>{section.category.name}</li>
+        {/each}
+    </ul>
+}

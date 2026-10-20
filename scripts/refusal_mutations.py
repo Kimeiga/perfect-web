@@ -24,8 +24,10 @@ page's, `pw-render`'s binary's (`tests/titles.rs`); a host mutant, the
 host's identity and announcer tests; a runtime or program mutant, the
 browser tests below, in Chromium.
 
-Run from the repository root; `just e14-refusal` records the output. The
-source is restored after every mutant, whatever happens.
+Run from the repository root; `just e14-refusal` records the output of
+part 1 of `PARTS`, `just e14-refusal-2` part 2 (`--part i/2`; with no part,
+every mutant runs). The source is restored after every mutant, whatever
+happens.
 """
 
 import os
@@ -369,13 +371,47 @@ SUITES = {
     "browser": browser_tests,
 }
 
+# **The parts a run of these mutants is split into** (the integrator's
+# ruling 1 of 2026-10-17, train-10): the recipe no longer fit a CI job. On
+# train-10's verify (39054436657) each browser mutant took about 1,800 s,
+# where train-9's took about 1,110 s, and the whole, with the recipe's tests,
+# browsers and baselines, some 26,600 s, past the 20,700 s a job runs: its
+# shard was stopped at the limit after 20,507 s. Ranges of `MUTANTS`, by
+# index, half open: part 1 the checker's, the host's, the render's and five
+# browser mutants, part 2 the other seven, each some four and a half hours on
+# that run's times. `e14-refusal` runs part 1 and `e14-refusal-2` part 2, each
+# with its own evidence and its own count; `evidence_counts.py` holds the two
+# to every mutant once. No mutant is left out: a run with no part runs all.
+PARTS = [(0, 23), (23, 30)]
+
+
+def chosen(argv: list[str]) -> tuple[list, str]:
+    """The mutants a run asks for, and how its output says which: `--part
+    i/n`, the i-th of `PARTS`, where n is how many there are; every mutant
+    where nothing is asked."""
+    if not argv:
+        return list(MUTANTS), ""
+    asked = re.fullmatch(r"(\d+)/(\d+)", argv[1]) if len(argv) == 2 and argv[0] == "--part" else None
+    if asked is None or int(asked.group(2)) != len(PARTS) or not 1 <= int(asked.group(1)) <= len(PARTS):
+        raise SystemExit(f"refusal_mutations.py: ask for every mutant, or --part i/{len(PARTS)}")
+    i = int(asked.group(1))
+    start, end = PARTS[i - 1]
+    return MUTANTS[start:end], f"part {i} of {len(PARTS)}: mutants {start + 1} to {end} of {len(MUTANTS)}"
+
 
 def main():
     import mutation_baseline  # keeps what each command says, for a red baseline
     # Stopped from outside, the source is still restored: SIGTERM raises
     # here, and the `finally` below runs.
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(1))
+    picked, which = chosen(sys.argv[1:])
+    if which:
+        print(which, flush=True)
     for suite, run in SUITES.items():
+        # A part's baselines are its suites' alone: a suite none of its
+        # mutants runs means nothing to it.
+        if not any(m[1] == suite for m in picked):
+            continue
         built, passed, failed = run(suite)
         print(f"baseline ({suite}): {passed} passed, {failed} failed", flush=True)
         if not built or failed or not passed:
@@ -384,7 +420,7 @@ def main():
             return 1
 
     survivors = 0
-    for what, suite, path, anchor, replacement in MUTANTS:
+    for what, suite, path, anchor, replacement in picked:
         original = path.read_text()
         if original.count(anchor) != 1:
             print(f"{what}: ANCHOR NOT FOUND EXACTLY ONCE in {path.name}")
@@ -404,9 +440,10 @@ def main():
             survivors += 1
         print(f"{what} [{suite}]: {verdict}", flush=True)
     # The pages and the server are built again from the restored source.
-    browser_tests()
+    if any(m[1] == "browser" for m in picked):
+        browser_tests()
 
-    print(f"{len(MUTANTS) - survivors} of {len(MUTANTS)} mutants killed")
+    print(f"{len(picked) - survivors} of {len(picked)} mutants killed")
     return 1 if survivors else 0
 
 

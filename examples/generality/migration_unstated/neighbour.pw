@@ -1,0 +1,18 @@
+// @status: NEIGHBOUR
+// @invariant: migration_unstated
+// @dimension: valid neighbour — the same change of type, stated with the value each row released holds
+// @schema-lock: neighbour.schema.lock
+//
+// A rule that refused a change of type, rather than one unstated, would
+// refuse this.
+
+module Tallies
+
+opaque type TallyId = String
+
+type Tally = Tally { id: TallyId, points: String }
+
+table Tallies
+    row     Tally
+    key     id
+    migrate points backfilled with "0"

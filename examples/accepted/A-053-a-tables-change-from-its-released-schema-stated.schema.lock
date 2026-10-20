@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "hash": "ff2baf4140e2487d",
+  "tables": [
+    {
+      "name": "Journals",
+      "source": null,
+      "fields": [
+        {
+          "name": "id",
+          "type": "EntryId",
+          "stored": {
+            "string": {}
+          }
+        },
+        {
+          "name": "body",
+          "type": "String",
+          "stored": {
+            "string": {}
+          }
+        },
+        {
+          "name": "tags",
+          "type": "List<String>",
+          "stored": {
+            "list": {
+              "string": {}
+            }
+          }
+        }
+      ],
+      "key": [
+        "id"
+      ]
+    }
+  ]
+}

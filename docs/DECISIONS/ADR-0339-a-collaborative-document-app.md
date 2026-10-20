@@ -51,8 +51,8 @@ before that approval.
    it (same origin, each file's hash in the manifest), never loosened.
 6. **A document read from each side** (question 6): confirmed; a derive per
    reader is measured by D6, not assumed affordable.
-7. **Codes and ports** (question 1): PW6601 upward for this app's tracks
-   (free at 2026-10-15 on master and every pushed branch); each track's
+7. **Codes and ports** (question 1): PW6701 upward for this app's tracks
+   (reservation amended 2026-10-16 below); each track's
    Playwright base is given when it starts.
 8. **The owner decisions that are design** (3 to 9), under the delegation:
    the editor at the page's authority, as stated, with a sandboxed frame
@@ -64,6 +64,22 @@ before that approval.
    presence as proposed, link guests anonymous (7); no suggestion mode
    (8); no WebSocket before D6's measurement (9). Decision 1 (the CRDT) is
    ruled 1 above. Decision 2 (the downloads) is the owner's alone.
+
+
+## Allocation amendment (the integrator, 2026-10-16)
+
+Accepted under the owner's delegation of 2026-10-02. This note previously
+reserved PW66xx, including PW6601 through PW6612, for unimplemented document
+features. The later check-is-build work independently allocated PW66xx to
+`Owner::CheckIsBuild` and tested PW6601 as its complete-build refusal. The
+earlier reservation was missed; it was not free when the later work began.
+
+Retain that tested check-is-build allocation. Move only this unimplemented
+document design to PW67xx, preserving suffixes: PW6701 through PW6712. The
+integrator audited committed references and all current branch heads before
+this ruling; none allocated block 67. No document code is registered as
+implemented by this amendment, and no dependency download is approved.
+The future tracks must recheck the registry before implementing a code.
 
 ## Context
 
@@ -730,7 +746,7 @@ private query DocumentView(reader: capability.User<UserId>, doc: DocId)
 ## The build plan, as tracks
 
 Each track: its files, its codes (proposed, in a block the integrator
-assigns; PW66xx and above are free at 5da9c05, PW61 being TodoMVC's), its
+assigns; this note now reserves PW67xx, PW61 being TodoMVC's), its
 recipe (`just/<track>.just`, `e14-<name>` writing
 `docs/evidence/E14/<name>.txt`), its acceptance and its mutation controls
 (`scripts/<track>_mutations.py`, each `.pw` mutant still well typed).
@@ -769,11 +785,11 @@ collaborative; phase 3 is the app; D9 is conditional.
   message, save, load, spans, cursors, render), `replicas_pg.rs` (the log
   and its snapshots), `migrations/docs/0001_replicas.sql`; `automerge =
   "=0.12.0"` in the server's `Cargo.toml`, a commit of its own.
-- **Codes**: PW6601 a replicated value's `conflict` is a policy its type
-  has; PW6602 every mark states its growth; PW6603 `storage device` holds
-  only a value keyed by its reader's own handle; PW6604 `offline
-  writable` states `on_conflict_unresolved`; PW6605 a link's address is a
-  `SafeUrl`; PW6606 a replicated document's sync names its edit predicate.
+- **Codes**: PW6701 a replicated value's `conflict` is a policy its type
+  has; PW6702 every mark states its growth; PW6703 `storage device` holds
+  only a value keyed by its reader's own handle; PW6704 `offline
+  writable` states `on_conflict_unresolved`; PW6705 a link's address is a
+  `SafeUrl`; PW6706 a replicated document's sync names its edit predicate.
 - **Acceptance** (`e14-replicated`): each rule refused and its control
   accepted; two replicas' concurrent edits merged as D0 measured; the
   renderer escaping text and dropping `javascript:` and `data:` links; an
@@ -789,7 +805,7 @@ collaborative; phase 3 is the app; D9 is conditional.
 - **Files**: `spikes/own-renderer/public/pw-device-store.mjs`; the
   sign-out telling at `TRACK SEAM (docs)` in `identity.rs`;
   `e2e/device-store.spec.mjs`.
-- **Codes**: none; the device's rules are D1's PW6603 and the runtime's.
+- **Codes**: none; the device's rules are D1's PW6703 and the runtime's.
 - **Acceptance** (`e14-device-store`, three engines): a replica written,
   the page reloaded offline and the replica read back; sign-out clearing
   the user's partition, and another tab's; two users of one browser
@@ -808,7 +824,7 @@ collaborative; phase 3 is the app; D9 is conditional.
   (`ReplicaSync`, `Presence`), `spikes/own-renderer/public/pw-replica.mjs`
   (one in flight, the offline queue, reconnection),
   `e2e/replica-sync.spec.mjs`.
-- **Codes**: none; its compile-time rule is D1's PW6606, the rest the
+- **Codes**: none; its compile-time rule is D1's PW6706, the rest the
   host's.
 - **Acceptance** (`e14-replica-sync`): two pages editing at once
   converge, in three engines; a page offline edits, reconnects and merges;
@@ -831,8 +847,8 @@ collaborative; phase 3 is the app; D9 is conditional.
   `scripts/vendor.py` (copies an approved package's files, rewrites its
   specifiers, records hashes), `serve_file`'s `vendor/` directory,
   `spikes/own-renderer/public/pw-editor.mjs`, `e2e/editor.spec.mjs`.
-- **Codes**: PW6607 a mount is given no handle, secret or another
-  document's replica; PW6608 the generated schema covers every case of
+- **Codes**: PW6707 a mount is given no handle, secret or another
+  document's replica; PW6708 the generated schema covers every case of
   `B` and `M`; the audit record's completeness is the existing
   `UNSAFE_AUDIT_INCOMPLETE`.
 - **Acceptance** (`e14-editor-mount`): each rule refused at build and
@@ -856,8 +872,8 @@ collaborative; phase 3 is the app; D9 is conditional.
   page, the share dialog), `docs.rs` and `docs_pg.rs` (grants, link
   grants, `Access`), `migrations/docs/0002_sharing.sql`,
   `e2e/docs-sharing.spec.mjs`.
-- **Codes**: PW6609 a program makes no share link (PW5037's rule for a
-  new handle); PW6610 a command that changes sharing `requires OwnsDoc`.
+- **Codes**: PW6709 a program makes no share link (PW5037's rule for a
+  new handle); PW6710 a command that changes sharing `requires OwnsDoc`.
 - **Acceptance** (`e14-docs-sharing`): each rule refused at build and its
   control accepted; every role against every ability, in memory and on
   PostgreSQL; a link redeemed into a grant and the
@@ -891,13 +907,13 @@ collaborative; phase 3 is the app; D9 is conditional.
 - **Files**: `examples/docs/app.pw` (`Comment`, `comment`, `reply`,
   `resolve`), `docs.rs` (anchors), `docs_pg.rs`,
   `migrations/docs/0003_comments.sql`, `e2e/docs-comments.spec.mjs`.
-- **Codes**: PW6611 a program makes no anchor.
+- **Codes**: PW6711 a program makes no anchor.
 - **Acceptance** (`e14-docs-comments`): an anchor a program makes refused
   at build, and its control; a commenter's selection made an anchor at
   the page's version, highlighted; the anchor following
   concurrent edits; a deleted range's comment shown detached; a viewer's
   comment refused `MayComment`; comments private as the document is.
-- **Mutation controls**: PW6611 disabled; an anchor resolved at the latest
+- **Mutation controls**: PW6711 disabled; an anchor resolved at the latest
   version instead of the page's; `MayComment` skipped; an anchor sent by
   the client accepted.
 
@@ -906,13 +922,13 @@ collaborative; phase 3 is the app; D9 is conditional.
 - **Files**: `docs.rs` (named versions and checkpoints, by heads),
   `examples/docs/app.pw` (the history page, `restore`),
   `e2e/docs-history.spec.mjs`.
-- **Codes**: PW6612 a `restore` `requires MayEdit`.
+- **Codes**: PW6712 a `restore` `requires MayEdit`.
 - **Acceptance** (`e14-docs-history`): a `restore` without `requires
   MayEdit` refused at build, and its control; a past version rendered; a
   diff by author, actors shown as users; a restore made as a new change
   that every replica merges, an offline editor's later changes kept; a
   viewer's request for history refused.
-- **Mutation controls**: PW6612 disabled; a restore that replaces the
+- **Mutation controls**: PW6712 disabled; a restore that replaces the
   document (breaking every replica) instead of a new change; history shown
   to a viewer; an author taken from the client.
 
@@ -1021,8 +1037,8 @@ names, 265,991 bytes.
 
 ## Questions for the integrator
 
-1. **The codes and ports** of D0 to D9: their block (PW66xx and above are
-   free) and their Playwright bases.
+1. **The codes and ports** of D0 to D9: their block (now PW67xx,
+   amended above) and their Playwright bases.
 2. **A predicate on a read.** `requires` is a command's (ADR-0258); the
    reader's page needs a query refused by role with its words, as a
    command is. Or keep it as the data operation's answer (`NotShared`),

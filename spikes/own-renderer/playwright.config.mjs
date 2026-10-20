@@ -155,6 +155,14 @@ export const REVIEWS_PORTS = Object.fromEntries(ENGINES.map((e, i) => [e, PORT +
 // provider. One per engine, because an entry is every reader's on a host.
 // Served only when it is built.
 export const GUESTBOOK_PORTS = Object.fromEntries(ENGINES.map((e, i) => [e, PORT + 210 + i]));
+// TRACK SEAM (scheduled-orders): the store's build taking payments from the
+// development provider, as the payments' hosts do, on hosts of their own, one
+// per engine, because a test of an order for a time moves its host's clock
+// forward, which would sweep another suite's order awaiting its payment. Each
+// host's provider is ten ports above it.
+export const SCHEDULED_ORDERS_PORTS = Object.fromEntries(
+  ENGINES.map((e, i) => [e, PORT + 183 + i]),
+);
 // A build serves the runtime it was built with. One built before the runtime
 // changed runs the old runtime against the new server, and fails for a reason
 // that is no test's: `dist-keyed` did, once each page's subscription named
@@ -165,12 +173,22 @@ export const GUESTBOOK_PORTS = Object.fromEntries(ENGINES.map((e, i) => [e, PORT
 //   warning that says what to run. Refusing it would fail every mutation
 //   control that changes the runtime and runs another spec, for no test's
 //   reason; the recipes that run the keyed suite build it first.
+// - And `dist` is refused unless it is a whole build (track
+//   evidence-integrity, finding 5): `run.sh` removes it first and records its
+//   sources last, so a build that stopped part-way has no `sources.json`.
+//   Track reviews found a suite run on a build stopped at step 3c
+//   (2026-10-15): the two checks below were asked only of a build that held
+//   its runtime, which `run.sh` copies after that step, so a build that
+//   stopped before it was served as it was.
 const RUNTIME = readFileSync(new URL("./public/pw-runtime.mjs", import.meta.url), "utf8");
 const builtWith = (dist) => {
   const built = new URL(`./${dist}/pw-runtime.mjs`, import.meta.url);
   return existsSync(built) ? readFileSync(built, "utf8") : null;
 };
-if (builtWith("dist") !== null && builtWith("dist") !== RUNTIME) {
+if (!existsSync(new URL("./dist/sources.json", import.meta.url))) {
+  throw new Error("dist is no whole build (run.sh stopped before its end, or never ran): run run.sh again");
+}
+if (builtWith("dist") !== RUNTIME) {
   throw new Error("dist was built with another pw-runtime.mjs: run run.sh again");
 }
 // And the sources it was built from (ADR-0166), each by its digest, as
@@ -186,7 +204,7 @@ const changedSince = (dist) => {
   const changed = files.find(({ path, sha256 }) => existsSync(path) && digest(path) !== sha256);
   return changed ? `${changed.path} changed since ${dist} was built` : null;
 };
-if (builtWith("dist") !== null && changedSince("dist")) {
+if (changedSince("dist")) {
   throw new Error(`${changedSince("dist")}: run run.sh again`);
 }
 const KEYED_WHY = !existsSync(new URL("./dist-keyed/build", import.meta.url))
@@ -365,6 +383,21 @@ export default defineConfig({
     ...(process.env.PW_PERFORMANCE
       ? []
       : Object.values(STORE_PAYMENTS_PORTS).map((port) => ({
+          command: `../../target/debug/pw-dev-server dist`,
+          env: {
+            PORT: String(port),
+            PW_PAYMENTS: "dev",
+            PW_PAYMENTS_PORT: String(port + 10),
+            ...IN_MEMORY,
+          },
+          port,
+          reuseExistingServer: !!process.env.PW_REUSE,
+          timeout: 60_000,
+        }))),
+    // TRACK SEAM (scheduled-orders): the store's hosts whose clock a test moves.
+    ...(process.env.PW_PERFORMANCE
+      ? []
+      : Object.values(SCHEDULED_ORDERS_PORTS).map((port) => ({
           command: `../../target/debug/pw-dev-server dist`,
           env: {
             PORT: String(port),

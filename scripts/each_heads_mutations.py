@@ -32,7 +32,7 @@ MUTANTS = [
     (
         "an each head is not read",
         LOWER,
-        "                let each = open.as_ref().and_then(|o| self.each_head(o));\n",
+        "                let each = open.as_ref().and_then(|o| self.each_head(b, o));\n",
         "                let each: Option<crate::hir::EachHead> = None;\n",
     ),
     (
@@ -85,20 +85,20 @@ MUTANTS = [
     (
         "a row's name is not in lexical scope",
         LEXICAL,
-        "                        each.as_ref().map(|e| (e.binder.clone(), e.list.clone()))\n",
-        "                        None::<(String, String)>.filter(|_| each.is_some())\n",
+        "                    if let Some(each) = each {\n",
+        "                    if let Some(each) = each.as_ref().filter(|_| false) {\n",
     ),
     (
         "the names check reads no head",
         NAMES,
-        "                    each.as_ref().map(|e| (e.list.clone(), e.binder.clone()))\n",
-        "                    None::<(String, String)>.filter(|_| each.is_some())\n",
+        "                if let Some(each) = &each {\n",
+        "                if let Some(each) = each.as_ref().filter(|_| false) {\n",
     ),
     (
         "Marko reads no head",
         MARKO,
-        "            let each = each.as_ref().map(Each::of).ok_or_else(|| {\n",
-        "            let each = each.as_ref().filter(|_| false).map(Each::of).ok_or_else(|| {\n",
+        "            let each = each.as_ref().ok_or_else(|| {\n",
+        "            let each = each.as_ref().filter(|_| false).ok_or_else(|| {\n",
     ),
     (
         "the template IR reads no head",

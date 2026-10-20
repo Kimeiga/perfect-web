@@ -92,6 +92,12 @@ generator only where malformed structure could crash a later phase.
 `retry_not_idempotent`, `retry_unbounded`, `stale_key_policy`,
 `optimistic_no_rollback`.
 
+Track `tables` (ADR-0338, D1): `table_malformed`, `data_not_declared`,
+`all_unbounded`, `refers_across_sources` and `migration_unstated`, each a rule
+over one declaration or one call, its challenge a shape the fixture does not
+have (a reference's key, a write by hand, a bare `all()`, a referring table in
+no source, a type changed) and its neighbour the same shape, valid.
+
 All complete at 2 files each. `constructor_arity` is tier 3 with a targeted
 generator, because malformed structure there **did** crash a later phase.
 

@@ -51,3 +51,12 @@ tempfile.workspace = true
 # ADR-0203: a view that contains itself, compiled here and rendered by the
 # renderer the hosts use, in one test. A workspace path: nothing is fetched.
 pw-render = { path = "../../runtime/pw-render" }
+
+# Track evidence-integrity, finding 4: `check_latency` bounds the checking
+# thread's CPU time, `clock_gettime(CLOCK_THREAD_CPUTIME_ID)`, where a loaded
+# machine stretched the wall clock past the ceiling. 0.2.189 was in Cargo.lock
+# already (wasmtime, tokio, rustix and others depend on it) and in the local
+# registry, so nothing is fetched; its own source declares both on Linux and
+# Apple targets (checked 2026-10-15). License MIT OR Apache-2.0.
+[target.'cfg(any(target_os = "linux", target_os = "macos"))'.dev-dependencies]
+libc = "0.2.189"

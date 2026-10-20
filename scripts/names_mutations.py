@@ -102,18 +102,14 @@ MUTANTS = [
     (
         "an `{#each}` source is not read",
         NAMES,
-        "if written && !self.bound(head) && !self.resolves(head) {",
-        "if false {",
+        "                    self.expr(each.list);\n",
+        "                    let _ = each.list;\n",
     ),
     (
         "an `{#each}` item outlives its block",
         NAMES,
-        """                    scope.insert(binding);
-                }
-                self.scoped(scope, |w| {""",
-        """                    self.bind([binding]);
-                }
-                self.scoped(scope, |w| {""",
+        "                    scope.insert(each.binder.clone());\n",
+        "                    self.bind([each.binder.clone()]);\n",
     ),
     (
         "a `{#match}` arm's binding reaches the arms after it",

@@ -110,6 +110,19 @@ fn rated_by_layer(
     store: &str,
     stars: i64,
 ) -> Result<Option<Val>, String> {
+    rated_by_layer_saying(s, session, store, stars, "")
+}
+
+/// [`rated_by_layer`], with a comment: past the command's boundary too,
+/// where the host holds a `Comment`'s invariant since ADR-0346, so only
+/// this call reaches the layer's own rule for a comment's length.
+fn rated_by_layer_saying(
+    s: &Server,
+    session: &str,
+    store: &str,
+    stars: i64,
+    comment: &str,
+) -> Result<Option<Val>, String> {
     let owner = s.owner(session);
     s.store_write(
         session,
@@ -118,7 +131,7 @@ fn rated_by_layer(
             Val::String(owner),
             Val::String(store.to_string()),
             Val::S64(stars),
-            Val::String(String::new()),
+            Val::String(comment.to_string()),
         ],
         &[],
         |_| {},
@@ -274,6 +287,12 @@ fn the_layer_holds_its_rules_without_the_predicate() {
     // Stars past 1 to 5 are no program's: the operation traps.
     let past = rated_by_layer(&s, "a", "48", 6).expect_err("past 5");
     assert!(past.contains("past 1 to 5"), "{past}");
+    // Nor is a comment past 500 characters: the host refuses one at the
+    // command's boundary (ADR-0346), and the operation, called past it,
+    // traps before it reads the order (train-10: the command's test alone
+    // no longer reached this rule).
+    let past = rated_by_layer_saying(&s, "a", "48", 5, &"é".repeat(501)).expect_err("past 500");
+    assert!(past.contains("a comment past 500 characters"), "{past}");
 }
 
 /// **The latest order alone is rated** (DoorDash's rule, ADR-0341 decision
@@ -442,7 +461,9 @@ fn a_rating_is_told_to_the_pages_that_show_it() {
 
 /// **A comment is the program's to bound** (ADR-0341, decision 2): 500
 /// characters are taken; the page's own check refuses more before any press
-/// reaches the store, and the layer traps on one past it.
+/// reaches the store, the host refuses one past it at the command's
+/// boundary (its type's invariant, ADR-0346), and the layer traps on one
+/// past it (`the_layer_holds_its_rules_without_the_predicate`).
 #[test]
 fn a_comment_is_at_most_five_hundred_characters() {
     let s = served();

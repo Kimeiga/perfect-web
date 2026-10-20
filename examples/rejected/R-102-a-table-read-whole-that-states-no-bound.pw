@@ -1,0 +1,30 @@
+// @corpus: rejected
+// @id: R-102
+// @category: a table read whole that states no bound
+// @rule: PW0364
+// @invariant: all_unbounded
+// @charter: §9.2, §9.5
+// @milestone: 14
+// @expect-error: `Shops.all()` reads every row of `Shops`, which states no `bounded`
+//
+// A table read whole costs what the table holds, which no key bounds: the
+// page is as slow as the table is long. A table that a page reads whole
+// states the most rows it holds (`bounded`), and gives `all()`; any other
+// is read by its key, a prefix of the key, or an index (ADR-0338, 1.2).
+// `A-050`'s table is bounded, and read whole, accepted.
+
+module Shops
+
+opaque type ShopId = String
+
+type Shop = Shop { id: ShopId, name: String }
+
+table Shops
+    row Shop
+    key id
+
+query EveryShop() -> List<Shop>
+    consistency strong
+{
+    Shops.all()
+}

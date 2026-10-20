@@ -84,6 +84,12 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "0015_schedules",
         include_str!("../migrations/store/0015_schedules.sql"),
     ),
+    // TRACK SEAM (scheduled-orders): the time chosen at checkout, and an
+    // order's time.
+    (
+        "0016_scheduled_orders",
+        include_str!("../migrations/store/0016_scheduled_orders.sql"),
+    ),
     // TRACK SEAM (reviews): a store's ratings, each through an order.
     (
         "0017_ratings",
@@ -494,6 +500,20 @@ impl Rows for PgRows<'_> {
     }
     fn rate(&mut self, rating: &crate::reviews::Rating) -> Result<bool, String> {
         crate::reviews::pg_rate(&mut self.0, rating)
+    }
+    // TRACK SEAM (scheduled-orders): an order's time (`scheduled_orders.rs`).
+    fn order_time(
+        &mut self,
+        owner: &str,
+    ) -> Result<Option<crate::scheduled_orders::OrderTime>, String> {
+        crate::scheduled_orders::pg_order_time(&mut self.0, owner)
+    }
+    fn set_order_time(
+        &mut self,
+        owner: &str,
+        time: &crate::scheduled_orders::OrderTime,
+    ) -> Result<(), String> {
+        crate::scheduled_orders::pg_set_order_time(&mut self.0, owner, time)
     }
 
     fn stores(&mut self) -> Result<Vec<StoreRow>, String> {

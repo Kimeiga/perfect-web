@@ -1,0 +1,53 @@
+Train-10 D1 compiler and bounded-read integration, 2026-10-16
+
+Tested source: c67bf6ed04f59264d934a0f397879820bee1f1f1 + pending merge 917fafbd9e415e90d86abbde3fac12becf6cfc99 and recorded integration changes.
+This is local integration evidence; no GitHub or master landing is claimed.
+All 2366 frozen source/config hashes restored after the final campaign and full CI.
+Environment: source /home/haki/pw-setup/env.sh; then unset KIOKUN_DATA KIOKUN_APP.
+CARGO_BUILD_JOBS=4 RUST_TEST_THREADS=4; private WSL target; PORT=11841.
+
+Commands: cargo fmt --all -- --check; python3 scripts/mutation_anchors.py;
+two exact bounded/store_pg fixture tests; whole bounded_checker_mutations.py;
+whole store_postgres_mutations.py; just e14-guide; just ci.
+
+Final bounded whole: 47/47 built test-failure kills; no stopped processes.
+Final PostgreSQL whole: 12/12 built test-failure kills; baseline29; no stopped processes.
+Guide campaign reports 74/74 = 66 document witnesses + 5 browser assertion kills + 3 named checker refusals.
+The checker refusals are PW5048 twice and PW5107 once; no build-error kill is substituted.
+Guide baseline browser: 12 passing in three engines, with deployment dictionary variables unset.
+Final guide restoration rebuild is gated; the mutation script does not repeat a final browser run.
+A separate private exit-status injection found that the guide parser accepts contradictory
+or stopped Cargo/browser output and exact partial diagnostic text; see guide-producer-exit-before.txt.
+This guide campaign remains historical evidence at that instrument, not a claim of strict producer validity.
+Guide producer exit validation remains a separate open corrective track.
+Full CI: ci: OK; 346 Rust result groups, 3058 passed, 0 failed, 25 ignored.
+Python evidence gates: 235 ran, 233 passed, 2 skipped.
+Source admissibility: 302 variants, 463 checks, 16 named-rule refusals, 0 failing.
+
+The previous full CI had 2 fixture-setup failures: canonical Addresses spacing and
+a StoreData patch that assumed changes none was EOF before sets one_call was added.
+Only those anchors were repaired; refusal assertions and source cost promises were retained.
+That full negative raw remains outside the repo; SHA-256:
+774dd47dd00ea43617b58cc1565a2f77a68fe84a0e572d8bf29cb5b1e2eea735
+
+The result parser had 6 failing adversarial regressions among 8 against the old source;
+all 8 pass after refusing incomplete summaries, contradictory exits, stops and build failures.
+Earlier whole table44/evidence35 and hermetic2 remain separately recorded at their tested inputs.
+D2 runtime provider admission/conformance, generic-result integration, final assembled CI,
+verification and quiet-host E9 remain open. No stronger adapter cost claim is made.
+
+Complete raw artifacts (copied byte for byte):
+train10-d1-ci.txt: sha256 79c6512be1d04d51631ae97e2da241a40490eac605abf781cbf0f15fdfce8c26, 309208 bytes
+train10-d1-bounded47.txt: sha256 914194b14acfa11f61b28ec9f3a8349e62cb66a86b7dd6989ec33ae07a8f95de, 3387 bytes
+train10-d1-postgres12.txt: sha256 ce772c7ed3f5980696792b4d892344677780a5ef98f8ab4b4c4a6fde0c01364a, 1001 bytes
+train10-d1-result-parser-before.txt: sha256 fd343f3027e976c0fac4eec28fa99fcb4f0605f5dbb8ac85bea6c74ba2b69e4c, 4690 bytes
+train10-d1-result-parser-after.txt: sha256 41220d2205cb897c40aba785f8a314f769c310db2c2f7b44e1827e9ed431bc1b, 929 bytes
+guide-producer-exit-before.txt: sha256 39aed97ec71e4ed51f3207dd61f760b96c599dded29484bbcbf528422b22b98d, 948 bytes
+train10-d1-input-sha256.json: sha256 0ad5eded2e8fb8898f57e481b02bb4bade46d25a3d5e29b6f524871396864ad9, 286205 bytes
+guide.txt: sha256 274b23bc9bccf7b347a2016fdc930a68269a693208ab8843cd29fe9b35ef237f
+
+Raw CI whitespace preservation: git diff --check reports only three trailing
+spaces in the byte-identical raw CI file, at lines13,252,255, emitted by
+unittest before nested command output. The raw file is not rewritten.
+Final whitespace check covers every other staged file with that exact raw
+path excluded; its complete SHA256/byte comparison is verified separately.

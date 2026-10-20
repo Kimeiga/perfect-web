@@ -313,6 +313,16 @@ type OrderStatus =
     | Delivered
     | AwaitingPayment(PaymentPage)
     | Canceled
+    // Paid, and sent to its stores at its time (track `scheduled-orders`):
+    // the store is told nothing until its preparation is due.
+    | Scheduled(ScheduledFor)
+
+// **When an order is for, and when its stores are told** (track
+// `scheduled-orders`): the start of the window its reader chose; when it is
+// sent to its stores, that less their estimates at their most and five
+// minutes more; and the window's day and time in its first store's zone,
+// which a page words, having no zone database (ADR-0328).
+type ScheduledFor = ScheduledFor { at: Instant, sends: Instant, day: Weekday, time: LocalTime }
 
 // **The provider's page an order's payment is made on** (NEXT 6c): what the
 // order page frames, the provider's own origin.
@@ -348,6 +358,14 @@ type OrderError =
     // The deployment's provider could not be reached to begin the payment
     // (NEXT 6c): nothing is written, and the reader may press again.
     | PaymentUnavailable
+    // The time the reader chose is no longer offered (track
+    // `scheduled-orders`): an hour away or less, or a store of the cart
+    // would take no order when its stores are told for it. The reader is
+    // shown the times offered now.
+    | NotOffered(Instant)
+    // An order of the reader's is scheduled (track `scheduled-orders`): a
+    // second is not placed beside it until it is sent to its stores.
+    | Scheduled
 
 // **Why an order was not taken back** (NEXT 6c, step eight).
 type CancelOrderError =

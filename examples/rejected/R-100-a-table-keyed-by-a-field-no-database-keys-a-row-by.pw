@@ -1,0 +1,22 @@
+// @corpus: rejected
+// @id: R-100
+// @category: a table keyed by a field no database keys a row by
+// @rule: PW0361
+// @invariant: table_malformed
+// @charter: §9.2
+// @milestone: 14
+// @expect-error: `key` names `tags`, of `List<String>`
+//
+// A table's key finds a row in every database that may hold it: a primary
+// key, a partition key and its clustering columns, a document's `_id`. No
+// adapter keys a row by a list, and two lists equal as values need not be
+// one key (track `tables`, ADR-0338). `A-050` is a table keyed by what every
+// database keys, accepted.
+
+module Taggings
+
+type Tagging = Tagging { tags: List<String>, label: String }
+
+table Taggings
+    row Tagging
+    key tags

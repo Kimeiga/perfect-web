@@ -199,10 +199,11 @@ fn a_block_inside_one_is_rendered_with_it() {
 
 /// The cart's page as the store ships it: what a query decides, the order's
 /// link and, since track `order-total`, the checkout's disclosure and its
-/// code's Remove; and its `{#if SignedIn}` Place order, which captures the
-/// checkout, the total it passes (ADR-0307: planned where a handler there
-/// captures a query's value). The cart's own fees line, decided by its
-/// lines, is the checkout's now.
+/// code's Remove, and, since track `scheduled-orders`, the checkout's line of
+/// when the order is for; and its `{#if SignedIn}` Place order, which
+/// captures the checkout, the total it passes (ADR-0307: planned where a
+/// handler there captures a query's value). The cart's own fees line,
+/// decided by its lines, is the checkout's now.
 #[test]
 fn the_cart_page_as_it_is_plans_what_it_did() {
     let units = store(&same, &same);
@@ -227,7 +228,13 @@ fn the_cart_page_as_it_is_plans_what_it_did() {
     subjects.sort();
     assert_eq!(
         subjects,
-        ["SignedIn~holds", "checkout.any", "checkout.promo", "order"],
+        [
+            "SignedIn~holds",
+            "checkout.any",
+            "checkout.any",
+            "checkout.promo",
+            "order"
+        ],
         "{:?}",
         plan.blocks
     );
