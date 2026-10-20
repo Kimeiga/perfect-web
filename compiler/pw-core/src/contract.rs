@@ -1402,17 +1402,26 @@ fn component_calls(
 }
 
 /// **A declaration's component id**: `module.Name`, or `Name` in the root
-/// module.
+/// module. Ui declarations append `~ui`, preserving their distinct namespace.
 ///
 /// The one derivation. A contract is filed under it, a component dependency
 /// names it, and a compiled handler calls a command by it (`backend::js`). A
 /// second derivation that disagreed would send a handler's call to a component
 /// the host has no contract for, which is a refusal at best.
 pub fn component_id(hir: &Hir, id: crate::hir::DeclId) -> String {
-    let name = &hir.decl(id).name;
-    match hir.module_of(id) {
+    let decl = hir.decl(id);
+    let name = &decl.name;
+    let path = match hir.module_of(id) {
         Some(module) if !module.is_empty() => format!("{module}.{name}"),
         _ => name.clone(),
+    };
+    // Term and Ui declarations may share a source path (A-008). The marker
+    // cannot be written in a source name; adding another declaration never
+    // changes an existing identity. All projections consume this authority.
+    if crate::resolve::Namespace::of(decl.kind) == Some(crate::resolve::Namespace::Ui) {
+        format!("{path}~ui")
+    } else {
+        path
     }
 }
 

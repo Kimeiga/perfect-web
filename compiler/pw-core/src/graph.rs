@@ -238,8 +238,8 @@ impl Graph {
         let mut by_def: std::collections::BTreeMap<crate::resolve::DefId, String> =
             std::collections::BTreeMap::new();
         for m in &ws.modules {
-            for ((_, name), def) in &m.defines {
-                by_def.insert(*def, qualified(&m.name, name));
+            for def in m.defines.values() {
+                by_def.insert(*def, path_of(hirs[def.unit], crate::hir::DeclId(def.decl)));
             }
         }
 
@@ -250,9 +250,8 @@ impl Graph {
                 let Some(kind) = node_kind(decl) else {
                     continue;
                 };
-                let module = hir.module_of(id).unwrap_or_default();
                 g.nodes.push(Node {
-                    path: qualified(module, &decl.name),
+                    path: path_of(hir, id),
                     name: decl.name.clone(),
                     kind,
                     params: decl.params.iter().map(|p| p.name.clone()).collect(),
@@ -266,8 +265,7 @@ impl Graph {
                 if node_kind(decl).is_none() {
                     continue;
                 }
-                let module = hir.module_of(id).unwrap_or_default();
-                let from = qualified(module, &decl.name);
+                let from = path_of(hir, id);
                 // An edge's target is a query, a materialization, an event, a
                 // command or a page — never a TYPE. Saying so is not an
                 // optimisation, it is the difference between two right answers:
@@ -617,17 +615,9 @@ pub struct KeyGap {
     pub why: String,
 }
 
-fn qualified(module: &str, name: &str) -> String {
-    if module.is_empty() {
-        name.to_string()
-    } else {
-        format!("{module}.{name}")
-    }
-}
-
 /// The node a declaration is: `Module.Name`, as [`Graph::build`] names it.
 pub(crate) fn path_of(hir: &Hir, id: crate::hir::DeclId) -> String {
-    qualified(hir.module_of(id).unwrap_or_default(), &hir.decl(id).name)
+    crate::contract::component_id(hir, id)
 }
 
 fn node_kind(decl: &Decl) -> Option<NodeKind> {
@@ -800,8 +790,7 @@ pub fn check(
         if node_kind(decl).is_none() {
             continue;
         }
-        let module = hir.module_of(id).unwrap_or_default();
-        let path = qualified(module, &decl.name);
+        let path = path_of(hir, id);
         let at = hir.decl_span(id);
 
         // 1. A clause that names nothing.

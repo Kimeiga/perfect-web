@@ -1185,14 +1185,9 @@ pub fn lowered(
     let hir = hirs.get(unit)?;
     let decl = hir.decl(id);
     let body = hir.body(decl.body?);
-    let module = hir.module_of(id).unwrap_or_default();
     let mut chunks = Vec::new();
     let mut ix = Indexer {
-        template: if module.is_empty() {
-            decl.name.clone()
-        } else {
-            format!("{module}.{}", decl.name)
-        },
+        template: crate::contract::component_id(hir, id),
         ..Indexer::default()
     };
     // Its own signals, and the signals it provides, by the names it writes:
@@ -1329,11 +1324,7 @@ pub fn lowered(
     let chunks = coalesce(chunks);
     let params: Vec<String> = decl.params.iter().map(|p| p.name.clone()).collect();
     let template = Template {
-        path: if module.is_empty() {
-            decl.name.clone()
-        } else {
-            format!("{module}.{}", decl.name)
-        },
+        path: crate::contract::component_id(hir, id),
         name: decl.name.clone(),
         schema: schema_of(&params, &chunks),
         params,
@@ -1406,12 +1397,7 @@ fn lower_layout(
     let id = DeclId(def.decl);
     let decl = hir.decl(id);
     let body = hir.body(decl.body?);
-    let module = hir.module_of(id).unwrap_or_default();
-    let path = if module.is_empty() {
-        decl.name.clone()
-    } else {
-        format!("{module}.{}", decl.name)
-    };
+    let path = crate::contract::component_id(hir, id);
     let mut names = asked_predicates(hirs, ws, sigs, def.unit);
     for (name, _, _) in crate::page_values::query_bindings(ws, def.unit, body) {
         names.insert(name.clone(), crate::layouts::bound(&decl.name, &name));
@@ -2838,12 +2824,8 @@ fn compose(
         if !ix.views.contains(&def) {
             ix.views.push(def);
         }
-        let module = hir.module_of(DeclId(def.decl)).unwrap_or_default();
-        let path = if module.is_empty() {
-            decl.name.clone()
-        } else {
-            format!("{module}.{}", decl.name)
-        };
+        let id = DeclId(def.decl);
+        let path = crate::contract::component_id(hir, id);
         out.push(Chunk::Dynamic(Part::Instance {
             id: ix.part(),
             path,
