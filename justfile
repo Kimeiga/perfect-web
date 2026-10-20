@@ -46,6 +46,7 @@ import 'just/kiokun-cache.just'
 import 'just/ci-diagnostics.just'
 import 'just/fuzz-floor.just'
 import 'just/check-is-build.just'
+import 'just/guide-producer.just'
 
 default:
     @just --list

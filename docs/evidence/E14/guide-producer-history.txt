@@ -1,0 +1,546 @@
+Guide producer validity: retained historical RED evidence
+
+Embedded log text normalizes trailing whitespace for Git patch hygiene; original
+raw bytes/hashes remain preserved in local recovery.
+
+These are unit-level/private-fixture observations, not browser/full mutation
+campaign failures. The original 28 draft methods (46 failed subtests across17
+methods,0errors) were expanded and migrated to canonical JSON consumption in
+the final40; do not treat them as byte-identical test files. Cargo/browser/checker
+seams retain their causal invalid-status controls. The independent real native
+fixture before/after observations establish the Python fixture boundary.
+Original own guide source SHA256:
+da1e1b61cfd50a6ed4b711245b84014abdaf4b65af7862d9d158609458e480f3
+
+--- original own28 RED; SHA256 6535b4d80a979aa00882fda186e452601027d8c934a24089ef939a17170488ae ---
+test_browser_accepts_actual_assertion_failure (__main__.GuideProducers) ... ok
+test_browser_accepts_green_producer (__main__.GuideProducers) ... ok
+test_browser_refuses_empty_or_missing_summary (__main__.GuideProducers) ... ok
+test_browser_refuses_invalid_failure_status (__main__.GuideProducers) ... test_browser_refuses_invalid_green_status (__main__.GuideProducers) ... test_browser_uses_canonical_authority_and_exact_selection (__main__.GuideProducers) ... FAIL
+test_cargo_accepts_actual_assertion_failure (__main__.GuideProducers) ... ok
+test_cargo_refuses_empty_or_missing_summary (__main__.GuideProducers) ... test_cargo_refuses_invalid_failure_status (__main__.GuideProducers) ... test_cargo_refuses_invalid_green_status (__main__.GuideProducers) ... test_final_restored_build_failure_fails_campaign (__main__.GuideProducers) ... ok
+test_guide_accepts_green_producers (__main__.GuideProducers) ... ok
+test_guide_retains_earlier_producer_output (__main__.GuideProducers) ... FAIL
+test_main_accepts_exact_named_compiler_refusal (__main__.GuideProducers) ... ok
+test_main_accepts_valid_intended_assertion_neighbours (__main__.GuideProducers) ... ok
+test_main_green_neighbours_are_survivors (__main__.GuideProducers) ... ok
+test_main_refuses_additional_named_codes (__main__.GuideProducers) ... ok
+test_main_refuses_bound_stop_with_valid_partial_summary (__main__.GuideProducers) ... FAIL
+test_main_refuses_browser_invalid_status_without_kill (__main__.GuideProducers) ... test_main_refuses_cargo_invalid_status_without_kill (__main__.GuideProducers) ... test_main_refuses_invalid_green_baseline (__main__.GuideProducers) ... FAIL
+test_main_refuses_named_codes_after_invalid_build_status (__main__.GuideProducers) ... test_main_refuses_python_invalid_status_without_kill (__main__.GuideProducers) ... test_main_refuses_unlisted_compiler_refusal (__main__.GuideProducers) ... FAIL
+test_python_accepts_actual_assertion_failure (__main__.GuideProducers) ... ok
+test_python_refuses_empty_or_missing_summary (__main__.GuideProducers) ... test_python_refuses_invalid_failure_status (__main__.GuideProducers) ... test_python_refuses_invalid_green_status (__main__.GuideProducers) ...
+======================================================================
+FAIL: test_browser_refuses_invalid_failure_status (__main__.GuideProducers) (status=-9)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 107, in test_browser_refuses_invalid_failure_status
+    self.assertFalse(self.browser_result(status, browser_output(True))[0][0])
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_browser_refuses_invalid_failure_status (__main__.GuideProducers) (status=137)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 107, in test_browser_refuses_invalid_failure_status
+    self.assertFalse(self.browser_result(status, browser_output(True))[0][0])
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_browser_refuses_invalid_failure_status (__main__.GuideProducers) (status=67)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 107, in test_browser_refuses_invalid_failure_status
+    self.assertFalse(self.browser_result(status, browser_output(True))[0][0])
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_browser_refuses_invalid_failure_status (__main__.GuideProducers) (status=0)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 107, in test_browser_refuses_invalid_failure_status
+    self.assertFalse(self.browser_result(status, browser_output(True))[0][0])
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_browser_refuses_invalid_green_status (__main__.GuideProducers) (status=-9)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 112, in test_browser_refuses_invalid_green_status
+    self.assertFalse(self.browser_result(status, browser_output())[0][0])
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_browser_refuses_invalid_green_status (__main__.GuideProducers) (status=137)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 112, in test_browser_refuses_invalid_green_status
+    self.assertFalse(self.browser_result(status, browser_output())[0][0])
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_browser_refuses_invalid_green_status (__main__.GuideProducers) (status=67)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 112, in test_browser_refuses_invalid_green_status
+    self.assertFalse(self.browser_result(status, browser_output())[0][0])
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_browser_refuses_invalid_green_status (__main__.GuideProducers) (status=1)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 112, in test_browser_refuses_invalid_green_status
+    self.assertFalse(self.browser_result(status, browser_output())[0][0])
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_browser_uses_canonical_authority_and_exact_selection (__main__.GuideProducers)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 132, in test_browser_uses_canonical_authority_and_exact_selection
+    self.assertEqual(calls[1].args[0], expected)
+AssertionError: Lists differ: ['pnpm', 'exec', 'playwright', 'test', 'e2e[72 chars]ine'] != ['bash', '/home/haki/code/pw-wt/check-is-bu[158 chars]ine']
+
+First differing element 0:
+'pnpm'
+'bash'
+
+Second list contains 5 additional elements.
+First extra element 8:
+'test'
+
++ ['bash',
++  '/home/haki/code/pw-wt/check-is-build/scripts/run_suite.sh',
++  '-C',
++  '.',
++  '--',
+- ['pnpm',
+? ^
+
++  'pnpm',
+? ^
+
+   'exec',
+   'playwright',
+   'test',
+   'e2e/guestbook.spec.mjs',
+   '--project=chromium',
+   '--retries=1',
+   '--reporter=line']
+
+======================================================================
+FAIL: test_cargo_refuses_empty_or_missing_summary (__main__.GuideProducers) (text='test result: ok. 0 passed; 0 failed\n')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 68, in test_cargo_refuses_empty_or_missing_summary
+    self.assertIsNone(self.guide_result(cargo=(0, text))[0])
+AssertionError: 7 is not None
+
+======================================================================
+FAIL: test_cargo_refuses_invalid_failure_status (__main__.GuideProducers) (status=-9)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 58, in test_cargo_refuses_invalid_failure_status
+    self.assertIsNone(self.guide_result(cargo=(status, cargo_output(True)))[0])
+AssertionError: 8 is not None
+
+======================================================================
+FAIL: test_cargo_refuses_invalid_failure_status (__main__.GuideProducers) (status=137)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 58, in test_cargo_refuses_invalid_failure_status
+    self.assertIsNone(self.guide_result(cargo=(status, cargo_output(True)))[0])
+AssertionError: 8 is not None
+
+======================================================================
+FAIL: test_cargo_refuses_invalid_failure_status (__main__.GuideProducers) (status=67)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 58, in test_cargo_refuses_invalid_failure_status
+    self.assertIsNone(self.guide_result(cargo=(status, cargo_output(True)))[0])
+AssertionError: 8 is not None
+
+======================================================================
+FAIL: test_cargo_refuses_invalid_failure_status (__main__.GuideProducers) (status=0)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 58, in test_cargo_refuses_invalid_failure_status
+    self.assertIsNone(self.guide_result(cargo=(status, cargo_output(True)))[0])
+AssertionError: 8 is not None
+
+======================================================================
+FAIL: test_cargo_refuses_invalid_green_status (__main__.GuideProducers) (status=-9)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 63, in test_cargo_refuses_invalid_green_status
+    self.assertIsNone(self.guide_result(cargo=(status, cargo_output()))[0])
+AssertionError: 8 is not None
+
+======================================================================
+FAIL: test_cargo_refuses_invalid_green_status (__main__.GuideProducers) (status=137)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 63, in test_cargo_refuses_invalid_green_status
+    self.assertIsNone(self.guide_result(cargo=(status, cargo_output()))[0])
+AssertionError: 8 is not None
+
+======================================================================
+FAIL: test_cargo_refuses_invalid_green_status (__main__.GuideProducers) (status=67)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 63, in test_cargo_refuses_invalid_green_status
+    self.assertIsNone(self.guide_result(cargo=(status, cargo_output()))[0])
+AssertionError: 8 is not None
+
+======================================================================
+FAIL: test_cargo_refuses_invalid_green_status (__main__.GuideProducers) (status=101)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 63, in test_cargo_refuses_invalid_green_status
+    self.assertIsNone(self.guide_result(cargo=(status, cargo_output()))[0])
+AssertionError: 8 is not None
+
+======================================================================
+FAIL: test_guide_retains_earlier_producer_output (__main__.GuideProducers)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 101, in test_guide_retains_earlier_producer_output
+    self.assertIn("earlier Cargo detail", out)
+AssertionError: 'earlier Cargo detail' not found in 'Ran 7 tests in 0.001s\n\nOK\n'
+
+======================================================================
+FAIL: test_main_refuses_bound_stop_with_valid_partial_summary (__main__.GuideProducers)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 243, in test_main_refuses_bound_stop_with_valid_partial_summary
+    self.assert_refused_without_kill(self.run_main("cargo", 101, mode="stopped"))
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 190, in assert_refused_without_kill
+    self.assertNotEqual(code, 0)
+AssertionError: 0 == 0
+
+======================================================================
+FAIL: test_main_refuses_browser_invalid_status_without_kill (__main__.GuideProducers) (status=-9)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 208, in test_main_refuses_browser_invalid_status_without_kill
+    self.assert_refused_without_kill(self.run_main("browser", status))
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 190, in assert_refused_without_kill
+    self.assertNotEqual(code, 0)
+AssertionError: 0 == 0
+
+======================================================================
+FAIL: test_main_refuses_browser_invalid_status_without_kill (__main__.GuideProducers) (status=137)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 208, in test_main_refuses_browser_invalid_status_without_kill
+    self.assert_refused_without_kill(self.run_main("browser", status))
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 190, in assert_refused_without_kill
+    self.assertNotEqual(code, 0)
+AssertionError: 0 == 0
+
+======================================================================
+FAIL: test_main_refuses_browser_invalid_status_without_kill (__main__.GuideProducers) (status=67)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 208, in test_main_refuses_browser_invalid_status_without_kill
+    self.assert_refused_without_kill(self.run_main("browser", status))
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 190, in assert_refused_without_kill
+    self.assertNotEqual(code, 0)
+AssertionError: 0 == 0
+
+======================================================================
+FAIL: test_main_refuses_browser_invalid_status_without_kill (__main__.GuideProducers) (status=0)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 208, in test_main_refuses_browser_invalid_status_without_kill
+    self.assert_refused_without_kill(self.run_main("browser", status))
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 190, in assert_refused_without_kill
+    self.assertNotEqual(code, 0)
+AssertionError: 0 == 0
+
+======================================================================
+FAIL: test_main_refuses_cargo_invalid_status_without_kill (__main__.GuideProducers) (status=-9)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 198, in test_main_refuses_cargo_invalid_status_without_kill
+    self.assert_refused_without_kill(self.run_main("cargo", status))
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 190, in assert_refused_without_kill
+    self.assertNotEqual(code, 0)
+AssertionError: 0 == 0
+
+======================================================================
+FAIL: test_main_refuses_cargo_invalid_status_without_kill (__main__.GuideProducers) (status=137)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 198, in test_main_refuses_cargo_invalid_status_without_kill
+    self.assert_refused_without_kill(self.run_main("cargo", status))
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 190, in assert_refused_without_kill
+    self.assertNotEqual(code, 0)
+AssertionError: 0 == 0
+
+======================================================================
+FAIL: test_main_refuses_cargo_invalid_status_without_kill (__main__.GuideProducers) (status=67)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 198, in test_main_refuses_cargo_invalid_status_without_kill
+    self.assert_refused_without_kill(self.run_main("cargo", status))
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 190, in assert_refused_without_kill
+    self.assertNotEqual(code, 0)
+AssertionError: 0 == 0
+
+======================================================================
+FAIL: test_main_refuses_cargo_invalid_status_without_kill (__main__.GuideProducers) (status=0)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 198, in test_main_refuses_cargo_invalid_status_without_kill
+    self.assert_refused_without_kill(self.run_main("cargo", status))
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 190, in assert_refused_without_kill
+    self.assertNotEqual(code, 0)
+AssertionError: 0 == 0
+
+======================================================================
+FAIL: test_main_refuses_invalid_green_baseline (__main__.GuideProducers)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 247, in test_main_refuses_invalid_green_baseline
+    self.assertNotEqual(code, 0)
+AssertionError: 0 == 0
+
+======================================================================
+FAIL: test_main_refuses_named_codes_after_invalid_build_status (__main__.GuideProducers) (status=-9)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 213, in test_main_refuses_named_codes_after_invalid_build_status
+    self.assert_refused_without_kill(self.run_main("build", status, named=True))
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 190, in assert_refused_without_kill
+    self.assertNotEqual(code, 0)
+AssertionError: 0 == 0
+
+======================================================================
+FAIL: test_main_refuses_named_codes_after_invalid_build_status (__main__.GuideProducers) (status=137)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 213, in test_main_refuses_named_codes_after_invalid_build_status
+    self.assert_refused_without_kill(self.run_main("build", status, named=True))
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 190, in assert_refused_without_kill
+    self.assertNotEqual(code, 0)
+AssertionError: 0 == 0
+
+======================================================================
+FAIL: test_main_refuses_named_codes_after_invalid_build_status (__main__.GuideProducers) (status=67)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 213, in test_main_refuses_named_codes_after_invalid_build_status
+    self.assert_refused_without_kill(self.run_main("build", status, named=True))
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 190, in assert_refused_without_kill
+    self.assertNotEqual(code, 0)
+AssertionError: 0 == 0
+
+======================================================================
+FAIL: test_main_refuses_python_invalid_status_without_kill (__main__.GuideProducers) (status=-9)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 203, in test_main_refuses_python_invalid_status_without_kill
+    self.assert_refused_without_kill(self.run_main("python", status))
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 190, in assert_refused_without_kill
+    self.assertNotEqual(code, 0)
+AssertionError: 0 == 0
+
+======================================================================
+FAIL: test_main_refuses_python_invalid_status_without_kill (__main__.GuideProducers) (status=137)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 203, in test_main_refuses_python_invalid_status_without_kill
+    self.assert_refused_without_kill(self.run_main("python", status))
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 190, in assert_refused_without_kill
+    self.assertNotEqual(code, 0)
+AssertionError: 0 == 0
+
+======================================================================
+FAIL: test_main_refuses_python_invalid_status_without_kill (__main__.GuideProducers) (status=67)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 203, in test_main_refuses_python_invalid_status_without_kill
+    self.assert_refused_without_kill(self.run_main("python", status))
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 190, in assert_refused_without_kill
+    self.assertNotEqual(code, 0)
+AssertionError: 0 == 0
+
+======================================================================
+FAIL: test_main_refuses_python_invalid_status_without_kill (__main__.GuideProducers) (status=0)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 203, in test_main_refuses_python_invalid_status_without_kill
+    self.assert_refused_without_kill(self.run_main("python", status))
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 190, in assert_refused_without_kill
+    self.assertNotEqual(code, 0)
+AssertionError: 0 == 0
+
+======================================================================
+FAIL: test_main_refuses_unlisted_compiler_refusal (__main__.GuideProducers)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 219, in test_main_refuses_unlisted_compiler_refusal
+    self.assert_refused_without_kill(self.run_main("build", 1))
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 191, in assert_refused_without_kill
+    self.assertIn("REFUSED", output)
+AssertionError: 'REFUSED' not found in "baseline: the guide's tests, 8 ran, 0 failed\nbaseline: the guestbook in Chromium, 4 ran, 0 failed\nprivate intended mutation: BROKEN (the mutant is refused: name its rule in CHECKED)\n0 of 1 mutants killed\n"
+
+======================================================================
+FAIL: test_python_refuses_empty_or_missing_summary (__main__.GuideProducers) (text='Ran 0 tests in 0.001s\n\nOK\n')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 88, in test_python_refuses_empty_or_missing_summary
+    self.assertIsNone(self.guide_result(python=(0, text))[0])
+AssertionError: 1 is not None
+
+======================================================================
+FAIL: test_python_refuses_invalid_failure_status (__main__.GuideProducers) (status=-9)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 78, in test_python_refuses_invalid_failure_status
+    self.assertIsNone(self.guide_result(python=(status, python_output(True)))[0])
+AssertionError: 2 is not None
+
+======================================================================
+FAIL: test_python_refuses_invalid_failure_status (__main__.GuideProducers) (status=137)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 78, in test_python_refuses_invalid_failure_status
+    self.assertIsNone(self.guide_result(python=(status, python_output(True)))[0])
+AssertionError: 2 is not None
+
+======================================================================
+FAIL: test_python_refuses_invalid_failure_status (__main__.GuideProducers) (status=67)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 78, in test_python_refuses_invalid_failure_status
+    self.assertIsNone(self.guide_result(python=(status, python_output(True)))[0])
+AssertionError: 2 is not None
+
+======================================================================
+FAIL: test_python_refuses_invalid_failure_status (__main__.GuideProducers) (status=0)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 78, in test_python_refuses_invalid_failure_status
+    self.assertIsNone(self.guide_result(python=(status, python_output(True)))[0])
+AssertionError: 2 is not None
+
+======================================================================
+FAIL: test_python_refuses_invalid_green_status (__main__.GuideProducers) (status=-9)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 83, in test_python_refuses_invalid_green_status
+    self.assertIsNone(self.guide_result(python=(status, python_output()))[0])
+AssertionError: 8 is not None
+
+======================================================================
+FAIL: test_python_refuses_invalid_green_status (__main__.GuideProducers) (status=137)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 83, in test_python_refuses_invalid_green_status
+    self.assertIsNone(self.guide_result(python=(status, python_output()))[0])
+AssertionError: 8 is not None
+
+======================================================================
+FAIL: test_python_refuses_invalid_green_status (__main__.GuideProducers) (status=67)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 83, in test_python_refuses_invalid_green_status
+    self.assertIsNone(self.guide_result(python=(status, python_output()))[0])
+AssertionError: 8 is not None
+
+======================================================================
+FAIL: test_python_refuses_invalid_green_status (__main__.GuideProducers) (status=1)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/guide-producer-current-unit-probe.py", line 83, in test_python_refuses_invalid_green_status
+    self.assertIsNone(self.guide_result(python=(status, python_output()))[0])
+AssertionError: 8 is not None
+
+----------------------------------------------------------------------
+Ran 28 tests in 0.139s
+
+FAILED (failures=46)
+
+--- parent real native setup OSError RED; SHA256 3b6cbe318561ca748b5f2b609a279b7a55485527bb80510a8188e90075eda56e ---
+Guide source SHA256: da1e1b61cfd50a6ed4b711245b84014abdaf4b65af7862d9d158609458e480f3
+Private actual Python producer status: 1
+Private test body entered: False
+Actual unittest output:
+test_a_line_that_is_no_entry_is_refused_not_skipped (private_fixture.Reading) ... ERROR
+
+======================================================================
+ERROR: test_a_line_that_is_no_entry_is_refused_not_skipped (private_fixture.Reading)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/guide-python-fixture-4jyzjkh9/private_fixture.py", line 4, in setUp
+    def setUp(self): raise OSError("private setup fixture failure")
+OSError: private setup fixture failure
+
+----------------------------------------------------------------------
+Ran 1 test in 0.000s
+
+FAILED (errors=1)
+
+Current classifier: {'ran': 16, 'failed': 1, 'names': ['test_a_line_that_is_no_entry_is_refused_not_skipped']}
+Current intended-witness kill decision: True
+Private fixture directory: /tmp/guide-python-fixture-4jyzjkh9
+
+--- intermediate TEST-HELPER missing-report fixture error (not producer failure); SHA256 6211396691d01da0116d43bb7ba3b1d52df16a7ad7219ff34f3f9f378949b9df ---
+test_browser_accepts_actual_assertion_failure (__main__.GuideProducers) ... ok
+test_browser_accepts_green_producer (__main__.GuideProducers) ... ok
+test_browser_refuses_empty_or_missing_summary (__main__.GuideProducers) ... ok
+test_browser_refuses_invalid_failure_status (__main__.GuideProducers) ... ok
+test_browser_refuses_invalid_green_status (__main__.GuideProducers) ... ok
+test_browser_uses_canonical_authority_and_exact_selection (__main__.GuideProducers) ... ok
+test_cargo_accepts_actual_assertion_failure (__main__.GuideProducers) ... ok
+test_cargo_refuses_empty_or_missing_summary (__main__.GuideProducers) ... ok
+test_cargo_refuses_invalid_failure_status (__main__.GuideProducers) ... ok
+test_cargo_refuses_invalid_green_status (__main__.GuideProducers) ... ok
+test_final_restored_build_failure_fails_campaign (__main__.GuideProducers) ... ok
+test_guide_accepts_green_producers (__main__.GuideProducers) ... ok
+test_guide_retains_earlier_producer_output (__main__.GuideProducers) ... ok
+test_main_accepts_exact_named_compiler_refusal (__main__.GuideProducers) ... ok
+test_main_accepts_valid_intended_assertion_neighbours (__main__.GuideProducers) ... ok
+test_main_green_neighbours_are_survivors (__main__.GuideProducers) ... ok
+test_main_refuses_additional_named_codes (__main__.GuideProducers) ... ok
+test_main_refuses_bound_stop_with_valid_partial_summary (__main__.GuideProducers) ... ok
+test_main_refuses_browser_invalid_status_without_kill (__main__.GuideProducers) ... ok
+test_main_refuses_cargo_invalid_status_without_kill (__main__.GuideProducers) ... ok
+test_main_refuses_invalid_green_baseline (__main__.GuideProducers) ... ok
+test_main_refuses_named_codes_after_invalid_build_status (__main__.GuideProducers) ... ok
+test_main_refuses_python_invalid_status_without_kill (__main__.GuideProducers) ... ok
+test_main_refuses_unlisted_compiler_refusal (__main__.GuideProducers) ... ok
+test_python_accepts_actual_assertion_failure (__main__.GuideProducers) ... ok
+test_python_refuses_empty_or_missing_summary (__main__.GuideProducers) ... test_python_refuses_invalid_failure_status (__main__.GuideProducers) ... ok
+test_python_refuses_invalid_green_status (__main__.GuideProducers) ... ok
+
+======================================================================
+ERROR: test_python_refuses_empty_or_missing_summary (__main__.GuideProducers) (kind='empty')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/check-is-build/scripts/tests/test_guide_producer_results.py", line 117, in test_python_refuses_empty_or_missing_summary
+    self.assertIsNone(self.guide_result(python=(0, kind))[0])
+  File "/home/haki/code/pw-wt/check-is-build/scripts/tests/test_guide_producer_results.py", line 70, in guide_result
+    text, expected, output = self.real_receipt("green" if kind == "missing" else kind)
+  File "/home/haki/code/pw-wt/check-is-build/scripts/tests/test_guide_producer_results.py", line 61, in real_receipt
+    text = (produced.directory / "result.json").read_text()
+  File "/usr/lib/python3.10/pathlib.py", line 1134, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors) as f:
+  File "/usr/lib/python3.10/pathlib.py", line 1119, in open
+    return self._accessor.open(self, mode, buffering, encoding, errors,
+FileNotFoundError: [Errno 2] No such file or directory: '/tmp/pw-guide-real-receipt-hymnknfc/evidence/pw-guide-result-uthx8hq2/result.json'
+
+----------------------------------------------------------------------
+Ran 28 tests in 0.554s
+
+FAILED (errors=1)
+
+--- external post74 receipt-helper error, corrected before CI; SHA256 84d684f97fe9e3940b414abfbe6e2d9da706d0e8e151813d3b3ec8661494a533 ---
+Post74 receipt helper first attempt had a missing newline when an external fragment was appended:
+  print('Restored all',len(manifest),'frozen source bytes and immutable check/build branch; probe exact')ports=[]
+                                                                                                       ^^^^^
+SyntaxError: invalid syntax
+The native fixture proof then ran because that old external runner lacked set -e. No project bytes were edited and CI was not launched. Corrected only the external helper newline, used set -e runner, and reran mandatory verification: all2723 frozen bytes/probe immutable branch exact and reserved10641..10853 listeners0. This helper error is distinct from the successful natural whole74 exit0.
