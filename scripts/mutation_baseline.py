@@ -41,6 +41,12 @@ And first, where `PW_MUTANT_SLOTS` asks for more than one slot, it hands
 the run to `mutation_slots.py`, which runs the script's own copy in each
 slot, its mutants dealt among them, and ends this process with the run's
 code: the script's loop never runs in this tree.
+
+And where the run sets `PW_MUTANT_INCREMENTAL=1` (verify.yml's recipe step),
+the script and every process it starts have no `CARGO_INCREMENTAL`, whatever
+its recipe's line says, so that cargo's defaults apply (incremental for the dev
+and test profiles), and the incremental caches are removed when they hold more
+than a bound (`mutant_incremental.py`, 2026-10-20).
 """
 
 import collections
@@ -94,6 +100,13 @@ mutation_slots.engage()
 # Every process the script starts from here on, bounded in memory.
 mutation_bound.start()
 
+import mutant_incremental
+
+# And, where the run asks (`PW_MUTANT_INCREMENTAL=1`, which verify.yml's recipe
+# step sets), its builds incremental, whatever its recipe's line says
+# (track ci-diagnostics, 2026-10-20).
+mutant_incremental.start()
+
 # How many commands are kept: a baseline's, and whatever ran since.
 KEPT = 64
 # How much of what one command said is kept: its end, where a test runner
@@ -136,6 +149,10 @@ def keeping(communicate):
             keep(self, None, as_text(stopped.stdout) + as_text(stopped.stderr))
             raise
         keep(self, self.returncode, as_text(out) + as_text(err))
+        try:
+            mutant_incremental.bounded(self.args)
+        except Exception:  # noqa: BLE001 - a cache left standing is no failure
+            pass
         return out, err
 
     communicated.keeps = True

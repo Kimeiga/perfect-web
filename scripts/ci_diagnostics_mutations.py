@@ -25,6 +25,26 @@ Each mutant undoes one piece:
    medians; the control (a check that happened) reads the median, or nothing.
    (The checker made pathological, and the clock that reads nothing, are
    `evidence_integrity_mutations.py`'s, which run the measurement itself.)
+3. a mutation script's mutants are built incrementally where the run asks
+   (`mutant_incremental.py`, `mutation_baseline.py`, `ci_recipes.py`,
+   `verify.yml`): the run's word is not heard, or is taken whether given or
+   not, or does not win over the recipe's own `CARGO_INCREMENTAL=0`, or is
+   forced to 1, which is every profile's; the
+   script never starts it, or the caches are never looked at after a command,
+   or are removed whatever they hold, or never, or a target triple's are
+   missed, or a command that is no cargo's is looked at, or incremental
+   compilation off is no reason to leave them, or the limit is not the
+   environment's, or a hundred times the default; the recipes' prune leaves a
+   triple's; the `Recipes` step does not ask, or every build is incremental;
+4. the nightly is skipped where `master`'s head has a successful run
+   (`nightly_skip.py`, `verify.yml`): Sunday's weekly run is skipped too, or
+   every schedule is taken for it; a dispatch's run, or a run that did not
+   succeed, verifies the head; no run at the head, or an error, skips the
+   nightly; the API is not asked for the successful runs; Sunday's schedule is
+   dropped, or fires on weekdays as well; the plan step is not told the
+   schedule that fired, or never asks, or a dispatch asks too; a skipped
+   nightly plans its shards or its browser suites, or says nothing in the
+   run's summary.
 
 Each runs the suite that holds it: `scripts/tests/`'s, by `unittest`, or
 `pw-core`'s statistic tests, by `cargo test`. At least one test must fail.
@@ -49,6 +69,8 @@ VERIFY = ROOT / ".github/workflows/verify.yml"
 IGNORE = ROOT / ".gitignore"
 RENDERER_IGNORE = ROOT / "spikes/own-renderer/.gitignore"
 LATENCY = ROOT / "compiler/pw-core/tests/check_latency.rs"
+INCREMENTAL = ROOT / "scripts/mutant_incremental.py"
+NIGHTLY = ROOT / "scripts/nightly_skip.py"
 
 # (what, suite, file, anchor, replacement)
 MUTANTS = [
@@ -328,6 +350,225 @@ MUTANTS = [
         "    cost.fastest > Duration::from_micros(200)\n",
         "    true\n",
     ),
+    # 3. A mutant's builds are incremental where the run asks, and bounded.
+    (
+        "a run that asks for incremental builds is not heard",
+        "incremental",
+        INCREMENTAL,
+        '    return (os.environ if env is None else env).get("PW_MUTANT_INCREMENTAL") == "1"\n',
+        "    return False\n",
+    ),
+    (
+        "every run is taken to ask",
+        "incremental",
+        INCREMENTAL,
+        '    return (os.environ if env is None else env).get("PW_MUTANT_INCREMENTAL") == "1"\n',
+        "    return True\n",
+    ),
+    (
+        "a recipe's own zero wins over the run's word",
+        "incremental",
+        INCREMENTAL,
+        '        os.environ.pop("CARGO_INCREMENTAL", None)\n',
+        "        pass\n",
+    ),
+    (
+        "the run's word forces incremental builds for every profile",
+        "incremental",
+        INCREMENTAL,
+        '        os.environ.pop("CARGO_INCREMENTAL", None)\n',
+        '        os.environ["CARGO_INCREMENTAL"] = "1"\n',
+    ),
+    (
+        "the script never starts it",
+        "incremental",
+        BASELINE,
+        "\nmutant_incremental.start()\n",
+        "\npass\n",
+    ),
+    (
+        "the caches are never looked at after a command",
+        "incremental",
+        BASELINE,
+        "            mutant_incremental.bounded(self.args)\n",
+        "            pass\n",
+    ),
+    (
+        "the caches are never removed",
+        "incremental",
+        INCREMENTAL,
+        "    if held <= limit:\n",
+        "    if True:\n",
+    ),
+    (
+        "the caches are removed whatever they hold",
+        "incremental",
+        INCREMENTAL,
+        "    if held <= limit:\n",
+        "    if False:\n",
+    ),
+    (
+        "a target triple's caches are missed",
+        "incremental",
+        INCREMENTAL,
+        '    for pattern in ("*/incremental", "*/*/incremental"):\n',
+        '    for pattern in ("*/incremental",):\n',
+    ),
+    (
+        "a command that is no cargo's is looked at",
+        "incremental",
+        INCREMENTAL,
+        "    if not asked() or not runs_cargo(args):\n",
+        "    if not asked():\n",
+    ),
+    (
+        "the caches are removed where the run did not ask",
+        "incremental",
+        INCREMENTAL,
+        "    if not asked() or not runs_cargo(args):\n",
+        "    if not runs_cargo(args):\n",
+    ),
+    (
+        "the limit is not the environment's",
+        "incremental",
+        INCREMENTAL,
+        "    return (int(said) if said.isdigit() else MAX_MIB) * 1024 * 1024\n",
+        "    return MAX_MIB * 1024 * 1024\n",
+    ),
+    (
+        "the limit is a hundred times as much",
+        "incremental",
+        INCREMENTAL,
+        "MAX_MIB = 6 * 1024\n",
+        "MAX_MIB = 600 * 1024\n",
+    ),
+    (
+        "the recipes' prune leaves a target triple's caches",
+        "incremental",
+        RECIPES,
+        '    for pattern in ("*/incremental", "*/*/incremental"):\n',
+        '    for pattern in ("*/incremental",):\n',
+    ),
+    (
+        "the Recipes step does not ask for incremental builds",
+        "incremental",
+        VERIFY,
+        '          PW_MUTANT_INCREMENTAL: "1"\n',
+        "",
+    ),
+    (
+        "every build of the workflow is incremental",
+        "incremental",
+        VERIFY,
+        '  CARGO_INCREMENTAL: "0"\n',
+        '  CARGO_INCREMENTAL: "1"\n',
+    ),
+    # 4. The nightly is skipped where master's head has a successful run.
+    (
+        "the weekly run is skipped too",
+        "nightly",
+        NIGHTLY,
+        "    if schedule == WEEKLY:\n",
+        "    if False:\n",
+    ),
+    (
+        "every schedule is taken for the weekly",
+        "nightly",
+        NIGHTLY,
+        "    if schedule == WEEKLY:\n",
+        "    if True:\n",
+    ),
+    (
+        "a dispatch's run verifies the head",
+        "nightly",
+        NIGHTLY,
+        "COVERING = verified_base.COVERING\n",
+        'COVERING = ("push", "schedule", "workflow_dispatch")\n',
+    ),
+    (
+        "a run that did not succeed verifies the head",
+        "nightly",
+        NIGHTLY,
+        '    return next((r for r in runs if r.get("conclusion") == "success" and r.get("event") in COVERING), None)\n',
+        '    return next((r for r in runs if r.get("event") in COVERING), None)\n',
+    ),
+    (
+        "an error skips the nightly",
+        "nightly",
+        NIGHTLY,
+        '        return False, f"run: could not ask',
+        '        return True, f"run: could not ask',
+    ),
+    (
+        "no run at the head skips the nightly",
+        "nightly",
+        NIGHTLY,
+        "    if found is None:\n",
+        "    if False:\n",
+    ),
+    (
+        "the API is asked for every run, not the successful ones",
+        "nightly",
+        NIGHTLY,
+        "&status=success&per_page=100",
+        "&per_page=100",
+    ),
+    (
+        "Sunday's schedule is dropped",
+        "nightly",
+        VERIFY,
+        '    - cron: "17 6 * * 0"\n',
+        "",
+    ),
+    (
+        "the weekday schedule fires on Sunday too",
+        "nightly",
+        VERIFY,
+        '    - cron: "17 6 * * 1-6"\n',
+        '    - cron: "17 6 * * *"\n',
+    ),
+    (
+        "the plan step is not told which schedule fired",
+        "nightly",
+        VERIFY,
+        "          SCHEDULE: ${{ github.event.schedule }}\n",
+        "",
+    ),
+    (
+        "the nightly never asks",
+        "nightly",
+        VERIFY,
+        '              if why=$(python3 scripts/nightly_skip.py "$GITHUB_SHA" "$SCHEDULE"); then\n',
+        "              if false; then\n",
+    ),
+    (
+        "a skipped nightly plans its shards",
+        "nightly",
+        VERIFY,
+        '                echo "shards=[]" >> "$GITHUB_OUTPUT"\n',
+        "",
+    ),
+    (
+        "a skipped nightly runs its browser suites",
+        "nightly",
+        VERIFY,
+        '                echo "browsers=false" >> "$GITHUB_OUTPUT"\n',
+        "",
+    ),
+    (
+        "a skipped nightly says nothing in the run's summary",
+        "nightly",
+        VERIFY,
+        '                echo "$why" >> "$GITHUB_STEP_SUMMARY"\n',
+        "",
+    ),
+    (
+        "a dispatch asks too",
+        "nightly",
+        VERIFY,
+        '              if [ -n "$RECIPES" ]; then\n',
+        '              python3 scripts/nightly_skip.py "$GITHUB_SHA" ""\n              if [ -n "$RECIPES" ]; then\n',
+    ),
 ]
 
 UNITTEST = [sys.executable, "-m", "unittest"]
@@ -335,6 +576,8 @@ SUITES = {
     "helper": UNITTEST + ["scripts/tests/test_run_suite.py"],
     "keep": UNITTEST + ["scripts/tests/test_keep_traces.py"],
     "baseline": UNITTEST + ["scripts/tests/test_mutation_baseline.py"],
+    "incremental": UNITTEST + ["scripts/tests/test_mutant_incremental.py"],
+    "nightly": UNITTEST + ["scripts/tests/test_nightly_skip.py"],
     # The statistic's tests, which run no check: no timing in them.
     "latency": [
         "cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "check_latency", "--",
