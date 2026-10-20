@@ -16751,12 +16751,23 @@ public query Store(",
                 written.push_str(&String::from_utf8_lossy(&buf[..n]));
             }
 
+            // ... and has gone round again since: each pass marks the
+            // subscriber seen as it begins, in the one hold of the table that
+            // looks at what the subscriber holds, so a pass begun after the
+            // write is a pass that has done with what it wrote whatever it
+            // does with it (acknowledges it, if it is wrong). A sleep of 300
+            // ms stood for this.
+            let key = (session.to_string(), document);
+            let seen = |s: &Server| s.pending.lock().expect("pending")[&key].seen;
+            let written_by = seen(&s);
+            until("the stream's pass after its write", || {
+                seen(&s) > written_by
+            });
+
             // ... which the page never read: its next request, from where it
             // was, is still sent it.
             let mut queue = s.pending.lock().expect("pending");
-            let waiting = queue
-                .get_mut(&(session.to_string(), document))
-                .expect("its subscriber");
+            let waiting = queue.get_mut(&key).expect("its subscriber");
             let (cursor, frames) = waiting.after(document);
             assert!(
                 !frames.is_empty(),
