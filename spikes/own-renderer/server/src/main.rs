@@ -6548,6 +6548,12 @@ impl Server {
                     .lock()
                     .expect("one change of a session at a time"),
             };
+            // Newer frames may be the newer key's own result. A request
+            // its page no longer awaits must not start another flight to
+            // catch up with those frames, especially after losing its hold.
+            if self.superseded(session, binding, seq, document, cancel) {
+                return Ok(KeyOutcome::Superseded);
+            }
             if !last && sent(self) != before {
                 drop(held);
                 attempt += 1;
@@ -12148,6 +12154,17 @@ public query Store(",
                 .count()
         };
         let before = joined();
+        let hot_started = || {
+            s.queries
+                .trace()
+                .iter()
+                .filter(|t| {
+                    matches!(t, pw_resource::Trace::RequestStarted { key, .. }
+                    if key.resource == "store.page.MenuIn" && key.key == "\"47\"\u{1f}\"hot\"")
+                })
+                .count()
+        };
+        let hot_before = hot_started();
         std::thread::scope(|scope| {
             let hot = scope.spawn(|| s.read_keyed("a", "browsing", 1, a, &category("hot"), STAYED));
             // `a`'s read is in flight, held at the gate, before `b`'s
@@ -12167,12 +12184,10 @@ public query Store(",
                 s.read_keyed("a", "browsing", 2, a, &category("cold"), STAYED),
                 Ok(KeyOutcome::Applied)
             );
-            // `a` has let go; the flight is `b`'s still. Hot's read, held,
-            // has been asked twice since whether it is stopped, and is not:
-            // asked here, with the gate closed, because once Hot's flight
-            // ends the read `b`'s page makes again may begin a flight of its
-            // own and let it go at once, and whether that one's source sees
-            // it is the machine's timing (it is not the flight asked about).
+            // `a` has let go; the flight is `b`'s still. With the gate
+            // closed, Hot's source must observe twice that it is not stopped.
+            // This proves cancellation protection before the shared flight
+            // completes; the flight count below also excludes a later retry.
             let asked = hot_gate.polls();
             hot_gate.polled(asked + 2);
             assert_eq!(
@@ -12188,6 +12203,15 @@ public query Store(",
                 .expect("command")
                 .expect("the command commits");
         });
+        // Cold's frames superseded Hot while it was in flight. The old
+        // read must not treat those frames as a reason to fetch Hot again:
+        // its first flight ran for `b`, and neither page needs another.
+        assert_eq!(
+            hot_started() - hot_before,
+            1,
+            "the superseded Hot read started another flight: {:#?}",
+            s.queries.trace()
+        );
         // Read to its end, for `b`: its page was not told to read itself
         // again.
         let queue = s.pending.lock().expect("pending");
