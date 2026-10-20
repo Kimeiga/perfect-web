@@ -373,6 +373,11 @@
         "mutable:controls"
       ]
     },
+    "device-store.spec.mjs": {
+      "roles": [
+        "base"
+      ]
+    },
     "dialog.spec.mjs": {
       "roles": [
         "base"

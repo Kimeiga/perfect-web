@@ -727,6 +727,9 @@ mod messages;
 mod kiokun;
 // TRACK SEAM (todomvc): a session's todos (docs/PARALLEL.md, W7).
 mod todomvc;
+// TRACK SEAM (device-store): a document of a page that holds values the
+// device keeps (ADR-XXXX).
+mod device;
 // ADR-0304: the platform's clock, and what a value read by it holds until.
 mod clock;
 // ADR-0305: a page's commands run in the order it sent them.
@@ -1718,10 +1721,21 @@ impl Server {
                     .as_str()
                     .is_some_and(notifications::is_current_user)
             });
+        // TRACK SEAM (device-store): a page that holds a value the device
+        // keeps hides what it decides until it is read, by a style its
+        // policy allows by its hash (ADR-XXXX).
+        let mut needs = csp::Needs::of(&templates);
+        if std::iter::once(&plan)
+            .chain(plans.values())
+            .any(device::holds)
+        {
+            needs.styles.insert(device::READING.to_string());
+            needs.styles.insert(device::UNSCRIPTED.to_string());
+        }
         Server {
             cart_by_reader,
             build_id,
-            needs: csp::Needs::of(&templates),
+            needs,
             templates,
             data,
             store,
@@ -10191,7 +10205,10 @@ fn computed_module(plan: &serde_json::Value) -> Option<String> {
         .as_array()
         .into_iter()
         .flatten()
-        .any(|l| l["derived"].is_string());
+        .any(|l| l["derived"].is_string())
+        // TRACK SEAM (device-store): or the steps of a value the device
+        // keeps from an earlier version to its own.
+        || device::migrates(plan);
     computes.then(|| {
         format!(
             "/computed/{}.mjs",
@@ -10232,6 +10249,8 @@ fn signal_document(
     let mut manifest = manifest;
     // The signal it binds to its address's fragment (track `todomvc`).
     with_fragment(&mut manifest, plan);
+    // TRACK SEAM (device-store): what the device keeps that it holds.
+    device::with_device(&mut manifest, plan);
     // What it computes from its signals (ADR-0227).
     if let Some(module) = computed_module(plan) {
         manifest["computed"] = serde_json::Value::String(module);
@@ -10245,10 +10264,13 @@ fn signal_document(
         pw_render::escape::json_in_script(&serde_json::to_string(&manifest).unwrap_or_default());
     // Where a failed press is said (ADR-0302), from the first byte.
     let announcer = pw_render::ANNOUNCER;
+    // TRACK SEAM (device-store): its root reading the device, and the style
+    // that hides what the device decides until it has (ADR-XXXX).
+    let (root, device) = (device::root(plan), device::head(plan));
     format!(
-        "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
+        "<!doctype html>\n<html{root}>\n<head>\n<meta charset=\"utf-8\">\n\
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
-         <title>{}</title>\n{metadata}</head>\n<body>\n{body}\n\
+         <title>{}</title>\n{metadata}{device}</head>\n<body>\n{body}\n\
          {announcer}\n<script type=\"application/json\" id=\"pw-parts\">{json}</script>\n\
          {RUNTIME}\n{DOCUMENT_END}",
         pw_render::escape::text(title)
@@ -10414,6 +10436,8 @@ fn document(
     }
     // The signal it binds to its address's fragment (track `todomvc`).
     with_fragment(&mut manifest, plan);
+    // TRACK SEAM (device-store): what the device keeps that it holds.
+    device::with_device(&mut manifest, plan);
     // What it computes from them (ADR-0227).
     if let Some(module) = computed_module(plan) {
         manifest["computed"] = serde_json::Value::String(module);
@@ -10494,10 +10518,13 @@ fn document(
     };
     // Where a failed press is said (ADR-0302), from the first byte.
     let announcer = pw_render::ANNOUNCER;
+    // TRACK SEAM (device-store): its root reading the device, and the style
+    // that hides what the device decides until it has (ADR-XXXX).
+    let (root, device) = (device::root(plan), device::head(plan));
     format!(
-        "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
+        "<!doctype html>\n<html{root}>\n<head>\n<meta charset=\"utf-8\">\n\
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
-         <title>{title}</title>\n{metadata}{style}</head>\n<body>\n{body}\n\
+         <title>{title}</title>\n{metadata}{style}{device}</head>\n<body>\n{body}\n\
          {announcer}\n<script type=\"application/json\" id=\"pw-parts\">{json}</script>\n\
          {RUNTIME}\n{DOCUMENT_END}",
         title = pw_render::escape::text(title)

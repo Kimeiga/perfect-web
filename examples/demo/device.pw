@@ -15,6 +15,10 @@
 // - a value version 1 kept is taken to version 2 by `notes_from_1`;
 // - an unreadable value is refused, kept aside, and the default shown;
 // - a full store is said where the change was made.
+//
+// The list has an element of its own, `#list`: an element holding what the
+// device decides is hidden until the device is read, and the field above it
+// is the page's, shown and focusable from the first byte.
 
 module demo.device
 
@@ -82,13 +86,15 @@ page DevicePage() {
                     draft = ""
                 }} />
             <p id="count">{counted(List.length(notes))}</p>
-            {#if List.length(notes) > 0}
-                <ul id="notes">
-                    {#each notes as note (note.id)}
-                        <li>{note.text}</li>
-                    {/each}
-                </ul>
-            {/if}
+            <section id="list" aria-label="The notes">
+                {#if List.length(notes) > 0}
+                    <ul id="notes">
+                        {#each notes as note (note.id)}
+                            <li>{note.text}</li>
+                        {/each}
+                    </ul>
+                {/if}
+            </section>
             <button id="clear" type="button" on:press={() => notes = []}>Clear</button>
             <button id="press" type="button" on:press={() => presses = presses + 1}>Count</button>
             <p id="presses">{presses}</p>

@@ -1581,12 +1581,16 @@ let sources = new Map();
 
 /** A handler changed `name`: held now, and rendered once per press. A value
  * the signal already holds changes nothing, and renders nothing. */
-function setSignal(name, value, source) {
+function setSignal(name, value, source, kept = true) {
   if (JSON.stringify(signals.get(name)) === JSON.stringify(value)) return;
   signals.set(name, value);
   if (source) sources.set(name, source);
   else sources.delete(name);
   dirty.add(name);
+  // A value the device keeps is written as it changes (track
+  // `device-store`), unless the change is the device's own: read at start,
+  // or another tab's.
+  if (kept && deviceHeld.has(name)) keep(deviceHeld.get(name), value, source);
   flushing ??= Promise.resolve().then(flushSignals);
 }
 
@@ -1704,6 +1708,277 @@ function followAutofocus() {
   });
   observer.observe(document.body, { childList: true, subtree: true });
   life.signal.addEventListener("abort", () => observer.disconnect(), { once: true });
+}
+
+// --- values the device keeps (track `device-store`, ADR-XXXX) --------------
+//
+// A module's signal declared `storage device "name"` and `privacy Device` is
+// the device's: the document says which ones the page holds, the name each
+// is kept under, its version and each version's form (`parts.device`). The
+// server rendered each one's declared default, and the elements it decides
+// are hidden while the root says `data-pw-device="reading"`. So, before any
+// handler binds:
+// - each is read from the browser's own storage, `localStorage`, under its
+//   key (the name at version 1, `name@v` after), and decoded against its
+//   form, never trusted (charter §7.10); an earlier version is decoded with
+//   its own form, taken to this one by the steps the page's computed module
+//   holds, written under the new key, and only then is the old one removed;
+// - what each value decides is rendered, as any signal's change is;
+// - and the root's mark is taken away, so the first frame that shows what
+//   the device decides shows the device's value.
+// From then on each change is written with `setItem`, whole; every other
+// tab hears it as a `storage` event and shows it, writing nothing back
+// (`conflict last_write_wins`: the whole value written last is every tab's).
+// A value no decoder takes is never used and never lost: the default is
+// shown, and the text is copied to `key!unreadable` before the first write
+// replaces it. A page that finds a newer version than its own writes nothing
+// more, and says so. A write the store refuses (`QuotaExceededError`) keeps
+// what was stored, and is said where the change was made. Nothing here
+// sends anything to any server.
+
+/** What the device keeps that this page holds, by the signal it is held as. */
+const deviceHeld = new Map((parts.device ?? []).map((h) => [h.signal, h]));
+
+/** Where each stands, for the tests to read: `default`, `read`, `migrated`,
+ * `unreadable`, `stale` or `unavailable`. */
+const deviceState = {};
+let deviceWrites = 0;
+
+/** The platform's words for what the device did not keep. */
+const DEVICE_SAYS = {
+  full: "This device has no room to keep that.",
+  stale: "This page is out of date. Reload to keep your changes.",
+};
+
+/** The key version `v` of `held` is kept under. */
+function deviceKey(held, v) {
+  return v === 1 ? held.name : `${held.name}@${v}`;
+}
+
+/** The browser's store, or none where it is refused: its getter throws in a
+ * document whose storage the browser keeps from it. */
+function deviceStore() {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+/** **Why `v` is not of the form `s`**, or `null` where it is: the wire form
+ * the browser's modules read (`js_pure`), checked whole. */
+function unlike(v, s, at) {
+  const record = (x) => x !== null && typeof x === "object" && !Array.isArray(x);
+  const ofCases = (x, cases) => {
+    if (!record(x) || typeof x.$case !== "string") return `${at} is no case`;
+    const found = cases.find(([name]) => name === x.$case);
+    if (!found) return `${at}'s case \`${x.$case}\` is none its type has`;
+    const [, fields] = found;
+    const extra = Object.keys(x).filter((k) => k !== "$case" && k !== "value");
+    if (extra.length) return `${at} holds \`${extra[0]}\`, which no case does`;
+    if (fields.length === 0) return "value" in x ? `${at}'s case holds nothing` : null;
+    if (fields.length === 1) return unlike(x.value, fields[0], `${at}.value`);
+    if (!Array.isArray(x.value) || x.value.length !== fields.length) {
+      return `${at}'s case holds ${fields.length} values`;
+    }
+    for (let i = 0; i < fields.length; i++) {
+      const why = unlike(x.value[i], fields[i], `${at}.value[${i}]`);
+      if (why) return why;
+    }
+    return null;
+  };
+  switch (s.t) {
+    case "int":
+      return Number.isSafeInteger(v) ? null : `${at} is no whole number`;
+    case "float":
+      return typeof v === "number" && Number.isFinite(v) ? null : `${at} is no number`;
+    case "bool":
+      return typeof v === "boolean" ? null : `${at} is no Bool`;
+    case "string":
+      return typeof v === "string" ? null : `${at} is no String`;
+    case "unit":
+      return v === null ? null : `${at} is no ()`;
+    case "list": {
+      if (!Array.isArray(v)) return `${at} is no list`;
+      for (let i = 0; i < v.length; i++) {
+        const why = unlike(v[i], s.of, `${at}[${i}]`);
+        if (why) return why;
+      }
+      return null;
+    }
+    case "option":
+      return ofCases(v, [["some", [s.of]], ["none", []]]);
+    case "result":
+      return ofCases(v, [["ok", [s.ok]], ["err", [s.err]]]);
+    case "record": {
+      if (!record(v)) return `${at} is no record`;
+      const names = new Set(s.fields.map(([name]) => name));
+      const extra = Object.keys(v).find((k) => !names.has(k));
+      if (extra !== undefined) return `${at} holds \`${extra}\`, which its type does not`;
+      for (const [name, f] of s.fields) {
+        if (!(name in v)) return `${at} has no \`${name}\``;
+        const why = unlike(v[name], f, `${at}.${name}`);
+        if (why) return why;
+      }
+      return null;
+    }
+    case "cases":
+      return ofCases(v, s.cases);
+    default:
+      return `${at}'s form \`${s.t}\` is none this runtime reads`;
+  }
+}
+
+/** **What the store holds, decoded** against `schema`: `{ value }`, or `{
+ * error }` naming what is wrong. */
+function decodeKept(text, schema) {
+  let json;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    return { error: "it is not JSON" };
+  }
+  const why = unlike(json, schema, "the value");
+  return why ? { error: why } : { value: json };
+}
+
+/** The newest version of `held` the store holds after this page's, if any:
+ * a newer build has taken it on, and this page writes it no more. */
+function newerKept(store, held) {
+  const prefix = `${held.name}@`;
+  let newest = 0;
+  for (let i = 0; i < store.length; i++) {
+    const key = store.key(i);
+    if (!key?.startsWith(prefix)) continue;
+    const v = Number(key.slice(prefix.length));
+    if (Number.isInteger(v) && v > held.version && v > newest) newest = v;
+  }
+  return newest;
+}
+
+/** **One value, read**: what the device holds of it at this page's version,
+ * or taken to it from the newest earlier one, or the default. */
+async function readKept(store, held) {
+  if (!store) return { state: "unavailable" };
+  if (newerKept(store, held)) return { state: "stale" };
+  const schema = held.schemas[held.version - 1];
+  const key = deviceKey(held, held.version);
+  const text = store.getItem(key);
+  if (text !== null) {
+    const got = decodeKept(text, schema);
+    if (got.error) return { state: "unreadable", why: got.error };
+    return { state: "read", value: got.value };
+  }
+  for (let v = held.version - 1; v >= 1; v--) {
+    const old = store.getItem(deviceKey(held, v));
+    if (old === null) continue;
+    const got = decodeKept(old, held.schemas[v - 1]);
+    if (got.error) return { state: "unreadable", why: `version ${v}: ${got.error}` };
+    let value = got.value;
+    try {
+      const steps = (await computedValues()).migrations?.[held.signal] ?? [];
+      for (let at = v; at < held.version; at++) value = steps[at - 1](value);
+    } catch (error) {
+      return { state: "unreadable", why: `version ${v} did not migrate: ${error.message}` };
+    }
+    const why = unlike(value, schema, "the migrated value");
+    if (why) return { state: "unreadable", why };
+    // Written under its own key before the old one goes: a stop between the
+    // two leaves both, and the next page reads the newer.
+    try {
+      store.setItem(key, wire(value));
+      store.removeItem(deviceKey(held, v));
+    } catch (error) {
+      log.push(`device: ${held.name} migrated from ${v}, not kept: ${error.name}`);
+    }
+    return { state: "migrated", from: v, value };
+  }
+  return { state: "default" };
+}
+
+/** **A change kept**: the whole value, under its version's key. */
+function keep(held, value, source) {
+  if (deviceState[held.signal] === "stale") {
+    if (source?.el) tell(source.el, DEVICE_SAYS.stale, "device-stale");
+    else say(DEVICE_SAYS.stale);
+    log.push(`device: ${held.name} not kept: a newer version holds it`);
+    return;
+  }
+  const store = deviceStore();
+  if (!store) return;
+  const key = deviceKey(held, held.version);
+  try {
+    // An unreadable value is kept aside before the first write replaces it.
+    if (deviceState[held.signal] === "unreadable") {
+      const unread = store.getItem(key);
+      if (unread !== null) store.setItem(`${key}!unreadable`, unread);
+    }
+    store.setItem(key, wire(value));
+    deviceState[held.signal] = "read";
+    deviceWrites++;
+  } catch (error) {
+    // The store refused it: what was kept stays (the HTML algorithm throws
+    // before the map changes), and the page holds what the person did.
+    if (source?.el) tell(source.el, DEVICE_SAYS.full, "device-full");
+    else say(DEVICE_SAYS.full);
+    log.push(`device: ${held.name} not kept: ${error.name}`);
+  }
+  window.__pw.device = { state: { ...deviceState }, writes: deviceWrites };
+}
+
+/** What another tab's write of `held` says, decoded as a read is. */
+function heardValue(held, e) {
+  if (e.newValue === null) return { state: "default" };
+  const got = decodeKept(e.newValue, held.schemas[held.version - 1]);
+  return got.error ? { state: "unreadable", why: got.error } : { state: "read", value: got.value };
+}
+
+/** **Another tab's write**: shown here, written nowhere. A `clear()`, whose
+ * event has no key, is every value read again. */
+async function heardKept(e) {
+  const store = deviceStore();
+  if (!store || e.storageArea !== store) return;
+  for (const held of deviceHeld.values()) {
+    if (e.key === null || e.key === deviceKey(held, held.version)) {
+      const got = e.key === null ? await readKept(store, held) : heardValue(held, e);
+      deviceState[held.signal] = got.state;
+      if (got.state === "unreadable") log.push(`device: ${held.name} unreadable: ${got.why}`);
+      log.push(`device: ${held.name} heard from another tab`);
+      setSignal(held.signal, "value" in got ? got.value : firstValues.get(held.signal), null, false);
+    } else if (e.key.startsWith(`${held.name}@`)) {
+      const v = Number(e.key.slice(held.name.length + 1));
+      if (Number.isInteger(v) && v > held.version && deviceState[held.signal] !== "stale") {
+        deviceState[held.signal] = "stale";
+        say(DEVICE_SAYS.stale);
+        log.push(`device: ${held.name} is held at version ${v} by another page`);
+      }
+    }
+  }
+  window.__pw.device = { state: { ...deviceState }, writes: deviceWrites };
+}
+
+/** **The device read before what it decides is shown**: each value set,
+ * what it decides rendered, and the root's mark taken away. The address's
+ * fragment, which no server sees either, is followed first, so the device's
+ * values are first shown as the address asks. */
+async function readDevice() {
+  if (deviceHeld.size === 0) return;
+  const store = deviceStore();
+  try {
+    for (const held of deviceHeld.values()) {
+      const got = await readKept(store, held);
+      deviceState[held.signal] = got.state;
+      if (got.state === "unreadable") log.push(`device: ${held.name} unreadable: ${got.why}`);
+      log.push(`device: ${held.name} ${got.state}`);
+      if ("value" in got) setSignal(held.signal, got.value, null, false);
+    }
+    if (parts.fragment) followFragment(parts.fragment);
+    if (flushing) await flushing;
+  } finally {
+    document.documentElement.dataset.pwDevice = "read";
+    window.__pw.device = { state: { ...deviceState }, writes: deviceWrites };
+  }
+  addEventListener("storage", (e) => void heardKept(e), { signal: life.signal });
 }
 
 // --- ADR-0152: a key a page changes ---------------------------------------
@@ -2378,6 +2653,10 @@ async function attach() {
   }
 
   await bootDecision();
+
+  // What the device keeps, read, and what it decides shown, before any
+  // handler binds (track `device-store`).
+  await readDevice();
 
   bindEvents();
   booted = true;
