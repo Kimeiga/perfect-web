@@ -110,6 +110,14 @@ pub(crate) struct Heard {
     pub more: bool,
 }
 
+/// One outbox row as a reader keeps it: its id, its kind, its name and its
+/// values' text.
+type OutboxRow = (i64, String, String, String);
+
+/// **A commit a reader is gathering**: its transaction, the last id read of
+/// it, and its rows so far.
+type Gathered = (String, i64, Vec<OutboxRow>);
+
 /// **A host's reader of the outbox** (ADR-XXXX): its cursor, the last id it
 /// has delivered or passed by, and a connection of its own that listens on
 /// the schema's channel and reads the rows after the cursor.
@@ -265,10 +273,8 @@ impl Tail {
         };
         // A commit's rows are consecutive ids (its lock), and share its
         // transaction.
-        let mut commit: Option<(String, i64, Vec<(i64, String, String, String)>)> = None;
-        let done = |commit: Option<(String, i64, Vec<(i64, String, String, String)>)>,
-                    heard: &mut Heard|
-         -> Result<(), String> {
+        let mut commit: Option<Gathered> = None;
+        let done = |commit: Option<Gathered>, heard: &mut Heard| -> Result<(), String> {
             if let Some((_, last, read)) = commit {
                 heard
                     .commits
