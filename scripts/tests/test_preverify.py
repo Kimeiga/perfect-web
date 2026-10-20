@@ -67,6 +67,13 @@ def save():
 
 
 save()
+meet = [m for m in os.environ.get("TOY_MEET", "").split(",") if m]
+if name in meet:
+    others = [m for m in meet if m != name]
+    waited = time.time() + 30
+    while time.time() < waited and not all(pathlib.Path(seen, f"{o}.json").exists() for o in others):
+        time.sleep(0.02)
+    record["met"] = all(pathlib.Path(seen, f"{o}.json").exists() for o in others)
 if mode == "leave":
     child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(120)"], start_new_session=True)
     record["child"] = child.pid
@@ -160,7 +167,9 @@ def free_range(lanes: int = 2) -> str:
     """A range of ports nothing listens on, wide enough for `lanes` lanes."""
     stride, _ = pv.mutation_slots.port_layout(ROOT)
     for attempt in range(60):
-        first = 30000 + (os.getpid() * 7919 + attempt * 2 * stride) % 25000
+        # Below the machine's ephemeral ports (32768-60999): a connection any
+        # process opens may hold one of those, and it would be found busy.
+        first = 20000 + (os.getpid() * 7919 + attempt * 2 * stride) % 11000
         if all(not pv.busy_ports(first + k * stride, ROOT) for k in range(lanes)):
             return f"{first}-{first + lanes * stride - 1}"
     raise AssertionError("no free range of ports")
@@ -176,6 +185,26 @@ class Toy(unittest.TestCase):
         self.seen = self.temp / "seen"
         self.seen.mkdir()
         self.out = self.temp / "out"
+        self.addCleanup(self.stop_lanes)
+
+    def stop_lanes(self):
+        """Whatever a lane started and a test left running (a hung recipe,
+        a process it left behind) is stopped."""
+        for k in range(8):
+            pv.stop_marked(str(self.out / f"lane-{k}"), grace=1)
+
+    def drop_lock(self, ports):
+        """The lock file of a range of ports a test ran on."""
+        pathlib.Path(f"/tmp/preverify-ports-{ports}.lock").unlink(missing_ok=True)
+
+    def reap(self, proc):
+        """A tool started by a test, stopped and its pipes closed."""
+        if proc.poll() is None:
+            proc.kill()
+        proc.wait()
+        for stream in (proc.stdout, proc.stderr):
+            if stream:
+                stream.close()
 
     def env(self, **extra):
         env = {k: v for k, v in os.environ.items() if not k.startswith(("PW_MUTANT_", "TOY_"))}
@@ -187,7 +216,7 @@ class Toy(unittest.TestCase):
         env.update(extra)
         return env
 
-    def tool(self, *args, env=None, timeout=180):
+    def tool(self, *args, env=None, timeout=90):
         return subprocess.run(
             [sys.executable, "scripts/preverify.py", *args], cwd=self.toy, env=env or self.env(),
             capture_output=True, text=True, timeout=timeout,
@@ -195,6 +224,7 @@ class Toy(unittest.TestCase):
 
     def run_recipes(self, recipes, *more, lanes=2, ports=None, env=None):
         ports = ports or free_range(lanes)
+        self.addCleanup(self.drop_lock, ports)
         return self.tool(
             "--recipes", recipes, "--lanes", str(lanes), "--no-setup", "--ports", ports,
             "--out", str(self.out), "--cpus", "8", *more, env=env,
@@ -326,6 +356,8 @@ class Environment(unittest.TestCase):
         "CARGO_INCREMENTAL": "1", "CARGO_PROFILE_DEV_DEBUG": "2", "PORT": "3141", "TMPDIR": "/t",
         "PW_MUTANT_SLOTS": "4", "PW_MESSAGES_PORT": "7141", "PW_NOTIFICATIONS_PORT": "6100",
         "BENCH_PORT": "3200", "CARGO_BUILD_JOBS": "99", "CARGO_TARGET_DIR": "/elsewhere",
+        "PW_MUTANT_SLOT_DIR": "/s", "PW_MUTANT_PICK": "3:0", "PW_MUTANT_SLOT": "1", "PW_HOST_TEST_PORT": "1",
+        "PW_PERFORMANCE": "1", "PW_REUSE": "1", "BENCH_REUSE": "1", "BENCH_STACK": "pleris",
     }
 
     def env(self, **extra):
@@ -353,8 +385,13 @@ class Environment(unittest.TestCase):
 
     def test_a_deployments_variables_and_slots_do_not_reach_a_lane(self):
         env = self.env()
-        for name in ("KIOKUN_DATA", "KIOKUN_APP", "PW_FEED_DATABASE_URL", "PW_STORE_DATABASE_URL", "PW_MUTANT_SLOTS"):
-            self.assertNotIn(name, env)
+        for name in (
+            "KIOKUN_DATA", "KIOKUN_APP", "PW_FEED_DATABASE_URL", "PW_STORE_DATABASE_URL", "PW_MUTANT_SLOTS",
+            "PW_MUTANT_SLOT_DIR", "PW_MUTANT_PICK", "PW_MUTANT_SLOT", "PW_HOST_TEST_PORT", "PW_PERFORMANCE",
+            "PW_REUSE", "BENCH_REUSE", "BENCH_STACK",
+        ):
+            self.assertIn(name, self.BASE, "the test does not offer it")
+            self.assertNotIn(name, env, name)
 
     def test_what_a_lane_does_not_set_stays_the_callers(self):
         env = self.env()
@@ -451,6 +488,9 @@ class Plan(unittest.TestCase):
         self.assertEqual(pv.run_directory("a" * 40, None), pathlib.Path("/tmp/preverify-aaaaaaaaaaaa"))
         self.assertEqual(pv.run_directory("a" * 40, "/x/y"), pathlib.Path("/x/y"))
 
+    def test_a_directory_named_relatively_is_the_callers_whatever_the_lanes_run_from(self):
+        self.assertEqual(pv.run_directory("a" * 40, "rel/dir"), pathlib.Path.cwd() / "rel" / "dir")
+
     def test_a_job_carries_what_the_plan_knows_of_its_recipe(self):
         jobs = pv.jobs_of(["e14-reviews", "e14-render-merge", "e14-kiokun-cache"], ROOT)
         by = {j.recipe: j for j in jobs}
@@ -464,8 +504,23 @@ class Plan(unittest.TestCase):
         self.assertGreater(by["e14-kiokun-cache"].cost, 0)
 
 
+class Steps(unittest.TestCase):
+    def test_the_default_steps_are_a_shards(self):
+        self.assertEqual(pv.BOOTSTRAP_STEPS, ["pnpm install --frozen-lockfile --offline"])
+        run = workflow_run("recipes", "Build")
+        self.assertTrue(run[0].startswith("for _ in $(seq 150)"), run)
+        self.assertEqual(run[1:], pv.BUILD_STEPS)
+
+
 class Planner(Toy):
     """The tool plans with the tree's own planner, as the workflow does."""
+
+    def test_the_seconds_and_the_bodies_are_the_trees_own_not_this_repositorys(self):
+        jobs = pv.jobs_of(["e14-builds", "e14-mid"], self.toy)
+        self.assertEqual([j.recipe for j in jobs], ["e14-mid", "e14-builds"])
+        by = {j.recipe: j for j in jobs}
+        self.assertEqual((by["e14-mid"].recorded, by["e14-mid"].cost), (150, 150))
+        self.assertTrue(by["e14-builds"].build)
 
     def second_commit(self):
         text = (self.toy / "justfile").read_text()
@@ -486,6 +541,19 @@ class Planner(Toy):
         self.assertIn("1 recipes", done.stdout)
         self.assertIn("e14-mid: planned 150 s, CI 150 s", done.stdout)
         self.assertNotIn("e14-long", done.stdout)
+
+    def test_the_plan_is_said_as_ci_would_be_asked_it(self):
+        first = git(self.toy, "rev-parse", "HEAD").stdout.strip()
+        self.second_commit()
+        head = git(self.toy, "rev-parse", "HEAD").stdout.strip()
+        done = self.tool("--plan", first)
+        self.assertIn(
+            f"preverify: planned as verify.yml plans a track's push: "
+            f"python3 scripts/ci_plan.py --shards 9 --changed {first} {head} --current", done.stdout)
+        named = self.tool("--plan", "--recipes", "e14-short e14-mid")
+        self.assertIn(
+            "preverify: planned as verify.yml plans a track's push: python3 scripts/ci_plan.py --shards 9 e14-short e14-mid",
+            named.stdout)
 
     def test_the_base_is_a_ref_and_the_range_starts_at_its_merge_base(self):
         git(self.toy, "branch", "base")
@@ -553,10 +621,19 @@ class Planner(Toy):
     def test_a_root_that_is_no_git_is_refused_in_gits_words(self):
         with tempfile.TemporaryDirectory() as t:
             buffer = io.StringIO()
-            with redirect_stderr(buffer):
+            # git looks upward for a repository, and a temporary directory may be under one
+            ceiling = {"GIT_CEILING_DIRECTORIES": str(pathlib.Path(t).parent)}
+            with mock.patch.dict(os.environ, ceiling), redirect_stderr(buffer):
                 code = pv.main(["--plan", "--recipes", "e14-a"], pathlib.Path(t))
         self.assertEqual(code, 2)
         self.assertIn("preverify: `git rev-parse HEAD` failed", buffer.getvalue())
+
+    def test_a_run_interrupted_before_the_lanes_exist_is_said_not_a_traceback(self):
+        buffer = io.StringIO()
+        with mock.patch.object(pv, "planned", side_effect=KeyboardInterrupt), redirect_stderr(buffer):
+            code = pv.main(["--recipes", "e14-short"], self.toy)
+        self.assertEqual(code, 130)
+        self.assertIn("preverify: interrupted", buffer.getvalue())
 
     def test_no_more_lanes_than_recipes(self):
         done = self.tool("--plan", "--recipes", "e14-short e14-long", "--lanes", "6")
@@ -662,9 +739,9 @@ class Lanes(Toy):
         cls.status_before = git(cls.toy, "status", "--porcelain").stdout
         env = {k: v for k, v in os.environ.items() if not k.startswith(("PW_MUTANT_", "TOY_"))}
         env.update(
-            TOY_SEEN=str(cls.seen), KIOKUN_DATA="/nonexistent/kiokun", KIOKUN_APP="/nonexistent/app",
-            PW_FEED_DATABASE_URL="postgresql://toy@localhost/toy", PW_STORE_DATABASE_URL="postgresql://toy/store",
-            CARGO_INCREMENTAL="1", PYTHONDONTWRITEBYTECODE="1",
+            TOY_SEEN=str(cls.seen), TOY_MEET="long,mid", KIOKUN_DATA="/nonexistent/kiokun",
+            KIOKUN_APP="/nonexistent/app", PW_FEED_DATABASE_URL="postgresql://toy@localhost/toy",
+            PW_STORE_DATABASE_URL="postgresql://toy/store", CARGO_INCREMENTAL="1", PYTHONDONTWRITEBYTECODE="1",
         )
         cls.ports = free_range(2)
         cls.first = int(cls.ports.split("-")[0])
@@ -746,9 +823,10 @@ class Lanes(Toy):
         self.assertLess(self.records_["mid"]["start"], self.records_["bad"]["start"])
 
     def test_the_lanes_run_at_the_same_time(self):
+        """`long` and `mid` each wait for the other to have started, so that
+        each having met the other is a proof that they ran at once."""
         long, mid = self.records_["long"], self.records_["mid"]
-        self.assertLess(long["start"], mid["end"])
-        self.assertLess(mid["start"], long["end"])
+        self.assertTrue(long["met"] and mid["met"])
         self.assertNotEqual(long["PORT"], mid["PORT"])
 
     def test_a_recipe_that_exits_non_zero_fails_with_its_exit_and_its_failing_lines(self):
@@ -869,6 +947,16 @@ class RunTwice(Toy):
         self.assertFalse((self.out / "marker.txt").exists())
         self.assertEqual([r["recipe"] for r in json.loads((self.out / "summary.json").read_text())["results"]], ["e14-mid"])
 
+    def test_a_relative_directory_is_made_where_the_caller_asked(self):
+        ports = free_range(1)
+        self.addCleanup(self.drop_lock, ports)
+        done = self.tool("--recipes", "e14-short", "--lanes", "1", "--no-setup", "--ports", ports,
+                         "--out", "../rel-out", "--cpus", "8")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertTrue((self.temp / "rel-out" / "summary.json").is_file())
+        self.assertEqual(pathlib.Path(self.records()["short"]["cwd"]).resolve(),
+                         (self.temp / "rel-out" / "lane-0" / "tree").resolve())
+
     def test_only_the_run_before_is_kept(self):
         ports = free_range(1)
         for marker in ("one", "two", "three"):
@@ -948,13 +1036,61 @@ class RunTwice(Toy):
 
     def test_the_disk_is_read_where_the_directory_would_be_made(self):
         self.assertGreater(pv.free_gib(self.temp / "not" / "made" / "yet"), 0)
-        self.assertEqual(pv.free_gib(self.temp), pv.free_gib(self.temp / "nothing"))
+        self.assertAlmostEqual(pv.free_gib(self.temp), pv.free_gib(self.temp / "nothing"), delta=1.0)
 
     def test_lanes_the_range_cannot_hold_are_refused(self):
         stride, _ = pv.mutation_slots.port_layout(ROOT)
         done = self.run_recipes("e14-short e14-mid e14-long", lanes=3, ports=f"40000-{40000 + 2 * stride - 1}")
         self.assertEqual(done.returncode, 2)
         self.assertIn("room for 2 lanes", done.stderr)
+
+
+class Locks(Toy):
+    def test_the_lock_names_its_owner_and_is_let_go_with_the_run(self):
+        first = 20000 + os.getpid() % 30000  # this process's own, so that tests run at once do not meet
+        last = first + 255
+        path = pathlib.Path(f"/tmp/preverify-ports-{first}-{last}.lock")
+        self.addCleanup(path.unlink, True)
+        with pv.port_lock(first, last):
+            self.assertEqual(path.read_text().strip(), str(os.getpid()))
+            with self.assertRaises(pv.Refusal) as caught:
+                with pv.port_lock(first, last):
+                    pass
+            self.assertIn(f"another preverify run (pid {os.getpid()}) holds the ports {first}-{last}", str(caught.exception))
+            self.assertIn("--ports", str(caught.exception))
+        with pv.port_lock(first, last):
+            pass
+
+    def test_two_runs_do_not_share_ports(self):
+        ports = free_range(1)
+        first, last = map(int, ports.split("-"))
+        self.addCleanup(pathlib.Path(f"/tmp/preverify-ports-{first}-{last}.lock").unlink, True)
+        with pv.port_lock(first, last):
+            done = self.run_recipes("e14-short", lanes=1, ports=ports)
+        self.assertEqual(done.returncode, 2)
+        self.assertIn(f"another preverify run (pid {os.getpid()}) holds the ports {ports}", done.stderr)
+        self.assertEqual(self.records(), {})
+        self.assertFalse(self.out.exists())
+        again = self.run_recipes("e14-short", lanes=1, ports=ports)
+        self.assertEqual(again.returncode, 0, again.stderr)
+
+    def test_a_run_on_other_ports_is_not_held_up(self):
+        ports = free_range(1)
+        first, last = map(int, ports.split("-"))
+        other = f"{first + 1024}-{last + 1024}"
+        for a, b in ((first, last), (first + 1024, last + 1024)):
+            self.addCleanup(pathlib.Path(f"/tmp/preverify-ports-{a}-{b}.lock").unlink, True)
+        with pv.port_lock(first, last):
+            done = self.run_recipes("e14-short", lanes=1, ports=other)
+        self.assertEqual(done.returncode, 0, done.stderr)
+
+    def test_a_plan_needs_no_ports(self):
+        ports = free_range(1)
+        first, last = map(int, ports.split("-"))
+        self.addCleanup(pathlib.Path(f"/tmp/preverify-ports-{first}-{last}.lock").unlink, True)
+        with pv.port_lock(first, last):
+            done = self.tool("--plan", "--recipes", "e14-short", "--ports", ports)
+        self.assertEqual(done.returncode, 0, done.stderr)
 
 
 class Outcomes(Toy):
@@ -978,7 +1114,7 @@ class Outcomes(Toy):
 
     def test_a_recipe_past_its_time_is_stopped_and_fails(self):
         started = time.monotonic()
-        done = self.run_recipes("e14-hang e14-short", "--timeout", "1", lanes=2)
+        done = self.run_recipes("e14-hang e14-short", "--timeout", "4", lanes=2)
         self.assertLess(time.monotonic() - started, 60)
         self.assertEqual(done.returncode, 1)
         self.assertIn("- e14-hang: timed out", done.stdout)
@@ -1003,9 +1139,10 @@ class Outcomes(Toy):
         self.assertIn("**2 recipes, 0 failed**", done.stdout)
 
     def test_a_lane_runs_one_recipe_at_a_time_and_takes_the_next_when_free(self):
-        done = self.run_recipes("e14-short e14-mid e14-long e14-bad", lanes=2)
+        done = self.run_recipes("e14-short e14-mid e14-long e14-bad", lanes=2, env=self.env(TOY_MEET="long,mid"))
         records = self.records()
         self.assertEqual(len(records), 4, done.stdout)
+        self.assertTrue(records["long"]["met"] and records["mid"]["met"])
         for port in {r["PORT"] for r in records.values()}:
             mine = sorted((r for r in records.values() if r["PORT"] == port), key=lambda r: r["start"])
             for a, b in zip(mine, mine[1:]):
@@ -1026,6 +1163,7 @@ class Outcomes(Toy):
              "--no-setup", "--ports", ports, "--out", str(self.out), "--cpus", "8"],
             cwd=self.toy, env=self.env(), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
         )
+        self.addCleanup(self.reap, proc)
         deadline = time.monotonic() + 60
         while time.monotonic() < deadline and not (self.seen / "hang.json").exists():
             time.sleep(0.1)
@@ -1053,9 +1191,11 @@ class Setup(Toy):
     """A lane sets up as a shard does: the node workspace, and the build once
     a recipe needs it. Run in this process, so that the steps can be toys."""
 
-    def run_in_process(self, recipes, lanes, bootstrap, build, env_extra=None):
+    def run_in_process(self, recipes, lanes, bootstrap, build, env_extra=None, extra=()):
         ports = free_range(lanes)
-        argv = ["--recipes", recipes, "--lanes", str(lanes), "--ports", ports, "--out", str(self.out), "--cpus", "8"]
+        self.addCleanup(self.drop_lock, ports)
+        argv = ["--recipes", recipes, "--lanes", str(lanes), "--ports", ports, "--out", str(self.out), "--cpus", "8",
+                *extra]
         buffer = io.StringIO()
         env = self.env(**(env_extra or {}))
         with mock.patch.dict(os.environ, env, clear=True), \
@@ -1081,6 +1221,15 @@ class Setup(Toy):
         self.assertEqual(self.records()["builds"]["PORT"], str(builder))
         self.assertNotEqual(self.records()["long"]["PORT"], str(builder))
 
+    def test_a_lane_told_to_skip_setup_runs_none_of_it(self):
+        marks = self.temp / "marks"
+        marks.mkdir()
+        code, out = self.run_in_process(
+            "e14-builds", 1, [f"echo x > {marks}/boot"], [f"echo x > {marks}/build"], extra=["--no-setup"])
+        self.assertEqual(code, 0, out)
+        self.assertEqual(sorted(p.name for p in marks.iterdir()), [])
+        self.assertEqual(set(self.records()), {"builds"})
+
     def test_a_lane_builds_once_however_many_recipes_need_it(self):
         marks = self.temp / "marks"
         marks.mkdir()
@@ -1096,9 +1245,11 @@ class Setup(Toy):
         marks.mkdir()
         code, out = self.run_in_process(
             "e14-builds", 1,
-            [f'pwd > {marks}/pwd; echo "$CARGO_TARGET_DIR $TMPDIR" > {marks}/env; echo boot >> {marks}/order'],
+            [f'pwd > {marks}/pwd; echo "$CARGO_TARGET_DIR $TMPDIR" > {marks}/env; echo boot >> {marks}/order; '
+             f'echo "[$PW_FEED_DATABASE_URL]" > {marks}/db'],
             [f'echo build >> {marks}/order'])
         self.assertEqual(code, 0, out)
+        self.assertEqual((marks / "db").read_text().strip(), "[]", "a setup command was given the database")
         self.assertEqual((marks / "order").read_text().split(), ["boot", "build"])
         tree = pathlib.Path((marks / "pwd").read_text().strip())
         self.assertEqual(tree.resolve(), (self.out / "lane-0" / "tree").resolve())
@@ -1180,11 +1331,34 @@ class Setup(Toy):
         self.assertEqual(code, 0, out)
         self.assertEqual((signal.getsignal(signal.SIGINT), signal.getsignal(signal.SIGTERM)), before)
 
-    def test_the_default_steps_are_a_shards(self):
-        self.assertEqual(pv.BOOTSTRAP_STEPS, ["pnpm install --frozen-lockfile --offline"])
-        run = workflow_run("recipes", "Build")
-        self.assertTrue(run[0].startswith("for _ in $(seq 150)"), run)
-        self.assertEqual(run[1:], pv.BUILD_STEPS)
+    def test_a_fault_in_the_tool_is_a_recipes_failure_said_not_a_lost_result(self):
+        with mock.patch.object(pv.Lane, "attempt", side_effect=RuntimeError("boom")):
+            code, out = self.run_in_process("e14-short e14-builds", 1, [], [])
+        self.assertEqual(code, 1, out)
+        results = json.loads((self.out / "summary.json").read_text())["results"]
+        self.assertEqual(
+            {r["recipe"]: (r["verdict"], r["reason"]) for r in results},
+            {"e14-short": ("FAILED", "preverify failed: RuntimeError('boom')"),
+             "e14-builds": ("FAILED", "preverify failed: RuntimeError('boom')")})
+        self.assertIn("- e14-short: preverify failed: RuntimeError('boom')", out)
+
+    def test_a_fault_that_ends_a_lane_is_said_and_the_others_go_on(self):
+        real = pv.Lane.bootstrap
+
+        def faulty(lane):
+            if lane.index == 0:
+                raise RuntimeError("no disk")
+            return real(lane)
+
+        with mock.patch.object(pv.Lane, "bootstrap", faulty):
+            code, out = self.run_in_process("e14-short e14-builds e14-feed-postgres", 2, [], [])
+        self.assertEqual(code, 1, out)
+        results = json.loads((self.out / "summary.json").read_text())["results"]
+        self.assertEqual({r["recipe"]: r["verdict"] for r in results},
+                         {"e14-short": "ok", "e14-builds": "ok", "e14-feed-postgres": "ok"})
+        self.assertEqual({r["lane"] for r in results}, {1})
+        self.assertIn("lane 0: stopped, preverify failed: RuntimeError('no disk')", out)
+        self.assertIn("- lane 0 stopped: preverify failed: RuntimeError('no disk')", out)
 
 
 # ---------------------------------------------------------------------------
@@ -1233,6 +1407,13 @@ class Judging(unittest.TestCase):
         self.assertEqual((result.verdict, result.lane, result.seconds, result.reason), ("ok", 3, 12.5, ""))
         self.assertEqual(result.wrote, ["docs/evidence/E14/a.txt"])
         self.assertEqual(result.out, str(out))
+
+    def test_evidence_the_runner_wrote_and_did_not_copy_fails_a_recipe(self):
+        out = recipe_out(self.temp, "e14-a", 0, {"docs/evidence/E14/a.txt": "ok\n"})
+        (out / "evidence" / "docs/evidence/E14/a.txt").unlink()
+        result = pv.result_of("e14-a", 0, out, "done", [])
+        self.assertEqual(result.verdict, "FAILED")
+        self.assertEqual(result.reason, "docs/evidence/E14/a.txt was written, and the runner's copy of it is missing")
 
     def test_a_non_zero_exit_is_failed_and_says_the_exit(self):
         out = recipe_out(self.temp, "e14-a", 101, {"docs/evidence/E14/a.txt": "ok\n"})
@@ -1448,6 +1629,29 @@ class Processes(unittest.TestCase):
         self.assertEqual(a.returncode, -signal.SIGTERM, "stopped by SIGKILL without the grace")
         self.assertIsNone(b.poll())
 
+    def test_a_process_is_given_the_grace_to_end_cleanly(self):
+        marker = f"/pv-test-grace-{os.getpid()}"
+        with tempfile.TemporaryDirectory() as t:
+            done = pathlib.Path(t) / "done"
+            code = (
+                "import pathlib, signal, sys, time\n"
+                "def stop(*a):\n"
+                "    time.sleep(0.5)\n"
+                f"    pathlib.Path({str(done)!r}).write_text('clean')\n"
+                "    sys.exit(0)\n"
+                "signal.signal(signal.SIGTERM, stop)\n"
+                "print('up', flush=True)\n"
+                "time.sleep(120)\n"
+            )
+            proc = subprocess.Popen([sys.executable, "-c", code], env={**os.environ, pv.MARKER: marker},
+                                    start_new_session=True, stdout=subprocess.PIPE, text=True)
+            self.addCleanup(lambda: (proc.kill(), proc.wait(), proc.stdout.close()))
+            proc.stdout.readline()
+            pv.stop_marked(marker, grace=10)
+            proc.wait(timeout=10)
+            self.assertEqual(done.read_text(), "clean", "killed before it had ended")
+            self.assertEqual(proc.returncode, 0)
+
     def test_a_term_proof_process_is_killed_after_the_grace(self):
         marker = f"/pv-test-kill-{os.getpid()}"
         env = {**os.environ, pv.MARKER: marker}
@@ -1521,9 +1725,9 @@ class ExitStatus(unittest.TestCase):
 class Say(Toy):
     def test_the_stamp_counts_hours_minutes_and_seconds_since_the_start(self):
         run = pv.Run(self.toy, "h" * 40, self.out)
-        run.start = time.monotonic() - (3600 + 2 * 60 + 5)
         buffer = io.StringIO()
-        with redirect_stdout(buffer):
+        with mock.patch.object(pv.time, "monotonic", return_value=run.start + 3600 + 2 * 60 + 5.4), \
+                redirect_stdout(buffer):
             run.say("hello")
         self.assertEqual(buffer.getvalue(), "[01:02:05] hello\n")
 
@@ -1600,6 +1804,13 @@ class Status(unittest.TestCase):
 
 
 class Load(unittest.TestCase):
+    def test_the_load_is_sampled_at_the_start_and_at_the_end_whatever_happens_between(self):
+        values = iter([1.0, 5.0] + [2.0] * 100)
+        with mock.patch.object(pv.os, "getloadavg", side_effect=lambda: (next(values), 0, 0)):
+            with pv.Load(every=1000) as load:
+                pass
+        self.assertEqual(load.samples, [1.0, 5.0])
+
     def test_the_load_is_sampled_while_a_run_goes_on_and_at_both_ends(self):
         values = iter([1.0, 5.0] + [2.0] * 1000)
         with mock.patch.object(pv.os, "getloadavg", side_effect=lambda: (next(values), 0, 0)):

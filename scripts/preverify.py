@@ -40,12 +40,15 @@ run in and never pushes. Each lane's evidence files and logs go under
 """
 
 import argparse
+import contextlib
 import dataclasses
+import fcntl
 import json
 import os
 import pathlib
 import queue
 import re
+import shlex
 import shutil
 import signal
 import socket
@@ -177,8 +180,8 @@ def lane_ports(
     lanes' ranges overlap, and every one within `first`..`last`."""
     if lanes < 1:
         raise Refusal("give a whole number of lanes, 1 or more")
-    stride, _ = mutation_slots.port_layout(root)
     try:
+        stride, _ = mutation_slots.port_layout(root)
         ports = [mutation_slots.port_for_slot(k, {"PORT": str(first)}, root) for k in range(lanes)]
     except ValueError as error:
         raise Refusal(str(error)) from error
@@ -220,6 +223,29 @@ def lane_environment(
     if database:
         env["PW_FEED_DATABASE_URL"] = database
     return env
+
+
+@contextlib.contextmanager
+def port_lock(first: int, last: int):
+    """Hold the range of ports for this run: two runs on one machine would
+    start their hosts on the same ports. The lock is a file's, the machine's,
+    and goes when the run does, however it ends."""
+    path = pathlib.Path("/tmp") / f"preverify-ports-{first}-{last}.lock"
+    with open(path, "a+") as handle:
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            handle.seek(0)
+            owner = handle.read().strip()
+            raise Refusal(
+                f"another preverify run{f' (pid {owner})' if owner else ''} holds the ports {first}-{last}: "
+                "wait for it, or give this run others with --ports"
+            ) from None
+        handle.seek(0)
+        handle.truncate()
+        handle.write(f"{os.getpid()}\n")
+        handle.flush()
+        yield
 
 
 def busy_ports(port: int, root: pathlib.Path = ROOT) -> list[int]:
@@ -395,7 +421,11 @@ def result_of(recipe: str, lane: int, out: pathlib.Path, outcome: str, left: lis
     survived: list[str] = []
     bound: list[str] = []
     for path in row["wrote"]:
-        text = (out / "evidence" / path).read_text(errors="replace")
+        try:
+            text = (out / "evidence" / path).read_text(errors="replace")
+        except OSError:
+            survived.append(f"{path} was written, and the runner's copy of it is missing")
+            continue
         survived += survivors(text)
         bound += bound_lines(recipe, text)
     ok = judge(row["status"], survived)
@@ -643,9 +673,18 @@ class Lane:
         return result_of(job.recipe, self.index, out, outcome, left)
 
     def work(self) -> None:
-        """A lane's life: set up, then take recipes from the queue until it is
-        empty. A setup that fails ends the lane, and what it was to run is
-        left for the others."""
+        """A lane's life, and a fault in this tool that ends it is said: the
+        recipes it did not reach are left for the others."""
+        try:
+            self.serve()
+        except Exception as error:  # noqa: BLE001 - a thread's fault must not pass unsaid
+            self.broken = f"preverify failed: {error!r}"
+            self.run.say(f"lane {self.index}: stopped, {self.broken}")
+
+    def serve(self) -> None:
+        """Set up, then take recipes from the queue until it is empty. A setup
+        that fails ends the lane, and what it was to run is left for the
+        others."""
         run = self.run
         try:
             self.bootstrap()
@@ -669,7 +708,10 @@ class Lane:
                 return
             run.say(f"lane {self.index}: {job.recipe} started; log {self.directory / 'out' / job.recipe / 'logs' / (job.recipe + '.log')}")
             self.running = (job.recipe, time.monotonic())
-            result = self.attempt(job)
+            try:
+                result = self.attempt(job)
+            except Exception as error:  # noqa: BLE001 - a fault here is this recipe's, said
+                result = Result(job.recipe, "FAILED", self.index, f"preverify failed: {error!r}")
             self.running = None
             run.record(result)
             if result.verdict == "ok":
@@ -783,7 +825,7 @@ def free_gib(path: pathlib.Path) -> float:
 
 
 def run_directory(head: str, out: str | None) -> pathlib.Path:
-    return pathlib.Path(out) if out else pathlib.Path("/tmp") / f"preverify-{head[:12]}"
+    return pathlib.Path(out).resolve() if out else pathlib.Path("/tmp") / f"preverify-{head[:12]}"
 
 
 def is_a_run(directory: pathlib.Path) -> bool:
@@ -900,6 +942,9 @@ def main(argv: list[str] | None = None, root: pathlib.Path = ROOT) -> int:
     except subprocess.CalledProcessError as error:
         print(f"preverify: `{' '.join(map(str, error.cmd))}` failed: {(error.stderr or '').strip()}", file=sys.stderr)
         return 2
+    except KeyboardInterrupt:
+        print("preverify: interrupted", file=sys.stderr)
+        return 130
 
 
 def pre_check(args: argparse.Namespace, root: pathlib.Path) -> int:
@@ -907,10 +952,12 @@ def pre_check(args: argparse.Namespace, root: pathlib.Path) -> int:
     first, last = port_range(args.ports)
     head = git(root, "rev-parse", "HEAD").stdout.strip()
     branch = git(root, "branch", "--show-current", check=False).stdout.strip()
-    recipes = list(dict.fromkeys(r for text in args.recipes for r in text.split()))
+    recipes = [r for text in args.recipes for r in text.split()]
     stale = branch.startswith(STALE_BRANCHES) if args.stale is None else args.stale
     base = "" if recipes else merge_base(root, args.base, head)
-    names, notes = planned(root, plan_command(base, head, stale, args.current, recipes))
+    command = plan_command(base, head, stale, args.current, recipes)
+    names, notes = planned(root, command)
+    print("preverify: planned as verify.yml plans a track's push: " + shlex.join(["python3", *command[1:]]), flush=True)
     for note in notes:
         print(note, flush=True)
     jobs = jobs_of(names, root)
@@ -927,6 +974,20 @@ def pre_check(args: argparse.Namespace, root: pathlib.Path) -> int:
             sets = ", ".join(w for w, on in (("browsers", job.browsers), ("build", job.build), ("database", job.database)) if on)
             print(f"  {job.recipe}: planned {job.cost} s, CI {ci}" + (f" ({sets})" if sets else ""))
         return 0
+    with port_lock(first, last):
+        return start(args, root, head, base, jobs, lanes, ports)
+
+
+def start(
+    args: argparse.Namespace,
+    root: pathlib.Path,
+    head: str,
+    base: str,
+    jobs: list[Job],
+    lanes: int,
+    ports: list[int],
+) -> int:
+    """Check that the run can start, and run it."""
     dirt = dirty_paths(root)
     if dirt:
         shown = "; ".join(d.strip() for d in dirt[:5]) + (f"; and {len(dirt) - 5} more" if len(dirt) > 5 else "")
