@@ -37,6 +37,7 @@ exits 1 where one fails.
 import importlib.util
 import pathlib
 import re
+import shlex
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -59,6 +60,51 @@ SCRIPT = re.compile(r"scripts/([a-z0-9_]+_mutations\.py)")
 # The recipe's count is of that part, and the parts together, each run by a
 # recipe, hold every mutant exactly once (`split`).
 PART = re.compile(r"scripts/([a-z0-9_]+_mutations\.py) --part (\d+)/(\d+)")
+
+
+def executed_scripts(body: str) -> list[str]:
+    """Literal Python campaign invocations, not hash inputs or quoted prose.
+    Dynamic shell execution is outside this static-reference model."""
+    lexer = shlex.shlex(body.replace("\\\n", " "), posix=True, punctuation_chars=";&|(){}\n")
+    lexer.whitespace = " \t\r"
+    lexer.whitespace_split = True
+    tokens = list(lexer)
+    found = set()
+    command = True
+    for at, token in enumerate(tokens):
+        if token and all(ch in ";&|(){}\n" for ch in token):
+            command = True
+            continue
+        if not command:
+            continue
+        word = token.lstrip("@")
+        if not word or word in {"if", "then", "do", "!", "env"} or re.match(r"^[A-Za-z_]\w*=", word):
+            continue
+        command = False
+        if not re.fullmatch(r"python(?:3(?:\.\d+)?)?", pathlib.PurePosixPath(word).name):
+            continue
+        at += 1
+        while at < len(tokens):
+            option = tokens[at]
+            if option in {"-X", "-W", "--check-hash-based-pycs"}:
+                at += 2
+            elif option in {"-B", "-u", "-E", "-s", "-S", "-I", "-O", "-OO"} or option.startswith(("-X", "-W")):
+                at += 1
+            else:
+                break
+        if at >= len(tokens):
+            continue
+        if tokens[at] == "--":
+            at += 1
+        if at >= len(tokens):
+            continue
+        candidate = tokens[at].removeprefix("./")
+        if candidate == "-m" and at + 1 < len(tokens):
+            candidate = tokens[at + 1].replace(".", "/") + ".py"
+        script = SCRIPT.fullmatch(candidate)
+        if script:
+            found.add(script[1])
+    return sorted(found)
 
 
 def split(mutants: int, parts: list, run: dict[int, list[str]], n: int) -> list[str]:
@@ -105,7 +151,10 @@ def words(mutant: tuple) -> tuple[str, list[str]]:
     said = [w for w in mutant[:-3] if isinstance(w, str)]
     if not said:
         return "", []
-    i = max(range(len(said)), key=lambda k: len(said[k]))
+    # A producer may carry its intended test method beside the description.
+    # The method's identifier is metadata even when longer than the prose.
+    descriptions = [i for i, word in enumerate(said) if not re.fullmatch(r"(?:\w+\.)+test_\w+", word)]
+    i = max(descriptions or range(len(said)), key=lambda k: len(said[k]))
     return said[i], said[:i] + said[i + 1 :]
 
 
@@ -190,7 +239,7 @@ def disagreements(
     # it, and the parts they ask for (`split`).
     partly: dict[str, tuple[int, dict[int, list[str]], list[str]]] = {}
     for recipe, body in sorted(plan.bodies(root).items()):
-        run = sorted(set(SCRIPT.findall(body)))
+        run = executed_scripts(body)
         files = plan.evidence_files(body)
         if not run or not files:
             continue

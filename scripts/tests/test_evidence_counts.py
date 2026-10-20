@@ -8,10 +8,12 @@ import importlib.util
 import pathlib
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
 SCRIPTS = pathlib.Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(SCRIPTS))
 
 
 def load(name: str):
@@ -120,6 +122,42 @@ class Counts(unittest.TestCase):
             }
         )
         return counts.disagreements(root, plan)
+
+    def test_hashed_or_quoted_script_names_are_not_executed_campaigns(self):
+        body = RECIPE.replace(
+            "python3 scripts/x_mutations.py;",
+            "sha256sum scripts/y_mutations.py; "
+            "echo 'python3 scripts/y_mutations.py'; "
+            "echo python3 scripts/y_mutations.py; "
+            "python3 -B scripts/x_mutations.py;",
+        )
+        self.assertEqual(self.found(AGREES, body), {})
+        for invocation in (
+            "python3 ./scripts/x_mutations.py",
+            "python3 -X dev -W ignore ./scripts/x_mutations.py",
+            "python3 -Xdev -Wignore scripts/x_mutations.py",
+            "python3 -- scripts/x_mutations.py",
+            "python3 -m scripts.x_mutations",
+            "env PW_MODE=test python3 scripts/x_mutations.py",
+        ):
+            recipe = RECIPE.replace("python3 scripts/x_mutations.py", invocation)
+            with self.subTest(invocation=invocation):
+                self.assertEqual(self.found(AGREES, recipe), {})
+                self.assertTrue(self.found("", recipe))
+        # The actual second campaign still requires its own evidence block.
+        actual = body.replace("python3 -B scripts/x_mutations.py;", "python3 scripts/y_mutations.py; python3 scripts/x_mutations.py;")
+        self.assertTrue(self.found(AGREES, actual))
+        self.assertEqual(self.found(Y_AGREES + AGREES, actual), {})
+
+    def test_a_method_id_does_not_replace_the_mutant_description(self):
+        witness = "GuideProducers.test_a_long_intended_body_assertion_identifier"
+        script = X.replace('"core"', repr(witness), 1)
+        evidence = AGREES.replace("a sink is read [core]", "a sink is read")
+        root = self.tree({"justfile": RECIPE, "scripts/x_mutations.py": script,
+                          "docs/evidence/E14/x.txt": evidence})
+        self.assertEqual(counts.disagreements(root, plan), {})
+        (root / "docs/evidence/E14/x.txt").write_text(evidence.replace("a sink is read:", witness + ":"))
+        self.assertTrue(counts.disagreements(root, plan))
 
     def test_evidence_that_agrees_with_its_script_names_nothing(self):
         self.assertEqual(self.found(AGREES), {})
