@@ -3,7 +3,7 @@
 # security pins may advance independently when a vulnerable tool is replaced.
 # PROJECT_CHARTER.md §13.3. Host snapshot: 2026-08-05T22:57:59Z.
 # Wasmtime security pin advanced by ADR-0116 on 2026-10-01, by ADR-0244 on
-# 2026-10-07, and by ADR-0335 on 2026-10-14.
+# 2026-10-07, by ADR-0335 on 2026-10-14, and by ADR-0363 on 2026-10-20.
 
 macos            = 26.5.2 (25F84)
 xcode_clt        = 26.6.0.0.1781586589
@@ -14,7 +14,7 @@ cargo            = cargo 1.97.1 (c980f4866 2026-06-30)
 node             = v22.21.1
 pnpm             = 10.15.1
 koka             = Koka 3.2.3, 01:29:29 Mar 18 2026 (ghc release version)
-wasmtime         = wasmtime 48.0.6 (72bc45bd1 2026-10-14)
+wasmtime         = wasmtime 48.0.7 (c6846e13f 2026-10-19)
 just             = just 1.58.0
 jq               = jq-1.7.1-apple
 limactl          = (absent)

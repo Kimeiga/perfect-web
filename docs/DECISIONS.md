@@ -3136,3 +3136,11 @@ guide mutation kills require valid producer outcomes (track
 - The guide's Cargo, Python and browser producers are each validated before
   a mutant counts as killed; an empty, inconsistent or stopped result is
   refused, not a kill.
+[ADR-0363](DECISIONS/ADR-0363-wasmtime-48-0-7.md):
+Wasmtime 48.0.7, for RUSTSEC-2026-0378 and 0379 (the integrator's, the
+downloads the owner's; train-11).
+- Every pin is 48.0.7 (28 crates in each lockfile, the CLI on three
+  platforms by GitHub's digests); 0378 needs host-made streams the host
+  never makes; 0379 (aarch64 Cranelift, a br_table of 256k targets) no
+  emitted component reaches, a hostile one could on an aarch64 host; the
+  engine's configuration stays.
