@@ -1,8 +1,133 @@
 # ADR-XXXX: check and build validate one executable program
 
-Status: draft before implementation, 2026-10-16. The integrator approved the
-ownership design and PW66xx allocation on 2026-10-16; results remain open.
+Status: implemented; on train-11's base as `track/check-is-build-train11`
+(2026-10-19, the next section). The integrator approved the ownership design
+and PW66xx allocation on 2026-10-16. Open for the integrator: the check's
+cost against train-10's latency ceiling (below).
 Milestone: E14, developer feedback (check-is-build).
+
+## On train-11's base: `track/check-is-build-train11` (2026-10-19)
+
+This section is the decision's current state. The sections after it are its
+history: the check-is-build line to e82b0d6c on its own base 17fade14, then
+Codex's assembly of that line onto 9902c62b beside a generic-effects overlay.
+Their results were measured at those commits, not at this branch's.
+
+**The branch** is `track/train-10-land` 587657ff (train-10's head, train-11's
+base) and:
+
+- 33f44bce, the merge of `track/check-is-build` e82b0d6c. Its conflicts are
+  resolved as the assembly resolved them (its first overlay: manifest
+  f471b0c7, 2,861 paths), without the assembly's generic-effects overlay:
+  each path is a 3-way merge of 587657ff and the assembly over
+  `wip/train10-generic-merge` 600ebf19, which equals that overlay's generic
+  part byte for byte. So D1 tables (ADR-0338) are composed in:
+  `program::validate_with`/`validate_sources_with` take the released schema,
+  `pw check` honours `--schema-lock` as `pw build` does, PW0366 refuses before
+  any backend runs, and `build::prepare` is handed the accepted tables and
+  schema. By hand: refusal's mutation script (train-10's `--part i/2` with
+  this decision's refused/killed counts and its gate on the restored browser
+  suite), evidence-integrity's latency mutant (it repeats
+  `validate_sources_with` ten times, where checking is now), the justfile's
+  import, and the codes reference regenerated (205 codes, 92 cite an ADR).
+- 281747fd, the assembly's later work on 14 paths, merged two independent
+  ways that agree: privacy facts derived once (below); producer validity
+  (`mutation_source.py`, and `unittest_producer.py`/`unittest_protocol.py`,
+  byte copies of guide-producer-validity 6abc09f3's); this decision's
+  controls from 35 to 50 and held-labels' memory watch; the CLI corpus pins
+  (A-052's PW0365 warning; R-106/R-107 with their schema locks). The C8/R-035
+  classification, the `calls_with_types` audit entry and E2D's R-090..R-095
+  rows (sections below) are generic-effects' own: its branch carries the
+  same bytes, and this one does not.
+- 19ab8166: refusal's script now runs in parts and reads its arguments; the
+  restored-browser gate's tests ask it for every mutant and mutate as a
+  browser mutant does (under `unittest discover` 13 of them had exited on the
+  runner's arguments), and the control on that gate anchors at its new depth.
+- 5b740407: the program census covers train-10's `examples/tables` app (the
+  census refused: four tracked sources uncovered).
+- 6fa7c616: the evidence below.
+
+HEAD equals 587657ff plus the assembly's check-is-build delta on all 61 of
+its paths, except exactly the four hand resolutions, and 587657ff everywhere
+else.
+
+**Privacy facts once.** Complete validation derived the privacy summaries
+and `Reads` in the semantic check and again for the contracts (profiled
+2026-10-16: about 57 ms of CPU a check). `Checked` owns the exact
+`PrivacyFacts` of its own preparation and lends them to `contracts_checked`;
+standalone wrappers derive their own.
+
+**Results** (lane worktrees at this branch's commits; load 20-115 from other
+workers throughout):
+
+- `just e14-check-is-build` at 5b740407 (docs/evidence/E14/check-is-build.txt):
+  pw-core check_is_build 12/12, pw-cli check_is_build 7/7, check_build_corpus
+  3/3, test_check_build_gate 15/15, this decision's controls 50 of 50 killed
+  (baseline 90, no bound stop), check_latency 2/2.
+- Census (check-is-build-programs.txt): 432 program assemblies, 598 of 598
+  tracked sources; 14 clean, 337 semantic or syntax refusals, 81 support
+  refusals. Against e82b0d6c's 407: 25 new programs, no changed verdict and
+  the same 16 unique PW6601 messages, which are the four accepted-corpus
+  backend gaps (A-007, A-008, A-013, A-018) as every assembly that includes
+  the accepted corpus inherits them. Nothing is newly refused; every
+  reference app (store, feed, kiokun, kiokun-site, demo, tables, guestbook,
+  hello-static, koka, render, the benchmark's store) checks clean.
+- The planner's reach (`ci_plan.py --changed 587657ff HEAD`): 54 recipes, 53
+  mutation scripts, 792 mutants. 52 scripts ran whole and killed all their
+  762 mutants, none surviving and none refused: the 43 cargo-only ones (544
+  mutants), eight browser ones (computed_signals 17, provide 29,
+  computed_conditions 12, computed_rows 12, speculated_arms 8, proof 4,
+  build_id 12, guide 74) and this decision's 50. refusal's 30 ran as
+  train-10 splits them: part 2 (`--part 2/2`, e14-refusal-2's mutants 24-30)
+  killed 7 of 7 with its restored browser suite green. Part 1 (`--part 1/2`,
+  mutants 1-23) has no clean run here: each of its mutants was killed in some
+  run (its 18 cargo mutants in every run; its 5 browser mutants, 19-23, in a
+  whole run of all 30, and 19-21 again in a part-1 run), but every run that
+  reached the browser ones ended with refusals at load 90-130: Playwright's
+  web servers missed their 60 s start, or a run passed its 1,200 s bound and
+  the web servers, outside the process group the bound kills, kept the ports
+  for the runs after it. No mutant survived; the push's verify runs both
+  parts.
+- `cargo test --workspace`: 350 binaries, 3,090 passed, 25 ignored; four
+  pw-dev-server timing tests failed at load 50-67 and passed on re-run.
+  mutant-programs 301 judged, 16 refused by their named rule, 0 failing;
+  evidence-gates 326 OK; clippy, fmt, case-check, anchors (3,330/274) green.
+
+**The check's cost (open, for the integrator).** Complete validation runs
+the backends a build runs, so a check costs about twice a semantic check.
+check_latency's binary built at 587657ff and at 5b740407, run alternately on
+the same program (the store, 56 files, 6,568 lines, which this branch does
+not change): 245-416 ms of CPU a thousand lines at 587657ff, 542-837 at
+5b740407, a ratio of 1.9-2.9 that moves with the load and with the hybrid
+CPU's core (an E-core run costs about twice); the record before agrees
+(17fade14 756 ms cold, d74e29ff 1,406: 1.86x). Train-10's ceiling is 800 ms a
+thousand lines, two and a half times ARM's 321.67 for 587657ff: at about
+twice, ARM would measure some 640-740, inside the ceiling with 10-25% to
+spare instead of 150%; on this PC under load runs pass at 542-761 and fail at
+809-967. The same binaries with dependencies optimized (`--config
+'profile.dev.package."*".opt-level=2'`, measurement only): 213-423 at
+587657ff, 341-586 at 5b740407: wasm-encoder, wit-component and wasmparser
+run unoptimized in a debug check. No ceiling or measurement is changed here;
+the choice (accept and re-rule the ceiling for complete validation, build
+dependencies optimized in the dev profile, or measure the minimum of several
+runs) is the integrator's. The push's `ci` run prints the ARM and x86 numbers.
+
+**Claimed:** `pw check` and `pw build` share one complete validation on
+train-11's base, D1 tables composed in: what checks, builds, but for
+build-only IO. **Not claimed:** that the four accepted-corpus backend gaps
+are closed (both commands refuse them now, with PW6601); that the evidence
+in the sections below was produced at this branch's commits.
+
+**For the integrator.** Merge this branch before guide-producer-validity
+6abc09f3: that branch is built on e82b0d6c, so merged first it would bring
+this decision's old line in unresolved; after this branch its merge base is
+e82b0d6c and only its own 13 paths come in, conflicting only in
+`scripts/cargo_test_results.py` (its version against train-10's, add/add;
+its `unittest_producer.py` and `unittest_protocol.py` are byte-identical
+here). A dry-run merge of generic-effects 618abfbe onto this branch
+conflicts only in docs/STATUS.md, NEXT.md and DECISIONS.md, the codes
+reference (regenerate it: `python3 scripts/guide_diagnostics.py`) and the
+justfile's imports (keep both).
 
 ## Finding
 
