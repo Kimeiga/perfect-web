@@ -1,7 +1,7 @@
 Track ci-diagnostics - a failure's trace is kept, and the checker's latency is measured under load
 
 produced by: just e14-ci-diagnostics
-commit: 061fdba816e032bd11d0d4027cee26f97dd99c0c
+commit: e438f689ed9051887f87e769fb48a4abaac6e4d9
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 python: Python 3.10.12
 
@@ -60,14 +60,36 @@ test_a_mutants_browser_run_is_not_kept (scripts.tests.test_mutation_baseline.Kee
 test_a_red_baselines_failed_browser_run_is_kept_apart (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun) ... ok
 test_the_benchmark_harness_run_is_kept_under_its_own_directory (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun) ... ok
 test_what_an_earlier_recipe_left_is_not_kept (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun) ... ok
-Ran 53 tests in 13.820s
+Ran 53 tests in 15.096s
 OK
+
+== 2. check_latency's ceiling bounds the fastest of seven or more checks, not their median (compiler/pw-core/tests/check_latency.rs): the statistic on checks that cost what a script says, then the measurement itself
+
+load: 61.08 59.97 67.53 44/815 110629
+test the_fastest_is_of_the_threads_cpu_time_not_of_the_wall_clock ... ok
+test the_ceiling_bounds_the_fastest_check_not_the_median ... ok
+test a_loaded_machine_is_waited_on_while_it_may_quiet_down ... ok
+test the_waiting_ends_with_the_window_or_the_most_checks ... ok
+test a_checker_made_slow_is_not_let_through_by_the_waiting ... ok
+test the_ceiling_is_800_ms_a_thousand_lines_and_a_check_is_judged_by_it ... ok
+test producing_diagnostics_is_judged_at_the_fastest_of_both ... ok
+test a_clock_that_reads_nothing_is_refused_by_the_control ... ok
+test a_quiet_machine_is_asked_for_seven_checks_and_no_more ... ok
+check-latency reject 2389.10 ms   (cpu 2388.28 ms; clean 1971.12 ms, cpu 1970.95 ms; the fastest of 7 and 7 checks, which the ratio bounds: cpu 2073.94 ms, clean cpu 1671.36 ms)
+test a_rejected_program_is_not_measurably_slower_than_a_clean_one ... ok
+test the_whole_program_and_one_edit_are_both_measured has been running for over 60 seconds
+check-latency cold   3734.22 ms   (cpu 2346.75 ms; 6568 lines, cpu 357.30 ms a thousand lines; the fastest of 7 checks, which the ceiling bounds: cpu 1998.22 ms, 304.24 ms a thousand lines)
+check-latency edit   4946.79 ms   (cpu 2688.58 ms; 56 files, no query system: an edit costs a full check)
+test the_whole_program_and_one_edit_are_both_measured ... ok
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 97.84s
+load: 66.39 59.56 66.45 76/897 131124
 
 == mutation controls (scripts/ci_diagnostics_mutations.py)
 
 baseline (helper): 16 passed, 0 failed
 baseline (keep): 11 passed, 0 failed
 baseline (baseline): 26 passed, 0 failed
+baseline (latency): 9 passed, 0 failed
 a failed run keeps nothing [helper]: KILLED (7 of 16 tests fail)
 only the last run's output is kept [helper]: KILLED (2 of 16 tests fail)
 a run that passed is kept too [helper]: KILLED (3 of 16 tests fail)
@@ -93,5 +115,18 @@ the recipes' upload drops kept-traces [keep]: KILLED (2 of 11 tests fail)
 the browser jobs' upload drops kept-traces [keep]: KILLED (2 of 11 tests fail)
 git does not ignore kept-traces at the root [keep]: KILLED (1 of 11 tests fail)
 git does not ignore kept-traces beside the suite [keep]: KILLED (1 of 11 tests fail)
-25 of 25 mutants killed
+the ceiling is raised to 1.6 s a thousand lines [latency]: KILLED (4 of 9 tests fail)
+a thousand lines is counted the wrong way round [latency]: KILLED (4 of 9 tests fail)
+the ceiling bounds the median again [latency]: KILLED (1 of 9 tests fail)
+the fastest is the median [latency]: KILLED (5 of 9 tests fail)
+the fastest is of the wall clock [latency]: KILLED (4 of 9 tests fail)
+a quiet machine is waited on too [latency]: KILLED (3 of 9 tests fail)
+no machine is waited for [latency]: KILLED (3 of 9 tests fail)
+the waiting does not end with its window [latency]: KILLED (1 of 9 tests fail)
+the waiting does not end with its most checks [latency]: KILLED (2 of 9 tests fail)
+fewer than seven checks are taken [latency]: KILLED (3 of 9 tests fail)
+the slow path is judged against the clean at their medians [latency]: KILLED (1 of 9 tests fail)
+the control reads the median of the checks [latency]: KILLED (1 of 9 tests fail)
+the control is lifted [latency]: KILLED (1 of 9 tests fail)
+38 of 38 mutants killed
 memory bound: no process was stopped
