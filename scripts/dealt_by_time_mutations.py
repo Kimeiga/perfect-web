@@ -25,7 +25,12 @@ descend from its commit, or where the recipe's files were recorded at two
 commits or one not at all; the plan dropping what is current only where it
 is asked, and the workflow asking at each push; and (train-5's finding,
 2026-10-14) a recipe planned by a program its own lines name, a glob read
-segment by segment and a path naming what is under it. At least one test of
+segment by segment and a path naming what is under it; and (train-10's
+finding, 2026-10-17) a recipe that skips without a database dealt where
+there is none; and (the integrator's ruling 2 of 2026-10-17) a recipe
+recorded past a job's limit planned, its shard's setup not counted against
+it, a note in the seconds kept read as a recipe's, and a recipe run to its
+end keeping its lower bound. At least one test of
 `scripts/tests/test_ci_scripts.py` must then fail.
 
 Run from the repository root; `just e14-dealt-by-time` records the output.
@@ -229,7 +234,7 @@ MUTANTS = [
     (
         "a recipe costs its mutants again",
         PLAN,
-        "    costs = estimated(names, body, measured())\n",
+        "    costs = estimated(names, body, seconds)\n",
         '    costs = {n: cost(body.get(n, "")) for n in names}\n',
     ),
     (
@@ -284,8 +289,52 @@ MUTANTS = [
     (
         "more shards are taken where fewer end the run as soon",
         PLAN,
-        "        if best is None or ends < best[0]:\n",
-        "        if best is None or ends <= best[0]:\n",
+        "        if best is None or score < best[0]:\n",
+        "        if best is None or score <= best[0]:\n",
+    ),
+    # ADR-0290, 2026-10-16: an irreducible singleton must not hide an
+    # avoidable ceiling excess in another shard at the same last finish.
+    (
+        "a long singleton hides a multi-recipe shard past the ceiling",
+        PLAN,
+        "        score = (ends, overflow)\n",
+        "        score = (ends, 0)\n",
+    ),
+    # The integrator's ruling 2 (train-10): a recipe recorded past a job's
+    # limit is refused before any shard runs; its shard's setup counts; a
+    # note in the seconds kept is no recipe; a run to its end ends a lower
+    # bound.
+    (
+        "a recipe recorded past a job's limit is planned",
+        PLAN,
+        "    if too_long:\n",
+        "    if False:\n",
+    ),
+    (
+        "a shard's setup is not counted against a job's limit",
+        PLAN,
+        "        if n in seconds and seconds[n] + SETUP[need.get(n, (False, False))] > LIMIT\n",
+        "        if n in seconds and seconds[n] > LIMIT\n",
+    ),
+    (
+        "a note in the seconds kept is read as a recipe's",
+        PLAN,
+        '            if not k.startswith("_")\n',
+        "            if True\n",
+    ),
+    (
+        "a recipe run to its end keeps its lower bound",
+        FETCH,
+        "            bounds.pop(name, None)\n",
+        "            pass\n",
+    ),
+    # Train-10's verify (39054436657): a recipe that skips without a
+    # database, dealt where there is none, records nothing and passes.
+    (
+        "a recipe that skips without a database is dealt where there is none",
+        PLAN,
+        '    "e14-scheduled-orders",\n',
+        "",
     ),
     (
         "a plan of nothing takes the longest of no shards",

@@ -23,7 +23,7 @@
 
 import { test, expect } from "@playwright/test";
 
-import { MUTABLE_PORTS } from "../playwright.config.mjs";
+import { MUTABLE_PORTS } from "../host-metadata.mjs";
 
 // Its own host, per engine. These tests mutate the shared public menu, and
 // every other spec reasonably assumes the menu it was served — as does every

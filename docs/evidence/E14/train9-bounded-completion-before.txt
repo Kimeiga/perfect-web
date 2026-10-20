@@ -1,0 +1,23 @@
+2026-10-16T10:52:49Z
+   Compiling pw-dev-server v0.0.0 (/home/haki/code/pw-wt/train9-bounded-fix/spikes/own-renderer/server)
+    Finished `test` profile [unoptimized] target(s) in 2.16s
+     Running unittests src/main.rs (target/debug/deps/pw_dev_server-ff76041b108b4a26)
+
+running 1 test
+held webhook counts: observed=[25]; completed=[25, 14]
+
+thread 'tests::bounded_statements::a_pending_real_payment_webhook_is_not_a_complete_statement_count' (2354261) panicked at spikes/own-renderer/server/src/tests/bounded_statements.rs:806:9:
+assertion `left == right` failed: a count is taken after the actual settlement
+  left: [25]
+ right: [25, 14]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test tests::bounded_statements::a_pending_real_payment_webhook_is_not_a_complete_statement_count ... FAILED
+
+failures:
+
+failures:
+    tests::bounded_statements::a_pending_real_payment_webhook_is_not_a_complete_statement_count
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 589 filtered out; finished in 14.46s
+
+error: test failed, to rerun pass `-p pw-dev-server --bin pw-dev-server`

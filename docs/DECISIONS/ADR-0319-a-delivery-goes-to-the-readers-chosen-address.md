@@ -307,3 +307,14 @@ Recorded by `just e14-store-accounts` in
   page) they meant this one, ADR-0319; the other is ADR-0318. Numbered at
   the merge by W8's mapping of each line.
 - **The four status documents are untouched.**
+
+## Amended, 2026-10-18: the chosen address's test settles the store's page in WebKit
+
+`e2e/store-accounts.spec.mjs`' "an address chosen goes back to the store,
+its estimate the chosen one's" now waits, in WebKit, for the store's page
+that each Save navigated to. It waits for that page's runtime and its
+subscription before it goes to the address page again. Its assertions are
+unchanged. It had failed on train-10's verifies because its `goto`
+cancelled requests the page had just started, which can crash WebKitGTK's
+network process. ADR-0280's amendment of 2026-10-18 has the finding and
+the ruling.

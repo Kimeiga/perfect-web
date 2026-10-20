@@ -16,6 +16,14 @@ file under `docs/DECISIONS/` whose name is the placeholder's is an ADR not
 numbered. A track's branch holds both until its merge, so the test that
 holds the repository to it runs on `master`'s CI, and a train's (`held`).
 
+Evidence records the files it read by their paths at the time: a path to a
+decision's file under the placeholder's name, recorded in `docs/evidence/`
+before the decision was numbered, is the name that file had then, as a
+receipt's manifest of input hashes keeps it, and names nothing now; a file
+still of that name is named by its own. Anything else on the line is read
+as before. Found at train-10's merge of train-9, whose receipts record
+ADR-0352's file as it was (ADR-0344, amended 2026-10-17).
+
 Prints each, `path:line: text`, and exits 1 where there is one.
 
     python3 scripts/unnumbered_adrs.py
@@ -34,6 +42,8 @@ PLACEHOLDER = "ADR-" + "XXXX"
 MENTION = re.compile(re.escape(PLACEHOLDER))
 # An inline code span: what is between two backticks on one line.
 CODE_SPAN = re.compile(r"`[^`\n]*`")
+# A decision's file by the placeholder's name, as evidence recorded its path.
+RECORDED_PATH = re.compile(r"docs/DECISIONS/" + re.escape(PLACEHOLDER) + r"-[A-Za-z0-9._-]+\.md")
 
 
 def held(ref: str | None) -> bool:
@@ -54,7 +64,8 @@ def tracked(root: pathlib.Path = ROOT) -> list[str]:
 
 def unnumbered(root: pathlib.Path = ROOT, files: list[str] | None = None) -> list[tuple[str, int, str]]:
     """Each unnumbered ADR in `files` (every tracked file): a mention outside
-    an inline code span, as (path, line, the line), and an ADR file of the
+    an inline code span and, in evidence, outside a recorded path of a
+    decision's file, as (path, line, the line), and an ADR file of the
     placeholder's name, as (path, 0, its name)."""
     found = []
     for rel in tracked(root) if files is None else files:
@@ -68,7 +79,10 @@ def unnumbered(root: pathlib.Path = ROOT, files: list[str] | None = None) -> lis
         if b"\0" in data or PLACEHOLDER.encode() not in data:
             continue
         for n, line in enumerate(data.decode("utf-8", errors="replace").splitlines(), 1):
-            if MENTION.search(CODE_SPAN.sub("", line)):
+            text = CODE_SPAN.sub("", line)
+            if rel.startswith("docs/evidence/"):
+                text = RECORDED_PATH.sub("", text)
+            if MENTION.search(text):
                 found.append((rel, n, line.strip()))
     return found
 

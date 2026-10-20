@@ -165,8 +165,10 @@ MUTANTS = [
         "a fresh value's instant is not kept",
         "server",
         SERVER,
-        "                    Some(until) => held.insert(key.clone(), until),\n",
-        "                    Some(_) => held.remove(key),\n",
+        # Re-anchored by NEXT 4c's render merge (track `render-merge`): the
+        # read's load is a closure of its own, read alone in a render.
+        "                Some(until) => held.insert(key.clone(), until),\n",
+        "                Some(_) => held.remove(key),\n",
     ),
     (
         "a kept value past its instant is served",

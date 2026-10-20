@@ -119,3 +119,35 @@ claim.
   know a page's text before its data. The store says enough.
 - **A host's answer to a command's argument.** Projection reads what a host
   answers into a component, not what a component sends.
+
+
+## Train-9 verification finding, 2026-10-16
+
+Verify 38823189869 at 1f370fd9 ran 82 recipes; descriptions killed only 8/9
+controls. Removing selected paragraphs no longer prevents WebKit from
+painting: the growing page has other useful text. That mutation no longer
+removes the behavior its name promises. It is retired as an absorbed
+content-size proxy, with its failure preserved in the downloaded evidence.
+
+The replacement withholds the initial HTML shell while slots settle. It
+targets the existing first-contentful-paint-before-fill assertion alone
+in WebKit, independently of how much the current page says. The two server
+controls still require the actual store/item descriptions; the full slots
+suite still runs in all three engines in the evidence recipe. The script
+also fails if its restored-source browser check fails. Production behavior
+is unchanged. At that initial decision, local whole-script, browser and CI results
+were pending; the failed verify is not landing evidence.
+
+
+The complete corrective recipe passes: host7, store66 files clean,
+server579 passed/9 ignored, and all21 browser tests across three engines.
+All9 controls are killed by test assertions, including the new WebKit1/1
+first-paint control; restored-source WebKit passes, with no bound stops.
+[Commands, hashes and raw results](../evidence/E14/train9-description-control.txt).
+Full corrected CI and a new GitHub verify remain required before landing.
+
+
+The final whole rerun after test-data isolation kills 9/9 controls again.
+Fresh full CI passes 2948 Rust tests (25 ignored) and 167 Python
+tests (one intentional skip). [Complete corrective record](../evidence/E14/train9-corrective-validation.txt).
+New GitHub CI and verify are pending; no landing is claimed.

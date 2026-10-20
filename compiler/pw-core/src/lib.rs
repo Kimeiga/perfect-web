@@ -58,6 +58,7 @@ pub mod placement;
 pub mod policy;
 pub mod predicates;
 pub mod privacy;
+pub mod program;
 pub mod provenance;
 pub mod recursion;
 pub mod resolve;

@@ -1,8 +1,8 @@
 ADR-0174 - a store delay, a cart delay, and a one-shot database error
 
 produced by: just e14-test-controls
-commit: 1824590b8d4c62d9923e4af049c525eecbd24977
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38773359015 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 320c52a44840a80423609ab476eb847c04de34a6
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39442025240 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
@@ -12,11 +12,11 @@ playwright: Version 1.58.0
 test tests::a_delay_slows_what_it_names_and_nothing_else ... ok
 test tests::a_one_shot_read_error_fails_the_next_read_once ... ok
 test tests::a_one_shot_write_error_fails_the_next_write_once ... ok
-test result: ok. 565 passed; 0 failed; 9 ignored; 0 measured; 0 filtered out; finished in 1102.79s
+test result: ok. 662 passed; 0 failed; 9 ignored; 0 measured; 0 filtered out; finished in 255.39s
 
 == the controls, and a rolled-back command, in three engines
 
-  51 passed (5.1m)
+  51 passed (58.3s)
 
 == mutation controls (scripts/test_controls_mutations.py)
 

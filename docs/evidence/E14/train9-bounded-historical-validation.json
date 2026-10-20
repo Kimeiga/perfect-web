@@ -1,0 +1,64 @@
+{
+  "base": "289068a65badb431c14548c3f9fa0db86c3fa19f",
+  "whole_results": [
+    {
+      "name": "bounded_statements",
+      "started": "2026-10-16T11:11:33.239773+00:00",
+      "ended": "2026-10-16T11:16:47.797081+00:00",
+      "exit": 0,
+      "changed_inputs": [],
+      "raw_sha256": "11454c269f8e6f8157b190644d42e77d15b3bb1881a62d070c3fa0d52bd54d95"
+    },
+    {
+      "name": "reviews",
+      "started": "2026-10-16T11:16:47.797217+00:00",
+      "ended": "2026-10-16T11:37:55.528484+00:00",
+      "exit": 0,
+      "changed_inputs": [],
+      "raw_sha256": "315ac6e4dbf984e653ccbe31feda2e6b299006c314254dd5a7bc56d1e7f4c1ff"
+    },
+    {
+      "name": "uploads",
+      "started": "2026-10-16T11:37:55.528659+00:00",
+      "ended": "2026-10-16T11:51:54.786287+00:00",
+      "exit": 0,
+      "changed_inputs": [],
+      "raw_sha256": "c8e3884d5f0d324a515e076b1d32abc0fcb6aead4b8b3e2ae166bc2231039778"
+    },
+    {
+      "name": "scheduled",
+      "started": "2026-10-16T11:51:54.786505+00:00",
+      "ended": "2026-10-16T12:20:17.593047+00:00",
+      "exit": 0,
+      "changed_inputs": [],
+      "raw_sha256": "cf3992863cd7fe95d37519460404bd664c30ef8b1cee8b60c1f2621edeed80de"
+    }
+  ],
+  "whole_manifest_sha256": "8727955460b8ebbefb15ec3851250fb8fb2a6da8c8c771ffaf7e1e2a805bdcf6",
+  "ci_manifest_sha256": "5ab0f054d3086473a2c69cf7f84f8e99be3d7e79a247ca11832c6dfe9fe85131",
+  "whole_to_ci_documentation_only_delta": {
+    "docs/DECISIONS/ADR-XXXX-bounded-statements-wait-for-completed-payment.md": {
+      "whole": "c425e6102560150a21d449b476c63580089b075f2f61962d0103c87cbdd08ef8",
+      "ci": "754c764817a3ed0bff1429fc72057bca0b70d2d6f77f84f3456b5f499c37d48a"
+    }
+  },
+  "source_sha256": {
+    "spikes/own-renderer/server/src/store_pg.rs": "9959c721f3b8e0f19afd6e3ab0c8bea114506fe6c5a085dfd8d427724b254215",
+    "spikes/own-renderer/server/src/feed_pg.rs": "5f57a39e07ee6d73c5fe31d4da442f959806afe4ce59fa4145b9291788d6f975",
+    "spikes/own-renderer/server/src/tests/bounded_statements.rs": "9fcb276873dedafc696d3bb7372b87dd7dfb597f3e74aafff804902a88df3767",
+    "scripts/bounded_statements_mutations.py": "56aaf81bb5abdab18982dfb556f028a0e21baccb585c0a0aaf6e41ca36a940a9",
+    "docs/DECISIONS/ADR-XXXX-bounded-statements-wait-for-completed-payment.md": "754c764817a3ed0bff1429fc72057bca0b70d2d6f77f84f3456b5f499c37d48a"
+  },
+  "focused_raw_sha256": "8746b562f2640dd29920fdb24aea8fe386b15301891dbc3b33e5965a107e3c61",
+  "full_ci": {
+    "command": "just ci",
+    "exit": 0,
+    "started": "2026-10-16T12:21:45Z",
+    "finished": "2026-10-16T12:49:12Z",
+    "raw_sha256": "72f836b5fe6de3ef898ab9aa42bca2eda961df1bb93212e718458602ad6d0220",
+    "native_failure_scan": [],
+    "final_frozen_input_receipt": "2222/2222 exact matches",
+    "environment": "setup sourced; dictionary paths and test-layer unset; own target/jobs4/threads4/PORT14201/offline"
+  },
+  "tracked_candidate_diff_sha256": "390bd5de85429c5ab5330fc99e5d932672255796967d2c0e18b37492343809a5"
+}

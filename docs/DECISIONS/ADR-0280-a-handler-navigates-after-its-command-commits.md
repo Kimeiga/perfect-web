@@ -207,3 +207,61 @@ brief (relayed 2026-10-08). Date: 2026-10-08. Milestone: E14.
   wins". The commit is already made. Turning away from its result for a
   press made on a page being left would strand the user on a page that no
   longer says what they did.
+
+## Amended, 2026-10-18: in WebKit, a test lets the page this navigation showed settle before it navigates again
+
+Found by train-10's second verify (39091059482) and ruled by the
+integrator on 2026-10-18 (PARALLEL's train-10 entry has the investigation).
+
+- **Corrections first.** The failure was read first as a flake, then as a
+  session's turn held across the store page's rebuild, its 400 ms estimate
+  included, with the navigation's request waiting behind it. Both readings
+  were wrong. With the estimator slowed to 2 s, no session's turn was held
+  longer than 63 ms and the navigation's request was answered within 24 ms,
+  on train-10 and on master alike. And the 400 ms estimate is master's
+  (charter §15.5), not track `scheduled-orders`'.
+- **What failed.** Two tests navigate (`goto`) as soon as this ADR's
+  navigation has changed the address (the soft navigation, ADR-0306):
+  `store-accounts.spec.mjs`' "an address chosen goes back to the store, its
+  estimate the chosen one's", after Save, and `accessibility.spec.mjs`' "the
+  order's page keeps every rule, as the store moves it along", after Place
+  order. Their `goto` cancelled requests the next document's runtime had
+  started 1 to 5 ms before (its module, `pw-resume.wasm`, `pw-handlers` or
+  its subscription). In WebKit the navigation then failed ("WebKit
+  encountered an internal error") or hung to its timeout. That was 4 of
+  train-10's 9 WebKit runs on CI (verifies 39054436657 and 39091059482),
+  against about 1 or 2 of some 21 runs on other branches.
+- **Why.** WebKitGTK's network process corrupts its heap. glibc reports
+  `malloc_consolidate(): unaligned fastbin chunk detected` and aborts it.
+  Under `glibc.malloc.perturb` it faults instead, in
+  `g_type_check_instance_cast` called from libsoup's send path: a
+  use-after-free. This is Playwright 1.58.0's WebKit (`webkit-2248`, WPE)
+  on the system's libsoup 3 (3.0.7 on Ubuntu 22.04 here, 3.4 on CI's
+  24.04).
+  - A 60-line script reproduces it against master's own server and program,
+    with no spec and none of train-10's code: start a page's requests, then
+    navigate a few milliseconds later. 3 of 750 navigations aborted the
+    network process.
+  - Two things did not reproduce it: a plain Python server serving the same
+    paths and sizes (0 of 1,200), and closing a context while a page's
+    subscription was open (0 of 1,200).
+  - What in this server's traffic trips it is not known (NEXT). Safari on
+    macOS uses another network stack.
+- **Decided** (the integrator, 2026-10-18). In WebKit, the two tests ask
+  for the next document (`nextDocument`) before the press that navigates.
+  Once the address has changed, they wait for it to settle before they
+  navigate again: its runtime booted (`data-pw-ready`) and its subscription
+  answered (a response for a later document's `/stream`). No assertion
+  changed. This does not loosen the tests: a person cannot cancel a page's
+  requests within milliseconds of their start, and the crash is the
+  browser's.
+  - Chromium and Firefox still navigate at once. That keeps the case in
+    which `accessibility.spec.mjs`' `goto` found ADR-0306's rule that the
+    browser's own load wins (Firefox's `NS_BINDING_ABORTED`, ADR-0306's
+    finding 2); no mutation control holds that rule.
+- **Recorded**:
+  - KNOWN_LIMITATIONS, under the browsers' navigation;
+  - NEXT, as an open item: what in the server's traffic trips it, a track
+    of its own, and whether a newer WebKit build changes it;
+  - PARALLEL's train-10 entry;
+  - an upstream report, for the owner to file. Nothing is posted from here.

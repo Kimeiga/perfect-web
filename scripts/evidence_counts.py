@@ -43,13 +43,48 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 COUNT = re.compile(r"^(\d+) of (\d+) mutants killed")
 # What a script says of each mutant (`mutation_anchors.py`'s shapes, and the
-# verdicts the scripts print).
+# verdicts the scripts print). A kill may say what killed it, as the guide's
+# script says (`KILLED by the checker (PW5048)`, ADR-0343): until train-10's
+# landing such a verdict was read as none, and the guide's evidence, once
+# current, named none of its 74 mutants.
 VERDICT = re.compile(
-    r"^(.*): (KILLED \(.*\)|SURVIVED|DID NOT BUILD.*|ANCHOR NOT FOUND EXACTLY ONCE in .+)$"
+    r"^(.*): (KILLED(?: by [^()]+)? \(.*\)|SURVIVED|DID NOT BUILD.*|ANCHOR NOT FOUND EXACTLY ONCE in .+)$"
 )
 # A suite's tag beside a mutant's description: `[core]`, `[server]`.
 TAG = re.compile(r"\[[\w./ -]*\]")
 SCRIPT = re.compile(r"scripts/([a-z0-9_]+_mutations\.py)")
+# **A recipe that runs a part of a script's mutants** (the integrator's
+# ruling 1 of 2026-10-17, train-10: `e14-refusal` no longer fit a CI job):
+# `--part i/n`, the i-th of the script's `PARTS`, ranges of its `MUTANTS`.
+# The recipe's count is of that part, and the parts together, each run by a
+# recipe, hold every mutant exactly once (`split`).
+PART = re.compile(r"scripts/([a-z0-9_]+_mutations\.py) --part (\d+)/(\d+)")
+
+
+def split(mutants: int, parts: list, run: dict[int, list[str]], n: int) -> list[str]:
+    """What is wrong with a script's split of its `mutants` (how many) into
+    `parts` (ranges of them), where the recipes `run` (by part, from 1) ask
+    for parts of `n`: a part no recipe runs, or two do; a mutant in no part,
+    or in two. Nothing, where the parts are a floor no mutant falls through."""
+    out = []
+    if n != len(parts):
+        out.append(f"is asked for parts of {n}; its script defines {len(parts)}")
+    for i in range(1, len(parts) + 1):
+        if not run.get(i):
+            out.append(f"part {i} of {len(parts)} is run by no recipe")
+        elif len(run[i]) > 1:
+            out.append(f"part {i} of {len(parts)} is run by {len(run[i])} recipes: {', '.join(run[i])}")
+    held = [0] * mutants
+    for start, end in parts:
+        for k in range(max(start, 0), min(end, mutants)):
+            held[k] += 1
+    none = sum(1 for h in held if h == 0)
+    if none:
+        out.append(f"its parts leave {none} of its {mutants} mutants to none")
+    twice = sum(1 for h in held if h > 1)
+    if twice:
+        out.append(f"its parts hold {twice} of its {mutants} mutants twice")
+    return out
 
 
 def load(path: pathlib.Path):
@@ -102,12 +137,15 @@ def blocks(text: str) -> list[tuple[int, int, int, list[tuple[int, str, str]]]]:
     return out
 
 
-def disagree(mutants: list, k: int, n: int, verdicts: list) -> list[tuple[int | None, str]]:
+def disagree(
+    mutants: list, k: int, n: int, verdicts: list, whose: str = "its script defines"
+) -> list[tuple[int | None, str]]:
     """What disagrees between one count, the verdicts above it and the
-    script's `mutants`: (a line, or None for the count's, and what)."""
+    script's `mutants` (or its part's, `whose` says): (a line, or None for
+    the count's, and what)."""
     out: list[tuple[int | None, str]] = []
     if n != len(mutants):
-        out.append((None, f"counts {n} mutants; its script defines {len(mutants)}"))
+        out.append((None, f"counts {n} mutants; {whose} {len(mutants)}"))
     if len(verdicts) != n:
         out.append((None, f"counts {n} mutants above {len(verdicts)} verdicts"))
     killed = sum(1 for _, _, verdict in verdicts if verdict.startswith("KILLED"))
@@ -147,17 +185,36 @@ def disagreements(
     plan = plan or planner(root)
     found: dict[str, list[tuple[str, int, str]]] = {}
     loaded: dict[str, list] = {}
+    parts_of: dict[str, list] = {}
+    # Each script some recipe runs a part of: by part, the recipes that run
+    # it, and the parts they ask for (`split`).
+    partly: dict[str, tuple[int, dict[int, list[str]], list[str]]] = {}
     for recipe, body in sorted(plan.bodies(root).items()):
         run = sorted(set(SCRIPT.findall(body)))
         files = plan.evidence_files(body)
         if not run or not files:
             continue
+        asked = {s: (int(i), int(n)) for s, i, n in PART.findall(body)}
         scripts = {}
+        whose = {}
+        said: list[tuple[str, int, str]] = []
         for s in run:
             if s not in loaded:
-                loaded[s] = list(getattr(load(root / "scripts" / s), "MUTANTS", []))
+                module = load(root / "scripts" / s)
+                loaded[s] = list(getattr(module, "MUTANTS", []))
+                parts_of[s] = list(getattr(module, "PARTS", []))
             scripts[s] = loaded[s]
-        said: list[tuple[str, int, str]] = []
+            if s in asked:
+                i, n = asked[s]
+                _, by_part, recipes_of = partly.setdefault(s, (n, {}, []))
+                by_part.setdefault(i, []).append(recipe)
+                recipes_of.append(recipe)
+                if 1 <= i <= len(parts_of[s]):
+                    start, end = parts_of[s][i - 1]
+                    scripts[s] = loaded[s][start:end]
+                    whose[s] = f"its part {i} of {len(parts_of[s])} holds"
+                else:
+                    said.append((files[0], 0, f"{s}: is asked for part {i} of {n}; it defines {len(parts_of[s])}"))
         counted: set[str] = set()
         for rel in files:
             path = root / rel
@@ -173,7 +230,7 @@ def disagreements(
                     said.append((rel, at, f"{s}'s mutants are counted twice"))
                     continue
                 counted.add(s)
-                for line, what in disagree(scripts[s], k, n, verdicts):
+                for line, what in disagree(scripts[s], k, n, verdicts, whose.get(s, "its script defines")):
                     said.append((rel, line or at, f"{s}: {what}"))
         if any(path.is_file() for path in (root / f for f in files)):
             for s in run:
@@ -181,6 +238,14 @@ def disagreements(
                     said.append((files[0], 0, f"counts none of {s}'s mutants, which the recipe runs"))
         if said:
             found[recipe] = said
+    # A script's parts, held together: what is wrong with them is said of
+    # every recipe that runs one of them.
+    bodies = plan.bodies(root)
+    for s, (n, by_part, recipes_of) in sorted(partly.items()):
+        for what in split(len(loaded[s]), parts_of[s], by_part, n):
+            for recipe in recipes_of:
+                files = plan.evidence_files(bodies[recipe])
+                found.setdefault(recipe, []).append((files[0], 0, f"{s}: {what}"))
     return found
 
 

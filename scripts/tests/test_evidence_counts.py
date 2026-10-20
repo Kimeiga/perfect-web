@@ -44,6 +44,37 @@ MUTANTS = [
     ("sveltekit", "the count is distinct items", ROOT / "store.ts", "i", "j"),
 ]
 """
+# A script of three mutants run in two parts, each a recipe of its own (the
+# integrator's ruling 1, train-10: `e14-refusal` no longer fit a CI job).
+Z = """\
+import pathlib
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+MUTANTS = [
+    ("a refusal is not read", "core", ROOT / "src.rs", "a", "b"),
+    ("a refusal is not told", "core", ROOT / "src.rs", "c", "d"),
+    ("an announcer says nothing", "browser", ROOT / "src.rs", "e", "f"),
+]
+PARTS = [(0, 2), (2, 3)]
+"""
+PARTED = (
+    "e14-z:\n"
+    "    @{ python3 scripts/z_mutations.py --part 1/2; } > docs/evidence/E14/z.txt\n"
+    "e14-z-2:\n"
+    "    @{ python3 scripts/z_mutations.py --part 2/2; } > docs/evidence/E14/z-2.txt\n"
+)
+Z1 = (
+    "part 1 of 2: mutants 1 to 2 of 3\n"
+    "baseline (core): 4 passed, 0 failed\n"
+    "a refusal is not read [core]: KILLED (1 of 4 tests fail)\n"
+    "a refusal is not told [core]: KILLED (2 of 4 tests fail)\n"
+    "2 of 2 mutants killed\n"
+)
+Z2 = (
+    "part 2 of 2: mutants 3 to 3 of 3\n"
+    "baseline (browser): 6 passed, 0 failed\n"
+    "an announcer says nothing [browser]: KILLED (1 of 6 tests fail)\n"
+    "1 of 1 mutants killed\n"
+)
 RECIPE = (
     "e14-x:\n"
     '    @{ echo "commit: $(git rev-parse HEAD)"; python3 scripts/x_mutations.py; '
@@ -93,6 +124,61 @@ class Counts(unittest.TestCase):
     def test_evidence_that_agrees_with_its_script_names_nothing(self):
         self.assertEqual(self.found(AGREES), {})
 
+    def parted(self, z: str = Z, justfile: str = PARTED, z1: str = Z1, z2: str = Z2) -> dict:
+        root = self.tree(
+            {
+                "justfile": justfile,
+                "scripts/z_mutations.py": z,
+                "docs/evidence/E14/z.txt": z1,
+                "docs/evidence/E14/z-2.txt": z2,
+            }
+        )
+        return counts.disagreements(root, plan)
+
+    def test_a_scripts_mutants_split_across_recipes_are_each_counted_in_its_part(self):
+        # The integrator's ruling 1 (train-10): `e14-refusal` runs part 1 of
+        # its script's mutants and `e14-refusal-2` part 2, each its own count.
+        self.assertEqual(self.parted(), {})
+        # A part's file that counts the whole script's mutants.
+        whole = Z1.replace("2 of 2 mutants killed", "2 of 3 mutants killed")
+        self.assertIn(
+            "z_mutations.py: counts 3 mutants; its part 1 of 2 holds 2",
+            [what for _, _, what in self.parted(z1=whole)["e14-z"]],
+        )
+
+    def test_a_scripts_parts_hold_every_mutant_once_each_run_by_a_recipe(self):
+        # The floor no mutant falls through: a mutant in no part, a mutant in
+        # two, and a part no recipe runs are each named, of each recipe that
+        # runs a part.
+        gap = Z.replace("PARTS = [(0, 2), (2, 3)]", "PARTS = [(0, 1), (2, 3)]")
+        one = Z1.replace("a refusal is not told [core]: KILLED (2 of 4 tests fail)\n", "").replace(
+            "2 of 2 mutants killed", "1 of 1 mutants killed"
+        )
+        self.assertEqual(
+            {r: [what for _, _, what in said] for r, said in self.parted(z=gap, z1=one).items()},
+            {
+                "e14-z": ["z_mutations.py: its parts leave 1 of its 3 mutants to none"],
+                "e14-z-2": ["z_mutations.py: its parts leave 1 of its 3 mutants to none"],
+            },
+        )
+        overlap = Z.replace("PARTS = [(0, 2), (2, 3)]", "PARTS = [(0, 2), (1, 3)]")
+        two = Z2.replace(
+            "an announcer says nothing [browser]",
+            "a refusal is not told [core]: KILLED (1 of 6 tests fail)\nan announcer says nothing [browser]",
+        ).replace("1 of 1 mutants killed", "2 of 2 mutants killed")
+        self.assertEqual(
+            {r: [what for _, _, what in said] for r, said in self.parted(z=overlap, z2=two).items()},
+            {
+                "e14-z": ["z_mutations.py: its parts hold 1 of its 3 mutants twice"],
+                "e14-z-2": ["z_mutations.py: its parts hold 1 of its 3 mutants twice"],
+            },
+        )
+        alone = PARTED.split("e14-z-2:")[0]
+        self.assertEqual(
+            [what for _, _, what in self.parted(justfile=alone)["e14-z"]],
+            ["z_mutations.py: part 2 of 2 is run by no recipe"],
+        )
+
     def test_a_count_and_a_verdict_of_a_retired_mutant_are_named(self):
         # As privacy-by-resolution.txt said, of a script that plants three.
         evidence = AGREES.replace(
@@ -125,6 +211,26 @@ class Counts(unittest.TestCase):
         short = AGREES.replace("PW1 speaks where PW2 does [server]: KILLED (1 of 4 tests fail)\n", "")
         self.assertEqual(
             [what for _, _, what in self.found(short)["e14-x"]],
+            [
+                "x_mutations.py: counts 3 mutants above 2 verdicts",
+                "x_mutations.py: counts 3 killed; 2 verdicts say KILLED",
+            ],
+        )
+
+    def test_a_verdict_that_says_what_killed_its_mutant_is_read(self):
+        # The guide's script (ADR-0343) says what killed each mutant: a test,
+        # the spec, the checker. Until train-10's landing such a verdict was
+        # read as none, and the guide's evidence named none of its mutants.
+        said = (
+            AGREES.replace("[core]: KILLED (1 of 4", "[core]: KILLED by a_test_of_sinks (1 of 4")
+            .replace("[core]: KILLED (3 of 4", "[core]: KILLED by the spec (3 of 4")
+            .replace("[server]: KILLED (1 of 4 tests fail)", "[server]: KILLED by the checker (PW5048)")
+        )
+        self.assertEqual(self.found(said), {})
+        # The control: a kill that says nothing in parentheses is no verdict.
+        bare = said.replace("KILLED by the checker (PW5048)", "KILLED by the checker")
+        self.assertEqual(
+            [what for _, _, what in self.found(bare)["e14-x"]],
             [
                 "x_mutations.py: counts 3 mutants above 2 verdicts",
                 "x_mutations.py: counts 3 killed; 2 verdicts say KILLED",

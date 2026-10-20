@@ -24,7 +24,7 @@ e14-bounded-reads:
        cargo test --locked -p pw-core --test checking_source --test generality 2>&1 | grep -E '^test result|^---- |panicked at'; \
        echo; echo "== the reference programs: the store, the accepted corpus, the feed, kiokun-site"; echo; \
        cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/store/*.pw 2>&1 | tail -1; \
-       cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | tail -1; \
+       python3 scripts/accepted_corpus.py; \
        cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/feed/*.pw 2>&1 | tail -1; \
        NO_COLOR=1 cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/kiokun/Shards.pw examples/kiokun/dictionary.pw examples/kiokun-site/*.pw 2>&1 \
          | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' | grep -E '^(error|warning)|^pw check'; \

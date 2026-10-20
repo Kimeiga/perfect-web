@@ -13,7 +13,7 @@
 
 use pw_core::backend::component::{self, Component};
 use pw_core::backend::ir::Program;
-use pw_core::backend::lower::{Checked, Context, program};
+use pw_core::backend::lower::program;
 use pw_core::backend::wasm::Encoding;
 use pw_core::contract::contracts;
 use pw_core::hir::Hir;
@@ -62,10 +62,6 @@ struct Compiled {
 }
 
 fn compile(files: &[(String, String)]) -> Compiled {
-    let hirs: Vec<Hir> = files
-        .iter()
-        .map(|(_, s)| lower_file(s, &parse_tree(s).green))
-        .collect();
     let units: Vec<pw_core::check::Unit> = files
         .iter()
         .map(|(path, src)| pw_core::check::Unit {
@@ -74,24 +70,13 @@ fn compile(files: &[(String, String)]) -> Compiled {
             hir: lower_file(src, &parse_tree(src).green),
         })
         .collect();
-    let refs: Vec<&Hir> = hirs.iter().collect();
+    let refs: Vec<&Hir> = units.iter().map(|u| &u.hir).collect();
     let ws = Workspace::build(&refs);
     let sigs = Signatures::build(&ws, &refs);
     let cs = contracts(&refs, &sigs, &ws);
     let (wit, worlds) = pw_core::wit::package(&refs, &ws, &cs).expect("the store generates WIT");
-    let cx = Context {
-        hirs: &refs,
-        ws: &ws,
-        sigs: &sigs,
-        contracts: &cs,
-    };
-    let checked = Checked::of(&units, cx).unwrap_or_else(|ds| {
-        panic!(
-            "the store must check before the backend sees it: {:?}",
-            ds.iter().map(|d| (d.code, &d.message)).collect::<Vec<_>>()
-        )
-    });
-    let (program, _) = program(&checked);
+    let (program, _) = pw_core::program::with_semantic_program(&units, program)
+        .unwrap_or_else(|d| panic!("{d:?}"));
     Compiled {
         wit,
         worlds,

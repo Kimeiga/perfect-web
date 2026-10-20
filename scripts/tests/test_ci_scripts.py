@@ -105,8 +105,69 @@ class Plan(unittest.TestCase):
         self.assertEqual(len(plan.plan(["a", "b"], {}, 16)), 2)
         # And nothing to run plans no shard: a change that touches no recipe
         # (run 37914111273 failed its plan instead, ADR-0290's first week).
-        self.assertEqual(plan.plan([], {}, 9), [])
-        self.assertEqual(plan.plan([], {}, 9, {}, {"d1"}), [])
+        for database in (frozenset(), {"d1"}):
+            with self.subTest(database=database):
+                try:
+                    empty = plan.plan([], {}, 9, database=database)
+                except ValueError as error:
+                    self.fail(f"An empty recipe selection must return no shards: {error}")
+                self.assertEqual(empty, [])
+
+    def test_a_recipe_recorded_past_a_jobs_limit_is_refused_before_any_shard(self) -> None:
+        # The integrator's ruling 2 (train-10): verify 39054436657 stopped
+        # `e14-refusal`, alone in its shard, at the 345-minute limit after
+        # 20,507 s. A plan that knows a recipe's seconds refuses it then, not
+        # a run hours in. Its shard's setup counts, and a note in the seconds
+        # kept (`_lower_bounds`) is no recipe.
+        import contextlib
+        import io
+
+        self.assertEqual(plan.past_the_limit(["a"], {"a": plan.LIMIT - 100}, {"a": (True, True)}), [("a", plan.LIMIT - 100)])
+        self.assertEqual(plan.past_the_limit(["a"], {"a": plan.LIMIT - 100}, {"a": (False, False)}), [])
+        self.assertEqual(plan.past_the_limit(["a"], {}, {"a": (True, True)}), [])
+        names = ["e10-affine-bindings", "e10-attribute-case"]
+        real, argv = plan.SECONDS, sys.argv
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                plan.SECONDS = pathlib.Path(d) / "seconds.json"
+                sys.argv = ["ci_plan.py", *names]
+                for recorded, refused in ((plan.LIMIT, True), (plan.LIMIT - 1_000, False)):
+                    plan.SECONDS.write_text(json.dumps({
+                        "_lower_bounds": {names[0]: "stopped at the limit"},
+                        names[0]: recorded,
+                        names[1]: 100,
+                    }))
+                    out, err = io.StringIO(), io.StringIO()
+                    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                        try:
+                            code = plan.main()
+                        except TypeError as error:
+                            self.fail(f"a note in the seconds kept is read as a recipe's: {error}")
+                    if refused:
+                        self.assertEqual(code, 1, err.getvalue())
+                        self.assertIn(f"{names[0]} is recorded at {recorded} s", err.getvalue())
+                        self.assertNotIn("shards=", out.getvalue())
+                    else:
+                        self.assertEqual(code, 0, err.getvalue())
+                        self.assertIn("shards=", out.getvalue())
+        finally:
+            plan.SECONDS, sys.argv = real, argv
+
+    def test_a_recipe_that_skips_without_a_database_is_dealt_beside_one(self) -> None:
+        # Found at train-10's verify (39054436657): `e14-scheduled-orders`
+        # says it skipped and writes no evidence where no database is named,
+        # NEEDS_DATABASE did not hold it, and its shard had none: the run
+        # recorded nothing of ADR-0347 and passed. Every recipe of that kind,
+        # read from the justfile's every part, is dealt beside a database.
+        skips = [
+            name
+            for name, body in plan.bodies().items()
+            if "skipped, PW_STORE_DATABASE_URL is not set" in body
+            or "skipped, PW_FEED_DATABASE_URL is not set" in body
+        ]
+        self.assertIn("e14-scheduled-orders", skips)
+        self.assertGreaterEqual(len(skips), 10, skips)
+        self.assertEqual(sorted(set(skips) - set(plan.NEEDS_DATABASE)), [])
 
     def test_a_measurement_of_the_machine_is_not_planned(self) -> None:
         self.assertIn("e10-close-bench", plan.LOCAL_ONLY)
@@ -229,6 +290,39 @@ class Plan(unittest.TestCase):
         other = plan.recipes_for({"spikes/own-renderer/README.md": [(1, 1)]}, 30, names)
         self.assertNotIn("e14-feed", other)
 
+    def test_the_modules_the_configuration_reads_are_its_own_and_plan_as_it_does(self) -> None:
+        # The host map (ADR-0356): the configuration plans each run's hosts
+        # with modules of its directory and the registry they read, found by
+        # following its imports; a change to any of them is a change to every
+        # suite run there, as a change to the configuration is.
+        found = plan.suite_configuration()
+        self.assertEqual(
+            sorted(found),
+            [
+                f"{plan.SUITE_DIRECTORY}/{name}"
+                for name in ("host-metadata.mjs", "host-plan-reporter.mjs", "host-plan.mjs", "host-registry.json", "playwright.config.mjs")
+            ],
+        )
+        names = plan.recipes()
+        body = plan.bodies()
+        under = sorted(n for n in names if plan.runs_browser_suite(body.get(n, "")))
+        for module in sorted(found - {plan.PLAYWRIGHT_CONFIG}):
+            planned = plan.recipes_for({module: [(1, 1)]}, 30, names)
+            self.assertEqual(sorted(set(under) - set(planned)), [], module)
+        # Followed through what each module imports or names beside itself,
+        # and not into what it only reads by a path of the tree.
+        with tempfile.TemporaryDirectory() as d:
+            root = pathlib.Path(d)
+            suite = root / plan.SUITE_DIRECTORY
+            suite.mkdir(parents=True)
+            (suite / "playwright.config.mjs").write_text('import { a } from "./a.mjs";\nimport { defineConfig } from "@playwright/test";\n')
+            (suite / "a.mjs").write_text('const b = await import("./b.mjs");\nconst data = new URL("./c.json", import.meta.url);\nreadFileSync("public/d.mjs");\n')
+            (suite / "b.mjs").write_text('export { a } from "./a.mjs";\n')
+            self.assertEqual(
+                sorted(plan.suite_configuration(root)),
+                [f"{plan.SUITE_DIRECTORY}/{name}" for name in ("a.mjs", "b.mjs", "c.json", "playwright.config.mjs")],
+            )
+
     def test_a_changed_spec_or_a_module_its_specs_import_plans_what_runs_them(self) -> None:
         # Track evidence-integrity-2: `e2e/accessibility-rules.mjs`, which
         # three specs import, planned nothing; and `e10-browser`, which runs
@@ -312,6 +406,87 @@ class Plan(unittest.TestCase):
             plan.recipes_for({"spikes/wasmtime-component/elsewhere.sh": [(1, 1)]}, 30, names),
             [],
         )
+
+    def test_a_changed_binary_is_named_where_a_line_names_it(self) -> None:
+        # Train-10's landing (2026-10-20): git diffs a binary with no `+++`
+        # line and no hunk, so 8c5618c8, which regenerated three of the
+        # store's components, planned no recipe and staled no evidence.
+        diff = (
+            b"diff --git a/d/x.wasm b/d/x.wasm\nindex 1..2 100644\n"
+            b"Binary files a/d/x.wasm and b/d/x.wasm differ\n"
+            b"diff --git a/n.bin b/n.bin\nnew file mode 100644\n"
+            b"Binary files /dev/null and b/n.bin differ\n"
+            b"diff --git a/g/o.bin b/g/o.bin\ndeleted file mode 100644\n"
+            b"Binary files a/g/o.bin and /dev/null differ\n"
+        )
+        self.assertEqual(plan.binaries(diff), ["d/x.wasm", "g/o.bin", "n.bin"])
+        self.assertEqual(plan.parsed(diff), {})
+        for line, named in [
+            ('std::fs::read(root().join("d/x.wasm"))', True),
+            ('let problems = components_against(&built, &root.join("d"));', True),
+            ('rm -f d/*.wasm; cp "$out"/components/*.wasm d/; \\', True),
+            ('let path = root().join(format!("d/{id}.wasm"));', True),
+            ('cmp "$out/$id.wasm" "d/$id.wasm"', True),
+            ("include_bytes!(\"../../d/${ID}.wasm\")", True),
+            # The controls: another file, a directory in it or beside it,
+            # another kind of file, another directory ending in its name.
+            ("d/y.wasm", False),
+            ('let dir = root.join("d/handlers");', False),
+            ("d/kiokun/x.wasm", False),
+            ("d/*/x.wasm", False),
+            ("d0/x.wasm", False),
+            ("dd/x.wasm", False),
+            ("d/*.json", False),
+        ]:
+            self.assertEqual(plan.names_binary(line, "d", "x.wasm"), named, line)
+
+    def test_a_changed_component_plans_the_recipes_whose_tests_read_it(self) -> None:
+        # On this tree: a committed component is read by `evidence_is_current`
+        # (whose scripts' recipes, e14-committed-components and others, run
+        # it), by pw-host's tests, by the server, and by e10-component's own
+        # lines, which write it.
+        names = plan.recipes()
+        component = "docs/evidence/E10/store.hours.CartHours.wasm"
+        readers = plan.read_by(component, None)
+        self.assertIn("compiler/pw-core/tests/evidence_is_current.rs", readers)
+        self.assertIn("runtime/pw-host/tests/display.rs", readers)
+        self.assertEqual([p for p in readers if p.startswith(plan.RECORDS)], [], "a record reads nothing")
+        planned = plan.recipes_for(plan.with_readers({}, [component], None), 30, names)
+        for recipe in ("e14-committed-components", "e10-component", "e14-last-known-good"):
+            self.assertIn(recipe, planned)
+        # The control: the component alone, as git's diff gave it, plans
+        # nothing (train-10's 72 recipes chosen by hand).
+        self.assertEqual(plan.recipes_for({component: []}, 30, names), [])
+
+    def test_a_binary_changed_in_a_range_or_the_tree_here_is_changed_where_it_is_read(self) -> None:
+        # `hunks`, end to end, on a git of its own: the range's and the
+        # tree's own changes, as the planner and the fetch's stale check ask.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+
+            def git(*args: str) -> str:
+                return subprocess.run(
+                    ["git", *args], cwd=root, check=True, capture_output=True, text=True
+                ).stdout.strip()
+
+            git("init", "-q")
+            git("config", "user.email", "toy@example.com")
+            git("config", "user.name", "toy")
+            (root / "d").mkdir()
+            (root / "d" / "x.bin").write_bytes(b"\x00one")
+            (root / "reader.rs").write_text('fn f() {}\nlet b = include_bytes!("d/x.bin");\n')
+            (root / "other.rs").write_text('let h = "d/handlers";\n')
+            git("add", "-A")
+            git("commit", "-q", "-m", "one")
+            first = git("rev-parse", "HEAD")
+            (root / "d" / "x.bin").write_bytes(b"\x00two")
+            expected = {"d/x.bin": [], "reader.rs": [(2, 2)]}
+            self.assertEqual(plan.hunks(first, None, root), expected)
+            git("commit", "-q", "-am", "two")
+            self.assertEqual(plan.hunks(first, "HEAD", root), expected)
+            # A text file's change is as it was: its own lines alone.
+            (root / "other.rs").write_text('let h = "d/handlers";\nlet i = 1;\n')
+            self.assertEqual(plan.hunks("HEAD", None, root), {"other.rs": [(2, 2)]})
 
     def test_a_recipe_in_an_imported_file_is_read_and_planned(self) -> None:
         # ADR-0253: a track's recipes live in a file the justfile imports.
@@ -524,6 +699,40 @@ class Plan(unittest.TestCase):
             if shard["recipes"] != ["long"]:
                 self.assertLessEqual(plan.ends([shard], costs), plan.CEILING)
 
+    def test_a_long_singleton_does_not_hide_a_database_shard_past_the_ceiling(self) -> None:
+        # More database shards cannot shorten the long singleton, but can
+        # prevent a different, splittable shard exceeding ADR-0290's ceiling.
+        costs = {"long": 100000, "d1": 6000, "d2": 6000}
+        db = {"d1", "d2"}
+        for asked in (2, 3, 4, plan.MOST):
+            with self.subTest(asked=asked):
+                dealt = plan.planned(list(costs), costs, asked, database=db)
+                self.assertEqual(len(dealt), 3)
+                self.assertEqual(sorted(s["recipes"] for s in dealt), [["d1"], ["d2"], ["long"]])
+
+    def test_a_long_database_singleton_does_not_hide_its_other_database_shard(self) -> None:
+        costs = {"ordinary": 6000, "long-db": 100000, "d1": 6000, "d2": 6000}
+        dealt = plan.planned(list(costs), costs, 3, database={"long-db", "d1", "d2"})
+        self.assertEqual(len(dealt), 4)
+        for shard in dealt:
+            if shard["recipes"] != ["long-db"]:
+                self.assertLessEqual(plan.ends([shard], costs), plan.CEILING)
+
+    def test_the_ceiling_tie_counts_database_setup(self) -> None:
+        # The recipes total 10,000: plain setup fits, browser setup does not.
+        costs = {"long": 100000, "d1": 5000, "d2": 5000}
+        db = {"d1", "d2"}
+        self.assertEqual(len(plan.planned(list(costs), costs, 3, database=db)), 2)
+        browsers = {"d1": (True, True)}
+        dealt = plan.planned(list(costs), costs, 3, browsers, db)
+        self.assertEqual(len(dealt), 3)
+        self.assertEqual([s["recipes"] for s in dealt if s["database"]], [["d1"], ["d2"]])
+
+    def test_a_safe_database_bundle_keeps_the_fewest_database_shards(self) -> None:
+        costs = {"long": 100000, "d1": 1200, "d2": 1200}
+        dealt = plan.planned(list(costs), costs, 3, database={"d1", "d2"})
+        self.assertEqual([s["recipes"] for s in dealt], [["long"], ["d1", "d2"]])
+
     def test_main_deals_a_run_within_the_ceiling(self) -> None:
         # The workflow's own call: four recipes of 8,000 s asked for in two
         # shards are dealt into four.
@@ -726,13 +935,17 @@ class Fetch(unittest.TestCase):
             "docs/evidence/E14/feed.txt": "e14-feed",
         })
         moved = {"e14-diffs"}
-        self.assertIn("reads what changed", fetch.verdict("e14-diffs", moved, []))
+        reason = fetch.verdict("e14-diffs", moved, [])
+        self.assertIsInstance(reason, str, "A moved recipe must return a refusal reason")
+        self.assertIn("reads what changed", reason)
         self.assertIsNone(fetch.verdict("e14-feed", moved, []))
         # Skipped, where another run records it: neither copied nor refused.
         self.assertEqual(fetch.verdict("e14-diffs", moved, ["e14-diffs"]), "skipped")
         self.assertEqual(fetch.verdict("e14-feed", set(), ["e14-feed"]), "skipped")
         # A file no recipe of the run says it wrote is no one's evidence.
-        self.assertIn("no recipe", fetch.verdict(None, set(), []))
+        reason = fetch.verdict(None, set(), [])
+        self.assertIsInstance(reason, str, "An unowned file must return a refusal reason")
+        self.assertIn("no recipe", reason)
 
     def test_what_changed_since_a_run_is_the_planners_against_the_tree_here(self) -> None:
         # A push plans by `ci_plan.py`'s rule; a fetch reads the same, from
@@ -801,9 +1014,32 @@ class Fetch(unittest.TestCase):
 
     def test_the_seconds_kept_are_each_a_recipes(self) -> None:
         kept = json.loads(fetch.SECONDS.read_text())
-        self.assertGreater(len(kept), 100)
-        self.assertTrue(all(plan.EVIDENCE_RECIPE.match(r) and isinstance(s, int) and s >= 0 for r, s in kept.items()))
+        notes = {k: v for k, v in kept.items() if k.startswith("_")}
+        seconds = {k: v for k, v in kept.items() if not k.startswith("_")}
+        self.assertGreater(len(seconds), 100)
+        self.assertTrue(all(plan.EVIDENCE_RECIPE.match(r) and isinstance(s, int) and s >= 0 for r, s in seconds.items()))
         self.assertEqual(list(kept), sorted(kept))
+        # The one note: the recipes whose seconds are lower bounds, each kept
+        # with its seconds, and why (the integrator's ruling 2, train-10).
+        self.assertLessEqual(set(notes), {"_lower_bounds"})
+        for recipe, why in notes.get("_lower_bounds", {}).items():
+            self.assertIn(recipe, seconds)
+            self.assertIsInstance(why, str)
+
+    def test_a_recipe_run_to_its_end_leaves_the_lower_bounds(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            path = pathlib.Path(d) / "seconds.json"
+            path.write_text(json.dumps({
+                "_lower_bounds": {"e14-a": "stopped at the limit", "e14-b": "stopped at the limit"},
+                "e14-a": 100,
+                "e14-b": 200,
+            }))
+            fetch.remember({"e14-a": 150}, path)
+            kept = json.loads(path.read_text())
+            self.assertEqual(kept["e14-a"], 150)
+            self.assertEqual(kept["_lower_bounds"], {"e14-b": "stopped at the limit"})
+            fetch.remember({"e14-b": 250}, path)
+            self.assertNotIn("_lower_bounds", json.loads(path.read_text()))
 
 class Summary(unittest.TestCase):
     def run_summary(self, shards: list[list[dict]], files: dict[str, str], planned: int) -> int:
@@ -1172,7 +1408,10 @@ class VerifiedBase(unittest.TestCase):
         def broken(_sha: str) -> list[dict]:
             raise RuntimeError("the API answered 403")
         with mock.patch("sys.stderr", new_callable=lambda: __import__("io").StringIO()) as err:
-            got = vbase.base(self.sha["before"], self.sha["evidence"], broken, self.root)
+            try:
+                got = vbase.base(self.sha["before"], self.sha["evidence"], broken, self.root)
+            except RuntimeError as error:
+                self.fail(f"A failing run provider must fall back to the previous commit: {error}")
         self.assertEqual(got, self.sha["before"])
         self.assertIn("the API answered 403", err.getvalue())
         # And a commit git does not know.

@@ -25,6 +25,7 @@ import 'just/store-search.just'
 import 'just/store-hours.just'
 import 'just/order-total.just'
 import 'just/bounded-statements.just'
+import 'just/render-merge.just'
 import 'just/payments.just'
 import 'just/page-policy.just'
 import 'just/scheduled.just'
@@ -39,6 +40,14 @@ import 'just/scheduled-orders.just'
 import 'just/evidence-integrity-2.just'
 import 'just/tables.just'
 import 'just/generic-effects.just'
+import 'just/committed-components.just'
+import 'just/browser-host-map.just'
+import 'just/parallel-mutants.just'
+import 'just/kiokun-cache.just'
+import 'just/ci-diagnostics.just'
+import 'just/fuzz-floor.just'
+import 'just/check-is-build.just'
+import 'just/guide-producer.just'
 
 default:
     @just --list
@@ -135,7 +144,7 @@ test-unit:
 # Validates the accepted/rejected corpus. Four phases since E2:
 #   0. pw fmt --check — the corpus is canonically formatted (ADR-0013)
 #   1. corpus-check — header well-formedness and full charter §16 coverage
-#   2. pw check on accepted/ — must be CLEAN
+#   2. accepted semantic conformance is clean; complete check/build pin four backend refusals
 #   3. cargo test  — asserts rejected files are caught by their declared @rule,
 #                    that none of them is caught by the wrong one, and that
 #                    coverage does not regress (see pw-cli rules::corpus_tests)
@@ -151,7 +160,10 @@ test-compile:
     # every accepted file. Feeding it the rejected files too would ask the
     # compiler to resolve 68 files as one program, which they are not — five
     # rejected fixtures reuse module names with each other (E2B).
-    cargo run --quiet -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/accepted/*.pw
+    # Semantic language conformance and current executable support are distinct.
+    # The complete CLI gate pins all four exposed backend gaps and no artifacts.
+    cargo test --locked -p pw-core --test checking_source no_accepted_corpus_file_reports_a_body_level_error
+    cargo test --locked -p pw-cli --test check_build_corpus accepted_corpus_has_exactly_its_known_backend_refusals
     # The demo, checked as the program it is. It was outside `ci` until E6,
     # and E6's first rule found two dangling edges in it — a milestone demo
     # nothing checks is a milestone demo that can quietly stop being true.
@@ -431,22 +443,20 @@ e9-values:
 # by upstream `wit-component`, checked by `wit-component`'s decoder against the
 # world each contract fixed. Named by component id, which is how the host and
 # the dev server find them; held to the compiler's current output by `pw-core`'s
-# `evidence_is_current`.
+# `evidence_is_current`. Every component the store's build emits, the list
+# the build's (`components/`), never one kept here: kept here until train-11,
+# it and the test named different sets, and three components went stale.
 e10-component:
     @mkdir -p docs/evidence/E10
-    @for id in store.page.add_to_cart store.page.clear_cart store.page.increase_in_cart store.page.decrease_in_cart store.page.remove_from_cart store.page.Store store.page.Menu store.page.Cart store.page.Reach UserCarts.line_count domain.display domain.count domain.total UserCarts.subtotal store.page.MenuSize store.page.MenuLine store.hours.StoreStatus store.hours.StoresOpen store.hours.CartHours store.reviews.StoreRatings; do \
-      cargo run --quiet --locked -p pw-cli -- emit-component --component "$id" \
-        --out "docs/evidence/E10/$id.wasm" \
-        packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw \
-        examples/lib/*.pw examples/store/*.pw; \
-    done
-    @# The store page's plan (ADR-0125): what the development server's tests
-    @# run the page by. Written by `pw build`, which is the one place it is made.
-    @# The other pages' plans are not kept: nothing reads them from here, and
-    @# `evidence_is_current` holds this one alone to the compiler.
+    @# The components and the store page's plan (ADR-0125), what the
+    @# development server's tests run the page by: written by `pw build`,
+    @# which is the one place they are made. The other pages' plans are not
+    @# kept: nothing reads them from here, and `evidence_is_current` holds this
+    @# one alone to the compiler. A component the build no longer emits goes.
     @out="$(mktemp -d)"; cargo run --quiet --locked -p pw-cli -- build --out "$out" \
         packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw \
         examples/lib/*.pw examples/store/*.pw > /dev/null; \
+      rm -f docs/evidence/E10/*.wasm; cp "$out"/components/*.wasm docs/evidence/E10/; \
       mkdir -p docs/evidence/E10/pages; \
       cp "$out"/pages/store.page.StorePage.json docs/evidence/E10/pages/; rm -rf "$out"
 
@@ -2557,8 +2567,7 @@ e14-ids:
        cargo test --locked -p pw-core --test corpus_history --test generality --test checking_source 2>&1 \
          | grep -E '^test (the_c10|the_c9|the_pre_change|generality_is|every_rejected|every_caught|a_caught_file|every_diagnostic)|^test result|^---- |panicked at'; \
        echo; echo "== every program the repository checks"; echo; \
-       cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw \
-         examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | tail -1; \
+       python3 scripts/accepted_corpus.py; \
        cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw \
          examples/domain.pw examples/lib/*.pw examples/store/*.pw examples/demo/*.pw 2>&1 | tail -1; \
        cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/kiokun/*.pw 2>&1 | tail -1; \
@@ -2584,8 +2593,7 @@ e14-links:
        cargo test --locked -p pw-core --test generality --test checking_source 2>&1 \
          | grep -E '^test (generality_is|every_rejected|every_caught|a_caught_file|every_diagnostic)|^test result|^---- |panicked at'; \
        echo; echo "== every program the repository checks"; echo; \
-       cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw \
-         examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | tail -1; \
+       python3 scripts/accepted_corpus.py; \
        cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw \
          examples/domain.pw examples/lib/*.pw examples/store/*.pw examples/demo/*.pw 2>&1 | tail -1; \
        cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/kiokun/*.pw 2>&1 | tail -1; \
@@ -3164,7 +3172,7 @@ e14-clause-heads:
        echo; echo "== the store, kiokun and the accepted corpus"; echo; \
        cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/store/*.pw 2>&1 | tail -1; \
        cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/kiokun/*.pw 2>&1 | tail -1; \
-       cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | tail -1; \
+       python3 scripts/accepted_corpus.py; \
        echo; echo "== mutation controls (scripts/clause_heads_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/clause_heads_mutations.py; \
      } > docs/evidence/E14/clause-heads.txt
@@ -3227,7 +3235,7 @@ e14-opaque-value:
        echo "== the rule (compiler/pw-core/tests/members.rs)"; echo; \
        cargo test --locked -p pw-core --test members 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the accepted corpus, A-015 to A-017 included"; echo; \
-       cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | tail -3; \
+       python3 scripts/accepted_corpus.py; \
        echo; echo "== mutation controls (scripts/opaque_value_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/opaque_value_mutations.py; \
      } > docs/evidence/E14/opaque-value.txt
@@ -3500,8 +3508,7 @@ e14-metadata:
        cargo test --locked -p pw-core --test generality --test checking_source 2>&1 \
          | grep -E '^test (generality_is|every_rejected|every_caught|a_caught_file|every_diagnostic)|^test result|^---- |panicked at'; \
        echo; echo "== every program the repository checks"; echo; \
-       cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw \
-         examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | tail -1; \
+       python3 scripts/accepted_corpus.py; \
        cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw \
          examples/domain.pw examples/lib/*.pw examples/store/*.pw examples/demo/*.pw 2>&1 | tail -1; \
        cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/kiokun/*.pw 2>&1 | tail -1; \
@@ -3565,7 +3572,7 @@ e14-case-and-delivery:
        echo "== the tests (compiler/pw-core/tests/case_and_delivery.rs)"; echo; \
        cargo test --locked -p pw-core --test case_and_delivery 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the store, the accepted corpus and the demos check as before"; echo; \
-       for program in store accepted demo; do \
+       python3 scripts/accepted_corpus.py; for program in store demo; do \
          printf '%s: ' "$program"; \
          cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw \
            examples/domain.pw examples/lib/*.pw examples/$program/*.pw 2>&1 | tail -1; \
@@ -3648,8 +3655,7 @@ e14-streams:
        echo; echo "== the server, its streamed response among it (spikes/own-renderer/server)"; echo; \
        cargo test --locked -p pw-dev-server 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the accepted corpus, A-008 among it, checks as one program"; echo; \
-       cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw \
-         examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | tail -1; \
+       python3 scripts/accepted_corpus.py; \
        echo; echo "== the browser (e2e/stream.spec.mjs), three engines and the host's Chrome"; echo; \
        bash scripts/run_suite.sh -- pnpm exec playwright test e2e/stream.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/streams_mutations.py)"; echo; \
@@ -3956,7 +3962,7 @@ e10-callbacks:
        echo; echo "== an effect through a callback (compiler/pw-core/tests/causal_evidence.rs)"; echo; \
        cargo test --locked -p pw-core --test causal_evidence 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== what must stay clean: errors reported"; echo; \
-       printf 'accepted corpus: %s\n' "$(./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -cE '^error' || true)"; \
+       python3 scripts/accepted_corpus.py; \
        printf 'store: %s\n' "$(./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/store/*.pw 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -cE '^error' || true)"; \
        printf 'kiokun: %s\n' "$(./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/kiokun/*.pw 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -cE '^error' || true)"; \
        echo; echo "== mutation controls (scripts/callback_mutations.py)"; echo; \
@@ -4049,7 +4055,7 @@ e10-members:
        echo "== the member tests (compiler/pw-core/tests/members.rs)"; echo; \
        cargo test --locked -p pw-core --test members 2>&1 | grep -E '^test result|^---- |panicked at'; \
        echo; echo "== what must stay clean: errors reported"; echo; \
-       printf 'accepted corpus: %s\n' "$(./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -cE '^error' || true)"; \
+       python3 scripts/accepted_corpus.py; \
        printf 'store: %s\n' "$(./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/store/*.pw 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -cE '^error' || true)"; \
        printf 'kiokun: %s\n' "$(./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/kiokun/*.pw 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -cE '^error' || true)"; \
        echo; echo "== what the audit decided (member relations, the accepted corpus)"; echo; \
@@ -4073,7 +4079,7 @@ e10-names:
        echo "== the name tests (compiler/pw-core/tests/every_name_resolves.rs)"; echo; \
        cargo test --locked -p pw-core --test every_name_resolves 2>&1 | grep -E '^test result|^---- |panicked at'; \
        echo; echo "== what must stay clean: errors reported"; echo; \
-       printf 'accepted corpus: %s\n' "$(./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -cE '^error' || true)"; \
+       python3 scripts/accepted_corpus.py; \
        printf 'store: %s\n' "$(./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/store/*.pw 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -cE '^error' || true)"; \
        printf 'kiokun: %s\n' "$(./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/kiokun/*.pw 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -cE '^error' || true)"; \
        echo; echo "== mutation controls (scripts/names_mutations.py)"; echo; \
@@ -4990,8 +4996,7 @@ e14-resource-clauses:
        echo; echo "== the generality witnesses (examples/generality/affine_not_consumed_once)"; echo; \
        cargo test --locked -p pw-core --test generality 2>&1 | grep -E '^test result|^---- |panicked at'; \
        echo; echo "== the accepted corpus, A-007, A-019 and A-024 among it, checks as one program"; echo; \
-       cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw \
-         examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | tail -1; \
+       python3 scripts/accepted_corpus.py; \
        echo; echo "== mutation controls (scripts/resource_clauses_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/resource_clauses_mutations.py; \
      } > docs/evidence/E14/resource-clauses.txt
@@ -5246,10 +5251,28 @@ e14-refusal:
        bash scripts/run_suite.sh -- pnpm exec playwright test e2e/recovery.spec.mjs -g "still stale" --reporter=line; \
        bash scripts/run_suite.sh -- pnpm exec playwright test e2e/lazy-handler.spec.mjs -g "fails to load" --reporter=line; \
        bash scripts/run_suite.sh -- pnpm exec playwright test e2e/accessibility.spec.mjs -g "announcer|same node from the start" --reporter=line; \
-       echo; echo "== mutation controls (scripts/refusal_mutations.py)"; echo; \
-       python3 scripts/refusal_mutations.py; \
+       echo; echo "== mutation controls, part 1 of 2 (scripts/refusal_mutations.py --part 1/2; part 2 is e14-refusal-2's)"; echo; \
+       python3 scripts/refusal_mutations.py --part 1/2; \
      } > docs/evidence/E14/refusal.txt
     @grep -E "^test result|passed|failed|mutants killed|Error:|panicked at" docs/evidence/E14/refusal.txt
+
+# ADR-0302's mutation controls, part 2 of 2 (the integrator's ruling 1 of
+# 2026-10-17, train-10): the browser mutants `e14-refusal`'s job has no time
+# for, run in a job of their own. Its builds, and the controls.
+e14-refusal-2:
+    @BUILD_ONLY=1 bash spikes/own-renderer/run.sh > /dev/null
+    @BUILD_ONLY=1 bash spikes/own-renderer/feed.sh > /dev/null
+    @cargo build --quiet --locked -p pw-dev-server
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0302 - a refusal is told where the press was: its mutation controls, part 2 of 2"; echo; \
+       echo "produced by: just e14-refusal-2"; \
+       echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
+       echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
+       echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
+       echo "== mutation controls, part 2 of 2 (scripts/refusal_mutations.py --part 2/2; part 1 is e14-refusal's)"; echo; \
+       python3 scripts/refusal_mutations.py --part 2/2; \
+     } > docs/evidence/E14/refusal-2.txt
+    @grep -E "passed|failed|mutants killed|Error:|panicked at" docs/evidence/E14/refusal-2.txt
 
 # ADR-0305: a page's commands run in the order it sent them. The server's
 # tests, the browser's in three engines, and the mutation controls.

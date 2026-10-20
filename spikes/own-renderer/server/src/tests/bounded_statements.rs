@@ -340,6 +340,24 @@ const PINNED: &[(&str, u64)] = &[
     ("store:host/recommendations#curate", 1),
 ];
 
+/// **The reader's open pages, asking** (ADR-0297): each document of `session`
+/// counts as asked for from now for an hour, as an open page's stream asks
+/// without pause. A commit tells the documents that asked within `LIVE`
+/// (three seconds of the machine's own clock) and passes the rest by, so a page
+/// opened a few slow steps before the commit was not read again, and the
+/// statements counted for "the open pages read again" were the machine's speed:
+/// 42 on a quiet one, 36 or 31 on a loaded one. An hour ahead is a time no
+/// step reaches.
+fn open_pages_ask(s: &Server, session: &str) {
+    let asked = std::time::Instant::now() + std::time::Duration::from_secs(3600);
+    let mut open = s.pending.lock().expect("pending");
+    for doc in documents_of(&open, session) {
+        if let Some(waiting) = open.get_mut(&doc) {
+            waiting.seen = asked;
+        }
+    }
+}
+
 /// **What a page or a command ran**, each in turn, on a store served on
 /// PostgreSQL, with fifty stores more where `more` says: the reader adds a
 /// line from each seeded store, saves an address, chooses a tip, and reads
@@ -408,6 +426,7 @@ fn steps(more: bool) -> Vec<(String, u64)> {
         step(path, &|| {
             fetched_as(&s, path, Some("a"));
         });
+        open_pages_ask(&s, "a");
     }
     // `place_order`, pinned apart (the integrator's ruling on NEXT 4b): its
     // transaction's operations, its commit (what it hands the outbox, its
@@ -419,6 +438,7 @@ fn steps(more: bool) -> Vec<(String, u64)> {
         s.data.statements().expect("counted"),
         s.data.statements_by_op(),
     );
+    open_pages_ask(&s, "a");
     s.command_answered(
         "store.page.place_order",
         "a",
@@ -433,7 +453,7 @@ fn steps(more: bool) -> Vec<(String, u64)> {
     let [own] = ran[..] else {
         panic!("place_order's one transaction: {ran:?}")
     };
-    let mut in_ops = 0;
+    let (mut in_ops, mut carts_again) = (0, 0);
     for (op, (calls, statements)) in s.data.statements_by_op() {
         let (c0, r0) = by_op.get(&op).copied().unwrap_or_default();
         if calls > c0 {
@@ -446,6 +466,11 @@ fn steps(more: bool) -> Vec<(String, u64)> {
             );
             if op.starts_with("command ") {
                 in_ops += statements - r0;
+            }
+            // The cart every page's layout shows, read again after the
+            // commit (NEXT 4c's render merge).
+            if op == "read store:data/user-carts#current" {
+                carts_again = calls - c0;
             }
         }
     }
@@ -461,6 +486,10 @@ fn steps(more: bool) -> Vec<(String, u64)> {
         "place_order, taking no payments: its queries read again".to_string(),
         after - own,
     ));
+    out.push((
+        "place_order, taking no payments: user-carts#current called again".to_string(),
+        carts_again,
+    ));
     let mut step = |name: &str, run: &dyn Fn()| {
         let before = s.data.statements().expect("a layer that counts");
         run();
@@ -472,6 +501,7 @@ fn steps(more: bool) -> Vec<(String, u64)> {
     step("/order", &|| {
         fetched_as(&s, "/order", Some("a"));
     });
+    open_pages_ask(&s, "a");
     // TRACK SEAM (reviews): the order delivered by the kitchen's route, no
     // reader's step; then store 47 rated, and its rate page read.
     let delivered = posted(&s, "/bench/order?status=delivered", "a", "", "");
@@ -480,10 +510,12 @@ fn steps(more: bool) -> Vec<(String, u64)> {
     // operations and its commit), and the reader's open pages read again
     // after it, which its cart's event regenerates (ADR-0218's session
     // entry): every page the scenario left open.
-    let (txns, all) = (
+    let (txns, all, by_op) = (
         s.data.statements_by_transaction().len(),
         s.data.statements().expect("counted"),
+        s.data.statements_by_op(),
     );
+    open_pages_ask(&s, "a");
     let rated = s
         .command_answered(
             "store.rate.rate_order",
@@ -498,10 +530,37 @@ fn steps(more: bool) -> Vec<(String, u64)> {
     let [own] = ran[..] else {
         panic!("rate_order's one transaction: {ran:?}")
     };
+    // What its statements are made of, by operation, as `place_order`'s
+    // (NEXT 4c's render merge), and the two reads every open page of the
+    // reader's makes with one key: the cart its layout shows, and its order.
+    let (mut carts_again, mut orders_again) = (0, 0);
+    for (op, (calls, statements)) in s.data.statements_by_op() {
+        let (c0, r0) = by_op.get(&op).copied().unwrap_or_default();
+        if calls > c0 {
+            eprintln!(
+                "rate_order: {op}: {} calls, {} statements",
+                calls - c0,
+                statements - r0
+            );
+            match op.as_str() {
+                "read store:data/user-carts#current" => carts_again = calls - c0,
+                "read store:data/user-orders#current" => orders_again = calls - c0,
+                _ => {}
+            }
+        }
+    }
     out.push(("rate_order: its transaction".to_string(), own));
     out.push((
         "rate_order: its reader's open pages read again".to_string(),
         after - own,
+    ));
+    out.push((
+        "rate_order: user-carts#current called again".to_string(),
+        carts_again,
+    ));
+    out.push((
+        "rate_order: user-orders#current called again".to_string(),
+        orders_again,
     ));
     let mut step = |name: &str, run: &dyn Fn()| {
         let before = s.data.statements().expect("a layer that counts");
@@ -588,6 +647,24 @@ fn a_commands_commit_is_counted_with_it() {
 // back). `place_order`'s three apart, where the deployment takes no
 // payments: `user-orders#settle` (7) is among its operations, the order
 // placed at once (ADR-0332).
+//
+// NEXT 4c's render merge (track `render-merge`): the queries read again
+// after `place_order`'s commit are one render, the drain's read of the cart
+// and the session's six documents, so an operation called with the same
+// arguments by several of them is called once there: `user-carts#current`,
+// which every page's layout reads, once where seven times (its row below),
+// `hours#for-cart` (6 statements) once where twice, and `checkout#chosen`
+// once where twice (the cart page and the page of times), and 32 statements
+// became 19. And the reader's eight open pages read again after
+// `rate_order` are one render: `user-carts#current` once where eight times,
+// `user-orders#current` (2 statements) once where twice (their rows below),
+// `hours#for-cart` once where twice and `checkout#chosen` once where twice,
+// and 53 statements became 37. Measured with the merge and without it (its
+// kept answers never given, a temporary edit, reverted) on train-11,
+// 2026-10-19; on master before scheduled-orders, 21 -> 16 and 42 -> 34
+// (2026-10-17). No other count moved: `hours#for-stores` and
+// `ratings#for-stores`, called three times after `rate_order`, are called
+// with other stores each time.
 const PAGES: &[(&str, u64)] = &[
     ("add_to_cart (47)", 10),
     ("add_to_cart (48)", 11),
@@ -612,36 +689,83 @@ const PAGES: &[(&str, u64)] = &[
     // (`user-orders#settle` 8, was 7).
     ("place_order, taking no payments: its operations", 35),
     ("place_order, taking no payments: its commit", 7),
-    // Track `scheduled-orders`: 21 and 11 more, the checkout's stores'
-    // hours (3), and the open page of times read again: its time chosen
-    // (1), its stores' hours (6) and its layout's cart (1).
+    // Track `scheduled-orders`: 21 and 11 more without the render merge,
+    // the checkout's stores' hours (3), and the open page of times read
+    // again: its time chosen (1), its stores' hours (6) and its layout's
+    // cart (1); with it, 16 and 3 more (the merge's paragraph above).
     (
         "place_order, taking no payments: its queries read again",
-        32,
+        19,
+    ),
+    (
+        "place_order, taking no payments: user-carts#current called again",
+        1,
     ),
     ("/order", 6),
     // TRACK SEAM (reviews): `rate_order`'s transaction (`MayRate`'s read,
     // `#rate`'s read and its row, and its commit); the reader's open pages
     // read again after it, including scheduling's extra cart-hours read
-    // (3) and the times page with an empty cart (8): 42 + 11 = 53. The rate
+    // (3) and the times page with an empty cart (8): 42 + 11 = 53 without
+    // the render merge, 37 with it (the merge's paragraph above). The rate
     // page reads its store and the layout's cart separately.
     ("rate_order: its transaction", 8),
-    ("rate_order: its reader's open pages read again", 53),
+    ("rate_order: its reader's open pages read again", 37),
+    ("rate_order: user-carts#current called again", 1),
+    ("rate_order: user-orders#current called again", 1),
     ("/order/rate/47", 2),
 ];
 
-/// **The transactions so far, once none is still running**: the provider
-/// tells the host of a cancel as it answers it, on a connection of its own,
-/// so a `settle_payment` may still be counting when the command returns.
-fn quiet(s: &Server) -> Vec<u64> {
-    let mut last = s.data.statements_by_transaction();
+/// **The transactions after exactly `completed` payment outcomes finish**.
+/// `Payments::heard` records each only after its real settlement command
+/// returns. Equal counters for an interval do not prove that completion.
+fn after_payments(s: &Server, completed: usize) -> Vec<u64> {
+    let payments = s.payments.get().expect("payments");
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
     loop {
-        std::thread::sleep(std::time::Duration::from_millis(300));
-        let now = s.data.statements_by_transaction();
-        if now == last {
-            return now;
+        let done = payments.settled.lock().expect("settled").len();
+        assert!(
+            done <= completed,
+            "expected exactly {completed} completed outcomes, got {done}"
+        );
+        if done == completed {
+            return s.data.statements_by_transaction();
         }
-        last = now;
+        assert!(
+            std::time::Instant::now() < deadline,
+            "expected {completed} completed payment outcomes, got {done}; transactions: {:?}",
+            s.data.statements_by_transaction()
+        );
+        POLLING.with(|polling| {
+            if let Some(polled) = &*polling.borrow() {
+                polled();
+            }
+        });
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+}
+
+std::thread_local! {
+    /// What this thread's test does each time `after_payments` finds fewer
+    /// payment outcomes than it waits for, before it waits again.
+    static POLLING: std::cell::RefCell<Option<Box<dyn Fn()>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// **A test's: `polled` is called on this thread each time `after_payments`
+/// finds fewer outcomes than it waits for**, until the guard is dropped. The
+/// waiting is counted in the helper's own polls, which a slow machine
+/// stretches along with the work it waits for: no stretch of time is
+/// guessed.
+fn tell_on_poll(polled: impl Fn() + 'static) -> PollingTold {
+    POLLING.with(|polling| *polling.borrow_mut() = Some(Box::new(polled)));
+    PollingTold
+}
+
+struct PollingTold;
+
+impl Drop for PollingTold {
+    fn drop(&mut self) {
+        POLLING.with(|polling| *polling.borrow_mut() = None);
     }
 }
 
@@ -713,12 +837,12 @@ fn awaiting(more: bool) -> Vec<(String, u64)> {
             Some("place-2"),
         )
         .expect("answered");
-        let before = quiet(s).len();
+        let before = after_payments(s, 1).len();
         let canceled = s
             .command_answered("store.page.cancel_order", "a", &[], Some("cancel-1"))
             .expect("answered");
         assert!(canceled.committed, "{:?}", canceled.result);
-        let ran = quiet(s)[before..].to_vec();
+        let ran = after_payments(s, 2)[before..].to_vec();
         // Its own, and `settle_payment` on the provider's word of the
         // cancel, which the provider tells the host as it answers the
         // cancel (ADR-0332's step eight).
@@ -740,10 +864,10 @@ fn awaiting(more: bool) -> Vec<(String, u64)> {
             Some("place-3"),
         )
         .expect("answered");
-        let before = quiet(s).len();
+        let before = after_payments(s, 2).len();
         s.query_clock.0.advance(30 * 60 * 1000);
         assert_eq!(s.run_due().0, 1, "the sweep, run");
-        let ran = quiet(s)[before..].to_vec();
+        let ran = after_payments(s, 3)[before..].to_vec();
         // Its own, and `settle_payment` on the provider's word of the cancel
         // the sweep asks of it.
         let [expire, told] = ran[..] else {
@@ -764,7 +888,7 @@ fn awaiting(more: bool) -> Vec<(String, u64)> {
         // preparation is due, the window less the estimate's most (35
         // minutes, no address chosen) and five more.
         let window = ((s.now() + 3_600_000) / 900_000 + 2) * 900_000;
-        let before = quiet(s).len();
+        let before = after_payments(s, 3).len();
         let chosen = s
             .command_answered(
                 "store.page.choose_time",
@@ -782,7 +906,7 @@ fn awaiting(more: bool) -> Vec<(String, u64)> {
             Some("place-4"),
         )
         .expect("answered");
-        let ran = quiet(s)[before..].to_vec();
+        let ran = after_payments(s, 3)[before..].to_vec();
         let [choose, place] = ran[..] else {
             panic!("choose_time's transaction, then place_order's: {ran:?}")
         };
@@ -798,10 +922,10 @@ fn awaiting(more: bool) -> Vec<(String, u64)> {
             panic!("an order awaiting its payment")
         };
         assert_eq!(status, "awaiting-payment");
-        let before = quiet(s).len();
+        let before = after_payments(s, 3).len();
         let paid = super::store_payments::pay(&page, "4242424242424242");
         assert!(paid.contains("Paid."), "{paid}");
-        let ran = quiet(s)[before..].to_vec();
+        let ran = after_payments(s, 4)[before..].to_vec();
         let [settle] = ran[..] else {
             panic!("settle_payment's transaction: {ran:?}")
         };
@@ -813,9 +937,9 @@ fn awaiting(more: bool) -> Vec<(String, u64)> {
         s.query_clock
             .0
             .advance(u64::try_from(sends - s.now()).expect("ahead") + 1000);
-        let before = quiet(s).len();
+        let before = after_payments(s, 4).len();
         assert_eq!(s.run_due().0, 1, "the send, run");
-        let ran = quiet(s)[before..].to_vec();
+        let ran = after_payments(s, 4)[before..].to_vec();
         let [send] = ran[..] else {
             panic!("send_to_store's transaction: {ran:?}")
         };
@@ -864,7 +988,7 @@ const AWAITING: &[(&str, u64)] = &[
     ("expire_order, run thirty minutes on: its transaction", 26),
     (
         "settle_payment, on the provider's word of the sweep's cancel: its transaction",
-        12,
+        14,
     ),
     // Track `scheduled-orders`: an order for a time. Its time chosen, held
     // to the windows its cart's stores take an order at when they are told:
@@ -886,3 +1010,397 @@ const AWAITING: &[(&str, u64)] = &[
         9,
     ),
 ];
+
+/// How many polls of `after_payments` a held event must outlast: sixty,
+/// ten milliseconds apart, twice the 300 ms of equal counters that once
+/// stood for completion.
+const POLLS: usize = 60;
+
+/// What the counting thread tells the test, in the order it happens.
+enum Counting {
+    /// `after_payments` found the payment outcome missing, and waits again.
+    Polled,
+    /// It returned this count.
+    Counted(Vec<u64>),
+}
+
+/// A provider may delay its webhook after answering the cancel. Unchanged
+/// counters in that interval do not prove the provider's transaction finished.
+#[test]
+fn a_pending_real_payment_webhook_is_not_a_complete_statement_count() {
+    if std::env::var("PW_STORE_TEST_LAYER").as_deref() != Ok("postgres") {
+        eprintln!("skipped: the store is not served on PostgreSQL");
+        return;
+    }
+    super::store_payments::paying(|s, provider| {
+        s.command(
+            "store.page.add_to_cart",
+            "a",
+            &add_shown("espresso", 1),
+            false,
+        )
+        .expect("added");
+        let total = s.shown_total("a");
+        let placed = s
+            .command_answered("store.page.place_order", "a", &[total], Some("held-place"))
+            .expect("placed");
+        assert!(placed.committed, "{:?}", placed.result);
+        provider.hold();
+        let before = s.data.statements_by_transaction().len();
+        let canceled = s
+            .command_answered("store.page.cancel_order", "a", &[], Some("held-cancel"))
+            .expect("answered");
+        assert!(canceled.committed, "{:?}", canceled.result);
+
+        std::thread::scope(|scope| {
+            let (told, heard) = std::sync::mpsc::channel();
+            scope.spawn(move || {
+                let polls = told.clone();
+                let _polling = tell_on_poll(move || {
+                    let _ = polls.send(Counting::Polled);
+                });
+                let counted = after_payments(s, 1)[before..].to_vec();
+                let _ = told.send(Counting::Counted(counted));
+            });
+            // The held event keeps the count waiting: `POLLS` of its polls
+            // pass, or it returns. The wait is counted in the count's own
+            // polls, so a slow machine stretches it with the count; and a
+            // count that stops polling, to return on counters that are
+            // equal, is heard returning where it should have polled.
+            let (mut polled, mut early) = (0, None);
+            while polled < POLLS && early.is_none() {
+                match heard
+                    .recv_timeout(MUST_HAPPEN)
+                    .expect("the counting thread neither polled nor returned")
+                {
+                    Counting::Polled => polled += 1,
+                    Counting::Counted(counted) => early = Some(counted),
+                }
+            }
+            // Always release and drain before asserting: the real signed HTTP
+            // event and compiled settlement run even if counting returned early.
+            provider.release_reversed();
+            let returned_early = early.is_some();
+            let finished = early.unwrap_or_else(|| {
+                loop {
+                    let counting = heard
+                        .recv_timeout(MUST_HAPPEN)
+                        .expect("the count after actual settlement");
+                    if let Counting::Counted(counted) = counting {
+                        break counted;
+                    }
+                }
+            });
+            eprintln!("delayed webhook: returned_early={returned_early}; completed={finished:?}");
+            assert!(
+                !returned_early,
+                "counting returned before the provider released its event"
+            );
+            assert_eq!(finished, [25, 14], "the exact completed transactions");
+        });
+    });
+}
+
+/// The longest a test waits for something that must happen. Only a hang
+/// reaches it: what happens is read the moment it does.
+const MUST_HAPPEN: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// **What a write met at the layer's write guard**, in the order it met it.
+enum Met<T> {
+    /// It found the guard held, and waits for it: it has written nothing.
+    Waits,
+    /// It returned.
+    Returned(T),
+}
+
+/// **A write on a thread of its own, and whether the layer's write guard held
+/// it back** (ADR-0352). The guard says so itself (`Writes::tell_on_wait`),
+/// before the write waits for it; a write that skips the guard says nothing
+/// and returns. So the first thing heard is the verdict, at any machine's
+/// speed: a stretch of time could only say that a write had not returned
+/// *yet*, and a slow write outlasts any stretch.
+struct Watched<T> {
+    heard: std::sync::mpsc::Receiver<Met<T>>,
+    first: Option<Met<T>>,
+}
+
+impl<T: Send + 'static> Watched<T> {
+    fn spawn<'scope, 'env>(
+        scope: &'scope std::thread::Scope<'scope, 'env>,
+        write: impl FnOnce() -> T + Send + 'scope,
+    ) -> Watched<T> {
+        let (told, heard) = std::sync::mpsc::channel();
+        scope.spawn(move || {
+            let waiting = told.clone();
+            let _tells = crate::data::Writes::tell_on_wait(move || {
+                let _ = waiting.send(Met::Waits);
+            });
+            let _ = told.send(Met::Returned(write()));
+        });
+        Watched { heard, first: None }
+    }
+
+    fn next(&self, what: &str) -> Met<T> {
+        self.heard.recv_timeout(MUST_HAPPEN).expect(what)
+    }
+
+    /// **Whether the write found the guard held**, known as soon as it has
+    /// either waited for the guard or returned without.
+    fn waited(&mut self) -> bool {
+        let first = self.next("the write neither waited for the guard nor returned");
+        let waited = matches!(first, Met::Waits);
+        self.first = Some(first);
+        waited
+    }
+
+    /// **What the write returned**, once the guard it waits for is let go.
+    fn returned(mut self) -> T {
+        let mut met = match self.first.take() {
+            Some(met) => met,
+            None => self.next("the write neither waited for the guard nor returned"),
+        };
+        if matches!(met, Met::Waits) {
+            met = self.next("the write after the guard was let go");
+        }
+        match met {
+            Met::Returned(returned) => returned,
+            Met::Waits => panic!("the write waited for the guard twice"),
+        }
+    }
+}
+
+/// Separate the clock command and its actual Runs::ran cleanup only to
+/// control the production boundary that run_scheduled crosses in this order.
+#[test]
+fn sweep_cleanup_and_payment_commit_share_the_same_write_guard() {
+    if std::env::var("PW_STORE_TEST_LAYER").as_deref() != Ok("postgres") {
+        return;
+    }
+    super::store_payments::paying(|s, provider| {
+        s.command(
+            "store.page.add_to_cart",
+            "a",
+            &add_shown("espresso", 1),
+            false,
+        )
+        .expect("added");
+        let total = s.shown_total("a");
+        assert!(
+            s.command_answered(
+                "store.page.place_order",
+                "a",
+                &[total],
+                Some("overlap-place")
+            )
+            .expect("placed")
+            .committed
+        );
+        let runs = s.runs().all_runs().expect("the actual pending sweep");
+        let [run] = runs.as_slice() else {
+            panic!("one sweep: {runs:?}");
+        };
+        provider.hold();
+        s.query_clock.0.advance(30 * 60 * 1000);
+        let before = s.data.statements_by_transaction().len();
+        let behalf =
+            s.identity
+                .principals()
+                .on_behalf("clock", &format!("schedule-{}", run.id), &run.user);
+        let args: Vec<serde_json::Value> =
+            serde_json::from_str(&run.args).expect("the actual arguments");
+        let expired = s
+            .command_answer(
+                &run.command,
+                behalf.session(),
+                &args,
+                Some(&format!("schedule-{}", run.id)),
+            )
+            .expect("the actual clock command");
+        assert!(expired.committed, "{expired:?}");
+
+        let (at_commit, arrived) = std::sync::mpsc::channel();
+        let (resume, paused) = std::sync::mpsc::channel();
+        *s.before_commit.lock().expect("before commit") = Some(Box::new(move |_| {
+            at_commit
+                .send(())
+                .expect("the real settlement reached commit");
+            paused
+                .recv_timeout(std::time::Duration::from_secs(10))
+                .expect("release settlement");
+        }));
+        std::thread::scope(|scope| {
+            let provider_request = scope.spawn(|| provider.release_reversed());
+            arrived
+                .recv_timeout(std::time::Duration::from_secs(10))
+                .expect("the real signed webhook reached the commit barrier");
+            // The actual cleanup meets the guard the payment's transaction holds.
+            let mut cleanup = Watched::spawn(scope, || s.runs().ran(run.id));
+            let cleanup_waited = cleanup.waited();
+            // Release and drain every real operation before failure assertions.
+            resume.send(()).expect("release settlement");
+            cleanup.returned().expect("the sweep row cleaned up");
+            provider_request
+                .join()
+                .expect("the actual HTTP webhook completed");
+            let finished = s.data.statements_by_transaction()[before..].to_vec();
+            let completed = s
+                .payments
+                .get()
+                .expect("payments")
+                .settled
+                .lock()
+                .expect("settled")
+                .len();
+            eprintln!(
+                "forced overlap: cleanup_waited={cleanup_waited}; completed_markers={completed}; transactions={finished:?}"
+            );
+            assert!(
+                cleanup_waited,
+                "cleanup crossed the active serializable payment transaction"
+            );
+            assert_eq!(
+                completed, 1,
+                "the payment's actual command completed successfully"
+            );
+            assert_eq!(
+                finished,
+                [26, 14],
+                "the exact completed clock and payment transactions"
+            );
+            assert_eq!(
+                super::store_payments::status_of(s, "a"),
+                Some(("canceled".to_string(), None))
+            );
+            assert!(s.runs().all_runs().expect("runs").is_empty());
+        });
+    });
+}
+
+/// Each adapter's two scheduler writes must respect the same real command
+/// transaction lifetime. A moved run keeps its new identity and due time.
+///
+/// **The write is held at the guard, not timed.** While a command's staging
+/// holds the guard the write starts, and the test hears what it met first:
+/// the guard held, which the guard itself reports, or nothing and a return.
+/// No stretch of time decides it, so neither a slow machine nor a slow write
+/// lets a write that skips the guard pass.
+fn scheduled_transition_waits<T>(layer: &T, retry: bool)
+where
+    T: crate::data::DataLayer + crate::schedules::Runs,
+{
+    let scheduled = |due| crate::schedules::Scheduled {
+        key: crate::schedules::key("test.expire", "[]"),
+        command: "test.expire".to_string(),
+        args: "[]".to_string(),
+        user: "private-test-reader".to_string(),
+        due_ms: Some(due),
+    };
+    let mut seed = layer.begin("private-test-session");
+    seed.commit(&[], &[], None, &[scheduled(10)])
+        .expect("the original run committed");
+    drop(seed);
+    let original = layer.all_runs().expect("the original run");
+    let [original] = original.as_slice() else {
+        panic!("one original run");
+    };
+    let old_id = original.id;
+    std::thread::scope(|scope| {
+        // This actual serializable transaction owns the adapter's guard.
+        let mut staged = layer.begin("private-test-session");
+        let mut write = Watched::spawn(scope, || {
+            if retry {
+                layer.retry(old_id, 1, 30, Some("private refusal control"))
+            } else {
+                layer.ran(old_id)
+            }
+        });
+        let waited = write.waited();
+        // Waiting at the guard, the write has changed nothing yet.
+        let while_waiting = layer.all_runs().expect("the runs while the write waits");
+        let committed = staged.commit(&[], &[], None, &[scheduled(20)]);
+        // Release every guard and drain before asserting, also on a refusal.
+        drop(staged);
+        let finished = write.returned();
+        committed.expect("the moved run committed");
+        finished.expect("the real scheduler write completed");
+        assert!(
+            waited,
+            "scheduler transition retry={retry} crossed an active command transaction"
+        );
+        assert_eq!(
+            while_waiting.as_slice(),
+            std::slice::from_ref(original),
+            "a write waiting at the guard has changed nothing"
+        );
+    });
+    let moved = layer.all_runs().expect("the moved run");
+    let [moved] = moved.as_slice() else {
+        panic!("one moved run");
+    };
+    assert_ne!(moved.id, old_id, "a reschedule owns a new identity");
+    assert_eq!(
+        moved.due_ms, 20,
+        "old cleanup/retry cannot change the new scheduling"
+    );
+    assert_eq!(moved.attempts, 0, "the moved run is a fresh attempt");
+    assert_eq!(
+        moved.failed, None,
+        "the moved run is not the previous refusal"
+    );
+}
+
+fn store_scheduled_transition(retry: bool) {
+    let Some(url) = database() else { return };
+    let layer = crate::store_pg::StorePg::for_test(&url).expect("private store schema");
+    scheduled_transition_waits(&layer, retry);
+}
+
+fn feed_scheduled_transition(retry: bool) {
+    let Some(url) = database() else { return };
+    struct Schema {
+        url: String,
+        name: String,
+    }
+    impl Drop for Schema {
+        fn drop(&mut self) {
+            if let Ok(mut client) = postgres::Client::connect(&self.url, postgres::NoTls) {
+                let _ = client.batch_execute(&format!(
+                    "DROP SCHEMA IF EXISTS {} CASCADE",
+                    crate::feed_pg::ident(&self.name)
+                ));
+            }
+        }
+    }
+    let schema = Schema {
+        url: url.clone(),
+        name: format!(
+            "pw_bounded_scheduler_{}_{}",
+            std::process::id(),
+            if retry { "retry" } else { "ran" }
+        ),
+    };
+    // layer drops before schema, so no live transaction is removed.
+    let layer =
+        crate::feed_pg::FeedPg::open(&url, Some(&schema.name)).expect("private feed schema");
+    scheduled_transition_waits(&layer, retry);
+}
+
+#[test]
+fn scheduled_state_writes_store_ran_waits_for_a_command() {
+    store_scheduled_transition(false);
+}
+
+#[test]
+fn scheduled_state_writes_store_retry_waits_for_a_command() {
+    store_scheduled_transition(true);
+}
+
+#[test]
+fn scheduled_state_writes_feed_ran_waits_for_a_command() {
+    feed_scheduled_transition(false);
+}
+
+#[test]
+fn scheduled_state_writes_feed_retry_waits_for_a_command() {
+    feed_scheduled_transition(true);
+}

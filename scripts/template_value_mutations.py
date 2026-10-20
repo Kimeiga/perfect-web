@@ -28,8 +28,8 @@ MUTANTS = [
     (
         "`pw build` writes a blocked part",
         BUILD,
-        "    if !blocked.is_empty() {",
-        "    if false && !blocked.is_empty() {",
+        "        for blocked in t.blocked() {",
+        "        for blocked in t.blocked().into_iter().take(0) {",
     ),
     (
         "a computed text hole lowers with an empty path",

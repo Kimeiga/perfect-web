@@ -1,34 +1,36 @@
 ADR-0189 - a <link> is written where HTML allows it
 
 produced by: just e14-links
-commit: 92fdd6e34743e33a80914939976125a9eb307842
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38559878637 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 2b8a8b81bb410adbc3174edc6039dff29125c4c4
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39478386992 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the rule (compiler/pw-core/tests/links.rs)
 
-test a_link_the_head_holds_is_refused_in_markup ... ok
 test a_link_html_allows_in_the_body_is_written_where_it_is ... ok
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test a_link_the_head_holds_is_refused_in_markup ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 == the corpus at C12 (corpus-check, generality.rs, checking_source.rs)
 
-accepted: 36 files
-accepted: 36/36 charter §16 categories covered
-rejected: 69 files
-rejected: 69/69 charter §16 categories covered
+accepted: 42 files
+accepted: 42/42 charter §16 categories covered
+rejected: 87 files
+rejected: 87/87 charter §16 categories covered
 corpus-check: OK
 test a_caught_file_conveys_every_fact_its_expect_error_lines_declare ... ok
 test every_rejected_fixture_emits_only_its_own_defect ... ok
+test every_rejected_fixtures_rule_is_a_code_its_check_reports ... ok
+test every_diagnostic_carries_what_charter_16_3_requires has been running for over 60 seconds
 test every_diagnostic_carries_what_charter_16_3_requires ... ok
-test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 81.22s
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 101.40s
 test generality_is_reported_separately_from_conformance ... ok
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 82.17s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 98.19s
 
 == every program the repository checks
 
-pw check: 83 file(s), no diagnostics
-pw check: 63 file(s), no diagnostics
+accepted corpus: 42 programs, 38 with no error, 4 refused exactly as listed (examples/accepted/build-refusals.json: 4 entries)
+pw check: 68 file(s), no diagnostics
 pw check: 27 file(s), no diagnostics
 pw check: 43 file(s), no diagnostics
 

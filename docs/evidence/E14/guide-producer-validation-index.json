@@ -1,0 +1,1118 @@
+{
+  "tested_source_commit": "0ff69eaaf309d56d59030bbfdb35479fcabbc6b4",
+  "immutable_check_build_commit": "e82b0d6cd17270da78e3591d9bee0e5df76439f9",
+  "runtime_source_hashes": {
+    "scripts/guide_mutations.py": "a2fe751498260a4ce443b4395174bbad25ead5c848fa2456e1f8d02026b4ea7d",
+    "scripts/guide_python.py": "19e4294b103ab0c7b2a34224b0d4f08687ff2bc2b1e8c0e4b021322f91609598",
+    "scripts/cargo_test_results.py": "acb698a7921b762ea47b976780f9bc89c41bcf96e43a6e44e12ed7cee986bd33",
+    "scripts/unittest_producer.py": "902dfef3cf62b16eaa264f0cba52a1bc30bc25d9c7e6bf0718ae6a2beea8b662",
+    "scripts/unittest_protocol.py": "91e941dc2157d53292aa5a709c4c3f0d10210f61a2db23d9edcaeb1df691ee55",
+    "scripts/guide_producer_mutations.py": "3aa867bb8bce5d6ace9cd5805f722b2c3a6a395efbf50d0e7b8477b74c091a9b",
+    "scripts/tests/test_guide_producer_results.py": "aca240344c0ebcc58e97ccff73424e13b67b0d495748da7f65e1dbff7426e018"
+  },
+  "frozen_v2_manifest_sha256": "53f43939c583358a50427814ee110dc44df52b11455aa499dc33c00e1c2c1810",
+  "source_state_at_whole74_and_ci": "saved uncommitted v2; byte-equal code committed afterward",
+  "whole_guide74": {
+    "source_head": "e82b0d6cd17270da78e3591d9bee0e5df76439f9",
+    "source_state": "frozen uncommitted v2 inputs; HEAD is base identity only",
+    "manifest_sha256": "53f43939c583358a50427814ee110dc44df52b11455aa499dc33c00e1c2c1810",
+    "guide_source_sha256": "a2fe751498260a4ce443b4395174bbad25ead5c848fa2456e1f8d02026b4ea7d",
+    "raw_sha256": "52e4d664e7aa48297ae207e67c21059047f6c633a768faae9eff5989311a2e68",
+    "whole": 74,
+    "killed": 74,
+    "refused": 0,
+    "survived": 0,
+    "memory_stops": 0,
+    "restored_paths": 2723,
+    "probe_sha256": "230eab1aea7b2dadc5b9477fc046c73d5a6d72215831be0e7cf70415e6c1cb6f",
+    "listeners10641to10853": 0,
+    "categories_overlap": true,
+    "categories": {
+      "Rust test failure": 59,
+      "Python body assertion": 10,
+      "Python body error": 0,
+      "KILLED by the spec": 5,
+      "KILLED by the checker": 3
+    },
+    "exclusive_categories": {
+      "Rust only": 56,
+      "Python assertion only": 7,
+      "Rust and Python assertion": 3,
+      "browser spec": 5,
+      "named checker": 3
+    },
+    "outcomes": [
+      "an example no longer type-checks: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust test failure)",
+      "an example is not as `pw fmt` writes it: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust test failure)",
+      "an example checks clean and `pw build` refuses it: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust test failure)",
+      "a refused example is refused no more: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust test failure)",
+      "a refused example is refused by another code: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust test failure)",
+      "output a page shows is not what `pw check` prints: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust test failure)",
+      "a block says nothing of what it is: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust test failure)",
+      "a block is in a language the guide is not written in: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust test failure)",
+      "a fence is indented: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust test failure)",
+      "a fence is never closed: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust test failure)",
+      "a page's files no longer check together: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust test failure)",
+      "the tutorial and the app differ by a byte: KILLED by a_pages_program_is_the_directory_it_names (1 of 22 tests fail; Rust test failure)",
+      "the tutorial builds a file the app does not have: KILLED by a_pages_program_is_the_directory_it_names (2 of 22 tests fail; Rust test failure)",
+      "the closed title gap claims check still accepts it: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust test failure)",
+      "a build gap is closed: the build accepts it: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust test failure)",
+      "a check gap is closed: the check refuses it: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust test failure)",
+      "the closed two-signal gap claims the wrong refusal: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust test failure)",
+      "the reference has no row for a code: KILLED by test_the_committed_page_is_what_the_registry_writes, the_diagnostic_reference_lists_every_registered_code (2 of 22 tests fail; Rust test failure, Python body assertion)",
+      "the reference gives a code another invariant: KILLED by test_the_committed_page_is_what_the_registry_writes, the_diagnostic_reference_lists_every_registered_code (2 of 22 tests fail; Rust test failure, Python body assertion)",
+      "the reference has a row for a code the compiler lacks: KILLED by test_the_committed_page_is_what_the_registry_writes, the_diagnostic_reference_lists_every_registered_code (2 of 22 tests fail; Rust test failure, Python body assertion)",
+      "a clean example need not check clean: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust test failure)",
+      "an example need not be as `pw fmt` writes it: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust test failure)",
+      "an example that parses is held to the format only where it is clean: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust test failure)",
+      "a clean example need not build: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust test failure)",
+      "a build gap may build: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust test failure)",
+      "a gap's build output need not be what is shown: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust test failure)",
+      "a refused example need not be refused: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust test failure)",
+      "a refusal's codes are compared as a subset of what is reported: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust test failure)",
+      "a refusal's codes are compared as a superset of what is reported: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust test failure)",
+      "output a page shows of a refusal need not be what is printed: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust test failure)",
+      "output a page shows keeps the closing count `pw check` prints: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust test failure)",
+      "a fence of another character closes a block: KILLED by an_unclosed_or_indented_fence_is_refused (1 of 22 tests fail; Rust test failure)",
+      "a closing fence may carry text: KILLED by an_unclosed_or_indented_fence_is_refused (1 of 22 tests fail; Rust test failure)",
+      "a shorter fence closes a block: KILLED by a_page_with_no_example_or_a_block_unseen_is_reported (1 of 22 tests fail; Rust test failure)",
+      "an indented fence is accepted: KILLED by an_unclosed_or_indented_fence_is_refused (1 of 22 tests fail; Rust test failure)",
+      "a fence never closed is accepted: KILLED by an_unclosed_or_indented_fence_is_refused (1 of 22 tests fail; Rust test failure)",
+      "two backticks are a fence: KILLED by a_fence_is_read_as_commonmark_reads_it (1 of 22 tests fail; Rust test failure)",
+      "an attribute a block does not take is skipped: KILLED by an_info_string_says_what_a_block_is (1 of 22 tests fail; Rust test failure)",
+      "an attribute may be given twice: KILLED by an_info_string_says_what_a_block_is (1 of 22 tests fail; Rust test failure)",
+      "a file may be outside the page's tree: KILLED by an_info_string_says_what_a_block_is (1 of 22 tests fail; Rust test failure)",
+      "a block may be a gap and a refusal: KILLED by an_info_string_says_what_a_block_is (1 of 22 tests fail; Rust test failure)",
+      "another language's block takes attributes: KILLED by an_info_string_says_what_a_block_is (1 of 22 tests fail; Rust test failure)",
+      "a language the guide is not written in passes: KILLED by an_info_string_says_what_a_block_is (1 of 22 tests fail; Rust test failure)",
+      "a page's pieces are joined with no blank line: KILLED by a_pages_file_blocks_are_its_program_in_order (2 of 22 tests fail; Rust test failure)",
+      "output belongs to any block before it: KILLED by shown_output_belongs_to_the_refused_example_before_it (1 of 22 tests fail; Rust test failure)",
+      "a build's output belongs to any block before it: KILLED by a_gaps_build_output_belongs_to_the_gap_before_it (1 of 22 tests fail; Rust test failure)",
+      "a build gap need not show what `pw build` prints: KILLED by a_gaps_build_output_belongs_to_the_gap_before_it (1 of 22 tests fail; Rust test failure)",
+      "a page with no example is accepted: KILLED by a_page_with_no_example_or_a_block_unseen_is_reported (1 of 22 tests fail; Rust test failure)",
+      "a Pleris block the reader of pages did not see goes unnoticed: KILLED by a_page_with_no_example_or_a_block_unseen_is_reported (1 of 22 tests fail; Rust test failure)",
+      "a page's pieces are not counted: KILLED by a_page_with_no_example_or_a_block_unseen_is_reported, every_example_in_the_guide_compiles_as_it_says (2 of 22 tests fail; Rust test failure)",
+      "the index is held to show Pleris: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust test failure)",
+      "a page's program is not compared with the directory it names: KILLED by a_page_is_held_to_the_directory_it_names (1 of 22 tests fail; Rust test failure)",
+      "a page that names a directory and builds nothing in it is accepted: KILLED by a_page_is_held_to_the_directory_it_names (1 of 22 tests fail; Rust test failure)",
+      "the directory a page names is read with its spaces: KILLED by a_page_is_held_to_the_directory_it_names (2 of 22 tests fail; Rust test failure)",
+      "a file the page lacks is not noticed: KILLED by a_program_differs_from_a_directory_by_a_file_or_a_byte (2 of 22 tests fail; Rust test failure)",
+      "trailing space is no difference: KILLED by a_program_differs_from_a_directory_by_a_file_or_a_byte (2 of 22 tests fail; Rust test failure)",
+      "a row's invariant is not compared with the registry's: KILLED by the_reference_is_held_to_the_registry (1 of 22 tests fail; Rust test failure)",
+      "a code with no row is not reported: KILLED by the_reference_is_held_to_the_registry (1 of 22 tests fail; Rust test failure)",
+      "a row for a code the compiler lacks is not reported: KILLED by the_reference_is_held_to_the_registry (1 of 22 tests fail; Rust test failure)",
+      "an ADR a comment cites twice is listed twice: KILLED by test_each_entry_with_its_invariant_and_the_adrs_its_comment_cites (1 of 22 tests fail; Python body assertion)",
+      "a comment is taken by the entry after the next: KILLED by test_each_entry_with_its_invariant_and_the_adrs_its_comment_cites (2 of 22 tests fail; Python body assertion)",
+      "a line that is no entry is skipped: KILLED by test_a_line_that_is_no_entry_is_refused_not_skipped (1 of 22 tests fail; Python body assertion)",
+      "a pipe in a cell ends it: KILLED by test_a_pipe_in_a_cell_is_escaped (2 of 22 tests fail; Python body assertion)",
+      "a retired code's reason loses its continuation: KILLED by test_a_retired_code_with_its_reason_continued_across_lines (2 of 22 tests fail; Python body assertion)",
+      "the retired codes are left out of the page: KILLED by test_the_committed_page_is_what_the_registry_writes (1 of 22 tests fail; Python body assertion)",
+      "the last code of each owner is left out of the page: KILLED by test_the_committed_page_is_what_the_registry_writes (2 of 22 tests fail; Python body assertion)",
+      "a signed entry does not clear the draft: KILLED by the spec (1 of 2 tests fail)",
+      "Remove is offered on another reader's entry and not on one's own: KILLED by the spec (1 of 2 tests fail)",
+      "a reader signed out is shown the signed-in half: KILLED by the spec (1 of 1 tests fail)",
+      "the entry is shown last, not first, before the server answers: KILLED by the spec (1 of 3 tests fail)",
+      "the entry can be removed before the server has it: KILLED by the spec (1 of 3 tests fail)",
+      "the composer is shown to a reader signed out: KILLED by the checker (PW5048)",
+      "Remove is shown to a reader signed out: KILLED by the checker (PW5048)",
+      "the entries are not told of a signed entry: KILLED by the checker (PW5107)"
+    ]
+  },
+  "instrument_distinct_controls": 8,
+  "instrument_runs": [
+    {
+      "state": "frozen uncommitted v1",
+      "killed": 8,
+      "refused": 0,
+      "survived": 0,
+      "raw_sha256": "d72587b6d9a93cada80e0cc45fea51e1f9ff83c3e68f96b1a38af48f1703e935"
+    },
+    {
+      "state": "clean tested source commit",
+      "killed": 8,
+      "refused": 0,
+      "survived": 0,
+      "recipe_report_sha256": "fb2b1c349a11fcf70b41bc7dd358c1066b079e448651fc9e5ad12965f26ca05d",
+      "recipe_outer_raw_sha256": "89a23d26f1f4984c17b9f90da66840fa0d4156d799f9b3d0670205c2c4115216",
+      "cost": [
+        "User time (seconds): 61.63",
+        "System time (seconds): 4.20",
+        "Percent of CPU this job got: 76%",
+        "Elapsed (wall clock) time (h:mm:ss or m:ss): 1:26.03",
+        "Maximum resident set size (kbytes): 28496",
+        "Exit status: 0"
+      ]
+    }
+  ],
+  "ci": {
+    "raw_sha256": "0651f78a748af36d0aa8bb04af97a6dbff12a6d194b0a33738353f120f7e744d",
+    "rust_summary_rows": 344,
+    "rust_reported_passes": 2975,
+    "rust_reported_failures": 0,
+    "rust_reported_ignored": 25,
+    "program_mutants": 248,
+    "exact_named_program_refusals": 11,
+    "program_failures": 0,
+    "anchors": 3090,
+    "anchor_scripts": 269,
+    "cost": [
+      "User time (seconds): 2263.93",
+      "System time (seconds): 109.88",
+      "Percent of CPU this job got: 385%",
+      "Elapsed (wall clock) time (h:mm:ss or m:ss): 10:15.87",
+      "Maximum resident set size (kbytes): 3372480",
+      "Exit status: 0"
+    ],
+    "python_run": 263,
+    "python_passed": 262,
+    "python_failed": 0,
+    "python_skipped": 1,
+    "python_skip_preexisting": true,
+    "rust_groups": 344
+  },
+  "native_unit_after_sha256": "5f9a4fa0a2fd6268bfb9dcbe0d14d9352601d04da82ee4c5d8def47799d01160",
+  "native_unit_before_sha256": "3b6cbe318561ca748b5f2b609a279b7a55485527bb80510a8188e90075eda56e",
+  "original_untracked_probe_sha256": "230eab1aea7b2dadc5b9477fc046c73d5a6d72215831be0e7cf70415e6c1cb6f",
+  "deployment_variables_unset": true,
+  "remaining_other_cleanup_scripts": 23,
+  "root_justfile_import": "integrator-owned; standalone recipe command is recorded truthfully",
+  "scope": "local guide producer validity; no universal process cancellation, framework, browser propagation, train landing or larger-train latency claim",
+  "focused_python": {
+    "run": 40,
+    "passed": 40,
+    "failed": 0,
+    "skipped": 0
+  },
+  "tested_source_files": {
+    "docs/DECISIONS/ADR-XXXX-guide-producer-validity.md": "cc28679ca6c131366a7aa3be874e4b339476d6653338df6122cff00ea8654a0e",
+    "just/guide-producer.just": "3c7b303c814225652fc118ac6961a066785063a6d18599ed8e54fb4f0bc96c1e",
+    "scripts/cargo_test_results.py": "acb698a7921b762ea47b976780f9bc89c41bcf96e43a6e44e12ed7cee986bd33",
+    "scripts/guide_mutations.py": "a2fe751498260a4ce443b4395174bbad25ead5c848fa2456e1f8d02026b4ea7d",
+    "scripts/guide_producer_mutations.py": "3aa867bb8bce5d6ace9cd5805f722b2c3a6a395efbf50d0e7b8477b74c091a9b",
+    "scripts/guide_python.py": "19e4294b103ab0c7b2a34224b0d4f08687ff2bc2b1e8c0e4b021322f91609598",
+    "scripts/tests/test_guide_producer_results.py": "aca240344c0ebcc58e97ccff73424e13b67b0d495748da7f65e1dbff7426e018",
+    "scripts/unittest_producer.py": "902dfef3cf62b16eaa264f0cba52a1bc30bc25d9c7e6bf0718ae6a2beea8b662",
+    "scripts/unittest_protocol.py": "91e941dc2157d53292aa5a709c4c3f0d10210f61a2db23d9edcaeb1df691ee55"
+  },
+  "guide_inventory_and_selections_unchanged_by_ast": true,
+  "commands": {
+    "cargo": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "pw-cli",
+      "--test",
+      "guide"
+    ],
+    "native_discovery_original": [
+      "python3",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "scripts/tests",
+      "-p",
+      "test_guide_diagnostics.py"
+    ],
+    "python_selector": "test_guide_diagnostics",
+    "python_frozen_count": 7,
+    "app_build": [
+      "bash",
+      "spikes/own-renderer/guestbook.sh"
+    ],
+    "browser_selection": [
+      "pnpm",
+      "exec",
+      "playwright",
+      "test",
+      "e2e/guestbook.spec.mjs",
+      "--project=chromium",
+      "--retries=1",
+      "--reporter=line"
+    ],
+    "browser_command_authority": "scripts/run_suite.sh",
+    "actual_recipe": "just --justfile just/guide-producer.just --working-directory . e14-guide-producer"
+  },
+  "control_inventory": {
+    "guide74": [
+      {
+        "name": "an example no longer type-checks",
+        "held": "guide",
+        "source": "docs/guide/tour.md",
+        "anchor_sha256": "1db0414f8f49d081f32333cca521cdd6fe7c5c364dbe2881d620793bc5101650",
+        "replacement_sha256": "1660728303fd2d7d4a3fe6918256628b2db0e30a1d30cd2a1fc4b9bb9d26fd1d",
+        "must": [
+          "every_example_in_the_guide_compiles_as_it_says"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "an example is not as `pw fmt` writes it",
+        "held": "guide",
+        "source": "docs/guide/tour.md",
+        "anchor_sha256": "fff6dfc25fbbf2a464440b6476942d5f2b7fa97bff77b913992d12490e69d1e3",
+        "replacement_sha256": "cbf1ee75f439c753b14379ffc0035c008c22431bbd981ebdf91e6116491f6fdc",
+        "must": [
+          "every_example_in_the_guide_compiles_as_it_says"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "an example checks clean and `pw build` refuses it",
+        "held": "guide",
+        "source": "docs/guide/tour-pages.md",
+        "anchor_sha256": "33e74819fe89c125dd15131cddf0f83b8418a7eb929ddae2b9dd68aa129c0a91",
+        "replacement_sha256": "85c83cd7df0c378c13dc3df3df9c2a975ab3d43a692c7649b2d4805ed00bcaac",
+        "must": [
+          "every_example_in_the_guide_compiles_as_it_says"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a refused example is refused no more",
+        "held": "guide",
+        "source": "docs/guide/tour.md",
+        "anchor_sha256": "bee465be452507a3b0511e3df3c70d8ff67497543fcec8bb96eb2203fee1fc7b",
+        "replacement_sha256": "5a0527655ca5ea2e91013e4389caa97fc78dbae551172f7fa6d7b50d490fcd09",
+        "must": [
+          "every_example_in_the_guide_compiles_as_it_says"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a refused example is refused by another code",
+        "held": "guide",
+        "source": "docs/guide/tour.md",
+        "anchor_sha256": "8f4620df26c300e38e9f97c2be8deb59188ef4bc892782ef4e3e5a7ef5bd1aa8",
+        "replacement_sha256": "d290f2f6afabb19d098d2fca4eec3d86724896c959be9ea57e077b06e9e1a781",
+        "must": [
+          "every_example_in_the_guide_compiles_as_it_says"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "output a page shows is not what `pw check` prints",
+        "held": "guide",
+        "source": "docs/guide/errors.md",
+        "anchor_sha256": "58cd7067f554b22c05a3a83c40fa3f9cd95b30bd3398c4f05908aad9f84c7cec",
+        "replacement_sha256": "2a5872676a4c7414ac5fa0ff6e5f27685f0515f660bfe5297477f498e76ecb9c",
+        "must": [
+          "every_example_in_the_guide_compiles_as_it_says"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a block says nothing of what it is",
+        "held": "guide",
+        "source": "docs/guide/errors.md",
+        "anchor_sha256": "5c456153bc7b5cc445a5108061ce5e2a4520f9a9c104738933e94cac5d5f1de4",
+        "replacement_sha256": "47c06c561d5c327343685268a46b3391f3998eee890d2be51f0d21cc4a53ae6d",
+        "must": [
+          "every_example_in_the_guide_compiles_as_it_says"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a block is in a language the guide is not written in",
+        "held": "guide",
+        "source": "docs/guide/tour.md",
+        "anchor_sha256": "780103e7bb69d08c635225772127d0fcc18ab5fa8db6c103419a54ec91e4d648",
+        "replacement_sha256": "dd5f6776db4129ae03a8a873967c1469a3193dc319e94b6496d8375a5111be41",
+        "must": [
+          "every_example_in_the_guide_compiles_as_it_says"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a fence is indented",
+        "held": "guide",
+        "source": "docs/guide/tour.md",
+        "anchor_sha256": "8f4620df26c300e38e9f97c2be8deb59188ef4bc892782ef4e3e5a7ef5bd1aa8",
+        "replacement_sha256": "9a7bcb98488d833d284da9b0bf1c6a2fe476e2a4ad12f214a4c488e5038c87ac",
+        "must": [
+          "every_example_in_the_guide_compiles_as_it_says"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a fence is never closed",
+        "held": "guide",
+        "source": "docs/guide/tour.md",
+        "anchor_sha256": "505c1c8213657a2bf32fc246341520adb3bb6b81671456a0fd67f4ecef1356da",
+        "replacement_sha256": "cf6e9b77f0ac42016c2238e47e391ccfd0c97e71709f45c011dd9927efcf524e",
+        "must": [
+          "every_example_in_the_guide_compiles_as_it_says"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a page's files no longer check together",
+        "held": "guide",
+        "source": "docs/guide/tour.md",
+        "anchor_sha256": "60694481f04576ba01ce49849ea7e2f109e2b8717784b67d107f032a05e30a5a",
+        "replacement_sha256": "7326ebfbd07168b69997a0bd3fe3c806b58a80a390d5bbc2103df7413fbc9b30",
+        "must": [
+          "every_example_in_the_guide_compiles_as_it_says"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "the tutorial and the app differ by a byte",
+        "held": "guide",
+        "source": "examples/guestbook/pages.pw",
+        "anchor_sha256": "e83e68e75281ca09d92b1721c299f7008479ec3c3e822c401379c8051f32203c",
+        "replacement_sha256": "05feb3bcfebdd4e30a7cc020cb4ba1f54ed2177ff27799c867fb87185bc6cc2f",
+        "must": [
+          "a_pages_program_is_the_directory_it_names"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "the tutorial builds a file the app does not have",
+        "held": "guide",
+        "source": "docs/guide/tutorial.md",
+        "anchor_sha256": "2300b42181236c25e99c08e64a25eb9d40e8fa317b5ffcfffae8e6fa8e587832",
+        "replacement_sha256": "d7a2977c1db4101255d13c217f8983f4313401261c40eb16a0aa3dbddd64cd42",
+        "must": [
+          "a_pages_program_is_the_directory_it_names"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "the closed title gap claims check still accepts it",
+        "held": "guide",
+        "source": "docs/guide/tour-pages.md",
+        "anchor_sha256": "711595720ec4fe6797d5e065e3ba174851060501c6bdfeb5224a3acbdb44c235",
+        "replacement_sha256": "56f17f1f5b92bfd634bb431f06c42fe0d28ba3a547b26338b414b60ab8be9399",
+        "must": [
+          "every_example_in_the_guide_compiles_as_it_says"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a build gap is closed: the build accepts it",
+        "held": "guide",
+        "source": "docs/guide/tour-pages.md",
+        "anchor_sha256": "6be4dc3bacb32c5cdbd4216f14e4c6bcc69e0805d2ba628d01c47af733bec5e0",
+        "replacement_sha256": "11de8d65b0b39b86f0a0d551ef9a7f33b90d8901cb578a9ba54f5846c1affd8c",
+        "must": [
+          "every_example_in_the_guide_compiles_as_it_says"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a check gap is closed: the check refuses it",
+        "held": "guide",
+        "source": "docs/guide/tour-pages.md",
+        "anchor_sha256": "f832c78e5ac990006e854459ffcb3642aa925823aa3a941c8324d024509f7dac",
+        "replacement_sha256": "b8f81f2d96ac6f737fbba91d5764d443a21a268f0daf3e9212c9ae131703d3a7",
+        "must": [
+          "every_example_in_the_guide_compiles_as_it_says"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "the closed two-signal gap claims the wrong refusal",
+        "held": "guide",
+        "source": "docs/guide/tour-pages.md",
+        "anchor_sha256": "79f1783bd07ddde23241614545dd598b94a5912398d2e246637317430f18ac59",
+        "replacement_sha256": "99304cc9a309ff67d1d29820494b5215fd8b532518b9a72b51c1b9ca44da993a",
+        "must": [
+          "every_example_in_the_guide_compiles_as_it_says"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "the reference has no row for a code",
+        "held": "guide",
+        "source": "docs/guide/diagnostics.md",
+        "anchor_sha256": "b3e5dc048b607752a233650f4683215dd96b70869c6b807b6cd474c4661e0bba",
+        "replacement_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "must": [
+          "test_the_committed_page_is_what_the_registry_writes",
+          "the_diagnostic_reference_lists_every_registered_code"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "the reference gives a code another invariant",
+        "held": "guide",
+        "source": "docs/guide/diagnostics.md",
+        "anchor_sha256": "b3e5dc048b607752a233650f4683215dd96b70869c6b807b6cd474c4661e0bba",
+        "replacement_sha256": "a9af61b32239b93db0ec4c789dea74dffe21d42e46fe3b04d764915a3ad97784",
+        "must": [
+          "test_the_committed_page_is_what_the_registry_writes",
+          "the_diagnostic_reference_lists_every_registered_code"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "the reference has a row for a code the compiler lacks",
+        "held": "guide",
+        "source": "docs/guide/diagnostics.md",
+        "anchor_sha256": "b3e5dc048b607752a233650f4683215dd96b70869c6b807b6cd474c4661e0bba",
+        "replacement_sha256": "65de33ec4b9ce3bdd05826e6b97066f6798cc47666d6030298f008be0629d561",
+        "must": [
+          "test_the_committed_page_is_what_the_registry_writes",
+          "the_diagnostic_reference_lists_every_registered_code"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a clean example need not check clean",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "90eac490d991add64caa9a4b47ab900ab4a5e54d35f5a70dbe281ab8dae064aa",
+        "replacement_sha256": "f01e6045c5c160ab2be90eef5f3a670e11815ff02d26bd9411281723ac9960cd",
+        "must": [
+          "a_wrong_example_is_reported_and_a_right_one_is_not"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "an example need not be as `pw fmt` writes it",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "c217b1e17a5858d573552bf4af8fc37f263da0e9a1ac1db0d5d19c39c3ce0893",
+        "replacement_sha256": "f294f4a7d22fff826bf2bc01f91232de92985264b1e1067b5a3a04971dd192a9",
+        "must": [
+          "a_wrong_example_is_reported_and_a_right_one_is_not"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "an example that parses is held to the format only where it is clean",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "c217b1e17a5858d573552bf4af8fc37f263da0e9a1ac1db0d5d19c39c3ce0893",
+        "replacement_sha256": "6562fe998b12abdafb5d7f33e66ae356a876cfaa8c1500223fac8853877089df",
+        "must": [
+          "a_wrong_example_is_reported_and_a_right_one_is_not"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a clean example need not build",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "1107492ca5f78ff6d3ba2fc2a19b9fd5649d2a8919e51bb1cb04b48610013cd1",
+        "replacement_sha256": "353d0484e1e2b2894f953713d1ef37b805e429bd0eeb308beda8294c3d9d17c2",
+        "must": [
+          "a_wrong_example_is_reported_and_a_right_one_is_not"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a build gap may build",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "309e860aa637d8426a3061fc6180198149406b3d807c7d96125388fbce543442",
+        "replacement_sha256": "66ed4f0923ffb38735c6571039f8ae0abb7989e39e1dc94e9a0383bcd52ce2cb",
+        "must": [
+          "a_wrong_example_is_reported_and_a_right_one_is_not"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a gap's build output need not be what is shown",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "4b6636914aee96d1bb8247959ce6f293f84c506110f4781d493eae2c486cecb2",
+        "replacement_sha256": "d7153812ea4cd269ddb31277d0ecb9e0ac0a0abfc816ed9bb545a8779237459f",
+        "must": [
+          "a_wrong_example_is_reported_and_a_right_one_is_not"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a refused example need not be refused",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "24b852b20e878b05ed995c305294e3f6f7116ac779b4e1f3cc6123a97040ade5",
+        "replacement_sha256": "14bbd07e0b4838cde175b96a8befa0dd2a319fb0aa5a92644ad14ad15a4908e3",
+        "must": [
+          "a_wrong_example_is_reported_and_a_right_one_is_not"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a refusal's codes are compared as a subset of what is reported",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "dc72b21f944ad45a456f5708c60ff8d1389bed946199ce56396408352ebe86e1",
+        "replacement_sha256": "cbc11d6697190df074ef159633ba3f108f436b57f6b64b34ea18b18793ba0015",
+        "must": [
+          "a_wrong_example_is_reported_and_a_right_one_is_not"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a refusal's codes are compared as a superset of what is reported",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "dc72b21f944ad45a456f5708c60ff8d1389bed946199ce56396408352ebe86e1",
+        "replacement_sha256": "cc6135ceae33691141a92f6ad3fa2ac43ce8b652ef3bd42b5bf927df4d5b7d8a",
+        "must": [
+          "a_wrong_example_is_reported_and_a_right_one_is_not"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "output a page shows of a refusal need not be what is printed",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "1f4842dfdcd218b74b21ea9c01d5267769b785d2896e054675a4e914ffb8f36d",
+        "replacement_sha256": "255ebf9ffc41a330e7ee004dcffecb05c0255ec76723418c93c4a50381438b35",
+        "must": [
+          "a_wrong_example_is_reported_and_a_right_one_is_not"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "output a page shows keeps the closing count `pw check` prints",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "f53f1e983fe9ff60708892eb96c09de90c66d2f81c7774d40614c070b22c1f11",
+        "replacement_sha256": "a4e1add0fe452359a9181b3330ac4d5ee4c5c0f0e23c87e80c8e2d4c9f871cd2",
+        "must": [
+          "every_example_in_the_guide_compiles_as_it_says"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a fence of another character closes a block",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "4e5091b6c3f3707074bd0392926275e8d222554d43cce55d4efc143083b8f37a",
+        "replacement_sha256": "8dc4c910c3af8c7ae758698351d27d2f4b35f15c7fb6ad4381af997d0d93aa34",
+        "must": [
+          "an_unclosed_or_indented_fence_is_refused"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a closing fence may carry text",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "4e5091b6c3f3707074bd0392926275e8d222554d43cce55d4efc143083b8f37a",
+        "replacement_sha256": "c210d5e772e685f4160e3ee20e3d37ec37da10cf892509689ae2f42347c87f61",
+        "must": [
+          "an_unclosed_or_indented_fence_is_refused"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a shorter fence closes a block",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "4e5091b6c3f3707074bd0392926275e8d222554d43cce55d4efc143083b8f37a",
+        "replacement_sha256": "ba0c45a5eacd9784d13d86fca1678122f5eb23deae63c2f1763c9da374b6570e",
+        "must": [
+          "a_page_with_no_example_or_a_block_unseen_is_reported"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "an indented fence is accepted",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "faeff8a7ce27db367658650583df576afb3cb240fbe5b02f944828ec3dff94d9",
+        "replacement_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "must": [
+          "an_unclosed_or_indented_fence_is_refused"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a fence never closed is accepted",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "a752b0270ee56e6898640478366bc81d4d81ee7f51ff7d6e932518765a8940e3",
+        "replacement_sha256": "6f4214930813a2ba2165d585b9acc04e54a67067e32c8716eb1f5aa7d411085c",
+        "must": [
+          "an_unclosed_or_indented_fence_is_refused"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "two backticks are a fence",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "a868ab1019cad6b4da8caf0c4a5e40b033fb8f1eed1f83e6921097a074689213",
+        "replacement_sha256": "a5e365f1d903359ced48bd87ed5975796661135117e0490cc176ba42470789ac",
+        "must": [
+          "a_fence_is_read_as_commonmark_reads_it"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "an attribute a block does not take is skipped",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "25501dd1a98c336f627dafb24013a5727cd1836d099ffe2507094c611ffbe84b",
+        "replacement_sha256": "cfe7911bf118d86063bd320ca806552c6f21fc708bb1222d42d04eef4713ccb0",
+        "must": [
+          "an_info_string_says_what_a_block_is"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "an attribute may be given twice",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "bd36ff8222d1fd22047f6f38aaf4b11512b84071491d95f225530b6898029412",
+        "replacement_sha256": "f95ddd9337186508eba5ef31b532904e4b636b0e8365ccfc4ea4e88831c2571c",
+        "must": [
+          "an_info_string_says_what_a_block_is"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a file may be outside the page's tree",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "45ab014b6859f972c899fb511f4fdd835720133a362c169d74efaeff91915089",
+        "replacement_sha256": "7b052777e843617b694824504c6a798d7baef0c6bfc91c68136f6334357cf3d2",
+        "must": [
+          "an_info_string_says_what_a_block_is"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a block may be a gap and a refusal",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "ea923b96aa862c609d25fca6b7ac2c1781c15543ff201faac2d01de9b10bdbd4",
+        "replacement_sha256": "43c65bae8de2438c742a8d86591a4c7432d677518509275f64c8435e365673e2",
+        "must": [
+          "an_info_string_says_what_a_block_is"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "another language's block takes attributes",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "a53c8549353d966f755e5925faea6f5c53cb36053c9e8ad1647c3ba5d9a95df0",
+        "replacement_sha256": "951054d0e561479fe549316aaa96b3d62acca47e8412708f5a51b2d2ff716bc5",
+        "must": [
+          "an_info_string_says_what_a_block_is"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a language the guide is not written in passes",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "5a8e9143744500c4899d49cb4f00a94b01857e1b2b0b0975da0131d59cbac0fa",
+        "replacement_sha256": "951054d0e561479fe549316aaa96b3d62acca47e8412708f5a51b2d2ff716bc5",
+        "must": [
+          "an_info_string_says_what_a_block_is"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a page's pieces are joined with no blank line",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "0f3a99033b65d2c887c3ee7a4164a299bc50271e3bc01aa4f16645db68494a0e",
+        "replacement_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "must": [
+          "a_pages_file_blocks_are_its_program_in_order"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "output belongs to any block before it",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "7e1ba90e6b5004690bb84a38f3399411b8fa21a8724d46b5fa5f32c05ad2afdb",
+        "replacement_sha256": "226a2f45630327590de13785be884440570db1510ab7c562b0cd3295223bc052",
+        "must": [
+          "shown_output_belongs_to_the_refused_example_before_it"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a build's output belongs to any block before it",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "6554f78e8d9271681ca7194dffafbe4ca74b21cb6ca94e5e8ae311ad6de2b55b",
+        "replacement_sha256": "226a2f45630327590de13785be884440570db1510ab7c562b0cd3295223bc052",
+        "must": [
+          "a_gaps_build_output_belongs_to_the_gap_before_it"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a build gap need not show what `pw build` prints",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "bd4f4b5ba9a5f019842f30914dbf3328e457040f60bdfbe597e6d079b6593e19",
+        "replacement_sha256": "4ef6a0810416e38b5bbec5c951c39ccfcd120590bc5beb150cfe017622b14407",
+        "must": [
+          "a_gaps_build_output_belongs_to_the_gap_before_it"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a page with no example is accepted",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "5f1cd51fd79b1f1a46a1594a40f350b2f168b2a9a8e0f9a0a816b6a9fe5d81e5",
+        "replacement_sha256": "4ef6a0810416e38b5bbec5c951c39ccfcd120590bc5beb150cfe017622b14407",
+        "must": [
+          "a_page_with_no_example_or_a_block_unseen_is_reported"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a Pleris block the reader of pages did not see goes unnoticed",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "eab4e977309c796f2ed206d260a9bef1da8392bfd89f23dbe54eb1b811653708",
+        "replacement_sha256": "66ed4f0923ffb38735c6571039f8ae0abb7989e39e1dc94e9a0383bcd52ce2cb",
+        "must": [
+          "a_page_with_no_example_or_a_block_unseen_is_reported"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a page's pieces are not counted",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "89301ba896fd47af7e965fdcbdebeea4cee1145b6bf6e17af42dd7dfc9a2e2aa",
+        "replacement_sha256": "a113b4abfb1ca0cf2031dba45968abdb269e11489094585a225648866946daed",
+        "must": [
+          "a_page_with_no_example_or_a_block_unseen_is_reported",
+          "every_example_in_the_guide_compiles_as_it_says"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "the index is held to show Pleris",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "10954e7618c957750746f4e297575a35f31b135f95b4b60d95623df396a1bd01",
+        "replacement_sha256": "70ce88e7574f92403aa1b390925905221b621031c955512e21e718bd34d955a5",
+        "must": [
+          "a_page_with_no_example_or_a_block_unseen_is_reported",
+          "every_example_in_the_guide_compiles_as_it_says"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a page's program is not compared with the directory it names",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "eaf4282664da6d2b92e16db078376b45e8e5f1a281b74de4dfcd0a8290bc6a3e",
+        "replacement_sha256": "54a0f30f623e098b53c60167edf4b80fb374b5ee2cf09163b2f82c5dd7361703",
+        "must": [
+          "a_page_is_held_to_the_directory_it_names"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a page that names a directory and builds nothing in it is accepted",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "e9c0f96d12610ff3b79f02331c2705a285c3675381b686a4534eccf258e6c986",
+        "replacement_sha256": "f9a543db2e9c5cfb40f73069b1ad0f50470e1dec900a8861a2265c16c80cb9e3",
+        "must": [
+          "a_page_is_held_to_the_directory_it_names"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "the directory a page names is read with its spaces",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "36c9c9a43e9d76909380c03b4307fc62f5825add16bc3d653f169475f06170d7",
+        "replacement_sha256": "5f29c996c23e6499a12fe62788d186afdc7c6a0e568bc9aa3aeb0e6251768d18",
+        "must": [
+          "a_page_is_held_to_the_directory_it_names"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a file the page lacks is not noticed",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "fe99719bf1ce9d7cb09901dc3cd42f196a6ae8765698a696204316d9ed3181ba",
+        "replacement_sha256": "951054d0e561479fe549316aaa96b3d62acca47e8412708f5a51b2d2ff716bc5",
+        "must": [
+          "a_program_differs_from_a_directory_by_a_file_or_a_byte"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "trailing space is no difference",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "97f00826a562e7318a5e032f5123cb3b876a0cc4e622c531ba5318b86d50e2df",
+        "replacement_sha256": "576df54c5484a83d2207be6f50a7f37a885829cd3f2ffd5213592ab760c784a6",
+        "must": [
+          "a_program_differs_from_a_directory_by_a_file_or_a_byte"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a row's invariant is not compared with the registry's",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "87a6e33bcfcd46f911c62b3a132e9f9a5e425059f7438f437dbc3d80a45d06f5",
+        "replacement_sha256": "1a39b468988661dc46471dc9d2d058df1ddfc0829281133cd739cd86237c0181",
+        "must": [
+          "the_reference_is_held_to_the_registry"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a code with no row is not reported",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "e8c56f1f3ad9e531efdfc87627b898345b1474fbc9d11554b4f1c662a6160d48",
+        "replacement_sha256": "aa310caabc0c2e13ee87dba73eea9e003f4b01d4aaf79131b0ee30cd92599a20",
+        "must": [
+          "the_reference_is_held_to_the_registry"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a row for a code the compiler lacks is not reported",
+        "held": "guide",
+        "source": "compiler/pw-cli/tests/guide.rs",
+        "anchor_sha256": "b36cf1035fcf82770f1f3816034cda154f7768d14b570333ac57ec6fe1e5cc9f",
+        "replacement_sha256": "951054d0e561479fe549316aaa96b3d62acca47e8412708f5a51b2d2ff716bc5",
+        "must": [
+          "the_reference_is_held_to_the_registry"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "an ADR a comment cites twice is listed twice",
+        "held": "guide",
+        "source": "scripts/guide_diagnostics.py",
+        "anchor_sha256": "496e21a8a8814c02f862b856056e1ce214bbb39c40402679ac0c6cc5c4787b47",
+        "replacement_sha256": "37a3838d1db99127b9beb1ecba6986b9d70a2c826f67721bd462ca58a486d9ac",
+        "must": [
+          "test_each_entry_with_its_invariant_and_the_adrs_its_comment_cites"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a comment is taken by the entry after the next",
+        "held": "guide",
+        "source": "scripts/guide_diagnostics.py",
+        "anchor_sha256": "047014173024a336e9b213f4f68ce202b35b370dac1f3385245c34a7d3a55d74",
+        "replacement_sha256": "d8f618a7d5bb834e7712d2b09b4c5f6ad54763e367425fc4e3a0555f832a824d",
+        "must": [
+          "test_each_entry_with_its_invariant_and_the_adrs_its_comment_cites"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a line that is no entry is skipped",
+        "held": "guide",
+        "source": "scripts/guide_diagnostics.py",
+        "anchor_sha256": "65f9d09c3e14256ad4ee0cda8f0312cf81a5cbc3958e26d0e6648411a99f70b4",
+        "replacement_sha256": "01728ad3af01cf3aebef41ffbe289dbb64422bb821a75d41d1419a247d92a78a",
+        "must": [
+          "test_a_line_that_is_no_entry_is_refused_not_skipped"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a pipe in a cell ends it",
+        "held": "guide",
+        "source": "scripts/guide_diagnostics.py",
+        "anchor_sha256": "bf30ce368b31d9501b4775246d375e561a00968f5e45f588d4d9499fda49e514",
+        "replacement_sha256": "c6a82654f14a207e1efc853d62a03aa6c225b1fb3b4c68be0144bf8333bcd8f0",
+        "must": [
+          "test_a_pipe_in_a_cell_is_escaped"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a retired code's reason loses its continuation",
+        "held": "guide",
+        "source": "scripts/guide_diagnostics.py",
+        "anchor_sha256": "f718200cbe2faffd2b0fe4e09c63cd407e90d791fd4f359d828d84dbf3f7cebf",
+        "replacement_sha256": "0ccc5a8b75cc0b458f68ba9fc6138d741d4759c5a254f592bf6f3f9527626c74",
+        "must": [
+          "test_a_retired_code_with_its_reason_continued_across_lines"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "the retired codes are left out of the page",
+        "held": "guide",
+        "source": "scripts/guide_diagnostics.py",
+        "anchor_sha256": "cd65d373e95c7b48bb16637a31bfae4c5aad1f1bd6ee8d685c1526f13ed2b567",
+        "replacement_sha256": "80460a86dd1c0837acd9d7aa89cda5c61332c4f89561d767d977752f90126789",
+        "must": [
+          "test_the_committed_page_is_what_the_registry_writes"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "the last code of each owner is left out of the page",
+        "held": "guide",
+        "source": "scripts/guide_diagnostics.py",
+        "anchor_sha256": "bffa1c41236a5cb8a45c81023518f900c54e5689c0f21d2c83a205f07444c3fc",
+        "replacement_sha256": "286d6dece3f17796ae7381fbe8fcb99ef3072fd2be070fe03947f517bc256eeb",
+        "must": [
+          "test_the_committed_page_is_what_the_registry_writes"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a signed entry does not clear the draft",
+        "held": "browser",
+        "source": "examples/guestbook/pages.pw",
+        "anchor_sha256": "0859df1b243dcd473f71dab754f41e222d9a9aa73f3adca714d3a4c6fd859377",
+        "replacement_sha256": "6549b967f4601351f8bc916721b3265e8fa3093ec6dfdaf19507178daad036d8",
+        "must": [
+          "signs, and the entry is theirs alone to remove"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "Remove is offered on another reader's entry and not on one's own",
+        "held": "browser",
+        "source": "examples/guestbook/pages.pw",
+        "anchor_sha256": "fc9c20a06930475bb9f6270c885d406d5fa2e4df99399874b6d921753749936a",
+        "replacement_sha256": "8548fc6e2f2136f6b5a5b5687139e1ad64c036761cd448195d982464cdc87806",
+        "must": [
+          "signs, and the entry is theirs alone to remove"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "a reader signed out is shown the signed-in half",
+        "held": "browser",
+        "source": "examples/guestbook/pages.pw",
+        "anchor_sha256": "fd0e1959d76494b41dcdea9f0a0ffd5506e25a3bbfb3229a4537871e7cff8f18",
+        "replacement_sha256": "b4738af634a295476af21ebdac26a4bd6d8774f8c0d8f2e8bdb61c3c91ebd963",
+        "must": [
+          "a signed-out reader reads the entries"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "the entry is shown last, not first, before the server answers",
+        "held": "browser",
+        "source": "examples/guestbook/book.pw",
+        "anchor_sha256": "e7d0ad29bb13bad0836c1d2fe241f304dd7164511589e64fe033cfd15e3d1a2d",
+        "replacement_sha256": "8be912cd7a6c1fbe720ecfebbc8ad192f4139fd52022e96d61a367946a8b5309",
+        "must": [
+          "an entry is shown before the server answers"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "the entry can be removed before the server has it",
+        "held": "browser",
+        "source": "examples/guestbook/book.pw",
+        "anchor_sha256": "c1e1c72987eab7cf5f9c7480012ca9e9fa1d82649b6c0ffea5c66ab1b2fc204d",
+        "replacement_sha256": "bf86361b763374dfa29d8828f1c3746486094a38e3681b3fd60a9daa4b976e57",
+        "must": [
+          "an entry is shown before the server answers"
+        ],
+        "exact_checker_codes": []
+      },
+      {
+        "name": "the composer is shown to a reader signed out",
+        "held": "browser",
+        "source": "examples/guestbook/pages.pw",
+        "anchor_sha256": "a112e41ba394c01f4397c4a1f4bf045406ddcd2740223d2e77b8a5c7222754a2",
+        "replacement_sha256": "29aab9ef81263ef676c2809f8db05a928ebffa694ef8e8b1533836b1d7564d99",
+        "must": [],
+        "exact_checker_codes": [
+          "PW5048"
+        ]
+      },
+      {
+        "name": "Remove is shown to a reader signed out",
+        "held": "browser",
+        "source": "examples/guestbook/pages.pw",
+        "anchor_sha256": "af27951363a724a996e1f2975a21b6763214d8d9a9ae319d45911f2c434787cf",
+        "replacement_sha256": "f8083a342484fdae820d536e0d679850a525c5b3fe0edeb2dca63c503e096ef0",
+        "must": [],
+        "exact_checker_codes": [
+          "PW5048"
+        ]
+      },
+      {
+        "name": "the entries are not told of a signed entry",
+        "held": "browser",
+        "source": "examples/guestbook/book.pw",
+        "anchor_sha256": "064c4abc8031691489d497d09d17744e625197707ddea4c40990b72ea1935975",
+        "replacement_sha256": "dff7e481128ac3821ab6444f160fc6a2f667e550227f8b7670dff2c23174063c",
+        "must": [],
+        "exact_checker_codes": [
+          "PW5107"
+        ]
+      }
+    ],
+    "producer8": [
+      {
+        "name": "Cargo result validity is ignored",
+        "full_witness": "test_guide_producer_results.GuideProducers.test_cargo_refuses_invalid_failure_status",
+        "source": "scripts/guide_mutations.py",
+        "anchor_sha256": "fb60cc132f90f3bb07a15238c824b2af6f02820583e077beacb8baac1694245d",
+        "replacement_sha256": "e19ca9ef0fabb6ec18425b6e18be6f00f1690b4a45ce131a10ee551714c07b71"
+      },
+      {
+        "name": "Python canonical result validity is ignored",
+        "full_witness": "test_guide_producer_results.GuideNativeProtocol.test_native_setup_failures_earn_no_kill_and_never_enter_body",
+        "source": "scripts/guide_mutations.py",
+        "anchor_sha256": "f9c443c5771070d1f799ff5980f47b1ba104c68d629f88156e6d4580bef8dc09",
+        "replacement_sha256": "f8d3c77baa3cc54ee7790638aedd584c54cf492c5c7a1963bf5074c53e5fa372"
+      },
+      {
+        "name": "browser command bypasses canonical suite authority",
+        "full_witness": "test_guide_producer_results.GuideProducers.test_browser_uses_canonical_authority_and_exact_selection",
+        "source": "scripts/guide_mutations.py",
+        "anchor_sha256": "a696142750967b1f5fb77b4df0ad9de4aa5febc1fa28904d82c3860c98719801",
+        "replacement_sha256": "6c281c322fa9b95569a802dbe8078a50d1b782f8a344bab529895dbda93b176d"
+      },
+      {
+        "name": "browser status and counts need not agree",
+        "full_witness": "test_guide_producer_results.GuideProducers.test_browser_refuses_invalid_failure_status",
+        "source": "scripts/guide_mutations.py",
+        "anchor_sha256": "dde7226bf32667c4e64d10d73872aff1f1b86b0c36d82aa9763d4e98cc038859",
+        "replacement_sha256": "7f69913c97d1f1d1a880be50f53c752fd2d59796fe0eaa75127f124f879dc062"
+      },
+      {
+        "name": "partial codes after an invalid compiler exit earn a checker kill",
+        "full_witness": "test_guide_producer_results.GuideProducers.test_main_refuses_named_codes_after_invalid_build_status",
+        "source": "scripts/guide_mutations.py",
+        "anchor_sha256": "73ee05553c1b9487b37fa68d25c808f2e7e0bec03e7e379a08574ccc8f511ec2",
+        "replacement_sha256": "59e2ddbb55e6bfe4248f2eaf4949d52dc7a6d1578745dbfd7d0f3ca1e1fd609c"
+      },
+      {
+        "name": "invalid guide producer is credited as killed",
+        "full_witness": "test_guide_producer_results.GuideProducers.test_main_refuses_cargo_invalid_status_without_kill",
+        "source": "scripts/guide_mutations.py",
+        "anchor_sha256": "2a08301582d47654739a0aa76d21edd7c4b24cdfe0dcda7be92f077e80183f18",
+        "replacement_sha256": "ef832fb6ff921f3723485d42312e930bf76ce1239f32127c1e2125498e5a7e99"
+      },
+      {
+        "name": "bound stop with partial valid output is ignored",
+        "full_witness": "test_guide_producer_results.GuideProducers.test_main_refuses_bound_stop_with_valid_partial_summary",
+        "source": "scripts/guide_mutations.py",
+        "anchor_sha256": "18e5906860668fe82622b2306100e183eb52615e188070098e2dbfac24f1f201",
+        "replacement_sha256": "e5bc4711ecca0450afc832779a88676a7c6960fa3da5af410ee02d1e0151591a"
+      },
+      {
+        "name": "final restored build failure is ignored",
+        "full_witness": "test_guide_producer_results.GuideProducers.test_final_restored_build_failure_fails_campaign",
+        "source": "scripts/guide_mutations.py",
+        "anchor_sha256": "c8d7afad23249f16ee318ec2b8887e935b710268829bd6a1d270f254efbe1947",
+        "replacement_sha256": "2c5baa8f92c43ef9bba2a8dfa98c2dd89b41e0ff3e2e6fd998670417e520df5c"
+      }
+    ]
+  }
+}

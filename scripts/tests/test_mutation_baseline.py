@@ -357,6 +357,148 @@ class Bytecode(unittest.TestCase):
         self.assertEqual(self.cached(root, "toy"), [])
 
 
+class KeepsABaselinesBrowserRun(unittest.TestCase):
+    """A red baseline keeps the output of its browser run, where the next run
+    in the shard would clear it (track ci-diagnostics, 2026-10-19); a
+    mutant's, which fails by design, is not kept."""
+
+    def setUp(self):
+        baseline.heard.clear()
+        self.tmp = pathlib.Path(tempfile.mkdtemp(prefix="pw-baseline-keeps-"))
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.saved = (baseline.ROOT, baseline.STARTED, os.environ.get("PW_RECIPE"))
+        baseline.ROOT = self.tmp
+        baseline.STARTED = time.time() - 60
+        os.environ["PW_RECIPE"] = "e14-refusal"
+        self.addCleanup(self.restore)
+
+    def restore(self):
+        baseline.ROOT, baseline.STARTED = self.saved[0], self.saved[1]
+        if self.saved[2] is None:
+            os.environ.pop("PW_RECIPE", None)
+        else:
+            os.environ["PW_RECIPE"] = self.saved[2]
+        baseline.heard.clear()
+
+    def left(self, suite="spikes/own-renderer"):
+        """The `test-results/` a failed browser run left."""
+        out = self.tmp / suite / "test-results" / "feed-load-more-webkit"
+        out.mkdir(parents=True)
+        (out / "trace.zip").write_bytes(b"trace")
+
+    def ran(self, status):
+        """A kept command that is a browser run, and how it ended."""
+        subprocess.run(python(f"import sys; sys.exit({status})") + ["playwright", "test"], capture_output=True)
+
+    def kept(self, suite="spikes/own-renderer"):
+        root = self.tmp / suite / "kept-traces"
+        return sorted(p.relative_to(root).parts for p in root.rglob("*") if p.is_file()) if root.exists() else []
+
+    def test_a_red_baselines_failed_browser_run_is_kept_apart(self):
+        self.left()
+        self.ran(1)
+        said = explained()
+        (recipe, _tag, run, test, trace), = self.kept()
+        self.assertEqual((recipe, test, trace), ("e14-refusal", "feed-load-more-webkit", "trace.zip"))
+        self.assertTrue(run.endswith("-baseline"), run)
+        self.assertIn("its browser run's output: kept 1 of 1 entries of its output", said)
+        self.assertIn("spikes/own-renderer/kept-traces/e14-refusal/", said)
+        # What failed is still said first, as it was.
+        self.assertIn("exit 1", said)
+
+    def test_a_browser_run_that_passed_keeps_nothing(self):
+        self.left()
+        self.ran(0)
+        self.assertNotIn("its browser run's output", explained())
+        self.assertEqual(self.kept(), [])
+
+    def test_a_mutants_browser_run_is_not_kept(self):
+        # Only the last command counts. A mutant's browser run failed by
+        # design, and the script went on: another command came after it, or a
+        # run that passed. (`explain()` at a refused producer finds a cargo
+        # command last.)
+        self.left()
+        self.ran(1)
+        subprocess.run(python("import sys; sys.exit(2)"), capture_output=True)
+        self.assertNotIn("its browser run's output", explained())
+        self.ran(1)
+        self.ran(0)
+        self.assertNotIn("its browser run's output", explained())
+        self.assertEqual(self.kept(), [])
+
+    def test_what_an_earlier_recipe_left_is_not_kept(self):
+        self.left()
+        baseline.STARTED = time.time() + 60  # the script began after the directory was written
+        self.ran(1)
+        self.assertNotIn("its browser run's output", explained())
+        self.assertEqual(self.kept(), [])
+
+    def test_the_benchmark_harness_run_is_kept_under_its_own_directory(self):
+        self.left("benchmarks/harness")
+        self.ran(1)
+        explained()
+        self.assertEqual(self.kept(), [])
+        self.assertEqual(len(self.kept("benchmarks/harness")), 1)
+
+    def test_a_failure_to_keep_is_said_and_what_failed_still_is(self):
+        self.left()
+        (self.tmp / "spikes/own-renderer/kept-traces").write_text("a file")
+        subprocess.run(python("import sys; print('  1) [webkit] › e2e/a.spec.mjs:1:1 › t'); sys.exit(1)") + ["playwright", "test"], capture_output=True, text=True)
+        said = explained()
+        self.assertIn("its browser run's output could not be kept", said)
+        self.assertIn("failed: [webkit] › e2e/a.spec.mjs:1:1 › t", said)
+
+
+class EveryCallOfExplain(unittest.TestCase):
+    """`explain()` keeps the output of the last command a script ran where it
+    was a browser run that failed, so a script that calls it after a MUTANT's
+    browser run would keep a control's intended failure. 278 of the 292 calls
+    follow the baseline's own red print; these fourteen are the others, each a
+    red baseline in its own words (one suite's, or after the output it
+    printed) or a call with a command last that is no mutant's browser run (a
+    producer refused, a build, the restored source's own check). Train-11
+    brought nine (the browser host map's, the committed components',
+    kiokun-cache's, the render merge's, the skipped specs' guard's; and with
+    check-is-build and guide-producer-validity build_id's and refusal's
+    restored-suite checks, held_labels' refused producer, a cargo run, and the
+    guide producer's red baseline), each read for that."""
+
+    OTHERS = {
+        ("bounded_statements_mutations.py", "REFUSED (invalid or stopped Cargo producer; no kill)"),
+        ("browser_host_map_mutations.py", "the unmutated {suite} suite is not green"),
+        ("build_id_mutations.py", "the restored browser suite is not green"),
+        ("committed_components_mutations.py", "REFUSED (invalid or stopped Cargo producer; no kill)"),
+        ("descriptions_mutations.py", "the restored-source browser check is not green"),
+        ("guide_producer_mutations.py", "print(baseline.output)"),
+        ("held_labels_mutations.py", "INVALID RESULT (campaign fails; not a kill)"),
+        ("kiokun_cache_mutations.py", "print(output)"),
+        ("kiokun_test_data_mutations.py", "print(output)"),
+        ("proof_mutations.py", "pw does not build unmutated"),
+        ("refusal_mutations.py", "the restored browser suite is not green"),
+        ("render_merge_mutations.py", "REFUSED (invalid or stopped Cargo producer; no kill)"),
+        ("skipped_specs_mutations.py", "REFUSED (the tests errored or said no count; no kill)"),
+        ("store_hours_mutations.py", "REFUSED (invalid or stopped Cargo producer; no kill)"),
+    }
+
+    def test_each_call_follows_a_red_baseline_or_one_of_those_named(self):
+        found = set()
+        calls = 0
+        for p in sorted(SCRIPTS.glob("*_mutations.py")):
+            lines = p.read_text().splitlines()
+            for i, line in enumerate(lines):
+                if line.strip() != "mutation_baseline.explain()":
+                    continue
+                calls += 1
+                before = lines[i - 1]
+                if "the unmutated baseline is not green" in before:
+                    continue
+                # A call none of these names is said by its line, to be read.
+                named = next((w for w in sorted({o for _, o in self.OTHERS}) if w in before), before.strip())
+                found.add((p.name, named))
+        self.assertGreater(calls, 250)
+        self.assertEqual(found, self.OTHERS)
+
+
 class EveryScript(unittest.TestCase):
     RED = re.compile(
         r'^(\s*)print\("FAIL: the unmutated baseline is not green; no (mutant|control) can '

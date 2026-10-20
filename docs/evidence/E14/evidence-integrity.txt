@@ -1,156 +1,180 @@
 Track evidence-integrity - six ways evidence could be wrong, or a gate fail for the wrong reason
 
 produced by: just e14-evidence-integrity
-commit: c67bf6ed04f59264d934a0f397879820bee1f1f1
+commit: 320c52a44840a80423609ab476eb847c04de34a6
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39442025240 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
-python: Python 3.10.12
+python: Python 3.12.3
 node: v22.21.1
 
 == 1. a mutation script's sources run as they are (scripts/tests/test_mutation_baseline.py)
 
-test_imported_it_bounds_every_process_the_script_starts (scripts.tests.test_mutation_baseline.Bounded) ... ok
-test_guarded_bytecode_left_before_for_a_mutated_source_is_not_read (scripts.tests.test_mutation_baseline.Bytecode) ... ok
-test_guarded_no_bytecode_is_written_so_the_restored_source_runs (scripts.tests.test_mutation_baseline.Bytecode) ... ok
-test_unguarded_the_restored_source_runs_its_mutants_bytecode (scripts.tests.test_mutation_baseline.Bytecode) ... ok
-test_every_red_baseline_says_what_failed (scripts.tests.test_mutation_baseline.EveryScript) ... ok
-test_every_script_keeps_what_its_commands_say_from_its_start (scripts.tests.test_mutation_baseline.EveryScript) ... ok
-test_a_browser_suites_failure_read_through_its_escapes (scripts.tests.test_mutation_baseline.Failures) ... ok
-test_a_build_that_failed (scripts.tests.test_mutation_baseline.Failures) ... ok
-test_a_failed_commands_output_with_no_result_is_shown_as_it_ended (scripts.tests.test_mutation_baseline.Failures) ... ok
-test_a_failing_test_and_its_panic (scripts.tests.test_mutation_baseline.Failures) ... ok
-test_a_failing_tests_records_are_shown_as_it_printed_them (scripts.tests.test_mutation_baseline.Failures) ... ok
-test_a_command_not_captured_keeps_how_it_ended (scripts.tests.test_mutation_baseline.Heard) ... ok
-test_a_command_stopped_past_its_bound_keeps_what_it_said_by_then (scripts.tests.test_mutation_baseline.Heard) ... ok
-test_commands_that_ended_well_say_what_each_counted (scripts.tests.test_mutation_baseline.Heard) ... ok
-test_explain_names_what_failed_as_it_failed (scripts.tests.test_mutation_baseline.Heard) ... ok
-test_explain_runs_nothing_again (scripts.tests.test_mutation_baseline.Heard) ... ok
-test_explain_shows_a_failing_tests_records (scripts.tests.test_mutation_baseline.Heard) ... ok
-test_only_the_last_commands_are_kept (scripts.tests.test_mutation_baseline.Heard) ... ok
-test_what_a_command_said_is_kept_with_how_it_ended (scripts.tests.test_mutation_baseline.Heard) ... ok
-test_a_complete_report_stays_visible_until_success (scripts.tests.test_atomic_evidence.AtomicEvidence) ... ok
-test_a_failed_run_keeps_the_previous_complete_report (scripts.tests.test_atomic_evidence.AtomicEvidence) ... ok
-test_a_first_run_publishes_only_the_complete_report (scripts.tests.test_atomic_evidence.AtomicEvidence) ... ok
-test_the_published_report_remains_a_planned_evidence_output (scripts.tests.test_atomic_evidence.AtomicEvidence) ... ok
-Ran 23 tests in 4.847s
+test_imported_it_bounds_every_process_the_script_starts (scripts.tests.test_mutation_baseline.Bounded.test_imported_it_bounds_every_process_the_script_starts) ... ok
+test_guarded_bytecode_left_before_for_a_mutated_source_is_not_read (scripts.tests.test_mutation_baseline.Bytecode.test_guarded_bytecode_left_before_for_a_mutated_source_is_not_read) ... ok
+test_guarded_no_bytecode_is_written_so_the_restored_source_runs (scripts.tests.test_mutation_baseline.Bytecode.test_guarded_no_bytecode_is_written_so_the_restored_source_runs) ... ok
+test_unguarded_the_restored_source_runs_its_mutants_bytecode (scripts.tests.test_mutation_baseline.Bytecode.test_unguarded_the_restored_source_runs_its_mutants_bytecode) ... ok
+test_each_call_follows_a_red_baseline_or_one_of_those_named (scripts.tests.test_mutation_baseline.EveryCallOfExplain.test_each_call_follows_a_red_baseline_or_one_of_those_named) ... ok
+test_every_red_baseline_says_what_failed (scripts.tests.test_mutation_baseline.EveryScript.test_every_red_baseline_says_what_failed) ... ok
+test_every_script_keeps_what_its_commands_say_from_its_start (scripts.tests.test_mutation_baseline.EveryScript.test_every_script_keeps_what_its_commands_say_from_its_start) ... ok
+test_a_browser_suites_failure_read_through_its_escapes (scripts.tests.test_mutation_baseline.Failures.test_a_browser_suites_failure_read_through_its_escapes) ... ok
+test_a_build_that_failed (scripts.tests.test_mutation_baseline.Failures.test_a_build_that_failed) ... ok
+test_a_failed_commands_output_with_no_result_is_shown_as_it_ended (scripts.tests.test_mutation_baseline.Failures.test_a_failed_commands_output_with_no_result_is_shown_as_it_ended) ... ok
+test_a_failing_test_and_its_panic (scripts.tests.test_mutation_baseline.Failures.test_a_failing_test_and_its_panic) ... ok
+test_a_failing_tests_records_are_shown_as_it_printed_them (scripts.tests.test_mutation_baseline.Failures.test_a_failing_tests_records_are_shown_as_it_printed_them) ... ok
+test_a_command_not_captured_keeps_how_it_ended (scripts.tests.test_mutation_baseline.Heard.test_a_command_not_captured_keeps_how_it_ended) ... ok
+test_a_command_stopped_past_its_bound_keeps_what_it_said_by_then (scripts.tests.test_mutation_baseline.Heard.test_a_command_stopped_past_its_bound_keeps_what_it_said_by_then) ... ok
+test_commands_that_ended_well_say_what_each_counted (scripts.tests.test_mutation_baseline.Heard.test_commands_that_ended_well_say_what_each_counted) ... ok
+test_explain_names_what_failed_as_it_failed (scripts.tests.test_mutation_baseline.Heard.test_explain_names_what_failed_as_it_failed) ... ok
+test_explain_runs_nothing_again (scripts.tests.test_mutation_baseline.Heard.test_explain_runs_nothing_again) ... ok
+test_explain_shows_a_failing_tests_records (scripts.tests.test_mutation_baseline.Heard.test_explain_shows_a_failing_tests_records) ... ok
+test_only_the_last_commands_are_kept (scripts.tests.test_mutation_baseline.Heard.test_only_the_last_commands_are_kept) ... ok
+test_what_a_command_said_is_kept_with_how_it_ended (scripts.tests.test_mutation_baseline.Heard.test_what_a_command_said_is_kept_with_how_it_ended) ... ok
+test_a_browser_run_that_passed_keeps_nothing (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun.test_a_browser_run_that_passed_keeps_nothing) ... ok
+test_a_failure_to_keep_is_said_and_what_failed_still_is (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun.test_a_failure_to_keep_is_said_and_what_failed_still_is) ... ok
+test_a_mutants_browser_run_is_not_kept (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun.test_a_mutants_browser_run_is_not_kept) ... ok
+test_a_red_baselines_failed_browser_run_is_kept_apart (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun.test_a_red_baselines_failed_browser_run_is_kept_apart) ... ok
+test_the_benchmark_harness_run_is_kept_under_its_own_directory (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun.test_the_benchmark_harness_run_is_kept_under_its_own_directory) ... ok
+test_what_an_earlier_recipe_left_is_not_kept (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun.test_what_an_earlier_recipe_left_is_not_kept) ... ok
+test_a_complete_report_stays_visible_until_success (scripts.tests.test_atomic_evidence.AtomicEvidence.test_a_complete_report_stays_visible_until_success) ... ok
+test_a_failed_run_keeps_the_previous_complete_report (scripts.tests.test_atomic_evidence.AtomicEvidence.test_a_failed_run_keeps_the_previous_complete_report) ... ok
+test_a_first_run_publishes_only_the_complete_report (scripts.tests.test_atomic_evidence.AtomicEvidence.test_a_first_run_publishes_only_the_complete_report) ... ok
+test_the_published_report_remains_a_planned_evidence_output (scripts.tests.test_atomic_evidence.AtomicEvidence.test_the_published_report_remains_a_planned_evidence_output) ... ok
+Ran 30 tests in 5.726s
 OK
 
 == 2. stale evidence planned, an evidence file's counts its script's (test_ci_scripts.py, test_evidence_counts.py)
 
-test_a_recipe_is_current_only_where_every_file_it_writes_is_at_one_commit (scripts.tests.test_ci_scripts.CurrentEvidence) ... ok
-test_a_recipe_that_writes_no_evidence_is_never_current (scripts.tests.test_ci_scripts.CurrentEvidence) ... ok
-test_a_recipe_whose_evidence_is_current_is_not_run_again (scripts.tests.test_ci_scripts.CurrentEvidence) ... ok
-test_a_tree_with_changes_records_no_commit (scripts.tests.test_ci_scripts.CurrentEvidence) ... ok
-test_any_error_leaves_a_recipe_planned (scripts.tests.test_ci_scripts.CurrentEvidence) ... ci_plan: e14-one's evidence not read, so it is planned: no git
+test_a_recipe_is_current_only_where_every_file_it_writes_is_at_one_commit (scripts.tests.test_ci_scripts.CurrentEvidence.test_a_recipe_is_current_only_where_every_file_it_writes_is_at_one_commit) ... ok
+test_a_recipe_that_writes_no_evidence_is_never_current (scripts.tests.test_ci_scripts.CurrentEvidence.test_a_recipe_that_writes_no_evidence_is_never_current) ... ok
+test_a_recipe_whose_evidence_is_current_is_not_run_again (scripts.tests.test_ci_scripts.CurrentEvidence.test_a_recipe_whose_evidence_is_current_is_not_run_again) ... ok
+test_a_tree_with_changes_records_no_commit (scripts.tests.test_ci_scripts.CurrentEvidence.test_a_tree_with_changes_records_no_commit) ... ok
+test_any_error_leaves_a_recipe_planned (scripts.tests.test_ci_scripts.CurrentEvidence.test_any_error_leaves_a_recipe_planned) ... ci_plan: e14-one's evidence not read, so it is planned: no git
 ok
-test_evidence_of_a_commit_the_head_does_not_descend_from_is_not_current (scripts.tests.test_ci_scripts.CurrentEvidence) ... ok
-test_main_runs_no_current_recipe_only_where_asked (scripts.tests.test_ci_scripts.CurrentEvidence) ... ci_plan: e10-attribute-case is current, recorded at aaaaaaaa
+test_evidence_of_a_commit_the_head_does_not_descend_from_is_not_current (scripts.tests.test_ci_scripts.CurrentEvidence.test_evidence_of_a_commit_the_head_does_not_descend_from_is_not_current) ... ok
+test_main_runs_no_current_recipe_only_where_asked (scripts.tests.test_ci_scripts.CurrentEvidence.test_main_runs_no_current_recipe_only_where_asked) ... ci_plan: e10-attribute-case is current, recorded at aaaaaaaa
 ok
-test_the_evidence_is_read_as_the_head_holds_it (scripts.tests.test_ci_scripts.CurrentEvidence) ... ok
-test_the_workflow_plans_each_push_with_the_evidence (scripts.tests.test_ci_scripts.CurrentEvidence) ... ok
-test_a_file_of_another_commit_is_refused (scripts.tests.test_ci_scripts.Fetch) ... ok
-test_a_file_whose_recipe_reads_what_changed_since_its_run_is_refused (scripts.tests.test_ci_scripts.Fetch) ... ok
-test_a_file_with_no_commit_is_copied_as_it_is (scripts.tests.test_ci_scripts.Fetch) ... ok
-test_a_recipe_that_ran_to_its_end_has_its_seconds_kept (scripts.tests.test_ci_scripts.Fetch) ... ok
-test_a_run_that_failed_is_fetched_only_where_its_failures_are_known (scripts.tests.test_ci_scripts.Fetch) ... ok
-test_main_reaches_the_refusal_by_its_own_name (scripts.tests.test_ci_scripts.Fetch) ... ok
-test_the_run_is_named_after_the_commit (scripts.tests.test_ci_scripts.Fetch) ... ok
-test_the_seconds_kept_are_each_a_recipes (scripts.tests.test_ci_scripts.Fetch) ... ok
-test_the_tree_here_is_what_is_staged_and_what_is_not (scripts.tests.test_ci_scripts.Fetch) ... ok
-test_what_a_failed_recipe_wrote_is_not_copied (scripts.tests.test_ci_scripts.Fetch) ... ok
-test_what_changed_since_a_run_is_the_planners_against_the_tree_here (scripts.tests.test_ci_scripts.Fetch) ... ok
-test_a_change_reaches_the_scripts_it_touches (scripts.tests.test_ci_scripts.Plan) ... ok
-test_a_change_to_a_sources_own_tests_reaches_what_runs_them (scripts.tests.test_ci_scripts.Plan) ... ok
-test_a_change_to_the_suites_configuration_plans_every_recipe_that_runs_a_suite_under_it (scripts.tests.test_ci_scripts.Plan) ... ok
-test_a_changed_browser_spec_reaches_the_scripts_and_recipes_that_run_it (scripts.tests.test_ci_scripts.Plan) ... ok
-test_a_changed_server_test_module_reaches_what_runs_it_by_its_filter (scripts.tests.test_ci_scripts.Plan) ... ok
-test_a_changed_spec_or_a_module_its_specs_import_plans_what_runs_them (scripts.tests.test_ci_scripts.Plan) ... ok
-test_a_diff_that_is_no_utf8_is_still_read (scripts.tests.test_ci_scripts.Plan) ... ok
-test_a_measurement_of_the_machine_is_not_planned (scripts.tests.test_ci_scripts.Plan) ... ok
-test_a_plan_is_the_same_every_time (scripts.tests.test_ci_scripts.Plan) ... ok
-test_a_recipe_costs_the_seconds_it_last_took (scripts.tests.test_ci_scripts.Plan) ... ok
-test_a_recipe_in_an_imported_file_is_read_and_planned (scripts.tests.test_ci_scripts.Plan) ... ok
-test_a_recipe_is_planned_where_a_shell_script_it_runs_changed (scripts.tests.test_ci_scripts.Plan) ... ok
-test_a_recipe_is_planned_where_its_own_lines_name_a_program_that_changed (scripts.tests.test_ci_scripts.Plan) ... ok
-test_a_recipe_is_planned_where_its_script_reads_what_changed (scripts.tests.test_ci_scripts.Plan) ... ok
-test_a_recipe_longer_than_the_ceiling_alone_is_not_paid_for_in_shards (scripts.tests.test_ci_scripts.Plan) ... ok
-test_a_recipe_needing_less_may_run_where_more_is_set_up (scripts.tests.test_ci_scripts.Plan) ... ok
-test_a_recipe_not_yet_measured_costs_what_its_kind_does (scripts.tests.test_ci_scripts.Plan) ... ok
-test_a_recipe_run_against_a_database_is_a_shard_of_its_own (scripts.tests.test_ci_scripts.Plan) ... ok
-test_a_recipe_whose_parameters_have_defaults_is_read (scripts.tests.test_ci_scripts.Plan) ... ok
-test_a_recipes_cost_counts_the_mutants_it_plants (scripts.tests.test_ci_scripts.Plan) ... ok
-test_a_run_is_planned_by_the_seconds_kept (scripts.tests.test_ci_scripts.Plan) ... ok
-test_a_run_takes_more_shards_than_it_asks_where_its_would_end_past_the_ceiling (scripts.tests.test_ci_scripts.Plan) ... ok
-test_a_shard_with_a_database_sets_up_what_its_recipe_needs (scripts.tests.test_ci_scripts.Plan) ... ok
-test_main_deals_a_run_within_the_ceiling (scripts.tests.test_ci_scripts.Plan) ... ok
-test_no_shard_is_planned_empty (scripts.tests.test_ci_scripts.Plan) ... ok
-test_recipes_run_against_a_database_take_the_shards_that_end_the_run_soonest (scripts.tests.test_ci_scripts.Plan) ... ok
-test_short_recipes_run_against_a_database_share_one (scripts.tests.test_ci_scripts.Plan) ... ok
-test_the_ceiling_is_within_the_shards_limit (scripts.tests.test_ci_scripts.Plan) ... ok
-test_the_costliest_go_first_each_to_where_it_ends_soonest (scripts.tests.test_ci_scripts.Plan) ... ok
-test_the_seconds_are_read_where_the_fetch_keeps_them (scripts.tests.test_ci_scripts.Plan) ... ok
-test_what_a_recipe_adds_to_a_shards_setup_counts (scripts.tests.test_ci_scripts.Plan) ... ok
-test_what_a_recipe_needs_is_read_from_its_lines (scripts.tests.test_ci_scripts.Plan) ... ok
-test_what_builds_leave_is_freed_and_the_newest_binary_kept (scripts.tests.test_ci_scripts.Prune) ... ok
-test_a_failed_recipe_says_its_last_lines_in_the_jobs_log (scripts.tests.test_ci_scripts.Recipes) ... ok
-test_a_heartbeat_says_what_a_recipe_is_doing_until_it_ends (scripts.tests.test_ci_scripts.Recipes) ... ok
-test_what_a_recipe_wrote_is_what_changed (scripts.tests.test_ci_scripts.Recipes) ... ok
-test_a_trains_push_plans_the_stale_evidence_and_another_tracks_does_not (scripts.tests.test_ci_scripts.StaleEvidence) ... ok
-test_evidence_from_a_tree_with_changes_or_none_at_all_is_stale (scripts.tests.test_ci_scripts.StaleEvidence) ... ok
-test_evidence_that_names_no_commit_is_not_judged (scripts.tests.test_ci_scripts.StaleEvidence) ... ok
-test_evidence_whose_reads_changed_since_its_commit_is_stale (scripts.tests.test_ci_scripts.StaleEvidence) ... ok
-test_main_plans_stale_evidence_only_where_asked (scripts.tests.test_ci_scripts.StaleEvidence) ... ci_plan: e10-attribute-case's evidence is stale, so it is planned
+test_the_evidence_is_read_as_the_head_holds_it (scripts.tests.test_ci_scripts.CurrentEvidence.test_the_evidence_is_read_as_the_head_holds_it) ... ok
+test_the_workflow_plans_each_push_with_the_evidence (scripts.tests.test_ci_scripts.CurrentEvidence.test_the_workflow_plans_each_push_with_the_evidence) ... ok
+test_a_file_of_another_commit_is_refused (scripts.tests.test_ci_scripts.Fetch.test_a_file_of_another_commit_is_refused) ... ok
+test_a_file_whose_recipe_reads_what_changed_since_its_run_is_refused (scripts.tests.test_ci_scripts.Fetch.test_a_file_whose_recipe_reads_what_changed_since_its_run_is_refused) ... ok
+test_a_file_with_no_commit_is_copied_as_it_is (scripts.tests.test_ci_scripts.Fetch.test_a_file_with_no_commit_is_copied_as_it_is) ... ok
+test_a_recipe_run_to_its_end_leaves_the_lower_bounds (scripts.tests.test_ci_scripts.Fetch.test_a_recipe_run_to_its_end_leaves_the_lower_bounds) ... ok
+test_a_recipe_that_ran_to_its_end_has_its_seconds_kept (scripts.tests.test_ci_scripts.Fetch.test_a_recipe_that_ran_to_its_end_has_its_seconds_kept) ... ok
+test_a_run_that_failed_is_fetched_only_where_its_failures_are_known (scripts.tests.test_ci_scripts.Fetch.test_a_run_that_failed_is_fetched_only_where_its_failures_are_known) ... ok
+test_main_reaches_the_refusal_by_its_own_name (scripts.tests.test_ci_scripts.Fetch.test_main_reaches_the_refusal_by_its_own_name) ... ok
+test_the_run_is_named_after_the_commit (scripts.tests.test_ci_scripts.Fetch.test_the_run_is_named_after_the_commit) ... ok
+test_the_seconds_kept_are_each_a_recipes (scripts.tests.test_ci_scripts.Fetch.test_the_seconds_kept_are_each_a_recipes) ... ok
+test_the_tree_here_is_what_is_staged_and_what_is_not (scripts.tests.test_ci_scripts.Fetch.test_the_tree_here_is_what_is_staged_and_what_is_not) ... ok
+test_what_a_failed_recipe_wrote_is_not_copied (scripts.tests.test_ci_scripts.Fetch.test_what_a_failed_recipe_wrote_is_not_copied) ... ok
+test_what_changed_since_a_run_is_the_planners_against_the_tree_here (scripts.tests.test_ci_scripts.Fetch.test_what_changed_since_a_run_is_the_planners_against_the_tree_here) ... ok
+test_a_binary_changed_in_a_range_or_the_tree_here_is_changed_where_it_is_read (scripts.tests.test_ci_scripts.Plan.test_a_binary_changed_in_a_range_or_the_tree_here_is_changed_where_it_is_read) ... ok
+test_a_change_reaches_the_scripts_it_touches (scripts.tests.test_ci_scripts.Plan.test_a_change_reaches_the_scripts_it_touches) ... ok
+test_a_change_to_a_sources_own_tests_reaches_what_runs_them (scripts.tests.test_ci_scripts.Plan.test_a_change_to_a_sources_own_tests_reaches_what_runs_them) ... ok
+test_a_change_to_the_suites_configuration_plans_every_recipe_that_runs_a_suite_under_it (scripts.tests.test_ci_scripts.Plan.test_a_change_to_the_suites_configuration_plans_every_recipe_that_runs_a_suite_under_it) ... ok
+test_a_changed_binary_is_named_where_a_line_names_it (scripts.tests.test_ci_scripts.Plan.test_a_changed_binary_is_named_where_a_line_names_it) ... ok
+test_a_changed_browser_spec_reaches_the_scripts_and_recipes_that_run_it (scripts.tests.test_ci_scripts.Plan.test_a_changed_browser_spec_reaches_the_scripts_and_recipes_that_run_it) ... ok
+test_a_changed_component_plans_the_recipes_whose_tests_read_it (scripts.tests.test_ci_scripts.Plan.test_a_changed_component_plans_the_recipes_whose_tests_read_it) ... ok
+test_a_changed_server_test_module_reaches_what_runs_it_by_its_filter (scripts.tests.test_ci_scripts.Plan.test_a_changed_server_test_module_reaches_what_runs_it_by_its_filter) ... ok
+test_a_changed_spec_or_a_module_its_specs_import_plans_what_runs_them (scripts.tests.test_ci_scripts.Plan.test_a_changed_spec_or_a_module_its_specs_import_plans_what_runs_them) ... ok
+test_a_diff_that_is_no_utf8_is_still_read (scripts.tests.test_ci_scripts.Plan.test_a_diff_that_is_no_utf8_is_still_read) ... ok
+test_a_long_database_singleton_does_not_hide_its_other_database_shard (scripts.tests.test_ci_scripts.Plan.test_a_long_database_singleton_does_not_hide_its_other_database_shard) ... ok
+test_a_long_singleton_does_not_hide_a_database_shard_past_the_ceiling (scripts.tests.test_ci_scripts.Plan.test_a_long_singleton_does_not_hide_a_database_shard_past_the_ceiling) ... ok
+test_a_measurement_of_the_machine_is_not_planned (scripts.tests.test_ci_scripts.Plan.test_a_measurement_of_the_machine_is_not_planned) ... ok
+test_a_plan_is_the_same_every_time (scripts.tests.test_ci_scripts.Plan.test_a_plan_is_the_same_every_time) ... ok
+test_a_recipe_costs_the_seconds_it_last_took (scripts.tests.test_ci_scripts.Plan.test_a_recipe_costs_the_seconds_it_last_took) ... ok
+test_a_recipe_in_an_imported_file_is_read_and_planned (scripts.tests.test_ci_scripts.Plan.test_a_recipe_in_an_imported_file_is_read_and_planned) ... ok
+test_a_recipe_is_planned_where_a_shell_script_it_runs_changed (scripts.tests.test_ci_scripts.Plan.test_a_recipe_is_planned_where_a_shell_script_it_runs_changed) ... ok
+test_a_recipe_is_planned_where_its_own_lines_name_a_program_that_changed (scripts.tests.test_ci_scripts.Plan.test_a_recipe_is_planned_where_its_own_lines_name_a_program_that_changed) ... ok
+test_a_recipe_is_planned_where_its_script_reads_what_changed (scripts.tests.test_ci_scripts.Plan.test_a_recipe_is_planned_where_its_script_reads_what_changed) ... ok
+test_a_recipe_longer_than_the_ceiling_alone_is_not_paid_for_in_shards (scripts.tests.test_ci_scripts.Plan.test_a_recipe_longer_than_the_ceiling_alone_is_not_paid_for_in_shards) ... ok
+test_a_recipe_needing_less_may_run_where_more_is_set_up (scripts.tests.test_ci_scripts.Plan.test_a_recipe_needing_less_may_run_where_more_is_set_up) ... ok
+test_a_recipe_not_yet_measured_costs_what_its_kind_does (scripts.tests.test_ci_scripts.Plan.test_a_recipe_not_yet_measured_costs_what_its_kind_does) ... ok
+test_a_recipe_recorded_past_a_jobs_limit_is_refused_before_any_shard (scripts.tests.test_ci_scripts.Plan.test_a_recipe_recorded_past_a_jobs_limit_is_refused_before_any_shard) ... ok
+test_a_recipe_run_against_a_database_is_a_shard_of_its_own (scripts.tests.test_ci_scripts.Plan.test_a_recipe_run_against_a_database_is_a_shard_of_its_own) ... ok
+test_a_recipe_that_skips_without_a_database_is_dealt_beside_one (scripts.tests.test_ci_scripts.Plan.test_a_recipe_that_skips_without_a_database_is_dealt_beside_one) ... ok
+test_a_recipe_whose_parameters_have_defaults_is_read (scripts.tests.test_ci_scripts.Plan.test_a_recipe_whose_parameters_have_defaults_is_read) ... ok
+test_a_recipes_cost_counts_the_mutants_it_plants (scripts.tests.test_ci_scripts.Plan.test_a_recipes_cost_counts_the_mutants_it_plants) ... ok
+test_a_run_is_planned_by_the_seconds_kept (scripts.tests.test_ci_scripts.Plan.test_a_run_is_planned_by_the_seconds_kept) ... ok
+test_a_run_takes_more_shards_than_it_asks_where_its_would_end_past_the_ceiling (scripts.tests.test_ci_scripts.Plan.test_a_run_takes_more_shards_than_it_asks_where_its_would_end_past_the_ceiling) ... ok
+test_a_safe_database_bundle_keeps_the_fewest_database_shards (scripts.tests.test_ci_scripts.Plan.test_a_safe_database_bundle_keeps_the_fewest_database_shards) ... ok
+test_a_shard_with_a_database_sets_up_what_its_recipe_needs (scripts.tests.test_ci_scripts.Plan.test_a_shard_with_a_database_sets_up_what_its_recipe_needs) ... ok
+test_main_deals_a_run_within_the_ceiling (scripts.tests.test_ci_scripts.Plan.test_main_deals_a_run_within_the_ceiling) ... ok
+test_no_shard_is_planned_empty (scripts.tests.test_ci_scripts.Plan.test_no_shard_is_planned_empty) ... ok
+test_recipes_run_against_a_database_take_the_shards_that_end_the_run_soonest (scripts.tests.test_ci_scripts.Plan.test_recipes_run_against_a_database_take_the_shards_that_end_the_run_soonest) ... ok
+test_short_recipes_run_against_a_database_share_one (scripts.tests.test_ci_scripts.Plan.test_short_recipes_run_against_a_database_share_one) ... ok
+test_the_ceiling_is_within_the_shards_limit (scripts.tests.test_ci_scripts.Plan.test_the_ceiling_is_within_the_shards_limit) ... ok
+test_the_ceiling_tie_counts_database_setup (scripts.tests.test_ci_scripts.Plan.test_the_ceiling_tie_counts_database_setup) ... ok
+test_the_costliest_go_first_each_to_where_it_ends_soonest (scripts.tests.test_ci_scripts.Plan.test_the_costliest_go_first_each_to_where_it_ends_soonest) ... ok
+test_the_modules_the_configuration_reads_are_its_own_and_plan_as_it_does (scripts.tests.test_ci_scripts.Plan.test_the_modules_the_configuration_reads_are_its_own_and_plan_as_it_does) ... ok
+test_the_seconds_are_read_where_the_fetch_keeps_them (scripts.tests.test_ci_scripts.Plan.test_the_seconds_are_read_where_the_fetch_keeps_them) ... ok
+test_what_a_recipe_adds_to_a_shards_setup_counts (scripts.tests.test_ci_scripts.Plan.test_what_a_recipe_adds_to_a_shards_setup_counts) ... ok
+test_what_a_recipe_needs_is_read_from_its_lines (scripts.tests.test_ci_scripts.Plan.test_what_a_recipe_needs_is_read_from_its_lines) ... ok
+test_what_builds_leave_is_freed_and_the_newest_binary_kept (scripts.tests.test_ci_scripts.Prune.test_what_builds_leave_is_freed_and_the_newest_binary_kept) ... ok
+test_a_failed_recipe_says_its_last_lines_in_the_jobs_log (scripts.tests.test_ci_scripts.Recipes.test_a_failed_recipe_says_its_last_lines_in_the_jobs_log) ... ok
+test_a_heartbeat_says_what_a_recipe_is_doing_until_it_ends (scripts.tests.test_ci_scripts.Recipes.test_a_heartbeat_says_what_a_recipe_is_doing_until_it_ends) ... ok
+test_what_a_recipe_wrote_is_what_changed (scripts.tests.test_ci_scripts.Recipes.test_what_a_recipe_wrote_is_what_changed) ... ok
+test_a_trains_push_plans_the_stale_evidence_and_another_tracks_does_not (scripts.tests.test_ci_scripts.StaleEvidence.test_a_trains_push_plans_the_stale_evidence_and_another_tracks_does_not) ... ok
+test_evidence_from_a_tree_with_changes_or_none_at_all_is_stale (scripts.tests.test_ci_scripts.StaleEvidence.test_evidence_from_a_tree_with_changes_or_none_at_all_is_stale) ... ok
+test_evidence_that_names_no_commit_is_not_judged (scripts.tests.test_ci_scripts.StaleEvidence.test_evidence_that_names_no_commit_is_not_judged) ... ok
+test_evidence_whose_reads_changed_since_its_commit_is_stale (scripts.tests.test_ci_scripts.StaleEvidence.test_evidence_whose_reads_changed_since_its_commit_is_stale) ... ok
+test_main_plans_stale_evidence_only_where_asked (scripts.tests.test_ci_scripts.StaleEvidence.test_main_plans_stale_evidence_only_where_asked) ... ci_plan: e10-attribute-case's evidence is stale, so it is planned
 ok
-test_a_failed_recipe_fails_the_run (scripts.tests.test_ci_scripts.Summary) ... ok
-test_a_kill_perhaps_the_memory_bounds_alone_is_listed_apart (scripts.tests.test_ci_scripts.Summary) ... ok
-test_a_run_of_one_shard_is_read_where_it_was_extracted (scripts.tests.test_ci_scripts.Summary) ... ok
-test_a_run_whose_recipes_passed_passes (scripts.tests.test_ci_scripts.Summary) ... ok
-test_a_shard_that_reported_nothing_fails_the_run (scripts.tests.test_ci_scripts.Summary) ... ok
-test_a_surviving_mutant_fails_the_run (scripts.tests.test_ci_scripts.Summary) ... ok
-test_a_dispatch_or_a_run_that_did_not_pass_does_not_count (scripts.tests.test_ci_scripts.VerifiedBase) ... ok
-test_a_merges_second_parent_does_not_count (scripts.tests.test_ci_scripts.VerifiedBase) ... ok
-test_a_pushed_commit_a_run_passed_at_plans_nothing_again (scripts.tests.test_ci_scripts.VerifiedBase) ... ok
-test_an_error_plans_from_the_commit_before (scripts.tests.test_ci_scripts.VerifiedBase) ... ok
-test_master_plans_from_the_newest_commit_a_run_passed_at (scripts.tests.test_ci_scripts.VerifiedBase) ... ok
-test_the_browser_suites_run_again_only_where_more_than_records_changed (scripts.tests.test_ci_scripts.VerifiedBase) ... ok
-test_the_runs_are_read_through_gh_by_their_commit (scripts.tests.test_ci_scripts.VerifiedBase) ... ok
-test_where_no_run_passed_master_plans_from_the_commit_before (scripts.tests.test_ci_scripts.VerifiedBase) ... ok
-test_a_count_and_a_verdict_of_a_retired_mutant_are_named (scripts.tests.test_evidence_counts.Counts) ... ok
-test_a_description_is_read_beside_its_words_its_suite_and_separators (scripts.tests.test_evidence_counts.Counts) ... ok
-test_a_disagreement_fails_unless_a_trains_push_records_it_again (scripts.tests.test_evidence_counts.Counts) ... ok
-test_a_mutant_named_twice_and_a_verdict_short_are_named (scripts.tests.test_evidence_counts.Counts) ... ok
-test_evidence_that_agrees_with_its_script_names_nothing (scripts.tests.test_evidence_counts.Counts) ... ok
-test_its_killed_are_the_verdicts_that_say_killed (scripts.tests.test_evidence_counts.Counts) ... ok
-test_two_scripts_blocks_are_read_by_the_mutants_they_name (scripts.tests.test_evidence_counts.Counts) ... ok
-test_evidence_current_in_the_tree_here_is_recorded_again_by_no_plan (scripts.tests.test_evidence_counts.PlannedAgain) ... ok
-test_evidence_whose_script_changed_in_the_tree_here_is_planned_again (scripts.tests.test_evidence_counts.PlannedAgain) ... ok
-test_the_repositorys_evidence_agrees_with_its_scripts_or_is_planned_again (scripts.tests.test_evidence_counts.Repository) ... ok
+test_a_failed_recipe_fails_the_run (scripts.tests.test_ci_scripts.Summary.test_a_failed_recipe_fails_the_run) ... ok
+test_a_kill_perhaps_the_memory_bounds_alone_is_listed_apart (scripts.tests.test_ci_scripts.Summary.test_a_kill_perhaps_the_memory_bounds_alone_is_listed_apart) ... ok
+test_a_run_of_one_shard_is_read_where_it_was_extracted (scripts.tests.test_ci_scripts.Summary.test_a_run_of_one_shard_is_read_where_it_was_extracted) ... ok
+test_a_run_whose_recipes_passed_passes (scripts.tests.test_ci_scripts.Summary.test_a_run_whose_recipes_passed_passes) ... ok
+test_a_shard_that_reported_nothing_fails_the_run (scripts.tests.test_ci_scripts.Summary.test_a_shard_that_reported_nothing_fails_the_run) ... ok
+test_a_surviving_mutant_fails_the_run (scripts.tests.test_ci_scripts.Summary.test_a_surviving_mutant_fails_the_run) ... ok
+test_a_dispatch_or_a_run_that_did_not_pass_does_not_count (scripts.tests.test_ci_scripts.VerifiedBase.test_a_dispatch_or_a_run_that_did_not_pass_does_not_count) ... ok
+test_a_merges_second_parent_does_not_count (scripts.tests.test_ci_scripts.VerifiedBase.test_a_merges_second_parent_does_not_count) ... ok
+test_a_pushed_commit_a_run_passed_at_plans_nothing_again (scripts.tests.test_ci_scripts.VerifiedBase.test_a_pushed_commit_a_run_passed_at_plans_nothing_again) ... ok
+test_an_error_plans_from_the_commit_before (scripts.tests.test_ci_scripts.VerifiedBase.test_an_error_plans_from_the_commit_before) ... ok
+test_master_plans_from_the_newest_commit_a_run_passed_at (scripts.tests.test_ci_scripts.VerifiedBase.test_master_plans_from_the_newest_commit_a_run_passed_at) ... ok
+test_the_browser_suites_run_again_only_where_more_than_records_changed (scripts.tests.test_ci_scripts.VerifiedBase.test_the_browser_suites_run_again_only_where_more_than_records_changed) ... ok
+test_the_runs_are_read_through_gh_by_their_commit (scripts.tests.test_ci_scripts.VerifiedBase.test_the_runs_are_read_through_gh_by_their_commit) ... ok
+test_where_no_run_passed_master_plans_from_the_commit_before (scripts.tests.test_ci_scripts.VerifiedBase.test_where_no_run_passed_master_plans_from_the_commit_before) ... ok
+test_a_count_and_a_verdict_of_a_retired_mutant_are_named (scripts.tests.test_evidence_counts.Counts.test_a_count_and_a_verdict_of_a_retired_mutant_are_named) ... ok
+test_a_description_is_read_beside_its_words_its_suite_and_separators (scripts.tests.test_evidence_counts.Counts.test_a_description_is_read_beside_its_words_its_suite_and_separators) ... ok
+test_a_disagreement_fails_unless_a_trains_push_records_it_again (scripts.tests.test_evidence_counts.Counts.test_a_disagreement_fails_unless_a_trains_push_records_it_again) ... ok
+test_a_mutant_named_twice_and_a_verdict_short_are_named (scripts.tests.test_evidence_counts.Counts.test_a_mutant_named_twice_and_a_verdict_short_are_named) ... ok
+test_a_scripts_mutants_split_across_recipes_are_each_counted_in_its_part (scripts.tests.test_evidence_counts.Counts.test_a_scripts_mutants_split_across_recipes_are_each_counted_in_its_part) ... ok
+test_a_scripts_parts_hold_every_mutant_once_each_run_by_a_recipe (scripts.tests.test_evidence_counts.Counts.test_a_scripts_parts_hold_every_mutant_once_each_run_by_a_recipe) ... ok
+test_a_verdict_that_says_what_killed_its_mutant_is_read (scripts.tests.test_evidence_counts.Counts.test_a_verdict_that_says_what_killed_its_mutant_is_read) ... ok
+test_evidence_that_agrees_with_its_script_names_nothing (scripts.tests.test_evidence_counts.Counts.test_evidence_that_agrees_with_its_script_names_nothing) ... ok
+test_its_killed_are_the_verdicts_that_say_killed (scripts.tests.test_evidence_counts.Counts.test_its_killed_are_the_verdicts_that_say_killed) ... ok
+test_two_scripts_blocks_are_read_by_the_mutants_they_name (scripts.tests.test_evidence_counts.Counts.test_two_scripts_blocks_are_read_by_the_mutants_they_name) ... ok
+test_evidence_current_in_the_tree_here_is_recorded_again_by_no_plan (scripts.tests.test_evidence_counts.PlannedAgain.test_evidence_current_in_the_tree_here_is_recorded_again_by_no_plan) ... ok
+test_evidence_whose_script_changed_in_the_tree_here_is_planned_again (scripts.tests.test_evidence_counts.PlannedAgain.test_evidence_whose_script_changed_in_the_tree_here_is_planned_again) ... ok
+test_the_repositorys_evidence_agrees_with_its_scripts_or_is_planned_again (scripts.tests.test_evidence_counts.Repository.test_the_repositorys_evidence_agrees_with_its_scripts_or_is_planned_again) ... ok
 
 ----------------------------------------------------------------------
-Ran 85 tests in 12.003s
+Ran 99 tests in 13.776s
 
 OK
-docs/evidence/E10/labels-through-plain-values.txt:20: label_plain_mutations.py: counts 3 mutants; its script defines 2
-docs/evidence/E10/labels-through-plain-values.txt:19: label_plain_mutations.py: 'a parameter that states a label carries its argument too' names no mutant of its script
-  e10-labels-through-plain-values: stale, and planned at a train's push (ci_plan.py --stale)
-docs/evidence/E10/privacy-by-resolution.txt:22: privacy_resolution_mutations.py: counts 4 mutants; its script defines 3
-docs/evidence/E10/privacy-by-resolution.txt:19: privacy_resolution_mutations.py: "the body's label is read by spelling" names no mutant of its script
-  e10-privacy-by-resolution: stale, and planned at a train's push (ci_plan.py --stale)
-docs/evidence/E14/argument-invariants.txt:0: no such file: the recipe's evidence is not recorded
-  e14-argument-invariants: stale, and planned at a train's push (ci_plan.py --stale)
-docs/evidence/E14/bounded-reads.txt:0: no such file: the recipe's evidence is not recorded
-  e14-bounded-reads: stale, and planned at a train's push (ci_plan.py --stale)
-docs/evidence/E14/bounded-statements.txt:92: bounded_statements_mutations.py: counts 7 mutants; its script defines 8
+docs/evidence/E14/bounded-statements.txt:114: bounded_statements_mutations.py: counts 13 mutants; its script defines 14
   e14-bounded-statements: stale, and planned at a train's push (ci_plan.py --stale)
-docs/evidence/E14/each-head-effects.txt:0: no such file: the recipe's evidence is not recorded
-  e14-each-head-effects: stale, and planned at a train's push (ci_plan.py --stale)
-docs/evidence/E14/evidence-integrity.txt:0: no such file: the recipe's evidence is not recorded
+docs/evidence/E14/browser-host-map.txt:112: browser_host_map_mutations.py: counts 47 mutants; its script defines 48
+docs/evidence/E14/browser-host-map.txt:89: browser_host_map_mutations.py: 'a stale optional build says nothing [fast]' names no mutant of its script
+  e14-browser-host-map: stale, and planned at a train's push (ci_plan.py --stale)
+docs/evidence/E14/committed-components.txt:0: no such file: the recipe's evidence is not recorded
+  e14-committed-components: stale, and planned at a train's push (ci_plan.py --stale)
+docs/evidence/E14/computed-signals.txt:56: computed_signals_mutations.py: counts 16 mutants; its script defines 17
+  e14-computed-signals: stale, and planned at a train's push (ci_plan.py --stale)
+docs/evidence/E14/evidence-integrity.txt:291: evidence_integrity_mutations.py: counts 43 mutants; its script defines 51
   e14-evidence-integrity: stale, and planned at a train's push (ci_plan.py --stale)
-docs/evidence/E14/guide.txt:0: no such file: the recipe's evidence is not recorded
+docs/evidence/E14/guide.txt:63: guide_mutations.py: "a gap's build output is not what `pw build` prints" names no mutant of its script
+docs/evidence/E14/guide.txt:66: guide_mutations.py: 'a build gap shows no build output' names no mutant of its script
   e14-guide: stale, and planned at a train's push (ci_plan.py --stale)
-docs/evidence/E14/museum.txt:76: proof_mutations.py: counts 3 mutants; its script defines 4
-  e14-museum: stale, and planned at a train's push (ci_plan.py --stale)
-docs/evidence/E14/scheduled-orders.txt:0: no such file: the recipe's evidence is not recorded
-  e14-scheduled-orders: stale, and planned at a train's push (ci_plan.py --stale)
+docs/evidence/E14/guide-producer.txt:71: its verdicts name the mutants of none of guide_mutations.py, guide_producer_mutations.py
+docs/evidence/E14/guide-producer.txt:0: counts none of guide_mutations.py's mutants, which the recipe runs
+docs/evidence/E14/guide-producer.txt:0: counts none of guide_producer_mutations.py's mutants, which the recipe runs
+  e14-guide-producer: stale, and planned at a train's push (ci_plan.py --stale)
+docs/evidence/E14/parallel-mutants.txt:116: mutation_slots_mutations.py: counts 85 mutants; its script defines 86
+  e14-parallel-mutants: stale, and planned at a train's push (ci_plan.py --stale)
+docs/evidence/E14/render-merge.txt:187: render_merge_mutations.py: counts 40 mutants; its script defines 49
+  e14-render-merge: stale, and planned at a train's push (ci_plan.py --stale)
+docs/evidence/E14/skipped-specs.txt:0: no such file: the recipe's evidence is not recorded
+  e14-skipped-specs: stale, and planned at a train's push (ci_plan.py --stale)
 evidence counts: 10 recipes disagree with their scripts, 10 of them stale and planned, 0 failing
 
 == 3. a rejected fixture's @rule is the code pw check reports (compiler/pw-core/tests/checking_source.rs)
@@ -161,99 +185,115 @@ test an_unmodelled_capability_family_never_manufactures_a_placement_error ... ok
 test a_nullary_constructor_is_not_read_as_a_binding ... ok
 test constructor_arity_is_respected ... ok
 test every_body_level_rejection_matches_its_declared_rule ... ok
-test a_caught_file_conveys_every_fact_its_expect_error_lines_declare ... ok
 test corpus_enforcement_is_reported_as_three_numbers_not_one ... ok
+test a_caught_file_conveys_every_fact_its_expect_error_lines_declare ... ok
 test a_fixtures_declared_symbol_matches_the_symbol_it_is_caught_by ... ok
 test every_rejected_fixtures_rule_is_a_code_its_check_reports ... ok
 test every_rejected_fixture_emits_only_its_own_defect ... ok
 test no_accepted_corpus_file_reports_a_body_level_error ... ok
-test semantic_coverage_of_the_rejected_corpus_does_not_regress ... ok
-test the_environment_spans_every_file_checked_together ... ok
 test no_diagnostic_restates_its_invariant_in_its_own_words ... ok
+test the_environment_spans_every_file_checked_together ... ok
 test the_committed_enforcement_table_is_what_the_corpus_checks_now ... ok
+test semantic_coverage_of_the_rejected_corpus_does_not_regress ... ok
 test the_unhandled_variant_case_is_caught_at_its_real_span ... ok
 test every_diagnostic_carries_what_charter_16_3_requires ... ok
-test the_structured_concurrency_rules_run_on_real_bodies ... ok
 test the_privacy_and_placement_rules_catch_their_corpus_cases ... ok
-test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 52.09s
+test the_structured_concurrency_rules_run_on_real_bodies ... ok
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 80.07s
 
 == 4. check_latency bounds its thread's CPU time (compiler/pw-core/tests/check_latency.rs)
 
-load: 7.47 13.38 14.84 7/578 385548
-check-latency reject  845.75 ms   (cpu 845.75 ms; clean 810.46 ms, cpu 810.42 ms)
-check-latency cold    879.77 ms   (cpu 879.75 ms)
-check-latency edit    858.14 ms   (cpu 858.10 ms; 56 files, no query system: an edit costs a full check)
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.86s
+load: 3.74 2.21 1.21 1/249 32899
+check-latency reject  930.66 ms   (cpu 930.53 ms; clean 1856.65 ms, cpu 1856.32 ms; the fastest of 7 and 7 checks, which the ratio bounds: cpu 913.03 ms, clean cpu 1819.08 ms)
+check-latency cold   1859.50 ms   (cpu 1859.24 ms; 6568 lines, cpu 283.07 ms a thousand lines; the fastest of 7 checks, which the ceiling bounds: cpu 1822.94 ms, 277.55 ms a thousand lines)
+check-latency edit   1837.44 ms   (cpu 1837.20 ms; 56 files, no query system: an edit costs a full check)
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 45.37s
 
-beside 64 busy loops, load: 16.11 14.54 15.16 100/774 393388
-check-latency reject 4928.93 ms   (cpu 2211.86 ms; clean 4476.38 ms, cpu 1991.56 ms)
-check-latency cold   3765.03 ms   (cpu 1636.01 ms)
-check-latency edit   4589.38 ms   (cpu 1980.42 ms; 56 files, no query system: an edit costs a full check)
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 128.45s
+beside 8 busy loops, load: 3.48 2.30 1.29 12/265 32947
+check-latency cold   5874.39 ms   (cpu 2731.02 ms; 6568 lines, cpu 415.81 ms a thousand lines; the fastest of 7 checks, which the ceiling bounds: cpu 2545.78 ms, 387.60 ms a thousand lines)
+check-latency edit   6511.22 ms   (cpu 2671.08 ms; 56 files, no query system: an edit costs a full check)
+check-latency reject 3396.63 ms   (cpu 1387.01 ms; clean 6665.68 ms, cpu 2688.42 ms; the fastest of 7 and 7 checks, which the ratio bounds: cpu 1381.55 ms, clean cpu 2633.58 ms)
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 152.71s
 
 == 5. a browser suite runs on what its recipe built (test_builds_before_suites.py)
 
-test_every_recipe_that_runs_a_browser_suite_builds_first_and_stops_where_a_build_fails (scripts.tests.test_builds_before_suites.BuildsBeforeSuites) ... 
-builds before suites: 88 recipes run the browser suite that serves `dist`; 203 builds before their suites, each failed in turn
-test_the_stand_ins_tell_a_build_that_stops_its_recipe_from_one_that_does_not (scripts.tests.test_builds_before_suites.BuildsBeforeSuites) ... ok
-test_a_build_of_another_runtime_or_of_changed_sources_is_refused (scripts.tests.test_builds_before_suites.DistIsWhole) ... ok
-test_a_build_stopped_part_way_or_never_made_is_refused (scripts.tests.test_builds_before_suites.DistIsWhole) ... ok
-test_a_whole_build_is_served (scripts.tests.test_builds_before_suites.DistIsWhole) ... ok
-Ran 5 tests in 65.082s
+test_every_recipe_that_runs_a_browser_suite_builds_first_and_stops_where_a_build_fails (scripts.tests.test_builds_before_suites.BuildsBeforeSuites.test_every_recipe_that_runs_a_browser_suite_builds_first_and_stops_where_a_build_fails) ... 
+builds before suites: 89 recipes run the browser suite that serves `dist`; 206 builds before their suites, each failed in turn
+test_the_stand_ins_tell_a_build_that_stops_its_recipe_from_one_that_does_not (scripts.tests.test_builds_before_suites.BuildsBeforeSuites.test_the_stand_ins_tell_a_build_that_stops_its_recipe_from_one_that_does_not) ... ok
+test_a_build_of_another_runtime_or_of_changed_sources_is_refused (scripts.tests.test_builds_before_suites.DistIsWhole.test_a_build_of_another_runtime_or_of_changed_sources_is_refused) ... ok
+test_a_build_stopped_part_way_or_never_made_is_refused (scripts.tests.test_builds_before_suites.DistIsWhole.test_a_build_stopped_part_way_or_never_made_is_refused) ... ok
+test_a_whole_build_is_served (scripts.tests.test_builds_before_suites.DistIsWhole.test_a_whole_build_is_served) ... ok
+Ran 5 tests in 23.353s
 OK
 
 == 6. master holds no unnumbered ADR (test_unnumbered_adrs.py; the repository's own on master's CI and a train's)
 
-test_a_mention_outside_code_and_an_unnumbered_file_are_named (scripts.tests.test_unnumbered_adrs.Unnumbered) ... ok
-test_master_and_a_train_are_held_and_a_tracks_branch_is_not (scripts.tests.test_unnumbered_adrs.Unnumbered) ... ok
-test_the_control_a_mention_of_the_placeholder_in_code_and_a_numbered_adr_name_nothing (scripts.tests.test_unnumbered_adrs.Unnumbered) ... ok
-test_the_repository_holds_no_unnumbered_adr (scripts.tests.test_unnumbered_adrs.Unnumbered) ... skipped "a track keeps its ADRs unnumbered until its merge; master's CI and a train's hold them"
-Ran 4 tests in 0.029s
-OK (skipped=1)
+test_a_mention_outside_code_and_an_unnumbered_file_are_named (scripts.tests.test_unnumbered_adrs.Unnumbered.test_a_mention_outside_code_and_an_unnumbered_file_are_named) ... ok
+test_master_and_a_train_are_held_and_a_tracks_branch_is_not (scripts.tests.test_unnumbered_adrs.Unnumbered.test_master_and_a_train_are_held_and_a_tracks_branch_is_not) ... ok
+test_the_control_a_mention_of_the_placeholder_in_code_and_a_numbered_adr_name_nothing (scripts.tests.test_unnumbered_adrs.Unnumbered.test_the_control_a_mention_of_the_placeholder_in_code_and_a_numbered_adr_name_nothing) ... ok
+test_the_repository_holds_no_unnumbered_adr (scripts.tests.test_unnumbered_adrs.Unnumbered.test_the_repository_holds_no_unnumbered_adr) ... ok
+Ran 4 tests in 0.082s
+OK
 
 == mutation controls (scripts/evidence_integrity_mutations.py)
 
 baseline (atomic): 4 passed, 0 failed
-baseline (baseline): 19 passed, 0 failed
-baseline (plan): 85 passed, 0 failed
+baseline (baseline): 26 passed, 0 failed
+baseline (plan): 99 passed, 0 failed
 baseline (corpus): 2 passed, 0 failed
-baseline (latency): 2 passed, 0 failed
+baseline (latency): 11 passed, 0 failed
 baseline (builds): 5 passed, 0 failed
-baseline (adrs): 3 passed, 0 failed
+baseline (adrs): 4 passed, 0 failed
 a report is visible while its own gate is reading it [atomic]: KILLED (3 of 4 tests fail)
 a failed recording hides its diagnostic output [atomic]: KILLED (1 of 4 tests fail)
 a published report disappears from evidence planning [atomic]: KILLED (1 of 4 tests fail)
-a mutation script's children write bytecode [baseline]: KILLED (2 of 19 tests fail)
-a mutation script's own process writes bytecode [baseline]: KILLED (1 of 19 tests fail)
-bytecode left before for a source a mutant changes is read [baseline]: KILLED (1 of 19 tests fail)
-a train's push plans no stale evidence [plan]: KILLED (1 of 85 tests fail)
-the planner adds no stale evidence where asked [plan]: KILLED (1 of 85 tests fail)
-evidence that names no commit is judged stale [plan]: KILLED (1 of 85 tests fail)
-evidence the head does not hold is not stale [plan]: KILLED (2 of 85 tests fail)
-an evidence file's count is not compared with its script's mutants [plan]: KILLED (1 of 85 tests fail)
-an evidence file's killed is not compared with its verdicts [plan]: KILLED (2 of 85 tests fail)
-a verdict that names no mutant of its script is let be [plan]: KILLED (2 of 85 tests fail)
-a verdict that names a mutant named before is let be [plan]: KILLED (1 of 85 tests fail)
-a script the recipe runs may be counted in no block [plan]: KILLED (1 of 85 tests fail)
-a suite's tag is taken as part of a mutant's name [plan]: KILLED (7 of 85 tests fail)
-a description inside a longer one names its mutant [plan]: KILLED (1 of 85 tests fail)
-a disagreement is planned again though its recipe is the development machine's [plan]: KILLED (1 of 85 tests fail)
-a disagreement is planned again though its evidence is current [plan]: KILLED (1 of 85 tests fail)
-a disagreement's staleness is read at the head, not in the tree here [plan]: KILLED (1 of 85 tests fail)
+a mutation script's children write bytecode [baseline]: KILLED (2 of 26 tests fail)
+a mutation script's own process writes bytecode [baseline]: KILLED (1 of 26 tests fail)
+bytecode left before for a source a mutant changes is read [baseline]: KILLED (1 of 26 tests fail)
+a train's push plans no stale evidence [plan]: KILLED (1 of 99 tests fail)
+the planner adds no stale evidence where asked [plan]: KILLED (1 of 99 tests fail)
+evidence that names no commit is judged stale [plan]: KILLED (1 of 99 tests fail)
+evidence the head does not hold is not stale [plan]: KILLED (2 of 99 tests fail)
+an evidence file's count is not compared with its script's mutants [plan]: KILLED (2 of 99 tests fail)
+an evidence file's killed is not compared with its verdicts [plan]: KILLED (3 of 99 tests fail)
+a part's count is held to its whole script's [plan]: KILLED (2 of 99 tests fail)
+a script's parts may leave a mutant to none [plan]: KILLED (1 of 99 tests fail)
+a script's parts may hold a mutant twice [plan]: KILLED (1 of 99 tests fail)
+a part no recipe runs is let be [plan]: KILLED (1 of 99 tests fail)
+a verdict that names no mutant of its script is let be [plan]: KILLED (2 of 99 tests fail)
+a verdict that names a mutant named before is let be [plan]: KILLED (1 of 99 tests fail)
+a script the recipe runs may be counted in no block [plan]: KILLED (1 of 99 tests fail)
+a verdict that says what killed its mutant is read as none [plan]: KILLED (1 of 99 tests fail)
+a suite's tag is taken as part of a mutant's name [plan]: KILLED (10 of 99 tests fail)
+a description inside a longer one names its mutant [plan]: KILLED (1 of 99 tests fail)
+a disagreement is planned again though its recipe is the development machine's [plan]: KILLED (1 of 99 tests fail)
+a disagreement is planned again though its evidence is current [plan]: KILLED (1 of 99 tests fail)
+a disagreement's staleness is read at the head, not in the tree here [plan]: KILLED (1 of 99 tests fail)
+a binary file's change is read as no change [plan]: KILLED (1 of 99 tests fail)
+the diff's binary files are not read [plan]: KILLED (2 of 99 tests fail)
+a changed binary's readers are not changes [plan]: KILLED (2 of 99 tests fail)
+a binary's directory named whole does not name it [plan]: KILLED (2 of 99 tests fail)
+a placeholder names no file [plan]: KILLED (2 of 99 tests fail)
+a directory in the binary's names it [plan]: KILLED (1 of 99 tests fail)
+another directory ending in the binary's names it [plan]: KILLED (1 of 99 tests fail)
+a record reads a binary [plan]: KILLED (1 of 99 tests fail)
 a header's alias passes [corpus]: KILLED (1 of 2 tests fail)
 a header's retired code passes [corpus]: KILLED (1 of 2 tests fail)
 a header's code its check does not report passes [corpus]: KILLED (1 of 2 tests fail)
 a header's invariant of another code passes [corpus]: KILLED (1 of 2 tests fail)
 R-004 names its alias again [corpus]: KILLED (1 of 2 tests fail)
-checking is pathological: the program is checked five times over [latency]: KILLED (1 of 2 tests fail)
-the checking thread's clock reads nothing [latency]: KILLED (2 of 2 tests fail)
+checking is pathological: the program is checked ten times over [latency]: KILLED (1 of 11 tests fail)
+the checking thread's clock reads nothing [latency]: KILLED (2 of 11 tests fail)
 a dist that records no sources is served [builds]: KILLED (3 of 5 tests fail)
 e14-signals runs its suite on what was built before [builds]: KILLED (1 of 5 tests fail)
 e14-slots's build failing leaves its suite to run [builds]: KILLED (1 of 5 tests fail)
-a mention in a code span is read too [adrs]: KILLED (1 of 3 tests fail)
-no mention is read [adrs]: KILLED (1 of 3 tests fail)
-an unnumbered ADR file is let be [adrs]: KILLED (1 of 3 tests fail)
-a track's branch is held [adrs]: KILLED (2 of 4 tests fail)
+a mention in a code span is read too [adrs]: KILLED (2 of 4 tests fail)
+no mention is read [adrs]: KILLED (1 of 4 tests fail)
+a path evidence recorded is read as a mention [adrs]: KILLED (2 of 4 tests fail)
+a decision's path is let be outside evidence too [adrs]: KILLED (1 of 4 tests fail)
+a line of evidence with a recorded path is let be whole [adrs]: KILLED (1 of 4 tests fail)
+an unnumbered ADR file is let be [adrs]: KILLED (1 of 4 tests fail)
+a track's branch is held [adrs]: KILLED (1 of 4 tests fail)
 a train is not held [adrs]: KILLED (1 of 3 tests fail)
-35 of 35 mutants killed
+51 of 51 mutants killed
 memory bound: no process was stopped

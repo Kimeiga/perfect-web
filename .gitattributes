@@ -28,3 +28,10 @@
 *.br binary
 *.zst binary
 *.pdf binary
+
+# Preserve exact native evidence bytes; scope exceptions to these raw files.
+docs/evidence/E14/train9-bounded-completion-before.txt -text whitespace=cr-at-eol
+docs/evidence/E14/train9-bounded-focused.txt -text whitespace=cr-at-eol
+docs/evidence/E14/train9-bounded-marker-focused-failed.txt -text whitespace=cr-at-eol
+docs/evidence/E14/train9-bounded-transitions-before.txt -text whitespace=cr-at-eol
+docs/evidence/E14/train9-bounded-strict-commands/0000.txt whitespace=-blank-at-eof

@@ -8,7 +8,7 @@
 //     and an item taken away brings it back;
 //   - another store's open page, which reads its own line, is told nothing.
 import { expect, test } from "@playwright/test";
-import { MUTABLE_PORTS } from "../playwright.config.mjs";
+import { MUTABLE_PORTS } from "../host-metadata.mjs";
 
 // The menu a test changes is one per server: a host of its own per engine.
 test.use({

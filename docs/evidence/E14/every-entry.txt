@@ -1,8 +1,8 @@
 ADR-0256 - an entry written with a wildcard is every entry at the rest
 
 produced by: just e14-every-entry
-commit: 92fdd6e34743e33a80914939976125a9eb307842
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38559878637 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 320c52a44840a80423609ab476eb847c04de34a6
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39442025240 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 postgres: none: PW_FEED_DATABASE_URL is not set
 
@@ -12,23 +12,23 @@ test a_bare_entry_names_none ... ok
 test an_event_is_given_a_value_at_each_parameter ... ok
 test a_wildcard_is_a_whole_argument ... ok
 test an_entry_written_with_a_wildcard_is_every_entry_at_the_rest ... ok
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
 
 == the compiled command (compiler/pw-conformance/tests/invalidations.rs)
 
 test a_command_leaves_a_position_to_every_value ... ok
 test its_contract_imports_the_invalidations_under_the_outbox ... ok
 test a_command_computes_the_entries_it_invalidates ... ok
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
 
 == the host (spikes/own-renderer/server/src/tests/every_entry.rs, feed_pg.rs)
 
 test tests::every_entry::an_entry_is_named_by_the_values_given_whatever_the_rest ... ok
 test tests::feed_pg::on_postgres_an_entry_written_with_a_wildcard_is_every_entry ... ok
-test tests::every_entry::a_private_entry_is_dropped_in_every_sessions_partition ... ok
-test tests::every_entry::a_wildcard_may_stand_first ... ok
 test tests::every_entry::an_entry_written_with_a_wildcard_is_every_entry_at_the_rest ... ok
-test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 564 filtered out; finished in 11.27s
+test tests::every_entry::a_wildcard_may_stand_first ... ok
+test tests::every_entry::a_private_entry_is_dropped_in_every_sessions_partition ... ok
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 666 filtered out; finished in 1.59s
 
 == the cache (runtime/pw-resource/tests/concurrency_regressions.rs)
 

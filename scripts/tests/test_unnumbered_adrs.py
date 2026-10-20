@@ -44,6 +44,10 @@ class Unnumbered(unittest.TestCase):
                 "compiler/tests/a.rs": f"// the refusals (writing {X}'s refusals)\nfn a() {{}}\n",
                 "docs/evidence/E14/x.txt": f"{X} - a header recorded on a track\n",
                 f"docs/DECISIONS/{X}-a-track.md": "# A track's decision\n",
+                # A header beside a recorded path is named all the same, and
+                # a path to the file outside evidence names the decision.
+                "docs/evidence/E14/y.txt": f"{X} - read docs/DECISIONS/{X}-a-track.md\n",
+                "scripts/c.py": f"# docs/DECISIONS/{X}-a-track.md says why\n",
             }
         )
         self.assertEqual(
@@ -52,6 +56,8 @@ class Unnumbered(unittest.TestCase):
                 ("compiler/tests/a.rs", 1, f"// the refusals (writing {X}'s refusals)"),
                 (f"docs/DECISIONS/{X}-a-track.md", 0, f"{X}-a-track.md"),
                 ("docs/evidence/E14/x.txt", 1, f"{X} - a header recorded on a track"),
+                ("docs/evidence/E14/y.txt", 1, f"{X} - read docs/DECISIONS/{X}-a-track.md"),
+                ("scripts/c.py", 1, f"# docs/DECISIONS/{X}-a-track.md says why"),
             ],
         )
 
@@ -64,6 +70,15 @@ class Unnumbered(unittest.TestCase):
                 "scripts/b.py": "# ADR-0335: numbered\n",
                 # A file that is no text is not read.
                 "docs/evidence/E10/c.wasm": f"\0{X}\0",
+                # A receipt's inputs, by the paths they had when it was
+                # recorded, as train-9's record ADR-0352's (ADR-0344,
+                # amended 2026-10-17).
+                "docs/evidence/E14/receipt.json": (
+                    '{\n  "inputs": {\n'
+                    f'    "docs/DECISIONS/{X}-a-track.md": "754c7648",\n'
+                    f'    "docs/DECISIONS/{X}-wasi-0.2-not-0.3.md": "9c4db5de"\n'
+                    "  }\n}\n"
+                ),
             }
         )
         self.assertEqual(adrs.unnumbered(root), [])

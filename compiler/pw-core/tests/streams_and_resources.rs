@@ -8,7 +8,9 @@
 //! `map-container` with two attributes, a resource nothing mounts, and a page
 //! that fails when rendered, since `center` is a record. Both are valid
 //! Pleris, and check. ADR-0075 refused both at build. ADR-0148 compiles the
-//! stream: its query's state, as a part.
+//! stream: its query's state, as a part. This is a template-stage guarantee;
+//! A-008 still has a complete-program generated-WIT name collision, asserted
+//! separately below and by the exact accepted-corpus executable-support gate.
 
 use pw_core::check::{Unit, check_sources};
 
@@ -77,9 +79,14 @@ fn refused(extra: &str, why: &str) {
 fn a_stream_builds_as_a_part() {
     let all = files(&["examples/accepted/A-008-streamed-public-recommendations.pw"]);
     checks_clean(&all);
-    let built = pw_core::build::build(&units(all)).unwrap_or_else(|e| panic!("{e}"));
-    let view = built
-        .templates
+    let input = units(all);
+    let sources: Vec<_> = input.iter().map(|u| u.src.as_str()).collect();
+    let templates = pw_core::program::with_semantic_program(&input, |checked| {
+        let cx = checked.context();
+        pw_core::build::templates(cx.hirs, &sources, cx.sigs)
+    })
+    .expect("the stream example is semantically valid");
+    let view = templates
         .iter()
         .find(|t| t.path == "store.recommendations.Recommendations")
         .expect("A-008's view");
@@ -89,6 +96,38 @@ fn a_stream_builds_as_a_part() {
             .any(|e| e.kind == "stream" && e.value == "store.recommendations.Recommendations"),
         "{:?}",
         view.manifest()
+    );
+}
+
+#[test]
+fn the_complete_stream_example_reports_its_exact_wit_collision() {
+    let all = files(&["examples/accepted/A-008-streamed-public-recommendations.pw"]);
+    checks_clean(&all);
+    let input = units(all);
+    let report = pw_core::program::validate(&input);
+    let errors: Vec<_> = report
+        .diagnostics
+        .iter()
+        .flat_map(|(path, ds)| ds.iter().filter(|d| d.is_error()).map(move |d| (path, d)))
+        .collect();
+    assert_eq!(errors.len(), 1, "{:?}", report.diagnostics);
+    let (path, refusal) = errors[0];
+    assert!(path.ends_with("examples/accepted/A-008-streamed-public-recommendations.pw"));
+    assert_eq!(refusal.code, "PW6601");
+    assert_eq!(refusal.reason, pw_core::program::Stage::Wit.reason());
+    assert_eq!(
+        refusal.message,
+        "the generated WIT does not parse: duplicate item named `store-recommendations-recommendations-api`"
+    );
+    let source = &input
+        .iter()
+        .find(|u| &u.path == path)
+        .expect("responsible unit")
+        .src;
+    assert!(source[refusal.primary_span.clone()].contains("query Recommendations"));
+    assert!(
+        report.into_build().is_err(),
+        "the complete program is refused"
     );
 }
 

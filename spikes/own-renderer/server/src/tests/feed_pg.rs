@@ -522,7 +522,12 @@ fn on_postgres_serializable_against_a_read_committed_default_is_refused() {
     let Some(url) = database() else { return };
     let as_is = |app: &str| app.to_string();
     let Err(why) = served_with(&url, "default_refused", as_is, |schema| {
-        FeedPg::open_with(&url, Some(schema), Isolation::ConnectionDefault)
+        FeedPg::open_with(
+            &url,
+            Some(schema),
+            Isolation::ConnectionDefault,
+            crate::feed_pg::RenderSeats::default(),
+        )
     }) else {
         panic!("serializable was stated, and read committed served");
     };
@@ -538,7 +543,12 @@ fn on_postgres_serializable_against_a_read_committed_default_is_refused() {
     let serializable =
         format!("{url}{separator}options=-c%20default_transaction_isolation%3Dserializable");
     served_with(&url, "default_given", as_is, |schema| {
-        FeedPg::open_with(&serializable, Some(schema), Isolation::ConnectionDefault)
+        FeedPg::open_with(
+            &serializable,
+            Some(schema),
+            Isolation::ConnectionDefault,
+            crate::feed_pg::RenderSeats::default(),
+        )
     })
     .expect("a serializable default gives serializable");
     served_with(&url, "per_transaction", as_is, |schema| {

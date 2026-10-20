@@ -522,3 +522,102 @@ fn a_set_reads_back_ordered_the_last_of_each_kept() {
         Val::Result(Ok(Some(Box::new(crate::hours::hours_val(&held))))),
     );
 }
+
+/// The legacy set contract retains request order and duplicates. Every
+/// occurrence carries the full value; a prior occurrence cannot consume it.
+/// The same test runs on the configured memory/PostgreSQL DataLayer.
+#[test]
+fn a_repeated_store_in_a_set_read_keeps_all_of_its_hours() {
+    let layer = crate::store::layer_for_tests();
+    let first = Hours {
+        zone: "America/Los_Angeles".into(),
+        last_order_minutes: 13,
+        weekly: vec![
+            Period {
+                weekday: 1,
+                opens: 420,
+                closes: 720,
+            },
+            Period {
+                weekday: 1,
+                opens: 780,
+                closes: 1140,
+            },
+        ],
+        special: vec![
+            Special {
+                date: pw_time::days(2027, 3, 3),
+                closed: true,
+                opens: 0,
+                closes: 0,
+            },
+            Special {
+                date: pw_time::days(2027, 3, 4),
+                closed: false,
+                opens: 600,
+                closes: 900,
+            },
+        ],
+    };
+    let second = Hours {
+        last_order_minutes: 7,
+        weekly: vec![Period {
+            weekday: 2,
+            opens: 540,
+            closes: 1020,
+        }],
+        special: vec![Special {
+            date: pw_time::days(2027, 3, 5),
+            closed: false,
+            opens: 660,
+            closes: 840,
+        }],
+        ..first.clone()
+    };
+    let mut staged = layer.begin("hours-conformance");
+    let writes = staged.ops();
+    for (store, hours) in [("47", &first), ("48", &second)] {
+        assert_eq!(
+            writes["store:host/hours#set"](&[
+                Val::String(store.into()),
+                crate::hours::hours_val(hours),
+            ])
+            .expect("the real host write runs"),
+            vec![Val::Result(Ok(None))],
+            "the fixture's hours are accepted for {store}",
+        );
+    }
+    staged
+        .commit(&[], &[], None, &[])
+        .expect("the fixture commits");
+    staged.publish();
+    drop(staged);
+    let reads = layer.reads("hours-conformance", None);
+    let result_for = |store: &str| {
+        let hours = match store {
+            "47" => &first,
+            "48" => &second,
+            _ => return None,
+        };
+        Some(Val::Record(vec![
+            ("store".into(), Val::String(store.into())),
+            ("name".into(), Val::String(String::new())),
+            ("hours".into(), crate::hours::hours_val(hours)),
+        ]))
+    };
+    for size in [3, 17] {
+        let requests: Vec<_> = (0..size)
+            .map(|i| ["48", "47", "missing", "47", "48"][i % 5])
+            .chain(["47", "missing", "48", "47"])
+            .collect();
+        let expected: Vec<_> = requests.iter().filter_map(|s| result_for(s)).collect();
+        let args = [Val::List(
+            requests.iter().map(|s| Val::String((*s).into())).collect(),
+        )];
+        assert_eq!(
+            reads["store:data/hours#for-stores"](&args).expect("the real set read runs"),
+            vec![Val::List(expected)],
+            "request order, misses, duplicates and full periods for {size} initial keys",
+        );
+    }
+}

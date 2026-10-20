@@ -15,7 +15,7 @@
 //
 // The recommender is one per server, so this suite has a server per engine.
 import { chromium, expect, test } from "@playwright/test";
-import { MUTABLE_PORTS } from "../playwright.config.mjs";
+import { MUTABLE_PORTS } from "../host-metadata.mjs";
 
 const PAGE = "/page/demo.streamed.StreamedPage?id=47";
 

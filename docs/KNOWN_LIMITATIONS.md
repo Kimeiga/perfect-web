@@ -9,16 +9,17 @@ CI existed. Its complete bytes are retained in
 [the historical limitations file](KNOWN_LIMITATIONS-history-2026-09-15.md).
 Those historical statements must not override current source or test results.
 
-## Train-10 integration, pending verification (2026-10-15)
+## Train-10 integration (2026-10-15 to 2026-10-17)
 
-The each-header and argument-boundary repairs below are integrated locally
-as ADR-0345/0346 and remain pending train verification. The browser command
-decoder already held opaque invariants; the actual gaps were direct
+The each-header and argument-boundary repairs below are integrated on
+train-10 as ADR-0345/0346; the train's verify is their record. The browser
+command decoder already held opaque invariants; the actual gaps were direct
 component calls, page parameters, Map/Set contents and a vacuous PostgreSQL
 test. Malformed path escapes and non-UTF-8 decoded path text now return
 400 before route matching (ADR-0309/0346); valid unknown paths remain 404.
-The HTTP regression and whole controls pass locally; full train verification
-remains pending. Generic-result effects are a separate unfinished track.
+Generic-result effects are a separate unfinished track (ADR-0345's not
+claimed: a member read through a generic call's result performs nothing the
+effect typer sees), for train-11.
 
 Scheduled orders (ADR-0347) allow one current scheduled order per reader;
 hours are held at choice and placement, not at send; an already-due send
@@ -26,9 +27,8 @@ runs when payment settles. The times page and chosen-time checkout wait on
 the estimator. Splitting scheduling's words from Checkout is queued. The
 per-store estimate N+1 found during integration is repaired by a set read,
 with three statements at both fixture sizes (ADR-0348). Whole scheduled,
-bounded-checker and statement controls pass, as do 24 combined browser tests;
-full assembled CI and verification remain pending. No production-readiness
-claim follows.
+bounded-checker and statement controls pass, as do 24 combined browser tests.
+No production-readiness claim follows.
 
 D1's compiler integration now passes local full CI (ADR-0350), but it does
 not supply a runtime table adapter. D2 memory execution, provider admission,
@@ -51,31 +51,27 @@ qualification.
 **Open findings, each with the track fixing it** (the integrator's,
 2026-10-15):
 
-- **An effectful call in an `{#each}`'s head escapes the effect check**
-  (`track/each-head-effects`): the head's list and key are read as written
-  (ADR-0242, below), so a database read or a secret written there is
-  charged no effect and no label, where the same call in a hole, a
-  condition or an attribute is refused (PW0401). The track's failing test
-  holds it.
-- **An opaque type's `where` invariant is not held on a command's
-  arguments** (`track/argument-invariants`): a value a browser sends is read
-  by its type's shape, not through its checked constructor, so a command
-  can be given a value its program could not have made.
+- (Fixed on train-10: an effectful call in an `{#each}`'s head is charged
+  as anywhere else, ADR-0345; and an opaque type's `where` invariant is
+  held on a command's arguments, a page's parameters and a map's or a
+  set's contents, ADR-0346.)
 - **`pw check` passes programs `pw build` refuses**
   (`track/check-is-build`): the build runs analyses the check does not (an
   `{#each}` over a computed list is refused by the build alone), so a
   check is green where the build fails.
-- **An `<img>` with no `alt` checks clean, and `&&` is refused with no hint
-  that Pleris writes `&`** (no track yet; ADR-0343): the guide holds each as
-  an example that turns red when the compiler closes it, beside its three
-  programs the check passes and the build refuses.
+- **An `<img>` with no `alt` checks clean** (no track yet; ADR-0343): the
+  guide holds it as an example that turns red when the compiler closes it,
+  beside its programs the check passes and the build refuses. (`&&` is
+  refused with the hint that Pleris writes `&` since train-10, ADR-0322's
+  follow-up.)
 
 **What the parser does not read yet** (found with ADR-0237, which made
 lowering report what it parses):
 
-- **An `{#each}`'s list and key are read as written** (ADR-0242): parsed by
-  the grammar, and not lowered into the body's arena, so a computed list is
-  not typed, and a key's names are not resolved as terms.
+- **An `{#each}`'s list is built by path** (ADR-0073): every check reads a
+  loop's list and key as expressions since ADR-0345 (train-10), and the
+  build still reads the list by path, so a pure computed list checks clean
+  and is refused by the build (the check-is-build finding above).
 - **A clause, a `return` and a block after a statement are statements**
   (ADR-0243, ADR-0038): a block separates its statements around them, and
   their readers read each pair as one. The grammar has no node for any of
@@ -772,6 +768,24 @@ awaited in order. What remains:
   aborts nothing, so there the page stays leaving until it is loaded again.
   A press that never answers holds the navigation as long as the browser
   waits for it.
+- **WebKitGTK's network process can crash when a navigation cancels a
+  page's requests within milliseconds of their start** (found on train-10's
+  verifies, 2026-10-18; ADR-0280's amendment).
+  - Mechanism: a use-after-free in libsoup 3.x's send path. glibc aborts
+    the process (`malloc_consolidate(): unaligned fastbin chunk
+    detected`), and the navigation under way fails ("WebKit encountered an
+    internal error") or hangs.
+  - Seen in Playwright 1.58.0's WebKit build on libsoup 3.0.7 (Ubuntu
+    22.04) and 3.4 (CI's 24.04).
+  - It reproduces with this program's server, master's included, and a
+    60-line script: 3 of 750 such navigations. It does not reproduce with
+    a plain Python server serving the same paths (0 of 1,200). What in our
+    traffic trips it is open (NEXT).
+  - A person cannot navigate that soon after a page appears. The two tests
+    that did, right after a soft navigation, now let the page settle first
+    in WebKit.
+  - Safari on macOS uses another network stack, and nothing here says it
+    is affected.
 - **A page's commands are ordered by one host** (ADR-0305): the host that
   answers keeps each page's order, so hosts behind a balancer would share
   it or pin a page to one. A command lost on its way from a page that has
@@ -942,23 +956,60 @@ itself does not prove complete enforcement. Read the per-record status and the
 
 ## Evidence and test coverage
 
-**Open findings about the evidence itself**, each fixed by
-`track/evidence-integrity` (the integrator's, 2026-10-15):
+**What train-10's first verify left in the evidence's harness** (the
+integrator's rulings of 2026-10-17):
+- `e14-refusal` runs as two recipes (`e14-refusal-2`, ADR-0302's
+  amendment): each of its browser mutants costs about 30 minutes on CI,
+  the whole past a job's 345 minutes, until the browser host map
+  (train-11) starts only the hosts a spec needs; dealing any script's
+  mutants across shards is train-11's.
+- `check_latency`'s ceiling per thousand lines is set by CI's slowest
+  runner, so on a fast machine it is some six and a half times the
+  measurement: a slower checker passes there and fails only on ARM's CI.
+- `e14-harness` is local: its sandboxes install offline from the
+  machine's pnpm store, which no runner holds (CI runs its Pleris stack,
+  `e14-pleris-controls`).
+- A browser recipe of three runs fails on one failed run. `e10-browser`'s
+  WebKit `store-accounts.spec.mjs:173` failed once in three runs on each of
+  verifies 39054436657 and 39091059482. This was not a flake: WebKitGTK's
+  network process crashed (the entry under the browsers' navigation above).
 
-- **Stale Python bytecode can decide a mutant's verdict**: Python holds a
-  cached `.pyc` to its source by size and modification second, so a
-  mutant of a Python source the same size as it, written and restored
-  within a second, can run the other's bytecode.
-- **An evidence file's counts are not checked against its script**:
-  `docs/evidence/E10/privacy-by-resolution.txt` says 4 of 4 mutants
-  killed, and `scripts/privacy_resolution_mutations.py` holds 3; nothing
-  staled the file when the script changed.
-- **The corpus's `@rule` headers are stale**: nothing holds a rejected
-  program's header to the code its `pw check` reports.
-- **`check_latency` fails under load**: its ceiling is wall-clock time, so
-  a machine shared by a dozen workers fails it whatever the checker does
-  (train-7's local `just ci`, PARALLEL.md); the track bounds the checking
-  thread's CPU time instead.
+**What train-10's landing found in the evidence's harness** (2026-10-19):
+- `evidence_is_current` holds 14 of the 20 committed components
+  (`docs/evidence/E10/*.wasm`) to the compiler, by a list kept by hand,
+  and the development server's unit tests run the committed ones. A
+  component left out can go stale unseen: the store's three hours
+  components did on train-10, and 107 server tests ran the old code until
+  they were regenerated before it landed. The other three left out
+  (`store.page.MenuLine`, `store.page.MenuSize`,
+  `store.reviews.StoreRatings`) are what the compiler builds at the
+  landing. Train-11 derives the list from the build.
+- The complete check (check-is-build, ADR-0361) refuses four accepted
+  programs, listed with their exact messages in
+  `examples/accepted/build-refusals.json`. Three use features the build does
+  not support yet: an element that mounts a resource (A-007), a page value
+  computed at build time from a workspace file (A-013), and `style:`
+  directives (A-018). One is a bug: the WIT generated for A-008 names an
+  item twice (`store-recommendations-recommendations-api`); NEXT queues it.
+- A binary file is planned by the lines that name it (ADR-0355); one a
+  program names only at run time, with its directory nowhere on the line,
+  is found only by the line that names the directory.
+- Seven recipes train-11's corpus gate reached have no evidence since it
+  (`e14-ids`, `e14-clause-heads`, `e14-opaque-value`,
+  `e14-resource-clauses`, `e10-callbacks`, `e10-members`, `e10-names`): the
+  next verify that plans them records it.
+- `stream_boot_mutations.py` runs only where Google Chrome is installed: on
+  CI's runners, not in the PC's WSL.
+
+**Findings about the evidence itself, fixed on train-10** (ADR-0344,
+ADR-0349): stale Python bytecode no longer decides a mutant's verdict; an
+evidence file's counts are held to its script's; the corpus's `@rule`
+headers to the codes `pw check` reports; `check_latency` bounds the
+checking thread's CPU time, not the wall clock; and a failed browser suite
+fails its recipe. What they do not claim stays in those ADRs: a mention of
+a decision written in backticks is read as one about the placeholder, and
+a decision's path recorded in evidence before its numbering is read as
+history (ADR-0344, amended 2026-10-17).
 
 The new recipe tests replace producers in isolated temporary trees. They prove
 exit-status propagation for the tested recipe shapes, not compiler correctness,
@@ -1237,3 +1288,13 @@ preserved, not replaced with invented results.
   provider's cancel) may be asked twice by two hosts, as a press sent twice
   asks it; a run failed for good is kept and said, and runs again only when
   it is scheduled again.
+
+
+- **Scheduler write ordering is per data-layer instance (ADR-0352).** The
+  StorePg/FeedPg scheduled cleanup/retry guard serializes with that instance's
+  command staging. Other host instances may still encounter legitimate
+  PostgreSQL serializable refusals; this correction adds neither a distributed
+  lock nor an automatic payment retry. Successful statement pins wait for the
+  actual post-settlement success marker and do not count refused attempts as
+  completion. Local strict whole12 and CI passed, and so did the exact
+  head's verify 38909882781; landed with train-9.

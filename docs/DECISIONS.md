@@ -2318,6 +2318,12 @@ a handler navigates after its command commits.
   leaves, answers each press made before it first, and loads the page's
   address, each value one encoded segment: read after the commit, never
   from a cache, with no cache-busting parameter and no reload.
+- Amended 2026-10-18: in WebKit, the two tests that navigated as soon as
+  the address changed (the chosen address's, the order page's audit) now
+  let the page it showed settle first. Their `goto` cancelled requests the
+  page had just started, which can crash WebKitGTK's network process (a
+  use-after-free in libsoup 3, reproduced on master). The corrections come
+  first: it was no flake, and no session's turn held across the estimate.
 [ADR-0281](DECISIONS/ADR-0281-a-merge-is-held-to-ci-s-verification-run.md):
 a merge is held to CI's verification run.
 - A branch is merged when its tip's `ci` and `verify` runs are green,
@@ -2404,7 +2410,10 @@ ADR-0249 and ADR-0278).
   345-minute limit, 10,350 s, half of it since 2026-10-11 (a branch ran its
   recipes up to twice their recorded seconds); a run takes more shards than
   it asks for where its own would (a track's 9 were dealt 21,900 s, and a
-  shard stopped at the limit throws the run away).
+  shard stopped at the limit throws the run away). Amended 2026-10-16
+  (train-10): of the deals that end as soon, the one whose shards of more
+  than one recipe go least past the ceiling; a long recipe alone in its
+  shard had hidden three PostgreSQL bundles dealt past it.
 [ADR-0291](DECISIONS/ADR-0291-a-hosts-record-is-written-as-the-program-names-its-fields.md):
 a host's record is written as the program names its fields (extends
 ADR-0172 to the host).
@@ -3007,56 +3016,131 @@ experience).
   generated from the registry, and each gap in the checks an example held
   open until the compiler closes it.
 
-### 2026-10-15 — evidence integrity on train-10
+[ADR-0344](DECISIONS/ADR-0344-evidence-integrity.md):
+six ways evidence could be wrong, or a gate fail for the wrong reason
+(track `evidence-integrity`; train-10).
+- Stale Python bytecode is discarded; evidence counts and corpus headers
+  are checked against their producers; latency bounds thread CPU time;
+  suites require complete builds; trains and master hold no unnumbered
+  ADR (amended 2026-10-17: a decision's path that evidence recorded
+  before its numbering is history). Reports are published atomically.
+[ADR-0345](DECISIONS/ADR-0345-each-head-effects.md):
+an `{#each}`'s list and key are expressions every walker of a view reads
+(track `each-head-effects`; train-10).
+- A loop's list and key are semantic expressions. One exhaustive
+  enumeration feeds view walkers; effects, privacy, signal and name checks
+  cover all seven positions.
+[ADR-0346](DECISIONS/ADR-0346-argument-invariants.md):
+a value from outside is held to its type's invariant at every boundary it
+crosses (track `argument-invariants`; train-10).
+- The host holds component arguments before predicates and execution,
+  page parameters at arrival, and invariants within maps and sets;
+  malformed path text is a 400.
+[ADR-0347](DECISIONS/ADR-0347-scheduled-orders.md):
+an order is placed for a time its reader chooses, and sent to its stores
+then (W9's, track `scheduled-orders`; train-10).
+- Paid orders are sent when preparation is due, with windows held to
+  every store's as-soon-as-possible admission rule at send time.
+[ADR-0348](DECISIONS/ADR-0348-a-set-read-keeps-each-keys-result.md):
+a set read keeps each key's result (train-10).
+- Set pairs can preserve each key's exact Result/Option, and are held to
+  the key by its name (track `pair-key-by-name`, ADR-0340's answers).
+[ADR-0349](DECISIONS/ADR-0349-evidence-integrity-2.md):
+a failed browser test fails its recipe, and five more rulings on the
+evidence (track `evidence-integrity-2`; train-10).
+- One browser-suite runner propagates failures; recipes and builds are
+  checked behaviorally; the planner follows suite configuration and helper
+  imports; mutation program checks cover every root; diagnostic evidence
+  is held current.
+[ADR-0350](DECISIONS/ADR-0350-tables-declare-an-apps-data.md):
+a table declares an app's data and gives its reads and writes (ADR-0338's
+D1, track `tables`; train-10).
+- Generated reads and writes, schema metadata and migration locks; the
+  bounded checker consumes generated pair metadata and source costs.
+  Runtime adapters (D2) are next.
 
-[ADR-0344](DECISIONS/ADR-0344-evidence-integrity.md): stale Python bytecode
-is discarded, evidence counts and corpus headers are checked, latency
-bounds thread CPU, suites require complete builds and trains require
-numbered decisions. Accepted under the owner's delegation; integrated
-verification is pending.
-
-### 2026-10-15 — every expression position in a view
-
-[ADR-0345](DECISIONS/ADR-0345-each-head-effects.md): a loop's list and key
-are semantic expressions. One exhaustive enumeration feeds view walkers;
-effects, privacy, signal and name checks cover all seven positions.
-Accepted under the owner's delegation; train-10 verification pending.
-
-### 2026-10-15 — invariants at external value boundaries
-
-[ADR-0346](DECISIONS/ADR-0346-argument-invariants.md): the host holds
-component arguments before predicates and execution, page parameters at
-arrival, and invariants within maps and sets. Accepted under the owner's
-delegation; integrated train-10 verification pending.
-
-### 2026-10-15 — scheduled orders and set-result preservation
-
-[ADR-0347](DECISIONS/ADR-0347-scheduled-orders.md): paid orders are sent
-when preparation is due, with windows held to every store's ASAP admission
-rule at send time. [ADR-0348](DECISIONS/ADR-0348-a-set-read-keeps-each-keys-result.md):
-set pairs can preserve each key's exact Result/Option. Accepted under the
-owner's delegation; train-10 integrated verification pending.
-
-### 2026-10-15 — a failed suite fails its recipe
-
-[ADR-0349](DECISIONS/ADR-0349-evidence-integrity-2.md): one browser-suite
-runner propagates failures, recipes and builds are checked behaviorally,
-the planner follows suite configuration and helper imports, mutation
-program checks cover every root, and diagnostic evidence is held current.
-Integrated train verification remains pending.
-
-
-### 2026-10-16 — tables give an app its data operations
-
-[ADR-0350](DECISIONS/ADR-0350-tables-declare-an-apps-data.md) implements
-ADR-0338 D1: generated reads and writes, schema metadata and migration locks.
-The bounded checker consumes generated pair metadata and source costs.
-Accepted under the owner's delegation. The local compiler integration,
-bounded47/PostgreSQL12 controls and full CI pass; runtime D2 and final
-assembled train verification remain pending.
-
-### 2026-10-16 — generic receivers retain canonical types and effects
-
-[ADR-0351](DECISIONS/ADR-0351-generic-effects.md) reuses the value solver for
-generic results, typed member reads and rooted effects. The accepted worker
-proof is separate from combined train validation, which remains pending.
+[ADR-0352](DECISIONS/ADR-0352-bounded-statements-wait-for-completed-payment.md):
+statement counts wait for the completed payment transaction.
+- Real delayed-webhook and staged PostgreSQL overlap witnesses establish the
+  completion and same-instance write-order defects; exact success pins are
+  retained. Strict Cargo producer classification refuses invalid/build/stopped
+  evidence with source restoration and no next control. Local strict12/12 and
+  fresh CI passed; verify 38909882781 green at the exact head; landed with
+  train-9.
+[ADR-0353](DECISIONS/ADR-0353-repeated-store-hours-preserve-each-occurrence.md):
+a repeated store keeps all of its opening hours (the integrator's local
+repair, track `legacy-hours-duplicates`; train-10).
+- PostgreSQL's `hours#for-stores` took a store's periods out of its maps
+  for the store's first occurrence, so a store asked for twice came back
+  the second time with none; they are read by lookup now, the caller's
+  order, duplicates and misses kept, on both layers. Two more controls,
+  and a Cargo result that is no result is refused, not counted.
+[ADR-0354](DECISIONS/ADR-0354-a-render-reads-each-call-once.md):
+a render reads each call once, in one snapshot, in a bounded few seats
+(NEXT 4c, track `render-merge`; train-11).
+- One render's identical calls are made once and read as of one snapshot; on
+  PostgreSQL its reads take one of a deployment's seats (`PW_RENDER_SEATS`,
+  `PW_RENDER_SEAT_WAIT`: 8 and 30 s where unset, refused at start); the
+  table's and a turn's lock-order checks run in every debug build.
+[ADR-0355](DECISIONS/ADR-0355-the-committed-components-are-the-builds.md):
+the committed components are the build's, every one (the integrator's
+defect; train-11).
+- `evidence_is_current` holds `docs/evidence/E10/*.wasm` to exactly the
+  components the store's build emits (55; three were stale on train-10's
+  head), with a control; the planner and the evidence fetch read a binary
+  file's change by the lines that name it.
+[ADR-0356](DECISIONS/ADR-0356-browser-host-map.md):
+a browser run starts only the hosts its selected tests need (track
+`browser-host-map`; train-11).
+- A registry of the suite's hosts (stride 256), the selection asked of
+  Playwright itself, only its hosts started; a spec an optional build cannot
+  serve is left out and said, and a guard holds that each runs where its
+  build is made.
+[ADR-0357](DECISIONS/ADR-0357-mutants-run-in-parallel-slots.md):
+a mutation script's mutants run in parallel slots (track
+`parallel-instrument`; train-11).
+- `PW_MUTANT_SLOTS` deals a script's mutants among worktrees of their own,
+  their ports from the browser registry, and says what the script says in
+  order; off on CI for now (the integrator's ruling, 2026-10-20).
+[ADR-0358](DECISIONS/ADR-0358-kiokun-cache.md):
+a Kiokun search cache is published whole, and a reader keeps the version
+it opened (track `kiokun-cache`; train-11).
+- Each builder stages in a private directory and publishes a complete,
+  validated one; final connections are read-only; a builder cleans only its
+  own failures and losing stages.
+[ADR-0359](DECISIONS/ADR-0359-ci-reliability-traces-latency-incremental-builds-and-the-nightly.md):
+a failure's trace is kept, the latency ceiling bounds the fastest check, a
+mutant is built incrementally, and the nightly does not repeat a verified
+head (track `ci-diagnostics`; train-11).
+- `kept-traces/` (32 MiB in all) for each failing browser run and red
+  baseline; `check_latency` bounds the fastest of seven or more checks (800
+  ms a thousand lines); `PW_MUTANT_INCREMENTAL` on verify's recipe step; the
+  nightly skips a head a run passed at, its recipes and browsers, never on
+  Sunday.
+[ADR-0360](DECISIONS/ADR-0360-the-coverage-guided-fuzzer-measures-or-fails.md):
+the coverage-guided fuzzer measures, or it fails (track `fuzz-floor`;
+train-11).
+- `llvm-profdata` is found through the toolchain's sysroot (`llvm-tools` in
+  `rust-toolchain.toml`); a target that covers no region fails the run;
+  `e14-fuzz-floor` records E9C's evidence.
+[ADR-0361](DECISIONS/ADR-0361-check-is-build.md):
+check and build validate one executable program (track `check-is-build`;
+train-11).
+- `pw check` and `pw build` share one complete validation, the backends a
+  build runs, D1 tables composed in; the accepted corpus's four backend gaps
+  are refused by both (PW6601); the check's cost is held to the unchanged
+  800 ms ceiling by its fastest of seven or more runs.
+[ADR-0362](DECISIONS/ADR-0362-guide-producer-validity.md):
+guide mutation kills require valid producer outcomes (track
+`guide-producer-validity`; train-11).
+- The guide's Cargo, Python and browser producers are each validated before
+  a mutant counts as killed; an empty, inconsistent or stopped result is
+  refused, not a kill.
+[ADR-0363](DECISIONS/ADR-0363-wasmtime-48-0-7.md):
+Wasmtime 48.0.7, for RUSTSEC-2026-0378 and 0379 (the integrator's, the
+downloads the owner's; train-11).
+- Every pin is 48.0.7 (28 crates in each lockfile, the CLI on three
+  platforms by GitHub's digests); 0378 needs host-made streams the host
+  never makes; 0379 (aarch64 Cranelift, a br_table of 256k targets) no
+  emitted component reaches, a hostile one could on an aarch64 host; the
+  engine's configuration stays.

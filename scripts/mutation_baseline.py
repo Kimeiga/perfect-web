@@ -36,6 +36,17 @@ Imported, it also bounds in memory every process the script starts from
 then on (`mutation_bound.py`, 2026-10-09): a mutant's test that holds more
 than the bound is stopped, the script's output says so, and its last line
 says what the bound did, a kind of kill apart from a test's.
+
+And first, where `PW_MUTANT_SLOTS` asks for more than one slot, it hands
+the run to `mutation_slots.py`, which runs the script's own copy in each
+slot, its mutants dealt among them, and ends this process with the run's
+code: the script's loop never runs in this tree.
+
+And where the run sets `PW_MUTANT_INCREMENTAL=1` (verify.yml's recipe step),
+the script and every process it starts have no `CARGO_INCREMENTAL`, whatever
+its recipe's line says, so that cargo's defaults apply (incremental for the dev
+and test profiles), and the incremental caches are removed when they hold more
+than a bound (`mutant_incremental.py`, 2026-10-20).
 """
 
 import collections
@@ -45,6 +56,7 @@ import pathlib
 import re
 import subprocess
 import sys
+import time
 
 # No bytecode written from here on, by the script (`dont_write_bytecode`) or
 # by any process it starts, each of which inherits the environment's word.
@@ -77,9 +89,23 @@ def forget_bytecode(mutants) -> list[pathlib.Path]:
 forget_bytecode(getattr(sys.modules.get("__main__"), "MUTANTS", None) or [])
 
 import mutation_bound
+import mutation_slots
+
+# Where `PW_MUTANT_SLOTS` asks for slots, the run is the slots' from here,
+# and this process ends with its code: the script's loop never runs in this
+# tree. In a slot, the script's `MUTANTS` are narrowed to those dealt to it
+# (`mutation_slots.py`). Asked for none, nothing changes.
+mutation_slots.engage()
 
 # Every process the script starts from here on, bounded in memory.
 mutation_bound.start()
+
+import mutant_incremental
+
+# And, where the run asks (`PW_MUTANT_INCREMENTAL=1`, which verify.yml's recipe
+# step sets), its builds incremental, whatever its recipe's line says
+# (track ci-diagnostics, 2026-10-20).
+mutant_incremental.start()
 
 # How many commands are kept: a baseline's, and whatever ran since.
 KEPT = 64
@@ -123,6 +149,10 @@ def keeping(communicate):
             keep(self, None, as_text(stopped.stdout) + as_text(stopped.stderr))
             raise
         keep(self, self.returncode, as_text(out) + as_text(err))
+        try:
+            mutant_incremental.bounded(self.args)
+        except Exception:  # noqa: BLE001 - a cache left standing is no failure
+            pass
         return out, err
 
     communicated.keeps = True
@@ -221,4 +251,59 @@ def explain(out=None):
             print(f"  {shown(args)}: {result(said) or '(no test result)'}", file=out)
     if not heard:
         print("  (no command it ran was kept)", file=out)
+    keep_browser_output(out)
     out.flush()
+
+
+# **A red baseline keeps its browser run's output** (track ci-diagnostics,
+# 2026-10-19). Playwright clears `test-results/` at the start of each run, and
+# every run after this script's in a CI shard is another's: the baseline's
+# failure was lost with the shard's later runs. Its trace is kept, apart from
+# those, in the suite's `kept-traces/<recipe>/<time>/<script>-baseline/`
+# (`keep_traces.py`: bounded, uploaded by `verify.yml`).
+#
+# **Only a baseline's.** A mutant's browser run fails by design, once per
+# mutant and hundreds to a shard, and its trace says nothing that the kill
+# does not: they would swamp the artifact. `explain()` is called where the
+# baseline is red, before any mutant has run, and where a script stops at a
+# mutant's producer it refused (292 calls on train-11; the fourteen after no
+# red baseline's usual words are named in `tests/test_mutation_baseline.py`),
+# so what is kept is the output of the LAST command the script ran, and only
+# where that was a browser run that failed: a refused producer's call finds a
+# cargo command last, and keeps nothing.
+SUITES = ("spikes/own-renderer", "benchmarks/harness")
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+# When this script began: a `test-results/` older than that is an earlier
+# recipe's, and is not this baseline's to keep.
+STARTED = time.time()
+
+
+def runs_a_suite(args):
+    """Whether a kept command is a Playwright run: `... playwright test ...`,
+    as a list of words or as one command line."""
+    words = [str(a) for a in args] if isinstance(args, (list, tuple)) else str(args).split()
+    return "test" in words and any("playwright" in w for w in words)
+
+
+def keep_browser_output(out):
+    """Keep the output of the script's last command where it was a browser run
+    that failed, in each suite directory it left some in since the script
+    began. Says where, or why not; never raises, since it runs where a
+    baseline has failed already."""
+    last = heard[-1] if heard else None
+    if last is None or last[1] == 0 or not runs_a_suite(last[0]):
+        return
+    try:
+        import keep_traces
+
+        script = pathlib.Path(getattr(sys.modules.get("__main__"), "__file__", None) or "script").stem
+        tag = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+        for suite in SUITES:
+            source = ROOT / suite / "test-results"
+            if not source.is_dir() or source.stat().st_mtime < STARTED:
+                continue
+            root = ROOT / suite / "kept-traces"
+            dest = keep_traces.destination(root, os.environ.get("PW_RECIPE"), tag, f"{script}-baseline")
+            print(f"  its browser run's output: {keep_traces.keep(source, dest, root).says()}", file=out)
+    except Exception as error:  # noqa: BLE001 - a failed baseline is told anyway
+        print(f"  its browser run's output could not be kept: {error}", file=out)

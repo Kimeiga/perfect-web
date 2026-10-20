@@ -14,7 +14,7 @@
 // it, and E10 reads the uncompressed one (`just e10-bench`).
 import { brotliCompressSync, constants, gzipSync } from "node:zlib";
 import { expect, test } from "@playwright/test";
-import { MUTABLE_PORTS } from "../playwright.config.mjs";
+import { MUTABLE_PORTS } from "../host-metadata.mjs";
 
 // The performance run's host. `just e7-performance` starts it alone, and the
 // suite starts it with the rest; nothing in the suite changes it.

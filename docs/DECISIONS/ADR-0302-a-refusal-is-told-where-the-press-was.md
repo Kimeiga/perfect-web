@@ -192,3 +192,28 @@ the third holds a control to what the page shows its predicate holds.
   a status (ARIA, "only for what must interrupt").
 - **`<output>`**: its implicit status role is announced unevenly (Context);
   an explicit role is announced where it is.
+
+
+## Amended at train-10's first verify (the integrator's ruling 1, 2026-10-17)
+
+- **Its recipe no longer fit a CI job.** Train-10's verify 39054436657
+  stopped `e14-refusal`'s shard at the 345-minute limit after 20,507 s,
+  8 of its 12 browser mutants killed: each took about 1,800 s, where
+  train-9's verify took about 1,110 s (16,444 s in all). A finding: each
+  browser mutant rebuilds the store and the feed and runs four Playwright
+  invocations, and each invocation starts every host the suite's
+  configuration names (train-10 added the scheduled orders' three and
+  their providers' beside the rest), and `run.sh` builds whole each time
+  (ADR-0344's finding 5). Track `browser-host-map` (train-11: a run starts
+  only the hosts its specs need) is expected to cut it, and the split is
+  revisited then.
+- **Split, not narrowed.** `refusal_mutations.py`'s `PARTS` are two ranges
+  of its 30 mutants: part 1, the checker's, the host's, the render's and
+  five browser mutants (23), and part 2, the other seven browser mutants,
+  each some four and a half hours on that run's times. `e14-refusal` runs
+  part 1 beside its tests and browsers (`refusal.txt`), `e14-refusal-2`
+  part 2 (`refusal-2.txt`), each with its own count; no mutant is dropped,
+  and `evidence_counts.py` holds the two parts to every mutant once
+  (ADR-0344's amendment). The generic mechanism, a script's mutants dealt
+  across shards (`PW_MUTANT_PICK`, the parallel slots' allocator), is
+  train-11's.

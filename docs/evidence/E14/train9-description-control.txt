@@ -1,0 +1,84 @@
+Train-9 description-control correction, 2026-10-16 05:04 UTC
+
+produced by: just e14-descriptions, plus formatting/anchor/diff checks
+commit: 1f370fd9d1a84f0aa26a1f5e4d1df98cd53dca3a + uncommitted control correction
+
+Verify 38823189869 failed solely at e14-descriptions: its older content-size
+control killed 8/9 mutants. Removing selected descriptions no longer stopped
+first paint because the page acquired other useful text. The negative
+control had stopped removing the behavior its name claimed. That failed
+run remains failed; the downloaded raw artifact is preserved with its hash.
+
+The replacement removes the initial HTML shell while slots settle and runs
+the existing first-contentful-paint-before-fill assertion in WebKit. It
+builds and is killed by that one test. The two server controls still require
+store/item descriptions. The whole recipe runs all21 slots tests across
+three engines, and the script now fails if restored-source WebKit is not
+green. No production source or browser assertion changed.
+
+Measured: host answers7; store66 files clean; server579 passed/9ignored;
+all21 browser tests pass; whole9/9 mutants killed by test failures, with
+zero memory-bound stops. Restored-source browser succeeds. Formatting,
+anchors and diff checks succeed. Full corrected CI and GitHub verification
+are pending at this checkpoint; no landing is claimed.
+
+Environment: offline dependencies, CARGO_BUILD_JOBS=4, RUST_TEST_THREADS=4,
+CARGO_TARGET_DIR=/home/haki/code/pw-wt/train-9/target, PORT11641.
+Reproduce: cargo fmt --all -- --check
+Reproduce: python3 scripts/mutation_anchors.py
+Reproduce: just e14-descriptions
+Reproduce: git diff --check
+
+SHA256:
+474c3e1a633b78c5676fb8f7cb02d3744c1eba6e3799c6aadbe10102e5334c29  scripts/descriptions_mutations.py
+7820e3e081c9765c89d35d223fc3a732d5ac5d34b8319f5be70ec636ec3230d9  docs/evidence/E14/descriptions.txt
+f4a291f801c5eaa86052874b354a6cc526c087d5691a93945f2abc85a1a66fdf  historical failed GitHub artifact /mnt/c/Users/haki/Documents/Codex/2026-10-15/files-pasted-by-the-user-you/work/train9-failed-38823189869/evidence/docs/evidence/E14/descriptions.txt
+
+--- Raw whole corrective recipe ---
+ADR-0166 - the store and its items say what they are
+
+produced by: just e14-descriptions
+commit: 1f370fd9d1a84f0aa26a1f5e4d1df98cd53dca3a + uncommitted changes
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+playwright: Version 1.58.0
+
+== a host's answer, read through the declared type (runtime/pw-host/tests/host_answers.rs)
+
+test a_field_in_another_order_is_read_by_its_name ... ok
+test a_field_the_type_does_not_declare_is_not_passed_in ... ok
+test a_field_under_neither_name_is_refused_by_both ... ok
+test a_field_the_type_declares_and_the_answer_lacks_is_refused ... ok
+test an_answer_as_the_type_declares_it_is_passed_as_it_is ... ok
+test a_field_written_as_the_program_names_it_is_read ... ok
+test a_list_s_rows_and_a_declared_error_are_read_through_their_types ... ok
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+== the store checks
+
+pw check: 66 file(s), no diagnostics
+
+== the development server (pw-dev-server), the benchmark's store among its tests
+
+test tests::the_store_and_each_item_say_what_they_are ... ok
+test result: ok. 579 passed; 0 failed; 9 ignored; 0 measured; 0 filtered out; finished in 945.04s
+
+== the slots, three engines, WebKit painting the store before them (e2e/slots.spec.mjs)
+
+  21 passed (3.8m)
+
+== mutation controls (scripts/descriptions_mutations.py)
+
+baseline (engine): 9 passed, 0 failed
+baseline (server): 2 passed, 0 failed
+baseline (webkit): 1 passed, 0 failed
+a host's answer is passed as it is [engine]: KILLED (8 of 9 tests fail)
+a field the type does not declare is passed in [engine]: KILLED (4 of 9 tests fail)
+a field the answer lacks is filled with nothing [engine]: KILLED (2 of 9 tests fail)
+a field is read by its WIT name alone [engine]: KILLED (1 of 9 tests fail)
+a list's rows are passed as they are [engine]: KILLED (3 of 9 tests fail)
+a result's value is passed as it is [engine]: KILLED (8 of 9 tests fail)
+the store's page does not say what the store is [server]: KILLED (2 of 2 tests fail)
+the store's page does not say what each item is [server]: KILLED (2 of 2 tests fail)
+the initial store document is withheld while its slots settle [webkit]: KILLED (1 of 1 tests fail)
+9 of 9 mutants killed
+memory bound: no process was stopped

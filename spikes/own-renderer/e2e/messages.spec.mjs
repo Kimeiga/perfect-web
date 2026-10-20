@@ -14,7 +14,7 @@
 //     conversation read again (`/pw-read`), for their own document and for
 //     another's.
 import { expect, test } from "@playwright/test";
-import { MESSAGES_PORTS } from "../playwright.config.mjs";
+import { MESSAGES_PORTS } from "../host-metadata.mjs";
 
 test.use({
   baseURL: async ({}, use, testInfo) => {

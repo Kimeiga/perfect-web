@@ -139,6 +139,310 @@ fn begin_command(c: &mut Client, isolation: Isolation) -> Result<(), postgres::E
     }
 }
 
+// TRACK SEAM (render-merge): a render's read transaction (NEXT 4c), the
+// feed's and the store's (`store_pg.rs`).
+/// **How a render's read transaction opens** (NEXT 4c): repeatable read, so
+/// every statement of the render reads the snapshot its first statement took
+/// (PostgreSQL 18, 13.2.2), and read only, so it never meets a serialization
+/// failure and never waits for a safe snapshot, as a deferrable one would.
+pub(crate) const READ_SNAPSHOT: &str = "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY";
+
+/// **How many renders read one layer's database at once, where the
+/// deployment says nothing** (NEXT 4c, the integrator's ruling 2 of
+/// 2026-10-15; its answer of 2026-10-17 makes it a deployment's setting,
+/// `PW_RENDER_SEATS`, with this default, to be measured under load on the
+/// production track): each holds a connection of its own from its first
+/// read to its end, besides the connections the layer's commands and single
+/// reads take. A render past them waits at its beginning
+/// (`render_merge::begin`), where it holds no connection.
+pub(crate) const RENDER_CONNECTIONS: usize = 8;
+
+/// **How long a render waits for its seat, where the deployment says
+/// nothing** (`PW_RENDER_SEAT_WAIT`, the integrator's answer of
+/// 2026-10-17), before it fails, loudly: each of its reads answers that it
+/// waited. Renders give their seats back by structure (`render_merge`), so
+/// this is a backstop against a wait no one ends, never a bound a render is
+/// expected to meet.
+#[cfg(not(test))]
+pub(crate) const SEAT_WAIT: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// [`SEAT_WAIT`], for a test's host: five seconds, so a mutation control
+/// that keeps a seat fails a test in seconds, not minutes.
+#[cfg(test)]
+pub(crate) const SEAT_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// **The renders' seats, as a deployment sets them** (the integrator's
+/// answer of 2026-10-17): how many renders read one layer's database at
+/// once, and how long a render waits for its seat; [`RENDER_CONNECTIONS`]
+/// and [`SEAT_WAIT`] where the deployment says nothing. The host reads them
+/// from its environment where it starts, for each layer it serves on
+/// PostgreSQL.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct RenderSeats {
+    pub(crate) seats: usize,
+    pub(crate) wait: std::time::Duration,
+}
+
+impl Default for RenderSeats {
+    fn default() -> RenderSeats {
+        RenderSeats {
+            seats: RENDER_CONNECTIONS,
+            wait: SEAT_WAIT,
+        }
+    }
+}
+
+impl RenderSeats {
+    /// **The seats as the deployment states them**: `seats`, the value of
+    /// `PW_RENDER_SEATS`, a count of one at least; `wait`, the value of
+    /// `PW_RENDER_SEAT_WAIT`, whole seconds, one at least. Each is its
+    /// default where unset or empty, and anything else is refused, by name,
+    /// so a host does not start on a setting it cannot read.
+    pub(crate) fn stated(seats: Option<&str>, wait: Option<&str>) -> Result<RenderSeats, String> {
+        let mut stated = RenderSeats::default();
+        if let Some(v) = seats.filter(|v| !v.is_empty()) {
+            stated.seats = match v.parse::<usize>() {
+                Ok(n) if n >= 1 => n,
+                _ => {
+                    return Err(format!(
+                        "PW_RENDER_SEATS={v} is not a count of seats, one at least"
+                    ));
+                }
+            };
+        }
+        if let Some(v) = wait.filter(|v| !v.is_empty()) {
+            stated.wait = match v.parse::<u64>() {
+                Ok(n) if n >= 1 => std::time::Duration::from_secs(n),
+                _ => {
+                    return Err(format!(
+                        "PW_RENDER_SEAT_WAIT={v} is not a count of seconds, one at least"
+                    ));
+                }
+            };
+        }
+        Ok(stated)
+    }
+}
+
+/// **The renders' connections of one layer** (NEXT 4c): no more seats
+/// taken than its deployment's [`RenderSeats`] say, and no more connections
+/// open than that, each a seat's or idle for the next render.
+pub(crate) struct Renders {
+    url: String,
+    schema: Option<String>,
+    /// How many renders are seated at once at most: the deployment's.
+    bound: usize,
+    seats: Mutex<Seats>,
+    freed: std::sync::Condvar,
+    /// How long a render waits for its seat: the deployment's, or a test's.
+    wait: Mutex<std::time::Duration>,
+}
+
+/// The seats taken, and the connections.
+#[derive(Default)]
+struct Seats {
+    /// Connections no render holds, kept for the next.
+    idle: Vec<Client>,
+    taken: usize,
+    /// Connections open: idle, or a seat's.
+    open: usize,
+    /// The most seats taken at once, and connections open (NEXT 4c's
+    /// tests).
+    #[cfg(test)]
+    most: (usize, usize),
+    /// Renders waiting for a seat now (NEXT 4c's tests).
+    #[cfg(test)]
+    waiting: usize,
+}
+
+impl Renders {
+    /// **The renders' connections of a layer on `url`**, seated as the
+    /// deployment's `seats` say, one of them opened now and kept idle, so
+    /// the host's first render does not wait for a connection to be made, as
+    /// no read did before renders had their own (the commands' pool is warm
+    /// once the layer has migrated). One that cannot be made now is made at
+    /// the first read.
+    pub(crate) fn new(url: &str, schema: Option<&str>, seats: RenderSeats) -> Arc<Renders> {
+        let renders = Arc::new(Renders {
+            url: url.to_string(),
+            schema: schema.map(str::to_string),
+            bound: seats.seats,
+            seats: Mutex::default(),
+            freed: std::sync::Condvar::new(),
+            wait: Mutex::new(seats.wait),
+        });
+        if let Ok(c) = renders.connection() {
+            renders.seats.lock().expect("seats").idle.push(c);
+        }
+        renders
+    }
+
+    /// **A render's seat**, once one is free: waited for while every seat is
+    /// taken, for the deployment's wait at most; past it, a seat whose every
+    /// read fails saying so.
+    pub(crate) fn seat(self: &Arc<Self>) -> Seat {
+        let wait = *self.wait.lock().expect("wait");
+        let deadline = std::time::Instant::now() + wait;
+        let mut seats = self.seats.lock().expect("seats");
+        while seats.taken >= self.bound {
+            let left = deadline.saturating_duration_since(std::time::Instant::now());
+            if left.is_zero() {
+                return Seat {
+                    renders: self.clone(),
+                    conn: Mutex::new(None),
+                    refused: Some(format!(
+                        "a render waited {wait:?} for one of the {} connections renders read in",
+                        self.bound
+                    )),
+                };
+            }
+            #[cfg(test)]
+            {
+                seats.waiting += 1;
+            }
+            seats = self.freed.wait_timeout(seats, left).expect("seats").0;
+            #[cfg(test)]
+            {
+                seats.waiting -= 1;
+            }
+        }
+        seats.taken += 1;
+        #[cfg(test)]
+        {
+            seats.most.0 = seats.most.0.max(seats.taken);
+        }
+        Seat {
+            renders: self.clone(),
+            conn: Mutex::new(None),
+            refused: None,
+        }
+    }
+
+    /// An idle connection, or a new one: never one more than the seats
+    /// taken need, since a seat asks only while it holds none.
+    fn connection(&self) -> Result<Client, String> {
+        {
+            let mut seats = self.seats.lock().expect("seats");
+            while let Some(c) = seats.idle.pop() {
+                if !c.is_closed() {
+                    return Ok(c);
+                }
+                seats.open -= 1;
+            }
+            seats.open += 1;
+            #[cfg(test)]
+            {
+                seats.most.1 = seats.most.1.max(seats.open);
+            }
+        }
+        let connected = Client::connect(&self.url, NoTls)
+            .map_err(pg)
+            .and_then(|mut c| {
+                if let Some(schema) = &self.schema {
+                    c.batch_execute(&format!("SET search_path TO {}", ident(schema)))
+                        .map_err(pg)?;
+                }
+                Ok(c)
+            });
+        if connected.is_err() {
+            self.seats.lock().expect("seats").open -= 1;
+        }
+        connected
+    }
+
+    /// A seat's transaction ended `how`, and its connection kept idle where
+    /// it could end it, closed otherwise.
+    fn ended(&self, mut c: Client, how: &str) {
+        let kept = c.batch_execute(how).is_ok();
+        let mut seats = self.seats.lock().expect("seats");
+        if kept {
+            seats.idle.push(c);
+        } else {
+            seats.open -= 1;
+        }
+    }
+
+    /// How long a render waits for its seat, from now (a test's shorter).
+    #[cfg(test)]
+    pub(crate) fn waiting_at_most(&self, wait: std::time::Duration) {
+        *self.wait.lock().expect("wait") = wait;
+    }
+
+    /// The most seats taken at once, and connections open, so far.
+    #[cfg(test)]
+    pub(crate) fn most(&self) -> (usize, usize) {
+        self.seats.lock().expect("seats").most
+    }
+
+    /// The seats taken now.
+    #[cfg(test)]
+    pub(crate) fn taken(&self) -> usize {
+        self.seats.lock().expect("seats").taken
+    }
+
+    /// The renders waiting for a seat now.
+    #[cfg(test)]
+    pub(crate) fn waiting(&self) -> usize {
+        self.seats.lock().expect("seats").waiting
+    }
+}
+
+/// **A render's seat** (NEXT 4c): its connection, opened at the render's
+/// first read with its read transaction ([`READ_SNAPSHOT`]), which every
+/// later read of the render reads in, and committed when the render ends. A
+/// read that fails ends the transaction, as it may have aborted it, and the
+/// render's next read opens another. Given back when dropped.
+pub(crate) struct Seat {
+    renders: Arc<Renders>,
+    conn: Mutex<Option<Client>>,
+    /// Why there is no seat: the wait for one passed the deployment's.
+    refused: Option<String>,
+}
+
+impl Seat {
+    /// `f`, on the seat's connection, in the render's read transaction.
+    pub(crate) fn read<T>(
+        &self,
+        f: impl FnOnce(&mut Client) -> Result<T, String>,
+    ) -> Result<T, String> {
+        if let Some(why) = &self.refused {
+            return Err(why.clone());
+        }
+        let mut conn = self.conn.lock().expect("the render's connection");
+        if conn.is_none() {
+            let mut c = self.renders.connection()?;
+            if let Err(e) = c.batch_execute(READ_SNAPSHOT) {
+                drop(c);
+                self.renders.seats.lock().expect("seats").open -= 1;
+                return Err(pg(e));
+            }
+            *conn = Some(c);
+        }
+        let out = f(conn.as_mut().expect("opened"));
+        if out.is_err() {
+            self.renders.ended(conn.take().expect("opened"), "ROLLBACK");
+        }
+        out
+    }
+}
+
+impl Drop for Seat {
+    fn drop(&mut self) {
+        let conn = match self.conn.get_mut() {
+            Ok(c) => c.take(),
+            Err(poisoned) => poisoned.into_inner().take(),
+        };
+        if let Some(c) = conn {
+            self.renders.ended(c, "COMMIT");
+        }
+        if self.refused.is_none() {
+            let mut seats = self.renders.seats.lock().expect("seats");
+            seats.taken -= 1;
+            self.renders.freed.notify_one();
+        }
+    }
+}
+
 /// One post as read: its author's handle and name where it has a row, its
 /// likes counted, and what it replies to.
 struct Row {
@@ -579,12 +883,14 @@ fn author(c: &mut Client, principals: &Principals, session: &str) -> Result<Stri
 /// **The feed's data in one PostgreSQL database.**
 pub(crate) struct FeedPg {
     pool: Arc<Pool>,
+    /// TRACK SEAM (render-merge): the renders' connections (NEXT 4c).
+    renders: Arc<Renders>,
     isolation: Isolation,
     /// One command of this host at a time, from its first write to its
     /// commit, as the in-memory layer's lock is: a host never conflicts with
     /// itself. A serializable transaction is what holds against any other
     /// writer of the database, and a commit it refuses keeps nothing.
-    writes: Mutex<()>,
+    writes: crate::data::Writes,
     /// Track `uploads`: the leases a post's image is committed from.
     uploaded: std::sync::OnceLock<crate::uploads::Leases>,
     /// Each session's principal (track `identity`): whom a session writes
@@ -602,14 +908,16 @@ impl FeedPg {
     /// transaction serializable.
     #[cfg(test)]
     pub(crate) fn open(url: &str, schema: Option<&str>) -> Result<FeedPg, String> {
-        FeedPg::open_with(url, schema, Isolation::Serializable)
+        FeedPg::open_with(url, schema, Isolation::Serializable, RenderSeats::default())
     }
 
-    /// [`FeedPg::open`], a command's transaction opened as `isolation` says.
+    /// [`FeedPg::open`], a command's transaction opened as `isolation` says,
+    /// and its renders seated as the deployment's `seats` say.
     pub(crate) fn open_with(
         url: &str,
         schema: Option<&str>,
         isolation: Isolation,
+        seats: RenderSeats,
     ) -> Result<FeedPg, String> {
         let pool = Arc::new(Pool {
             url: url.to_string(),
@@ -630,8 +938,9 @@ impl FeedPg {
         pool.give(c);
         Ok(FeedPg {
             pool,
+            renders: Renders::new(url, schema, seats),
             isolation,
-            writes: Mutex::new(()),
+            writes: crate::data::Writes::new(),
             uploaded: std::sync::OnceLock::new(),
             principals: std::sync::RwLock::new(Principals::default()),
         })
@@ -936,6 +1245,7 @@ impl crate::schedules::Runs for FeedPg {
     }
 
     fn ran(&self, id: i64) -> Result<(), String> {
+        let _writes = self.writes.lock().unwrap_or_else(|e| e.into_inner());
         self.pool.with(|c| crate::schedules::pg::ran(c, id))
     }
 
@@ -946,6 +1256,7 @@ impl crate::schedules::Runs for FeedPg {
         due_ms: i64,
         failed: Option<&str>,
     ) -> Result<(), String> {
+        let _writes = self.writes.lock().unwrap_or_else(|e| e.into_inner());
         self.pool
             .with(|c| crate::schedules::pg::retry(c, id, attempts, due_ms, failed))
     }
@@ -964,6 +1275,44 @@ impl crate::data::DataLayer for FeedPg {
             self.principals(),
             self.uploaded.get().cloned(),
         )
+    }
+
+    // TRACK SEAM (render-merge): a render's snapshot, its seat (waited for
+    // while every seat is taken) and the read transaction it holds, and each
+    // of its queries' reads in it (NEXT 4c).
+    fn snapshot(&self) -> Option<crate::data::Snapshot> {
+        Some(Box::new(Arc::new(self.renders.seat())))
+    }
+
+    fn reads_in(
+        &self,
+        snapshot: &crate::data::Snapshot,
+        session: &str,
+        stopped: Option<Stopped>,
+    ) -> crate::data::Ops {
+        // Never another layer's: a render's snapshot is its layer's
+        // (`render_merge`, by the layer's address).
+        let Some(seat) = snapshot.downcast_ref::<Arc<Seat>>() else {
+            return self.reads(session, stopped);
+        };
+        let seat = seat.clone();
+        reads_through(
+            Arc::new(move |f: Read<'_>| seat.read(|c| f(c))),
+            self.principals(),
+            self.uploaded.get().cloned(),
+        )
+    }
+
+    /// Another writer's commit, between a render's reads (NEXT 4c's tests).
+    #[cfg(test)]
+    fn execute_for_test(&self, sql: &str) -> Result<(), String> {
+        self.pool.with(|c| c.batch_execute(sql))
+    }
+
+    /// The renders' connections (NEXT 4c's tests).
+    #[cfg(test)]
+    fn renders_for_test(&self) -> Option<Arc<Renders>> {
+        Some(self.renders.clone())
     }
 
     fn uploaded_by(&self, leases: crate::uploads::Leases) {

@@ -14,6 +14,80 @@ owner's ruling of 2026-10-02
 and an offline harness; no model is called until the owner chooses the models
 and budget.
 
+**Train-11 landed, 2026-10-20** (`track/train-11`, verify 39442025240 at
+`320c52a4`, and dispatch 39478386992 at `2b8a8b81` for the six recipes its
+last fix reached; the integrator's delegate assembled it). Each item:
+
+- **ADR-0354, a render reads each call once** (NEXT 4c, track
+  `render-merge`): one render's identical calls are made once, read as of
+  one snapshot; on PostgreSQL in one of a deployment's seats
+  (`PW_RENDER_SEATS`, `PW_RENDER_SEAT_WAIT`, 8 and 30 s where unset); the
+  table's and a turn's lock-order checks run in every debug build. Verify 39442025240 and dispatch 39478386992 green, with train-11.
+- **ADR-0355, the committed components are the build's**: every component
+  the store's build emits is committed current (55; three were stale on
+  train-10's head), the list derived from the build, with a control; the
+  planner and the evidence fetch read a binary file's change by the lines
+  that name it (8c5618c8 now plans 9 recipes, none before). Verify 39442025240 and dispatch 39478386992 green, with train-11.
+- **ADR-0356, the browser host map**: a run starts only the hosts its
+  selected tests need; a spec its optional build cannot serve is left out
+  and said, and a guard holds that each runs where its build is made. Verify 39442025240 and dispatch 39478386992 green, with train-11.
+- **ADR-0357, mutants run in parallel slots** (`PW_MUTANT_SLOTS`; off on
+  CI). Verify 39442025240 and dispatch 39478386992 green, with train-11.
+- **ADR-0358, a Kiokun search cache is published whole**, and a reader
+  keeps the version it opened. Verify 39442025240 and dispatch 39478386992 green, with train-11.
+- **ADR-0359, CI reliability**: a failing browser run's trace and a red
+  baseline's are kept (`kept-traces/`); `check_latency` bounds the fastest
+  of seven or more checks (800 ms a thousand lines); a mutant is built
+  incrementally on verify's recipe step; the nightly does not repeat a
+  verified head. Verify 39442025240 and dispatch 39478386992 green, with train-11.
+- **ADR-0360, the coverage-guided fuzzer measures or fails**
+  (`llvm-tools`), and `e14-fuzz-floor` records E9C's evidence. Verify 39442025240 and dispatch 39478386992 green, with train-11.
+- **ADR-0361, check is build**: `pw check` and `pw build` share one
+  complete validation; the four accepted programs it refuses are listed,
+  with their messages, in `examples/accepted/build-refusals.json`, which
+  every corpus check reads (A-007, A-013, A-018 use features not built
+  yet; A-008's generated WIT names an item twice, NEXT). Verify 39442025240 and dispatch 39478386992 green, with train-11.
+- **ADR-0362, the guide's mutation kills require valid producer
+  outcomes**. Verify 39442025240 and dispatch 39478386992 green, with train-11.
+- **ADR-0363, Wasmtime 48.0.7**, for RUSTSEC-2026-0378 and 0379. Verify 39442025240 and dispatch 39478386992 green, with train-11.
+- **Bounded-race**: the write-guard controls wait for the guard's own
+  report, not a timer. Verify 39442025240 and dispatch 39478386992 green, with train-11.
+- **The train's own fixes**: three hand-kept lists that other tracks'
+  changes broke (the explain() calls, the slots' toy machinery, the slots'
+  reviewed-source pin), a Python 3.10-only test fixture CI's 3.12 exposed,
+  a flaky test that patched `builtins.open` for every thread, the layouts
+  survivor the render merge hid, and NEXT 4b's count flake. Verify 39442025240 and dispatch 39478386992 green, with train-11.
+
+**Train-9 payment/scheduler correction, 2026-10-16 (ADR-0352):** scheduled
+cleanup and retry acquire the existing StorePg/FeedPg write guard before a
+pool connection. Statement witnesses wait for successful completed settlement,
+with exact37/17/25/14/26/14 pins; the old12 sweep pin was an aborted transaction.
+The strict complete12-control campaign retains13 actual native Cargo results,
+with baseline0 and12 named101 test failures. Fresh `just ci` passes2954 Rust
+tests (25 explicitly ignored); all2280 frozen source/config inputs restore
+exactly. [Current receipt and raw results](evidence/E14/train9-bounded-strict-validation.json)
+distinguish the older112 reported neighbor kills, whose individual native
+statuses/full raw were not retained, and the old2222-path inventory omission.
+GitHub verify38863242953 remains failed. The exact head's `ci` and `verify`
+then passed: verify 38909882781 and ci 38909883157 at `e2a4acd9`, green, and
+train-9 landed on it 2026-10-17 (master `32757966`).
+The write guard orders one instance's writes, with cross-host serializable
+refusals still possible.
+
+**Train-9 corrective validation, 2026-10-16:** the absorbed description
+control is replaced by a withheld initial shell; the complete recipe passes
+all 21 browser tests in three engines and all 9 assertion controls. Unit-test
+Kiokun servers now explicitly use the committed sample while production
+retains deployment configuration; its child regression is red-before and
+green-after, with 2/2 independent controls. Fresh inherited-environment
+`just ci` passes 2948 Rust tests (25 ignored), 167 Python tests
+and one intentional skip. The preceding 16 server failures and failed
+GitHub verify 38823189869 remain failed historical results.
+[Commands, raw results and hashes](evidence/E14/train9-corrective-validation.txt).
+GitHub's verify 38909882781 at `e2a4acd9` then passed (`e14-descriptions` 9
+of 9, `e14-kiokun-test-data` 2 of 2), and train-9 landed 2026-10-17.
+Production cache publication/lifetime concurrency remains open.
+
 **ADR-0249, 2026-10-07: a verification shard sets up only what its recipes
 need** (the owner's approval, relayed 2026-10-07). A shard spent more than
 half its time setting up: shard 3 at `c1738ec` freed the disk for 84 s,
@@ -23,21 +97,95 @@ install one, only those that read the build build, the disk is freed in the
 background, and every run fits the Free plan's 20 jobs at once. Playwright
 advises against caching its browsers, so they are not cached.
 
-**ADR-0351, 2026-10-16: generic results retain their member types and effects.**
-Local integration of worker7ec6a534 is in progress after D1. The shared value
-solver remains the single authority for each generic invocation; rooted
-effect walks retain the bounded callback metadata and expression-based each
-headers. Candidate C28 is43 accepted/93 rejected and63 challenged invariants;
-the combined regression, whole-control and full CI gates remain pending.
-The combined review also closes a property-call omission from bounded reads
-and interface lexical-scope omissions; actual before/after probes are recorded
-under ADR-0351. Positive unexpected Cargo exits remained a classification gap
-in the earlier bounded instrument: the new shared parser rejects them, with
-14 focused regressions green. Fresh own33, affected whole scripts and full CI
-remain pending at this uncommitted source; earlier campaigns keep their tested
-input and instrument qualifications.
-Worker-only evidence and exact inputs are recorded in
-[ADR-0351](DECISIONS/ADR-0351-generic-effects.md).
+**Train-10's first verify, and the integrator's rulings, 2026-10-17**
+(ADR-0302, ADR-0290, ADR-0344, ADR-0352 and ADR-0349 amended). Verify
+39054436657 did not pass: three recipe shards were stopped at the
+345-minute job limit, four recipes failed, and `ubuntu-24.04-arm`'s ci
+failed `check_latency`.
+- `e14-refusal` runs as two recipes, part 1 and part 2 of its mutants
+  (`e14-refusal-2`), each its own count; the count gate holds a script's
+  parts to every mutant exactly once. Its browser mutants each took about
+  1,800 s on that run, train-9's about 1,110 s: the browser host map
+  (train-11) is expected to cut that.
+- `ci_seconds.json` holds that run's seconds, a stopped or failed
+  recipe's marked a lower bound, and the plan refuses a recipe recorded
+  past the job's limit before any shard runs.
+- `check_latency` bounds the check's CPU time per thousand lines checked,
+  at two and a half times CI's slowest runner's (321 ms on ARM; 800 ms);
+  x86 measured 214 quietly and 352 beside eight busy loops.
+- Beside them: a recipe that skips without a database is dealt beside one
+  (`e14-scheduled-orders` had recorded nothing), `e14-harness` is local
+  (its sandboxes install offline from the machine's store), and the
+  scheduler guard tests give an unguarded write two seconds, not 100 ms.
+- The second verify (39091059482) failed in WebKit alone. WebKitGTK's
+  network process crashed when a test's `goto` cancelled requests a page
+  had just started: a use-after-free in libsoup 3, reproduced on master and
+  outside this program. It was no flake, and no session's turn held across
+  the estimate (ADR-0280, amended 2026-10-18). In WebKit, the two specs
+  that did so now let the page settle first.
+- The third verify (39131257549, on `ddaeeb1d`) passed 205 of its 206
+  recipes and the three engines' suites. `e10-browser` failed one
+  Chromium test, once in its three runs: a `waitForURL` in
+  `scheduled-orders.spec.mjs` timed out, its cause open (NEXT). The spec
+  now names its own failure; the ten recipes that change reaches ran
+  again by dispatch (39270030023, on `587657ff`), every one green.
+- Three committed components the server's unit tests run, the store's
+  hours, were stale: `evidence_is_current` holds 14 of the 20 to the
+  compiler, by a list kept by hand. They are regenerated (`8c5618c8`),
+  and the 72 recipes whose tests read them ran again by dispatch
+  (39325789224, on `8c5618c8`), every one green. The planner sees no
+  change to a binary file; train-11 derives the list from the build
+  (NEXT).
+- The landing's own gate found ADR-0344's count check unable to read a
+  verdict that says what killed its mutant, as the guide's script says
+  them: fixed (`e9bad0c1`), and `e14-evidence-integrity` ran again by
+  dispatch (39364245453, on `e9bad0c1`), green.
+Verify 39131257549 and dispatches 39270030023, 39325789224 and 39364245453 green, with train-10.
+
+**ADR-0290 amended, 2026-10-16: no shard is dealt past the job's ceiling
+where another deal ends as soon** (train-10, from `58e3797b`, track
+`ci-planner-ceiling`: Codex's work, committed as it was left).
+- The planner took the deal whose last shard ends soonest, then the fewest
+  database shards. A long recipe alone in its shard fixes the last finish,
+  so a bundle of several recipes past the ceiling (10,350 s) could stay
+  whole where more database shards would have split it: a replay of
+  train-9's roster found three PostgreSQL bundles past it in forty shards,
+  where thirty shards hold none at the same estimated finish (19,320 s).
+  Train-9's verify ran its longest shard 5 h 27 min of the 345 minutes.
+- Among deals that end as soon, the one whose shards of more than one
+  recipe go least past the ceiling, then the fewest database shards; a
+  long recipe alone still may. Three tests of the suite assert their
+  API's contract now where a control made them error, not fail: `plan([])`,
+  the verified-base fallback, and two refusals' `str`-or-`None`.
+- The track's own runs: `dealt_by_time_mutations.py` whole, 49 of 49
+  killed; its default `just ci` green. On the train, `test_ci_scripts.py`
+  79 of 79.
+Verify 39131257549 and dispatches 39270030023, 39325789224 and 39364245453 green, with train-10.
+
+**ADR-0353, 2026-10-16: a repeated store keeps all of its opening hours**
+(train-10, from `57f34890`, track `legacy-hours-duplicates`: the
+integrator's local repair, on train-9's `e2a4acd9`).
+- On PostgreSQL, `hours#for-stores` asked for a store twice gave its
+  second and later occurrences no weekly and no special periods:
+  `pg_hours_of` took each store's periods out of its maps (`remove`) for
+  the first. It reads them now (`get(..).cloned()`); its three set
+  queries, their order, and the caller's order, duplicates and misses are
+  unchanged. A test on both layers,
+  `a_repeated_store_in_a_set_read_keeps_all_of_its_hours` (3 and 17 keys
+  with duplicate and missing tails), was red on PostgreSQL before and
+  passes on both after.
+- `store_hours_mutations.py`: two controls more, one for each lookup (19
+  in all), and a Cargo result that is a build error, a stopped process or
+  self-contradictory is refused, not counted, as ADR-0352's script does
+  (`test_store_hours_result_integrity.py`, 4 tests).
+- `e14-store-hours`'s browser stage fails its recipe where its suite fails
+  (train-10's `run_suite.sh`, ADR-0349); the track's four recipe tests
+  hold it: with `|| true` put back, three of them fail.
+- The track's own runs, at its local snapshot: the hours script whole 19
+  of 19 and the bounded statements' 12 of 12, 36 browser tests in three
+  engines, and `just ci` green (2955 Rust tests passed, 25 ignored;
+  [raw output](evidence/E14/repeated-store-hours-ci.txt)).
+Verify 39131257549 and dispatches 39270030023, 39325789224 and 39364245453 green, with train-10.
 
 **ADR-0350, 2026-10-16: tables and bounded generated reads**
 (local train-10 integration). Table declarations generate their reads,
@@ -51,9 +199,10 @@ refusals and 0 failing cases. Corpus C27 is 42 accepted / 87 rejected;
 generality is 60/60. The guide's ordinary browser suite passed 12 tests
 in three engines with dictionary deployment variables absent. Its 74-control
 campaign is recorded with a separate known exit-status classification gap;
-strict guide-producer validity remains open. Runtime adapter conformance,
-generic-result integration, final assembled CI, verification and quiet-host
-E9 remain pending. [Commands, complete raw output and source manifest](evidence/E14/train10-d1-integration.txt).
+strict guide-producer validity remains open. Runtime adapter conformance
+(D2), generic-result integration and quiet-host E9 remain open. [Commands,
+complete raw output and source manifest](evidence/E14/train10-d1-integration.txt).
+Verify 39131257549 and dispatches 39270030023, 39325789224 and 39364245453 green, with train-10.
 
 **ADR-0349, 2026-10-15: a failed suite fails its recipe** (train-10,
 from `3adbfe44`). Browser suites and benchmark controls propagate their
@@ -70,7 +219,27 @@ both strict-code tests and all 35 mutation controls pass. Behavioral
 injection covers 143 suite failures and 203 build failures. Corpus evidence
 is current at 79/79.
 [Integration commands and raw results](evidence/E14/train10-evidence-integrity.txt).
-Full assembled CI, verification and quiet-host latency remain pending.
+Quiet-host latency remains open.
+Verify 39131257549 and dispatches 39270030023, 39325789224 and 39364245453 green, with train-10.
+
+**ADR-0340's and ADR-0322's follow-ups, 2026-10-15: a set pair carries
+its key by name, and PW0009 says how Pleris spells and and or**
+(train-10, from `920dbe67` with `17fade14`, merged as `9010d860`).
+- A handwritten set pair must carry the key in a field named as the keyed
+  read's first parameter, of the same resolved type (ADR-0340's Found 6):
+  before, a wrapper's `other: Int` was taken for an `item: Int` key. A
+  result wrapper's other fields are still matched by type, and ADR-0348's
+  exact Result/Option payload is kept beside the named key. A new
+  generality witness (`set_pair_shape/misnamed-key.pw`) is refused with
+  exactly PW0407. That an adapter answers each key's values stays the
+  conformance suite's to prove.
+- `&&` and `||` are still PW0009, which now says "Pleris writes `&` for
+  and and `|` for or; write one operator" (ADR-0322's follow-up); the
+  parser is unchanged.
+- On the train: bounded reads 32, source and corpus 20, generality 6,
+  syntax 96; `bounded_checker_mutations.py` whole 42 of 42, the logical
+  operators' 6 of 6 ([raw](evidence/E14/bounded-key-field-name.txt)).
+Verify 39131257549 and dispatches 39270030023, 39325789224 and 39364245453 green, with train-10.
 
 **ADR-0347 and ADR-0348, 2026-10-15: scheduled orders and batched
 estimates** (train-10, from `40e81d51` plus integration repairs). Windows
@@ -82,21 +251,28 @@ without diagnostics; 46 focused memory tests and all four PostgreSQL
 bounded tests passed. Whole controls killed 53/53 scheduled, 41/41 bounded
 checker and 8/8 statement mutants. Combined browser tests passed 24/24 in
 three engines. [Commands and raw results](evidence/E14/train10-scheduled-integration.txt).
-Full integrated CI remains pending. Estimator isolation,
-send-time hours rechecking and multiple current scheduled orders remain
-limitations.
+Estimator isolation, send-time hours rechecking and multiple current
+scheduled orders remain limitations. Merging train-9's ADR-0352, its four
+payment-taking transactions wait on completed payments, every pin as
+measured. Its recipe skips without a database, and the planner did not
+deal it beside one: train-10's first verify recorded nothing of it, and
+the planner holds every such recipe to a database's shard now.
+Verify 39131257549 and dispatches 39270030023, 39325789224 and 39364245453 green, with train-10.
 
 **ADR-0346, 2026-10-15: argument and page-parameter invariants**
 (train-10, from `ac3f2553`). The browser command decoder already refused
 invalid values; the repaired gaps were direct component calls, page
 parameters and nested Map/Set values. Arguments are held before predicates
 read them. Branch evidence recorded 17/17 own controls, four related whole
-scripts, and 12 browser tests in three engines. Integrated CI and
-verification are pending. The path-text follow-up `49a2f90f` refuses
+scripts, and 12 browser tests in three engines. The path-text
+follow-up `49a2f90f` refuses
 malformed escapes and non-UTF-8 path text with 400, while valid unknown
 paths remain 404. Memory and PostgreSQL parameter suites passed 6/6 each;
 whole controls killed 18/18. [Raw correction evidence](evidence/E14/argument-path-text.txt).
-Full assembled verification remains pending.
+Merged with train-9's reviews, the boundary refuses a comment past 500
+characters before the reviews layer does, whose own rule is tested
+directly since (`e920c40c`).
+Verify 39131257549 and dispatches 39270030023, 39325789224 and 39364245453 green, with train-10.
 
 **ADR-0345, 2026-10-15: each-header expressions are checked**
 (train-10, from `839e8bfa`). Effects, privacy, signals and names now see a
@@ -104,7 +280,8 @@ loop's list and key through an exhaustive enumeration of seven expression
 positions. Branch evidence recorded 20/20 own controls and twelve other
 whole scripts. Corpus collision resolved as C26/A-038, retaining
 bounded-read C25/A-037. Generic-result effects remain a separate open
-track. Integrated CI and verification are pending.
+track.
+Verify 39131257549 and dispatches 39270030023, 39325789224 and 39364245453 green, with train-10.
 
 **ADR-0344, 2026-10-15: evidence integrity** (train-10, from
 `83cdac27`). Mutation runs discard stale Python bytecode; train pushes
@@ -112,8 +289,7 @@ plan stale evidence; counts and rejected fixture headers are held to their
 producers; checking latency bounds thread CPU time; browser suites require
 complete build outputs; trains and master require numbered ADRs.
 The branch recorded 32/32 own controls, plus whole related scripts. The
-integration also makes reviews' failed build fail its recipe. Integrated
-CI and verification are pending; this is not a landing claim.
+integration also makes reviews' failed build fail its recipe.
 The corrective report publisher preserves prior complete evidence and
 publishes atomically. The shared planner discovers the published output.
 Its final suite kills 35/35 controls; 227 Python tests run with 225 passes
@@ -122,7 +298,11 @@ recorded as failing. [Corrective evidence](evidence/E14/evidence-integrity-atomi
 The actual clean-source recipe at `c67bf6ed` now passes, including both
 ordinary and 64-busy-loop latency checks and all 35 controls.
 [Clean-source receipt](evidence/E14/evidence-integrity-clean-recipe.txt).
-Assembled train CI and verification remain pending.
+Amended at train-10's merge of train-9 (2026-10-17): a decision's file,
+by the path evidence recorded it under before its numbering, is history,
+not an unnumbered mention; train-9's receipts of ADR-0352 hold five such
+paths, which the check named on a train's ref. 38 controls, from 35.
+Verify 39131257549 and dispatches 39270030023, 39325789224 and 39364245453 green, with train-10.
 
 **ADR-0343, 2026-10-15: a guide whose examples compile** (NEXT's
 developer experience, its docs and tutorial for a developer from outside;
@@ -147,7 +327,7 @@ track `guide`, merged from `49967631`, with the integrator's rulings of
   its verify green at `00471782` (`e14-guide` among its jobs) and again
   at `49967631`, with train-8 merged (38815010191), and its `ci` there
   (38815009873).
-Verify TRAIN_RUN green, with train-9.
+Verify 38909882781 green, with train-9.
 
 **ADR-0342, 2026-10-15: the claim, measured: the bug museum and the
 head-to-head** (NEXT's evidence that answers "is Pleris perfect?"; track
@@ -173,7 +353,7 @@ head-to-head** (NEXT's evidence that answers "is Pleris perfect?"; track
   `--checks-only` run on the train: 4 refused, none otherwise than
   expected; `proof_mutations.py` 4 of 4 killed, H07's new control among
   them.
-Verify TRAIN_RUN green, with train-9.
+Verify 38909882781 green, with train-9.
 
 **ADR-0341, 2026-10-15: a store is rated through its delivered orders, and
 its reviewers go unnamed** (W9's; NEXT's ratings and reviews, the DoorDash
@@ -202,7 +382,7 @@ from `2190221c`, with the integrator's rulings of 2026-10-15).
   which still described the page without its ratings: brought to the page
   on the train, in a commit of their own. Its browser hosts are PORT + 200
   to 202.
-Verify TRAIN_RUN green, with train-9.
+Verify 38909882781 green, with train-9.
 
 **ADR-0340, 2026-10-15: a read keyed by its loop's element is refused**
 (NEXT 4c's second step, the checker's half of ADR-0337; track
@@ -220,8 +400,8 @@ and answers of 2026-10-15; corpus C25).
   kiokun-site reads four times per element, as kiokun.com does, each a
   warning through `KNOWN_READS_PER_ELEMENT` until kiokun's layer has set
   forms and the pair takes a list of key records (the integrator's
-  answer). The pair matches its key's field by type until track
-  `pair-key-by-name` matches it by name.
+  answer). The pair matched its key's field by type; track
+  `pair-key-by-name` matches it by name (train-10, `9010d860`).
 - Corpus C25: R-075 to R-077 (PW0405, one per loop form), R-078 (PW0407)
   and A-037; generality 56 / 56. The rejected corpus exercises 56 of the
   199 codes (`pw check` over each fixture as `checking_source.rs` builds
@@ -232,7 +412,7 @@ and answers of 2026-10-15; corpus C25).
   On the train, its store test edits the home page's loop as ADR-0341
   left it (the train's first `just ci` found the two merges meeting
   there), and the script ran whole again, 40 of 40.
-Verify TRAIN_RUN green, with train-9.
+Verify 38909882781 green, with train-9.
 
 **ADR-0339, 2026-10-15: a collaborative document is merged by Automerge,
 edited in a mounted ProseMirror, and told on the stream** (a design note
@@ -5100,9 +5280,18 @@ Latest local integration validation (2026-10-16): the D1 source snapshot
 `evidence/E14/train10-d1-input-sha256.json` passed full `just ci` with
 3,058 Rust tests and no failures. This records tested inputs before the
 local merge commit; it is not a master or GitHub verification claim.
-The latest committed train-9 source `289068a6` passed local full CI
-(2,948 Rust tests, 0 failed, 25 ignored) and GitHub CI38863243118;
-verify38863242953 is not yet complete. Older records follow.
+Train-10 at `e9bad0c1` (2026-10-19): `just ci` green on the PC, 3,065
+Rust tests passed, none failed, 25 ignored, mutant programs 301 judged
+and none failing, as at `8c5618c8`, `587657ff` and `e920c40c`
+(2026-10-17, when the recipes its merges reach ran whole, every control
+killed: PARALLEL's train-10 entry). Its record is GitHub's verify
+39131257549 at `ddaeeb1d`, dispatch 39270030023 at `587657ff`, dispatch
+39325789224 at `8c5618c8` and dispatch 39364245453 at `e9bad0c1`, with ci
+39364199325 there; master moves to its evidence commit (2026-10-19,
+PARALLEL's "train-10 landed"). Before it, master
+`32757966` was train-9's landing (2026-10-17): its
+source `e2a4acd9` passed GitHub's verify 38909882781 (85 recipes, 1,391
+of 1,391 mutants killed) and ci 38909883157. Older records follow.
 
 `4310769` (2026-10-07, ADR-0232 to ADR-0234, and the two survivors at
 `c7f999b` accounted for): `just ci` passes locally, the workspace's 2110

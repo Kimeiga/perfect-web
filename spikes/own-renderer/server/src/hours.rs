@@ -376,8 +376,8 @@ pub(crate) fn pg_hours_of(
                 Hours {
                     zone,
                     last_order_minutes,
-                    weekly: weekly.remove(s).unwrap_or_default(),
-                    special: special.remove(s).unwrap_or_default(),
+                    weekly: weekly.get(s).cloned().unwrap_or_default(),
+                    special: special.get(s).cloned().unwrap_or_default(),
                 },
             ))
         })

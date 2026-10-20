@@ -3,7 +3,7 @@
 // reaches that store's pages, and no other store's. And ADR-0163: a store
 // that is not there is not found.
 import { expect, test } from "@playwright/test";
-import { MUTABLE_PORTS } from "../playwright.config.mjs";
+import { MUTABLE_PORTS } from "../host-metadata.mjs";
 
 test.use({
   baseURL: async ({}, use, testInfo) => {

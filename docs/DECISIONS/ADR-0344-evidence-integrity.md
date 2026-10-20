@@ -381,3 +381,71 @@ All controls fail test assertions; no bound stopped a process. Publication
 records that exact clean source. The source commit is preserved beneath a
 separate evidence commit. [Receipt and hashes](../evidence/E14/evidence-integrity-clean-recipe.txt).
 Assembled train verification is still pending.
+
+
+## Amended at train-10's merge of train-9 (the integrator's delegate, 2026-10-17)
+
+- **Found at the merge.** Train-9's receipts of ADR-0352's correction,
+  merged with master, record their inputs by the paths they had: three
+  JSON manifests under `docs/evidence/E14/` (`train9-bounded-validation`,
+  `train9-bounded-historical-validation`, `train9-bounded-strict-inputs`)
+  name ADR-0352's file by its name before it was numbered, five times,
+  each with its hash. Finding 6's check named all five on a train's ref,
+  so the train's `ci`, its verify's `e14-evidence-integrity` and master's
+  CI after it would each have failed on records no recipe writes again.
+  Renaming the keys would make each receipt claim a file the hash is not
+  of.
+- **Ruled (cheap to reverse).** A path to a decision's file of the
+  placeholder's name, recorded in `docs/evidence/`, is the name the file
+  had then and names nothing now; anything else on its line is read as
+  before, and outside `docs/evidence/` such a path names the decision as
+  any mention does. A file still of that name is named by its own name,
+  as before.
+- **Held by** two more cases in `test_unnumbered_adrs.py` (a receipt's
+  recorded paths name nothing; a header beside a recorded path, and a
+  path in a script, are named) and three more controls in
+  `evidence_integrity_mutations.py` (the recorded path read as a mention;
+  a path let be outside evidence too; a line of evidence with one let be
+  whole), and the two anchors this moved re-anchored: 38 controls, from
+  35.
+
+
+## Amended at train-10's landing (the integrator's delegate, 2026-10-19)
+
+- **Finding 2 reads a verdict that says what killed its mutant.**
+  `VERDICT` took a kill only as `KILLED (...)`; the guide's script
+  (ADR-0343) says `KILLED by the checker (PW5048)` and `KILLED by <test>
+  (...)`, so the count check read none of the guide's 74 verdicts. It was
+  excused while the committed `guide.txt` was stale, and failed `just
+  evidence-gates` once the landing fetched a current one (39131257549).
+  Fixed on the train (`e9bad0c1`): a test, with its control (a kill that
+  says nothing in parentheses is no verdict), and a control in
+  `evidence_integrity_mutations.py`: 43. `e14-evidence-integrity` ran
+  again by dispatch (39364245453).
+
+## Amended at train-10's first verify (the integrator's rulings 1 and 4, 2026-10-17)
+
+- **Finding 4's ceiling measured the program** (ruling 4). Train-10's ci
+  39054436550 failed on `ubuntu-24.04-arm` alone: a whole check of the
+  store program, 56 files and 6,568 lines, a fifth more to check than
+  train-9's for its scheduled orders, cost 2,108.54 ms of the checking
+  thread's CPU, past the fixed 2 s. Its verify 39054436657 measured the
+  same program on the x86 runner at 1,404.39 ms quietly and 2,311.03 ms
+  beside eight busy loops (`e14-evidence-integrity`'s contention phase,
+  which failed there for it); the quiet PC, 813 to 986 ms. A fixed ceiling
+  over a program that grows is crossed by its growth. The ceiling is now
+  per thousand lines checked: two and a half times the slowest runner's,
+  321 ms on ARM, so 802.6, rounded down to 800 ms. Measured per thousand
+  lines: ARM 321, x86 214 quietly and 352 beside eight busy loops, the PC
+  124 to 150. The measurements are written past the harness's capture, so
+  a passing run says them in CI's logs. The control holds with ten checks
+  for one: five pass on the PC, where the ceiling is some six and a half
+  times the measurement (ten: 1,214.54 ms a thousand lines, refused).
+- **Finding 2's count, split across recipes** (ruling 1). `e14-refusal` no
+  longer fit a job, and runs as two recipes over two ranges of its
+  script's mutants (ADR-0302's amendment). `evidence_counts.py` holds a
+  recipe that runs `--part i/n` to its part's count, and a script's parts
+  together to every mutant exactly once: each part run by one recipe, no
+  mutant left to none, none in two (`split`). Two tests in
+  `test_evidence_counts.py` and four controls in
+  `evidence_integrity_mutations.py`: 42.

@@ -307,3 +307,18 @@ argument-invariant browsers passed 24/24 across all three engines.
 [Integration evidence](../evidence/E14/train10-scheduled-integration.txt)
 records commands, source hashes and raw results. Full assembled CI and
 verification remain pending; no landing is claimed here.
+
+
+## Found at train-10's verify (the integrator's delegate, 2026-10-17)
+
+- **Its recipe ran nowhere a database was.** `e14-scheduled-orders` says
+  it skipped, and writes no evidence, where `PW_STORE_DATABASE_URL` names
+  no database, and the planner's `NEEDS_DATABASE` did not hold it: train-10's
+  first verify (39054436657) dealt it to `recipes 1`, a shard with no
+  PostgreSQL, where it passed in three minutes recording nothing. Locally,
+  beside a database, the recipe passed whole (53 of 53 killed). It is in
+  the list now, with `e14-argument-invariants`, whose PostgreSQL part ran
+  only where a database was named; a test holds every recipe that skips
+  without a database to the list (`test_ci_scripts.py`), and a control in
+  `dealt_by_time_mutations.py` takes this one out of it. The train's next
+  verify records both.

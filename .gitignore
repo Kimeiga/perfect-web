@@ -39,6 +39,9 @@ next-env.d.ts
 /benchmarks/harness/.grading/
 playwright-report/
 test-results/
+# A failing browser run's output, kept where the next run does not clear it
+# (scripts/keep_traces.py)
+kept-traces/
 blob-report/
 
 # Local CA material — never commit (PROJECT_CHARTER.md §3.7, §14 M11)

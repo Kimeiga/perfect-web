@@ -7,9 +7,10 @@
 //! on kiokun.com's D1: its `porter unicode61` tokenizer is not reimplemented.
 //!
 //! The index is built once per process from the CSV, into a file under
-//! `target/` keyed by the CSV's and the schema's digests (gone with `cargo
-//! clean`; a stale one is removed when a new one is built), or in memory for
-//! a small CSV. Nothing is written in either repository.
+//! `target/` keyed by the CSV's and the schema's digest, or in memory for
+//! a small CSV. Each disk builder closes its private SQLite before publishing
+//! a directory; existing versions remain linked while readers may hold them.
+//! Nothing is written in either repository.
 
 use rusqlite::Connection;
 use rusqlite::types::Value as Sql;
@@ -150,22 +151,112 @@ fn fill(conn: &mut Connection, csv: &str) -> Result<usize, String> {
     Ok(n)
 }
 
-/// The index's cache file for `csv` under `dir`: named by the digests of the
-/// CSV's bytes and of the schema.
-fn cache_of(dir: &Path, csv: &[u8]) -> PathBuf {
+/// A versioned cache directory, keyed by the full CSV/schema fingerprint.
+/// Old flat files are ignored, never removed while another reader may hold
+/// them. The directory is nonempty before its atomic publication.
+fn cache_of(dir: &Path, identity: &str) -> PathBuf {
+    dir.join(format!("kiokun-search-v2-{identity}"))
+}
+
+fn fingerprint(csv: &[u8]) -> String {
     let mut h = Sha256::new();
     h.update(csv);
     h.update(SCHEMA.as_bytes());
-    let digest = h.finalize();
-    let name: String = digest.iter().take(12).map(|b| format!("{b:02x}")).collect();
-    dir.join(format!("kiokun-search-{name}.db"))
+    h.finalize().iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// Owns only the exclusively created staging directory. Declaration before
+/// a SQLite connection makes error unwinding close SQLite before cleanup.
+/// A killed process may leave this private stage; other builders ignore it.
+struct Stage {
+    dir: PathBuf,
+    published: bool,
+}
+
+impl Stage {
+    fn create(cache: &Path) -> Result<Stage, String> {
+        for _ in 0..8 {
+            let mut random = [0; 16];
+            getrandom::fill(&mut random).map_err(|e| e.to_string())?;
+            let name: String = random.iter().map(|b| format!("{b:02x}")).collect();
+            let dir = cache.join(format!("kiokun-search-building-{name}"));
+            match std::fs::create_dir(&dir) {
+                Ok(()) => {
+                    return Ok(Stage {
+                        dir,
+                        published: false,
+                    });
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(error) => return Err(error.to_string()),
+            }
+        }
+        Err("could not allocate a private search-cache staging directory".into())
+    }
+}
+
+impl Drop for Stage {
+    fn drop(&mut self) {
+        if !self.published {
+            let _ = std::fs::remove_dir_all(&self.dir);
+        }
+    }
+}
+
+/// A winner is complete only if SQLite can read its expected identity and
+/// exact FTS schema. Invalid winners are refused, never repaired in place.
+fn open_cached(dir: &Path, expected: &str) -> Result<Connection, String> {
+    let file = dir.join("index.db");
+    let conn = Connection::open_with_flags(&file, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+        .map_err(|e| format!("search cache {}: {e}", file.display()))?;
+    let actual: String = conn
+        .query_row("SELECT fingerprint FROM kiokun_cache", [], |r| r.get(0))
+        .map_err(|e| format!("search cache identity: {e}"))?;
+    if actual != expected {
+        return Err("search cache fingerprint does not match its CSV/schema".into());
+    }
+    let schema: String = conn
+        .query_row(
+            "SELECT sql FROM sqlite_schema WHERE name = 'dictionary_search'",
+            [],
+            |r| r.get(0),
+        )
+        .map_err(|e| format!("search cache schema: {e}"))?;
+    if schema != SCHEMA {
+        return Err("search cache FTS schema does not match".into());
+    }
+    Ok(conn)
+}
+
+/// Per-call scheduling points for real SQLite concurrency tests. These do
+/// not exist in a non-test build, and carry no global process state.
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CachePhase {
+    Opened,
+    Ready,
 }
 
 impl Index {
     /// The index of `csv`: in memory where the CSV is small; else the file
-    /// under `cache` its digests name, built where it is not there, a stale
-    /// one removed.
+    /// under `cache` its digest names, privately built and published only
+    /// when complete. Existing versions and live builders remain linked.
     pub(crate) fn open(csv: &Path, cache: &Path) -> Result<Index, String> {
+        #[cfg(not(test))]
+        {
+            Self::open_inner(csv, cache)
+        }
+        #[cfg(test)]
+        {
+            Self::open_inner(csv, cache, |_, _| {})
+        }
+    }
+
+    fn open_inner(
+        csv: &Path,
+        cache: &Path,
+        #[cfg(test)] mut observe: impl FnMut(CachePhase, &Path),
+    ) -> Result<Index, String> {
         let bytes = std::fs::read(csv).map_err(|e| format!("{}: {e}", csv.display()))?;
         let text = std::str::from_utf8(&bytes).map_err(|e| format!("{}: {e}", csv.display()))?;
         if (bytes.len() as u64) < IN_MEMORY {
@@ -176,32 +267,38 @@ impl Index {
             });
         }
         std::fs::create_dir_all(cache).map_err(|e| format!("{}: {e}", cache.display()))?;
-        let file = cache_of(cache, &bytes);
-        if !file.exists() {
-            let building = file.with_extension("building");
-            let _ = std::fs::remove_file(&building);
+        let expected = fingerprint(&bytes);
+        let directory = cache_of(cache, &expected);
+        if !directory.exists() {
+            let mut stage = Stage::create(cache)?;
+            let building = stage.dir.join("index.db");
             let mut conn = Connection::open(&building).map_err(|e| e.to_string())?;
+            #[cfg(test)]
+            observe(CachePhase::Opened, &building);
             fill(&mut conn, text)?;
-            drop(conn);
-            std::fs::rename(&building, &file).map_err(|e| e.to_string())?;
-            for stale in std::fs::read_dir(cache)
-                .map_err(|e| e.to_string())?
-                .flatten()
-            {
-                let path = stale.path();
-                let name = path
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or_default();
-                if name.starts_with("kiokun-search-") && path != file {
-                    let _ = std::fs::remove_file(&path);
+            conn.execute_batch("CREATE TABLE kiokun_cache (fingerprint TEXT NOT NULL)")
+                .map_err(|e| e.to_string())?;
+            conn.execute("INSERT INTO kiokun_cache VALUES (?1)", [&expected])
+                .map_err(|e| e.to_string())?;
+            conn.close().map_err(|(_, e)| e.to_string())?;
+            #[cfg(test)]
+            observe(CachePhase::Ready, &building);
+            match std::fs::rename(&stage.dir, &directory) {
+                Ok(()) => stage.published = true,
+                // Nonempty directories exclude replacing a concurrent
+                // winner. Validate that winner before treating this as a
+                // lost race; other rename failures remain visible.
+                Err(error) => {
+                    let winner = open_cached(&directory, &expected)
+                        .map_err(|invalid| format!("search cache publish: {error}; {invalid}"))?;
+                    return Ok(Index {
+                        conn: Mutex::new(winner),
+                    });
                 }
             }
         }
-        let conn = Connection::open_with_flags(&file, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
-            .map_err(|e| e.to_string())?;
         Ok(Index {
-            conn: Mutex::new(conn),
+            conn: Mutex::new(open_cached(&directory, &expected)?),
         })
     }
 
@@ -448,3 +545,6 @@ mod tests {
         );
     }
 }
+
+#[cfg(all(test, unix))]
+mod cache_tests;
