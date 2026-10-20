@@ -116,8 +116,14 @@ the hosts a run needs) and the allocator
    failure its **failing test lines** (cargo's and libtest's, Playwright's,
    unittest's, a mutation script's survivors and baselines, the compiler's)
    and **the tail of its log and evidence** as CI prints them, with the path
-   of the log. A failure is said when it happens, not only at the end; every
-   five minutes a status line says what each lane runs. Exit status 1 where
+   of the log. **A failure is said when it happens, not only at the end.** A
+   mutation script prints each mutant's verdict as it has it, and the recipe
+   fails at its end, hours later; so each running recipe's evidence is looked
+   at every 15 s (`GLANCE_EVERY`), and a survivor, a failed test or a red
+   baseline in it is said at once (`lane 0: e14-x so far: ..`, five lines to
+   a recipe, then "more"; only the files it has written since it began, only
+   whole lines). Its verdict is still its end's. Every five minutes a status
+   line says what each lane runs. Exit status 1 where
    any recipe failed or did not run, or a lane stopped, or the run was
    stopped; 2 where it could not start (a tree not clean, a port in use, too
    little disk for the lanes, a plan the planner refused, a directory that is
@@ -147,26 +153,67 @@ On the PC (WSL2, 32 threads, shared with ten-plus other workers), Python
 3.10.12, just 1.58.0, git 2.34.1:
 
 - **Smoke, four cheap recipes, two lanes** (`e10-ownership`, `e14-logical-mixed`,
-  `e10-same-name`, `e14-unsafe-table`): 158 s wall-clock at load 37-50, all ok,
-  each lane's setup 4 s (the node install; the toolchain not needed), the
-  lanes removed, the tree it was run in untouched. CI records 2 to 10 s for
-  each: in a cold lane each recipe compiles its own dependencies (23 to 93 s).
+  `e10-same-name`, `e14-unsafe-table`), run twice: at 608ef607, 158 s
+  wall-clock at load 37-50; at the final code (45fc25b1), 160 s at load
+  99.5 falling to 68.5. All ok, each lane's setup 4 to 5 s (the node install
+  and the toolchain's hard links), the lanes removed, the tree it was run in
+  untouched. CI records 2 to 10 s for each: in a cold lane each recipe
+  compiles its own dependencies (23 to 95 s), which the load hardly changes.
 - **A cold lane's build**: `cargo build --workspace --locked` took 4m01 to
   4m14 in each of three lanes at once (8 jobs each, load 55); a lane's
   `target/` is 1.5 GB after it (no debug info, as CI), and the lanes are
   small enough that `--min-free-gib` (default 8 per lane) is a floor, not a
   budget.
-- **The real subset** (train-11's last merges): <FILL: the proof run's
-  wall-clock against the same recipes' recorded seconds on CI, and the load>.
-- **The tool's tests**: 152, ~45 s on a quiet machine. <FILL: mutants>.
+- **The real subset**, the recipes train-11's last three merges reach:
+  `python3 scripts/ci_plan.py --changed 10d51f47 85234f71 --current` names
+  `e14-bounded-statements`, `e14-kiokun-cache`, `e14-render-merge`,
+  `e14-reviews`, `e14-scheduled-orders` and `e14-store-search`, and so does
+  `just preverify 10d51f47 --plan` at this branch (which leaves its own
+  `e14-preverify` out, its committed evidence being current, as a push would).
+  Run with `--recipes` at 608ef607 in four lanes: **6 recipes, 0 failed, in
+  8,695 s (2 h 25 min)**, at a one-minute load average of **22.6 at the start,
+  78.6 at the end and 156.6 at most** (sampled every 30 s, on 32 threads; this
+  worker's own evidence, mutation and gate runs went on at the same time,
+  beside the PC's other workers):
+
+  | recipe | here, s | CI recorded, s | lane |
+  |---|---|---|---|
+  | `e14-scheduled-orders` | 8,233.8 | not measured | 0 |
+  | `e14-render-merge` | 6,855.8 | 2,094 | 2 |
+  | `e14-store-search` | 5,681.8 | 4,867 | 3 |
+  | `e14-reviews` | 4,916.0 | 5,259 | 1 |
+  | `e14-bounded-statements` | 2,468.4 | 1,372 | 1 |
+  | `e14-kiokun-cache` | 437.3 | not measured | 1 |
+
+  The four CI has measured sum to 13,592 s there and 19,922 s here (1.47
+  times; 0.94 for reviews, 3.27 for render-merge, not looked into); the queue's
+  whole work here was 28,593 s in 8,695 s of wall-clock, the lanes busy 86% of
+  it. A lane that built (the node install, `cargo build --workspace`, the
+  three pages' builds) took 450 to 458 s to set up; the lane given only
+  `e14-render-merge` took 6. **At this load the four lanes are not faster than
+  CI's critical path for this subset** (at least 5,650 s: `e14-reviews` and its
+  shard's setup, and scheduled-orders has no CI time yet; the planner guesses
+  17,658 s, against 8,234 s here). What they give is each failure on the PC,
+  before a push, and a survivor within minutes of its being written (decision
+  5), not a faster whole.
+- **The tool's tests and mutants**: 167 tests (45 s on a quiet machine, 76 to
+  110 s at load 100+), and 225 mutants of the tool, of `verify.yml` and of the
+  recipe, all killed, in 4 allocator slots in 25 minutes (the first whole run
+  killed 220 of 226: its six survivors were four tests missing and one
+  redundant line, and are fixed).
 
 ## Evidence
 
-- `just e14-preverify` (`docs/evidence/E14/preverify.txt`): the 152 tests and
-  the <FILL> mutation controls, each killed by a failed assertion.
-- The real subset's summary and plan: <FILL: `/tmp/preverify-proof2/`, quoted
-  above>.
-- `just ci` at this branch's head, which is pushed only on its `ci: OK`.
+- `just e14-preverify` (`docs/evidence/E14/preverify.txt`, recorded at
+  33277666 with `PW_MUTANT_SLOTS=4`): the 167 tests, and 225 of 225
+  mutants killed, each by the failed assertion of a test of
+  `scripts/tests/test_preverify.py`, the cheap classes first.
+- The real subset's report is quoted above (`/tmp/preverify-proof1/`: its
+  `plan.json`, `summary.txt` and `summary.json`, and each lane's logs and
+  evidence; the PC's /tmp is not a record, and CI's verify of a train carrying
+  these recipes is). A second look at the final code, on four cheap recipes,
+  is in "Measured".
+- `just ci` at this branch's last commit that touches Rust or `.pw`: <FILL>.
 
 ## Not claimed; limits
 

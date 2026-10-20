@@ -56,6 +56,7 @@ import subprocess
 import sys
 import threading
 import time
+from collections.abc import Callable
 
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parent
@@ -134,6 +135,14 @@ BUILD_STEPS = [
 # (which decides nothing but the deal), and `--stale` on these branches.
 PLAN_SHARDS = 9
 STALE_BRANCHES = "track/train-"
+
+# **How often a running recipe's evidence is looked at**, in seconds, and how
+# many of its lines a run quotes before it says there are more. A mutation
+# script prints each mutant's verdict as it has it, so a survivor is in the
+# evidence within minutes of the run's start and the recipe, which fails at its
+# end, ends hours later: this is what makes a failure show up in minutes.
+GLANCE_EVERY = 15.0
+GLANCE_LINES = 5
 
 # Lines of a log that name a failure, for the report: cargo's and libtest's,
 # Playwright's (a failure's listing, a list reporter's cross, its counts),
@@ -508,16 +517,31 @@ def terminate(proc: subprocess.Popen, grace: float = 30.0) -> None:
             continue
 
 
-def watch(proc: subprocess.Popen, stop: threading.Event, timeout: float) -> str:
+def watch(
+    proc: subprocess.Popen,
+    stop: threading.Event,
+    timeout: float,
+    tick: Callable[[], None] | None = None,
+    every: float | None = None,
+) -> str:
     """Wait for a process: "done", or "stopped" or "timeout" (the process and
-    its group stopped) when the run was stopped or the time passed."""
+    its group stopped) when the run was stopped or the time passed. `tick`, if
+    given, is called every `every` seconds (`GLANCE_EVERY`) while it runs."""
+    every = GLANCE_EVERY if every is None else every
     deadline = time.monotonic() + timeout
+    looked = time.monotonic()
     while True:
         try:
             proc.wait(timeout=1.0)
             return "done"
         except subprocess.TimeoutExpired:
             pass
+        if tick is not None and time.monotonic() - looked >= every:
+            looked = time.monotonic()
+            try:
+                tick()
+            except Exception:  # noqa: BLE001 - a look at the evidence must never change a recipe's verdict
+                pass
         outcome = "stopped" if stop.is_set() else "timeout" if time.monotonic() >= deadline else "done"
         if outcome != "done":
             terminate(proc)
@@ -527,6 +551,50 @@ def watch(proc: subprocess.Popen, stop: threading.Event, timeout: float) -> str:
 # ---------------------------------------------------------------------------
 # A lane
 # ---------------------------------------------------------------------------
+
+
+class Glance:
+    """What a running recipe's evidence says already. A recipe writes its
+    evidence as it goes: a survivor, a failed test or a red baseline is in the
+    file when it happens, and the run says so then, `GLANCE_LINES` lines to a
+    recipe. The verdict is still the recipe's, at its end."""
+
+    def __init__(self, tree: pathlib.Path, recipe: str, lane: int, say: Callable[[str], None], since: float) -> None:
+        self.root = tree / "docs" / "evidence"
+        self.recipe = recipe
+        self.lane = lane
+        self.say = say
+        self.since = since
+        self.offsets: dict[pathlib.Path, int] = {}
+        self.said = 0
+
+    def __call__(self) -> None:
+        for path in sorted(self.root.rglob("*.txt")):
+            try:
+                stat = path.stat()
+                if stat.st_mtime < self.since:
+                    continue
+                offset = self.offsets.get(path, 0)
+                if stat.st_size < offset:
+                    offset = 0
+                if stat.st_size == offset:
+                    continue
+                with open(path, "rb") as handle:
+                    handle.seek(offset)
+                    chunk = handle.read(stat.st_size - offset)
+            except OSError:
+                continue
+            whole = chunk[: chunk.rfind(b"\n") + 1]
+            self.offsets[path] = offset + len(whole)
+            for line in failing_lines(whole.decode(errors="replace")):
+                self.tell(path, line)
+
+    def tell(self, path: pathlib.Path, line: str) -> None:
+        if self.said < GLANCE_LINES:
+            self.say(f"lane {self.lane}: {self.recipe} so far: {line}   ({path.name})")
+        elif self.said == GLANCE_LINES:
+            self.say(f"lane {self.lane}: {self.recipe} so far: more lines like these are in its evidence, and in the report")
+        self.said += 1
 
 
 class Run:
@@ -664,11 +732,14 @@ class Lane:
         out.mkdir(parents=True)
         command = [sys.executable, "scripts/ci_recipes.py", "--out", str(out), job.recipe]
         with open(out / "runner.out", "w") as runner:
+            # The files a recipe writes are dated by the filesystem's clock, and so is this one's, made
+            # as it starts: what was in the tree before it is not the recipe's.
+            glance = Glance(self.tree, job.recipe, self.index, self.run.say, os.fstat(runner.fileno()).st_mtime)
             proc = subprocess.Popen(
                 command, cwd=self.tree, env=self.environment(job.database), stdout=runner,
                 stderr=subprocess.STDOUT, start_new_session=True,
             )
-            outcome = watch(proc, self.run.stop, self.timeout)
+            outcome = watch(proc, self.run.stop, self.timeout, glance)
         left = stop_marked(self.marker)
         return result_of(job.recipe, self.index, out, outcome, left)
 

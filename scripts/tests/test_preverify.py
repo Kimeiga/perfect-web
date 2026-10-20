@@ -77,9 +77,19 @@ if name in meet:
 if mode == "leave":
     child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(120)"], start_new_session=True)
     record["child"] = child.pid
+if mode == "early":
+    evidence_now = pathlib.Path("docs/evidence/E14")
+    evidence_now.mkdir(parents=True, exist_ok=True)
+    with open(evidence_now / f"{name}.txt", "w") as out:
+        out.write("toy early\\n")
+        out.write("a first mutant: KILLED (1 of 3 tests fail)\\n")
+        out.flush()
+        out.write("an early mutant: SURVIVED\\n")
+        out.flush()
+        time.sleep(delay)
 if mode == "hang":
     time.sleep(600)
-time.sleep(delay)
+time.sleep(delay if mode != "early" else 0)
 record["end"] = time.time()
 save()
 evidence = pathlib.Path("docs/evidence/E14")
@@ -88,7 +98,8 @@ head = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=Tr
 lines = [f"toy {name}", f"commit: {head}"]
 if mode == "survive":
     lines.append("a mutant is undone: SURVIVED")
-(evidence / f"{name}.txt").write_text("\\n".join(lines) + "\\n")
+if mode != "early":
+    (evidence / f"{name}.txt").write_text("\\n".join(lines) + "\\n")
 print(f"{name}: done")
 if mode == "fail":
     print(f"test toy::{name} ... FAILED")
@@ -117,11 +128,13 @@ e14-hang:
     @python3 scripts/toy.py hang 0 hang
 e14-builds:
     @python3 scripts/toy.py builds 0.1 ok target/debug/pw
+e14-early:
+    @python3 scripts/toy.py early 3.0 early
 """
 
 SECONDS = {
     "e14-long": 250, "e14-mid": 150, "e14-short": 50, "e14-bad": 30, "e14-survivor": 20,
-    "e14-feed-postgres": 10, "e14-leave": 5, "e14-hang": 500, "e14-builds": 1,
+    "e14-feed-postgres": 10, "e14-leave": 5, "e14-hang": 500, "e14-builds": 1, "e14-early": 40,
 }
 
 
@@ -1221,6 +1234,23 @@ class Setup(Toy):
         self.assertEqual(self.records()["builds"]["PORT"], str(builder))
         self.assertNotEqual(self.records()["long"]["PORT"], str(builder))
 
+    def test_a_survivor_in_a_running_recipes_evidence_is_said_while_it_runs(self):
+        # Evidence committed with the tree, a survivor among it, is not news.
+        (self.toy / "docs/evidence/E14").mkdir(parents=True)
+        (self.toy / "docs/evidence/E14/committed.txt").write_text("an old mutant: SURVIVED\n")
+        git(self.toy, "add", "-A")
+        git(self.toy, "commit", "-q", "-m", "evidence that was already there")
+        with mock.patch.object(pv, "GLANCE_EVERY", 0.3):
+            # a setup that takes a moment, as a real one does: the tree is older than the recipe
+            code, out = self.run_in_process("e14-early", 1, ["sleep 0.3"], [])
+        self.assertEqual(code, 1, out)
+        said = out.index("lane 0: e14-early so far: an early mutant: SURVIVED   (early.txt)")
+        ended = out.index("lane 0: e14-early FAILED")
+        self.assertLess(said, ended, "said at the recipe's end, not while it ran")
+        self.assertNotIn("a first mutant", out.split("lane 0: e14-early FAILED")[0], "a killed mutant is no sign")
+        self.assertNotIn("committed.txt", out, "evidence the tree carried was taken for the recipe's")
+        self.assertIn("| `e14-early` | FAILED |", out)
+
     def test_a_lane_told_to_skip_setup_runs_none_of_it(self):
         marks = self.temp / "marks"
         marks.mkdir()
@@ -1698,6 +1728,23 @@ class Processes(unittest.TestCase):
         self.assertFalse(pv.alive(proc.pid))
         self.assertTrue(pv.alive(os.getpid()))
 
+    def test_a_watched_process_is_looked_at_every_so_often_and_a_look_that_fails_changes_nothing(self):
+        looks = []
+
+        def look():
+            looks.append(time.monotonic())
+            raise RuntimeError("a look that fails")
+
+        proc = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(3)"], start_new_session=True)
+        self.assertEqual(pv.watch(proc, pv.threading.Event(), 30, look, every=0.5), "done")
+        self.assertGreaterEqual(len(looks), 2)
+        quiet = subprocess.Popen([sys.executable, "-c", "pass"], start_new_session=True)
+        self.assertEqual(pv.watch(quiet, pv.threading.Event(), 30, look, every=0.5), "done")
+        rarely = []
+        slow = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(2.5)"], start_new_session=True)
+        self.assertEqual(pv.watch(slow, pv.threading.Event(), 30, lambda: rarely.append(1), every=100), "done")
+        self.assertEqual(rarely, [], "looked at before its time")
+
     def test_a_watched_process_that_ends_is_done_and_one_that_overstays_is_stopped(self):
         stop = pv.threading.Event()
         quick = subprocess.Popen([sys.executable, "-c", "pass"], start_new_session=True)
@@ -1709,6 +1756,88 @@ class Processes(unittest.TestCase):
         stop.set()
         self.assertEqual(pv.watch(again, stop, 30), "stopped")
         self.assertIsNotNone(again.returncode)
+
+
+class Glances(unittest.TestCase):
+    def setUp(self):
+        self.temp = pathlib.Path(tempfile.mkdtemp(prefix="pv-glance-"))
+        self.addCleanup(shutil.rmtree, self.temp, True)
+        self.evidence = self.temp / "docs" / "evidence" / "E14"
+        self.evidence.mkdir(parents=True)
+        self.said = []
+        self.glance = pv.Glance(self.temp, "e14-x", 2, self.said.append, time.time() - 5)
+
+    def test_a_line_that_says_failed_is_said_once_with_its_lane_recipe_and_file(self):
+        (self.evidence / "x.txt").write_text("fine\nm: SURVIVED\n")
+        self.glance()
+        self.glance()
+        self.assertEqual(self.said, ["lane 2: e14-x so far: m: SURVIVED   (x.txt)"])
+
+    def test_what_does_not_say_failed_is_not_said(self):
+        (self.evidence / "x.txt").write_text(
+            "m: KILLED (1 of 3 tests fail)\nbaseline (a): 3 passed, 0 failed\ntest result: ok. 3 passed; 0 failed\n")
+        self.glance()
+        self.assertEqual(self.said, [])
+
+    def test_lines_written_later_are_said_and_the_earlier_are_not_said_again(self):
+        path = self.evidence / "x.txt"
+        path.write_text("a: SURVIVED\n")
+        self.glance()
+        with open(path, "a") as out:
+            out.write("fine\nb: SURVIVED\n")
+        self.glance()
+        self.assertEqual([m.split(" so far: ")[1].split("   ")[0] for m in self.said], ["a: SURVIVED", "b: SURVIVED"])
+
+    def test_a_line_not_yet_whole_waits_for_its_end(self):
+        path = self.evidence / "x.txt"
+        path.write_text("a mutant: SURVIV")
+        self.glance()
+        self.assertEqual(self.said, [])
+        with open(path, "a") as out:
+            out.write("ED\n")
+        self.glance()
+        self.assertEqual(len(self.said), 1)
+        self.assertIn("a mutant: SURVIVED", self.said[0])
+
+    def test_a_file_written_before_the_recipe_began_is_not_read(self):
+        path = self.evidence / "old.txt"
+        path.write_text("a: SURVIVED\n")
+        long_ago = time.time() - 3600
+        os.utime(path, (long_ago, long_ago))
+        self.glance()
+        self.assertEqual(self.said, [])
+
+    def test_a_file_that_starts_again_is_read_from_its_start(self):
+        path = self.evidence / "x.txt"
+        path.write_text("a long line of what is fine, and what is fine again\na: SURVIVED\n")
+        self.glance()
+        path.write_text("b: SURVIVED\n")
+        self.glance()
+        self.assertEqual(len(self.said), 2)
+        self.assertIn("b: SURVIVED", self.said[1])
+
+    def test_only_text_files_under_the_evidence_directory_are_read(self):
+        (self.evidence / "x.json").write_text("a: SURVIVED\n")
+        (self.temp / "docs" / "other.txt").write_text("a: SURVIVED\n")
+        (self.evidence.parent / "nested").mkdir()
+        (self.evidence.parent / "nested" / "deep.txt").write_text("c: SURVIVED\n")
+        self.glance()
+        self.assertEqual(len(self.said), 1)
+        self.assertIn("(deep.txt)", self.said[0])
+
+    def test_after_five_lines_it_says_there_are_more_and_then_nothing(self):
+        (self.evidence / "x.txt").write_text("".join(f"m{n}: SURVIVED\n" for n in range(9)))
+        self.glance()
+        (self.evidence / "y.txt").write_text("another: SURVIVED\n")
+        self.glance()
+        self.assertEqual(len(self.said), 6)
+        self.assertEqual(sum("SURVIVED" in m for m in self.said), 5)
+        self.assertIn("more lines like these are in its evidence", self.said[5])
+
+    def test_a_tree_with_no_evidence_yet_is_no_fault(self):
+        shutil.rmtree(self.temp / "docs")
+        self.glance()
+        self.assertEqual(self.said, [])
 
 
 class ExitStatus(unittest.TestCase):
@@ -1790,6 +1919,11 @@ class LaneUnits(Toy):
         self.addCleanup(lane.remove)
         lane.bootstrap()
         self.assertFalse((lane.tree / ".toolchain").exists())
+
+
+class Glancing(unittest.TestCase):
+    def test_a_running_recipes_evidence_is_looked_at_every_fifteen_seconds_for_five_lines(self):
+        self.assertEqual((pv.GLANCE_EVERY, pv.GLANCE_LINES), (15.0, 5))
 
 
 class Status(unittest.TestCase):

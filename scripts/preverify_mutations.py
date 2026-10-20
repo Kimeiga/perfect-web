@@ -636,6 +636,69 @@ MUTANTS = [
     ("the plan is said with the caller's interpreter", PV, '["python3", *command[1:]]', "[*command]"),
     ("a directory named relatively is kept relative", PV, "    return pathlib.Path(out).resolve() if out else", "    return pathlib.Path(out) if out else"),
     ("a run interrupted before its lanes exist is a traceback", PV, "    except KeyboardInterrupt:\n", "    except SystemExit:\n"),
+    # -- what a running recipe's evidence says already
+    (
+        "a failure already in a running recipe's evidence is not said",
+        PV,
+        '            for line in failing_lines(whole.decode(errors="replace")):\n                self.tell(path, line)\n',
+        '            for line in []:\n                self.tell(path, line)\n',
+    ),
+    ("a line already said is said at each look", PV, "            self.offsets[path] = offset + len(whole)\n", "            self.offsets[path] = offset\n"),
+    ("a line not yet whole is read", PV, '            whole = chunk[: chunk.rfind(b"\\n") + 1]\n', "            whole = chunk\n"),
+    (
+        "a file written before the recipe began is read",
+        PV,
+        "                if stat.st_mtime < self.since:\n                    continue\n",
+        "",
+    ),
+    (
+        "a file that starts again is read from where the last ended",
+        PV,
+        "                if stat.st_size < offset:\n                    offset = 0\n",
+        "",
+    ),
+    (
+        "files outside the evidence directory are read",
+        PV,
+        '        for path in sorted(self.root.rglob("*.txt")):\n',
+        '        for path in sorted(self.root.parent.rglob("*.txt")):\n',
+    ),
+    ("files that are not text are read", PV, '        for path in sorted(self.root.rglob("*.txt")):\n', '        for path in sorted(self.root.rglob("*")):\n'),
+    ("a recipe is told of every failing line", PV, "        if self.said < GLANCE_LINES:\n", "        if True:\n"),
+    ("a recipe is never told there are more", PV, "        elif self.said == GLANCE_LINES:\n", "        elif False:\n"),
+    ("a recipe is told of six lines", PV, "GLANCE_LINES = 5\n", "GLANCE_LINES = 6\n"),
+    ("the evidence is looked at every quarter of an hour", PV, "GLANCE_EVERY = 15.0\n", "GLANCE_EVERY = 900.0\n"),
+    (
+        "a running recipe's evidence is not looked at",
+        PV,
+        "            outcome = watch(proc, self.run.stop, self.timeout, glance)\n",
+        "            outcome = watch(proc, self.run.stop, self.timeout)\n",
+    ),
+    (
+        "what the tree carried is taken for the recipe's",
+        PV,
+        "glance = Glance(self.tree, job.recipe, self.index, self.run.say, os.fstat(runner.fileno()).st_mtime)",
+        "glance = Glance(self.tree, job.recipe, self.index, self.run.say, 0.0)",
+    ),
+    (
+        "a watched process is never looked at",
+        PV,
+        "        if tick is not None and time.monotonic() - looked >= every:\n",
+        "        if False:\n",
+    ),
+    (
+        "a watched process is looked at at every wait",
+        PV,
+        "        if tick is not None and time.monotonic() - looked >= every:\n",
+        "        if tick is not None:\n",
+    ),
+    ("a watch looks at its own pace, not the one asked", PV, "    every = GLANCE_EVERY if every is None else every\n", "    every = GLANCE_EVERY\n"),
+    (
+        "a look that fails ends the watch",
+        PV,
+        "            except Exception:  # noqa: BLE001 - a look at the evidence must never change a recipe's verdict\n",
+        "            except KeyError:  # noqa: BLE001 - a look at the evidence must never change a recipe's verdict\n",
+    ),
     # -- the workflow the tool follows, read by its tests
     (
         "verify.yml plans a track's push in other shards",
@@ -693,7 +756,7 @@ MUTANTS = [
 
 # The test classes, cheap first. The first failure ends a mutant's run.
 CLASSES = [
-    "Ports", "Environment", "Plan", "Steps", "Judging", "FailingLines", "Report", "Status", "ExitStatus", "Say", "Help",
+    "Ports", "Environment", "Plan", "Steps", "Glancing", "Glances", "Judging", "FailingLines", "Report", "Status", "ExitStatus", "Say", "Help",
     "Load", "LaneUnits", "Processes", "Planner", "CleanTree", "RunTwice", "Locks", "Lanes", "Outcomes", "Setup",
 ]
 MODULE = "scripts.tests.test_preverify"
