@@ -55,6 +55,7 @@ import 'just/todomvc.just'
 import 'just/device-store.just'
 import 'just/second-host.just'
 import 'just/node-audit.just'
+import 'just/keyed-retry.just'
 
 default:
     @just --list
