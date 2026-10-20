@@ -56,6 +56,7 @@ import 'just/device-store.just'
 import 'just/second-host.just'
 import 'just/node-audit.just'
 import 'just/keyed-retry.just'
+import 'just/effect-convergence.just'
 
 default:
     @just --list
