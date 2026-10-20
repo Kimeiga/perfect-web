@@ -1,5 +1,5 @@
 {
-  "page": "kiokun.page.WordPage",
+  "page": "kiokun.page.WordPage~ui",
   "params": [
     "word",
     "entry"

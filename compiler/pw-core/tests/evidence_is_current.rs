@@ -341,10 +341,10 @@ fn the_committed_page_plan_is_what_the_compiler_plans_now() {
     let store = built
         .pages
         .iter()
-        .find(|p| p.page == "store.page.StorePage")
+        .find(|p| p.page == "store.page.StorePage~ui")
         .expect("the store page is planned");
     let fresh = serde_json::to_value(store.plan.as_ref().expect("its plan")).expect("serializes");
-    let path = "docs/evidence/E10/pages/store.page.StorePage.json";
+    let path = "docs/evidence/E10/pages/store.page.StorePage~ui.json";
     let committed: serde_json::Value = serde_json::from_str(
         &std::fs::read_to_string(root.join(path))
             .unwrap_or_else(|e| panic!("{path}: {e} — run `just e10-component`")),

@@ -130,7 +130,7 @@ fn a_pages_plan_states_what_its_parameters_must_hold() {
             .clone()
             .expect("planned")
     };
-    let held = plan("demo.invariants.InvariantsPage");
+    let held = plan("demo.invariants.InvariantsPage~ui");
     assert_eq!(held.params, ["code", "note"]);
     assert_eq!(
         serde_json::to_value(&held.bounded).expect("serializes"),

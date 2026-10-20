@@ -306,9 +306,9 @@ fn the_contract_no_longer_requires_a_capability_for_a_policy_value() {
     let sigs = Signatures::build(&ws, &refs);
     let cs = contracts(&refs, &sigs, &ws);
 
-    let poll = contract(&cs, "probe.Poll");
-    let term = contract(&cs, "probe.Term");
-    let neither = contract(&cs, "probe.Neither");
+    let poll = contract(&cs, "probe.Poll~ui");
+    let term = contract(&cs, "probe.Term~ui");
+    let neither = contract(&cs, "probe.Neither~ui");
 
     assert!(
         caps(poll).is_empty(),
@@ -381,7 +381,7 @@ fn the_call_graph_sees_neither_position() {
         .map(|n| n.path.as_str())
         .collect();
     assert!(
-        nodes.contains("probe.Poll") && nodes.contains("probe.Term"),
+        nodes.contains("probe.Poll~ui") && nodes.contains("probe.Term~ui"),
         "{nodes:?}"
     );
 }

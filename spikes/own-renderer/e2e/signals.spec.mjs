@@ -12,7 +12,7 @@
 // - what the browser renders is escaped as the server escapes it.
 import { expect, test } from "@playwright/test";
 
-const PAGE = "/page/demo.panel.PanelPage";
+const PAGE = "/page/demo.panel.PanelPage~ui";
 
 async function ready(page) {
   await page.goto(PAGE);

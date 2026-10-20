@@ -122,14 +122,14 @@ fn same(s: &str) -> String {
 fn store_page(b: &pw_core::build::Build) -> &pw_core::template_ir::Template {
     b.templates
         .iter()
-        .find(|t| t.path == "store.page.StorePage")
+        .find(|t| t.path == "store.page.StorePage~ui")
         .expect("the store page's template")
 }
 
 fn plan_of(b: pw_core::build::Build) -> Result<pw_core::page_values::PageValues, String> {
     b.pages
         .into_iter()
-        .find(|p| p.page == "store.page.StorePage")
+        .find(|p| p.page == "store.page.StorePage~ui")
         .expect("the store page")
         .plan
 }
@@ -320,11 +320,11 @@ fn a_page_that_streams_a_query_does_not_take_its_authority() {
             .collect()
     };
     assert!(
-        !needs("store.page.StorePage")
+        !needs("store.page.StorePage~ui")
             .iter()
             .any(|c| c == "network.fetch"),
         "{:?}",
-        needs("store.page.StorePage")
+        needs("store.page.StorePage~ui")
     );
     assert!(
         needs("store.page.Recommendations")

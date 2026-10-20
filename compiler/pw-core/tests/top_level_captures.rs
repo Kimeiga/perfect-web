@@ -63,14 +63,14 @@ fn cart_page(keep: bool) -> (Vec<u32>, Vec<u32>, String) {
     let plan = build
         .pages
         .into_iter()
-        .find(|p| p.page == "store.page.CartPage")
+        .find(|p| p.page == "store.page.CartPage~ui")
         .expect("the cart's page")
         .plan
         .expect("planned");
     let speculation = build
         .speculations
         .into_iter()
-        .find(|s| s.page == "store.page.CartPage")
+        .find(|s| s.page == "store.page.CartPage~ui")
         .expect("the cart's speculation");
     let pw_core::backend::wasm::Encoding::Encoded(module) = speculation.module else {
         panic!("the cart's speculation compiles");

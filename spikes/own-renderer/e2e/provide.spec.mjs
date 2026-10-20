@@ -10,7 +10,7 @@
 // - a view's signal inside a block starts again when the block shows again.
 import { expect, test } from "@playwright/test";
 
-const PAGE = "/page/demo.provide.ProvidePage";
+const PAGE = "/page/demo.provide.ProvidePage~ui";
 
 async function ready(page) {
   await page.goto(PAGE);

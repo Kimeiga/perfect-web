@@ -138,7 +138,7 @@ fn the_plan_holds_each_signals_first_value_and_the_parts_it_decides() {
     let plan = b
         .pages
         .iter()
-        .find(|p| p.page == "t.P")
+        .find(|p| p.page == "t.P~ui")
         .and_then(|p| p.plan.as_ref().ok())
         .expect("a plan");
     let first: Vec<(String, serde_json::Value)> = plan
@@ -216,7 +216,7 @@ fn a_first_value_that_computes_is_refused_by_name() {
     assert!(
         refused
             .iter()
-            .any(|r| r.contains("`t.P`'s values") && r.contains("an operation")),
+            .any(|r| r.contains("`t.P~ui`'s values") && r.contains("an operation")),
         "{refused:?}"
     );
 

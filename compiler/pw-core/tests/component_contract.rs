@@ -296,7 +296,7 @@ fn a_component_with_no_effects_needs_no_capabilities_and_may_import_nothing() {
     // means EVERY import is undeclared. A contract that treated "no
     // capabilities" as "no constraint" would give the most trusted-looking
     // component unlimited authority.
-    let c = one(&[PURE], "shop.pure.Label");
+    let c = one(&[PURE], "shop.pure.Label~ui");
     assert!(c.required_capabilities.is_empty());
     assert!(c.imports.is_empty());
     assert_eq!(
@@ -316,11 +316,11 @@ fn allowed_placements_are_solved_rather_than_declared() {
         ["origin"]
     );
     assert_eq!(
-        one(&[BROWSER_ONLY], "shop.view.Badge").allowed_placements,
+        one(&[BROWSER_ONLY], "shop.view.Badge~ui").allowed_placements,
         ["browser"]
     );
     assert_eq!(
-        one(&[PURE], "shop.pure.Label").allowed_placements,
+        one(&[PURE], "shop.pure.Label~ui").allowed_placements,
         ["build", "browser", "edge", "origin"],
         "a component with no restricted capability runs anywhere"
     );
@@ -335,7 +335,7 @@ fn placement_is_not_a_capability() {
     // would be wrong in one of these two cases.
     let reader = one(&[PROGRAM], "shop.origin.Menu");
     let writer = one(&[PROGRAM], "shop.origin.Restock");
-    let browser = one(&[BROWSER_ONLY], "shop.view.Badge");
+    let browser = one(&[BROWSER_ONLY], "shop.view.Badge~ui");
 
     assert_eq!(reader.allowed_placements, ["origin"]);
     assert_eq!(browser.allowed_placements, ["browser"]);
@@ -380,7 +380,7 @@ fn actual_imports_may_never_be_a_superset() {
 fn every_undeclared_import_is_reported_not_only_the_first() {
     // A build that fixes the first and rediscovers the second is a slow way to
     // learn the shape of a problem.
-    let c = one(&[PURE], "shop.pure.Label");
+    let c = one(&[PURE], "shop.pure.Label~ui");
     let actual = vec![
         "pw:host/secret#read".to_string(),
         "pw:host/database#write".to_string(),
@@ -567,7 +567,7 @@ page Shop(id: Int) {
     }
 }
 ";
-    let page = one(&[program], "shop.ui.Shop");
+    let page = one(&[program], "shop.ui.Shop~ui");
     let command = one(&[program], "shop.ui.Buy");
 
     assert!(
@@ -651,12 +651,12 @@ component Read() {
     let all = build(&[empty, reads]);
     let a = all
         .iter()
-        .find(|c| c.component_id == "a.Read")
-        .expect("a.Read");
+        .find(|c| c.component_id == "a.Read~ui")
+        .expect("a.Read~ui");
     let b = all
         .iter()
-        .find(|c| c.component_id == "b.Read")
-        .expect("b.Read");
+        .find(|c| c.component_id == "b.Read~ui")
+        .expect("b.Read~ui");
 
     assert!(
         a.required_capabilities.is_empty(),
@@ -844,7 +844,7 @@ fn an_operation_whose_authority_is_not_held_is_refused() {
 fn an_operation_that_needs_no_authority_is_consistent_with_none() {
     use pw_core::contract::consistent;
 
-    let c = one(&[BROWSER_ONLY], "shop.view.Badge");
+    let c = one(&[BROWSER_ONLY], "shop.view.Badge~ui");
     assert!(
         c.required_capabilities.is_empty(),
         "{:?}",

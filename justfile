@@ -41,6 +41,7 @@ import 'just/scheduled-orders.just'
 import 'just/evidence-integrity-2.just'
 import 'just/tables.just'
 import 'just/committed-components.just'
+import 'just/wit-unique.just'
 import 'just/browser-host-map.just'
 import 'just/parallel-mutants.just'
 import 'just/kiokun-cache.just'
@@ -458,7 +459,7 @@ e10-component:
         examples/lib/*.pw examples/store/*.pw > /dev/null; \
       rm -f docs/evidence/E10/*.wasm; cp "$out"/components/*.wasm docs/evidence/E10/; \
       mkdir -p docs/evidence/E10/pages; \
-      cp "$out"/pages/store.page.StorePage.json docs/evidence/E10/pages/; rm -rf "$out"
+      cp "$out"/pages/store.page.StorePage~ui.json docs/evidence/E10/pages/; rm -rf "$out"
 
 # E10-I — a Pleris-compiled command, executed through the E8 host, with the
 # Rust closure path deleted. The compiled components, the host running them
@@ -525,7 +526,7 @@ e10-build:
        cargo test --locked -p pw-core --test build 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; \
        echo "Since ADR-0125 the development server runs the store's queries and"; \
-       echo "the cart's count (UserCarts.line_count since track store-accounts) by"; echo "pages/store.page.StorePage.json. NOT CLAIMED: their"; \
+       echo "the cart's count (UserCarts.line_count since track store-accounts) by"; echo "pages/store.page.StorePage~ui.json. NOT CLAIMED: their"; \
        echo "policies (freshness, cache, key, concurrency); E14-Q's second slice. The"; \
        echo "four Resources.* queries are 'todo' in the library, and nothing the store"; \
        echo "builds depends on them."; \
@@ -2148,7 +2149,7 @@ e14-row-reads:
        out="$(mktemp -d)"; ./target/debug/pw build --out "$out" \
          packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw \
          examples/lib/*.pw examples/store/*.pw | grep -E "domain.display|page  "; \
-       python3 -c "import json,sys; print(json.dumps(json.load(open(sys.argv[1]))['rows']))" "$out/pages/store.page.StorePage.json"; \
+       python3 -c "import json,sys; print(json.dumps(json.load(open(sys.argv[1]))['rows']))" "$out/pages/store.page.StorePage~ui.json"; \
        rm -rf "$out"; \
        echo; echo "== the development server (pw-dev-server)"; echo; \
        cargo test --locked -p pw-dev-server 2>&1 | grep -E '^test tests::(each_menu_row_shows|an_inserted_item_arrives|a_menu_change_drops)|^test result|^---- |panicked at'; \

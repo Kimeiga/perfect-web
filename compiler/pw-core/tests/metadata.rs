@@ -51,7 +51,7 @@ fn a_page_s_metadata_is_a_part_of_its_head_after_its_title() {
     let t = b
         .templates
         .iter()
-        .find(|t| t.path == "t.P")
+        .find(|t| t.path == "t.P~ui")
         .expect("the template");
     let metas: Vec<&Part> = t
         .chunks
@@ -233,7 +233,7 @@ fn an_item_s_property_is_written_where_it_is() {
     let t = b
         .templates
         .iter()
-        .find(|t| t.path == "t.P")
+        .find(|t| t.path == "t.P~ui")
         .expect("the template");
     let body: String = t
         .chunks
@@ -347,7 +347,7 @@ fn a_page_s_metadata_reads_no_signal() {
     let why = b
         .pages
         .iter()
-        .find(|p| p.page == "t.P")
+        .find(|p| p.page == "t.P~ui")
         .expect("a plan")
         .plan
         .as_ref()

@@ -153,9 +153,9 @@ fn a_view_is_written_where_it_is_used() {
     let a = built(&files);
     let b = built(&[("t.pw", &inlined)]);
     // One document: the same chunks, the same parts, the same schema.
-    assert_eq!(template(&a, "t.P"), template(&b, "t.P"));
+    assert_eq!(template(&a, "t.P~ui"), template(&b, "t.P~ui"));
     // The view keeps a template of its own.
-    assert!(a.templates.iter().any(|t| t.path == "ui.MenuLine"));
+    assert!(a.templates.iter().any(|t| t.path == "ui.MenuLine~ui"));
 }
 
 #[test]
@@ -166,7 +166,7 @@ fn a_view_used_twice_has_parts_of_its_own_each_time() {
         "            <h1><Name s={store} /></h1>\n            <p><Name s={store} /></p>",
     );
     let b = built(&[("ui.pw", &views), ("t.pw", &src)]);
-    let found: Vec<(u32, String)> = template(&b, "t.P")
+    let found: Vec<(u32, String)> = template(&b, "t.P~ui")
         .manifest()
         .into_iter()
         .map(|e| (e.id.0, e.value))
@@ -190,7 +190,7 @@ fn a_handler_in_a_view_captures_what_the_page_gave_it() {
     let files = [("ui.pw", views.as_str()), ("t.pw", src.as_str())];
     assert_eq!(reported(&files), Vec::<String>::new());
     let b = built(&files);
-    let t = template(&b, "t.P");
+    let t = template(&b, "t.P~ui");
     let Some(Part::Event {
         handler,
         captures,
@@ -222,7 +222,7 @@ fn a_handler_in_a_view_captures_what_the_page_gave_it() {
         .replace("as item (item.id)", "as entry (entry.id)")
         .replace("<AddButton entry={item} />", "<AddButton entry={entry} />");
     let b = built(&[("ui.pw", &views), ("t.pw", &same)]);
-    let t = template(&b, "t.P");
+    let t = template(&b, "t.P~ui");
     assert!(
         parts(&t.chunks)
             .into_iter()
@@ -243,7 +243,7 @@ fn tags(tags_view: &str, used: &str) -> Template {
     let refs: Vec<&pw_core::hir::Hir> = hirs.iter().collect();
     pw_core::template_ir::build(&refs)
         .into_iter()
-        .find(|t| t.path == "t.Outer")
+        .find(|t| t.path == "t.Outer~ui")
         .expect("Outer")
 }
 
@@ -345,7 +345,7 @@ fn a_page_plans_a_composed_view_as_its_own_markup() {
         let b = built(&[("ui.pw", &views), ("t.pw", src)]);
         b.pages
             .into_iter()
-            .find(|p| p.page == "t.P")
+            .find(|p| p.page == "t.P~ui")
             .expect("a plan")
             .plan
             .expect("planned")
@@ -401,8 +401,8 @@ fn a_view_s_part_and_handler_are_the_page_s_to_speculate() {
         let s = b
             .speculations
             .iter()
-            .find(|s| s.page == "t.P")
-            .unwrap_or_else(|| panic!("no speculation for `t.P` (inline: {inline})"));
+            .find(|s| s.page == "t.P~ui")
+            .unwrap_or_else(|| panic!("no speculation for `t.P~ui` (inline: {inline})"));
         match &s.module {
             pw_core::backend::wasm::Encoding::Encoded(m) => m.clone(),
             other => panic!("{other}"),
@@ -578,7 +578,7 @@ fn a_signal_a_view_shows_is_live_as_the_page_s_own() {
         built(&[("t.pw", &src)])
             .pages
             .into_iter()
-            .find(|p| p.page == "t.P")
+            .find(|p| p.page == "t.P~ui")
             .expect("a plan")
             .plan
             .expect("planned")

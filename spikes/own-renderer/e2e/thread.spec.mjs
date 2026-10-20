@@ -14,7 +14,7 @@
 //   one as its nodes, and sends one to a command so (ADR-0205).
 import { expect, test } from "@playwright/test";
 
-const THREAD = "/page/demo.thread.ThreadPage";
+const THREAD = "/page/demo.thread.ThreadPage~ui";
 
 async function ready(page) {
   await page.goto(THREAD);
@@ -157,7 +157,7 @@ test("a change the server sends replaces an instance whole, and binds it", async
   await ready(page);
   const manifest = await page.evaluate(() => window.__pw.parts);
   const part = manifest.parts.find((p) => p.kind === "instance");
-  expect(part.value).toBe("demo.thread.Thread");
+  expect(part.value).toBe("demo.thread.Thread~ui");
   const html = (await page.locator("#thread").innerHTML()).replace(
     "Twenty grams in.",
     "Eighteen grams in.",

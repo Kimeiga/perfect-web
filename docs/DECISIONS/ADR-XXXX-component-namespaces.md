@@ -40,3 +40,20 @@ This repair is not a compatibility guarantee for an already running old UI build
 - Actual accepted A-008 complete check/build before removing its named refusal.
 - Mangling collision negative control, mutation controls, relevant whole campaigns,
   and CI on the final source. Evidence and further limitations will be recorded here.
+## Consumer audit
+
+The same-name browser fixture revealed that view-tag checking and two template
+lookups searched every namespace, choosing a query before its same-named view.
+They now resolve the Ui namespace, matching the existing value checker. A tag
+without a Ui declaration keeps the existing diagnostic about its other declaration.
+The fixture proves both query results, nested view markup, derived page bindings,
+and resumed signal updates. The view-tag regression failed with PW5020 before
+this repair. A semantic review regression also failed before repair: changing
+query freshness beside a same-named view produced no change report.
+
+Review declarations use one namespace-aware helper: Term and Ui agree with the
+canonical component identity; Type, Effect, Event and Predicate use review-only
+~type, ~effect, ~event and ~predicate suffixes. The separate Model.types map and
+written type references retain raw type paths. A query/type freshness witness
+also failed before repair and covers both declaration orders. No noncomponent
+WIT identity changes are made by this review repair.

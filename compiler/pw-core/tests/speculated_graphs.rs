@@ -112,7 +112,7 @@ fn module(program: &str) -> Result<String, String> {
     pw_core::backend::speculation::compile(&units(program))
         .expect("the program checks")
         .into_iter()
-        .find(|c| c.page == "m.P")
+        .find(|c| c.page == "m.P~ui")
         .map(|c| match c.module {
             Encoding::Encoded(m) => Ok(m.source),
             other => Err(format!("{other:?}")),

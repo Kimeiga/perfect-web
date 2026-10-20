@@ -36,9 +36,9 @@ fn frames(s: &Server, doc: &Doc) -> String {
     format!("{:?}", sets_of(s, doc))
 }
 
-const HOME: &str = "feed.app.Home";
-const LIST: &str = "feed.app.MessagesPage";
-const TALK: &str = "feed.app.ConversationPage";
+const HOME: &str = "feed.app.Home~ui";
+const LIST: &str = "feed.app.MessagesPage~ui";
+const TALK: &str = "feed.app.ConversationPage~ui";
 
 /// The conversation page's parameters, with `with`.
 fn with(user: &str) -> Params {

@@ -337,13 +337,7 @@ pub(crate) fn compile_with_handlers(
 }
 
 fn template_path(hir: &Hir, id: DeclId) -> String {
-    let module = hir.module_of(id).unwrap_or_default();
-    let name = &hir.decl(id).name;
-    if module.is_empty() {
-        name.clone()
-    } else {
-        format!("{module}.{name}")
-    }
+    crate::contract::component_id(hir, id)
 }
 
 /// The command a component id names.

@@ -2451,7 +2451,7 @@ impl StoreData {
     /// **The page a document with none recorded is** (ADR-0218): the store's
     /// own, which its first documents and tests were served as.
     pub(crate) fn default_page() -> &'static str {
-        "store.page.StorePage"
+        "store.page.StorePage~ui"
     }
 
     pub(crate) fn new() -> StoreData {

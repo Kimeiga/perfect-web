@@ -13,8 +13,8 @@
 // - a page's parameter comes from the address, escaped where it is written.
 import { expect, test } from "@playwright/test";
 
-const PANEL = "/page/demo.panel.PanelPage";
-const PICK = "/page/demo.pick.PickPage";
+const PANEL = "/page/demo.panel.PanelPage~ui";
+const PICK = "/page/demo.pick.PickPage~ui";
 
 async function ready(page, url) {
   await page.goto(url);

@@ -83,7 +83,7 @@ fn plan(build: &pw_core::build::Build) -> PageValues {
     build
         .pages
         .iter()
-        .find(|p| p.page == "store.page.StorePage")
+        .find(|p| p.page == "store.page.StorePage~ui")
         .expect("the store page")
         .plan
         .clone()
@@ -129,7 +129,7 @@ fn speculation(markup: &str) -> pw_core::backend::speculation::Compiled {
     build(store(markup, true))
         .speculations
         .into_iter()
-        .find(|s| s.page == "store.page.StorePage")
+        .find(|s| s.page == "store.page.StorePage~ui")
         .expect("the store page speculates")
 }
 
@@ -139,7 +139,7 @@ fn part_of(markup: &str, kind: &str, value: &str) -> u32 {
     build(store(markup, true))
         .templates
         .iter()
-        .find(|t| t.path == "store.page.StorePage")
+        .find(|t| t.path == "store.page.StorePage~ui")
         .expect("the store's template")
         .manifest()
         .into_iter()
@@ -195,13 +195,13 @@ fn a_region_that_reads_what_the_browser_does_not_hold_is_refused() {
     ] {
         let refused = build(store(markup, true)).refusals();
         assert!(
-            refused
-                .iter()
-                .any(|r| r.starts_with("`store.page.StorePage`'s speculations:")
+            refused.iter().any(
+                |r| r.starts_with("`store.page.StorePage~ui`'s speculations:")
                     && r.contains(
                         "a value a speculated region reads that the browser does not hold"
                     )
-                    && r.contains(what)),
+                    && r.contains(what)
+            ),
             "{markup}: {refused:#?}"
         );
     }
@@ -221,11 +221,11 @@ fn a_region_whose_handler_captures_what_the_browser_does_not_hold_is_refused() {
     })
     .refusals();
     assert!(
-        refused
-            .iter()
-            .any(|r| r.starts_with("`store.page.StorePage`'s speculations:")
+        refused.iter().any(
+            |r| r.starts_with("`store.page.StorePage~ui`'s speculations:")
                 && r.contains("a value a speculated region reads that the browser does not hold")
-                && r.contains("captures `store.name` inside part")),
+                && r.contains("captures `store.name` inside part")
+        ),
         "{refused:#?}"
     );
 }
@@ -238,13 +238,11 @@ fn a_speculated_value_read_in_a_block_no_region_renders_is_refused() {
                   <li hidden={cart.lines}>{item.name}</li>{/each}</ul>";
     let refused = build(store(markup, true)).refusals();
     assert!(
-        refused
-            .iter()
-            .any(|r| r.starts_with("`store.page.StorePage`'s speculations:")
-                && r.contains(
-                    "a speculated value read where this module does not render it again"
-                )
-                && r.contains("reads `cart.lines` inside a block")),
+        refused.iter().any(
+            |r| r.starts_with("`store.page.StorePage~ui`'s speculations:")
+                && r.contains("a speculated value read where this module does not render it again")
+                && r.contains("reads `cart.lines` inside a block")
+        ),
         "{refused:#?}"
     );
 }

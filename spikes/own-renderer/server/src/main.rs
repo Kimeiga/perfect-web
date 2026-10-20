@@ -1636,7 +1636,7 @@ impl Server {
                 components: components(),
                 graph: pw_materialize::Graph::from_json(GRAPH).expect("the committed graph parses"),
                 plan: serde_json::from_str(include_str!(
-                    "../../../../docs/evidence/E10/pages/store.page.StorePage.json"
+                    "../../../../docs/evidence/E10/pages/store.page.StorePage~ui.json"
                 ))
                 .expect("the committed page plan parses"),
                 plans: BTreeMap::new(),
@@ -12917,7 +12917,7 @@ public query Store(",
             .0
             .advance(u64::try_from(nine - 30_000 - now).unwrap());
         let (html, _, _, _) = s
-            .serve_document_settled("a", "store.page.HomePage", &Params::new(), &[])
+            .serve_document_settled("a", "store.page.HomePage~ui", &Params::new(), &[])
             .expect("served");
         assert!(visible(&html).contains("On sale"), "{html}");
         let doc = latest(&s.pending.lock().expect("pending"), "a");
@@ -12986,7 +12986,7 @@ public query Store(",
             .advance(u64::try_from(nine - 30_000 - now).unwrap());
         let home = |session: &str| {
             let (html, _, _, _) = s
-                .serve_document_settled(session, "store.page.HomePage", &Params::new(), &[])
+                .serve_document_settled(session, "store.page.HomePage~ui", &Params::new(), &[])
                 .expect("served");
             visible(&html)
         };
@@ -13010,7 +13010,7 @@ public query Store(",
     fn a_page_that_compares_no_clock_holds_nothing() {
         let s = served_from_patches_in("examples", |app| app.to_string(), &[]);
         let _ = s
-            .serve_document_settled("a", "store.page.OrderPage", &Params::new(), &[])
+            .serve_document_settled("a", "store.page.OrderPage~ui", &Params::new(), &[])
             .expect("served");
         let doc = latest(&s.pending.lock().expect("pending"), "a");
         assert_eq!(s.timers.at(&doc), None);
@@ -13576,10 +13576,10 @@ public query Store(",
     fn speculating_server() -> Server {
         let mut s = rendering_server();
         s.speculations.insert(
-            "store.page.StorePage".to_string(),
+            "store.page.StorePage~ui".to_string(),
             serde_json::json!({
-                "page": "store.page.StorePage",
-                "module": "store.page.StorePage.mjs",
+                "page": "store.page.StorePage~ui",
+                "module": "store.page.StorePage~ui.mjs",
                 "bindings": [{ "binding": "cart", "resource": "store.page.Cart", "key": ["current_session()"] }],
                 "commands": ["store.page.add_to_cart"],
             }),
@@ -14176,7 +14176,7 @@ public query Store(",
     fn the_feed_is_served_by_the_host_its_data_the_deployments() {
         let s = served_feed();
         let (html, _, _, _) = s
-            .serve_document_settled("a", "feed.app.Home", &Params::new(), &[])
+            .serve_document_settled("a", "feed.app.Home~ui", &Params::new(), &[])
             .expect("served");
         assert!(html.contains("Hello, feed."), "{html}");
         let doc = latest(&s.pending.lock().expect("pending"), "a");
@@ -14205,7 +14205,7 @@ public query Store(",
     fn a_post_reaches_every_open_timeline() {
         let s = served_feed();
         for session in ["a", "b"] {
-            s.serve_document_settled(session, "feed.app.Home", &Params::new(), &[])
+            s.serve_document_settled(session, "feed.app.Home~ui", &Params::new(), &[])
                 .expect("served");
         }
         let (mine, theirs) = {
@@ -14247,7 +14247,7 @@ public query Store(",
     fn a_burst_of_posts_tells_another_reader_once() {
         let s = served_feed();
         for session in ["a", "b"] {
-            s.serve_document_settled(session, "feed.app.Home", &Params::new(), &[])
+            s.serve_document_settled(session, "feed.app.Home~ui", &Params::new(), &[])
                 .expect("served");
         }
         let theirs = latest(&s.pending.lock().expect("pending"), "b");
@@ -14295,7 +14295,7 @@ public query Store(",
     fn a_commit_while_a_reader_is_told_is_told_after_it() {
         let s = served_feed();
         for session in ["a", "b"] {
-            s.serve_document_settled(session, "feed.app.Home", &Params::new(), &[])
+            s.serve_document_settled(session, "feed.app.Home~ui", &Params::new(), &[])
                 .expect("served");
         }
         let theirs = latest(&s.pending.lock().expect("pending"), "b");
@@ -14342,7 +14342,7 @@ public query Store(",
     fn the_table_is_free_while_a_telling_derives() {
         let s = served_feed();
         for session in ["a", "b"] {
-            s.serve_document_settled(session, "feed.app.Home", &Params::new(), &[])
+            s.serve_document_settled(session, "feed.app.Home~ui", &Params::new(), &[])
                 .expect("served");
         }
         let free = record_freedom(&s);
@@ -14373,7 +14373,7 @@ public query Store(",
             .expect("runs");
         }
         let (_, cursor, _, _) = s
-            .serve_document_settled("a", "feed.app.Home", &Params::new(), &[])
+            .serve_document_settled("a", "feed.app.Home~ui", &Params::new(), &[])
             .expect("served");
         let free = record_freedom(&s);
         let more = BTreeMap::from([("shown".to_string(), serde_json::json!(40))]);
@@ -14414,7 +14414,7 @@ public query Store(",
     fn a_document_changed_while_its_change_is_derived_is_derived_against_again() {
         let s = served_feed();
         for session in ["a", "b"] {
-            s.serve_document_settled(session, "feed.app.Home", &Params::new(), &[])
+            s.serve_document_settled(session, "feed.app.Home~ui", &Params::new(), &[])
                 .expect("served");
         }
         let theirs = latest(&s.pending.lock().expect("pending"), "b");
@@ -14448,7 +14448,7 @@ public query Store(",
             .expect("runs");
         }
         let (_, cursor, _, _) = s
-            .serve_document_settled("a", "feed.app.Home", &Params::new(), &[])
+            .serve_document_settled("a", "feed.app.Home~ui", &Params::new(), &[])
             .expect("served");
         let doc = latest(&s.pending.lock().expect("pending"), "a");
         let derived = replace_while_derived(&s, &doc, 1);
@@ -14468,7 +14468,7 @@ public query Store(",
     fn a_document_changed_at_every_attempt_is_still_told() {
         let s = served_feed();
         for session in ["a", "b"] {
-            s.serve_document_settled(session, "feed.app.Home", &Params::new(), &[])
+            s.serve_document_settled(session, "feed.app.Home~ui", &Params::new(), &[])
                 .expect("served");
         }
         let theirs = latest(&s.pending.lock().expect("pending"), "b");
@@ -14509,7 +14509,7 @@ public query Store(",
     fn a_reader_is_told_while_another_readers_telling_takes_its_time() {
         let s = served_feed();
         for session in ["a", "b", "c"] {
-            s.serve_document_settled(session, "feed.app.Home", &Params::new(), &[])
+            s.serve_document_settled(session, "feed.app.Home~ui", &Params::new(), &[])
                 .expect("served");
         }
         let (slow, quick) = {
@@ -14549,7 +14549,7 @@ public query Store(",
     fn a_document_no_page_asks_for_is_told_when_one_asks() {
         let s = served_feed();
         for session in ["a", "b"] {
-            s.serve_document_settled(session, "feed.app.Home", &Params::new(), &[])
+            s.serve_document_settled(session, "feed.app.Home~ui", &Params::new(), &[])
                 .expect("served");
         }
         let theirs = latest(&s.pending.lock().expect("pending"), "b");
@@ -14596,7 +14596,7 @@ public query Store(",
         let home = s
             .templates
             .iter()
-            .find(|t| t.path == "feed.app.Home")
+            .find(|t| t.path == "feed.app.Home~ui")
             .expect("the home page");
         let table = get_as(&s, "a", "/pw-handlers");
         assert!(
@@ -14608,7 +14608,10 @@ public query Store(",
             "{table}"
         );
         assert!(
-            table.contains(&format!("#page|feed.app.Home|{}|session:\n", home.schema)),
+            table.contains(&format!(
+                "#page|feed.app.Home~ui|{}|session:\n",
+                home.schema
+            )),
             "{table}"
         );
         let page = get_as(&s, "a", "/");
@@ -14666,7 +14669,7 @@ public query Store(",
     fn a_documents_trail_says_what_happened_to_its_frames() {
         let s = served_feed();
         for session in ["a", "b"] {
-            s.serve_document_settled(session, "feed.app.Home", &Params::new(), &[])
+            s.serve_document_settled(session, "feed.app.Home~ui", &Params::new(), &[])
                 .expect("served");
         }
         let theirs = latest(&s.pending.lock().expect("pending"), "b");
@@ -14731,7 +14734,7 @@ public query Store(",
     fn a_telling_that_panics_does_not_silence_the_reader() {
         let s = served_feed();
         for session in ["a", "b"] {
-            s.serve_document_settled(session, "feed.app.Home", &Params::new(), &[])
+            s.serve_document_settled(session, "feed.app.Home~ui", &Params::new(), &[])
                 .expect("served");
         }
         let theirs = latest(&s.pending.lock().expect("pending"), "b");
@@ -14823,7 +14826,7 @@ public query Store(",
     #[test]
     fn the_feeds_page_opening_its_stream_is_not_told_to_reload() {
         let s = served_feed();
-        s.serve_document_settled("a", "feed.app.Home", &Params::new(), &[])
+        s.serve_document_settled("a", "feed.app.Home~ui", &Params::new(), &[])
             .expect("served");
         let doc = latest(&s.pending.lock().expect("pending"), "a");
         let polled = fetched_as(
@@ -14865,7 +14868,7 @@ public query Store(",
     fn a_guests_post_names_the_guest_to_every_reader() {
         let s = served_feed();
         for session in ["a", "b"] {
-            s.serve_document_settled(session, "feed.app.Home", &Params::new(), &[])
+            s.serve_document_settled(session, "feed.app.Home~ui", &Params::new(), &[])
                 .expect("served");
         }
         let theirs = latest(&s.pending.lock().expect("pending"), "b");
@@ -14889,7 +14892,7 @@ public query Store(",
     fn a_post_over_http_reaches_another_reader_after_its_answer() {
         let s = served_feed();
         for session in ["a", "b"] {
-            s.serve_document_settled(session, "feed.app.Home", &Params::new(), &[])
+            s.serve_document_settled(session, "feed.app.Home~ui", &Params::new(), &[])
                 .expect("served");
         }
         let theirs = latest(&s.pending.lock().expect("pending"), "b");
@@ -14944,7 +14947,7 @@ public query Store(",
         let open = |id: &str| {
             let thread = Params::from([("id".to_string(), id.to_string())]);
             let (_, _, entries, _) = s
-                .serve_document_settled("a", "feed.app.PostPage", &thread, &[])
+                .serve_document_settled("a", "feed.app.PostPage~ui", &thread, &[])
                 .expect("served");
             let doc = latest(&s.pending.lock().expect("pending"), "a");
             (entries["thread"]["entry"].clone(), doc)
@@ -14955,7 +14958,7 @@ public query Store(",
             p1,
             serde_json::json!(speculated_entry(
                 "a",
-                "feed.app.PostPage",
+                "feed.app.PostPage~ui",
                 "thread",
                 &["p1".to_string()]
             ))
@@ -15027,12 +15030,12 @@ public query Store(",
     fn a_post_is_shown_before_the_server_answers_and_the_page_told_when_it_holds_it() {
         let s = served_feed();
         let (_, _, entries, _) = s
-            .serve_document_settled("a", "feed.app.Home", &Params::new(), &[])
+            .serve_document_settled("a", "feed.app.Home~ui", &Params::new(), &[])
             .expect("served");
         let feed = &entries["feed"];
         assert_eq!(
             feed["entry"],
-            serde_json::json!(speculated_entry("a", "feed.app.Home", "feed", &[]))
+            serde_json::json!(speculated_entry("a", "feed.app.Home~ui", "feed", &[]))
         );
         assert_eq!(feed["value"].as_array().map(Vec::len), Some(1), "{feed}");
         let before = feed["version"].as_u64().expect("a version");
@@ -15068,7 +15071,7 @@ public query Store(",
     #[test]
     fn a_speculated_value_that_did_not_change_is_not_sent_again() {
         let s = served_feed();
-        s.serve_document_settled("a", "feed.app.Home", &Params::new(), &[])
+        s.serve_document_settled("a", "feed.app.Home~ui", &Params::new(), &[])
             .expect("served");
         let doc = latest(&s.pending.lock().expect("pending"), "a");
         s.command_answered(
@@ -15108,7 +15111,7 @@ public query Store(",
             .expect("runs");
         }
         let (_, cursor, entries, _) = s
-            .serve_document_settled("a", "feed.app.Home", &Params::new(), &[])
+            .serve_document_settled("a", "feed.app.Home~ui", &Params::new(), &[])
             .expect("served");
         assert_eq!(entries["feed"]["value"].as_array().map(Vec::len), Some(20));
         let doc = latest(&s.pending.lock().expect("pending"), "a");
@@ -15140,7 +15143,7 @@ public query Store(",
             .expect("runs");
         }
         let (_, cursor, _, _) = s
-            .serve_document_settled("a", "feed.app.Home", &Params::new(), &[])
+            .serve_document_settled("a", "feed.app.Home~ui", &Params::new(), &[])
             .expect("served");
         let doc = latest(&s.pending.lock().expect("pending"), "a");
         *s.keyed_fetched.lock().expect("between") = Some(Box::new(|s: &Server| {
@@ -15225,9 +15228,9 @@ public query Store(",
             )
         });
         let thread = Params::from([("id".to_string(), "p1".to_string())]);
-        s.serve_document_settled("a", "feed.app.Home", &Params::new(), &[])
+        s.serve_document_settled("a", "feed.app.Home~ui", &Params::new(), &[])
             .expect("served");
-        s.serve_document_settled("c", "feed.app.PostPage", &thread, &[])
+        s.serve_document_settled("c", "feed.app.PostPage~ui", &thread, &[])
             .expect("served");
         let theirs = latest(&s.pending.lock().expect("pending"), "c");
         let frames = |doc: &Doc| s.pending.lock().expect("pending")[doc].frames.len();
@@ -15273,12 +15276,12 @@ public query Store(",
         ] {
             let thread = Params::from([("id".to_string(), id.to_string())]);
             let (html, ..) = s
-                .serve_document_settled("a", "feed.app.PostPage", &thread, &[])
+                .serve_document_settled("a", "feed.app.PostPage~ui", &thread, &[])
                 .expect("served");
             assert_eq!(shown(&html), counts, "{id}: {html}");
         }
         let thread = Params::from([("id".to_string(), "p1".to_string())]);
-        s.serve_document_settled("c", "feed.app.PostPage", &thread, &[])
+        s.serve_document_settled("c", "feed.app.PostPage~ui", &thread, &[])
             .expect("served");
         let theirs = latest(&s.pending.lock().expect("pending"), "c");
         let answered = s
@@ -15329,16 +15332,16 @@ public query Store(",
         });
         let thread = |id: &str| Params::from([("id".to_string(), id.to_string())]);
         let (html, ..) = s
-            .serve_document_settled("a", "feed.app.PostPage", &thread("p1"), &[])
+            .serve_document_settled("a", "feed.app.PostPage~ui", &thread("p1"), &[])
             .expect("served");
         assert!(html.contains("title=\"2 likes\""), "{html}");
         assert!(!html.contains(" hidden"), "a thread with a reply: {html}");
         let (html, ..) = s
-            .serve_document_settled("a", "feed.app.PostPage", &thread("p3"), &[])
+            .serve_document_settled("a", "feed.app.PostPage~ui", &thread("p3"), &[])
             .expect("served");
         assert!(html.contains("title=\"1 like\""), "{html}");
         assert!(html.contains(" hidden"), "a thread with no reply: {html}");
-        s.serve_document_settled("c", "feed.app.PostPage", &thread("p1"), &[])
+        s.serve_document_settled("c", "feed.app.PostPage~ui", &thread("p1"), &[])
             .expect("served");
         let theirs = latest(&s.pending.lock().expect("pending"), "c");
         s.command_answered(
@@ -15385,7 +15388,7 @@ public query Store(",
     #[test]
     fn what_a_page_computes_from_a_signal_is_rendered_at_its_first_value() {
         let home = |s: &Server| {
-            s.serve_document_settled("a", "feed.app.Home", &Params::new(), &[])
+            s.serve_document_settled("a", "feed.app.Home~ui", &Params::new(), &[])
                 .expect("served")
                 .0
         };
@@ -15403,10 +15406,10 @@ public query Store(",
         // draft first changes.
         let document = body("/");
         assert!(
-            document.contains("\"computed\":\"/computed/feed.app.Home.mjs\""),
+            document.contains("\"computed\":\"/computed/feed.app.Home~ui.mjs\""),
             "{document}"
         );
-        let module = body("/computed/feed.app.Home.mjs");
+        let module = body("/computed/feed.app.Home~ui.mjs");
         assert!(
             module.starts_with("HTTP/1.1 200") && module.contains("export const parts"),
             "{module}"
@@ -15415,7 +15418,7 @@ public query Store(",
         // plan does not name is read, one that leaves the directory least of
         // all.
         assert!(
-            body("/computed/feed.app.PostPage.mjs").contains("export const parts"),
+            body("/computed/feed.app.PostPage~ui.mjs").contains("export const parts"),
             "the thread page's module"
         );
         assert!(
@@ -15477,7 +15480,7 @@ public query Store(",
     fn a_value_computed_in_a_row_is_each_rows_and_sent_with_it() {
         let s = served_feed();
         let (html, ..) = s
-            .serve_document_settled("a", "feed.app.Home", &Params::new(), &[])
+            .serve_document_settled("a", "feed.app.Home~ui", &Params::new(), &[])
             .expect("served");
         assert_eq!(text_in(&html, "<span class=\"likes\">"), "2 likes");
         let doc = latest(&s.pending.lock().expect("pending"), "a");
@@ -15513,7 +15516,7 @@ public query Store(",
         for (id, said) in [("p1", "the first"), ("p2", "a reply")] {
             let thread = Params::from([("id".to_string(), id.to_string())]);
             let (html, ..) = s
-                .serve_document_settled("a", "feed.app.PostPage", &thread, &[])
+                .serve_document_settled("a", "feed.app.PostPage~ui", &thread, &[])
                 .expect("served");
             assert_eq!(text_in(&html, "<p id=\"which\">"), said, "{id}");
         }
@@ -15534,7 +15537,7 @@ public query Store(",
         });
         let thread = |id: &str| Params::from([("id".to_string(), id.to_string())]);
         let page = |id: &str| {
-            s.serve_document_settled("a", "feed.app.PostPage", &thread(id), &[])
+            s.serve_document_settled("a", "feed.app.PostPage~ui", &thread(id), &[])
                 .expect("served")
                 .0
         };
@@ -15564,7 +15567,7 @@ public query Store(",
     #[test]
     fn a_condition_the_browser_computes_is_rendered_at_its_first_value() {
         let home = |s: &Server| {
-            s.serve_document_settled("a", "feed.app.Home", &Params::new(), &[])
+            s.serve_document_settled("a", "feed.app.Home~ui", &Params::new(), &[])
                 .expect("served")
                 .0
         };
@@ -15650,7 +15653,7 @@ public query Store(",
             )
         });
         let p3 = Params::from([("id".to_string(), "p3".to_string())]);
-        s.serve_document_settled("b", "feed.app.PostPage", &p3, &[])
+        s.serve_document_settled("b", "feed.app.PostPage~ui", &p3, &[])
             .expect("served");
         let reader = latest(&s.pending.lock().expect("pending"), "b");
         let answered = s
@@ -15722,13 +15725,13 @@ public query Store(",
     fn a_value_that_contains_itself_is_written_as_its_nodes() {
         let s = served_feed();
         let p1 = Params::from([("id".to_string(), "p1".to_string())]);
-        s.serve_document_settled("a", "feed.app.PostPage", &p1, &[])
+        s.serve_document_settled("a", "feed.app.PostPage~ui", &p1, &[])
             .expect("served");
         let doc = latest(&s.pending.lock().expect("pending"), "a");
         let bindings = s.bindings("a", doc.1).expect("read");
         let written = s
             .speculated_json(
-                s.plan_of("feed.app.PostPage"),
+                s.plan_of("feed.app.PostPage~ui"),
                 "thread",
                 &bindings["thread"],
             )
@@ -15743,12 +15746,12 @@ public query Store(",
         assert_eq!(nodes[2]["replies"], serde_json::json!([]));
         assert_eq!(nodes[0]["author"]["name"], "Ada", "{written}");
         // The timeline's rows, of no such type: as they were written.
-        s.serve_document_settled("b", "feed.app.Home", &Params::new(), &[])
+        s.serve_document_settled("b", "feed.app.Home~ui", &Params::new(), &[])
             .expect("served");
         let home = latest(&s.pending.lock().expect("pending"), "b");
         let bindings = s.bindings("b", home.1).expect("read");
         assert_eq!(
-            s.speculated_json(s.plan_of("feed.app.Home"), "feed", &bindings["feed"]),
+            s.speculated_json(s.plan_of("feed.app.Home~ui"), "feed", &bindings["feed"]),
             Ok(val_to_json(&bindings["feed"]))
         );
     }
@@ -15762,7 +15765,7 @@ public query Store(",
     fn a_reply_is_its_threads_to_every_reader_and_no_timelines() {
         let s = served_feed();
         let p3 = Params::from([("id".to_string(), "p3".to_string())]);
-        s.serve_document_settled("b", "feed.app.PostPage", &p3, &[])
+        s.serve_document_settled("b", "feed.app.PostPage~ui", &p3, &[])
             .expect("served");
         let reader = latest(&s.pending.lock().expect("pending"), "b");
         let answered = s
@@ -15791,10 +15794,10 @@ public query Store(",
                     .0,
             )
         };
-        let thread = page("feed.app.PostPage", &p3);
+        let thread = page("feed.app.PostPage~ui", &p3);
         assert!(thread.contains("A reply to p3"), "{thread}");
         assert!(!thread.contains("No replies yet."), "{thread}");
-        let home = page("feed.app.Home", &Params::new());
+        let home = page("feed.app.Home~ui", &Params::new());
         assert!(home.contains("Hello, feed."), "{home}");
         assert!(!home.contains("A reply to p3"), "{home}");
         // To a post that is not there: not found, and nothing commits.
@@ -16391,7 +16394,7 @@ public query Store(",
             .routed("/stores/48", "")
             .expect("the store's route")
             .expect("its query read");
-        assert_eq!(page, "store.page.StorePage");
+        assert_eq!(page, "store.page.StorePage~ui");
         assert_eq!(params, store_params("48"));
         assert_eq!(s.routed("/stores", ""), None);
         let (harbor, _) = s.serve_store_document("a", "48").expect("served");
@@ -16521,7 +16524,7 @@ public query Store(",
     }
 
     /// The cart page's path (ADR-0190).
-    const CART_PAGE: &str = "store.page.CartPage";
+    const CART_PAGE: &str = "store.page.CartPage~ui";
 
     /// **A second page that binds a query is served at its route** (ADR-0190),
     /// by its own template and plan: the cart page reads the session's cart.
@@ -16535,23 +16538,23 @@ public query Store(",
                 .map(|(_, c)| c)
                 .collect()
         };
-        for path in ["/cart", "/page/store.page.CartPage"] {
+        for path in ["/cart", "/page/store.page.CartPage~ui"] {
             let cart = page(path, "a");
             assert!(cart.starts_with("HTTP/1.1 200"), "{path}: {cart}");
             assert!(cart.contains("<title>Your cart</title>"), "{path}: {cart}");
             assert!(
-                cart.contains("\"template\":\"store.page.CartPage\""),
+                cart.contains("\"template\":\"store.page.CartPage~ui\""),
                 "{cart}"
             );
             assert!(visible(&cart).contains("Your cart is empty."), "{cart}");
             // It speculates from its own module (ADR-0191).
             assert!(
-                cart.contains("\"speculation\":\"/speculation/store.page.CartPage.mjs\""),
+                cart.contains("\"speculation\":\"/speculation/store.page.CartPage~ui.mjs\""),
                 "{cart}"
             );
         }
         // Which is served, and a module no page's manifest names is not.
-        let module = page("/speculation/store.page.CartPage.mjs", "a");
+        let module = page("/speculation/store.page.CartPage~ui.mjs", "a");
         assert!(
             module.starts_with("HTTP/1.1 200") && module.contains("text/javascript"),
             "{module}"
@@ -16571,7 +16574,7 @@ public query Store(",
     }
 
     /// The order's page, and the command that places an order (ADR-0193).
-    const ORDER_PAGE: &str = "store.page.OrderPage";
+    const ORDER_PAGE: &str = "store.page.OrderPage~ui";
     const PLACE: &str = "store.page.place_order";
 
     /// Every patch set queued for one document, in order.
@@ -16689,10 +16692,10 @@ public query Store(",
         // Nothing is sent by the layout's name: the cart's entry is the
         // materializer's, and no other value is speculated on.
         assert_eq!(
-            s.speculates_on_cart("store.page.StorePage").as_deref(),
+            s.speculates_on_cart("store.page.StorePage~ui").as_deref(),
             Some("cart")
         );
-        assert!(s.speculated_bindings("store.page.StorePage").is_empty());
+        assert!(s.speculated_bindings("store.page.StorePage~ui").is_empty());
     }
 
     /// **What a handler at the top of the page captures is set again when it
@@ -16948,7 +16951,7 @@ public query Store(",
         s.command(ADD, "a", &add_shown("espresso", 2), false)
             .expect("the command commits");
         let count = s
-            .template_of("store.page.HomePage")
+            .template_of("store.page.HomePage~ui")
             .manifest()
             .into_iter()
             .find(|e| e.value == "cart.line_count")
@@ -18361,7 +18364,7 @@ public query Store(",
     #[test]
     fn the_store_s_document_carries_its_signals() {
         let template: Template = serde_json::from_value(serde_json::json!({
-            "path": "store.page.StorePage",
+            "path": "store.page.StorePage~ui",
             "name": "StorePage",
             "params": [],
             "schema": "s",

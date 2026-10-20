@@ -220,7 +220,7 @@ fn the_page_of_times_is_held_until_the_first_windows_hour() {
     s.command(ADD, "a", &add_shown("espresso", 1), false)
         .expect("added");
     let (html, _, _, _) = s
-        .serve_document_settled("a", "store.page.TimePage", &Params::new(), &[])
+        .serve_document_settled("a", "store.page.TimePage~ui", &Params::new(), &[])
         .expect("served");
     assert!(visible(&html).contains("11:15 am"), "{html}");
     let doc = latest(&s.pending.lock().expect("pending"), "a");
@@ -668,7 +668,7 @@ fn an_order_is_sent_to_its_stores_when_its_preparation_is_due() {
             "told nothing until paid"
         );
         let (html, _, _, _) = s
-            .serve_document_settled("a", "store.page.OrderPage", &Params::new(), &[])
+            .serve_document_settled("a", "store.page.OrderPage~ui", &Params::new(), &[])
             .expect("served");
         let doc = latest(&s.pending.lock().expect("pending"), "a");
         let page_url = html
@@ -1041,7 +1041,7 @@ fn an_order_for_a_time_is_paid_now_and_its_page_says_when() {
             assert!(place(s, "place").committed);
             assert!(s.cart_lines("a").is_empty());
             let (html, _, _, _) = s
-                .serve_document_settled("a", "store.page.OrderPage", &Params::new(), &[])
+                .serve_document_settled("a", "store.page.OrderPage~ui", &Params::new(), &[])
                 .expect("served");
             assert!(visible(&html).contains("Awaiting your payment"), "{html}");
             let page_url = html

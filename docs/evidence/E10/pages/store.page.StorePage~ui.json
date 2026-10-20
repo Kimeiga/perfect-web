@@ -1,5 +1,5 @@
 {
-  "page": "store.page.StorePage",
+  "page": "store.page.StorePage~ui",
   "route": "/stores/{id}",
   "params": [
     "id"
@@ -391,7 +391,7 @@
   "title": 50,
   "scope": "user:",
   "layout": {
-    "path": "store.page.StoreLayout",
+    "path": "store.page.StoreLayout~ui",
     "schema": "d92ef64b146df5d6",
     "parts": 1,
     "elements": 0

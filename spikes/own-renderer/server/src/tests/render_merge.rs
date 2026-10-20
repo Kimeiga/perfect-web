@@ -153,7 +153,7 @@ fn cart_page_of(s: &Server, session: &str) -> u64 {
     )
     .expect("added");
     let (_, doc, _, _) = s
-        .serve_document_settled(session, "store.page.CartPage", &Params::new(), &[])
+        .serve_document_settled(session, "store.page.CartPage~ui", &Params::new(), &[])
         .expect("served");
     doc
 }
@@ -216,7 +216,7 @@ fn two_renders_straddle_a_commit_between_them() {
 fn a_feed_sessions_documents_are_read_in_one_render_each_identical_call_once() {
     let s = served_feed();
     for _ in 0..2 {
-        s.serve_document_settled("a", "feed.app.Home", &Params::new(), &[])
+        s.serve_document_settled("a", "feed.app.Home~ui", &Params::new(), &[])
             .expect("served");
     }
     let before = calls(&s);
@@ -272,7 +272,7 @@ fn on_postgres_a_feed_renders_bindings_read_one_snapshot() {
     let Some(url) = feed_database() else { return };
     let s = super::feed_pg::served_on(&url, "render_merge_one");
     let (_, doc, _, _) = s
-        .serve_document_settled("a", "feed.app.NotificationsPage", &Params::new(), &[])
+        .serve_document_settled("a", "feed.app.NotificationsPage~ui", &Params::new(), &[])
         .expect("served");
     *s.between_bindings.lock().expect("between") = Some(Box::new(|s: &Server| {
         s.data
@@ -296,7 +296,7 @@ fn on_postgres_a_feeds_two_renders_straddle_a_commit_between_them() {
     let Some(url) = feed_database() else { return };
     let s = super::feed_pg::served_on(&url, "render_merge_two");
     let (_, doc, _, _) = s
-        .serve_document_settled("a", "feed.app.NotificationsPage", &Params::new(), &[])
+        .serve_document_settled("a", "feed.app.NotificationsPage~ui", &Params::new(), &[])
         .expect("served");
     let one = |binding: &str| {
         s.bindings_where("a", Some(doc), |b| b == binding, &Keys::Shown)
@@ -738,7 +738,7 @@ fn on_postgres_a_feed_renders_never_hold_their_seats_waiting_for_the_table() {
         .map(|i| {
             let session = format!("f{i}");
             let (_, doc, _, _) = s
-                .serve_document_settled(&session, "feed.app.Home", &Params::new(), &[])
+                .serve_document_settled(&session, "feed.app.Home~ui", &Params::new(), &[])
                 .expect("served");
             (session, doc)
         })

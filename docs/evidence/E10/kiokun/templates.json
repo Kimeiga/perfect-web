@@ -1,6 +1,6 @@
 [
   {
-    "path": "kiokun.page.SearchPage",
+    "path": "kiokun.page.SearchPage~ui",
     "name": "SearchPage",
     "params": [
       "q",
@@ -174,7 +174,7 @@
     ]
   },
   {
-    "path": "kiokun.page.WordPage",
+    "path": "kiokun.page.WordPage~ui",
     "name": "WordPage",
     "params": [
       "word",

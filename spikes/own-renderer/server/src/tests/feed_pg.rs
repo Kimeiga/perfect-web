@@ -246,7 +246,7 @@ fn on_postgres_a_post_reaches_another_session() {
     let s = served(&url, "reaches");
     for session in ["a", "b"] {
         let (html, _, _, _) = s
-            .serve_document_settled(session, "feed.app.Home", &Params::new(), &[])
+            .serve_document_settled(session, "feed.app.Home~ui", &Params::new(), &[])
             .expect("served");
         assert!(html.contains("Hello, feed."), "{html}");
     }
@@ -267,7 +267,7 @@ fn on_postgres_a_like_counts_and_reaches_an_open_thread() {
     let Some(url) = database() else { return };
     let s = served(&url, "like");
     let (html, _, _, _) = s
-        .serve_document_settled("b", "feed.app.PostPage", &thread_of("p1"), &[])
+        .serve_document_settled("b", "feed.app.PostPage~ui", &thread_of("p1"), &[])
         .expect("served");
     assert!(html.contains("2 likes"), "{html}");
     let theirs = latest(&s.pending.lock().expect("pending"), "b");
@@ -319,7 +319,7 @@ fn on_postgres_a_reply_is_in_its_thread_as_deep_as_it_goes() {
         .expect("runs");
     assert!(answered.committed, "{:?}", answered.result);
     let (html, _, _, _) = s
-        .serve_document_settled("c", "feed.app.PostPage", &thread_of("p1"), &[])
+        .serve_document_settled("c", "feed.app.PostPage~ui", &thread_of("p1"), &[])
         .expect("served");
     // p1, its reply p2, p2's reply p3, and p3's reply: in that order.
     let at = |text: &str| html.find(text).unwrap_or_else(|| panic!("{text}: {html}"));
@@ -355,7 +355,7 @@ fn on_postgres_the_timeline_loads_more() {
         )
         .expect("thirty posts");
     let (html, _, _, _) = s
-        .serve_document_settled("a", "feed.app.Home", &Params::new(), &[])
+        .serve_document_settled("a", "feed.app.Home~ui", &Params::new(), &[])
         .expect("served");
     // The newest twenty: 30 down to 11.
     assert!(html.contains("Numbered 30<"), "{html}");
@@ -400,7 +400,7 @@ fn on_postgres_a_command_refused_at_its_commit_leaves_nothing() {
         )
         .expect("a refusal at commit");
     for session in ["a", "b"] {
-        s.serve_document_settled(session, "feed.app.Home", &Params::new(), &[])
+        s.serve_document_settled(session, "feed.app.Home~ui", &Params::new(), &[])
             .expect("served");
     }
     let (mine, theirs) = {
@@ -483,10 +483,10 @@ fn on_postgres_the_feed_serves_what_it_serves_in_memory() {
             .expect("runs");
         assert!(like.committed, "{:?}", like.result);
         let (home, _, _, _) = s
-            .serve_document_settled("c", "feed.app.Home", &Params::new(), &[])
+            .serve_document_settled("c", "feed.app.Home~ui", &Params::new(), &[])
             .expect("served");
         let (thread, _, _, _) = s
-            .serve_document_settled("c", "feed.app.PostPage", &thread_of("p4"), &[])
+            .serve_document_settled("c", "feed.app.PostPage~ui", &thread_of("p4"), &[])
             .expect("served");
         pages.push((home, thread));
     }

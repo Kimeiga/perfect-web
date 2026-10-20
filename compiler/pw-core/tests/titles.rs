@@ -95,7 +95,7 @@ const STORE_LINK: &str = "href=\"/stores/{store.id}\"";
 fn store_template(b: &pw_core::build::Build) -> &Template {
     b.templates
         .iter()
-        .find(|t| t.path == "store.page.StorePage")
+        .find(|t| t.path == "store.page.StorePage~ui")
         .expect("the store's template")
 }
 
@@ -140,7 +140,7 @@ fn a_page_s_title_is_a_part_of_the_document_numbered_after_the_rest() {
     let plan = b
         .pages
         .iter()
-        .find(|p| p.page == "store.page.StorePage")
+        .find(|p| p.page == "store.page.StorePage~ui")
         .expect("the store's plan")
         .plan
         .as_ref()
@@ -284,7 +284,7 @@ fn a_title_reads_no_signal() {
     let why = b
         .pages
         .iter()
-        .find(|p| p.page == "t.P")
+        .find(|p| p.page == "t.P~ui")
         .expect("a plan")
         .plan
         .as_ref()

@@ -1,0 +1,34 @@
+// @corpus: fixture
+// @id: DEMO-namespaces
+// @category: distinct query, view and page namespaces
+// @charter: section 8.1
+// @milestone: E14
+// ADR-XXXX: a source name may identify both a term and UI declaration.
+
+module demo.namespaces
+
+query Card() -> Int { 7 }
+
+view Card() !{} {
+    <strong id="namespace-view">Card view</strong>
+}
+
+query Home() -> Int { 11 }
+
+page Home() {
+    route "/namespace-identities"
+    cache private
+    let card = query Card()
+    let home = query Home()
+    signal count: Int = 0
+    view {
+        <title>Declaration namespaces</title>
+        <Card />
+        <p id="namespace-query">{card}</p>
+        <p id="namespace-page-query">{home}</p>
+        <p id="namespace-computed">{card + 1}</p>
+        <p id="namespace-count">{count}</p>
+        <p id="namespace-next">{count + 1}</p>
+        <button type="button" on:press={() => count = count + 1}>Count</button>
+    }
+}

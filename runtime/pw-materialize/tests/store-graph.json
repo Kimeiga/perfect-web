@@ -194,7 +194,7 @@
       ]
     },
     {
-      "path": "store.page.AddressPage",
+      "path": "store.page.AddressPage~ui",
       "name": "AddressPage",
       "node": "page",
       "params": [
@@ -215,7 +215,7 @@
       ]
     },
     {
-      "path": "store.page.CartPage",
+      "path": "store.page.CartPage~ui",
       "name": "CartPage",
       "node": "page",
       "params": []
@@ -249,7 +249,7 @@
       ]
     },
     {
-      "path": "store.page.HomePage",
+      "path": "store.page.HomePage~ui",
       "name": "HomePage",
       "node": "page",
       "params": []
@@ -313,7 +313,7 @@
       ]
     },
     {
-      "path": "store.page.OrderPage",
+      "path": "store.page.OrderPage~ui",
       "name": "OrderPage",
       "node": "page",
       "params": []
@@ -404,7 +404,7 @@
       "params": []
     },
     {
-      "path": "store.page.StorePage",
+      "path": "store.page.StorePage~ui",
       "name": "StorePage",
       "node": "page",
       "params": [
@@ -412,7 +412,7 @@
       ]
     },
     {
-      "path": "store.page.TimePage",
+      "path": "store.page.TimePage~ui",
       "name": "TimePage",
       "node": "page",
       "params": [
@@ -576,7 +576,7 @@
       ]
     },
     {
-      "path": "store.rate.RatePage",
+      "path": "store.rate.RatePage~ui",
       "name": "RatePage",
       "node": "page",
       "params": [
@@ -658,7 +658,7 @@
       ]
     },
     {
-      "path": "store.search.SearchPage",
+      "path": "store.search.SearchPage~ui",
       "name": "SearchPage",
       "node": "page",
       "params": [
@@ -765,7 +765,7 @@
       ]
     },
     {
-      "from": "store.page.AddressPage",
+      "from": "store.page.AddressPage~ui",
       "to": "store.page.Cart",
       "kind": "reads",
       "key": [
@@ -773,13 +773,13 @@
       ]
     },
     {
-      "from": "store.page.AddressPage",
+      "from": "store.page.AddressPage~ui",
       "to": "store.page.Places",
       "kind": "reads",
       "key": []
     },
     {
-      "from": "store.page.AddressPage",
+      "from": "store.page.AddressPage~ui",
       "to": "store.page.SavedAddresses",
       "kind": "reads",
       "key": [
@@ -795,7 +795,7 @@
       ]
     },
     {
-      "from": "store.page.CartPage",
+      "from": "store.page.CartPage~ui",
       "to": "store.hours.CartHours",
       "kind": "reads",
       "key": [
@@ -803,7 +803,7 @@
       ]
     },
     {
-      "from": "store.page.CartPage",
+      "from": "store.page.CartPage~ui",
       "to": "store.page.Cart",
       "kind": "reads",
       "key": [
@@ -811,7 +811,7 @@
       ]
     },
     {
-      "from": "store.page.CartPage",
+      "from": "store.page.CartPage~ui",
       "to": "store.page.Checkout",
       "kind": "reads",
       "key": [
@@ -819,7 +819,7 @@
       ]
     },
     {
-      "from": "store.page.CartPage",
+      "from": "store.page.CartPage~ui",
       "to": "store.page.Order",
       "kind": "reads",
       "key": [
@@ -867,13 +867,13 @@
       ]
     },
     {
-      "from": "store.page.HomePage",
+      "from": "store.page.HomePage~ui",
       "to": "store.hours.StoresOpen",
       "kind": "reads",
       "key": []
     },
     {
-      "from": "store.page.HomePage",
+      "from": "store.page.HomePage~ui",
       "to": "store.page.Cart",
       "kind": "reads",
       "key": [
@@ -939,7 +939,7 @@
       ]
     },
     {
-      "from": "store.page.OrderPage",
+      "from": "store.page.OrderPage~ui",
       "to": "store.page.Cart",
       "kind": "reads",
       "key": [
@@ -947,7 +947,7 @@
       ]
     },
     {
-      "from": "store.page.OrderPage",
+      "from": "store.page.OrderPage~ui",
       "to": "store.page.Order",
       "kind": "reads",
       "key": [
@@ -955,7 +955,7 @@
       ]
     },
     {
-      "from": "store.page.OrderPage",
+      "from": "store.page.OrderPage~ui",
       "to": "store.page.OrderTotal",
       "kind": "reads",
       "key": [
@@ -963,7 +963,7 @@
       ]
     },
     {
-      "from": "store.page.OrderPage",
+      "from": "store.page.OrderPage~ui",
       "to": "store.reviews.OrderRatings",
       "kind": "reads",
       "key": [
@@ -1003,7 +1003,7 @@
       ]
     },
     {
-      "from": "store.page.StorePage",
+      "from": "store.page.StorePage~ui",
       "to": "store.hours.StoreStatus",
       "kind": "reads",
       "key": [
@@ -1011,7 +1011,7 @@
       ]
     },
     {
-      "from": "store.page.StorePage",
+      "from": "store.page.StorePage~ui",
       "to": "store.page.Cart",
       "kind": "reads",
       "key": [
@@ -1019,7 +1019,7 @@
       ]
     },
     {
-      "from": "store.page.StorePage",
+      "from": "store.page.StorePage~ui",
       "to": "store.page.Menu",
       "kind": "reads",
       "key": [
@@ -1027,7 +1027,7 @@
       ]
     },
     {
-      "from": "store.page.StorePage",
+      "from": "store.page.StorePage~ui",
       "to": "store.page.MenuLine",
       "kind": "reads",
       "key": [
@@ -1035,7 +1035,7 @@
       ]
     },
     {
-      "from": "store.page.StorePage",
+      "from": "store.page.StorePage~ui",
       "to": "store.page.Reach",
       "kind": "reads",
       "key": [
@@ -1044,7 +1044,7 @@
       ]
     },
     {
-      "from": "store.page.StorePage",
+      "from": "store.page.StorePage~ui",
       "to": "store.page.Store",
       "kind": "reads",
       "key": [
@@ -1052,7 +1052,7 @@
       ]
     },
     {
-      "from": "store.page.StorePage",
+      "from": "store.page.StorePage~ui",
       "to": "store.reviews.StoreRatings",
       "kind": "reads",
       "key": [
@@ -1060,7 +1060,7 @@
       ]
     },
     {
-      "from": "store.page.TimePage",
+      "from": "store.page.TimePage~ui",
       "to": "store.page.Cart",
       "kind": "reads",
       "key": [
@@ -1068,7 +1068,7 @@
       ]
     },
     {
-      "from": "store.page.TimePage",
+      "from": "store.page.TimePage~ui",
       "to": "store.page.TimesOffered",
       "kind": "reads",
       "key": [
@@ -1517,7 +1517,7 @@
       ]
     },
     {
-      "from": "store.rate.RatePage",
+      "from": "store.rate.RatePage~ui",
       "to": "store.page.Cart",
       "kind": "reads",
       "key": [
@@ -1525,7 +1525,7 @@
       ]
     },
     {
-      "from": "store.rate.RatePage",
+      "from": "store.rate.RatePage~ui",
       "to": "store.reviews.StoreToRate",
       "kind": "reads",
       "key": [
@@ -1632,7 +1632,7 @@
       ]
     },
     {
-      "from": "store.search.SearchPage",
+      "from": "store.search.SearchPage~ui",
       "to": "store.page.Cart",
       "kind": "reads",
       "key": [
@@ -1640,7 +1640,7 @@
       ]
     },
     {
-      "from": "store.search.SearchPage",
+      "from": "store.search.SearchPage~ui",
       "to": "store.search.Search",
       "kind": "reads",
       "key": [

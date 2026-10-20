@@ -211,7 +211,7 @@ fn a_handlers_work_is_still_deferred() {
          page All() {{\n    route \"/all\"\n\n    view {{\n        \
          <button on:press={{SaveAll}}>Save all</button>\n    }}\n}}\n"
     );
-    for page in ["probe.things.Shop", "probe.things.All"] {
+    for page in ["probe.things.Shop~ui", "probe.things.All~ui"] {
         let page = contract(&program, page);
         assert_eq!(
             requires(&page),
@@ -270,12 +270,12 @@ fn a_handlers_code_is_the_handlers() {
          view Chime() !{{ dom.mutate }} {{\n    <p>{{ring()}}</p>\n}}\n"
     );
     assert_eq!(
-        imports(&contract(&program, "probe.things.Bell")),
+        imports(&contract(&program, "probe.things.Bell~ui")),
         Vec::<String>::new()
     );
     // The control: a view that calls it while it renders imports it.
     assert_eq!(
-        imports(&contract(&program, "probe.things.Chime")),
+        imports(&contract(&program, "probe.things.Chime~ui")),
         ["probe:ui/beep#beep"]
     );
 }

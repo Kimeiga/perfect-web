@@ -88,7 +88,7 @@ fn a_stream_builds_as_a_part() {
     .expect("the stream example is semantically valid");
     let view = templates
         .iter()
-        .find(|t| t.path == "store.recommendations.Recommendations")
+        .find(|t| t.path == "store.recommendations.Recommendations~ui")
         .expect("A-008's view");
     assert!(
         view.manifest()
@@ -100,37 +100,32 @@ fn a_stream_builds_as_a_part() {
 }
 
 #[test]
-fn the_complete_stream_example_reports_its_exact_wit_collision() {
+fn the_complete_stream_example_builds_distinct_query_and_view_components() {
     let all = files(&["examples/accepted/A-008-streamed-public-recommendations.pw"]);
     checks_clean(&all);
-    let input = units(all);
-    let report = pw_core::program::validate(&input);
-    let errors: Vec<_> = report
-        .diagnostics
+    let built = pw_core::program::build(&units(all)).expect("the complete stream builds");
+    let query = built
+        .components
         .iter()
-        .flat_map(|(path, ds)| ds.iter().filter(|d| d.is_error()).map(move |d| (path, d)))
-        .collect();
-    assert_eq!(errors.len(), 1, "{:?}", report.diagnostics);
-    let (path, refusal) = errors[0];
-    assert!(path.ends_with("examples/accepted/A-008-streamed-public-recommendations.pw"));
-    assert_eq!(refusal.code, "PW6601");
-    assert_eq!(refusal.reason, pw_core::program::Stage::Wit.reason());
-    assert_eq!(
-        refusal.message,
-        "the generated WIT does not parse: duplicate item named `store-recommendations-recommendations-api`"
-    );
-    let source = &input
+        .find(|(id, _)| id == "store.recommendations.Recommendations")
+        .expect("query component");
+    let view = built
+        .components
         .iter()
-        .find(|u| &u.path == path)
-        .expect("responsible unit")
-        .src;
-    assert!(source[refusal.primary_span.clone()].contains("query Recommendations"));
-    assert!(
-        report.into_build().is_err(),
-        "the complete program is refused"
-    );
+        .find(|(id, _)| id == "store.recommendations.Recommendations~ui")
+        .expect("view component");
+    assert!(matches!(
+        query.1,
+        pw_core::backend::component::Built::Component { audited: 2, .. }
+    ));
+    assert!(matches!(
+        view.1,
+        pw_core::backend::component::Built::NoBody {
+            kind: pw_core::hir::DeclKind::View
+        }
+    ));
+    assert!(built.refusals().is_empty());
 }
-
 #[test]
 fn a_mounted_resource_does_not_build() {
     refused(

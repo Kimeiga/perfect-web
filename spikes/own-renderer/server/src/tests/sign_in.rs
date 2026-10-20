@@ -147,7 +147,7 @@ fn page(s: &Server, session: &str, name: &str, params: &Params) -> String {
 
 /// The home page served to `session`, as text.
 fn home(s: &Server, session: &str) -> String {
-    page(s, session, "feed.app.Home", &Params::new())
+    page(s, session, "feed.app.Home~ui", &Params::new())
 }
 
 /// The thread page's parameters for the post `id`.
@@ -678,7 +678,7 @@ fn a_post_and_a_reply_are_their_signed_in_authors() {
         .find(|li| li.contains("Ada's own post"))
         .unwrap_or_else(|| panic!("the post: {theirs}"));
     assert!(row.contains("Name of ada"), "{row}");
-    let thread = page(&s, "s-reader", "feed.app.PostPage", &thread_of("p1"));
+    let thread = page(&s, "s-reader", "feed.app.PostPage~ui", &thread_of("p1"));
     let reply = thread
         .split("<article")
         .find(|a| a.contains("Ada's reply"))
@@ -838,7 +838,7 @@ fn two_users_pages_never_share_private_parts() {
         let mut pages = Vec::new();
         for session in &sessions {
             pages.push(home(&s, session));
-            page(&s, session, "feed.app.PostPage", &thread_of("p1"));
+            page(&s, session, "feed.app.PostPage~ui", &thread_of("p1"));
         }
         if signed {
             assert!(

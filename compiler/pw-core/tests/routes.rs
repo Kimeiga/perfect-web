@@ -282,6 +282,6 @@ fn the_plan_carries_the_route() {
             .route
             .clone()
     };
-    assert_eq!(route("t.P").as_deref(), Some("/stores/{id}"));
-    assert_eq!(route("t.Plain"), None);
+    assert_eq!(route("t.P~ui").as_deref(), Some("/stores/{id}"));
+    assert_eq!(route("t.Plain~ui"), None);
 }

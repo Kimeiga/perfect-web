@@ -1587,7 +1587,10 @@ impl<'a> Lowering<'a> {
         if !tag.starts_with(|c: char| c.is_ascii_uppercase()) {
             return None;
         }
-        match self.ws.resolve(self.unit, tag) {
+        match self
+            .ws
+            .resolve_in(self.unit, crate::resolve::Namespace::Ui, tag)
+        {
             Resolution::Local(def) | Resolution::Imported { def, .. } => {
                 crate::resolve::declaration(self.hirs, def)
                     .is_some_and(|d| d.kind == crate::hir::DeclKind::View)
@@ -1621,7 +1624,7 @@ fn view_uses(ws: &Workspace, hirs: &[&Hir], def: DefId) -> Vec<(DefId, bool)> {
             Node::Element { tag, children, .. } => {
                 if tag.starts_with(|c: char| c.is_ascii_uppercase())
                     && let Resolution::Local(d) | Resolution::Imported { def: d, .. } =
-                        ws.resolve(def.unit, tag)
+                        ws.resolve_in(def.unit, crate::resolve::Namespace::Ui, tag)
                     && crate::resolve::declaration(hirs, d)
                         .is_some_and(|x| x.kind == crate::hir::DeclKind::View)
                 {

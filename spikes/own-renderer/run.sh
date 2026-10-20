@@ -92,7 +92,7 @@ cargo run --quiet -p pw-cli --manifest-path "$REPO_ROOT/Cargo.toml" -- \
 if [ "$SOURCES" = "$REPO_ROOT/examples" ]; then
   cargo run --quiet -p pw-render --manifest-path "$REPO_ROOT/Cargo.toml" --bin pw-render -- \
     --out "$OUT" --values "$SPIKE/store-values.json" --resume "$SPIKE/store-resume.json" \
-    --plan "$OUT/build/pages/store.page.StorePage.json" \
+    --plan "$OUT/build/pages/store.page.StorePage~ui.json" \
     --document "StorePage(47)" --partition public --compatibility B1 \
     --identity-key "own-renderer-spike-key" \
     --runtime /pw-runtime.mjs < "$STORE_IR"

@@ -305,7 +305,7 @@ fn a_contract_is_as_private_as_what_its_component_reads() {
         let sigs = Signatures::build(&ws, &refs);
         contracts(&refs, &sigs, &ws)
             .into_iter()
-            .find(|c| c.component_id == "t.ShopPage")
+            .find(|c| c.component_id == "t.ShopPage~ui")
             .expect("the page's contract")
             .allowed_placements
     };

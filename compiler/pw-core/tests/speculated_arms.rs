@@ -85,7 +85,7 @@ fn each_page_speculates_on_the_arm_whose_target_it_shows() {
     let program = feed(&|s| s.to_string());
     assert_eq!(reported(&program), Vec::<String>::new());
     // The home page shows the timeline: `like`'s first arm.
-    let home = speculation(&program, "feed.app.Home")
+    let home = speculation(&program, "feed.app.Home~ui")
         .expect("the home page's")
         .unwrap_or_else(|e| panic!("{e}"));
     assert!(
@@ -100,7 +100,7 @@ fn each_page_speculates_on_the_arm_whose_target_it_shows() {
         home.source
     );
     // The thread page shows the thread its `id` keys: the second.
-    let thread = speculation(&program, "feed.app.PostPage")
+    let thread = speculation(&program, "feed.app.PostPage~ui")
         .expect("the thread page's")
         .unwrap_or_else(|e| panic!("{e}"));
     assert!(
@@ -127,7 +127,7 @@ fn an_arm_whose_target_a_page_shows_under_another_key_is_refused() {
             "<button id=\"like\" type=\"button\" on:press={() =>",
         )
     });
-    match speculation(&program, "feed.app.PostPage").expect("the thread page's") {
+    match speculation(&program, "feed.app.PostPage~ui").expect("the thread page's") {
         Ok(s) => panic!("speculated {:?}", s.bindings),
         Err(e) => assert!(
             e.contains("reads by no binding whose key resolves to the same invocation context"),

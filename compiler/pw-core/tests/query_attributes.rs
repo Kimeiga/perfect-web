@@ -76,7 +76,7 @@ fn plan(markup: &str) -> PageValues {
     assert!(b.refusals().is_empty(), "{:?}", b.refusals());
     b.pages
         .into_iter()
-        .find(|p| p.page == "store.page.StorePage")
+        .find(|p| p.page == "store.page.StorePage~ui")
         .expect("the store page")
         .plan
         .expect("planned")
@@ -88,7 +88,7 @@ fn part_of(markup: &str, kind: &str, value: &str) -> u32 {
     let b = build(store(markup));
     b.templates
         .iter()
-        .find(|t| t.path == "store.page.StorePage")
+        .find(|t| t.path == "store.page.StorePage~ui")
         .expect("the store's template")
         .manifest()
         .into_iter()

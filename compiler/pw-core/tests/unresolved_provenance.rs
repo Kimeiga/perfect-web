@@ -193,7 +193,7 @@ fn a014_content_addressed_handler_after_repair() {
         "examples/accepted/A-005-idempotent-command.pw",
         "examples/accepted/A-014-content-addressed-resumable-handler.pw",
     ]);
-    let view = of(&cs, "store.add_button.AddToCartButton");
+    let view = of(&cs, "store.add_button.AddToCartButton~ui");
 
     assert!(
         caps(view).is_empty(),
@@ -255,7 +255,7 @@ fn a_page_does_not_inherit_its_handlers_authority() {
     let refs: Vec<&str> = extra.iter().map(String::as_str).collect();
     let cs = contracts_for(&refs);
 
-    let page = of(&cs, "store.page.StorePage");
+    let page = of(&cs, "store.page.StorePage~ui");
     let handler = of(&cs, "store.page.add_to_cart");
 
     assert!(
@@ -366,7 +366,7 @@ fn store_page_after_repair() {
     let refs: Vec<&str> = extra.iter().map(String::as_str).collect();
     let cs = contracts_for(&refs);
 
-    let page = of(&cs, "store.page.StorePage");
+    let page = of(&cs, "store.page.StorePage~ui");
     assert_eq!(
         caps(page),
         BTreeSet::from(["session.read".to_string()]),

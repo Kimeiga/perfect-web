@@ -154,7 +154,7 @@ fn an_order_awaits_its_payment_on_the_providers_page() {
         );
         assert!(s.cart_lines("a").is_empty(), "the cart is empty after");
         let (html, _, _, _) = s
-            .serve_document_settled("a", "store.page.OrderPage", &Params::new(), &[])
+            .serve_document_settled("a", "store.page.OrderPage~ui", &Params::new(), &[])
             .expect("served");
         assert!(visible(&html).contains("Awaiting your payment"), "{html}");
         assert!(
@@ -190,7 +190,7 @@ fn an_order_awaits_its_payment_on_the_providers_page() {
 fn a_card_paid_places_the_order_and_its_open_page_is_told() {
     paying(|s, _| {
         let page = placed_awaiting(s);
-        s.serve_document_settled("a", "store.page.OrderPage", &Params::new(), &[])
+        s.serve_document_settled("a", "store.page.OrderPage~ui", &Params::new(), &[])
             .expect("served");
         let doc = latest(&s.pending.lock().expect("pending"), "a");
         let paid = pay(&page, "4242424242424242");
@@ -411,7 +411,7 @@ fn a_reader_takes_back_an_order_awaiting_its_payment() {
             vec![("espresso".to_string(), 3), ("cortado".to_string(), 1)]
         );
         let (html, _, _, _) = s
-            .serve_document_settled("a", "store.page.OrderPage", &Params::new(), &[])
+            .serve_document_settled("a", "store.page.OrderPage~ui", &Params::new(), &[])
             .expect("served");
         assert!(
             visible(&html).contains("Canceled: its items are back in your cart."),

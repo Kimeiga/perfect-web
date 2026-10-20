@@ -6,23 +6,15 @@
       "code": "PW6601",
       "stage": "backend_template",
       "responsible": "view StoreLocation",
-      "message": "a template part the renderer cannot render: store.map_widget.StoreLocation: `<map resource={..}>`: an element that mounts a resource is not compiled",
+      "message": "a template part the renderer cannot render: store.map_widget.StoreLocation~ui: `<map resource={..}>`: an element that mounts a resource is not compiled",
       "why": "not supported yet: an element that mounts a resource (`<map resource={..}>`)"
-    },
-    {
-      "file": "A-008-streamed-public-recommendations.pw",
-      "code": "PW6601",
-      "stage": "backend_wit",
-      "responsible": "query Recommendations",
-      "message": "the generated WIT does not parse: duplicate item named `store-recommendations-recommendations-api`",
-      "why": "a bug: the WIT the build generates for this program names one item twice (NEXT queues it as a small track)"
     },
     {
       "file": "A-013-build-time-deterministic-page.pw",
       "code": "PW6601",
       "stage": "backend_page",
       "responsible": "page Terms",
-      "message": "`marketing.terms.Terms`'s values: part 0 computes a value that performs `build.input.read<WorkspaceFile>`, and a host computes only a value that performs nothing",
+      "message": "`marketing.terms.Terms~ui`'s values: part 0 computes a value that performs `build.input.read<WorkspaceFile>`, and a host computes only a value that performs nothing",
       "why": "not supported yet: a page value computed at build time from a workspace file (`build.input.read`)"
     },
     {
@@ -30,7 +22,7 @@
       "code": "PW6601",
       "stage": "backend_template",
       "responsible": "style:grid-template-columns",
-      "message": "a template part the renderer cannot render: store.responsive_menu.ResponsiveMenu: `style:grid-template-columns`: `style:grid-template-columns` is a directive, and only `on:` directives are compiled",
+      "message": "a template part the renderer cannot render: store.responsive_menu.ResponsiveMenu~ui: `style:grid-template-columns`: `style:grid-template-columns` is a directive, and only `on:` directives are compiled",
       "why": "not supported yet: `style:` directives (only `on:` directives are compiled)"
     }
   ]

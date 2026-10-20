@@ -56,7 +56,7 @@ fn thread_page(program: &str) -> Result<pw_core::backend::speculation::Speculati
     pw_core::backend::speculation::compile(&units(program))
         .expect("the program checks")
         .into_iter()
-        .find(|c| c.page == "feed.app.PostPage")
+        .find(|c| c.page == "feed.app.PostPage~ui")
         .map(|c| match c.module {
             Encoding::Encoded(m) => Ok(m),
             other => Err(format!("{other:?}")),

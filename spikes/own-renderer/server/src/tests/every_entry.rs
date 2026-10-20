@@ -145,7 +145,7 @@ fn a_private_entry_is_dropped_in_every_sessions_partition() {
     let thread = Params::from([("id".to_string(), "p1".to_string())]);
     for session in ["a", "b"] {
         let (html, _, _, _) = s
-            .serve_document_settled(session, "feed.app.PostPage", &thread, &[])
+            .serve_document_settled(session, "feed.app.PostPage~ui", &thread, &[])
             .expect("served");
         assert!(html.contains("2 likes"), "{html}");
     }

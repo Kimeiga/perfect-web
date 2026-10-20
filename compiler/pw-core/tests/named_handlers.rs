@@ -170,7 +170,7 @@ fn identities(b: &pw_core::build::Build) -> Vec<String> {
     let t = b
         .templates
         .iter()
-        .find(|t| t.path == "t.P")
+        .find(|t| t.path == "t.P~ui")
         .expect("the page's template");
     let ir = serde_json::to_value(t).expect("serializes");
     let mut out = Vec::new();
@@ -236,7 +236,7 @@ fn module_of(src: &str) -> String {
     let compiled = pw_core::backend::js::compile(&units(src)).expect("checks");
     let modules: Vec<String> = compiled
         .iter()
-        .filter(|c| c.declaration == "t.P")
+        .filter(|c| c.declaration == "t.P~ui")
         .filter_map(|c| match &c.module {
             pw_core::backend::wasm::Encoding::Encoded(m) => {
                 Some(m.source.replace(&m.identity, "ID"))
@@ -377,7 +377,7 @@ fn a_named_handler_is_named_as_its_lambda_forms_call_is() {
         pw_core::backend::js::compile(&all)
             .expect("checks")
             .iter()
-            .filter(|h| h.declaration == "t.P")
+            .filter(|h| h.declaration == "t.P~ui")
             .filter_map(|h| match &h.module {
                 pw_core::backend::wasm::Encoding::Encoded(m) => Some(m.name.clone()),
                 _ => None,
@@ -390,7 +390,7 @@ fn a_named_handler_is_named_as_its_lambda_forms_call_is() {
         pw_core::backend::js::compile(&units(&program("", handler)))
             .expect("checks")
             .iter()
-            .filter(|h| h.declaration == "t.P")
+            .filter(|h| h.declaration == "t.P~ui")
             .filter_map(|h| match &h.module {
                 pw_core::backend::wasm::Encoding::Encoded(m) => Some(m.name.clone()),
                 _ => None,

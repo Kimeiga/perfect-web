@@ -11,7 +11,7 @@
 // - a button in it closes it the same way, and its action runs.
 import { expect, test } from "@playwright/test";
 
-const PAGE = "/page/demo.dialog.DialogPage";
+const PAGE = "/page/demo.dialog.DialogPage~ui";
 
 async function ready(page) {
   await page.goto(PAGE);

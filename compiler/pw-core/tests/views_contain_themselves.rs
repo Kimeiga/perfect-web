@@ -153,18 +153,18 @@ fn each_use_is_an_instance_of_the_views_own_template() {
     };
     // In its own template, inside the loop's row, at two elements deep, and
     // its template nests two.
-    let thread = parts("t.Thread");
+    let thread = parts("t.Thread~ui");
     assert!(
         thread.contains(
-            r#""part":"instance","id":2,"path":"t.Thread","args":[["c","r"]],"elements":2,"deepest":2"#
+            r#""part":"instance","id":2,"path":"t.Thread~ui","args":[["c","r"]],"elements":2,"deepest":2"#
         ),
         "{thread}"
     );
     // And where it is used: an instance too, never composed in place.
-    let root = parts("t.Root");
+    let root = parts("t.Root~ui");
     assert!(
         root.contains(
-            r#""part":"instance","id":0,"path":"t.Thread","args":[["c","c"]],"elements":1,"deepest":2"#
+            r#""part":"instance","id":0,"path":"t.Thread~ui","args":[["c","c"]],"elements":1,"deepest":2"#
         ),
         "{root}"
     );
@@ -174,7 +174,7 @@ fn each_use_is_an_instance_of_the_views_own_template() {
 #[test]
 fn it_renders_to_the_depth_its_data_has_each_instance_in_a_frame() {
     let all = templates(THREAD);
-    let root = all.iter().find(|t| t.path == "t.Root").expect("Root");
+    let root = all.iter().find(|t| t.path == "t.Root~ui").expect("Root");
     let tree = comment(
         1,
         vec![comment(2, vec![comment(4, vec![])]), comment(3, vec![])],
@@ -209,7 +209,7 @@ fn it_renders_to_the_depth_its_data_has_each_instance_in_a_frame() {
 #[test]
 fn past_what_a_browser_nests_it_is_refused() {
     let all = templates(THREAD);
-    let root = all.iter().find(|t| t.path == "t.Root").expect("Root");
+    let root = all.iter().find(|t| t.path == "t.Root~ui").expect("Root");
     // A chain: each reply nests two more elements than the one it answers.
     let chain = |depth: i64| {
         (0..depth)
@@ -227,7 +227,7 @@ fn past_what_a_browser_nests_it_is_refused() {
     assert!(render(247).is_ok());
     let deep = render(260);
     assert!(
-        matches!(deep, Err(pw_render::Blocked::TooDeep { ref path, .. }) if path == "t.Thread"),
+        matches!(deep, Err(pw_render::Blocked::TooDeep { ref path, .. }) if path == "t.Thread~ui"),
         "{deep:?}"
     );
 }
@@ -239,7 +239,7 @@ fn the_renderer_goes_no_deeper_for_each_instance() {
     // markup around it, never on its stack. Rendered one inside another, it
     // overflowed 4 MiB in a debug build; written after, it needs under one.
     let all = templates(THREAD);
-    let root = all.iter().find(|t| t.path == "t.Root").expect("Root");
+    let root = all.iter().find(|t| t.path == "t.Root~ui").expect("Root");
     let chain = (0..247)
         .rev()
         .fold(comment(247, vec![]), |c, k| comment(k, vec![c]));
@@ -274,16 +274,25 @@ fn a_templates_schema_closes_over_the_views_its_instances_reach() {
             .schema
     };
     let changed = THREAD.replace("<p>{c.text}</p>", "<p>said: {c.text}</p>");
-    assert_ne!(schema(THREAD, "t.Thread"), schema(&changed, "t.Thread"));
-    assert_ne!(schema(THREAD, "t.Root"), schema(&changed, "t.Root"));
+    assert_ne!(
+        schema(THREAD, "t.Thread~ui"),
+        schema(&changed, "t.Thread~ui")
+    );
+    assert_ne!(schema(THREAD, "t.Root~ui"), schema(&changed, "t.Root~ui"));
     // Control: a view no instance of `Root`'s reaches leaves it alone.
     let other = format!("{THREAD}\nview Other(c: Comment) !{{}} {{\n    <p>{{c.text}}</p>\n}}\n");
     let other_changed = other.replace(
         "view Other(c: Comment) !{} {\n    <p>{c.text}</p>",
         "view Other(c: Comment) !{} {\n    <p>other: {c.text}</p>",
     );
-    assert_ne!(schema(&other, "t.Other"), schema(&other_changed, "t.Other"));
-    assert_eq!(schema(&other, "t.Root"), schema(&other_changed, "t.Root"));
+    assert_ne!(
+        schema(&other, "t.Other~ui"),
+        schema(&other_changed, "t.Other~ui")
+    );
+    assert_eq!(
+        schema(&other, "t.Root~ui"),
+        schema(&other_changed, "t.Root~ui")
+    );
     // Through a view reached through another: `Ask` and `Answer` hold each
     // other, and `Page` uses `Ask` alone.
     let mutual = "module t\n\ntype Q = Q { id: Int, text: String, next: List<Q> }\n\n\
@@ -292,7 +301,7 @@ fn a_templates_schema_closes_over_the_views_its_instances_reach() {
         view Page(q: Q) !{} {\n    <ul><Ask q={q} /></ul>\n}\n";
     assert_eq!(reported(mutual), Vec::<String>::new());
     let answered = mutual.replace("<li>{q.text}<ol>", "<li>answer: {q.text}<ol>");
-    assert_ne!(schema(mutual, "t.Page"), schema(&answered, "t.Page"));
+    assert_ne!(schema(mutual, "t.Page~ui"), schema(&answered, "t.Page~ui"));
 }
 
 /// Each page's plan, for a program of `src` with the standard packages.
@@ -347,10 +356,10 @@ fn an_instance_is_rendered_again_whole_by_what_gives_it_its_value() {
             .clone()
             .expect("planned")
     };
-    let asked = plan("t.Asked");
+    let asked = plan("t.Asked~ui");
     assert_eq!(asked.blocks, [0], "{asked:?}");
     assert!(asked.live.is_empty(), "{asked:?}");
-    let held = plan("t.Held");
+    let held = plan("t.Held~ui");
     assert!(held.blocks.is_empty(), "{held:?}");
     assert_eq!(held.live.len(), 1, "{held:?}");
     assert_eq!(
@@ -368,7 +377,7 @@ fn an_instance_is_rendered_again_whole_by_what_gives_it_its_value() {
     );
     let refused = plans(&mixed)
         .into_iter()
-        .find(|p| p.page == "t.Mixed")
+        .find(|p| p.page == "t.Mixed~ui")
         .expect("Mixed")
         .plan
         .expect_err("refused");

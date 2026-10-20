@@ -159,7 +159,10 @@ fn first_draft() -> serde_json::Value {
 #[test]
 fn the_build_writes_a_first_value_as_its_nodes() {
     let compiled = pw_core::backend::signals::compile(&units(PROGRAM)).expect("checks");
-    let page = compiled.iter().find(|c| c.page == "m.P").expect("the page");
+    let page = compiled
+        .iter()
+        .find(|c| c.page == "m.P~ui")
+        .expect("the page");
     let signals = page.signals.as_ref().expect("its first values are data");
     let draft = signals.iter().find(|s| s.name == "draft").expect("draft");
     assert_eq!(draft.initial, first_draft());
@@ -337,7 +340,10 @@ fn each_node_holds_the_next_run_in_the_order_its_fields_are_declared() {
         { "n": 4, "left": [], "right": [] },
     ]});
     let compiled = pw_core::backend::signals::compile(&units(program)).expect("checks");
-    let page = compiled.iter().find(|c| c.page == "m.P").expect("the page");
+    let page = compiled
+        .iter()
+        .find(|c| c.page == "m.P~ui")
+        .expect("the page");
     let tree = &page.signals.as_ref().expect("data")[0];
     assert_eq!(tree.initial, first);
     // The handler writes the tree twice under a new root, each copy's nodes

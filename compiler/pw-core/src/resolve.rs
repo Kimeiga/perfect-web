@@ -53,10 +53,7 @@ pub enum Namespace {
     /// `fn`, `let`, and the data operations: query, command, subscription,
     /// resource, task. These are *called*.
     Term,
-    /// `view`, `component`, `page`, `materialize`. These are *rendered*, never
-    /// called. A materialization belongs here rather than with the data
-    /// operations because nothing in a program invokes one: the materializer
-    /// decides when it runs, from the graph.
+    /// `view`, `component`, `page`, `layout`. These are *rendered*, never called.
     Ui,
     /// `effect`. Its own namespace: an effect name appears only in an effect
     /// row, never in an expression, and `database.read` must not collide with

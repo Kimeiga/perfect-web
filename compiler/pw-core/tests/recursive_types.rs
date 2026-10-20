@@ -337,7 +337,7 @@ page P() {
     let signals = pw_core::backend::signals::compile(&units).expect("checks");
     let page = signals
         .iter()
-        .find(|c| c.page.ends_with(".P"))
+        .find(|c| c.page.ends_with(".P~ui"))
         .expect("the page's signals");
     let held = page.signals.as_ref().expect("its first value is data");
     assert_eq!(

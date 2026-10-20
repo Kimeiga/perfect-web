@@ -216,7 +216,7 @@ fn on_postgres_a_cart_change_reaches_the_sessions_open_page() {
         "the commit's rows, recorded"
     );
     let count = s
-        .template_of("store.page.HomePage")
+        .template_of("store.page.HomePage~ui")
         .manifest()
         .into_iter()
         .find(|e| e.value == "cart.line_count")

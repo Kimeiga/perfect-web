@@ -73,7 +73,7 @@ page Shop(id: Int) {
         <button on:press={resumable() => Buy(id)}>Buy</button>
     }
 }",
-        "shop.ui.Shop",
+        "shop.ui.Shop~ui",
     );
     assert!(caps.is_empty(), "rendering requires nothing, got {caps:?}");
 }
@@ -89,7 +89,7 @@ page Shop(id: Int) {
         <button on:press={resumable() => Buy(poke(id))}>Buy</button>
     }
 }",
-        "shop.ui.Shop",
+        "shop.ui.Shop~ui",
     );
     assert!(
         caps.is_empty(),
@@ -113,7 +113,7 @@ page Shop(id: Int) {
         <button on:press={resumable() => Buy(id)}>{seen}</button>
     }
 }",
-        "shop.ui.Shop",
+        "shop.ui.Shop~ui",
     );
     assert_eq!(
         caps,
@@ -136,7 +136,7 @@ page Shop(id: Int) {
         <button on:press={resumable(captures = { peek() }) => Buy(id)}>Buy</button>
     }
 }",
-        "shop.ui.Shop",
+        "shop.ui.Shop~ui",
     );
     assert_eq!(
         caps,
@@ -163,7 +163,7 @@ page Shop(id: Int) {
         <button on:press={resumable(captures = { seen }) => Buy(seen)}>Buy</button>
     }
 }",
-        "shop.ui.Shop",
+        "shop.ui.Shop~ui",
     );
     assert_eq!(caps, ["database.read<Stores>"]);
 }
@@ -184,7 +184,7 @@ page Shop(id: Int) {
         <button on:press={resumable(captures = { seen }) => Buy(seen)}>{seen}</button>
     }
 }",
-        "shop.ui.Shop",
+        "shop.ui.Shop~ui",
     );
     assert_eq!(caps, ["database.read<Stores>"]);
     assert!(

@@ -5495,13 +5495,23 @@ fn view_elements(
             if !tag.starts_with(|c: char| c.is_ascii_uppercase()) {
                 continue;
             }
-            let resolved = match workspace.resolve(unit, tag) {
+            let resolved = match workspace.resolve_in(unit, crate::resolve::Namespace::Ui, tag) {
                 Resolution::Local(def) | Resolution::Imported { def, .. } => {
                     crate::resolve::declaration(hirs, def).map(|d| (def, d.kind))
                 }
                 Resolution::Unresolved | Resolution::Ambiguous(_) => None,
             };
-            let named = resolved.map(|(_, k)| k);
+            // Resolve rendered declarations in their namespace; a different
+            // namespace is consulted only to preserve the diagnostic for a
+            // tag that names no UI declaration.
+            let named = resolved
+                .map(|(_, k)| k)
+                .or_else(|| match workspace.resolve(unit, tag) {
+                    Resolution::Local(def) | Resolution::Imported { def, .. } => {
+                        crate::resolve::declaration(hirs, def).map(|d| d.kind)
+                    }
+                    Resolution::Unresolved | Resolution::Ambiguous(_) => None,
+                });
             // **A view composes** (ADR-0136): its markup is written into the
             // page where it is used, its parameters read as the props given.
             // What this slice composes: a view whose body is its markup alone,

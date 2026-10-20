@@ -281,7 +281,7 @@ fn a_session_keyed_carts_change_reaches_no_other_session() {
     for session in [&ada, &ben] {
         s.serve_document_settled(
             session,
-            "store.page.StorePage",
+            "store.page.StorePage~ui",
             &store_params(STORE_ID),
             &[],
         )
@@ -417,7 +417,7 @@ fn a_command_is_answered_for_the_reader_its_page_was_shown_to() {
     // A guest's page, pressed from its own session: it runs.
     s.serve_document_settled(
         "came-ada",
-        "store.page.StorePage",
+        "store.page.StorePage~ui",
         &store_params(STORE_ID),
         &[],
     )
@@ -458,8 +458,13 @@ fn a_command_is_answered_for_the_reader_its_page_was_shown_to() {
         );
     }
     // Ada's own page, read after the sign-in, runs.
-    s.serve_document_settled(&ada, "store.page.StorePage", &store_params(STORE_ID), &[])
-        .expect("served");
+    s.serve_document_settled(
+        &ada,
+        "store.page.StorePage~ui",
+        &store_params(STORE_ID),
+        &[],
+    )
+    .expect("served");
     let hers = latest(&s.pending.lock().expect("pending"), &ada).1;
     let answer = pressed_on(&s, &ada, Some(hers), "i-6");
     assert!(answer.contains("\"committed\":true"), "{answer}");
@@ -486,7 +491,7 @@ fn a_retry_of_a_press_that_committed_is_answered_from_what_was_kept() {
     };
     s.serve_document_settled(
         "came-ada",
-        "store.page.StorePage",
+        "store.page.StorePage~ui",
         &store_params(STORE_ID),
         &[],
     )
@@ -516,8 +521,13 @@ fn a_retry_of_a_press_that_committed_is_answered_from_what_was_kept() {
     assert!(fresh.starts_with("HTTP/1.1 403"), "{fresh}");
 
     // Ada's own page, its answer lost, then forgotten by the host.
-    s.serve_document_settled(&ada, "store.page.StorePage", &store_params(STORE_ID), &[])
-        .expect("served");
+    s.serve_document_settled(
+        &ada,
+        "store.page.StorePage~ui",
+        &store_params(STORE_ID),
+        &[],
+    )
+    .expect("served");
     let doc = latest(&s.pending.lock().expect("pending"), &ada);
     drop_after(&ada);
     assert_eq!(pressed_on(&s, &ada, Some(doc.1), "i-3"), "");
@@ -547,7 +557,7 @@ fn a_stale_press_is_refused_before_the_order_waits() {
     let s = store_with(provider.clone());
     s.serve_document_settled(
         "came-ada",
-        "store.page.StorePage",
+        "store.page.StorePage~ui",
         &store_params(STORE_ID),
         &[],
     )

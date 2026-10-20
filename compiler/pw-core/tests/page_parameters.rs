@@ -93,7 +93,7 @@ fn a_parameter_is_read_where_a_value_is_and_set_again_nowhere() {
     );
     assert_eq!(reported(&files), Vec::<String>::new());
     let b = build(&files).unwrap_or_else(|e| panic!("{e}"));
-    let plan = plan_of(&b, "feed.app.PostPage");
+    let plan = plan_of(&b, "feed.app.PostPage~ui");
     assert_eq!(plan.params, ["id"]);
     // A host sets nothing again for it: every part it sets again reads the
     // thread, no attribute and no handler's captures are among them.

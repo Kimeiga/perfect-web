@@ -126,7 +126,7 @@ test("after the resends its clause allows, the press fails and its line is taken
 
 test("a command that declares no retry is sent once", async ({ page }) => {
   // `demo.pick`'s `pick` is idempotent and declares no `retry`.
-  await page.goto("/page/demo.pick.PickPage?first=espresso&second=cortado");
+  await page.goto("/page/demo.pick.PickPage~ui?first=espresso&second=cortado");
   await page.waitForFunction(() => document.documentElement.dataset.pwReady === "1");
   let sent = 0;
   await page.route("**/command/demo.pick.pick", async (route) => {

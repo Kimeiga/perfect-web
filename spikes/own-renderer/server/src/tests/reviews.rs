@@ -11,7 +11,7 @@ use super::*;
 const ADD: &str = "store.page.add_to_cart";
 const PLACE: &str = "store.page.place_order";
 const RATE: &str = "store.rate.rate_order";
-const STORE_PAGE: &str = "store.page.StorePage";
+const STORE_PAGE: &str = "store.page.StorePage~ui";
 
 fn served() -> Served {
     served_from_patches_in("examples", |app| app.to_string(), &[])
@@ -561,10 +561,10 @@ fn the_checker_keeps_the_reader_out_of_a_stores_shared_ratings() {
 fn a_rating_is_told_to_the_raters_open_pages() {
     let s = served();
     delivered(&s, "a", &["espresso"]);
-    s.serve_document_settled("a", "store.page.OrderPage", &Params::new(), &[])
+    s.serve_document_settled("a", "store.page.OrderPage~ui", &Params::new(), &[])
         .expect("the order page");
     let order = latest(&s.pending.lock().expect("pending"), "a");
-    s.serve_document_settled("a", "store.rate.RatePage", &store_params("47"), &[])
+    s.serve_document_settled("a", "store.rate.RatePage~ui", &store_params("47"), &[])
         .expect("the rate page");
     let rating = latest(&s.pending.lock().expect("pending"), "a");
     let (o, r) = (sets_of(&s, &order).len(), sets_of(&s, &rating).len());

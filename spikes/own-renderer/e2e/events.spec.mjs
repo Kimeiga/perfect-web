@@ -9,7 +9,7 @@
 // - a form's submission is stopped in the listener, before any code loads.
 import { expect, test } from "@playwright/test";
 
-const PAGE = "/page/demo.events.EventsPage";
+const PAGE = "/page/demo.events.EventsPage~ui";
 
 async function ready(page) {
   await page.goto(PAGE);
