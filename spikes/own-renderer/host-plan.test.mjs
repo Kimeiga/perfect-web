@@ -6,7 +6,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createHash } from "node:crypto";
+import { spawn } from "node:child_process";
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import net from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -14,7 +16,7 @@ import {
   validateRegistry, listenersForSlots, portsForRole, rolesForTest, roleOfURL, buildProblem, buildState, servable,
   unservedSpecs, hostsReachedBy, hostAnnotationsIn,
 } from "./host-metadata.mjs";
-import { collectionArguments, serversForSelection, validatePlan } from "./host-plan.mjs";
+import { collectionArguments, ownedCommand, serversForSelection, validatePlan } from "./host-plan.mjs";
 import HostPlanReporter from "./host-plan-reporter.mjs";
 
 const clone = () => structuredClone(REGISTRY);
@@ -342,8 +344,9 @@ test("selected descriptors preserve memory identity blobs provider ports target 
       assert.equal(host.env.PORT, String(host.port));
     }
     const at = (port) => hosts.find((host) => host.port === port);
-    assert.ok(at(13241).command.startsWith(`'${root}/private-target/debug/kiokun-server'`) && !at(13241).command.includes("dist"));
-    assert.ok(hosts.filter((host) => host.port !== 13241).every((host) => host.command.startsWith(`'${root}/private-target/debug/pw-dev-server' '`)));
+    // Each host is run by the launcher that ends it with its owner.
+    assert.equal(at(13241).command, ownedCommand([`${root}/private-target/debug/kiokun-server`]));
+    assert.ok(hosts.filter((host) => host.port !== 13241).every((host) => host.command.startsWith(`${ownedCommand([`${root}/private-target/debug/pw-dev-server`])} '`)));
     for (const port of [13273, 13403, 13413]) assert.equal(at(port).env.PW_IDENTITY, "dev-accounts");
     assert.ok(hosts.filter((host) => ![13273, 13403, 13413].includes(host.port)).every((host) => host.env.PW_IDENTITY === undefined));
     assert.equal(at(13283).env.PW_BLOB_DIR, "dist-feed/blobs-13283");
@@ -438,5 +441,115 @@ test("public collection reporter publishes only one successful complete callback
 test("spec metadata imports cannot recurse through the Playwright config", () => {
   for (const file of specFiles()) {
     assert.doesNotMatch(readFileSync(new URL(file, SPECS), "utf8"), /from ["']\.\.\/playwright\.config\.mjs["']/);
+  }
+});
+
+// **A host ends with the process that started it** (`serve-while-owned.sh`).
+// Playwright stops its hosts as it ends, but a runner killed outright (a
+// recipe's bound) stops none, and each host, the leader of a process group of
+// its own, lived on holding its port. These tests run the launcher as
+// Playwright does, `sh -c` of the host's command with a pipe for its standard
+// input that the owner holds; the events they wait for are the host's own
+// word that it listens, its port refusing a connection, its exit.
+const NODE = process.execPath;
+// A host: listens on a port of the system's choosing, and says which.
+const LISTENER = 's=require("net").createServer(c=>c.end()).listen(0,"127.0.0.1",()=>console.log("listening "+s.address().port+" "+process.pid));';
+const CAP = 15000;
+
+// The host's command run as Playwright runs it, its input a pipe held here.
+function launched(command, options = {}) {
+  const child = spawn("/bin/sh", ["-c", command], { stdio: ["pipe", "pipe", "inherit"], ...options });
+  let text = "";
+  const heard = [];
+  child.stdout.on("data", (data) => { text += data; for (const waiting of heard) waiting(); });
+  const said = (pattern, what) => new Promise((accept, reject) => {
+    const timer = setTimeout(() => reject(new assert.AssertionError({ message: `${what}: never said ${pattern} (it said ${JSON.stringify(text)})` })), CAP);
+    const look = () => { const found = text.match(pattern); if (found) { clearTimeout(timer); accept(found); } };
+    heard.push(look);
+    look();
+  });
+  const exit = new Promise((accept) => child.once("exit", (code, signal) => accept({ code, signal })));
+  // Its exit, with a cap on a hang: a launcher that never ends fails here,
+  // and does not hold the run.
+  const exited = (what) => Promise.race([exit, new Promise((accept, reject) => {
+    setTimeout(() => reject(new assert.AssertionError({ message: `${what}: did not end within ${CAP} ms` })), CAP).unref();
+  })]);
+  return { child, said, exited, text: () => text };
+}
+const connects = (port) => new Promise((accept) => {
+  const socket = net.connect(port, "127.0.0.1");
+  socket.once("connect", () => { socket.destroy(); accept(true); });
+  socket.once("error", () => accept(false));
+});
+// Until `check` holds: the event itself, with a cap on a hang.
+async function until(check, what) {
+  const deadline = Date.now() + CAP;
+  while (!(await check())) {
+    if (Date.now() > deadline) assert.fail(`${what}: not within ${CAP} ms`);
+    await new Promise((accept) => setTimeout(accept, 10));
+  }
+}
+const gone = (pid) => { try { process.kill(pid, "SIGKILL"); } catch {} };
+
+test("a host's command passes each word to its host as it is", async () => {
+  const words = ["a b", "it's", "$HOME", "`id`", "*", ";echo no", "", "--flag=\"x\""];
+  const run = launched(ownedCommand([NODE, "-e", "console.log(JSON.stringify(process.argv.slice(1)))", ...words]));
+  try {
+    const seen = await run.said(/^(\[.*\])$/m, "the host");
+    assert.deepEqual(JSON.parse(seen[1]), words);
+    assert.equal((await run.exited("the launcher")).code, 0);
+  } finally { run.child.stdin.destroy(); }
+});
+
+test("a host's launcher keeps its host while its input is open and ends it when the input ends", async () => {
+  const run = launched(ownedCommand([NODE, "-e", LISTENER]));
+  let pid;
+  try {
+    // Up: the launcher did not end it as it started, with its input open.
+    const [, port, hostPid] = await run.said(/listening (\d+) (\d+)/, "the host");
+    pid = Number(hostPid);
+    assert.equal(await connects(Number(port)), true, "the host answers while its input is open");
+    run.child.stdin.end();
+    await run.exited("the launcher, its input ended");
+    await until(async () => !(await connects(Number(port))), "the host's port closing");
+  } finally { if (pid) gone(pid); }
+});
+
+test("a host's launcher ends with its host's status, whatever its input", async () => {
+  const run = launched(ownedCommand([NODE, "-e", "process.exit(7)"]));
+  try {
+    // The input stays open: the launcher does not wait for its end.
+    assert.equal((await run.exited("the launcher")).code, 7);
+  } finally { run.child.stdin.destroy(); }
+});
+
+test("a host's owner killed outright leaves its host listening nowhere", async () => {
+  // The owner is a process of its own that starts the host as Playwright
+  // does (a group of its own, a pipe for its input) and is then killed, as a
+  // recipe's bound kills a runner.
+  const owner = `const {spawn}=require("child_process");
+const host=spawn("/bin/sh",["-c",process.argv[1]],{detached:true,stdio:["pipe","pipe","inherit"]});
+host.stdout.on("data",(data)=>process.stdout.write(data));
+setInterval(()=>{},1e6);`;
+  let pid;
+  let owning;
+  try {
+    owning = spawn(NODE, ["-e", owner, ownedCommand([NODE, "-e", LISTENER])], { stdio: ["ignore", "pipe", "inherit"] });
+    let text = "";
+    const [, port, hostPid] = await new Promise((accept, reject) => {
+      const timer = setTimeout(() => reject(new assert.AssertionError({ message: `the host never said it listens (it said ${JSON.stringify(text)})` })), CAP);
+      owning.stdout.on("data", (data) => {
+        text += data;
+        const found = text.match(/listening (\d+) (\d+)/);
+        if (found) { clearTimeout(timer); accept(found); }
+      });
+    });
+    pid = Number(hostPid);
+    assert.equal(await connects(Number(port)), true, "the host listens while its owner lives");
+    owning.kill("SIGKILL");
+    await until(async () => !(await connects(Number(port))), "the host's port closing after its owner was killed");
+  } finally {
+    owning?.kill("SIGKILL");
+    if (pid) gone(pid);
   }
 });
