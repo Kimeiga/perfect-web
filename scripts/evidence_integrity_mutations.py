@@ -19,7 +19,10 @@ Each mutant undoes one piece:
    its staleness is read at the head and not in the tree here; and (the
    integrator's ruling 1 of 2026-10-17, train-10) a part's count held to its
    whole script's, a script's parts leaving a mutant to none or holding one
-   twice, or a part no recipe runs let be;
+   twice, or a part no recipe runs let be; and (2b, train-11, 2026-10-20) a
+   binary file's change is read as none: the diff's binaries not read, their
+   readers' lines not changes, a directory named whole, a placeholder, a
+   directory inside or ending in the binary's, or a record misread;
 3. a rejected fixture's `@rule` is its code as written
    (`checking_source.rs`): an alias, a retired code, a code its check does
    not report, or another code's invariant passes; R-004 names its alias
@@ -207,6 +210,13 @@ MUTANTS = [
         "            for s in []:\n                if s not in counted:\n",
     ),
     (
+        "a verdict that says what killed its mutant is read as none",
+        "plan",
+        COUNTS,
+        r'    r"^(.*): (KILLED(?: by [^()]+)? \(.*\)|SURVIVED' + "|",
+        r'    r"^(.*): (KILLED \(.*\)|SURVIVED' + "|",
+    ),
+    (
         "a suite's tag is taken as part of a mutant's name",
         "plan",
         COUNTS,
@@ -240,6 +250,65 @@ MUTANTS = [
         COUNTS,
         "            reach=lambda sha, head: set(plan.recipes_for(plan.hunks(sha, None), plan.NEAR, names)),\n",
         "            reach=lambda sha, head: set(plan.recipes_for(plan.hunks(sha, head), plan.NEAR, names)),\n",
+    ),
+    # 2b. A binary's change planned by what reads it (train-11, 2026-10-20:
+    # train-10's regenerated components planned nothing).
+    (
+        "a binary file's change is read as no change",
+        "plan",
+        PLAN,
+        "    return with_readers(parsed(diff), binaries(diff), head, root)\n",
+        "    return parsed(diff)\n",
+    ),
+    (
+        "the diff's binary files are not read",
+        "plan",
+        PLAN,
+        "    return sorted({m.group(2) or m.group(1) for m in BINARY.finditer(text)})\n",
+        "    return []\n",
+    ),
+    (
+        "a changed binary's readers are not changes",
+        "plan",
+        PLAN,
+        "        for path, lines in read_by(binary, head, root).items():\n",
+        "        for path, lines in {}.items():\n",
+    ),
+    (
+        "a binary's directory named whole does not name it",
+        "plan",
+        PLAN,
+        "        if not rest:\n            return True\n",
+        "        if not rest:\n            continue\n",
+    ),
+    (
+        "a placeholder names no file",
+        "plan",
+        PLAN,
+        r'        pattern = re.sub(r"\$\{[^}]*\}|\$\w+|\{[^}]*\}|%[sd]", "*", rest)' + "\n",
+        "        pattern = rest\n",
+    ),
+    (
+        "a directory in the binary's names it",
+        "plan",
+        PLAN,
+        '        if "/" in rest:\n            continue\n',
+        '        if "/" in rest:\n            return True\n',
+    ),
+    (
+        "another directory ending in the binary's names it",
+        "plan",
+        PLAN,
+        r'    for m in re.finditer(r"(?<![\w.-])" + re.escape(directory) + r"(?![\w.-])(/[-\w.*?{}$%\[\]/]*)?", text):'
+        + "\n",
+        r'    for m in re.finditer(re.escape(directory) + r"(?![\w.-])(/[-\w.*?{}$%\[\]/]*)?", text):' + "\n",
+    ),
+    (
+        "a record reads a binary",
+        "plan",
+        PLAN,
+        "        if not number.isdigit() or path == binary or path.startswith(RECORDS):\n",
+        "        if not number.isdigit() or path == binary:\n",
     ),
     # 3. The corpus's headers.
     (

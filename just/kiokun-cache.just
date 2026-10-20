@@ -1,7 +1,7 @@
-# ADR-XXXX: private SQLite disk-cache concurrency/publication/lifetime.
+# ADR-0358: private SQLite disk-cache concurrency/publication/lifetime.
 e14-kiokun-cache:
     @mkdir -p docs/evidence/E14
-    @{ echo "ADR-XXXX - Kiokun cache publication and reader lifetime"; echo; \
+    @{ echo "ADR-0358 - Kiokun cache publication and reader lifetime"; echo; \
        echo "produced by: just e14-kiokun-cache"; \
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' || echo ' + uncommitted changes')"; \
        echo "rust: $(rustc --version)"; echo; \

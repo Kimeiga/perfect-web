@@ -1,4 +1,4 @@
-# ADR-XXXX: a browser run starts only the hosts its selected tests need (the host map)
+# ADR-0356: a browser run starts only the hosts its selected tests need (the host map)
 
 Status: proposed by track browser-host-map for train-11, unnumbered; the
 integrator numbers it. Date: 2026-10-19. Milestone: E14, the evidence's own
@@ -271,7 +271,7 @@ CI's per-host time is not measured here; train-11's verify will show it.
 3. The registry shared with the allocator: the host map merges first; the
    allocator's copy is the same bytes.
 4. The stale components: fixed in the train before this merge
-   (ADR-XXXX-the-committed-components-are-the-builds.md).
+   (ADR-0355-the-committed-components-are-the-builds.md).
 
 ## What to do next
 
@@ -284,3 +284,15 @@ CI's per-host time is not measured here; train-11's verify will show it.
   15 s, before a loaded runner meets its 60 s bound.
 - If UI or watch mode is wanted with the host map, start every servable host
   for it (the base's behaviour) rather than refuse.
+
+## Numbered on train-11 (2026-10-20)
+
+- **Numbered ADR-0356** (the integrator's ruling of 2026-10-20: a train is
+  numbered before it is pushed, after master's ADR-0353, in train order),
+  merged from `78f90684` (`track/browser-host-map-train11`). `ADR-XXXX`
+  reads `ADR-0356` in `just/browser-host-map.just` (its recipe's header line
+  too), `browser_host_map_mutations.py`, `browser_host_map_timing.py`,
+  `ci_plan.py`, the tests `test_browser_host_map.py`,
+  `test_builds_before_suites.py` and `test_ci_scripts.py`,
+  `host-metadata.mjs`, `host-plan.mjs`, and the header of its two evidence
+  files, as in this file's name and title.

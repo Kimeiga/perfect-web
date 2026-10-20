@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Mutation controls for a mutation script's mutants run in parallel slots
-(`mutation_slots.py`, ADR-XXXX).
+(`mutation_slots.py`, ADR-0357).
 
 Each mutant undoes one thing the slots do: the tree never mutated (the
 script's loop run in the tree, or the tree's copy of the script run in a
@@ -407,7 +407,10 @@ MUTANTS += [
      "            pass\n"),
 ]
 BOUND = 900
-CLEANUP_SHA256 = "8facb4097ca6d8bc363804b3de6e88d273ff10b77bd9ff0980da60722b92a0fa"
+# The reviewed source's SHA-256. Train-11's numbering (b18b704e) changed only
+# its first line, the ADR's placeholder to ADR-0357; reviewed again so
+# (8facb409... before).
+CLEANUP_SHA256 = "f9b98537d0ece843c5e5cf19b8e4ab2e5b71016fe389583f2eb0642d22f5960b"
 _CLEANUP = None
 FROZEN = {}
 EVIDENCE = None

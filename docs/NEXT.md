@@ -39,6 +39,29 @@ The next executable tasks, in order, with acceptance criteria. Charter §3.4.
     here.
   - Its scripts and traces are beside the report.
 
+- **Every committed component held to the compiler, its list derived
+  from the build** (train-10's landing; train-11). `evidence_is_current`
+  lists 14 of the 20 by hand, and three went stale unseen on train-10
+  while 107 server tests ran them (regenerated before it landed). With a
+  control that leaves one out. And the planner and the evidence fetch
+  read a binary file's change (`git diff -U0` gives none a `+++` line),
+  so a component's change plans the recipes whose tests read it.
+- **A Chromium timeout in `scheduled-orders.spec.mjs`, open** (train-10's
+  third verify, 39131257549: `e10-browser` run 2 of 3, the test "an order
+  for a time is paid now...", `page.waitForURL` past the test's 30 s).
+  Once in about 12 Chromium runs of the test on CI, in no other engine,
+  and in none of 40 on the PC; the dispatch after it passed. The spec now
+  names its own failure in the run's log: its step, where the page was,
+  the runtime's and the host's last lines (`pw-record`). At its next
+  failure, read those lines and find the cause; it is not re-run until it
+  passes.
+- **A failing browser run's trace is lost when a passing run follows**
+  (train-10's finding). CI keeps a failing test's trace in
+  `spikes/own-renderer/test-results/` and uploads that directory once, at
+  the shard's end; `run_suite.sh --runs N` and every later Playwright run
+  in the shard clear it first. Keep each failing run's output outside it,
+  and upload it too (a small track).
+
 - ADR-0347: split scheduling's when_said from Checkout so an estimator
   outage degrades that line alone; offer delivery-streamed times. The
   current chosen-time checkout and times page both wait on the estimator.

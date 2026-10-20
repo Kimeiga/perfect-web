@@ -1,4 +1,4 @@
-ADR-XXXX - Kiokun cache publication and reader lifetime
+ADR-0358 - Kiokun cache publication and reader lifetime
 
 produced by: just e14-kiokun-cache
 commit: 7ec6a5342acb27a4c5b498d365e88fb3a6b9668a + uncommitted changes

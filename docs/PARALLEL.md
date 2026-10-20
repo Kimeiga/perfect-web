@@ -2200,3 +2200,159 @@ Each a decision for a track, with its date; a track's ADR records it too.
       Their assertions are unchanged. Chromium and Firefox still navigate
       at once: ADR-0306's finding 2 was found by such a `goto`. The owner
       has an upstream report to file, which this train does not post.
+  - **The third verify, 39131257549 (on `ddaeeb1d`), did not pass.** 206
+    recipes on 40 shards and the three engines; 205 green, every mutant of
+    theirs killed. The three browser jobs passed, WebKit's among them, and
+    WebKit passed in each of `e10-browser`'s three runs: the settle held.
+    `e10-browser` failed one Chromium test in run 2 of 3, below. Its ci,
+    39131257548, passed (`check_latency` 321.67 ms a thousand lines on
+    ARM, 262.04 on x86).
+
+- **2026-10-19, train-10 landed** (`track/train-10`, verify 39131257549 and
+  three dispatches: 39270030023 for the ten recipes its spec changes reach,
+  39325789224 for the 72 recipes whose server tests read the store's
+  regenerated hours components, and 39364245453 for the count check its
+  landing fixed): the merges and fixes of the entry above.
+  - **Corrections first.**
+    - **The train's server tests ran stale components.** The committed
+      `store.hours.StoreStatus`, `StoresOpen` and `CartHours` components
+      (`docs/evidence/E10/`) were not what the compiler builds at the
+      train's head (the host-map worker's finding). `evidence_is_current`
+      holds 14 of the 20 committed components to the compiler, by a list
+      kept by hand, and not these three; master's nightly (39259943428, at
+      `32757966`) found master's copies current, so train-10's merges made
+      them stale, and no one ran `just e10-component` on the train. The
+      development server's unit tests run the committed components
+      (`Server::on`), and the store page's committed plan reads
+      `StoreStatus`. Measured with a hook that records each component a
+      test's server reads (local, not committed), each server test alone on
+      each layer: 107 of 620 read one of the three, PostgreSQL's
+      statement-count pins among them. So the train's verify recorded those
+      tests, and the recipes that run them, against the old code.
+      Regenerated before landing (`8c5618c8`, by `just e10-component`: byte
+      for byte what the third verify's `e10-component` wrote); with them the
+      server's whole suite passed on each layer (620 passed, 9 ignored), and
+      the 72 recipes that run those tests ran again by dispatch. **And the
+      planner could not see it**: `git diff -U0` prints no `+++` line for a
+      binary file, so `ci_plan.hunks`, and the fetch's stale check, read no
+      change to a component; the 72 were chosen by hand from the measured
+      tests and each recipe's test filters (58 of the train's verify, 14
+      beside it). `e10-browser` and `e14-accessibility` only build the
+      server, whose running host reads its build's own components, and
+      the server tests `e14-refusal` and `e14-refusal-2` run read none of
+      the three. `e10-load`, local only, reads them too; its record, from
+      `bff437c6`, is not made again here. NEXT holds both (train-11: the
+      list derived from the build, with a control).
+    - **And the landing's own gate found a check that could not read the
+      guide's verdicts.** `evidence_counts.py` (ADR-0344) read a verdict only
+      as `KILLED (...)`; the guide's script (ADR-0343, train-9) says what
+      killed each mutant (`KILLED by the checker (PW5048)`), so the guide's
+      evidence named none of its 74 mutants, and `just evidence-gates`
+      failed once the fetch made that evidence current. At the head it was
+      excused: the committed file, train-9's run, was stale and a train's
+      push plans it again. The two met in this check at the master merge;
+      each was green alone. `e9bad0c1`: a verdict may say what killed it,
+      with a test and a control (`evidence_integrity_mutations.py`, 43 of
+      43); `e14-evidence-integrity` ran again by dispatch (39364245453).
+    - **The WebKit failures were the browser's, not a flake and not the
+      train's code.** The first two verifies' WebKit failures were
+      WebKitGTK's network process crashing, a use-after-free in libsoup
+      3.x's send path (the entry above), not a session's turn held across
+      the store page's rebuild, the integrator's first reading; and the
+      400 ms estimate is master's. In WebKit the two specs let the page
+      settle before they navigate again (`ddaeeb1d`). The owner has an
+      upstream report to file (the handoff's
+      `tracks/train-10-webkit/upstream-report.md`); nothing is posted from
+      here, and NEXT holds the track that finds what in our traffic trips
+      it.
+    - **The third verify's one failure was Chromium's, in a spec of this
+      train.** `e10-browser`'s run 2 of 3: `scheduled-orders.spec.mjs:74`
+      ("an order for a time is paid now, says when, and is placed when its
+      store is told"), `page.waitForURL: Test timeout of 30000ms exceeded`;
+      the file's second test did not run (a serial file). It failed 1 of
+      about 12 Chromium runs of the test on CI, none in Firefox or WebKit,
+      and 0 of 40 on the PC. Which of the test's waits timed out, and why,
+      its record did not say. The dispatch after it passed the spec in
+      every engine; its cause is open (NEXT).
+    - **Its trace was lost, as any failure's is that a passing run
+      follows.** CI keeps a failing test's trace (`retain-on-failure`) in
+      `spikes/own-renderer/test-results/`, and uploads that directory once,
+      at the shard's end. `e10-browser`'s three runs (`run_suite.sh --runs
+      3`), and each later Playwright run in the shard, clear it first. The
+      shard's artifact (`traces-23`, downloaded with the owner's approval)
+      held only a mutation control's intended stable-layout failures. To
+      do (NEXT): keep each failing run's output outside `test-results/`,
+      and upload it too.
+  - **The spec names its own failure now** (`587657ff`; no assertion
+    changed, no timeout raised). Its steps are named (`test.step`). A
+    press's navigation that does not come fails at once in the page's own
+    words where the page says why (its notice, the platform's refusal by
+    the press, a handler's error); otherwise, bounded by what is left of
+    the test's time, with where the page is and its runtime's last lines.
+    A failure attaches the runtime's log and the host's records of the
+    document shown (`/bench/records`, as `feed.spec.mjs` keeps them), and
+    prints their latest lines into the run's log, so a recurrence explains
+    itself without its trace. `c0bc0033` says at each WebKit wait why
+    Chromium and Firefox still navigate at once.
+  - **Its runs.**
+    - 39131257549, the third verify (above): 45 jobs; 206 recipes on 40
+      shards, 8 of them on PostgreSQL; 5 h 45 min. The longest shard,
+      `recipes 13`, took 5 h 1 min; the longest recipe,
+      `e14-store-accounts`, 15,924 s.
+    - 39270030023 (on `587657ff`), by the precedent of train-6's landing:
+      the ten recipes `ci_plan.py --changed ddaeeb1d 587657ff` plans, each
+      a shard of its own, two on PostgreSQL, and the three engines' suites:
+      "10 recipes, 0 failed", 15 jobs, 5 h 17 min (`e10-browser` 3,087 s
+      in its three runs; `e14-refusal` 15,730 s, twice the third verify's
+      7,806). The push's own verify (39269996132) was cancelled for it; its
+      ci, 39269996170, passed each of its 3 jobs (`check_latency` 328.23
+      ms a thousand lines on ARM, 244.76 on x86).
+    - 39325789224 (on `8c5618c8`): the 72 recipes, on 30 shards, seven of them
+      on PostgreSQL, and the three engines' suites: "72 recipes, 0 failed", 35
+      jobs, 4 h 25 min; its longest shard, `recipes 24 on PostgreSQL`
+      (`e14-store-accounts`, 15,656 s), 4 h 24 min. The push's own verify
+      (39325755958) was cancelled for it; its ci, 39325755917, passed each of
+      its 3 jobs.
+    - 39364245453 (on `e9bad0c1`): `e14-evidence-integrity`, its 43 controls
+      all killed in 1,574 s, and the three engines' suites, 6 jobs, all green
+      in 29 min. The push's own verify (39364199312) was cancelled for it; its
+      ci, 39364199325, passed each of its 3 jobs. The first attempt of each,
+      the dispatch's and the ci's, was cancelled by the repository's move
+      (below), not by a failure, and the integrator ran both again; their
+      second attempts are the record.
+    - **The repository moved** (the owner's request, 2026-10-20 04:12Z):
+      `Kimeiga/perfect-web` is `studiokimeiga/perfect-web`, an organization
+      on GitHub's Team plan (60 jobs at once). The evidence fetched for this
+      landing names its runs there; GitHub redirects the old addresses that
+      older evidence names.
+    - The memory bound stopped one process, as in each run of the recipe
+      since 2026-10-09: `e14-graphs-on-the-wire`'s "the renderer takes a
+      node twice", the mutant `mutation_bound.py` was written for (killed,
+      2 of 20 tests failing, perhaps by the bound alone).
+  - **The evidence**, fetched before any document was edited. 39131257549's,
+    at `ddaeeb1d` (`--any-commit --known summary`), refused as stale the files
+    of the ten recipes the train's later commits reach by the planner's rule:
+    the nine its two spec commits reach (`e14-accessibility`, `e14-home`,
+    `e14-orders`, `e14-pages`, `e14-refusal`, `e14-refusal-2`,
+    `e14-scheduled-orders`, `e14-store-accounts`, `e14-titles`) and
+    `e14-evidence-integrity`, which the count fix reaches; and it did not copy
+    `e10-browser`'s, whose recipe failed. With those ten and the 58 of its
+    recipes whose server tests read the components skipped (62 in all), it
+    copied 143 files, 1,506 of 1,506 mutants killed. 39270030023's, at
+    `587657ff`, copied the files of its four recipes that read none of the
+    components (`e10-browser`, `e14-accessibility`, `e14-refusal`,
+    `e14-refusal-2`): 44 of 44. 39325789224's, at `8c5618c8`, copied 72: 1,137
+    of 1,137. 39364245453's, at `e9bad0c1`, copied `e14-evidence-integrity`'s:
+    43 of 43. In all 217 files changed, four of them new to the tree
+    (`e14-argument-invariants`, `e14-each-head-effects`, `e14-refusal-2`,
+    `e14-scheduled-orders`), 2,730 of 2,730 mutants killed over 209 of them,
+    and `scripts/ci_seconds.json` holds each recipe's latest seconds.
+  - **Its local runs** (the PC, WSL2, with other agents' runs beside, at loads
+    of 3 to 82). `just ci` on `587657ff`, `8c5618c8` and `e9bad0c1`, green:
+    346 test binaries, 3,065 tests passed, none failed, 25 ignored;
+    `check_latency` 194.13 ms a thousand lines on `587657ff`. The
+    scheduled-orders spec at `587657ff`, one worker, three times in each
+    engine: 18 passed. (Five times with parallel workers it failed 12: the
+    repeats shared each engine's one host, whose clock moves only forward. The
+    spec's design, not a defect; the new `pw-record` lines printed at each
+    failure.)

@@ -3,7 +3,7 @@
 # evidence recipe is `e14-<name>:`, writes `docs/evidence/E14/<name>.txt`, and
 # is planned by the verification run like any other.
 
-# Track `ci-diagnostics` (ADR-XXXX): a failing browser run's trace is kept
+# Track `ci-diagnostics` (ADR-0359): a failing browser run's trace is kept
 # where the next run does not clear it (scripts/keep_traces.py, called by
 # scripts/run_suite.sh and by a red mutation baseline), bounded in size, and
 # uploaded by verify.yml, a mutation control's intended failures not among

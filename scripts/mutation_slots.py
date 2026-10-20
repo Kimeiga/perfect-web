@@ -1,4 +1,4 @@
-"""**A mutation script's mutants, run in parallel slots** (ADR-XXXX).
+"""**A mutation script's mutants, run in parallel slots** (ADR-0357).
 
 Each mutation script applies one mutant at a time in place, rebuilds, runs
 its tests and restores: `store_accounts_mutations.py` took 37 minutes on a

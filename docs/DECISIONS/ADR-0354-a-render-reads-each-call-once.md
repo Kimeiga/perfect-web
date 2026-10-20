@@ -1,4 +1,4 @@
-# ADR-XXXX: a render reads each call once, in one snapshot, in a bounded few seats
+# ADR-0354: a render reads each call once, in one snapshot, in a bounded few seats
 
 Status: proposed by the render-merge worker, NEXT 4c's first step (track
 `render-merge`), under the owner's delegation of 2026-10-02. Dates:
@@ -443,3 +443,10 @@ with a test and mutation controls the tests kill:
 - The commits after the merge with train-9 were rewritten before any push
   (the pre-rewrite head is the local tag `render-merge-before-squash`, the
   same tree).
+
+## Numbered on train-11 (2026-10-20)
+
+- **Numbered ADR-0354** (the integrator's ruling of 2026-10-20: a train is
+  numbered before it is pushed, after master's ADR-0353, in train order),
+  merged from `117803bf` (`track/render-merge`). `ADR-XXXX` reads `ADR-0354`
+  in `just/render-merge.just`, as in this file's name and title.

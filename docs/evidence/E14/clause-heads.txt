@@ -1,8 +1,8 @@
 ADR-0216 - every clause belongs to a declaration that reads it, and a code body admits none
 
 produced by: just e14-clause-heads
-commit: e2a4acd960c88144e3b40e7a6e9d9b8bd774ee1a
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38909882781 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: ddaeeb1dfba9630371b7dd5b127c23855d245c74
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39131257549 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the rule (compiler/pw-core/tests/clause_places.rs)
@@ -17,17 +17,17 @@ test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 == the store, kiokun and the accepted corpus
 
-pw check: 55 file(s), no diagnostics
+pw check: 56 file(s), no diagnostics
 pw check: 27 file(s), no diagnostics
-pw check: 85 file(s), no diagnostics
+pw check: 90 file(s), 0 error(s), 1 warning(s)
 
 == mutation controls (scripts/clause_heads_mutations.py)
 
-baseline: 24 passed, 0 failed
-a head with no place fails open: KILLED (2 of 24 tests fail)
-a cached read's heads belong to a command too: KILLED (1 of 24 tests fail)
-`retry` belongs to a function too: KILLED (1 of 24 tests fail)
-a code body admits clauses: KILLED (1 of 24 tests fail)
-no feasible placement speaks over the declared placement's refusal: KILLED (1 of 18 tests fail)
+baseline: 26 passed, 0 failed
+a head with no place fails open: KILLED (2 of 26 tests fail)
+a cached read's heads belong to a command too: KILLED (1 of 26 tests fail)
+`retry` belongs to a function too: KILLED (1 of 26 tests fail)
+a code body admits clauses: KILLED (1 of 26 tests fail)
+no feasible placement speaks over the declared placement's refusal: KILLED (1 of 20 tests fail)
 5 of 5 mutants killed
 memory bound: no process was stopped

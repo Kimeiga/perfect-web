@@ -1,8 +1,8 @@
 ADR-0192 - the stores, as the home page
 
 produced by: just e14-home
-commit: e2a4acd960c88144e3b40e7a6e9d9b8bd774ee1a
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38909882781 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 8c5618c86eeb62202be29b374661962175bfefb0
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39325789224 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
@@ -10,20 +10,20 @@ playwright: Version 1.58.0
 == the development server (pw-dev-server)
 
 test tests::the_stores_are_the_home_page ... ok
-test result: ok. 586 passed; 0 failed; 9 ignored; 0 measured; 0 filtered out; finished in 1511.19s
+test result: ok. 620 passed; 0 failed; 9 ignored; 0 measured; 0 filtered out; finished in 1610.96s
 
 == the home page, in three engines (e2e/pages.spec.mjs, e2e/accessibility.spec.mjs)
 
-  ✓  2 [chromium] › e2e/accessibility.spec.mjs:210:1 › the home page keeps every rule (1.9s)
+  ✓  2 [chromium] › e2e/accessibility.spec.mjs:256:1 › the home page keeps every rule (1.9s)
   ✓  1 [chromium] › e2e/pages.spec.mjs:114:1 › the stores are the home page, each a link to its own (2.3s)
-  ✓  3 [chromium] › e2e/pages.spec.mjs:128:1 › the home page counts the session's cart as it changes (1.7s)
-  ✓  4 [firefox] › e2e/accessibility.spec.mjs:210:1 › the home page keeps every rule (4.2s)
-  ✓  5 [firefox] › e2e/pages.spec.mjs:114:1 › the stores are the home page, each a link to its own (2.9s)
-  ✓  6 [firefox] › e2e/pages.spec.mjs:128:1 › the home page counts the session's cart as it changes (1.5s)
-  ✓  8 [webkit] › e2e/pages.spec.mjs:114:1 › the stores are the home page, each a link to its own (5.4s)
-  ✓  7 [webkit] › e2e/accessibility.spec.mjs:210:1 › the home page keeps every rule (5.9s)
-  ✓  9 [webkit] › e2e/pages.spec.mjs:128:1 › the home page counts the session's cart as it changes (1.4s)
-  9 passed (6.5m)
+  ✓  3 [chromium] › e2e/pages.spec.mjs:128:1 › the home page counts the session's cart as it changes (1.6s)
+  ✓  4 [firefox] › e2e/accessibility.spec.mjs:256:1 › the home page keeps every rule (3.4s)
+  ✓  5 [firefox] › e2e/pages.spec.mjs:114:1 › the stores are the home page, each a link to its own (2.5s)
+  ✓  6 [firefox] › e2e/pages.spec.mjs:128:1 › the home page counts the session's cart as it changes (1.3s)
+  ✓  8 [webkit] › e2e/pages.spec.mjs:114:1 › the stores are the home page, each a link to its own (2.2s)
+  ✓  7 [webkit] › e2e/accessibility.spec.mjs:256:1 › the home page keeps every rule (3.5s)
+  ✓  9 [webkit] › e2e/pages.spec.mjs:128:1 › the home page counts the session's cart as it changes (1.5s)
+  9 passed (5.8m)
 
 == mutation controls (scripts/home_mutations.py)
 

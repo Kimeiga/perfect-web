@@ -1,9 +1,9 @@
-# The browser host map's recipes (ADR-XXXX): which development servers a
+# The browser host map's recipes (ADR-0356): which development servers a
 # browser run starts. The root justfile imports this file; an evidence recipe
 # is `e14-<name>:`, writes `docs/evidence/E14/<name>.txt`, and is planned by
 # the verification run like any other.
 
-# ADR-XXXX: each browser run starts only the hosts its selected tests need,
+# ADR-0356: each browser run starts only the hosts its selected tests need,
 # by the map of the suite's hosts (spikes/own-renderer/host-registry.json,
 # host-metadata.mjs), the selection asked of Playwright itself
 # (host-plan.mjs). The map held to every spec, the registry, the build
@@ -17,7 +17,7 @@ e14-browser-host-map:
     @bash spikes/own-renderer/feed.sh > /dev/null
     @cargo build --quiet --locked -p pw-dev-server
     @mkdir -p docs/evidence/E14
-    @{ echo "ADR-XXXX - the browser host map: a run starts only the hosts its selected tests need"; echo; \
+    @{ echo "ADR-0356 - the browser host map: a run starts only the hosts its selected tests need"; echo; \
        echo "produced by: just e14-browser-host-map"; \
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
        echo "node: $(node --version)"; \

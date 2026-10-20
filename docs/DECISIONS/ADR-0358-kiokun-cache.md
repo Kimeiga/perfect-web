@@ -1,4 +1,4 @@
-# ADR-XXXX: Kiokun search cache publication and reader lifetime
+# ADR-0358: Kiokun search cache publication and reader lifetime
 
 Status: accepted under the integrator's delegated ruling, 2026-10-16.
 Track: `kiokun-cache`. Base: `7ec6a5342acb27a4c5b498d365e88fb3a6b9668a`.
@@ -125,3 +125,12 @@ only private CSV/cache paths. The final CI driver removes `KIOKUN_DATA` and
 `KIOKUN_APP` from its child environment after setup. No external checkout is
 inspected, read, changed or stopped. Browser host isolation is a separate
 queued assignment; no browser isolation guarantee is made here.
+
+## Numbered on train-11 (2026-10-20)
+
+- **Numbered ADR-0358** (the integrator's ruling of 2026-10-20: a train is
+  numbered before it is pushed, after master's ADR-0353, in train order),
+  merged from `3019936e` (`track/kiokun-cache`'s own commit, cherry-picked).
+  `ADR-XXXX` reads `ADR-0358` in `just/kiokun-cache.just` (its recipe's
+  header line too), ADR-0314's amendment, and its evidence's header and
+  validation note, as in this file's name and title.

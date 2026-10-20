@@ -315,7 +315,7 @@ class BuildsBeforeSuites(unittest.TestCase):
         self.assertEqual(found, [], "\n".join(found))
 
 
-# Since the host map (ADR-XXXX) the configuration asks `buildProblem`
+# Since the host map (ADR-0356) the configuration asks `buildProblem`
 # (`host-metadata.mjs`) of `dist` where a selected test needs it, and refuses
 # what it says; it is asked here without Playwright. The planner's refusal
 # itself is `host-plan.test.mjs`'s.
