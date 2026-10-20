@@ -48,9 +48,10 @@ disagree, the charter wins.
 | `docs/RISK_REGISTER.md` | Live risks with fallbacks. |
 | `docs/ARCHITECTURE.md` | How the pieces fit today and where they are going. |
 | `docs/SEMANTICS.md` | The language/platform semantics being validated. |
+| `docs/GLOSSARY.md` | The project's own terms (track, train, evidence of record, set read, ...) mapped to standard ones. |
 | `docs/BENCHMARKS.md` | Measured results with reproduction metadata. |
-| `docs/milestones/M*.md` | Per-milestone question, gate, and measured result. |
-| `docs/evidence/M*/` | Raw command output backing each gate claim. |
+| `docs/milestones/E*.md` | Per-milestone question, gate, and measured result. |
+| `docs/evidence/E*/` | Raw command output backing each gate claim. |
 
 ## Commands
 
