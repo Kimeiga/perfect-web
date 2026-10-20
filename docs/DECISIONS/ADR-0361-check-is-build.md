@@ -1,4 +1,4 @@
-# ADR-XXXX: check and build validate one executable program
+# ADR-0361: check and build validate one executable program
 
 Status: implemented; on train-11's base as `track/check-is-build-train11`
 (2026-10-19, the next section). The integrator approved the ownership design
@@ -1092,3 +1092,12 @@ exactly one executed test, generated report SHA256
 six-row/header-only diff, then run the same test without write permission.
 This ruling precedes the evidence write. Refreeze the amended inputs and run
 the complete unchanged 50+8 rosters and fresh default CI before any checkpoint.
+
+## Numbered on train-11 (2026-10-20)
+
+- **Numbered ADR-0361** (the integrator's ruling of 2026-10-20: a train is
+  numbered before it is pushed, after the train's first seven, in train
+  order), merged from `0c8d0c1e` (`track/check-is-build-train11`).
+  `ADR-XXXX` reads `ADR-0361` in its validation index's scope
+  (`docs/evidence/E14/check-is-build-validation-index.json`), as in this
+  file's name and title.

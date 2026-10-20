@@ -1,4 +1,4 @@
-# ADR-XXXX: guide mutation kills require valid producer outcomes
+# ADR-0362: guide mutation kills require valid producer outcomes
 
 Status: locally complete and validated; integrator owns landing/numbering (2026-10-16).
 Parent: the reviewed evidence-integrity/check-is-build work. No diagnostic code,
@@ -272,3 +272,10 @@ with the control that empty binaries alone are no result. `just/guide-producer.j
 is imported by the justfile, so `e14-guide-producer` is a recipe the verify
 plans and records.
 
+## Numbered on train-11 (2026-10-20)
+
+- **Numbered ADR-0362** (the integrator's ruling of 2026-10-20: a train is
+  numbered before it is pushed, after the train's first seven, in train
+  order), merged from `6abc09f3` (`track/guide-producer-validity`).
+  `ADR-XXXX` reads `ADR-0362` in nothing else (the placeholder was this
+  file's name and title only), as in this file's name and title.

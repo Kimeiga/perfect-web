@@ -1,5 +1,5 @@
 {
-  "scope": "Retained whole-campaign results across checkpoints; historical source/environment qualifications are in ADR-XXXX-check-is-build. This does not assert all campaigns ran at the final source commit.",
+  "scope": "Retained whole-campaign results across checkpoints; historical source/environment qualifications are in ADR-0361-check-is-build. This does not assert all campaigns ran at the final source commit.",
   "tested_source_checkpoint": "d74e29ffe11cdbc382fcf99f4bcd892f28bc4bec",
   "full_ci4": {
     "head": "30f7e670f0b880153481bf7d83335e1ef1ae370d",
