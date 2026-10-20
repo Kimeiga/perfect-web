@@ -246,6 +246,56 @@ class Plan(unittest.TestCase):
         self.assertFalse(plan.names_module("pw_core::csp::Needs", "csp"))
         self.assertTrue(plan.names_module('"csp::", "tests::page_policy::"', "csp"))
 
+    def test_root_test_changes_reach_the_package_test_consumers(self) -> None:
+        # Crate roots do not contribute `main::` or `lib::` to a test name.
+        # Select the package conservatively, including bare-name filters.
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            (root / "sample/src").mkdir(parents=True)
+            (root / "scripts").mkdir()
+            (root / "sample/Cargo.toml").write_text('[package]\nname = "sample-crate"\n')
+            source = 'fn production() {}\n#[cfg(test)]\nmod tests {\n    #[test]\n    fn witness() {}\n}\n'
+            (root / "sample/src/main.rs").write_text(source)
+            (root / "scripts/root_mutations.py").write_text(
+                'COMMAND = ["cargo", "test", "-p", "sample-crate", "witness"]\nMUTANTS = []\n'
+            )
+            (root / "scripts/other_mutations.py").write_text(
+                'COMMAND = ["cargo", "test", "-p", "other-crate"]\nMUTANTS = []\n'
+            )
+            bodies = {
+                "direct": "cargo test --package=sample-crate witness",
+                "workspace": "cargo test --workspace",
+                "script": "python3 scripts/root_mutations.py",
+                "other": "cargo test -p other-crate witness",
+                "prefix": "cargo test -p sample-crate-extra witness",
+            }
+            with mock.patch.object(plan, "ROOT", root), mock.patch.object(plan, "bodies", return_value=bodies), mock.patch.object(plan, "justfile_parts", return_value=[]):
+                for name in ("main.rs", "lib.rs"):
+                    path = f"sample/src/{name}"
+                    (root / path).write_text(source)
+                    changed = {path: [(5, 5)]}
+                    with self.subTest(source=name):
+                        self.assertEqual(plan.touched_scripts(changed, 0), {"root_mutations.py"})
+                        self.assertEqual(plan.recipes_for(changed, 0, list(bodies)), ["direct", "script", "workspace"])
+                        self.assertEqual(plan.touched_scripts({path: [(1, 1)]}, 0), set())
+
+    def test_python_test_changes_reach_scripts_and_direct_recipes(self) -> None:
+        path = "scripts/tests/test_ci_scripts.py"
+        changed = {path: [(1, 1)]}
+        self.assertIn("evidence_integrity_mutations.py", plan.touched_scripts(changed, 0))
+        self.assertIn("e14-evidence-integrity", plan.recipes_for(changed, 0, plan.recipes()))
+        bodies = {
+            "path": f"python3 -m unittest {path}",
+            "module": "python3 -m unittest scripts.tests.test_ci_scripts.Plan",
+            "discovery": "python3 -m unittest discover -s scripts/tests -p test_ci_scripts.py",
+            "other": "python3 -m unittest scripts/tests/test_ci_scripts_extra.py",
+            "other-module": "python3 -m unittest scripts.tests.test_ci_scripts_extra",
+        }
+        with mock.patch.object(plan, "bodies", return_value=bodies):
+            self.assertEqual(plan.recipes_for(changed, 0, list(bodies)), ["discovery", "module", "path"])
+        unknown = {"scripts/tests/test_nobody_runs_this.py": [(1, 1)]}
+        self.assertEqual(plan.touched_scripts(unknown, 0), set())
+
     def test_a_changed_browser_spec_reaches_the_scripts_and_recipes_that_run_it(self) -> None:
         # ADR-0281: a spec a script runs is its test, as a Rust test file is;
         # a change to `accessibility.spec.mjs` planned nothing before.
