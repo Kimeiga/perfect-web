@@ -189,7 +189,7 @@ and merge to master; its numbered ADR records the decision and remaining limits.
 *Project term.* ≈ vacuous-pass check. A guard showing a check did not pass by checking nothing: `suite_status.py` requires as many browser-suite invocations recognised as appear in the recipes, and at least one; `mutant-programs` requires every mutant of a `.pw` source to stay a well-typed program. [suite_status.py], [mutant_programs.py].
 
 ### number an ADR
-*Project term.* The [integrator](#integrator) replacing `ADR-XXXX` with the next number in the ADR's file name, title and every mention in code, tests, recipes and evidence. That rewrites lines recipes read, so the order is merge, resolve, [evidence-fetch](#evidence-fetch), then number. [ADR-0281], [PARALLEL.md: branches].
+*Project term.* The [integrator](#integrator) replacing `ADR-XXXX` with the next number in the ADR's file name, title and every mention in code, tests, recipes and evidence. That can rewrite inputs recipes read. A train is numbered before publication; final verification and [evidence currentness](#current) must cover the numbered inputs. Fetch only eligible reports through [evidence-fetch](#evidence-fetch). [ADR-0281], [PARALLEL.md: branches].
 
 ### oracle
 *Standard (test oracle), used narrowly here.* A reference whose answers the compiler's are compared with. Koka was a temporary "effects-only oracle" for effect rows; compiled declarations are later checked against independent references. [ADR-0011].
