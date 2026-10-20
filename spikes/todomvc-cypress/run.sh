@@ -7,7 +7,7 @@
 # and runs `cypress/e2e/spec.cy.js` as the repository ships it
 # (`UPSTREAM.md` holds each file to its upstream blob):
 #
-#     cypress run --env framework=page/todomvc.app.Todos --config baseUrl=http://127.0.0.1:<port>
+#     cypress run --env framework=page/todomvc.app.Todos~ui --config baseUrl=http://127.0.0.1:<port>
 #
 # The suite visits `baseUrl + '/' + framework`: the name is the page's own
 # path on the host. (The root, `.`, was tried: Cypress asks for `/.`, which no
@@ -29,12 +29,11 @@
 # `localStorage` (`noLocalStorageCheck`: `puremvc`, which has no known issues
 # either), reached through the address's fragment, which the page ignores:
 #
-#     cypress run --env framework=puremvc --config baseUrl=http://127.0.0.1:<port>/page/todomvc.app.Todos#
+#     cypress run --env framework=puremvc --config baseUrl=http://127.0.0.1:<port>/page/todomvc.app.Todos~ui#
 #
-# The acceptance's own name is in none of the tables, so each test that asks
-# `localStorage` for the todos fails by design, and a failed test's polling
-# loop makes a later hook fail, which skips the rest of the suite. The
-# diagnostic shows what the rest of each test says of this app.
+# The acceptance's own name is in none of the tables: all 29 official tests,
+# including persistence, must execute and pass. The separate diagnostic may
+# explain a failure; it never substitutes for passing acceptance (ADR-0368).
 #
 # Cypress's output goes to $OUT (default /tmp/pw-todomvc-cypress.txt, or
 # /tmp/pw-todomvc-cypress-diagnostic.txt), with the browser's own console

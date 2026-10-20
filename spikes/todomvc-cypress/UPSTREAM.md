@@ -38,17 +38,17 @@ the repository's `examples/`), its other frameworks' folders, and
 host of its own and runs the suite against it:
 
 ```
-cypress run --env framework=page/todomvc.app.Todos --config baseUrl=http://127.0.0.1:<port>
+cypress run --env framework=page/todomvc.app.Todos~ui --config baseUrl=http://127.0.0.1:<port>
 ```
 
 The suite visits `baseUrl + '/' + framework`; the name is the page's own path
-on the host (`/page/todomvc.app.Todos`), so nothing here proxies or rewrites an
+on the host (`/page/todomvc.app.Todos~ui`), so nothing here proxies or rewrites an
 address. (The root, `.`, was tried first: Cypress asks for `/.`, which no host
 here serves as `/`.) The name is in none of the suite's tables
 (`noLocalStorageCheck` and the rest), so every check the suite makes of an app
-it knows nothing about is made of this one: including `localStorage`, which this
-app does not use (see the ADR's section on the suite's result). That is **the
-acceptance**.
+it knows nothing about is made of this one: including `localStorage`. TodoMVC now declares device storage under
+`todos-pleris`; the combined train-12 verification must demonstrate that the
+unchanged suite passes. That is **the acceptance**.
 
 `DIAGNOSTIC=1 run.sh` runs the same files a second time, **not as the
 acceptance**, under a name the suite's own tables take as keeping nothing in
@@ -59,10 +59,10 @@ app.
 `run.sh` does not skip. It exits 1 where Cypress cannot run (no Xvfb, no
 binary, no build of the app, no host) and where a run printed no results, and
 its status is the verdict of `scripts/todomvc_cypress_result.py`, which reads
-what Cypress printed: the table must count the spec's 29 tests, and each test
-must come out as the app's design gives it (an app that never writes
-`localStorage` fails every test that asks it, and a test that asks nothing
-passes). `scripts/tests/test_todomvc_cypress.py` holds all of this to real
+what Cypress printed. Acceptance requires all 29 official tests to pass,
+with none failed, pending or skipped and Cypress exit status zero
+([ADR-0368](../../docs/DECISIONS/ADR-0368-todomvc-acceptance-means-passing.md)).
+Understanding a failure never turns it into acceptance. `scripts/tests/test_todomvc_cypress.py` holds all of this to real
 outputs and runs `run.sh` whole with a stand-in Cypress;
 `scripts/todomvc_cypress_mutations.py` breaks each rule. `just e14-todomvc`
 records both runs; the suite is not part of `just ci`.

@@ -3179,8 +3179,8 @@ TodoMVC in Pleris, held to its own spec and its own tests (track
 TodoMVC acceptance requires every official test to pass (the integrator's;
 train-12).
 - A judge that called a run of 3 of 29 a success was no acceptance;
-  acceptance is the unchanged official suite passing in full, on the Cypress
-  version TodoMVC pins (ruling 4 of 2026-10-20).
+  acceptance is the unchanged official suite passing in full, on the reviewed
+  Cypress 15.21.1 pin (ruling 4 of 2026-10-20).
 [ADR-0369](DECISIONS/ADR-0369-hosts-share-one-database.md):
 hosts share one database: each hears every commit from the outbox, and a
 session is the database's (track `second-host`; train-12).

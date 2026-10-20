@@ -1,4 +1,4 @@
-ADR-XXXX - generic/member effects
+ADR-0351 - generic/member effects
 
 produced by: just e14-generic-effects
 commit: 1e8b1ccdee54ed7b0437e06575c4a5d9e6ac0ff3
