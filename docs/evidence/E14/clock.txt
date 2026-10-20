@@ -1,8 +1,8 @@
 ADR-0304 - what a page shows by the clock is told when the clock passes it
 
 produced by: just e14-clock
-commit: 92fdd6e34743e33a80914939976125a9eb307842
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38559878637 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 8c5618c86eeb62202be29b374661962175bfefb0
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39325789224 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 tz database: 2026c
 
@@ -30,16 +30,16 @@ test effects::tests::a_row_that_is_not_written_is_not_checked ... ok
 test effects::tests::a_pure_body_infers_nothing ... ok
 test effects::tests::a_view_may_not_reach_the_database_whatever_it_declares ... ok
 test effects::tests::a_direct_call_contributes_its_effect ... ok
-test signatures::tests::a_pure_function_carries_no_effects_and_no_label ... ok
 test effects::tests::an_effect_hidden_behind_a_helper_still_propagates ... ok
 test effects::tests::an_undeclared_effect_is_reported_with_its_chain ... ok
 test effects::tests::an_effect_inside_a_callback_still_propagates ... ok
+test signatures::tests::a_pure_function_carries_no_effects_and_no_label ... ok
 test signatures::tests::one_declaration_answers_privacy_effects_and_placement ... ok
-test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 173 filtered out; finished in 0.00s
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 180 filtered out; finished in 0.00s
 test a_public_materialization_may_not_compare_the_clock ... ok
 test a_query_that_compares_the_clock_may_be_kept_for_every_reader ... ok
 test a_page_built_once_may_not_compare_the_clock ... ok
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.64s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.69s
 
 == the host's clock, what a value holds until, and a page told then (spikes/own-renderer/server)
 
@@ -53,12 +53,12 @@ test tests::the_hosts_clock_moves_forward_as_a_test_says ... ok
 test tests::a_page_is_told_when_the_instant_it_compared_passes ... ok
 test tests::a_kept_value_past_its_instant_is_read_again ... ok
 test tests::a_page_that_compares_no_clock_holds_nothing ... ok
-test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 559 filtered out; finished in 23.89s
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 619 filtered out; finished in 32.94s
 
 == mutation controls (scripts/clock_mutations.py)
 
 baseline (zones): 9 passed, 0 failed
-baseline (core): 188 passed, 0 failed
+baseline (core): 195 passed, 0 failed
 baseline (server): 10 passed, 0 failed
 a skipped local time is read with the offset after the gap [zones]: KILLED (2 of 9 tests fail)
 a repeated local time is its last occurrence [zones]: KILLED (1 of 9 tests fail)
@@ -68,9 +68,9 @@ daylight time south of the equator is never [zones]: KILLED (1 of 9 tests fail)
 a rule's start is read in daylight time [zones]: KILLED (1 of 9 tests fail)
 a day begins at a midnight a transition skipped [zones]: KILLED (1 of 9 tests fail)
 a file's footer is unread [zones]: KILLED (2 of 9 tests fail)
-a page built once may compare the clock [core]: KILLED (1 of 188 tests fail)
-a page built once, or a public materialization, may compare the clock [core]: KILLED (1 of 185 tests fail)
-a public materialization may compare the clock [core]: KILLED (1 of 185 tests fail)
+a page built once may compare the clock [core]: KILLED (1 of 195 tests fail)
+a page built once, or a public materialization, may compare the clock [core]: KILLED (1 of 192 tests fail)
+a public materialization may compare the clock [core]: KILLED (1 of 192 tests fail)
 an instant ahead is not noted [server]: KILLED (3 of 10 tests fail)
 `passed` answers before its instant [server]: KILLED (1 of 10 tests fail)
 a zone's date is held by nothing [server]: KILLED (2 of 10 tests fail)

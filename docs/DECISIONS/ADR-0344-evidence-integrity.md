@@ -410,6 +410,19 @@ Assembled train verification is still pending.
   35.
 
 
+## Amended at train-10's landing (the integrator's delegate, 2026-10-19)
+
+- **Finding 2 reads a verdict that says what killed its mutant.**
+  `VERDICT` took a kill only as `KILLED (...)`; the guide's script
+  (ADR-0343) says `KILLED by the checker (PW5048)` and `KILLED by <test>
+  (...)`, so the count check read none of the guide's 74 verdicts. It was
+  excused while the committed `guide.txt` was stale, and failed `just
+  evidence-gates` once the landing fetched a current one (39131257549).
+  Fixed on the train (`e9bad0c1`): a test, with its control (a kill that
+  says nothing in parentheses is no verdict), and a control in
+  `evidence_integrity_mutations.py`: 43. `e14-evidence-integrity` ran
+  again by dispatch (39364245453).
+
 ## Amended at train-10's first verify (the integrator's rulings 1 and 4, 2026-10-17)
 
 - **Finding 4's ceiling measured the program** (ruling 4). Train-10's ci

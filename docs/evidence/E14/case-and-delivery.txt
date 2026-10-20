@@ -1,8 +1,8 @@
 ADR-0153, ADR-0154 - a case tested with {#match}, a command a page sends declared idempotent
 
 produced by: just e14-case-and-delivery
-commit: e2a4acd960c88144e3b40e7a6e9d9b8bd774ee1a
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38909882781 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: ddaeeb1dfba9630371b7dd5b127c23855d245c74
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39131257549 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the tests (compiler/pw-core/tests/case_and_delivery.rs)
@@ -10,16 +10,16 @@ rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 test a_value_compared_with_a_computed_one_is_not_a_case_test ... ok
 test a_case_of_another_type_spelled_alike_is_not_this_ones ... ok
 test a_command_a_page_handler_calls_declares_idempotent_by ... ok
-test an_idempotent_command_and_one_no_handler_calls_are_the_controls ... ok
 test every_case_named_by_a_match_is_the_control ... ok
+test an_idempotent_command_and_one_no_handler_calls_are_the_controls ... ok
 test a_template_tests_a_case_with_match ... ok
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.48s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.43s
 
 == the store, the accepted corpus and the demos check as before
 
-store: pw check: 55 file(s), no diagnostics
-accepted: pw check: 85 file(s), no diagnostics
-demo: pw check: 59 file(s), no diagnostics
+store: pw check: 56 file(s), no diagnostics
+accepted: pw check: 90 file(s), 0 error(s), 1 warning(s)
+demo: pw check: 60 file(s), no diagnostics
 
 == mutation controls (scripts/case_and_delivery_mutations.py)
 

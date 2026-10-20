@@ -1,8 +1,8 @@
 ADR-0058 - handlers that compute
 
 produced by: just e10-handlers-compute
-commit: e2a4acd960c88144e3b40e7a6e9d9b8bd774ee1a
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38909882781 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: ddaeeb1dfba9630371b7dd5b127c23855d245c74
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39131257549 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 
@@ -29,7 +29,7 @@ test a_program_that_does_not_check_compiles_no_handlers ... ok
 test a_handler_calls_its_commands_by_the_contracts_own_ids ... ok
 test the_stores_handlers_compile_to_the_calls_their_bodies_make ... ok
 test a_module_and_its_event_part_name_one_handler ... ok
-test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.17s
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.27s
 
 == mutation controls (scripts/handler_mutations.py)
 

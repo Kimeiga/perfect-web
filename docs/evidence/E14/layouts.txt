@@ -1,8 +1,8 @@
 ADR-0303 - a page is shown in its layout
 
 produced by: just e14-layouts
-commit: e2a4acd960c88144e3b40e7a6e9d9b8bd774ee1a
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38909882781 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 8c5618c86eeb62202be29b374661962175bfefb0
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39325789224 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
@@ -21,18 +21,17 @@ test layout_is_a_declaration_and_a_clause_only_where_a_name_follows ... ok
 test what_a_layout_shows_is_its_pages_for_the_shared_cache ... ok
 test a_page_reads_what_its_layout_reads_in_the_graph ... ok
 test a_page_is_shown_in_its_layout_whose_parts_are_numbered_first ... ok
-test its_plan_reads_the_layouts_bindings_under_names_no_source_writes has been running for over 60 seconds
 test its_plan_reads_the_layouts_bindings_under_names_no_source_writes ... ok
-test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 114.01s
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 97.79s
 
 == the store's pages, served in their layout
 
 test tests::a_store_page_is_shown_in_its_layout_and_its_count_is_told ... ok
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 594 filtered out; finished in 23.03s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 628 filtered out; finished in 20.31s
 
 == the store's pages in three engines (e2e/layouts.spec.mjs)
 
-  12 passed (6.4m)
+  12 passed (5.9m)
 
 == mutation controls (scripts/layouts_mutations.py)
 
