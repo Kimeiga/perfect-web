@@ -23,6 +23,10 @@ Read it in this order:
 5. [The diagnostic codes](diagnostics.md): every code, its rule and its
    ADR.
 
+A word you do not know, in these pages or in the ADRs (*track*, *evidence*,
+*set read*, *the seam*)? [The glossary](../GLOSSARY.md) maps the project's
+terms to standard ones and says where each is defined.
+
 ## Every example compiles
 
 Each Pleris example in this guide is a whole program, and a test,

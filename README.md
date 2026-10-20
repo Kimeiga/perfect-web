@@ -16,6 +16,10 @@ TypeScript and React, Next.js or Svelte: why Pleris, a tour of the language, a
 tutorial that builds a small app, and every diagnostic code. A test compiles
 its examples.
 
+The project also speaks a private dialect (tracks, trains, evidence of record,
+set reads, the seam). [The glossary](docs/GLOSSARY.md) maps each term to its
+standard software-engineering equivalent and says where it is defined.
+
 ## Implementation status
 
 Current milestone state, completed evidence, open gates, and reproduce commands
