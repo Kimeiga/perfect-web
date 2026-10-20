@@ -1152,3 +1152,32 @@ Generality at open:        60/60 invariants generality-tested
 | `all_unbounded` | a GENERAL witness, `all()` called bare in the table's own module, and a NEIGHBOUR one, the same call of a bounded table | new invariant |
 | `refers_across_sources` | a GENERAL witness, the referring table in no source, and a NEIGHBOUR one, a self-reference within one source | new invariant |
 | `migration_unstated` | a GENERAL witness, a field's type changed, and a NEIGHBOUR one, the same change `backfilled with` a value | new invariant |
+
+## C28: a value the reader's device keeps, 2026-10-20
+
+Opened because the specification changed (track `device-store`, ADR-XXXX:
+charter §9.1's fourth kind of state). A module's signal with a value and
+`storage device "name"`, `privacy Device` and `conflict last_write_wins` is
+kept in the reader's browser, read before what it decides is shown, and
+never sent: a read of one carries `Device` (charter §7.8), which follows it
+as every label does, and the browser's ways to the server refuse it: a
+command's argument or a call it decides (`PW6801`), a page query's key
+(`PW6802`), and an address, a navigation or a form's control (`PW6803`).
+The declaration's own rules (`PW6804` to `PW6808`) are held in
+`tests/device_store.rs`. No invariant is retired; no fixture changed.
+
+```text
+Corpus version:            C28
+Accepted programs:         43
+Rejected programs:         89
+Charter categories:        43/43 accepted, 89/89 rejected
+Generality at open:        62/62 invariants generality-tested
+```
+
+| Fixture | Change | Kind |
+|---|---|---|
+| A-054 | added: a value the device keeps, read by a page and written by its handler, shown and never sent | new category |
+| R-108 | added: a value the device keeps given to a command as its argument (`PW6801`) | new category |
+| R-109 | added: a page's query keyed by its own signal, assigned a value the device keeps (`PW6802`) | new category |
+| `device_value_to_a_command` | a GENERAL witness, a kept list summarized by a helper, put in a record and its field given to a command from a key handler's match arm, and a NEIGHBOUR one, the command given the page's own value with the device's shown | new invariant |
+| `device_value_keys_a_query` | a GENERAL witness, a query keyed beside the session by a page's signal a key handler assigns, trimmed, from the device's value, and a NEIGHBOUR one, keyed by what is typed with the device's value shown | new invariant |

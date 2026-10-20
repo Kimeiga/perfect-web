@@ -5,7 +5,7 @@ produced by: just evidence-corpus
 held to the corpus by: compiler/pw-core/tests/checking_source.rs
 (the_committed_enforcement_table_is_what_the_corpus_checks_now)
 
-87/87 enforce their declared invariant
+89/89 enforce their declared invariant
 
 R-001  enforced                  PW0401
        network request inside view
@@ -181,3 +181,7 @@ R-106  enforced                  PW0366
        a field dropped from a released schema with no migrate
 R-107  enforced                  PW0366
        a field renamed from a released schema with no migrate
+R-108  enforced                  PW6801
+       a value the device keeps sent as a command's argument
+R-109  enforced                  PW6802
+       a query keyed by a value the device keeps

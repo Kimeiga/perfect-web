@@ -3196,7 +3196,10 @@ fn lower_block_at(
         // does.
         let computed = value_path(body, each.list).is_none();
         let collection = value_path(body, each.list).unwrap_or_default();
-        if computed && inputs_of(body, each.list, ctx).is_empty() {
+        let browsers = inputs_of(body, each.list, ctx);
+        if computed
+            && (browsers.is_empty() || !browsers.iter().all(|(name, _)| ctx.signals.contains(name)))
+        {
             out.push(blocked(format!(
                 "`{{#each}}` reads its list by path, and `{}` is computed",
                 each.written.list
@@ -3232,7 +3235,7 @@ fn lower_block_at(
         }
         let collection = match computed {
             true => {
-                let inputs = inputs_of(body, each.list, ctx);
+                let inputs = browsers;
                 let value = ix.computed_path(id, &inputs);
                 ix.read(id, &value, ReadKind::List, ReadAt::Expr(each.list), ctx);
                 if let Some(read) = ix.reads.last_mut() {

@@ -268,15 +268,13 @@ fn what_the_browser_does_not_compute_yet_is_refused_by_name() {
             "computes a value from `open` and `post`, and a host computes one from one value \
              (ruling 0073-a)",
         ),
-        (
-            "{#if open}<p>{shown(panel.open)}</p>{/if}",
-            "computes a value inside a block a signal decides, and the browser, which renders \
-             that block again, computes none yet (ruling 0073-a)",
-        ),
+        // Inside a block a host renders, which the browser does not render
+        // again (track `device-store`: inside one the browser renders, it
+        // computes it, below).
         (
             "{#if post.pinned}<p>{shown(open)}</p>{/if}",
-            "computes a value from the signal `open` inside a block, and the browser computes \
-             one at the top of the page (ruling 0073-a)",
+            "computes a value from the signal `open` inside a block a value other than a signal \
+             decides, which the browser does not render again (ruling 0073-a)",
         ),
     ] {
         let files = page(markup);
@@ -286,6 +284,18 @@ fn what_the_browser_does_not_compute_yet_is_refused_by_name() {
             Err(e) => assert!(e.contains(why), "{markup}: {e}"),
         }
     }
-    // Control: at the top of the page, it builds.
+    // Control: at the top of the page, it builds; and inside a block a signal
+    // decides, which the browser renders again, computing it first (track
+    // `device-store`, ruling 0073-a's later steps).
     build(&page("<p>{shown(open)}</p>")).unwrap_or_else(|e| panic!("{e}"));
+    let b =
+        build(&page("{#if open}<p>{shown(panel.open)}</p>{/if}")).unwrap_or_else(|e| panic!("{e}"));
+    assert!(
+        plan_of(&b, "t.P")
+            .live
+            .iter()
+            .any(|l| l.kind == "value" && !l.derived.is_empty()),
+        "{:?}",
+        plan_of(&b, "t.P").live
+    );
 }

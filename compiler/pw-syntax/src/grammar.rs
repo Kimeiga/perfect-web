@@ -249,11 +249,10 @@ const NAMED_HEADS: &[&str] = &[
     "layout", "set", "sets", "row", "order", "index", "unique", "refers", "migrate",
 ];
 
-/// A table's bounded clause takes a literal count on its line.
-const COUNTED_HEADS: &[&str] = &[
-    "bounded", // A device's signal's version (track `device-store`): `version 2`.
-    "version",
-];
+/// A table's bounded clause takes a literal count on its line, and so does
+/// the version of a signal the device keeps (track `device-store`):
+/// `version 2`.
+const COUNTED_HEADS: &[&str] = &["bounded", "version"];
 
 pub const POLICY_KEYWORDS: &[&str] = &[
     // E8's effect ontology: `capability database.read<T>` and

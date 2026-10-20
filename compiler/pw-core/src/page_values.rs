@@ -361,7 +361,10 @@ fn rendered_again(
 ) -> Result<(), String> {
     use crate::template_ir::{Chunk, Part, Segment};
     let root = |path: &str| path.split('.').next().unwrap_or_default().to_string();
-    let signal = |path: &str| signals.contains(&root(path));
+    // A value the browser computes from the signals it holds (track
+    // `device-store`, decision 7) is one they decide: the browser renders it
+    // again only where it renders what holds it.
+    let signal = |path: &str| signals.contains(&root(path)) || computed.contains_key(path);
     for c in chunks {
         let Chunk::Dynamic(p) = c else { continue };
         let id = p.id().map(|i| i.0).unwrap_or_default();
@@ -433,7 +436,20 @@ fn rendered_again(
             }
             Reach::Top | Reach::Frame => {
                 if let Some(s) = own.iter().find(|v| signal(v)) {
-                    let s = root(s);
+                    // What the part reads, as a message names it: the signal,
+                    // or each one a value computed from them reads.
+                    let lifted = computed.get(s.as_str()).cloned();
+                    let named = match lifted.as_deref() {
+                        Some([one]) => format!("the signal `{one}`"),
+                        Some([init @ .., last]) if !init.is_empty() => format!(
+                            "the signals {} and `{last}`",
+                            init.iter()
+                                .map(|n| format!("`{n}`"))
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        ),
+                        _ => format!("the signal `{}`", root(s)),
+                    };
                     match (p, reach) {
                         (
                             Part::Text { .. } | Part::Conditional { .. } | Part::Match { .. },
@@ -444,7 +460,7 @@ fn rendered_again(
                         (Part::Instance { .. }, Reach::Top) => {
                             if let Some(other) = own.iter().find(|v| !signal(v)) {
                                 return Err(format!(
-                                    "part {id} is an instance given the signal `{s}` and \
+                                    "part {id} is an instance given {named} and \
                                      `{other}`, and the browser renders it again from the \
                                      page's signals alone (ADR-0203)"
                                 ));
@@ -468,26 +484,36 @@ fn rendered_again(
                         }
                         (Part::Event { .. }, _) => {
                             return Err(format!(
-                                "part {id}'s handler captures the signal `{s}` as the page was \
+                                "part {id}'s handler captures {named} as the page was \
                                  rendered; a handler reads a signal through its context (ADR-0133)"
                             ));
                         }
                         (Part::Each { .. }, Reach::Top) => {
                             return Err(format!(
-                                "part {id} is a list the signal `{s}` holds, which the browser \
+                                "part {id} is a list {named} holds, which the browser \
                                  does not render again outside a block a signal decides (ADR-0137)"
+                            ));
+                        }
+                        // A value computed from the signals, inside a block a
+                        // host renders, which the browser does not render
+                        // again (track `device-store`).
+                        (_, Reach::Frame) if lifted.is_some() => {
+                            return Err(format!(
+                                "part {id} computes a value from {named} inside a \
+                                 block a value other than a signal decides, which the browser \
+                                 does not render again (ruling 0073-a)"
                             ));
                         }
                         (_, Reach::Frame) => {
                             return Err(format!(
-                                "part {id} reads the signal `{s}` inside a block a value other \
+                                "part {id} reads {named} inside a block a value other \
                                  than a signal decides, which the browser does not render again \
                                  (ADR-0137)"
                             ));
                         }
                         _ => {
                             return Err(format!(
-                                "part {id} is a {} part the signal `{s}` decides, which the \
+                                "part {id} is a {} part {named} decides, which the \
                                  browser does not render again (ADR-0137)",
                                 p.kind()
                             ));

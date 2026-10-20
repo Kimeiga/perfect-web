@@ -1,0 +1,36 @@
+// @corpus: accepted
+// @id: A-054
+// @category: a value the reader's device keeps
+// @charter: §9.1, §7.8
+// @milestone: 14
+//
+// Charter §9.1's fourth kind of state, as its first version builds it
+// (track `device-store`): a module's signal the device provides, kept in the
+// browser's own storage under the name the program chooses, the device's
+// own, and the whole value written last every tab's. A page reads it and a
+// handler writes it, as any signal; nothing sends it anywhere. R-108 and
+// R-109 send it, and are refused.
+
+module corpus.kept
+
+import List
+
+type Bookmark = Bookmark { url: String, title: String }
+
+signal bookmarks: List<Bookmark> = []
+    storage  device "corpus-bookmarks"
+    privacy  Device
+    conflict last_write_wins
+
+page Bookmarks() {
+    route "/bookmarks"
+    cache private
+
+    view {
+        <title>Bookmarks</title>
+        <main>
+            <p>{List.length(bookmarks)} kept on this device</p>
+            <button type="button" on:press={() => bookmarks = []}>Forget them</button>
+        </main>
+    }
+}

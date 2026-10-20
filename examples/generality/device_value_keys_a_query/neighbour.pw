@@ -1,0 +1,42 @@
+// @status: NEIGHBOUR
+// @invariant: device_value_keys_a_query
+// @dimension: valid neighbour — a query keyed by what is typed, and the device's value shown
+module generality.device_key_ok
+
+import events.{ KeyEvent }
+import context.{ current_session }
+import capability.{ Session, SessionId }
+
+signal last: String = ""
+    storage  device "generality-last-ok"
+    privacy  Device
+    conflict last_write_wins
+
+session query Lookup(session: Session<SessionId>, term: String) -> String
+    freshness     0.seconds
+    consistency   read_your_writes
+    cache         private
+    key           session, term
+    concurrency   one_per_key
+    on_key_change cancel
+    timeout       2.seconds
+{
+    term
+}
+
+page Find() {
+    route "/find"
+    cache private
+
+    signal term: String = ""
+    let found = query Lookup(current_session(), term)
+
+    view {
+        <title>Find</title>
+        <main>
+            <p>Last time: {last}</p>
+            <input aria-label="Find" bind:value={term} />
+            <p>{found}</p>
+        </main>
+    }
+}

@@ -577,10 +577,13 @@ fn generality_is_reported_separately_from_conformance() {
     // on 2026-10-15: 4c's `read_per_element` and `set_pair_shape`. 60 / 60
     // on 2026-10-16: tables' `table_malformed`, `data_not_declared`,
     // `all_unbounded` and `migration_unstated` (ADR-0350, corpus C27).
-    // PW0365's warning has its own witnesses too.
+    // PW0365's warning has its own witnesses too. 62 / 62 on 2026-10-20: the
+    // device-store track's `device_value_to_a_command` and
+    // `device_value_keys_a_query` (ADR-XXXX, corpus C28); STATUS's figure is
+    // the integrator's to move at the merge.
     assert_eq!(
         (general.len(), narrow.len(), untested.len()),
-        (60, 0, 0),
+        (62, 0, 0),
         "the published figure moved. If that is intended, update
          docs/STATUS.md and docs/NEXT.md in the same commit — a number in a
          status report that no test holds is a number that drifts."

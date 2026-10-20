@@ -953,7 +953,9 @@ pub struct Provision {
     /// page that keys one by a signal reads it wherever it is declared.
     pub stale_work: BTreeMap<DefId, Option<String>>,
     /// **The module signals the device keeps** (track `device-store`,
-    /// ADR-XXXX): provided by the device, so no page or view needs to.
+    /// ADR-XXXX): provided by the device, so no page or view needs to. One
+    /// with a value of its own is the device's by its form, kept or refused
+    /// at its declaration (PW6805), and is never also "not provided".
     pub device: BTreeSet<DefId>,
 }
 
@@ -970,6 +972,9 @@ impl Provision {
                 if decl.kind == DeclKind::Signal {
                     p.names
                         .insert(DefId { unit, decl: id.0 }, decl.name.clone());
+                }
+                if decl.kind == DeclKind::Signal && decl.body.is_some() {
+                    p.device.insert(DefId { unit, decl: id.0 });
                 }
                 if decl.kind == DeclKind::Query {
                     p.stale_work.insert(

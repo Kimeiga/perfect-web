@@ -183,8 +183,14 @@ fn every_policy_keyword_is_read_as_a_policy_and_not_as_an_expression() {
     // body, which is what `depends_on Store(id)` was until E6.
     let mut invisible = Vec::new();
     for kw in POLICY_KEYWORDS {
-        // A counted clause is written with a number, not an arbitrary name.
-        let value = if *kw == "bounded" { "10" } else { "something" };
+        // A counted clause is written with a number, not an arbitrary name:
+        // a table's `bounded`, a device value's `version` (track
+        // `device-store`).
+        let value = if matches!(*kw, "bounded" | "version") {
+            "10"
+        } else {
+            "something"
+        };
         let src = format!("module m\n\nquery X(id: Int) -> Int\n    {kw} {value}\n{{\n    0\n}}\n");
         let p = parse_tree(&src);
         if !p.ok() {

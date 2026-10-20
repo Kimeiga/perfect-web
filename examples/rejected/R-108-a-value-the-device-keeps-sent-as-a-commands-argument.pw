@@ -1,0 +1,41 @@
+// @corpus: rejected
+// @id: R-108
+// @category: a value the device keeps sent as a command's argument
+// @rule: PW6801
+// @invariant: device_value_to_a_command
+// @charter: §7.8, §9.1
+// @milestone: 14
+// @expect-error: `draft` is kept on this device, and `publish`'s argument is sent to the server
+//
+// A signal declared `privacy Device` never leaves the device; a command runs
+// on the server, and what it is given is sent there. A-054 is its control.
+
+module corpus.sent
+
+signal draft: String = ""
+    storage  device "corpus-draft"
+    privacy  Device
+    conflict last_write_wins
+
+opaque type Press = String
+
+command publish(text: String) -> Result<String, String>
+    idempotent_by Press
+{
+    Ok(text)
+}
+
+page Draft() {
+    route "/draft"
+    cache private
+
+    view {
+        <title>Draft</title>
+        <main>
+            <button type="button" on:press={() => match publish(draft) {
+                Ok(_) => draft = "",
+                Err(_) => draft = draft,
+            }}>Publish</button>
+        </main>
+    }
+}

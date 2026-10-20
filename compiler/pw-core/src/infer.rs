@@ -322,14 +322,24 @@ impl<'a> Types<'a> {
                 if types.bindings.contains_key(&Binder::Each(*n)) {
                     continue;
                 }
+                // A path whose root no binding holds is a module's signal's
+                // (track `device-store`): of the type it declares.
+                let of_a_module_signal = |root: ExprId| match body.expr(root) {
+                    Expr::Name(n) => types.module_signal(n).is_some(),
+                    _ => false,
+                };
                 let elem = match head {
                     Some(b) => types.element_at(body, *b, fields),
-                    None if crate::lexical::path_root(body, *list).is_none() => types
-                        .of(body, *list)
-                        .as_ref()
-                        .and_then(element_of_type)
-                        .filter(|t| !mentions_parameter(t))
-                        .cloned(),
+                    None if crate::lexical::path_root(body, *list)
+                        .is_none_or(of_a_module_signal) =>
+                    {
+                        types
+                            .of(body, *list)
+                            .as_ref()
+                            .and_then(element_of_type)
+                            .filter(|t| !mentions_parameter(t))
+                            .cloned()
+                    }
                     None => None,
                 };
                 if let Some(elem) = elem {

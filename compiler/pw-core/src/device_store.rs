@@ -41,7 +41,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::codes::{self, Code};
-use crate::diagnostics::{Detector, Diagnostic, Repair, Severity};
+use crate::diagnostics::{Detector, Diagnostic, Related, Repair, Severity};
 use crate::hir::{AttrValue, BinOp, Body, Decl, DeclId, DeclKind, Expr, ExprId, Hir, Node, Span};
 use crate::privacy::{Label, Restriction};
 use crate::resolve::{DefId, Resolution};
@@ -253,6 +253,7 @@ pub fn check(
             body,
             labels: &labels,
             lexical: crate::lexical::Lexical::build(decl, body),
+            hirs,
         };
         cx.provides(&mut out);
         cx.assignments(&mut out);
@@ -265,7 +266,7 @@ pub fn check(
 fn diagnostic(
     code: Code,
     reason: &'static str,
-    at: Span,
+    (at, boundary): (Span, Related),
     message: String,
     explanation: &str,
     repair: &str,
@@ -278,7 +279,7 @@ fn diagnostic(
         severity: Severity::Error,
         message,
         primary_span: at,
-        related: Vec::new(),
+        related: vec![boundary],
         explanation: Some(explanation.to_string()),
         repairs: vec![Repair {
             description: repair.to_string(),
@@ -303,11 +304,20 @@ fn declaration(
     kept: &BTreeMap<DefId, Kept>,
     out: &mut Vec<Diagnostic>,
 ) {
+    let declared = || {
+        Related::new(
+            decl.name_span.clone(),
+            format!(
+                "`{}` is declared here, a signal the device keeps",
+                decl.name
+            ),
+        )
+    };
     let clauses = |at: Span, message: String, repair: &str| {
         diagnostic(
             codes::DEVICE_SIGNAL_CLAUSES,
             "device_signal_clauses",
-            at,
+            (at, declared()),
             message,
             "A module's signal with a value is one the device keeps (ADR-XXXX): its clauses \
              say where it rests and under what name, whose it is, and what two tabs' writes \
@@ -427,7 +437,7 @@ fn declaration(
         out.push(diagnostic(
             codes::DEVICE_SIGNAL_FORM,
             "device_signal_form",
-            at.clone(),
+            (at.clone(), declared()),
             format!(
                 "`{name}` is a `{}`, which the device cannot hold: {why}",
                 ty.display_name()
@@ -525,7 +535,16 @@ fn versions(
         diagnostic(
             codes::DEVICE_SIGNAL_VERSIONS,
             "device_signal_versions",
-            at,
+            (
+                at,
+                Related::new(
+                    decl.name_span.clone(),
+                    format!(
+                        "`{}` is declared here, a signal the device keeps",
+                        decl.name
+                    ),
+                ),
+            ),
             message,
             "What a device keeps outlives the code that wrote it. Each version is kept under \
              a key of its own, and a page reading an earlier one takes it to its own version \
@@ -653,6 +672,7 @@ struct Flows<'a> {
     body: &'a Body,
     labels: &'a crate::labels::Labels<'a>,
     lexical: crate::lexical::Lexical,
+    hirs: &'a [&'a Hir],
 }
 
 impl Flows<'_> {
@@ -663,19 +683,80 @@ impl Flows<'_> {
             .any(|r| *r == Restriction::Device)
     }
 
-    /// The signal the device keeps that brings its label into `e`: the
-    /// first named in it, or the one a call's body reads.
-    fn blame(&self, e: ExprId) -> String {
-        self.body
+    /// **What brings the device's label into `e`**: the first signal the
+    /// device keeps named in it, or else the first name holding a value of
+    /// one (a page's signal it was assigned to, a binding made from it).
+    fn blamed(&self, e: ExprId) -> (String, bool) {
+        let names: Vec<(ExprId, &String)> = self
+            .body
             .walk_from(e)
             .into_iter()
-            .find_map(|x| match self.body.expr(x) {
-                Expr::Name(n) => {
-                    kept_named(self.sigs, self.kept, self.unit, n).map(|_| format!("`{n}`"))
-                }
+            .filter_map(|x| match self.body.expr(x) {
+                Expr::Name(n) => Some((x, n)),
                 _ => None,
             })
-            .unwrap_or_else(|| "a value the device keeps".to_string())
+            .collect();
+        if let Some((_, n)) = names
+            .iter()
+            .find(|(_, n)| kept_named(self.sigs, self.kept, self.unit, n).is_some())
+        {
+            return (format!("`{n}`"), true);
+        }
+        match names.iter().find(|(x, _)| self.device(*x)) {
+            Some((_, n)) => (format!("`{n}`"), false),
+            None => ("this value".to_string(), false),
+        }
+    }
+
+    /// **Where `e` is the device's** (charter §16.3's boundary): the
+    /// declaration of the signal the device keeps it names, or else where the
+    /// binding holding one acquired it.
+    fn origin(&self, e: ExprId) -> Related {
+        for x in self.body.walk_from(e) {
+            let Expr::Name(n) = self.body.expr(x) else {
+                continue;
+            };
+            if let Some(def) = kept_named(self.sigs, self.kept, self.unit, n)
+                && let Some(decl) = crate::resolve::declaration(self.hirs, def)
+            {
+                return Related::in_unit(
+                    def.unit,
+                    decl.name_span.clone(),
+                    format!("`{n}` is kept on the device, `privacy Device`, here"),
+                );
+            }
+        }
+        for x in self.body.walk_from(e) {
+            if let Expr::Name(n) = self.body.expr(x)
+                && self.device(x)
+                && let Some((_, at)) = self.labels.origin(x)
+            {
+                return Related::new(
+                    at.clone(),
+                    format!("`{n}` holds what the device keeps here"),
+                );
+            }
+        }
+        Related::new(
+            self.body.expr_span(e),
+            "this value holds what the device keeps",
+        )
+    }
+
+    /// `e`'s blame as a sentence's subject.
+    fn blame(&self, e: ExprId) -> String {
+        match self.blamed(e) {
+            (n, true) => format!("{n} is kept on this device"),
+            (n, false) => format!("{n} holds what this device keeps"),
+        }
+    }
+
+    /// `e`'s blame after a clause it ends.
+    fn which(&self, e: ExprId) -> String {
+        match self.blamed(e) {
+            (n, true) => format!("{n}, which is kept on this device"),
+            (n, false) => format!("{n}, which holds what this device keeps"),
+        }
     }
 
     /// The signal the device keeps that `target`, an assignment's left
@@ -705,7 +786,7 @@ impl Flows<'_> {
             out.push(diagnostic(
                 codes::DEVICE_SIGNAL_PROVIDED,
                 "device_signal_provided",
-                self.body.expr_span(e),
+                (self.body.expr_span(e), self.origin(*lhs)),
                 format!("`{n}` is kept by the device, and this gives it a value of its own"),
                 "A module's signal is provided where it lives (ADR-0144). One the device keeps \
                  lives on the device: every page and view that names it holds the device's \
@@ -744,7 +825,7 @@ impl Flows<'_> {
             out.push(diagnostic(
                 codes::DEVICE_KEEPS_ITS_OWN,
                 "device_keeps_its_own",
-                self.body.expr_span(*rhs),
+                (self.body.expr_span(*rhs), self.origin(*lhs)),
                 format!(
                     "`{name}` is kept on this device, and this value is {}",
                     foreign.join(" and ")
@@ -773,9 +854,9 @@ impl Flows<'_> {
                             out.push(diagnostic(
                                 codes::DEVICE_VALUE_TO_A_COMMAND,
                                 "device_value_to_a_command",
-                                self.body.expr_span(a.value),
+                                (self.body.expr_span(a.value), self.origin(a.value)),
                                 format!(
-                                    "{} is kept on this device, and `{command}`'s argument is \
+                                    "{}, and `{command}`'s argument is \
                                      sent to the server",
                                     self.blame(a.value)
                                 ),
@@ -794,11 +875,10 @@ impl Flows<'_> {
                         out.push(diagnostic(
                             codes::DEVICE_VALUE_TO_A_COMMAND,
                             "device_value_to_a_command",
-                            self.body.expr_span(*callee),
+                            (self.body.expr_span(*callee), self.origin(*cause)),
                             format!(
-                                "whether `{command}` is sent is decided by {}, which is kept on \
-                                 this device",
-                                self.blame(*cause)
+                                "whether `{command}` is sent is decided by {}",
+                                self.which(*cause)
                             ),
                             KEPT_EXPLAINED,
                             "decide the call on what the server may know",
@@ -811,9 +891,9 @@ impl Flows<'_> {
                             out.push(diagnostic(
                                 codes::DEVICE_VALUE_KEYS_A_QUERY,
                                 "device_value_keys_a_query",
-                                self.body.expr_span(a),
+                                (self.body.expr_span(a), self.origin(a)),
                                 format!(
-                                    "{} is kept on this device, and a query's key is sent to the \
+                                    "{}, and a query's key is sent to the \
                                      server to read it again",
                                     self.blame(a)
                                 ),
@@ -830,9 +910,9 @@ impl Flows<'_> {
                             out.push(diagnostic(
                                 codes::DEVICE_VALUE_SENT,
                                 "device_value_sent",
-                                self.body.expr_span(a),
+                                (self.body.expr_span(a), self.origin(a)),
                                 format!(
-                                    "{} is kept on this device, and a navigation's arguments \
+                                    "{}, and a navigation's arguments \
                                      are the address the server is asked for",
                                     self.blame(a)
                                 ),
@@ -918,8 +998,8 @@ impl Flows<'_> {
                     out.push(diagnostic(
                         codes::DEVICE_VALUE_SENT,
                         "device_value_sent",
-                        attr.span.clone(),
-                        format!("{} is kept on this device, and {why}", self.blame(value)),
+                        (attr.span.clone(), self.origin(value)),
+                        format!("{}, and {why}", self.blame(value)),
                         KEPT_EXPLAINED,
                         "show it as text, which the browser keeps, or outside the form",
                     ));

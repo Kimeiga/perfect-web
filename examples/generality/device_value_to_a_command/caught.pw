@@ -1,0 +1,53 @@
+// @status: GENERAL
+// @invariant: device_value_to_a_command
+//
+// Structurally different from R-108: the value the device keeps is a list,
+// summarized by a helper whose body reads it, put in a record, and the
+// record's field given to the command, from a match arm of a key handler.
+
+module generality.device_summary
+
+import List
+import String
+import events.{ KeyEvent }
+
+type Note = Note { text: String }
+
+type Report = Report { summary: String, size: Int }
+
+signal notes: List<Note> = []
+    storage  device "generality-notes"
+    privacy  Device
+    conflict last_write_wins
+
+opaque type Press = String
+
+command report(summary: String) -> Result<Int, String>
+    idempotent_by Press
+{
+    Ok(String.length(summary))
+}
+
+fn summarized(notes: List<Note>) -> Report !{} {
+    Report { summary: String.join(List.map(notes, (n) => n.text), ", "), size: List.length(notes) }
+}
+
+page Notes() {
+    route "/notes"
+    cache private
+
+    signal said: String = ""
+
+    view {
+        <title>Notes</title>
+        <main>
+            <input aria-label="Report" on:keydown={(e: KeyEvent) => if e.key == "Enter" {
+                match report(summarized(notes).summary) {
+                    Ok(_) => said = "sent",
+                    Err(_) => said = "not sent",
+                }
+            }} />
+            <p>{said}</p>
+        </main>
+    }
+}

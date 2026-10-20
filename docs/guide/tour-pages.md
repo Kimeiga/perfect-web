@@ -368,9 +368,12 @@ pw: refused: `shop.titled.Counter`'s values: part 1 is a title part the signal `
 pw: 1 refusal(s); nothing written
 ```
 
-A part of a page cannot compute a value from two signals (ruling 0073-a):
+A part of a page may compute a value from two signals, or from any of the
+values the browser holds: the browser computes it again when either changes,
+and the host computes its first from their first values (track
+`device-store`, ruling 0073-a's later steps):
 
-```pw gap=build
+```pw
 module shop.sum
 
 page Sum() {
@@ -389,11 +392,6 @@ page Sum() {
         </main>
     }
 }
-```
-
-```text pw-build
-pw: refused: `shop.sum.Sum`'s values: part 0 computes a value from `a` and `b`, and a host computes one from one value (ruling 0073-a)
-pw: 1 refusal(s); nothing written
 ```
 
 Effects in an `{#each}` head are checked just as they are elsewhere in

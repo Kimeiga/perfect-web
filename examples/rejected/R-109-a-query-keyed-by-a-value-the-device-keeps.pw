@@ -1,0 +1,50 @@
+// @corpus: rejected
+// @id: R-109
+// @category: a query keyed by a value the device keeps
+// @rule: PW6802
+// @invariant: device_value_keys_a_query
+// @charter: §7.8, §9.1
+// @milestone: 14
+//
+// A page's query keyed by a signal is read again, for the new key, by a
+// request that names the key (ADR-0152): a value the device keeps there is
+// sent to the server, here through the page's own signal it was assigned
+// to, whose label it brings (ADR-0129). A-054 is its control.
+
+module corpus.keyed
+
+import context.{ current_session }
+import capability.{ Session, SessionId }
+
+signal term: String = ""
+    storage  device "corpus-term"
+    privacy  Device
+    conflict last_write_wins
+
+session query Found(session: Session<SessionId>, term: String) -> String
+    freshness     0.seconds
+    consistency   read_your_writes
+    cache         private
+    key           session, term
+    concurrency   one_per_key
+    on_key_change cancel
+    timeout       2.seconds
+{
+    term
+}
+
+page Search() {
+    route "/search"
+    cache private
+
+    signal shown: String = ""
+    let found = query Found(current_session(), shown)
+
+    view {
+        <title>Search</title>
+        <main>
+            <button type="button" on:press={() => shown = term}>Search for it</button>
+            <p>{found}</p>
+        </main>
+    }
+}
