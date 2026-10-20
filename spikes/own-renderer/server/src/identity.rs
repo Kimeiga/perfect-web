@@ -618,6 +618,45 @@ impl Principals {
     pub fn signed_in(&self) -> usize {
         self.0.sessions.read().expect("principals").len()
     }
+
+    /// TRACK SEAM (second-host): `session` held as `principal`, opened
+    /// `opened_ago` and last used `seen_after` after it was opened, as a
+    /// test ages a session in this host's memory alone.
+    #[cfg(test)]
+    pub(crate) fn held_for_test(
+        &self,
+        session: &str,
+        principal: Principal,
+        opened_ago: Duration,
+        seen_after: Duration,
+    ) {
+        let held = Held {
+            principal,
+            opened: std::time::Instant::now()
+                .checked_sub(opened_ago)
+                .expect("the host has run that long"),
+            seen: std::sync::atomic::AtomicU64::new(
+                u64::try_from(seen_after.as_millis()).unwrap_or(u64::MAX),
+            ),
+        };
+        self.0
+            .sessions
+            .write()
+            .expect("principals")
+            .insert(session.to_string(), held);
+    }
+
+    /// When `session` was last used, after it was opened, as this host
+    /// holds it; none where it holds it not.
+    #[cfg(test)]
+    pub(crate) fn seen_for_test(&self, session: &str) -> Option<Duration> {
+        self.0
+            .sessions
+            .read()
+            .expect("principals")
+            .get(session)
+            .map(|h| Duration::from_millis(h.seen.load(Ordering::SeqCst)))
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1711,71 +1750,5 @@ mod tests {
         assert_eq!(identity.requires("OwnsPost", &[], "s-1", &host), Ok(false));
         assert_eq!(take_refusal().as_deref(), Some("SignedIn"));
         assert_eq!(take_refusal(), None);
-    }
-
-    /// **A session in this host's memory alone expires** (track
-    /// second-host, the integrator's ruling 2 of 2026-10-20), by the host's
-    /// clock: idle past its idle time, or past its lifetime however it was
-    /// used, it is no one in the accounts model, its own guest in the guest
-    /// model, and forgotten; used within its idle time it holds, and its use
-    /// is recorded.
-    #[test]
-    fn a_session_in_memory_alone_expires_idle_and_past_its_lifetime() {
-        let principals = Principals::default();
-        principals.set_accounts(true);
-        principals.expire_after(SessionLifetimes {
-            idle: Duration::from_secs(50),
-            absolute: Duration::from_secs(200),
-        });
-        let ada = Principal {
-            user: "ada".to_string(),
-            handle: "@ada".to_string(),
-            name: "Ada".to_string(),
-            issuer: "https://id.example.test".to_string(),
-        };
-        // Opened `opened_ago` seconds ago, last used `seen_after` seconds
-        // after it was opened.
-        let held = |opened_ago: u64, seen_after: u64| Held {
-            principal: ada.clone(),
-            opened: std::time::Instant::now()
-                .checked_sub(Duration::from_secs(opened_ago))
-                .expect("the host has run that long"),
-            seen: std::sync::atomic::AtomicU64::new(seen_after * 1000),
-        };
-        let put = |session: &str, h: Held| {
-            principals
-                .0
-                .sessions
-                .write()
-                .expect("principals")
-                .insert(session.to_string(), h);
-        };
-        put("idle", held(100, 0));
-        put("used", held(100, 90));
-        put("old", held(300, 299));
-        assert_eq!(principals.of("idle"), None, "idle past fifty seconds");
-        assert_eq!(
-            principals.of("old"),
-            None,
-            "past its two hundred, used a moment ago"
-        );
-        assert_eq!(
-            principals.of("used"),
-            Some(ada.clone()),
-            "used ten seconds ago"
-        );
-        let recorded = principals.0.sessions.read().expect("principals")["used"]
-            .seen
-            .load(Ordering::SeqCst);
-        assert!(recorded >= 100_000, "its use recorded now: {recorded} ms");
-        let held_now = principals.0.sessions.read().expect("principals").len();
-        assert_eq!(held_now, 1, "the expired ones forgotten");
-        principals.set_accounts(false);
-        put("idle-guest", held(100, 0));
-        assert_eq!(
-            principals.of("idle-guest"),
-            Some(Principal::guest("idle-guest")),
-            "its own guest in the guest model"
-        );
     }
 }

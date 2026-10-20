@@ -1008,6 +1008,66 @@ fn a_deployment_states_how_long_its_sessions_live() {
     assert!(refused_as_no_one(&b, &ada, "i-2"), "one hour idle allowed");
 }
 
+/// **A session in one host's memory alone expires** (the integrator's
+/// ruling 2 of 2026-10-20), by the host's clock, where no database keeps
+/// sessions: idle past its idle time, or past its lifetime however it was
+/// used, it is no one in the accounts model, its own guest in the guest
+/// model, and forgotten; used within its idle time it holds, and its use is
+/// recorded.
+#[test]
+fn a_session_in_one_hosts_memory_alone_expires_idle_and_past_its_lifetime() {
+    use crate::identity::{Principal, Principals, SessionLifetimes};
+    use std::time::Duration;
+    let lifetimes = SessionLifetimes {
+        idle: Duration::from_secs(50),
+        absolute: Duration::from_secs(200),
+    };
+    let identity = crate::identity::Identity::default();
+    identity.signed_in_for_test("s-ada", "ada", "Ada");
+    let principals = identity.principals();
+    principals.expire_after(lifetimes);
+    let ada = principals.of("s-ada").expect("signed in");
+    let aged = |p: &Principals, session: &str, opened_ago: u64, seen_after: u64| {
+        p.held_for_test(
+            session,
+            ada.clone(),
+            Duration::from_secs(opened_ago),
+            Duration::from_secs(seen_after),
+        );
+    };
+    aged(&principals, "idle", 100, 0);
+    aged(&principals, "used", 100, 90);
+    aged(&principals, "old", 300, 299);
+    assert_eq!(principals.of("idle"), None, "idle past fifty seconds");
+    assert_eq!(
+        principals.of("old"),
+        None,
+        "past its two hundred, used a moment ago"
+    );
+    assert_eq!(
+        principals.of("used"),
+        Some(ada.clone()),
+        "used ten seconds ago"
+    );
+    let recorded = principals.seen_for_test("used").expect("held");
+    assert!(
+        recorded >= Duration::from_secs(100),
+        "its use recorded now: {recorded:?}"
+    );
+    for gone in ["idle", "old"] {
+        assert_eq!(principals.seen_for_test(gone), None, "{gone} forgotten");
+    }
+    // The guest model: a session expired is its own guest.
+    let guests = Principals::default();
+    guests.expire_after(lifetimes);
+    aged(&guests, "idle-guest", 100, 0);
+    assert_eq!(
+        guests.of("idle-guest"),
+        Some(Principal::guest("idle-guest")),
+        "its own guest"
+    );
+}
+
 /// **Signing in gives a new session, on every host** (the integrator's
 /// ruling 2 of 2026-10-20; OWASP's session fixation defence): the session the
 /// browser came with, which another could have set, is no one on either

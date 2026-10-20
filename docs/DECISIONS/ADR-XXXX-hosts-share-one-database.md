@@ -381,7 +381,7 @@ layer and host:
 ### 6. Tests
 
 - Two hosts in one process, each its own `Server` on one PostgreSQL schema
-  (`tests/second_host.rs`, 30): a post through A told live to a page on B,
+  (`tests/second_host.rs`, 31): a post through A told live to a page on B,
   and not before B reads; each commit told once on each host (A's reader
   hears none of A's own); B's listening connection terminated
   (`pg_terminate_backend`) while A commits, and B catching up from its
@@ -408,8 +408,8 @@ layer and host:
   hosts, its row gone, each with its control; its use recorded at most once
   a minute; a deployment's lifetimes read, refused by name, and held to;
   signing in, and again as another user, rotating the session on both
-  hosts; `PW_FEED_SCHEMA` a test's. In `identity.rs`: a session in one
-  host's memory alone expiring idle and past its lifetime.
+  hosts; `PW_FEED_SCHEMA` a test's; a session in one host's memory alone
+  expiring idle and past its lifetime.
 - The browser: two servers per engine on one schema of the engine's own, in
   Chromium, Firefox and WebKit (`e2e-hosts/second-host.spec.mjs`, through
   `playwright.hosts.config.mjs`, 5 tests): a session made on A holding on B

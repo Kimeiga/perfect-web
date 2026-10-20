@@ -37,8 +37,7 @@ Each mutant undoes one rule:
   not recorded, an expired one not forgotten.
 
 The tests then fail: `tests::second_host::` (`hosts`), two of the store's
-PostgreSQL tests (`store`), identity's own (`unit`), or the two-host browser
-suite in Chromium
+PostgreSQL tests (`store`), or the two-host browser suite in Chromium
 (`browser`, `e2e-hosts/second-host.spec.mjs` through
 `playwright.hosts.config.mjs`; it needs the feed's build, `feed.sh`). Every
 suite needs a database: PW_FEED_DATABASE_URL and PW_STORE_DATABASE_URL, a
@@ -539,28 +538,28 @@ MUTANTS = [
     ),
     (
         "in memory, an idle session is signed in still",
-        "unit",
+        "hosts",
         IDENTITY,
         "        age > lifetimes.absolute || age.saturating_sub(seen) > lifetimes.idle\n",
         "        age > lifetimes.absolute\n",
     ),
     (
         "in memory, a session past its lifetime is signed in still",
-        "unit",
+        "hosts",
         IDENTITY,
         "        age > lifetimes.absolute || age.saturating_sub(seen) > lifetimes.idle\n",
         "        age.saturating_sub(seen) > lifetimes.idle\n",
     ),
     (
         "in memory, a session's use is not recorded",
-        "unit",
+        "hosts",
         IDENTITY,
         "        self.seen.store(age, Ordering::SeqCst);\n",
         "        let _ = age;\n",
     ),
     (
         "in memory, an expired session is not forgotten",
-        "unit",
+        "hosts",
         IDENTITY,
         "        if expired {\n"
         "            self.close(session);\n"
@@ -577,8 +576,6 @@ STORE_TESTS = [
 SUITES = {
     "hosts": (CARGO + ["tests::second_host::"], {}),
     "store": (CARGO + STORE_TESTS, {}),
-    # A session in one host's memory alone, its expiry by the host's clock.
-    "unit": (CARGO + ["identity::tests::"], {}),
 }
 
 # The browser suite: the development server built from the source as it is,
@@ -650,7 +647,7 @@ def main():
         if not os.environ.get(needed):
             print(f"FAIL: every suite needs {needed}, a throwaway database")
             return 1
-    for suite in ("hosts", "store", "unit", "browser"):
+    for suite in ("hosts", "store", "browser"):
         valid, passed, failed = run(suite)
         print(f"baseline ({suite}): {passed} passed, {failed} failed", flush=True)
         if not valid or failed or not passed or watch.stopped:
