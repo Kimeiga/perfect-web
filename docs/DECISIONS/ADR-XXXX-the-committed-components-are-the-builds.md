@@ -56,3 +56,50 @@ it. The store's build emits 55 components.
   (`spikes/own-renderer/store-ir.json`, which `run.sh` rewrites) is not held
   here; `wip/host-map-all-2026-10-19` (a520282f) has a check of it for the
   integrator.
+
+## A changed binary plans what reads it (the integrator's addition, 2026-10-20)
+
+Train-10's landing found the other half of the defect: **neither the planner
+nor the evidence fetch's stale check sees a change to a binary file**. `git
+diff -U0` gives a binary no `+++` line and no hunk, only `Binary files a/x
+and b/x differ`, so `ci_plan.parsed` never listed it: 8c5618c8, which
+regenerated three of the store's components, planned no recipe and staled no
+evidence, and the recipes that read them (72, with what else train-10
+changed) were chosen by hand.
+
+Now `ci_plan.hunks`, which the planner (`--changed`), `current`'s reach, the
+fetch's stale check (`hunks(sha, None)`) and the evidence-count check all
+read, lists each binary the diff names (`binaries`: changed, added, or
+deleted, by its path before) and adds, as changed lines, **each line of a
+text file that names it** (`read_by`, `with_readers`), at the head the range
+ends at, or in the tree here: its path; its directory as a whole
+(`root.join("<directory>")`, `cp ... <directory>/`); or its directory with a
+name a glob or a placeholder makes it (`<directory>/*.wasm`,
+`format!("<directory>/{id}.wasm")`, `$id`, `${id}`); never another file's
+name, a directory inside or beside it, or a record (`docs/`,
+`scripts/ci_seconds.json`, as `verified_base.RECORDS`). The planner's rules
+then plan from those lines as from any change: the recipe whose own lines
+name the binary, a test file that loads it and so each script and recipe
+that runs that test, a mutant beside such a line.
+
+8c5618c8 alone, planned on this tree's recipes: none before; now
+`e10-build`, `e14-command-retry`, `e14-committed-components`,
+`e14-descriptions`, `e14-last-known-good`, `e14-render-merge`,
+`e14-row-reads`, `e14-telling`, `e9-values` (through
+`evidence_is_current.rs`, pw-host's `display`, `host_answers` and
+`list_arguments` tests, the server's loader lines in `main.rs`, and
+`e10-component`'s own lines). Tests (scripts/tests/test_ci_scripts.py):
+`test_a_changed_binary_is_named_where_a_line_names_it`,
+`test_a_changed_component_plans_the_recipes_whose_tests_read_it` (with the
+control that the component alone, as the diff gave it, plans nothing), and
+`test_a_binary_changed_in_a_range_or_the_tree_here_is_changed_where_it_is_read`
+(on a git of its own). Controls: eight in
+`scripts/evidence_integrity_mutations.py` (2b), each killed by the plan
+suite.
+
+Not claimed: a binary read by a name the program builds at run time with
+its directory nowhere on the line (a list of ids joined with a directory
+named elsewhere) is found only by the line that names the directory; a line
+naming an ancestor as a whole (`docs/evidence`) does not name it; and a
+recipe whose own lines run a reader test without a mutation script is
+planned by that test's change only where the planner already plans it.
