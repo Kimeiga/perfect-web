@@ -250,7 +250,10 @@ const NAMED_HEADS: &[&str] = &[
 ];
 
 /// A table's bounded clause takes a literal count on its line.
-const COUNTED_HEADS: &[&str] = &["bounded"];
+const COUNTED_HEADS: &[&str] = &[
+    "bounded", // A device's signal's version (track `device-store`): `version 2`.
+    "version",
+];
 
 pub const POLICY_KEYWORDS: &[&str] = &[
     // E8's effect ontology: `capability database.read<T>` and
@@ -304,6 +307,11 @@ pub const POLICY_KEYWORDS: &[&str] = &[
     "refers",
     "bounded",
     "migrate",
+    // Track `device-store` (ADR-XXXX): the version of a value the device
+    // keeps, a clause only where its count follows on its line
+    // (`COUNTED_HEADS`); its `migrate` is a table's word, for the same
+    // thing: its change from the version released.
+    "version",
     // Track `uploads` (ADR-0260): where an upload's committed files are
     // served, and its limits, each a literal.
     "serves",
@@ -2916,7 +2924,13 @@ impl<'a> P<'a> {
         // **`signal drawer: Bool`: a signal a page or view provides**
         // (ADR-0144). A name and a type: a `provide` in a body gives it its
         // value, for what that body contains. A value written here is
-        // refused, and kept in the tree.
+        // refused, and kept in the tree, unless clauses follow it on the
+        // lines below: **a signal the device keeps** (track `device-store`,
+        // ADR-XXXX), whose value is the default the device starts with and
+        // whose clauses say where it rests (`storage device "todos"`), whose
+        // it is (`privacy Device`) and what two tabs' writes do (`conflict
+        // last_write_wins`). What they must say is the checker's
+        // (`device_store`, PW6805).
         if self.at_kw("signal") && self.nth_is(1, Kind::Ident) {
             self.start(K::LetDecl);
             self.bump(); // signal
@@ -2926,13 +2940,22 @@ impl<'a> P<'a> {
                 self.type_ref();
             }
             if self.at(Kind::Eq) {
-                self.error_help(
-                    "PW5306",
-                    "a signal declared in a module has no value of its own",
-                    "a page or view gives it one, for what it contains: `provide name = value`",
-                );
+                let written = self.cur_span();
                 self.bump();
                 self.expr(0);
+                if self.at_policy_head() && self.newline_ahead() {
+                    self.policies(false);
+                } else {
+                    self.errors.push(SyntaxError {
+                        code: "PW5306",
+                        message: "a signal declared in a module has no value of its own".into(),
+                        span: written,
+                        help: Some(
+                            "a page or view gives it one, for what it contains: `provide name =                              value`; or the device keeps it: `storage device \"name\"` on the                              line below"
+                                .into(),
+                        ),
+                    });
+                }
             }
             self.finish();
             return true;

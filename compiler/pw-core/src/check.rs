@@ -268,6 +268,9 @@ pub fn check_units(units: &[Unit]) -> Vec<(String, Vec<Diagnostic>)> {
             // Track `todomvc` (ADR-XXXX): a page binds a signal to its
             // address's fragment (PW61xx).
             out.extend(crate::address_fragment::check(&hirs, i));
+            // Track `device-store` (ADR-XXXX): a value the device keeps, and
+            // the `Device` label that keeps it there (PW68xx).
+            out.extend(crate::device_store::check(&hirs, i, &sigs, &summaries));
             // ADR-0303: a page is shown in its layout.
             out.extend(crate::layouts::check(&hirs, &workspace, i));
             // ADR-0243's amendment: markup is no operand.

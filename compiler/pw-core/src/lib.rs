@@ -35,6 +35,8 @@ pub mod check;
 pub mod codes;
 pub mod contexts;
 pub mod contract;
+// Track `device-store` (ADR-XXXX): a value the reader's device keeps.
+pub mod device_store;
 pub mod diag;
 pub mod diagnostics;
 pub mod effects;

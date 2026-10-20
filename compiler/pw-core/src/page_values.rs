@@ -776,6 +776,13 @@ pub struct PageValues {
     /// renders the signal's first value, since it never sees a fragment.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fragment: Option<crate::address_fragment::Binding>,
+    /// **The values the device keeps that the page holds** (track
+    /// `device-store`, ADR-XXXX): each one's signal, the name and version it
+    /// is kept under, its tabs' policy and each version's form. The browser
+    /// reads each before what it decides is shown; a host renders its
+    /// declared default, since the device's never reaches it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub device: Vec<crate::device_store::Held>,
 }
 
 fn public_scope() -> String {
@@ -2354,6 +2361,7 @@ fn plan(
             layout,
             predicates: asked.into_iter().collect(),
             fragment: crate::address_fragment::declared(decl),
+            device: crate::device_store::held(hirs, ws, sigs, unit, id)?,
         },
         members,
         computed,

@@ -217,6 +217,42 @@ impl Lowerer<'_> {
         Some(BodyId(self.hir.bodies.alloc(body, span)))
     }
 
+    /// **The default of a signal the device keeps** (track `device-store`,
+    /// ADR-XXXX): `signal todos: List<Todo> = []` at module level, its clauses
+    /// below it. Its value is a body of its own, whose root is the value, so
+    /// it is resolved, typed and checked as data where it is written, and
+    /// the build writes it as a page's signal's first value is written
+    /// (`backend::signals`). A module's signal with a value and no clause is
+    /// the grammar's PW5306, and has none.
+    fn signal_default(
+        &mut self,
+        owner: DeclId,
+        kind: DeclKind,
+        node: &SyntaxNode,
+        policies: &mut [Policy],
+    ) -> Option<BodyId> {
+        if kind != DeclKind::Signal || policies.is_empty() {
+            return None;
+        }
+        let value = node.children().find(|c| is_expr(c.kind()))?;
+        let mut b = BodyBuilder::default();
+        let root = self.expr(&mut b, &value);
+        self.policy_terms(&mut b, policies);
+        let body = Body {
+            owner,
+            exprs: b.exprs,
+            pats: b.pats,
+            types: b.types,
+            nodes: b.nodes,
+            root,
+            signals: b.signals,
+            param_types: b.param_types,
+            bound: b.bound,
+            provides: b.provides,
+        };
+        Some(BodyId(self.hir.bodies.alloc(body, span_of(&value))))
+    }
+
     /// **A standalone parse's errors, each moved to its place in the file**
     /// (ADR-0237). Until then they were dropped, and what such a parse could
     /// not read was simply not there: `invalidates Cart(s) Order(s)`
@@ -468,7 +504,10 @@ impl Lowerer<'_> {
         );
         let (body, children) = match node.children().find(|c| c.kind() == K::Body) {
             Some(b) => self.body(id, &b, &mut policies),
-            None => (None, Vec::new()),
+            None => (
+                self.signal_default(id, kind, node, &mut policies),
+                Vec::new(),
+            ),
         };
         // An interface's clause terms, in an arena of their own (ADR-0240).
         let terms = match body {

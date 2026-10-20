@@ -4,7 +4,7 @@
 //! their resolved identities, or the reason resolution failed, never a second
 //! head/argument spelling. Missing and invalid annotations are distinct states.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::hir::{Decl, DeclKind, DeclaredType, Hir, Span};
 use crate::privacy::{Label, Restriction};
@@ -173,6 +173,9 @@ pub struct Signatures {
     /// **Each module signal's type** (ADR-0144), resolved where it is
     /// declared: what a body it is provided to reads and writes.
     signal_types: BTreeMap<DefId, TypeResolution>,
+    /// **The module signals the device keeps** (track `device-store`,
+    /// ADR-XXXX): a read of one is the device's (`labels.rs`).
+    device: BTreeSet<DefId>,
 }
 
 impl Signatures {
@@ -197,6 +200,9 @@ impl Signatures {
                 };
                 out.paths.insert(def, path);
                 out.kinds.insert(def, decl.kind);
+                if crate::device_store::is_kept(decl) {
+                    out.device.insert(def);
+                }
                 if decl.kind == DeclKind::Signal
                     && let Some(written) = &decl.ret
                 {
@@ -505,6 +511,32 @@ impl Signatures {
     /// **The type a module signal declares** (ADR-0144), by its identity.
     pub fn signal_type(&self, def: DefId) -> Option<&TypeResolution> {
         self.signal_types.get(&def)
+    }
+
+    /// **Is `def` a module signal the device keeps?** (track
+    /// `device-store`, ADR-XXXX).
+    pub fn kept_by_the_device(&self, def: DefId) -> bool {
+        self.device.contains(&def)
+    }
+
+    /// **The label a module's signal named `name` brings, read in `module`**:
+    /// `Device` for one the device keeps, and nothing for any other, which
+    /// holds what a page or view provides (track `device-store`).
+    pub fn signal_label(&self, module: Option<&str>, name: &str) -> Option<Label> {
+        let unit = self.unit_of(module)?;
+        let found = if name.contains('.') {
+            self.workspace.resolve_path_in(unit, Namespace::Term, name)
+        } else {
+            self.workspace.resolve_in(unit, Namespace::Term, name)
+        };
+        match found {
+            Resolution::Local(def) | Resolution::Imported { def, .. }
+                if self.device.contains(&def) =>
+            {
+                Some(Label::device())
+            }
+            _ => None,
+        }
     }
 
     pub fn in_module(&self, module: Option<&str>, path: &str) -> Option<&Signature> {

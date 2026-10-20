@@ -60,15 +60,98 @@ pub fn compile(units: &[crate::check::Unit]) -> Result<Vec<Compiled>, String> {
     for planned in crate::page_values::pages(&hirs, &ws, &sigs) {
         let Ok(plan) = &planned.plan else { continue };
         let computed: Vec<&Live> = plan.live.iter().filter(|l| !l.derived.is_empty()).collect();
-        if computed.is_empty() {
+        // And the steps each value the device keeps takes from an earlier
+        // version to its own (track `device-store`), which the runtime loads
+        // only where the device holds an earlier one.
+        let migrating = plan.device.iter().any(|h| h.version > 1);
+        if computed.is_empty() && !migrating {
             continue;
         }
+        let module = module(&cx, &planned.page, &computed, &derived).and_then(|mut source| {
+            if migrating {
+                source.push_str(&migrations(&cx, &planned.page)?);
+            }
+            Ok(source)
+        });
         out.push(Compiled {
-            module: module(&cx, &planned.page, &computed, &derived),
+            module,
             page: planned.page,
         });
     }
     Ok(out)
+}
+
+/// **Each value the device keeps that `page` holds, its steps from each
+/// earlier version to the next** (track `device-store`, ADR-XXXX): `export
+/// const migrations`, by the signal, each step a function from the stored
+/// value's wire form to the next version's.
+fn migrations(cx: &Context<'_>, page: &str) -> Result<String, String> {
+    let mut found = None;
+    for (unit, hir) in cx.hirs.iter().enumerate() {
+        for (id, decl) in hir.all_decls() {
+            if decl.kind == crate::hir::DeclKind::Page
+                && crate::contract::component_id(hir, id) == page
+            {
+                found = Some((unit, id));
+            }
+        }
+    }
+    let (unit, id) = found.ok_or_else(|| format!("no page `{page}`"))?;
+    let mut source = String::from(
+        "
+export const migrations = {
+",
+    );
+    for (signal, def) in crate::device_store::held_by(cx.hirs, cx.ws, cx.sigs, unit, id) {
+        let Some(kept) =
+            crate::resolve::declaration(cx.hirs, def).and_then(crate::device_store::Kept::of)
+        else {
+            continue;
+        };
+        if kept.version < 2 {
+            continue;
+        }
+        let mut steps = Vec::new();
+        for step in &kept.migrations {
+            let target = match cx.sigs.workspace().resolve(def.unit, step) {
+                crate::resolve::Resolution::Local(d)
+                | crate::resolve::Resolution::Imported { def: d, .. } => d,
+                _ => return Err(format!("`{signal}`'s migration `{step}` names nothing")),
+            };
+            let decl = crate::resolve::declaration(cx.hirs, target)
+                .ok_or_else(|| format!("`{step}` has no declaration"))?;
+            let span = decl.name_span.clone();
+            let function = match lower::function(cx, target.unit, decl, span) {
+                Lowering::Lowered(f) => f,
+                other => return Err(format!("`{signal}`'s migration `{step}`: {other}")),
+            };
+            let program = lower::program_of(cx, vec![function]);
+            steps.push(super::js_pure::wire_to_wire(
+                &program.functions[0],
+                &program,
+            )?);
+        }
+        source.push_str(&format!(
+            "  {}: [
+{}
+  ],
+",
+            serde_json::Value::String(signal).to_string(),
+            steps
+                .iter()
+                .map(|s| format!("    {s}"))
+                .collect::<Vec<_>>()
+                .join(
+                    ",
+"
+                )
+        ));
+    }
+    source.push_str(
+        "};
+",
+    );
+    Ok(source)
 }
 
 /// **One page's module**: each function the compiler lifted, as `js_pure`

@@ -952,11 +952,19 @@ pub struct Provision {
     /// **Each query's `on_key_change`**, as declared, or `None` (ADR-0152): a
     /// page that keys one by a signal reads it wherever it is declared.
     pub stale_work: BTreeMap<DefId, Option<String>>,
+    /// **The module signals the device keeps** (track `device-store`,
+    /// ADR-XXXX): provided by the device, so no page or view needs to.
+    pub device: BTreeSet<DefId>,
 }
 
 impl Provision {
     pub fn of(hirs: &[&Hir], sigs: &Signatures) -> Provision {
-        let mut p = Provision::default();
+        let mut p = Provision {
+            device: crate::device_store::kept_signals(hirs)
+                .into_keys()
+                .collect(),
+            ..Provision::default()
+        };
         for (unit, hir) in hirs.iter().enumerate() {
             for (id, decl) in hir.all_decls() {
                 if decl.kind == DeclKind::Signal {
@@ -1012,7 +1020,9 @@ fn needs_of(
         .collect();
     let mut needs: BTreeMap<DefId, Vec<String>> = BTreeMap::new();
     for (signal, _) in module_signals_named(sigs, def.unit, &lexical, body) {
-        if !gives.contains(&signal) {
+        // One the device keeps is the device's to provide (track
+        // `device-store`).
+        if !gives.contains(&signal) && !p.device.contains(&signal) {
             needs.entry(signal).or_default();
         }
     }
@@ -1088,7 +1098,11 @@ fn provided_in(sigs: &Signatures, unit: usize, body: &Body) -> Vec<(DefId, ExprI
 
 /// **The views a body's markup uses**: each element naming one, the view,
 /// the tag as written, and whether it is inside a loop's row.
-fn composed(sigs: &Signatures, unit: usize, body: &Body) -> Vec<(NodeId, DefId, String, bool)> {
+pub(crate) fn composed(
+    sigs: &Signatures,
+    unit: usize,
+    body: &Body,
+) -> Vec<(NodeId, DefId, String, bool)> {
     fn walk(
         sigs: &Signatures,
         unit: usize,
@@ -1227,6 +1241,10 @@ fn provided(
     let lexical = Lexical::build(decl, body);
     let mut reported: BTreeSet<DefId> = BTreeSet::new();
     for (signal, e) in module_signals_named(sigs, at, &lexical, body) {
+        // The device provides one it keeps (track `device-store`).
+        if provision.device.contains(&signal) {
+            continue;
+        }
         if given.contains_key(&signal) || !reported.insert(signal) {
             continue;
         }

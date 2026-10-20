@@ -662,13 +662,32 @@ impl<'a> Types<'a> {
         &self.lexical
     }
 
+    /// The type a module's signal named `n` declares, where `n` names one
+    /// from this body's module.
+    fn module_signal(&self, n: &str) -> Option<ResolvedType> {
+        let unit = self.sigs.unit_of(self.module.as_deref())?;
+        let def = match self
+            .sigs
+            .workspace()
+            .resolve_in(unit, crate::resolve::Namespace::Term, n)
+        {
+            crate::resolve::Resolution::Local(d)
+            | crate::resolve::Resolution::Imported { def: d, .. } => d,
+            _ => return None,
+        };
+        self.sigs.signal_type(def)?.resolved().cloned()
+    }
+
     pub fn of(&self, body: &Body, id: ExprId) -> Option<ResolvedType> {
         match body.expr(id) {
             // The binding the name means here (ADR-0063), or `self`.
             Expr::Name(n) => match self.lexical.binder(id) {
                 Some(b) => self.bindings.get(&b).cloned(),
                 None if n == "self" => self.self_type.clone(),
-                None => None,
+                // A module's signal the body reads, provided to it or kept
+                // by the device: of the type it declares (ADR-0144; track
+                // `device-store`).
+                None => self.module_signal(n),
             },
             Expr::Field { base, name } => {
                 let receiver = self.of(body, *base)?;

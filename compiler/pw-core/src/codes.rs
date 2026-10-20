@@ -24,6 +24,7 @@
 //! PW60xx   the kiokun track's (ADR-0253): kiokun.com in Pleris
 //! PW61xx   the todomvc track's (ADR-0253): TodoMVC in Pleris
 //! PW64xx   the payments track's (NEXT 6c): a command the platform invokes
+//! PW68xx   the device-store track's: a value the reader's device keeps
 //! ```
 //!
 //! A parallel track registers its codes in its own block, with its own
@@ -129,6 +130,10 @@ pub enum Owner {
     /// to its own spec and tests (docs/PARALLEL.md, W7's plan). A signal a
     /// page binds to its address's fragment.
     Todomvc,
+    /// The device-store track's codes, PW68xx (ADR-XXXX, a block asked of
+    /// the integrator): a value the reader's device keeps, charter §9.1's
+    /// fourth kind of state, and the `Device` label that keeps it there.
+    DeviceStore,
 }
 
 impl fmt::Display for Code {
@@ -942,6 +947,28 @@ codes! {
         "a `schedule` or an `unschedule` is a command's statement: what a page shows schedules nothing";
     SCHEDULE_TIME = "PW6503" / schedule_time / 1, Schedules,
         "a scheduled run's time is `at` an `Instant` or `after` a `Duration`";
+
+    // --- the device-store track (PW68xx; ADR-XXXX) ------------------------
+    //
+    // `signal todos: List<Todo> = []` at module level with `storage device
+    // "todos-pleris"`, `privacy Device` and `conflict last_write_wins`: a
+    // value the reader's device keeps, which never leaves it.
+    DEVICE_VALUE_TO_A_COMMAND = "PW6801" / device_value_to_a_command / 1, DeviceStore,
+        "a value the device keeps is no command's argument, and decides no command's call: a command runs on the server";
+    DEVICE_VALUE_KEYS_A_QUERY = "PW6802" / device_value_keys_a_query / 1, DeviceStore,
+        "a value the device keeps keys no page's query: the key is sent to the server to read it again";
+    DEVICE_VALUE_SENT = "PW6803" / device_value_sent / 1, DeviceStore,
+        "a value the device keeps is written nowhere the browser sends: a navigation, an address, a form";
+    DEVICE_KEEPS_ITS_OWN = "PW6804" / device_keeps_its_own / 1, DeviceStore,
+        "a signal the device keeps is assigned no session's, user's, organization's or secret's value";
+    DEVICE_SIGNAL_CLAUSES = "PW6805" / device_signal_clauses / 1, DeviceStore,
+        "a signal the device keeps says where it rests, `storage device \"name\"` (one name a program), whose it is, `privacy Device`, and what two tabs' writes do, `conflict last_write_wins`";
+    DEVICE_SIGNAL_VERSIONS = "PW6806" / device_signal_versions / 1, DeviceStore,
+        "a signal the device keeps has a pure migration for each version before its own, each taking the one before it to the next";
+    DEVICE_SIGNAL_FORM = "PW6807" / device_signal_form / 1, DeviceStore,
+        "a signal the device keeps is of a type the device can hold: data, no function, no type that contains itself, no opaque type with a `where`";
+    DEVICE_SIGNAL_PROVIDED = "PW6808" / device_signal_provided / 1, DeviceStore,
+        "a signal the device keeps is provided by the device: no `provide` gives it a value";
 }
 
 /// Codes that were registered, are no longer emitted, and whose numbers must
@@ -1036,6 +1063,7 @@ impl Owner {
             Owner::StoreSearch => "PW63",
             Owner::Payments => "PW64",
             Owner::Schedules => "PW65",
+            Owner::DeviceStore => "PW68",
             Owner::Syntax | Owner::Resolution => "PW00",
             Owner::Placement | Owner::Privacy | Owner::Markup => "PW50",
             Owner::Types => "PW06",
@@ -1104,6 +1132,7 @@ mod tests {
                 (Owner::StoreSearch, "PW63"),
                 (Owner::Payments, "PW64"),
                 (Owner::Schedules, "PW65"),
+                (Owner::DeviceStore, "PW68"),
             ] {
                 assert!(
                     !c.id.starts_with(block) || c.owner == owner,
