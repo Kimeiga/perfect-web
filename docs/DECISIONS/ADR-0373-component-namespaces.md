@@ -1,4 +1,4 @@
-# ADR-XXXX: component identity retains the declaration namespace
+# ADR-0373: component identity retains the declaration namespace
 
 Status: integrator-approved policy, 2026-10-20; implementation in progress.
 Milestone: E14; A-008 follow-up to ADR-0361.

@@ -3,7 +3,7 @@
 // @category: distinct query, view and page namespaces
 // @charter: section 8.1
 // @milestone: E14
-// ADR-XXXX: a source name may identify both a term and UI declaration.
+// ADR-0373: a source name may identify both a term and UI declaration.
 
 module demo.namespaces
 

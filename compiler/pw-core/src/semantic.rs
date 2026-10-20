@@ -81,7 +81,7 @@ pub struct Page {
 
 /// Review declarations share one map, so retain each resolver namespace.
 /// Component namespaces agree with contracts; the separate type-shape map
-/// and type references keep their existing paths (ADR-XXXX).
+/// and type references keep their existing paths (ADR-0373).
 fn declaration_path(hir: &crate::hir::Hir, id: crate::hir::DeclId) -> String {
     use crate::resolve::Namespace;
     let path = crate::contract::component_id(hir, id);

@@ -1,4 +1,4 @@
-// ADR-XXXX: a query and UI declaration with the same source name stay distinct.
+// ADR-0373: a query and UI declaration with the same source name stay distinct.
 import { expect, test } from "@playwright/test";
 
 const PAGE = "/namespace-identities";

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Controls for namespace-preserving component identities (ADR-XXXX).
+"""Controls for namespace-preserving component identities (ADR-0373).
 
 Run whole through just e14-wit-unique. A broken build or stopped producer is
 refused, never a kill; source is restored after every mutation.
