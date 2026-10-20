@@ -592,39 +592,44 @@ None open: the four of 2026-10-19 were ruled on 2026-10-20 (above).
 
 ## Evidence
 
-Recorded on the PC, 2026-10-19/20 (WSL2, 32 threads shared with other
-workers, load averages 40-100 through these runs), PostgreSQL 18.6, rustc
-1.97.1, Playwright 1.58.0:
+Recorded on the PC, 2026-10-20, after the merge of train-10 and with the
+integrator's rulings of 2026-10-20 built (WSL2, 32 threads shared with
+other workers, load averages 15-100), PostgreSQL 18.6, rustc 1.97.1,
+Playwright 1.58.0; and, from 2026-10-20 14:00Z, on GitHub, by the owner's
+rule that heavy runs go there:
 
-- **`just e14-second-host`** at 773fa9c4, clean
-  (`docs/evidence/E14/second-host.txt`, 79 min, PORT=9264, load 70-135):
-  `tests::second_host::` 22 passed; `tests::feed_pg::` and
-  `tests::store_pg::` on PostgreSQL 32 passed;
-  `e2e-hosts/second-host.spec.mjs` 12 passed (4 tests in Chromium, Firefox
-  and WebKit, 1.1 min); `scripts/second_host_mutations.py` **34 of 34
-  mutants killed** (31 by the two-host tests, 1 by the store's, 2 by the
-  browser suite), every baseline green, no process stopped by the memory
-  bound. The same at 5cf742f2 (61 min), before 773fa9c4 named two of
-  `Tail::heard`'s types for clippy, which only `e14-second-host` reaches.
-- **Every mutation script the branch reaches** (`ci_plan.py --changed
-  origin/master HEAD`: twelve recipes), each run whole on this branch's code
-  (057801ce, the same code as 5cf742f2), in this worktree and two
-  throwaway lanes of it: scheduled 37 of 37, reviews 30 of 30, identity 16
-  of 16, bounded_statements 12 of 12, store_postgres 12 of 12,
-  interactions 10 of 10, cross_session 8 of 8, feed_postgres 7 of 7,
-  notifications 23 of 23, uploads 33 of 33, store_accounts 37 of 37 (their
-  browser suites in Chromium at PORT=9141, one at a time); with this
-  track's own, **259 of 259 mutants killed in twelve scripts**, every
-  baseline green, no process stopped by the memory bound, the anchors
-  checked after each (3083 in 268 scripts, each once).
-- **The server's whole suite** at 057801ce's code (in memory, the
-  PostgreSQL tests with the databases named): 607 passed, 1 failed, 9
-  ignored; the one, `the_store_sends_its_slots_after_its_own_content`
-  (154.1 ms past its 150 ms bound at load 60-74), passed alone, the flake
-  the render merge's ADR records on master.
-- **The render merge composed** (above): 93 passed on a local trial merge.
-- `just ci` at the pushed head, before the push (`just ci > log && git
-  push`): nothing is pushed on a red one.
+- **`just e14-second-host`** at e5a64c97, clean
+  (`docs/evidence/E14/second-host.txt`, PORT=9264): `tests::second_host::`
+  31 passed; `tests::feed_pg::` and `tests::store_pg::` on PostgreSQL 32
+  passed; `e2e-hosts/second-host.spec.mjs` 15 passed (5 tests in Chromium,
+  Firefox and WebKit, through `scripts/run_suite.sh`);
+  `scripts/second_host_mutations.py` **50 of 50 mutants killed**, every
+  baseline green, no process stopped by the memory bound. (At b78300e8 the
+  recipe builds `dist` first, for train-10's gate; its run on GitHub is
+  the verify below.)
+- **The mutation scripts the branch reaches** (`ci_plan.py --changed
+  origin/master HEAD`: seventeen recipes), each run whole on this branch's
+  code in this worktree and throwaway lanes of it: second_host 50 of 50,
+  dealt_by_time 54 of 54, evidence_integrity_2 35 of 35, reviews 30 of 30,
+  bounded_statements 13 of 13, store_postgres 12 of 12, cross_session 8 of
+  8, scheduled_orders 53 of 53, scheduled 37 of 37, identity 16 of 16,
+  interactions 10 of 10, feed_postgres 7 of 7, command_order 20 of 20 (its
+  eight browser mutants among them), canonical 21 of 21, notifications 23
+  of 23: **389 of 389 mutants killed in fifteen scripts**, every baseline
+  green, the anchors checked after each. uploads and store_accounts, the
+  last two, run on GitHub with every recipe of the plan: verify dispatched
+  on `wip/second-host` at this ADR's commit (its run named in the track's
+  report).
+- **The server's whole suite with the store on PostgreSQL** at 65162304:
+  649 passed, 2 failed: the two layers' pages compared to the byte (fixed,
+  a751a475: the memory host numbered as the PostgreSQL host) and the
+  bounded-statements page test's LIVE-window flake under load ~100 (fixed
+  on train-11, above).
+- **The render merge composed** (above, at ce9f8fb3, before the train-10
+  merge): 93 passed on a local trial merge.
+- `ci`: the `ci` workflow of the push of this ADR's commit to
+  `wip/second-host` (the equivalent of `just ci`, with the audit and ARM
+  jobs); `track/second-host` is pushed only at a commit whose `ci` is green.
 
 ## Next
 
