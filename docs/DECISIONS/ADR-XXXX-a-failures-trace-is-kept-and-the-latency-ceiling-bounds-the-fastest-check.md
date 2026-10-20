@@ -36,10 +36,12 @@ Amends ADR-0349's `scripts/run_suite.sh` and ADR-0344's section 4
   the CPU's flags, `perf_event_paranoid` is 2), and a GitHub-hosted runner
   is a virtual machine too. The statistic is the fastest of several CPU
   times (section 2).
-- **At the PC's own loads the old ceiling holds for train-10's checker.**
+- **At the PC's own loads the old ceiling held for train-10's checker.**
   Measured below: 143 to 330 ms CPU a thousand lines, alone, beside a
-  build, or beside 64 busy loops, against 800. The failures the coordinator saw (three of five
-  local `just ci` runs at load 40 to 80) need the complete-validation
+  build, or beside 64 busy loops (loads of 25 to 60), and 333 to 644 at
+  loads of 49 to 116 (the table), against 800. The failures the coordinator
+  saw (three of five local `just ci` runs at load 40 to 80) need the
+  complete-validation
   checker of track `check-is-build` (2.0 to 2.9 times the work: 508 to 809
   ms a thousand lines at loads of 21 to 55, its own notes), which is not
   on this base. So the proof of section 2 runs the checker also made two
@@ -152,7 +154,7 @@ Measured with `scripts/ci_plan.py` on this track's first two commits
   core and the host's, as well as its own work. The test took the median of
   seven consecutive checks, ten to thirty seconds of it, so the drift of
   those seconds was taken whole. For train-10's checker that is far from
-  800 ms a thousand lines (143 to 330 measured); for the
+  800 ms a thousand lines (143 to 644 measured, by load); for the
   complete-validation checker of track `check-is-build` (2.0 to 2.9 times
   the work, its notes) it was 508 to 809 at loads of 21 to 55, and the
   integrator reported three of five local `just ci` runs failing at 40 to
@@ -229,7 +231,7 @@ Measured with `scripts/ci_plan.py` on this track's first two commits
   hybrid cores, SMT and the host, which a guest cannot see: WSL2 reports 16
   cores of two threads), and the checker three times over fails there
   whatever the statistic. That is the ceiling's margin to carry
-  (train-10's checker: 800 against 143 to 330 on the PC, 321 on ARM; the
+  (train-10's checker: 800 against 143 to 644 on the PC, 321 on ARM; the
   complete-validation checker is 2.0 to 2.9 times that: ARM would measure
   640 to 930 against the 800, which is the integrator's to rule on, and
   no measurement here changes). A calibration loop would hold the verdict
