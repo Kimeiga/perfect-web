@@ -24,7 +24,8 @@ import sys
 import tempfile
 import time
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
+from types import SimpleNamespace
 from unittest import mock
 
 SCRIPTS = pathlib.Path(__file__).resolve().parent.parent
@@ -96,24 +97,24 @@ e14-long:
 e14-mid:
     @python3 scripts/toy.py mid 1.5
 e14-short:
-    @python3 scripts/toy.py short 0.5
+    @python3 scripts/toy.py short 0.2
 e14-bad:
-    @python3 scripts/toy.py bad 0.3 fail
+    @python3 scripts/toy.py bad 0.1 fail
 e14-survivor:
-    @python3 scripts/toy.py survivor 0.3 survive
+    @python3 scripts/toy.py survivor 0.1 survive
 e14-feed-postgres:
-    @python3 scripts/toy.py feed-postgres 0.3
+    @python3 scripts/toy.py feed-postgres 0.1
 e14-leave:
     @python3 scripts/toy.py leave 0.2 leave
 e14-hang:
     @python3 scripts/toy.py hang 0 hang
 e14-builds:
-    @python3 scripts/toy.py builds 0.3 ok target/debug/pw
+    @python3 scripts/toy.py builds 0.1 ok target/debug/pw
 """
 
 SECONDS = {
     "e14-long": 250, "e14-mid": 150, "e14-short": 50, "e14-bad": 30, "e14-survivor": 20,
-    "e14-feed-postgres": 10, "e14-leave": 5, "e14-hang": 5, "e14-builds": 1,
+    "e14-feed-postgres": 10, "e14-leave": 5, "e14-hang": 500, "e14-builds": 1,
 }
 
 
@@ -255,6 +256,20 @@ class Ports(unittest.TestCase):
             with self.assertRaises(pv.Refusal):
                 pv.lane_ports(4, root, 1000, 2000)
 
+    def test_lanes_that_fit_the_range_exactly_are_not_refused_and_one_port_short_is(self):
+        stride, _ = pv.mutation_slots.port_layout(ROOT)
+        self.assertEqual(pv.lane_ports(2, ROOT, 1000, 1000 + 2 * stride - 1), [1000, 1000 + stride])
+        with self.assertRaises(pv.Refusal):
+            pv.lane_ports(2, ROOT, 1000, 1000 + 2 * stride - 2)
+
+    def test_the_room_is_counted_in_whole_strides_over_the_whole_range(self):
+        stride, _ = pv.mutation_slots.port_layout(ROOT)
+        with self.assertRaises(pv.Refusal) as caught:
+            pv.lane_ports(4, ROOT, 1000, 1000 + 3 * stride - 1)
+        self.assertIn("room for 3 lanes", str(caught.exception))
+        self.assertIn(f"4 lanes need {4 * stride} ports ({stride} each", str(caught.exception))
+        self.assertIn(f"holds {3 * stride}", str(caught.exception))
+
     def test_a_range_past_the_last_port_is_refused(self):
         with self.assertRaises(pv.Refusal):
             pv.lane_ports(2, ROOT, 65400, 65535)
@@ -266,6 +281,27 @@ class Ports(unittest.TestCase):
             taken = s.getsockname()[1]
             self.assertIn(taken, pv.busy_ports(taken - 7, ROOT))
         self.assertNotIn(taken, pv.busy_ports(taken - 7, ROOT))
+
+    def test_a_port_in_time_wait_is_free_for_a_host_to_bind(self):
+        """A server that closed its connection first leaves its port in
+        TIME_WAIT, as the last run's hosts did; nothing listens there."""
+        with socket.socket() as server:
+            server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            server.bind(("127.0.0.1", 0))
+            server.listen()
+            port = server.getsockname()[1]
+            client = socket.create_connection(("127.0.0.1", port))
+            connection, _ = server.accept()
+            connection.close()
+            client.close()
+        self.assertNotIn(port, pv.busy_ports(port - 3, ROOT))
+
+    def test_the_first_port_of_a_range_is_checked_too(self):
+        with socket.socket() as s:
+            s.bind(("127.0.0.1", 0))
+            s.listen()
+            taken = s.getsockname()[1]
+            self.assertIn(taken, pv.busy_ports(taken, ROOT))
 
     def test_the_ports_checked_are_the_registrys_reserved_ones(self):
         _, highest = pv.mutation_slots.port_layout(ROOT)
@@ -408,6 +444,13 @@ class Plan(unittest.TestCase):
     def test_a_recipe_unmeasured_is_taken_as_one(self):
         self.assertEqual(pv.order(["x", "y"], {"y": 5}), ["y", "x"])
 
+    def test_a_recipe_without_a_cost_is_taken_as_one_not_as_nothing(self):
+        self.assertEqual(pv.order(["y", "x"], {"y": 1}), ["x", "y"])
+
+    def test_the_run_directory_is_named_by_the_head_unless_told(self):
+        self.assertEqual(pv.run_directory("a" * 40, None), pathlib.Path("/tmp/preverify-aaaaaaaaaaaa"))
+        self.assertEqual(pv.run_directory("a" * 40, "/x/y"), pathlib.Path("/x/y"))
+
     def test_a_job_carries_what_the_plan_knows_of_its_recipe(self):
         jobs = pv.jobs_of(["e14-reviews", "e14-render-merge", "e14-kiokun-cache"], ROOT)
         by = {j.recipe: j for j in jobs}
@@ -477,6 +520,43 @@ class Planner(Toy):
         self.assertEqual(names, ["e14-long", "e14-short", "e14-feed-postgres", "e14-builds"])
         self.assertIn("e14-feed-postgres: planned 10 s, CI 10 s (database)", done.stdout)
         self.assertIn("e14-builds: planned 1 s, CI 1 s (build)", done.stdout)
+
+    def test_recipes_named_twice_are_planned_once(self):
+        done = self.tool("--plan", "--recipes", "e14-short e14-mid", "--recipes", "e14-short")
+        self.assertEqual(re.findall(r"^  (e14-[a-z-]+):", done.stdout, re.M), ["e14-mid", "e14-short"])
+        self.assertIn("2 recipes at", done.stdout)
+
+    def test_lanes_of_none_are_refused(self):
+        done = self.tool("--plan", "--recipes", "e14-short", "--lanes", "0")
+        self.assertEqual(done.returncode, 2)
+        self.assertIn("give a whole number of lanes, 1 or more", done.stderr)
+
+    def test_current_evidence_is_left_out_as_a_push_leaves_it_and_the_planners_note_is_passed_on(self):
+        first = git(self.toy, "rev-parse", "HEAD").stdout.strip()
+        (self.toy / "justfile").write_text(
+            JUSTFILE + "e14-current:\n    @mkdir -p docs/evidence/E14\n"
+            '    @echo "commit: $(git rev-parse HEAD)" > docs/evidence/E14/current.txt\n')
+        git(self.toy, "commit", "-q", "-am", "a recipe that records its evidence")
+        second = git(self.toy, "rev-parse", "HEAD").stdout.strip()
+        (self.toy / "docs/evidence/E14").mkdir(parents=True)
+        (self.toy / "docs/evidence/E14/current.txt").write_text(f"commit: {second}\n")
+        git(self.toy, "add", "-A")
+        git(self.toy, "commit", "-q", "-m", "its evidence, recorded at the commit before")
+        left_out = self.tool("--plan", first)
+        self.assertEqual(left_out.returncode, 0, left_out.stderr)
+        self.assertIn(f"ci_plan: e14-current is current, recorded at {second[:8]}", left_out.stdout)
+        self.assertIn("nothing to run", left_out.stdout)
+        kept = self.tool("--plan", first, "--no-current")
+        self.assertIn("e14-current: planned", kept.stdout)
+        self.assertNotIn("is current", kept.stdout)
+
+    def test_a_root_that_is_no_git_is_refused_in_gits_words(self):
+        with tempfile.TemporaryDirectory() as t:
+            buffer = io.StringIO()
+            with redirect_stderr(buffer):
+                code = pv.main(["--plan", "--recipes", "e14-a"], pathlib.Path(t))
+        self.assertEqual(code, 2)
+        self.assertIn("preverify: `git rev-parse HEAD` failed", buffer.getvalue())
 
     def test_no_more_lanes_than_recipes(self):
         done = self.tool("--plan", "--recipes", "e14-short e14-long", "--lanes", "6")
@@ -702,6 +782,13 @@ class Lanes(Toy):
         self.assertIn("load average (1 min):", text)
         self.assertIn('just preverify origin/master --recipes "e14-bad e14-survivor"', text)
 
+    def test_the_wall_clock_is_the_runs_own(self):
+        wall = self.summary["meta"]["wall"]
+        self.assertTrue(0 < wall < 120, wall)
+        self.assertEqual(self.summary["meta"]["lanes"], 2)
+        self.assertEqual(self.summary["meta"]["cpus"], 8)
+        self.assertEqual(self.summary["meta"]["head"], git(self.toy, "rev-parse", "HEAD").stdout.strip())
+
     def test_the_report_is_kept_beside_the_logs(self):
         self.assertTrue(self.done.stdout.endswith((self.out / "summary.txt").read_text()))
         self.assertTrue((self.out / "plan.json").is_file())
@@ -730,6 +817,12 @@ class Lanes(Toy):
             self.assertFalse((directory / "tree").exists())
             self.assertFalse((directory / "tmp").exists())
             self.assertTrue((directory / "out").is_dir())
+
+    def test_a_run_says_where_the_logs_are_and_that_it_takes_the_worktrees_away(self):
+        text = self.done.stdout
+        self.assertIn(f"logs under {self.out}", text)
+        self.assertIn("taking the lanes' worktrees away (the logs and evidence stay)", text)
+        self.assertRegex(text, r"lane [01]: e14-long started; log \S+/lane-[01]/out/e14-long/logs/e14-long\.log")
 
     def test_a_run_says_what_it_is_doing(self):
         text = self.done.stdout
@@ -775,6 +868,15 @@ class RunTwice(Toy):
         self.assertEqual((previous / "marker.txt").read_text(), "the first\n")
         self.assertFalse((self.out / "marker.txt").exists())
         self.assertEqual([r["recipe"] for r in json.loads((self.out / "summary.json").read_text())["results"]], ["e14-mid"])
+
+    def test_only_the_run_before_is_kept(self):
+        ports = free_range(1)
+        for marker in ("one", "two", "three"):
+            self.assertEqual(self.run_recipes("e14-short", lanes=1, ports=ports).returncode, 0)
+            (self.out / "marker.txt").write_text(marker)
+        previous = self.out.with_name(self.out.name + ".prev")
+        self.assertEqual((previous / "marker.txt").read_text(), "two")
+        self.assertEqual((self.out / "marker.txt").read_text(), "three")
 
     def test_a_directory_that_is_no_earlier_run_is_never_touched(self):
         self.out.mkdir()
@@ -828,10 +930,25 @@ class RunTwice(Toy):
         self.assertIn(f"port(s) {first + 3} in a lane's range are in use already", done.stderr)
         self.assertFalse(self.out.exists())
 
-    def test_too_little_disk_is_refused(self):
+    def test_too_little_disk_is_refused_before_an_earlier_run_is_moved(self):
+        self.assertEqual(self.run_recipes("e14-short", lanes=1).returncode, 0)
         done = self.run_recipes("e14-short", "--min-free-gib", "999999999", lanes=1)
         self.assertEqual(done.returncode, 2)
         self.assertIn("GiB free under", done.stderr)
+        self.assertTrue((self.out / "plan.json").is_file(), "the earlier run was moved aside by a refused one")
+        self.assertFalse(self.out.with_name(self.out.name + ".prev").exists())
+
+    def test_the_disk_needed_is_for_each_lane(self):
+        free = shutil.disk_usage(self.temp).free / 2**30
+        two = self.run_recipes("e14-short e14-mid", "--min-free-gib", str(free * 0.75), lanes=2)
+        self.assertEqual(two.returncode, 2, two.stdout)
+        self.assertIn("and 2 lanes need", two.stderr)
+        one = self.run_recipes("e14-short", "--min-free-gib", str(free * 0.75), lanes=1)
+        self.assertEqual(one.returncode, 0, one.stderr)
+
+    def test_the_disk_is_read_where_the_directory_would_be_made(self):
+        self.assertGreater(pv.free_gib(self.temp / "not" / "made" / "yet"), 0)
+        self.assertEqual(pv.free_gib(self.temp), pv.free_gib(self.temp / "nothing"))
 
     def test_lanes_the_range_cannot_hold_are_refused(self):
         stride, _ = pv.mutation_slots.port_layout(ROOT)
@@ -846,6 +963,7 @@ class Outcomes(Toy):
         self.assertEqual(done.returncode, 0, done.stderr)
         self.assertTrue((self.out / "lane-0" / "tree" / "justfile").is_file())
         self.assertEqual(len(self.worktrees()), 2)
+        self.assertNotIn("taking the lanes' worktrees away", done.stdout)
 
     def test_a_process_a_recipe_leaves_running_is_stopped_and_said(self):
         done = self.run_recipes("e14-leave", lanes=1)
@@ -860,7 +978,7 @@ class Outcomes(Toy):
 
     def test_a_recipe_past_its_time_is_stopped_and_fails(self):
         started = time.monotonic()
-        done = self.run_recipes("e14-hang e14-short", "--timeout", "3", lanes=2)
+        done = self.run_recipes("e14-hang e14-short", "--timeout", "1", lanes=2)
         self.assertLess(time.monotonic() - started, 60)
         self.assertEqual(done.returncode, 1)
         self.assertIn("- e14-hang: timed out", done.stdout)
@@ -892,21 +1010,20 @@ class Outcomes(Toy):
             mine = sorted((r for r in records.values() if r["PORT"] == port), key=lambda r: r["start"])
             for a, b in zip(mine, mine[1:]):
                 self.assertLessEqual(a["end"], b["start"] + 0.05)
-        # `long` (2.5 s) holds one lane while the other runs mid, short and bad in turn.
-        self.assertEqual(len({records[n]["PORT"] for n in ("mid", "short", "bad")}), 1)
+        # `long` and `mid` start together, one in each lane.
         self.assertNotEqual(records["long"]["PORT"], records["mid"]["PORT"])
 
     def test_one_lane_takes_the_recipes_longest_first(self):
-        done = self.run_recipes("e14-short e14-bad e14-mid e14-long", lanes=1)
+        done = self.run_recipes("e14-builds e14-bad e14-short e14-survivor", lanes=1)
         self.assertEqual(done.returncode, 1)
         by_start = [r["name"] for r in sorted(self.records().values(), key=lambda r: r["start"])]
-        self.assertEqual(by_start, ["long", "mid", "short", "bad"])
+        self.assertEqual(by_start, ["short", "bad", "survivor", "builds"])
 
-    def test_a_signal_stops_the_lanes_and_leaves_nothing(self):
-        ports = free_range(2)
+    def test_a_signal_stops_the_lane_starts_nothing_more_and_leaves_nothing(self):
+        ports = free_range(1)
         proc = subprocess.Popen(
-            [sys.executable, "scripts/preverify.py", "--recipes", "e14-hang e14-mid", "--lanes", "2", "--no-setup",
-             "--ports", ports, "--out", str(self.out), "--cpus", "8"],
+            [sys.executable, "scripts/preverify.py", "--recipes", "e14-hang e14-short e14-bad", "--lanes", "1",
+             "--no-setup", "--ports", ports, "--out", str(self.out), "--cpus", "8"],
             cwd=self.toy, env=self.env(), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
         )
         deadline = time.monotonic() + 60
@@ -914,16 +1031,22 @@ class Outcomes(Toy):
             time.sleep(0.1)
         self.assertTrue((self.seen / "hang.json").exists(), "the recipe did not start")
         hung = json.loads((self.seen / "hang.json").read_text())["pid"]
+        self.assertEqual((self.out / "pid").read_text().strip(), str(proc.pid))
         started = time.monotonic()
         proc.send_signal(signal.SIGTERM)
         out, err = proc.communicate(timeout=60)
         self.assertLess(time.monotonic() - started, 45)
         self.assertEqual(proc.returncode, 1, out + err)
         self.assertFalse(pv.alive(hung), "the recipe still runs after the signal")
+        self.assertEqual(set(self.records()), {"hang"}, "a recipe was started after the signal")
         self.assertEqual(len(self.worktrees()), 1, "a lane was left registered")
-        self.assertFalse((self.out / "lane-0" / "tree").exists() or (self.out / "lane-1" / "tree").exists())
-        self.assertIn("- e14-hang: interrupted", out)
+        self.assertFalse((self.out / "lane-0" / "tree").exists())
         self.assertFalse((self.out / "pid").exists())
+        results = {r["recipe"]: r for r in json.loads((self.out / "summary.json").read_text())["results"]}
+        self.assertEqual(results["e14-hang"]["reason"], "interrupted")
+        self.assertEqual(results["e14-short"]["reason"], "not run: interrupted")
+        self.assertEqual(results["e14-bad"]["verdict"], "NOT RUN")
+        self.assertIn("- e14-hang: interrupted", out)
 
 
 class Setup(Toy):
@@ -988,8 +1111,8 @@ class Setup(Toy):
     def test_a_lane_whose_install_fails_stops_and_says_so_while_another_runs_everything(self):
         ports = free_range(2)
         first = ports.split("-")[0]
-        argv = ["--recipes", "e14-short e14-mid e14-long", "--lanes", "2", "--ports", ports, "--out", str(self.out),
-                "--cpus", "8"]
+        argv = ["--recipes", "e14-short e14-feed-postgres e14-builds", "--lanes", "2", "--ports", ports,
+                "--out", str(self.out), "--cpus", "8"]
         buffer = io.StringIO()
         with mock.patch.dict(os.environ, self.env(), clear=True), \
                 mock.patch.object(pv, "BOOTSTRAP_STEPS", [f'test "$PORT" != "{first}"']), \
@@ -999,7 +1122,7 @@ class Setup(Toy):
         self.assertEqual(code, 1, out)
         results = json.loads((self.out / "summary.json").read_text())
         self.assertEqual({r["recipe"]: r["verdict"] for r in results["results"]},
-                         {"e14-short": "ok", "e14-mid": "ok", "e14-long": "ok"})
+                         {"e14-short": "ok", "e14-feed-postgres": "ok", "e14-builds": "ok"})
         self.assertEqual({r["lane"] for r in results["results"]}, {1})
         self.assertIn("- lane 0 stopped: `test", out)
         self.assertIn("lane 0: stopped,", out)
@@ -1026,11 +1149,11 @@ class Setup(Toy):
         self.assertIn("lane 0 stopped: `test", out)
 
     def test_when_no_lane_can_set_up_what_is_left_is_not_run(self):
-        code, out = self.run_in_process("e14-short e14-mid", 2, ["false"], [])
+        code, out = self.run_in_process("e14-short e14-builds", 2, ["false"], [])
         self.assertEqual(code, 1, out)
         results = json.loads((self.out / "summary.json").read_text())
         self.assertEqual({r["recipe"]: r["verdict"] for r in results["results"]},
-                         {"e14-short": "NOT RUN", "e14-mid": "NOT RUN"})
+                         {"e14-short": "NOT RUN", "e14-builds": "NOT RUN"})
         self.assertIn("not run: no lane could run it", out)
         self.assertEqual(self.records(), {})
 
@@ -1044,6 +1167,18 @@ class Setup(Toy):
         self.assertEqual((marks / "seen").read_text().split(), ["koka"])
         # and the original is the original
         self.assertEqual((self.toy / ".toolchain/prefix/bin/koka").read_text(), "#!/bin/sh\necho koka\n")
+
+    def test_a_run_says_what_the_lanes_are_doing_every_so_often(self):
+        with mock.patch.object(pv, "STATUS_EVERY", 0.4):
+            code, out = self.run_in_process("e14-long", 1, [], [])
+        self.assertEqual(code, 0, out)
+        self.assertRegex(out, r"\[\d\d:\d\d:\d\d\] running: lane 0 e14-long \(\d+ s\); 0 of 1 recipes done, 0 failed; load [\d.]+")
+
+    def test_the_callers_signal_handlers_are_put_back(self):
+        before = (signal.getsignal(signal.SIGINT), signal.getsignal(signal.SIGTERM))
+        code, out = self.run_in_process("e14-short", 1, [], [])
+        self.assertEqual(code, 0, out)
+        self.assertEqual((signal.getsignal(signal.SIGINT), signal.getsignal(signal.SIGTERM)), before)
 
     def test_the_default_steps_are_a_shards(self):
         self.assertEqual(pv.BOOTSTRAP_STEPS, ["pnpm install --frozen-lockfile --offline"])
@@ -1165,15 +1300,17 @@ class FailingLines(unittest.TestCase):
             "FAIL: test_x (test_y.Z)\nERROR: test_w (test_y.Z)\nsome mutant: SURVIVED\n"
             "other mutant: ANCHOR NOT FOUND EXACTLY ONCE in a.py\nbaseline (core): 3 passed, 2 failed\n"
             "baseline (core): 3 passed, 0 failed\nFAIL: the unmutated baseline is not green; no mutant can mean anything\n"
-            "error[E0425]: cannot find value `x` in this scope\nPREPARATION FAILED: bash x.sh\nall fine\n"
+            "error[E0425]: cannot find value `x` in this scope\n    Error: expect(received).toBe(expected)\nall fine\n"
         )
         found = pv.failing_lines(text)
         self.assertEqual(len(found), 8)
+        self.assertIn("Error: expect(received).toBe(expected)", found)
         self.assertNotIn("baseline (core): 3 passed, 0 failed", found)
         self.assertNotIn("all fine", found)
 
     def test_colours_are_taken_out_lines_are_once_each_and_the_list_is_capped(self):
         self.assertEqual(pv.failing_lines("\x1b[31mtest a ... FAILED\x1b[0m\ntest a ... FAILED\n"), ["test a ... FAILED"])
+        self.assertEqual(pv.failing_lines("\x1b[1;31mtest b ... FAILED\x1b[0m\n"), ["test b ... FAILED"])
         many = "".join(f"test t{n} ... FAILED\n" for n in range(100))
         self.assertEqual(len(pv.failing_lines(many)), 30)
         self.assertEqual(len(pv.failing_lines(many, limit=5)), 5)
@@ -1217,9 +1354,25 @@ class Report(unittest.TestCase):
 
     def test_the_totals_say_the_wall_clock_the_load_and_ci_seconds(self):
         text = pv.render(self.results(), self.jobs, self.meta, [])
-        self.assertIn("pre-check at aaaaaaaaaaaa (base bbbbbbbbbbbb): 3 recipes in 2 lanes, wall-clock 600 s (10.0 min)", text)
+        self.assertIn("pre-check at aaaaaaaaaaaa, changed since bbbbbbbbbbbb: 3 recipes in 2 lanes, wall-clock 600 s (10.0 min)", text)
         self.assertIn("CI recorded 110 s for the 2 it has measured, the longest 100 s", text)
         self.assertIn("load average (1 min): 10.0 at the start, 20.0 at the end, 30.5 at most (sampled every 30 s), on 32 threads", text)
+
+    def test_a_recipe_not_run_has_a_block_of_one_line(self):
+        self.assertEqual(pv.failure_block(pv.not_run("e14-c", "no lane could run it")),
+                         "--- e14-c: not run: no lane could run it")
+
+    def test_a_run_of_named_recipes_says_so_in_place_of_a_base(self):
+        text = pv.render(self.results()[:1], self.jobs, dict(self.meta, base=""), [])
+        self.assertIn("pre-check at aaaaaaaaaaaa, recipes named: 1 recipes in 2 lanes", text)
+
+    def test_a_long_log_is_shown_by_its_last_forty_lines(self):
+        out = recipe_out(self.temp, "e14-b", 1, {}, log="".join(f"line {n}\n" for n in range(100)))
+        block = pv.failure_block(pv.result_of("e14-b", 0, out, "done", []))
+        self.assertIn("e14-b: log, its last 40 lines", block)
+        self.assertIn("  | line 99\n", block + "\n")
+        self.assertIn("  | line 60\n", block)
+        self.assertNotIn("  | line 59\n", block)
 
     def test_a_failure_shows_its_failing_lines_and_the_tail_of_its_log_and_evidence(self):
         text = pv.render(self.results(), self.jobs, self.meta, [])
@@ -1275,24 +1428,24 @@ class Processes(unittest.TestCase):
     def test_a_marked_process_is_found_in_a_session_of_its_own_and_an_unmarked_one_is_not(self):
         marker = f"/pv-test-{os.getpid()}"
         a, b = self.spawn(marker), self.spawn(None)
-        self.addCleanup(lambda: [p.kill() for p in (a, b)])
+        self.addCleanup(lambda: [(p.kill(), p.wait()) for p in (a, b)])
         self.assertEqual(pv.marked(marker), [a.pid])
         self.assertEqual(pv.marked(marker + "0"), [])
 
     def test_a_marker_is_matched_whole_not_as_a_prefix(self):
         marker = f"/pv-test-lane-1-{os.getpid()}"
         a = self.spawn(marker + "0")
-        self.addCleanup(a.kill)
+        self.addCleanup(lambda: (a.kill(), a.wait()))
         self.assertEqual(pv.marked(marker), [])
 
     def test_the_marked_are_stopped_and_the_rest_left(self):
         marker = f"/pv-test-stop-{os.getpid()}"
         a, b = self.spawn(marker), self.spawn(None)
-        self.addCleanup(b.kill)
+        self.addCleanup(lambda: (b.kill(), b.wait()))
         found = pv.stop_marked(marker, grace=5)
         self.assertEqual(found, [a.pid])
         a.wait(timeout=10)
-        self.assertIsNotNone(a.returncode)
+        self.assertEqual(a.returncode, -signal.SIGTERM, "stopped by SIGKILL without the grace")
         self.assertIsNone(b.poll())
 
     def test_a_term_proof_process_is_killed_after_the_grace(self):
@@ -1300,7 +1453,7 @@ class Processes(unittest.TestCase):
         env = {**os.environ, pv.MARKER: marker}
         code = "import signal, time; signal.signal(signal.SIGTERM, lambda *a: None); print('up', flush=True); time.sleep(120)"
         proc = subprocess.Popen([sys.executable, "-c", code], env=env, start_new_session=True, stdout=subprocess.PIPE, text=True)
-        self.addCleanup(proc.kill)
+        self.addCleanup(lambda: (proc.kill(), proc.wait(), proc.stdout.close()))
         proc.stdout.readline()
         pv.stop_marked(marker, grace=0.5)
         proc.wait(timeout=10)
@@ -1313,6 +1466,7 @@ class Processes(unittest.TestCase):
             "print(c.pid, flush=True)\ntime.sleep(120)\n"
         )
         proc = subprocess.Popen([sys.executable, "-c", code], start_new_session=True, stdout=subprocess.PIPE, text=True)
+        self.addCleanup(proc.stdout.close)
         child = int(proc.stdout.readline())
         self.addCleanup(lambda: os.kill(child, signal.SIGKILL) if pv.alive(child) else None)
         pv.terminate(proc, grace=5)
@@ -1325,6 +1479,7 @@ class Processes(unittest.TestCase):
     def test_a_term_proof_group_is_killed(self):
         code = "import signal, time; signal.signal(signal.SIGTERM, lambda *a: None); print('up', flush=True); time.sleep(120)"
         proc = subprocess.Popen([sys.executable, "-c", code], start_new_session=True, stdout=subprocess.PIPE, text=True)
+        self.addCleanup(proc.stdout.close)
         proc.stdout.readline()
         pv.terminate(proc, grace=0.5)
         self.assertEqual(proc.returncode, -signal.SIGKILL)
@@ -1350,6 +1505,98 @@ class Processes(unittest.TestCase):
         stop.set()
         self.assertEqual(pv.watch(again, stop, 30), "stopped")
         self.assertIsNotNone(again.returncode)
+
+
+class ExitStatus(unittest.TestCase):
+    def test_zero_only_where_every_recipe_passed_every_lane_stood_and_nothing_stopped_the_run(self):
+        ok = [pv.Result("a", "ok")]
+        self.assertEqual(pv.exit_status(ok, [], False), 0)
+        self.assertEqual(pv.exit_status(ok, [{"broken": None}], False), 0)
+        self.assertEqual(pv.exit_status([pv.Result("a", "FAILED")], [], False), 1)
+        self.assertEqual(pv.exit_status([pv.not_run("a", "x")], [], False), 1)
+        self.assertEqual(pv.exit_status(ok, [{"broken": "x"}], False), 1)
+        self.assertEqual(pv.exit_status(ok, [], True), 1)
+
+
+class Say(Toy):
+    def test_the_stamp_counts_hours_minutes_and_seconds_since_the_start(self):
+        run = pv.Run(self.toy, "h" * 40, self.out)
+        run.start = time.monotonic() - (3600 + 2 * 60 + 5)
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            run.say("hello")
+        self.assertEqual(buffer.getvalue(), "[01:02:05] hello\n")
+
+
+class LaneUnits(Toy):
+    def lane(self):
+        self.out.mkdir(parents=True, exist_ok=True)
+        run = pv.Run(self.toy, git(self.toy, "rev-parse", "HEAD").stdout.strip(), self.out)
+        return pv.Lane(run, 0, 40000, 4, None, 60.0, setup=False)
+
+    def test_a_lane_that_exists_is_refused_not_overwritten(self):
+        lane = self.lane()
+        lane.create()
+        self.addCleanup(lane.remove)
+        with self.assertRaises(pv.Refusal) as caught:
+            self.lane().create()
+        self.assertIn("cannot make lane 0's worktree", str(caught.exception))
+
+    def test_a_worktree_git_does_not_know_is_still_taken_away(self):
+        lane = self.lane()
+        lane.tree.mkdir(parents=True)
+        (lane.tree / "x").write_text("x")
+        lane.tmp.mkdir()
+        lane.remove()
+        self.assertFalse(lane.tree.exists())
+        self.assertFalse(lane.tmp.exists())
+
+    def test_the_toolchain_is_hard_linked_where_it_can_be(self):
+        (self.toy / ".toolchain/prefix/bin/koka").write_text("koka")
+        lane = self.lane()
+        lane.create()
+        self.addCleanup(lane.remove)
+        lane.bootstrap()
+        theirs = lane.tree / ".toolchain/prefix/bin/koka"
+        self.assertEqual(theirs.read_text(), "koka")
+        self.assertEqual(os.stat(theirs).st_ino, os.stat(self.toy / ".toolchain/prefix/bin/koka").st_ino)
+
+    def test_a_toolchain_that_cannot_be_linked_is_copied(self):
+        (self.toy / ".toolchain/prefix/bin/koka").write_text("koka")
+        real = subprocess.run
+
+        def refuse_cp(command, *args, **kwargs):
+            if command[0] == "cp":
+                return subprocess.CompletedProcess(command, 1, b"", b"cross-device link")
+            return real(command, *args, **kwargs)
+
+        lane = self.lane()
+        lane.create()
+        self.addCleanup(lane.remove)
+        with mock.patch.object(pv.subprocess, "run", side_effect=refuse_cp):
+            lane.bootstrap()
+        theirs = lane.tree / ".toolchain/prefix/bin/koka"
+        self.assertEqual(theirs.read_text(), "koka")
+        self.assertNotEqual(os.stat(theirs).st_ino, os.stat(self.toy / ".toolchain/prefix/bin/koka").st_ino)
+
+    def test_a_lane_with_no_toolchain_to_copy_sets_up_all_the_same(self):
+        shutil.rmtree(self.toy / ".toolchain")
+        lane = self.lane()
+        lane.create()
+        self.addCleanup(lane.remove)
+        lane.bootstrap()
+        self.assertFalse((lane.tree / ".toolchain").exists())
+
+
+class Status(unittest.TestCase):
+    def test_the_status_says_what_each_lane_runs_and_how_far_the_queue_is(self):
+        lanes = [SimpleNamespace(index=0, running=("e14-a", 100.0)), SimpleNamespace(index=1, running=None),
+                 SimpleNamespace(index=2, running=("e14-b", 250.0))]
+        results = [pv.Result("e14-x", "ok"), pv.Result("e14-y", "FAILED"), pv.not_run("e14-z", "x")]
+        self.assertEqual(
+            pv.status_line(lanes, results, 5, 41.26, 400.0),
+            "running: lane 0 e14-a (300 s), lane 2 e14-b (150 s); 3 of 5 recipes done, 2 failed; load 41.3")
+        self.assertEqual(pv.status_line([], [], 3, 1.0, 0.0), "running: nothing; 0 of 3 recipes done, 0 failed; load 1.0")
 
 
 class Load(unittest.TestCase):
@@ -1383,6 +1630,14 @@ class Help(unittest.TestCase):
         self.assertTrue(args.current)
         self.assertIsNone(args.stale)
 
+    def test_the_defaults_are_a_jobs_limit_eight_gib_a_lane_and_the_range_for_lanes(self):
+        args = pv.parser().parse_args([])
+        self.assertEqual(args.timeout, float(pv.ci_plan.LIMIT))
+        self.assertEqual(args.min_free_gib, 8.0)
+        self.assertEqual(args.ports, "12741-14740")
+        self.assertEqual(args.cpus, os.cpu_count() or 32)
+        self.assertEqual((args.keep_lanes, args.no_setup, args.plan, args.recipes, args.out), (False, False, False, [], None))
+
     def test_the_recipe_passes_its_arguments_through(self):
         text = (ROOT / "just/preverify.just").read_text()
         self.assertRegex(text, r'(?m)^preverify \*args:\n    @python3 scripts/preverify\.py "\$@"$')
@@ -1399,6 +1654,8 @@ class Help(unittest.TestCase):
 
     def test_the_ports_option_is_a_range_in_order(self):
         self.assertEqual(pv.port_range("12741-14740"), (12741, 14740))
+        self.assertEqual(pv.port_range("5-5"), (5, 5))
+        self.assertEqual(pv.port_range("1-65535"), (1, 65535))
         for bad in ("12741", "14740-12741", "1-70000", "a-b", "1-2-3"):
             with self.assertRaises(pv.Refusal):
                 pv.port_range(bad)

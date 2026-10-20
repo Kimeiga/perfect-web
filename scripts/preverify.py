@@ -147,8 +147,7 @@ FAILING = re.compile(
     r"|: (SURVIVED|ANCHOR NOT FOUND EXACTLY ONCE in .*)$"
     r"|^baseline \(.*\): \d+ passed, [1-9]\d* failed"
     r"|^error(\[E\d+\])?: "
-    r"|^(AssertionError|Error): "
-    r"|^PREPARATION FAILED"
+    r"|^\s*(AssertionError|Error): "
 )
 ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
@@ -550,6 +549,7 @@ class Lane:
         self.built = False
         self.broken: str | None = None
         self.setup_seconds = 0.0
+        self.running: tuple[str, float] | None = None
 
     # -- the worktree
 
@@ -631,7 +631,6 @@ class Lane:
     def attempt(self, job: Job) -> Result:
         """Run one recipe as a shard's runner does, and judge it."""
         out = self.directory / "out" / job.recipe
-        shutil.rmtree(out, ignore_errors=True)
         out.mkdir(parents=True)
         command = [sys.executable, "scripts/ci_recipes.py", "--out", str(out), job.recipe]
         with open(out / "runner.out", "w") as runner:
@@ -668,8 +667,10 @@ class Lane:
                 run.queue.put(job)
                 run.say(f"lane {self.index}: stopped, {self.broken}")
                 return
-            run.say(f"lane {self.index}: {job.recipe} started")
+            run.say(f"lane {self.index}: {job.recipe} started; log {self.directory / 'out' / job.recipe / 'logs' / (job.recipe + '.log')}")
+            self.running = (job.recipe, time.monotonic())
             result = self.attempt(job)
+            self.running = None
             run.record(result)
             if result.verdict == "ok":
                 run.say(f"lane {self.index}: {job.recipe} ok in {result.seconds:.1f} s")
@@ -734,8 +735,9 @@ def render(results: list[Result], jobs: list[Job], meta: dict, setups: list[dict
         )
     out.append("")
     ci_all = [v for v in recorded.values() if v]
+    since = f", changed since {meta['base'][:12]}" if meta["base"] else ", recipes named"
     out.append(
-        f"pre-check at {meta['head'][:12]} (base {meta['base'][:12]}): {len(rows)} recipes in {meta['lanes']} lanes, "
+        f"pre-check at {meta['head'][:12]}{since}: {len(rows)} recipes in {meta['lanes']} lanes, "
         f"wall-clock {meta['wall']:.0f} s ({meta['wall'] / 60:.1f} min); CI recorded {sum(ci_all):g} s for the "
         f"{len(ci_all)} it has measured, the longest {max(ci_all, default=0):g} s"
     )
@@ -756,6 +758,28 @@ def render(results: list[Result], jobs: list[Job], meta: dict, setups: list[dict
 # ---------------------------------------------------------------------------
 # A run
 # ---------------------------------------------------------------------------
+
+
+# How often a run says what its lanes are doing, in seconds.
+STATUS_EVERY = 300.0
+
+
+def status_line(lanes: list, results: list[Result], total: int, load: float, now: float) -> str:
+    """What the lanes are running and how far the queue has got."""
+    busy = [f"lane {l.index} {l.running[0]} ({now - l.running[1]:.0f} s)" for l in lanes if l.running]
+    failed = sum(1 for r in results if r.verdict != "ok")
+    return (
+        f"running: {', '.join(busy) or 'nothing'}; {len(results)} of {total} recipes done, {failed} failed; "
+        f"load {load:.1f}"
+    )
+
+
+def free_gib(path: pathlib.Path) -> float:
+    """The disk free where `path` is, or would be made: at its nearest
+    existing parent."""
+    while not path.exists():
+        path = path.parent
+    return shutil.disk_usage(path).free / 2**30
 
 
 def run_directory(head: str, out: str | None) -> pathlib.Path:
@@ -782,7 +806,7 @@ def retire(root: pathlib.Path, directory: pathlib.Path) -> None:
             owner = int((directory / "pid").read_text())
         except (OSError, ValueError):
             owner = 0
-        if owner and owner != os.getpid() and alive(owner):
+        if owner and alive(owner):
             raise Refusal(f"another preverify run (pid {owner}) is using {directory}")
         for tree in sorted(directory.glob("lane-*/tree")):
             removed = git(root, "worktree", "remove", "--force", str(tree), check=False)
@@ -880,8 +904,6 @@ def main(argv: list[str] | None = None, root: pathlib.Path = ROOT) -> int:
 
 def pre_check(args: argparse.Namespace, root: pathlib.Path) -> int:
     """Plan, check that the run can start, and run it."""
-    if args.lanes < 1:
-        raise Refusal("give a whole number of lanes, 1 or more")
     first, last = port_range(args.ports)
     head = git(root, "rev-parse", "HEAD").stdout.strip()
     branch = git(root, "branch", "--show-current", check=False).stdout.strip()
@@ -918,11 +940,11 @@ def pre_check(args: argparse.Namespace, root: pathlib.Path) -> int:
             raise Refusal(f"port(s) {', '.join(map(str, taken[:5]))} in a lane's range are in use already: "
                           "another run, or a host one left, holds them")
     directory = run_directory(head, args.out)
-    retire(root, directory)
-    free = shutil.disk_usage(directory).free / 2**30
+    free = free_gib(directory)
     if free < args.min_free_gib * lanes:
         raise Refusal(f"{free:.1f} GiB free under {directory}, and {lanes} lanes need {args.min_free_gib * lanes:g} "
                       f"(--min-free-gib {args.min_free_gib:g} each)")
+    retire(root, directory)
     if not (root / ".toolchain").is_dir():
         print("preverify: this tree has no .toolchain (run just bootstrap): a recipe that runs koka or the "
               "wasmtime CLI will fail in a lane, as it would here", file=sys.stderr)
@@ -968,10 +990,16 @@ def execute(
                 threads = [threading.Thread(target=lane.work, name=f"lane-{lane.index}") for lane in team]
                 for t in threads:
                     t.start()
+                last = time.monotonic()
                 while any(t.is_alive() for t in threads):
                     for t in threads:
                         t.join(timeout=0.5)
+                    if time.monotonic() - last >= STATUS_EVERY:
+                        last = time.monotonic()
+                        run.say(status_line(team, list(run.results), len(jobs), os.getloadavg()[0], last))
             finally:
+                if not args.keep_lanes:
+                    run.say("taking the lanes' worktrees away (the logs and evidence stay)")
                 for lane in team:
                     lane.remove(keep=args.keep_lanes)
     finally:
@@ -982,7 +1010,7 @@ def execute(
     while not run.queue.empty():
         run.record(not_run(run.queue.get_nowait().recipe, why))
     meta = {
-        "head": head, "base": base or "(recipes named)", "lanes": lanes, "cpus": args.cpus, "sample": sample,
+        "head": head, "base": base, "lanes": lanes, "cpus": args.cpus, "sample": sample,
         "wall": time.monotonic() - run.start, "load_start": load.samples[0], "load_end": load.samples[-1],
         "load_max": max(load.samples),
     }
@@ -997,7 +1025,13 @@ def execute(
         "meta": meta, "setups": setups,
         "results": [dataclasses.asdict(r) for r in sorted(run.results, key=lambda r: r.recipe)]}, indent=2) + "\n")
     print(text, end="", flush=True)
-    return 1 if interrupted or any(r.verdict != "ok" for r in run.results) or any(s["broken"] for s in setups) else 0
+    return exit_status(run.results, setups, bool(interrupted))
+
+
+def exit_status(results: list[Result], setups: list[dict], interrupted: bool) -> int:
+    """1 where any recipe failed or did not run, a lane stopped, or the run was
+    stopped from outside; else 0. (2 is a run that could not start.)"""
+    return 1 if interrupted or any(r.verdict != "ok" for r in results) or any(s["broken"] for s in setups) else 0
 
 
 if __name__ == "__main__":
