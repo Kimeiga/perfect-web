@@ -473,6 +473,7 @@ class EveryCallOfExplain(unittest.TestCase):
         ("committed_components_mutations.py", "REFUSED (invalid or stopped Cargo producer; no kill)"),
         ("descriptions_mutations.py", "the restored-source browser check is not green"),
         ("guide_producer_mutations.py", "print(baseline.output)"),
+        ("node_audit_mutations.py", "print(baseline.output)"),
         ("held_labels_mutations.py", "INVALID RESULT (campaign fails; not a kill)"),
         ("kiokun_cache_mutations.py", "print(output)"),
         ("kiokun_test_data_mutations.py", "print(output)"),

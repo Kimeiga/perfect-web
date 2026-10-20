@@ -51,6 +51,7 @@ import 'just/preverify.just'
 import 'just/todomvc.just'
 import 'just/device-store.just'
 import 'just/second-host.just'
+import 'just/node-audit.just'
 
 default:
     @just --list
