@@ -4,7 +4,8 @@ Pleris is built by many parallel agent sessions under a strict process, and the
 project has grown a private dialect on top of an unfamiliar language. This page
 is the bridge. For each word it says what the word means *in this project*, the
 standard software-engineering term if there is one (marked ≈), and where it is
-defined. Checked against `master` at `115895de` (train-11 landed, 2026-10-20).
+defined. Checked against `master` at `115895de` (train-11 landed, 2026-10-20), with
+train-12 integration entries explicitly marked below. Its final gates are pending.
 
 ## Start here
 
@@ -29,9 +30,8 @@ does not define.
 
 Each entry opens with its kind: *Standard* (used as everyone uses it),
 *Standard, used narrowly here* (the usual word with a narrower or stricter
-meaning), or *Project term* (coined here). "Not on master" marks work on a
-branch that has not landed; its definition lives in an unnumbered ADR on that
-branch, and the entry should gain a link when the ADR is numbered.
+meaning), or *Project term* (coined here). "In train-12 integration" marks implemented work awaiting the combined gates
+and merge to master; its numbered ADR records the decision and remaining limits.
 
 ## Terms
 
@@ -93,7 +93,7 @@ branch, and the entry should gain a link when the ADR is numbered.
 *Standard, used narrowly here.* ≈ conformance suite. The [accepted](#accepted-fixture) and [rejected](#rejected-fixture) programs of charter §16, the language's executable specification, versioned (C1 frozen 2026-08-06) so a fixture cannot be edited into compliance. [CORPUS.md], [charter §16].
 
 ### device store
-*Project term.* ≈ client-side persistence. Not on master (track `device-store`). A module `signal` with a `storage device "name"` clause (and `privacy Device`): the browser keeps its value (`localStorage` first), reads it before the page is shown, and never sends it to the server. [charter §9.1] (the fourth kind of state).
+*Project term.* ≈ client-side persistence. In train-12 integration ([ADR-0366]). A module `signal` with a `storage device "name"` clause (and `privacy Device`): the browser keeps its value (`localStorage` first), reads it before the page is shown, and never sends it to the server. [charter §9.1] (the fourth kind of state).
 
 ### dispatch
 *Standard (GitHub `workflow_dispatch`), used narrowly here.* Starting a [verify](#verify) run by hand for named recipes (`gh workflow run verify.yml --ref <branch> -f recipes="..."`); an empty list runs every recipe. [verify.yml], [ADR-0245].
@@ -165,7 +165,7 @@ branch, and the entry should gain a link when the ADR is numbered.
 *Project term.* ≈ merging to the main branch once a merge queue passes. A [train](#train) lands when `master` is moved to its final evidence commit, after its [verify](#verify) run is green and its evidence fetched ("a local merge is not a verified landing", ARCHITECTURE.md). [ADR-0281], [ARCHITECTURE.md].
 
 ### lanes
-*Project term.* ≈ parallel CI runners. Not on master (track `preverify`). In `just preverify`, throwaway worktrees, each with its own `CARGO_TARGET_DIR` and `PORT` window, in which a plan's recipes run side by side; the integrator first did this by hand ("lanes A to E") for train-11. See [pre-verify](#pre-verify).
+*Project term.* ≈ parallel CI runners. In train-12 integration ([ADR-0364]). In `just preverify`, throwaway worktrees, each with its own `CARGO_TARGET_DIR` and `PORT` window, in which a plan's recipes run side by side; the integrator first did this by hand ("lanes A to E") for train-11. See [pre-verify](#pre-verify).
 
 ### layout
 *Standard (Next.js `layout`), used narrowly here.* A `layout` declaration: the markup pages share, with a `<slot />` where each page goes. A navigation between pages of one layout and one build keeps the layout in place. Not browser layout (reflow). [guide: layouts], [ADR-0303].
@@ -183,7 +183,7 @@ branch, and the entry should gain a link when the ADR is numbered.
 *Standard.* Checking the tests by breaking the code: each [mutant](#mutant) must make some test fail ([killed](#killed)); one that does not ([survived](#survived)) is a hole in the tests. Every behaviour here needs a test and a mutation control; there are hundreds of `scripts/*_mutations.py`, each ending `k of n mutants killed`. [mutation_baseline.py], [ADR-0245].
 
 ### nightly
-*Standard, used narrowly here.* The scheduled [verify](#verify) run (06:17 UTC): every recipe, not just those a push touches. It keeps no evidence, so the integrator reads its failed recipes daily ("read the nightly"). [verify.yml], [PARALLEL.md: working rules].
+*Standard, used narrowly here.* The scheduled [verify](#verify) run (06:17 UTC): every recipe, unless that exact master commit already has a successful run. Sunday always runs everything. The integrator reads failures and imports successful evidence through [evidence-fetch](#evidence-fetch). [verify.yml], [PARALLEL.md: working rules].
 
 ### non-vacuity
 *Project term.* ≈ vacuous-pass check. A guard showing a check did not pass by checking nothing: `suite_status.py` requires as many browser-suite invocations recognised as appear in the recipes, and at least one; `mutant-programs` requires every mutant of a `.pw` source to stay a well-typed program. [suite_status.py], [mutant_programs.py].
@@ -213,7 +213,7 @@ branch, and the entry should gain a link when the ADR is numbered.
 *Project term.* ≈ authorization rule. `predicate SignedIn says "Sign in to post."`: a named condition a `command` [requires](#requires). The program names it and says what a refused reader is told; its meaning is the deployment's. The development server evaluates only `SignedIn`, `OwnsPost(post)` and `MayMessage(to)`. [guide: predicates].
 
 ### pre-verify
-*Project term.* Not on master (track `preverify`). `just preverify [BASE]` plans, with CI's own [planner](#planner), the recipes [verify](#verify) would run for HEAD and runs them locally in [lanes](#lanes) before a train is pushed. A pre-check: it writes no evidence and pushes nothing.
+*Project term.* In train-12 integration ([ADR-0364]). `just preverify [BASE]` plans, with CI's own [planner](#planner), the recipes [verify](#verify) would run for HEAD and can run them locally in [lanes](#lanes). It writes no evidence and pushes nothing. The owner's current workflow keeps short checks local and sends heavy batches to GitHub on a `wip/*` branch.
 
 ### principal
 *Standard (security), used narrowly here.* The authenticated identity behind a session. The host answers `current_user()` from the session's principal, typed `User<UserId>`, via `pw:host/principal#read`; a program cannot forge one. A guest is a principal too. [ADR-0263], [ADR-0270].
@@ -414,3 +414,6 @@ branch, and the entry should gain a link when the ADR is numbered.
 [SEMANTICS §9]: SEMANTICS.md#9-placement-charter-79
 [suite_status.py]: ../scripts/suite_status.py
 [verify.yml]: ../.github/workflows/verify.yml
+
+[ADR-0364]: DECISIONS/ADR-0364-a-train-is-pre-verified-locally.md
+[ADR-0366]: DECISIONS/ADR-0366-device-local-storage.md

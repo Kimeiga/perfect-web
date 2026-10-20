@@ -1,6 +1,6 @@
-# ADR-XXXX: inferred effects reach a fixed point before checks and contracts
+# ADR-0375: inferred effects reach a fixed point before checks and contracts
 
-Status: proposed for integration; ADR-0375 reserved. Date: 2026-10-20.
+Status: proposed for integration. Date: 2026-10-20.
 Milestone: E14.
 
 ## Context

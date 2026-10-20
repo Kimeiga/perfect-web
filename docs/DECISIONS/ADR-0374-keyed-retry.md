@@ -1,4 +1,4 @@
-# ADR-XXXX: only a current keyed read retries after newer frames
+# ADR-0374: only a current keyed read retries after newer frames
 
 Status: proposed for integration. Date: 2026-10-20. Milestone: E14.
 
