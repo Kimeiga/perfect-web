@@ -13,6 +13,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 TABLES = ROOT / "compiler/pw-core/src/tables.rs"
 LOWER = ROOT / "compiler/pw-core/src/lower.rs"
 BUILD = ROOT / "compiler/pw-core/src/build.rs"
+PROGRAM = ROOT / "compiler/pw-core/src/program.rs"
 CHECK = ROOT / "compiler/pw-core/src/check.rs"
 CLI = ROOT / "compiler/pw-cli/src/main.rs"
 BACKEND = ROOT / "compiler/pw-core/src/backend/mod.rs"
@@ -115,12 +116,12 @@ MUTANTS = [
     ("a prefix's rows have no declared order", TABLES,
      "    for f in grouped.iter().chain(t.order.iter()).chain(t.key.iter()) {\n",
      "    for f in grouped.iter().chain(t.key.iter()) {\n"),
-    ("build ignores the released schema", BUILD,
-     "    let (tables, schema, refused) = crate::tables::tables_json(&hirs, &ws, &sigs, released);\n",
-     "    let (tables, schema, refused) = crate::tables::tables_json(&hirs, &ws, &sigs, None);\n"),
+    ("build ignores the released schema", PROGRAM,
+     "            crate::tables::tables_json(cx.hirs, cx.ws, cx.sigs, released);\n",
+     "            crate::tables::tables_json(cx.hirs, cx.ws, cx.sigs, None);\n"),
     ("check ignores the released schema", CHECK,
-     "        for (unit, d) in crate::tables::held_to(&hirs, &ws, &sigs, released).1 {\n",
-     "        for (unit, d) in crate::tables::held_to(&hirs, &ws, &sigs, None).1 {\n"),
+     "        for (unit, diagnostic) in crate::tables::held_to(&hirs, &ws, &sigs, released).1 {\n",
+     "        for (unit, diagnostic) in crate::tables::held_to(&hirs, &ws, &sigs, None).1 {\n"),
     ("a no-table rebuild keeps old metadata", BUILD,
      '            for name in ["tables.json", "schema.lock"] {\n',
      '            for name in ["tables.json", "schema.lock"].into_iter().take(0) {\n'),

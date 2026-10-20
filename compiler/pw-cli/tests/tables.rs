@@ -70,8 +70,29 @@ fn check_and_build_hold_a_program_to_the_named_release() {
         &source,
     );
     assert!(out.status.success(), "{}", shown(&out));
+    let checked = pw("check", &[Path::new("--schema-lock"), &lock], &source);
+    assert!(checked.status.success(), "{}", shown(&checked));
     let tables = std::fs::read_to_string(built.join("tables.json")).unwrap();
     assert!(tables.contains("drop_field"), "{tables}");
+    let tables: pw_core::tables::TablesJson = serde_json::from_str(&tables).unwrap();
+    let accepted =
+        pw_core::tables::Schema::read(&std::fs::read_to_string(built.join("schema.lock")).unwrap())
+            .unwrap();
+    let previous = pw_core::tables::Schema::read(&std::fs::read_to_string(&lock).unwrap()).unwrap();
+    assert_eq!(tables.hash, accepted.hash);
+    assert_eq!(
+        tables.migration.from.as_deref(),
+        Some(previous.hash.as_str())
+    );
+    assert_eq!(tables.migration.to, accepted.hash);
+    assert_eq!(
+        tables
+            .tables
+            .iter()
+            .map(|table| table.schema.clone())
+            .collect::<Vec<_>>(),
+        accepted.tables
+    );
     assert_ne!(
         std::fs::read(&lock).unwrap(),
         std::fs::read(built.join("schema.lock")).unwrap()
@@ -93,4 +114,74 @@ fn an_invalid_or_missing_release_is_an_error() {
         .unwrap();
     assert_eq!(out.status.code(), Some(2), "{}", shown(&out));
     assert!(shown(&out).contains("needs a file"), "{}", shown(&out));
+}
+
+#[test]
+fn a_released_schema_does_not_skip_executable_support() {
+    let dir = std::env::temp_dir().join(format!("pw-cli-schema-support-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let source = dir.join("Menu.pw");
+    std::fs::write(&source, "module shop.head\nfn items() -> List<Int> !{} { [1, 2] }\nview Menu() !{} { <ul>{#each items() as item (item)}<li>{item}</li>{/each}</ul> }\n").unwrap();
+    let lock = dir.join("released.lock");
+    std::fs::write(&lock, pw_core::tables::Schema::of(Vec::new()).written()).unwrap();
+    for command in ["check", "build"] {
+        let dest = dir.join(format!("refused-{command}"));
+        let mut args = vec![Path::new("--schema-lock"), lock.as_path()];
+        if command == "build" {
+            args.extend([Path::new("--out"), dest.as_path()]);
+        }
+        let out = pw(command, &args, &source);
+        let said = shown(&out);
+        assert_eq!(out.status.code(), Some(1), "{command}: {said}");
+        assert!(
+            said.contains("PW6601") && said.contains("reads its list by path"),
+            "{command}: {said}"
+        );
+        assert!(
+            !said.contains("PW0366"),
+            "a valid empty release was reinterpreted: {said}"
+        );
+        assert!(!dest.exists(), "refused {command} wrote artifacts");
+    }
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn migration_refusals_precede_unsupported_backend_diagnostics() {
+    let dir = std::env::temp_dir().join(format!("pw-cli-schema-priority-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let source = dir.join("Notes.pw");
+    let original = "module Notes\ntype Note = Note { id: String, text: String }\ntable Notes\n    row Note\n    key id\n";
+    std::fs::write(&source, original).unwrap();
+    let first = dir.join("first");
+    let out = pw("build", &[Path::new("--out"), &first], &source);
+    assert!(out.status.success(), "{}", shown(&out));
+    let lock = dir.join("released.lock");
+    std::fs::copy(first.join("schema.lock"), &lock).unwrap();
+    let unsupported = "\nfn items() -> List<Int> !{} { [1, 2] }\nview Menu() !{} { <ul>{#each items() as item (item)}<li>{item}</li>{/each}</ul> }\n";
+    std::fs::write(
+        &source,
+        original.replace(", text: String", "") + unsupported,
+    )
+    .unwrap();
+    for command in ["check", "build"] {
+        let dest = dir.join(format!("refused-{command}"));
+        let mut args = vec![Path::new("--schema-lock"), lock.as_path()];
+        if command == "build" {
+            args.extend([Path::new("--out"), dest.as_path()]);
+        }
+        let out = pw(command, &args, &source);
+        let said = shown(&out);
+        assert_eq!(out.status.code(), Some(1), "{command}: {said}");
+        assert!(
+            said.contains("PW0366"),
+            "native migration identity was lost: {command}: {said}"
+        );
+        assert!(
+            !said.contains("PW6601"),
+            "backend ran after migration refusal: {command}: {said}"
+        );
+        assert!(!dest.exists(), "refused {command} wrote artifacts");
+    }
+    std::fs::remove_dir_all(dir).unwrap();
 }

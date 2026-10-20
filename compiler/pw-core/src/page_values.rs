@@ -2566,69 +2566,60 @@ fn computed_part(
     ))
 }
 
-/// **Every page's plan.**
-pub fn pages(hirs: &[&Hir], ws: &Workspace, sigs: &Signatures) -> Vec<Planned> {
-    let captures = crate::resume::capture_map(hirs, sigs);
+/// One run of the existing page planner, shared by contracts and backends.
+#[derive(Clone)]
+pub(crate) struct Analysis {
+    pub pages: Vec<Planned>,
+    pub members: BTreeSet<DefId>,
+    pub derived: Vec<Derived>,
+}
+pub(crate) fn analyze(hirs: &[&Hir], ws: &Workspace, sigs: &Signatures) -> Analysis {
     let mut inference = crate::effects::Inference::new(sigs, ws);
     inference.run(hirs);
-    let mut out = Vec::new();
+    analyze_inferred(hirs, ws, sigs, &inference)
+}
+
+pub(crate) fn analyze_inferred(
+    hirs: &[&Hir],
+    ws: &Workspace,
+    sigs: &Signatures,
+    inference: &crate::effects::Inference<'_>,
+) -> Analysis {
+    let captures = crate::resume::capture_map(hirs, sigs);
+    let mut out = Analysis {
+        pages: Vec::new(),
+        members: BTreeSet::new(),
+        derived: Vec::new(),
+    };
     for (unit, hir) in hirs.iter().enumerate() {
         for (id, decl) in hir.all_decls() {
             if decl.kind != DeclKind::Page {
                 continue;
             }
-            let page = {
-                let module = hir.module_of(id).unwrap_or_default();
-                if module.is_empty() {
-                    decl.name.clone()
-                } else {
-                    format!("{module}.{}", decl.name)
-                }
-            };
-            out.push(Planned {
+            let page = crate::contract::component_id(hir, id);
+            let planned = plan(hirs, ws, sigs, &captures, inference, unit, id).map(|(p, m, d)| {
+                out.members.extend(m);
+                out.derived.extend(d);
+                p
+            });
+            out.pages.push(Planned {
                 page,
-                plan: plan(hirs, ws, sigs, &captures, &inference, unit, id).map(|(p, ..)| p),
+                plan: planned,
             });
         }
     }
     out
 }
 
-/// **The member functions some page's plan calls**: each gets a contract of
-/// kind `function` and is compiled as a component of its own (ADR-0125).
-pub fn members(hirs: &[&Hir], ws: &Workspace, sigs: &Signatures) -> BTreeSet<DefId> {
-    let captures = crate::resume::capture_map(hirs, sigs);
-    let mut inference = crate::effects::Inference::new(sigs, ws);
-    inference.run(hirs);
-    let mut out = BTreeSet::new();
-    for (unit, hir) in hirs.iter().enumerate() {
-        for (id, decl) in hir.all_decls() {
-            if decl.kind == DeclKind::Page
-                && let Ok((_, m, _)) = plan(hirs, ws, sigs, &captures, &inference, unit, id)
-            {
-                out.extend(m);
-            }
-        }
-    }
-    out
+/// Every page's plan, projected from the shared page analysis.
+pub fn pages(hirs: &[&Hir], ws: &Workspace, sigs: &Signatures) -> Vec<Planned> {
+    analyze(hirs, ws, sigs).pages
 }
-
-/// **The computed parts some page's plan has a host compute** (ADR-0226):
-/// each a function the compiler lifts, with a contract of kind `derived`,
-/// compiled as a component of its own.
+/// The member functions some page's plan calls (ADR-0125).
+pub fn members(hirs: &[&Hir], ws: &Workspace, sigs: &Signatures) -> BTreeSet<DefId> {
+    analyze(hirs, ws, sigs).members
+}
+/// The computed parts some page's plan lifts into functions (ADR-0226).
 pub fn derived(hirs: &[&Hir], ws: &Workspace, sigs: &Signatures) -> Vec<Derived> {
-    let captures = crate::resume::capture_map(hirs, sigs);
-    let mut inference = crate::effects::Inference::new(sigs, ws);
-    inference.run(hirs);
-    let mut out = Vec::new();
-    for (unit, hir) in hirs.iter().enumerate() {
-        for (id, decl) in hir.all_decls() {
-            if decl.kind == DeclKind::Page
-                && let Ok((_, _, d)) = plan(hirs, ws, sigs, &captures, &inference, unit, id)
-            {
-                out.extend(d);
-            }
-        }
-    }
-    out
+    analyze(hirs, ws, sigs).derived
 }

@@ -51,7 +51,7 @@ MUTANTS = [
     (
         "a clause written in a block is not judged",
         CHECK,
-        "        per_unit.extend(clause_values(&workspace, i, &u.hir, &names.clauses));\n",
+        '        per_unit.extend(clause_values(workspace, i, &u.hir, &names.clauses));\n',
         "        per_unit.extend(clause_values(&workspace, i, &u.hir, &[]));\n",
     ),
     (

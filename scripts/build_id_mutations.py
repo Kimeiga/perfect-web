@@ -17,8 +17,8 @@ host mutant, the host's; a decision mutant, `pw-resume-wasm`'s; the
 runtime's, `e2e/recovery.spec.mjs`'s test of a document of another schema,
 in Chromium.
 
-Run from the repository root; `just e14-build-id` records the output. The
-source is restored after every mutant, whatever happens.
+Run from the repository root; `just e14-build-id` records the output. Each completed attempt or handled SIGTERM restores its source in finally;
+externally interrupted runs require byte-verified recovery before another run.
 """
 
 import os
@@ -160,11 +160,14 @@ def cargo_tests(suite):
     """(built, passed, failed) over the suite's tests."""
     out, code = bounded(COMMANDS[suite], cwd=ROOT)
     if code is None:
-        return True, 0, 1
+        return False, 0, 0
     found = re.findall(r"test result: \w+\. (\d+) passed; (\d+) failed", out)
     if not found:
         return False, 0, 0
-    return True, sum(int(p) for p, _ in found), sum(int(f) for _, f in found)
+    passed = sum(int(p) for p, _ in found)
+    failed = sum(int(f) for _, f in found)
+    valid = code == (101 if failed else 0) and passed + failed > 0
+    return valid, passed, failed
 
 
 def browser_tests(_suite="browser"):
@@ -188,18 +191,24 @@ def browser_tests(_suite="browser"):
     if server.returncode != 0:
         return False, 0, 0
     passed = failed = 0
+    complete = True
     for spec in SPECS:
         out, code = bounded(
-            ["pnpm", "exec", "playwright", "test", *spec, "--reporter=line"],
+            ["bash", str(ROOT / "scripts/run_suite.sh"), "-C", ".", "--",
+             "pnpm", "exec", "playwright", "test", *spec, "--reporter=line"],
             cwd=ROOT / "spikes/own-renderer",
         )
         if code is None:
-            failed += 1
+            complete = False
             continue
         out = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", out)
         passed += sum(int(n) for n in re.findall(r"(\d+) passed", out))
-        failed += sum(int(n) for n in re.findall(r"(\d+) failed", out))
-    return passed + failed > 0, passed, failed
+        command_failed = sum(int(n) for n in re.findall(r"(\d+) failed", out))
+        failed += command_failed
+        # Counts describe tests; run_suite owns producer status/no-test refusal.
+        if code != (1 if command_failed else 0):
+            complete = False
+    return complete and passed + failed > 0, passed, failed
 
 
 SUITES = {"core": cargo_tests, "host": cargo_tests, "wasm": cargo_tests, "browser": browser_tests}
@@ -207,42 +216,52 @@ SUITES = {"core": cargo_tests, "host": cargo_tests, "wasm": cargo_tests, "browse
 
 def main():
     import mutation_baseline  # keeps what each command says, for a red baseline
+    watch = mutation_baseline.mutation_bound.start()
     # Stopped from outside, the source is still restored: SIGTERM raises
     # here, and the `finally` below runs.
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(1))
     for suite, run in SUITES.items():
         built, passed, failed = run(suite)
         print(f"baseline ({suite}): {passed} passed, {failed} failed", flush=True)
-        if not built or failed or not passed:
+        if not built or failed or not passed or (watch is not None and watch.stopped):
             print("FAIL: the unmutated baseline is not green; no mutant can mean anything")
             mutation_baseline.explain()
             return 1
 
-    survivors = 0
+    survivors = refused = killed = 0
     for what, suite, path, anchor, replacement in MUTANTS:
         original = path.read_text()
         if original.count(anchor) != 1:
             print(f"{what}: ANCHOR NOT FOUND EXACTLY ONCE in {path.name}")
-            survivors += 1
+            refused += 1
             continue
         try:
             path.write_text(original.replace(anchor, replacement, 1))
-            built, passed, failed = SUITES[suite](suite)
+            result = SUITES[suite](suite)
+            built, passed, failed = result
         finally:
             path.write_text(original)
-        if not built:
-            verdict = "KILLED (does not build)"
+        stopped = watch is not None and bool(watch.stopped)
+        if not built or passed + failed == 0 or stopped:
+            verdict = "REFUSED (invalid build, status, empty result or stopped producer)"
+            refused += 1
         elif failed:
             verdict = f"KILLED ({failed} of {passed + failed} tests fail)"
+            killed += 1
         else:
             verdict = "SURVIVED"
             survivors += 1
         print(f"{what} [{suite}]: {verdict}", flush=True)
     # The page and the server are built again from the restored source.
-    browser_tests()
+    built, passed, failed = browser_tests()
+    print(f"restored (browser): {passed} passed, {failed} failed", flush=True)
+    if not built or failed or not passed or (watch is not None and watch.stopped):
+        print("FAIL: the restored browser suite is not green")
+        mutation_baseline.explain()
+        return 1
 
-    print(f"{len(MUTANTS) - survivors} of {len(MUTANTS)} mutants killed")
-    return 1 if survivors else 0
+    print(f"{killed} of {len(MUTANTS)} mutants killed; {refused} refused")
+    return 1 if survivors or refused else 0
 
 
 if __name__ == "__main__":

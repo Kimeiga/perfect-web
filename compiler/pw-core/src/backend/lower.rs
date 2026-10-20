@@ -62,69 +62,110 @@ use crate::signatures::Signatures;
 /// failing to emit rather than by being told.
 ///
 /// So the precondition is carried by a **type with a private field**. The only
-/// way to obtain a `Checked` is `Checked::of`, which runs the checker on the
-/// same units, and `program` takes one. A caller cannot hand the backend an
+/// public way to obtain a `Checked` is `program::with_semantic_program`,
+/// which constructs its own resolution/signature context, and `program`
+/// takes the proof it lends. A caller cannot hand the backend an
 /// unresolved program by forgetting a step: there is no step to forget.
 ///
 /// It is deliberately not a `bool` on `Context`, and not a documented
 /// convention. Both are things a caller can be wrong about, which is the shape
 /// of every entry in `docs/RISK_QUEUE.md`.
+///
+/// A caller cannot combine source with a foreign resolution/signature context:
+/// ```compile_fail
+/// use pw_core::{check::Unit, backend::lower::{Checked, Context}};
+/// fn forge<'a>(units: &'a [Unit], context: Context<'a>) {
+///     let _ = Checked::of(units, context);
+/// }
+/// ```
 pub struct Checked<'a> {
     cx: Context<'a>,
+    units: &'a [crate::check::Unit],
+    pages: std::cell::OnceCell<crate::page_values::Analysis>,
+    privacy: std::rc::Rc<crate::check::PrivacyFacts>,
 }
 
 impl<'a> Checked<'a> {
-    /// Run the checker, and return the context only if it produced no errors.
-    ///
-    /// `units` must be the same program `cx` was built from — the borrow makes
-    /// that checkable at the call site rather than assumed, because a proof
-    /// about a different program is the coincidental correctness of ADR-0022.
-    pub fn of(
-        units: &[crate::check::Unit],
+    pub(crate) fn diagnose_inferred(
+        units: &'a [crate::check::Unit],
         cx: Context<'a>,
-    ) -> Result<Checked<'a>, Vec<crate::diagnostics::Diagnostic>> {
-        assert_eq!(
-            units.len(),
-            cx.hirs.len(),
-            "the checked units and the lowering context describe different \
-             programs, so the proof would be about neither"
+        inference: &crate::effects::Inference<'_>,
+    ) -> Result<(Checked<'a>, crate::program::Diagnostics), crate::program::Diagnostics> {
+        assert!(
+            units.len() == cx.hirs.len()
+                && units
+                    .iter()
+                    .zip(cx.hirs)
+                    .all(|(unit, hir)| std::ptr::eq(&unit.hir, *hir)),
+            "the checked units and the lowering context describe different programs"
         );
-        // **A program that did not parse did not check**, whatever the checker
-        // says of the tree that survived. `Unit` carries its source and not
-        // its parse errors, so they are read again here. Until 2026-09-25 they
-        // were not: `{ a + b }` in a query was an unknown policy to the parser
-        // and an empty body to the backend, which compiled it.
-        let mut errors: Vec<crate::diagnostics::Diagnostic> =
-            units.iter().flat_map(syntax_errors).collect();
-        errors.extend(
-            crate::check::check_units(units)
-                .into_iter()
-                .flat_map(|(_, ds)| ds)
-                .filter(|d| d.severity == crate::diagnostics::Severity::Error),
-        );
-        if errors.is_empty() {
-            Ok(Checked { cx })
+        let syntax: crate::program::Diagnostics = units
+            .iter()
+            .map(|u| {
+                (
+                    u.path.clone(),
+                    pw_syntax::parse_tree(&u.src)
+                        .errors
+                        .into_iter()
+                        .map(crate::check::syntax_error)
+                        .collect(),
+                )
+            })
+            .collect();
+        if syntax.iter().any(|(_, ds)| !ds.is_empty()) {
+            return Err(syntax);
+        }
+        let (diagnostics, privacy) =
+            crate::check::check_inferred_prepared(units, cx.hirs, cx.ws, cx.sigs, inference);
+        if diagnostics
+            .iter()
+            .any(|(_, ds)| ds.iter().any(|d| d.is_error()))
+        {
+            Err(diagnostics)
         } else {
-            Err(errors)
+            Ok((
+                Checked {
+                    cx,
+                    units,
+                    pages: std::cell::OnceCell::new(),
+                    privacy: std::rc::Rc::new(privacy),
+                },
+                diagnostics,
+            ))
         }
     }
-
     pub fn context(&self) -> &Context<'a> {
         &self.cx
     }
-}
-
-/// A unit's syntax errors, as diagnostics, each naming its file.
-fn syntax_errors(unit: &crate::check::Unit) -> Vec<crate::diagnostics::Diagnostic> {
-    pw_syntax::parse_tree(&unit.src)
-        .errors
-        .into_iter()
-        .map(|e| {
-            let mut d = crate::check::syntax_error(e);
-            d.message = format!("{}: {}", unit.path, d.message);
-            d
-        })
-        .collect()
+    pub(crate) fn with_contracts<'b>(&'b self, contracts: &'b [ComponentContract]) -> Checked<'b> {
+        Checked {
+            cx: Context {
+                hirs: self.cx.hirs,
+                ws: self.cx.ws,
+                sigs: self.cx.sigs,
+                contracts,
+            },
+            units: self.units,
+            pages: std::cell::OnceCell::from(self.pages().clone()),
+            privacy: std::rc::Rc::clone(&self.privacy),
+        }
+    }
+    pub(crate) fn privacy(&self) -> &crate::check::PrivacyFacts {
+        &self.privacy
+    }
+    pub(crate) fn set_pages(&self, pages: crate::page_values::Analysis) {
+        assert!(
+            self.pages.set(pages).is_ok(),
+            "page analysis was already prepared"
+        );
+    }
+    pub(crate) fn pages(&self) -> &crate::page_values::Analysis {
+        self.pages
+            .get_or_init(|| crate::page_values::analyze(self.cx.hirs, self.cx.ws, self.cx.sigs))
+    }
+    pub(crate) fn sources(&self) -> Vec<&str> {
+        self.units.iter().map(|u| u.src.as_str()).collect()
+    }
 }
 
 /// What the lowering needs from upstream, gathered once.
@@ -1276,7 +1317,7 @@ pub fn program_by_declaration(
     let mut out = Program::default();
     let mut refusals = Vec::new();
     // And each function a page's template reads as a member (ADR-0125).
-    let members = crate::page_values::members(cx.hirs, cx.ws, cx.sigs);
+    let members = &checked.pages().members;
     for (unit, hir) in cx.hirs.iter().enumerate() {
         for (id, decl) in hir.all_decls() {
             let member = members.contains(&DefId { unit, decl: id.0 });
@@ -1294,8 +1335,8 @@ pub fn program_by_declaration(
     }
     // And each computed part a host computes (ADR-0226): the function its
     // expression is lifted into.
-    for d in crate::page_values::derived(cx.hirs, cx.ws, cx.sigs) {
-        match hole(cx, &d) {
+    for d in &checked.pages().derived {
+        match hole(cx, d) {
             Lowering::Lowered(f) => out.functions.push(f),
             other => refusals.push((d.declaration(), other)),
         }
@@ -6395,5 +6436,53 @@ fn construct_name(e: &Expr) -> &'static str {
         Expr::Keyword { .. } => "a body-level statement",
         Expr::Template { .. } => "markup",
         Expr::Error => "an expression that did not parse",
+    }
+}
+
+#[cfg(test)]
+mod checked_input_tests {
+    use super::*;
+    #[test]
+    fn another_program_of_equal_length_cannot_receive_the_proof() {
+        let units = |src: &str| {
+            vec![crate::check::Unit {
+                path: "app.pw".into(),
+                src: src.into(),
+                hir: crate::lower::lower_file(src, &pw_syntax::parse_tree(src).green),
+            }]
+        };
+        let a = units("module a\nquery N() -> Int { 1 }\n");
+        let b = units("module b\nquery N() -> Int { 2 }\n");
+        let hirs: Vec<_> = b.iter().map(|u| &u.hir).collect();
+        let ws = Workspace::build(&hirs);
+        let sigs = Signatures::build(&ws, &hirs);
+        let mut inference = crate::effects::Inference::new(&sigs, &ws);
+        inference.run(&hirs);
+        let make = || {
+            Checked::diagnose_inferred(
+                &a,
+                Context {
+                    hirs: &hirs,
+                    ws: &ws,
+                    sigs: &sigs,
+                    contracts: &[],
+                },
+                &inference,
+            )
+        };
+        assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(make)).is_err());
+        assert!(
+            Checked::diagnose_inferred(
+                &b,
+                Context {
+                    hirs: &hirs,
+                    ws: &ws,
+                    sigs: &sigs,
+                    contracts: &[]
+                },
+                &inference
+            )
+            .is_ok()
+        );
     }
 }
