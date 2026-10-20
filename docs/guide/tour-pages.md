@@ -188,10 +188,10 @@ A handler that calls a command matches on its answer, as the
 Err(_) => () }`. The answer says whether the command committed; the new
 data comes through the page's queries.
 
-A signal can be read in a part of the page, but not in a `<title>`, and a
-part cannot compute a value from two signals, as in `{a + b}`: `pw build`
-refuses both, and `pw check` passes them
-([where `pw check` stops](#where-pw-check-stops)).
+A signal can be read in a part of the page, but not in a `<title>`: `pw
+check` and `pw build` both refuse it
+([where `pw check` stops](#where-pw-check-stops)). A part may compute a value
+from two signals, as in `{a + b}`, which the section below shows.
 
 ## Forms and `bind:value`
 

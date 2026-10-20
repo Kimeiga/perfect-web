@@ -1101,3 +1101,21 @@ the complete unchanged 50+8 rosters and fresh default CI before any checkpoint.
   `ADR-XXXX` reads `ADR-0361` in its validation index's scope
   (`docs/evidence/E14/check-is-build-validation-index.json`), as in this
   file's name and title.
+
+## Amended on train-12 (2026-10-20)
+
+- **The two-signal witness builds now.** The witness that a part cannot
+  compute a value from two signals (`{a + b}`), in the CLI test and the
+  guide's tour, was a gap track `device-store` closed (ADR-0366, decision
+  7: the browser computes from several values it holds). The witness is a
+  signal and a query's value together, still refused in the same words
+  ("computes a value from `a` and `count`, and a host computes one from one
+  value (ruling 0073-a)"):
+  `a_part_cannot_compute_from_a_signal_and_a_query`
+  (`compiler/pw-cli/tests/check_is_build.rs`). Two signals build, as `pw
+  check` and `pw build` both say: `a_part_may_compute_from_two_signals`,
+  held by a mutant of `scripts/check_is_build_mutations.py` ("a part
+  computed from two signals is refused again"), killed by that test alone.
+  The guide's tour (`shop.sum`) is a plain `pw` block, not `fails=PW6601`,
+  and `docs/guide/why.md`'s list of what `pw build` refuses no longer names
+  it.

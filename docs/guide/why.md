@@ -194,8 +194,8 @@ Pleris is a research project, and these are true today (2026-10-15):
 - **No project tooling.** There is no `pw new`, no project file and no
   editor support yet: you name the standard packages on the command line.
 - **Gaps in the checks.** `pw check` is not the whole build: `pw build`
-  refuses programs it passes (a `<title>` that reads a signal, a value
-  computed from two signals, a computed list in an `{#each}`), so build
+  refuses programs it passes (a `<title>` that reads a signal, a computed
+  list in an `{#each}`), so build
   before you trust a green check. Effects in an `{#each}` head are now
   checked, including its list and key (ADR-0345). An `<img>` without `alt`
   is not refused. [The tour's last section](tour-pages.md#where-pw-check-stops)

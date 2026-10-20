@@ -78,6 +78,10 @@ MUTANTS = [
     ('first source-release cancellation is discarded', ROOT / "scripts/mutation_source.py", '        if primary is None or (not cancellation(primary) and not isinstance(secondary, Exception)):', '        if primary is None:'),
     ('first source-diagnostic cancellation is discarded', ROOT / "scripts/mutation_source.py", '            if not cancellation(primary) and not isinstance(diagnostic, Exception):', '            if False:'),
     ('report directory context exit masks the original cancellation', ROOT / "scripts/check_is_build_mutations.py", '\n    with mutation_source.releasing(directory.cleanup):', '\n    with directory:'),
+    # Train-12: track `device-store` (ADR-0366, decision 7) made a part computed from two signals build, so the
+    # witness that a part cannot compute from several values is a signal and a query's value together, and
+    # `a_part_may_compute_from_two_signals` holds the lift.
+    ('a part computed from two signals is refused again', ROOT / "compiler/pw-core/src/page_values.rs", '    if browsers && (inputs.len() > 1 || nested) && !path.contains(".#") {\n', '    if browsers && false && !path.contains(".#") {\n'),
  ]
 COMMANDS = [
     ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--doc", "backend::lower::Checked"],

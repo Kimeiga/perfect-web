@@ -84,12 +84,30 @@ fn a_signal_in_a_title_is_refused_during_check() {
     );
 }
 
+/// A part cannot compute a value from a signal and a query's value together.
+/// Its witness was two signals (`{a + b}`) until track `device-store` made the
+/// browser compute from several values it holds (ADR-0366, decision 7), which
+/// builds now; a query's value is a host's, and stays refused (ruling
+/// 0073-a).
 #[test]
-fn a_part_cannot_compute_from_two_signals() {
+fn a_part_cannot_compute_from_a_signal_and_a_query() {
     refused(
-        "module shop.sum\npage Sum() {\n route \"/sum\"\n cache private\n signal a: Int = 1\n signal b: Int = 2\n view { <title>Sum</title><p>{a + b}</p><button type=\"button\" on:press={() => a = a + 1}>Add</button><button type=\"button\" on:press={() => b = b + 1}>Add</button> }\n}\n",
-        "computes a value from `a` and `b`",
+        "module shop.sum\nquery Count() -> Int { 3 }\npage Sum() {\n route \"/sum\"\n cache private\n let count = query Count()\n signal a: Int = 1\n view { <title>Sum</title><p>{a + count}</p><button type=\"button\" on:press={() => a = a + 1}>Add</button> }\n}\n",
+        "computes a value from `a` and `count`",
     );
+}
+
+/// And a part may compute a value from two signals: the same page with the
+/// second value a signal builds, as `pw check` and `pw build` both say.
+#[test]
+fn a_part_may_compute_from_two_signals() {
+    let program = Program::new(
+        "module shop.sum\npage Sum() {\n route \"/sum\"\n cache private\n signal a: Int = 1\n signal b: Int = 2\n view { <title>Sum</title><p>{a + b}</p><button type=\"button\" on:press={() => a = a + 1}>Add</button><button type=\"button\" on:press={() => b = b + 1}>Add</button> }\n}\n",
+    );
+    for command in ["check", "build"] {
+        let out = program.run(command);
+        assert!(out.status.success(), "{command}: {}", text(&out));
+    }
 }
 #[test]
 fn a_pure_computed_each_head_is_refused() {
