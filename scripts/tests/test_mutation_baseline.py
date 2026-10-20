@@ -452,20 +452,28 @@ class KeepsABaselinesBrowserRun(unittest.TestCase):
 class EveryCallOfExplain(unittest.TestCase):
     """`explain()` keeps the output of the last command a script ran where it
     was a browser run that failed, so a script that calls it after a MUTANT's
-    browser run would keep a control's intended failure. 272 of the 277 calls
-    follow the baseline's own red print; these five are the others, each with
-    a command last that is no mutant's browser run (a producer refused, a
-    build, the restored source's own check)."""
+    browser run would keep a control's intended failure. 277 of the 287 calls
+    follow the baseline's own red print; these ten are the others, each a red
+    baseline in its own words (one suite's, or after the output it printed)
+    or a call with a command last that is no mutant's browser run (a producer
+    refused, a build, the restored source's own check). Train-11 brought five
+    (the browser host map's, the committed components', kiokun-cache's, the
+    render merge's and the skipped specs' guard), each read for that."""
 
     OTHERS = {
         ("bounded_statements_mutations.py", "REFUSED (invalid or stopped Cargo producer; no kill)"),
+        ("browser_host_map_mutations.py", "the unmutated {suite} suite is not green"),
+        ("committed_components_mutations.py", "REFUSED (invalid or stopped Cargo producer; no kill)"),
         ("descriptions_mutations.py", "the restored-source browser check is not green"),
+        ("kiokun_cache_mutations.py", "print(output)"),
         ("kiokun_test_data_mutations.py", "print(output)"),
         ("proof_mutations.py", "pw does not build unmutated"),
+        ("render_merge_mutations.py", "REFUSED (invalid or stopped Cargo producer; no kill)"),
+        ("skipped_specs_mutations.py", "REFUSED (the tests errored or said no count; no kill)"),
         ("store_hours_mutations.py", "REFUSED (invalid or stopped Cargo producer; no kill)"),
     }
 
-    def test_each_call_follows_a_red_baseline_or_one_of_five_named(self):
+    def test_each_call_follows_a_red_baseline_or_one_of_those_named(self):
         found = set()
         calls = 0
         for p in sorted(SCRIPTS.glob("*_mutations.py")):
@@ -477,7 +485,9 @@ class EveryCallOfExplain(unittest.TestCase):
                 before = lines[i - 1]
                 if "the unmutated baseline is not green" in before:
                     continue
-                found.add((p.name, next(w for w in sorted({o for _, o in self.OTHERS}) if w in before)))
+                # A call none of these names is said by its line, to be read.
+                named = next((w for w in sorted({o for _, o in self.OTHERS}) if w in before), before.strip())
+                found.add((p.name, named))
         self.assertGreater(calls, 250)
         self.assertEqual(found, self.OTHERS)
 

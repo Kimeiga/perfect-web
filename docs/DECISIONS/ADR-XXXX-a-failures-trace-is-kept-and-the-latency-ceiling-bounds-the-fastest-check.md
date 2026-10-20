@@ -316,3 +316,19 @@ the repository's own suite needs its builds, and is the verify run's.)
   none failed, 25 ignored (train-10's 3,065 and this track's 9), mutant
   programs 301 judged in 12. Its own `check_latency` ran at a load of 55 to
   62: the fastest of seven 229.5 ms a thousand lines, the median 245.4.
+
+## Merged into train-11 (2026-10-20)
+
+Merged after the render merge, the committed-components check, the browser
+host map, the allocator, kiokun-cache and bounded-race (train-11's
+526ccf66). There the scripts call `mutation_baseline.explain()` 287 times,
+not 277, and `EveryCallOfExplain` failed `just ci` with a StopIteration: a
+call after a line it could not name. The five the train brought were each
+read: the browser host map's follows a red baseline of one suite in its own
+words; the committed components', the render merge's and the skipped specs'
+guard's follow a refused producer, whose last command is a cargo build or a
+unittest run, never a mutant's browser run; kiokun-cache's follows a red
+baseline and the output it printed. The test names all ten
+(`test_each_call_follows_a_red_baseline_or_one_of_those_named`, "five"
+before), and a call it cannot name now fails its assertion, named by its
+line, not with a StopIteration.
