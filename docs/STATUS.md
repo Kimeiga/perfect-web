@@ -79,7 +79,24 @@ failed `check_latency`.
   outside this program. It was no flake, and no session's turn held across
   the estimate (ADR-0280, amended 2026-10-18). In WebKit, the two specs
   that did so now let the page settle first.
-Verify TRAIN_RUN green, with train-10.
+- The third verify (39131257549, on `ddaeeb1d`) passed 205 of its 206
+  recipes and the three engines' suites. `e10-browser` failed one
+  Chromium test, once in its three runs: a `waitForURL` in
+  `scheduled-orders.spec.mjs` timed out, its cause open (NEXT). The spec
+  now names its own failure; the ten recipes that change reaches ran
+  again by dispatch (39270030023, on `587657ff`), every one green.
+- Three committed components the server's unit tests run, the store's
+  hours, were stale: `evidence_is_current` holds 14 of the 20 to the
+  compiler, by a list kept by hand. They are regenerated (`8c5618c8`),
+  and the 72 recipes whose tests read them ran again by dispatch
+  (39325789224, on `8c5618c8`), every one green. The planner sees no
+  change to a binary file; train-11 derives the list from the build
+  (NEXT).
+- The landing's own gate found ADR-0344's count check unable to read a
+  verdict that says what killed its mutant, as the guide's script says
+  them: fixed (`e9bad0c1`), and `e14-evidence-integrity` ran again by
+  dispatch (39364245453, on `e9bad0c1`), green.
+Verify 39131257549 and dispatches 39270030023, 39325789224 and 39364245453 green, with train-10.
 
 **ADR-0290 amended, 2026-10-16: no shard is dealt past the job's ceiling
 where another deal ends as soon** (train-10, from `58e3797b`, track
@@ -99,7 +116,7 @@ where another deal ends as soon** (train-10, from `58e3797b`, track
 - The track's own runs: `dealt_by_time_mutations.py` whole, 49 of 49
   killed; its default `just ci` green. On the train, `test_ci_scripts.py`
   79 of 79.
-Verify TRAIN_RUN green, with train-10.
+Verify 39131257549 and dispatches 39270030023, 39325789224 and 39364245453 green, with train-10.
 
 **ADR-0353, 2026-10-16: a repeated store keeps all of its opening hours**
 (train-10, from `57f34890`, track `legacy-hours-duplicates`: the
@@ -124,7 +141,7 @@ integrator's local repair, on train-9's `e2a4acd9`).
   of 19 and the bounded statements' 12 of 12, 36 browser tests in three
   engines, and `just ci` green (2955 Rust tests passed, 25 ignored;
   [raw output](evidence/E14/repeated-store-hours-ci.txt)).
-Verify TRAIN_RUN green, with train-10.
+Verify 39131257549 and dispatches 39270030023, 39325789224 and 39364245453 green, with train-10.
 
 **ADR-0350, 2026-10-16: tables and bounded generated reads**
 (local train-10 integration). Table declarations generate their reads,
@@ -141,7 +158,7 @@ campaign is recorded with a separate known exit-status classification gap;
 strict guide-producer validity remains open. Runtime adapter conformance
 (D2), generic-result integration and quiet-host E9 remain open. [Commands,
 complete raw output and source manifest](evidence/E14/train10-d1-integration.txt).
-Verify TRAIN_RUN green, with train-10.
+Verify 39131257549 and dispatches 39270030023, 39325789224 and 39364245453 green, with train-10.
 
 **ADR-0349, 2026-10-15: a failed suite fails its recipe** (train-10,
 from `3adbfe44`). Browser suites and benchmark controls propagate their
@@ -159,7 +176,7 @@ injection covers 143 suite failures and 203 build failures. Corpus evidence
 is current at 79/79.
 [Integration commands and raw results](evidence/E14/train10-evidence-integrity.txt).
 Quiet-host latency remains open.
-Verify TRAIN_RUN green, with train-10.
+Verify 39131257549 and dispatches 39270030023, 39325789224 and 39364245453 green, with train-10.
 
 **ADR-0340's and ADR-0322's follow-ups, 2026-10-15: a set pair carries
 its key by name, and PW0009 says how Pleris spells and and or**
@@ -178,7 +195,7 @@ its key by name, and PW0009 says how Pleris spells and and or**
 - On the train: bounded reads 32, source and corpus 20, generality 6,
   syntax 96; `bounded_checker_mutations.py` whole 42 of 42, the logical
   operators' 6 of 6 ([raw](evidence/E14/bounded-key-field-name.txt)).
-Verify TRAIN_RUN green, with train-10.
+Verify 39131257549 and dispatches 39270030023, 39325789224 and 39364245453 green, with train-10.
 
 **ADR-0347 and ADR-0348, 2026-10-15: scheduled orders and batched
 estimates** (train-10, from `40e81d51` plus integration repairs). Windows
@@ -196,7 +213,7 @@ payment-taking transactions wait on completed payments, every pin as
 measured. Its recipe skips without a database, and the planner did not
 deal it beside one: train-10's first verify recorded nothing of it, and
 the planner holds every such recipe to a database's shard now.
-Verify TRAIN_RUN green, with train-10.
+Verify 39131257549 and dispatches 39270030023, 39325789224 and 39364245453 green, with train-10.
 
 **ADR-0346, 2026-10-15: argument and page-parameter invariants**
 (train-10, from `ac3f2553`). The browser command decoder already refused
@@ -211,7 +228,7 @@ whole controls killed 18/18. [Raw correction evidence](evidence/E14/argument-pat
 Merged with train-9's reviews, the boundary refuses a comment past 500
 characters before the reviews layer does, whose own rule is tested
 directly since (`e920c40c`).
-Verify TRAIN_RUN green, with train-10.
+Verify 39131257549 and dispatches 39270030023, 39325789224 and 39364245453 green, with train-10.
 
 **ADR-0345, 2026-10-15: each-header expressions are checked**
 (train-10, from `839e8bfa`). Effects, privacy, signals and names now see a
@@ -220,7 +237,7 @@ positions. Branch evidence recorded 20/20 own controls and twelve other
 whole scripts. Corpus collision resolved as C26/A-038, retaining
 bounded-read C25/A-037. Generic-result effects remain a separate open
 track.
-Verify TRAIN_RUN green, with train-10.
+Verify 39131257549 and dispatches 39270030023, 39325789224 and 39364245453 green, with train-10.
 
 **ADR-0344, 2026-10-15: evidence integrity** (train-10, from
 `83cdac27`). Mutation runs discard stale Python bytecode; train pushes
@@ -241,7 +258,7 @@ Amended at train-10's merge of train-9 (2026-10-17): a decision's file,
 by the path evidence recorded it under before its numbering, is history,
 not an unnumbered mention; train-9's receipts of ADR-0352 hold five such
 paths, which the check named on a train's ref. 38 controls, from 35.
-Verify TRAIN_RUN green, with train-10.
+Verify 39131257549 and dispatches 39270030023, 39325789224 and 39364245453 green, with train-10.
 
 **ADR-0343, 2026-10-15: a guide whose examples compile** (NEXT's
 developer experience, its docs and tutorial for a developer from outside;
@@ -5219,11 +5236,16 @@ Latest local integration validation (2026-10-16): the D1 source snapshot
 `evidence/E14/train10-d1-input-sha256.json` passed full `just ci` with
 3,058 Rust tests and no failures. This records tested inputs before the
 local merge commit; it is not a master or GitHub verification claim.
-Train-10 at `e920c40c` (2026-10-17): `just ci` green on the PC, 3,065
-Rust tests passed, none failed, 25 ignored, `check_latency` 2 of 2,
-mutant programs 301 judged and none failing; the recipes its merges reach
-run whole, every control killed (PARALLEL's train-10 entry). Its verify is
-the record. Master `32757966` is train-9's landing (2026-10-17): its
+Train-10 at `e9bad0c1` (2026-10-19): `just ci` green on the PC, 3,065
+Rust tests passed, none failed, 25 ignored, mutant programs 301 judged
+and none failing, as at `8c5618c8`, `587657ff` and `e920c40c`
+(2026-10-17, when the recipes its merges reach ran whole, every control
+killed: PARALLEL's train-10 entry). Its record is GitHub's verify
+39131257549 at `ddaeeb1d`, dispatch 39270030023 at `587657ff`, dispatch
+39325789224 at `8c5618c8` and dispatch 39364245453 at `e9bad0c1`, with ci
+39364199325 there; master moves to its evidence commit (2026-10-19,
+PARALLEL's "train-10 landed"). Before it, master
+`32757966` was train-9's landing (2026-10-17): its
 source `e2a4acd9` passed GitHub's verify 38909882781 (85 recipes, 1,391
 of 1,391 mutants killed) and ci 38909883157. Older records follow.
 

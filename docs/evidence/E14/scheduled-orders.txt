@@ -1,0 +1,154 @@
+Track scheduled-orders - an order placed for a time its reader chooses
+
+produced by: just e14-scheduled-orders
+commit: 8c5618c86eeb62202be29b374661962175bfefb0
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39325789224 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64, PostgreSQL 18.6)
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+node: v22.21.1
+postgres: 18.6 (Debian 18.6-1.pgdg13+2)
+playwright: Version 1.58.0
+
+== the clock's arithmetic and the times a page cannot compute (compiler/pw-core/tests/scheduled_orders.rs)
+
+test a_run_is_scheduled_at_an_instant_moved_along_the_clock ... ok
+test moving_and_ordering_instants_reads_no_clock ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+== the times offered and an order for one, the store in memory (tests/scheduled_orders.rs, scheduled_orders.rs)
+
+test scheduled_orders::tests::an_orders_time_is_read_as_given_and_refused_where_it_cannot_be ... ok
+test tests::scheduled_orders::a_readers_press_of_the_send_is_not_a_command ... ok
+test tests::scheduled_orders::a_cart_of_two_stores_is_sent_by_its_longest_estimate ... ok
+test tests::scheduled_orders::a_cart_across_two_zones_is_offered_the_windows_both_are_open_at ... ok
+test tests::scheduled_orders::a_cart_for_as_soon_as_possible_asks_no_estimate ... ok
+test tests::scheduled_orders::a_second_order_waits_for_a_scheduled_one_to_be_sent ... ok
+test tests::scheduled_orders::a_send_before_its_order_is_paid_places_nothing ... ok
+test tests::scheduled_orders::a_send_places_only_its_own_order ... ok
+test tests::scheduled_orders::a_stores_hours_offer_the_windows_it_is_open_at ... ok
+test tests::scheduled_orders::a_time_is_held_to_the_estimate_as_it_is_when_the_order_is_placed ... ok
+test tests::scheduled_orders::a_time_not_offered_is_refused_when_chosen ... ok
+test tests::scheduled_orders::a_time_the_hours_no_longer_cover_is_refused ... ok
+test tests::scheduled_orders::a_window_is_offered_exactly_where_an_order_for_as_soon_as_possible_is_taken_when_told ... ok
+test tests::scheduled_orders::a_time_no_longer_offered_is_refused_when_the_order_is_placed ... ok
+test tests::scheduled_orders::a_window_is_offered_where_its_store_takes_an_order_when_it_is_told ... ok
+test tests::scheduled_orders::an_order_for_a_time_is_paid_now_and_its_page_says_when ... ok
+test tests::scheduled_orders::an_order_is_sent_its_estimates_most_and_five_minutes_before ... ok
+test tests::scheduled_orders::an_order_for_a_time_is_taken_while_its_store_is_closed ... ok
+test tests::scheduled_orders::an_order_for_a_time_awaiting_its_payment_is_swept ... ok
+test tests::scheduled_orders::estimates_read_together_preserve_each_stores_result ... ok
+test tests::scheduled_orders::hours_past_midnight_offer_windows_across_it ... ok
+test tests::scheduled_orders::an_order_is_sent_to_its_stores_when_its_preparation_is_due ... ok
+test tests::scheduled_orders::the_estimate_moves_the_windows ... ok
+test tests::scheduled_orders::the_page_of_times_is_held_until_the_first_windows_hour ... ok
+test tests::scheduled_orders::the_seeds_hours_offer_every_quarter_hour_from_an_hour_to_a_week_ahead ... ok
+test tests::scheduled_orders::the_page_of_times_lists_a_days_windows_and_its_days ... ok
+test tests::scheduled_orders::the_time_chosen_is_kept_with_the_readers_choices ... ok
+test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 602 filtered out; finished in 121.59s
+
+== the same, the store on PostgreSQL (PW_STORE_TEST_LAYER=postgres)
+
+test tests::scheduled_orders::a_readers_press_of_the_send_is_not_a_command ... ok
+test tests::scheduled_orders::a_cart_of_two_stores_is_sent_by_its_longest_estimate ... ok
+test tests::scheduled_orders::a_cart_across_two_zones_is_offered_the_windows_both_are_open_at ... ok
+test tests::scheduled_orders::a_cart_for_as_soon_as_possible_asks_no_estimate ... ok
+test tests::scheduled_orders::a_second_order_waits_for_a_scheduled_one_to_be_sent ... ok
+test tests::scheduled_orders::a_send_before_its_order_is_paid_places_nothing ... ok
+test tests::scheduled_orders::a_send_places_only_its_own_order ... ok
+test tests::scheduled_orders::a_stores_hours_offer_the_windows_it_is_open_at ... ok
+test tests::scheduled_orders::a_time_is_held_to_the_estimate_as_it_is_when_the_order_is_placed ... ok
+test tests::scheduled_orders::a_time_not_offered_is_refused_when_chosen ... ok
+test tests::scheduled_orders::a_time_the_hours_no_longer_cover_is_refused ... ok
+test tests::scheduled_orders::a_window_is_offered_exactly_where_an_order_for_as_soon_as_possible_is_taken_when_told ... ok
+test tests::scheduled_orders::a_time_no_longer_offered_is_refused_when_the_order_is_placed ... ok
+test tests::scheduled_orders::a_window_is_offered_where_its_store_takes_an_order_when_it_is_told ... ok
+test tests::scheduled_orders::an_order_for_a_time_is_taken_while_its_store_is_closed ... ok
+test tests::scheduled_orders::an_order_is_sent_its_estimates_most_and_five_minutes_before ... ok
+test tests::scheduled_orders::an_order_for_a_time_is_paid_now_and_its_page_says_when ... ok
+test tests::scheduled_orders::an_order_for_a_time_awaiting_its_payment_is_swept ... ok
+test tests::scheduled_orders::estimates_read_together_preserve_each_stores_result ... ok
+test tests::scheduled_orders::hours_past_midnight_offer_windows_across_it ... ok
+test tests::scheduled_orders::an_order_is_sent_to_its_stores_when_its_preparation_is_due ... ok
+test tests::scheduled_orders::the_estimate_moves_the_windows ... ok
+test tests::scheduled_orders::the_page_of_times_is_held_until_the_first_windows_hour ... ok
+test tests::scheduled_orders::the_page_of_times_lists_a_days_windows_and_its_days ... ok
+test tests::scheduled_orders::the_time_chosen_is_kept_with_the_readers_choices ... ok
+test tests::scheduled_orders::the_seeds_hours_offer_every_quarter_hour_from_an_hour_to_a_week_ahead ... ok
+test result: ok. 26 passed; 0 failed; 0 ignored; 0 measured; 603 filtered out; finished in 120.64s
+
+== each operation, page and command counted on PostgreSQL (tests/bounded_statements.rs)
+
+test tests::bounded_statements::each_operation_is_a_bounded_number_of_statements_per_call ... ok
+test tests::bounded_statements::a_pending_real_payment_webhook_is_not_a_complete_statement_count ... ok
+test tests::bounded_statements::scheduled_state_writes_feed_ran_waits_for_a_command ... ok
+test tests::bounded_statements::scheduled_state_writes_feed_retry_waits_for_a_command ... ok
+test tests::bounded_statements::scheduled_state_writes_store_ran_waits_for_a_command ... ok
+test tests::bounded_statements::scheduled_state_writes_store_retry_waits_for_a_command ... ok
+test tests::bounded_statements::a_commands_commit_is_counted_with_it ... ok
+test tests::bounded_statements::each_page_and_command_is_a_bounded_number_of_statements ... ok
+test tests::bounded_statements::placing_and_settling_where_payments_are_taken_is_bounded ... ok
+test tests::bounded_statements::sweep_cleanup_and_payment_commit_share_the_same_write_guard ... ok
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 619 filtered out; finished in 41.45s
+
+== the store in three engines (e2e/scheduled-orders.spec.mjs)
+
+  6 passed (4.4m)
+
+== mutation controls (scripts/scheduled_orders_mutations.py)
+
+baseline (memory): 27 passed, 0 failed
+baseline (postgres): 27 passed, 0 failed
+set estimates return only the first store [memory]: KILLED (1 of 27 tests fail)
+a window within the hour is offered [memory]: KILLED (4 of 27 tests fail)
+a window more than a week ahead is offered [memory]: KILLED (5 of 27 tests fail)
+a window is held to the hours at its start, not when its stores are told [memory]: KILLED (9 of 27 tests fail)
+a store is open before it opens [memory]: KILLED (11 of 27 tests fail)
+the last order is held to an order for as soon as possible alone [memory]: KILLED (7 of 27 tests fail)
+the last order is held to a window alone [memory]: KILLED (2 of 27 tests fail)
+an instant is not yet past when it is told [memory]: KILLED (3 of 27 tests fail)
+one store's hours stand for the cart's [memory]: KILLED (1 of 27 tests fail)
+a time between two quarter hours is held to be offered [memory]: KILLED (4 of 27 tests fail)
+a day's windows run past its midnight [memory]: KILLED (6 of 27 tests fail)
+an order is placed for a time no longer offered [memory]: KILLED (3 of 27 tests fail)
+the checkout says a time it no longer offers is scheduled [memory]: KILLED (1 of 27 tests fail)
+the store is told with no lead [memory]: KILLED (11 of 27 tests fail)
+the store is told the lead alone [memory]: KILLED (14 of 27 tests fail)
+the store is told at the window's start [memory]: KILLED (15 of 27 tests fail)
+the estimate's least is counted [memory]: KILLED (14 of 27 tests fail)
+the last store's estimate is counted, not the longest [memory]: KILLED (1 of 27 tests fail)
+a cart for as soon as possible asks the estimate [memory]: KILLED (1 of 27 tests fail)
+the page of times ignores the estimate [memory]: KILLED (6 of 27 tests fail)
+a time is chosen without the estimate [memory]: KILLED (1 of 27 tests fail)
+an order is placed for a time without the estimate [memory]: KILLED (7 of 27 tests fail)
+a window is said an hour off [memory]: KILLED (6 of 27 tests fail)
+a scheduled order is said an hour off [memory]: KILLED (7 of 27 tests fail)
+a scheduled order is said on another day [memory]: KILLED (7 of 27 tests fail)
+noon is said am [memory]: KILLED (6 of 27 tests fail)
+an evening is said on a 24-hour clock [memory]: KILLED (4 of 27 tests fail)
+a week on is said as this week [memory]: KILLED (3 of 27 tests fail)
+the day the page's address names is not shown [memory]: KILLED (5 of 27 tests fail)
+a time is chosen whatever it is [memory]: KILLED (1 of 27 tests fail)
+as soon as possible keeps the time chosen [memory]: KILLED (2 of 27 tests fail)
+an order for a time is held to the hours now [memory]: KILLED (4 of 27 tests fail)
+an order paid at the provider is sent at once [memory]: KILLED (1 of 27 tests fail)
+an order paid at the provider is never sent [memory]: KILLED (1 of 27 tests fail)
+an order paid at once is sent at once [memory]: KILLED (2 of 27 tests fail)
+the order page does not say when [memory]: KILLED (3 of 27 tests fail)
+the cart does not say when [memory]: KILLED (2 of 27 tests fail)
+the checkout is not read again when the reader's address changes [memory]: KILLED (26 of 27 tests fail)
+the page of times is not read again when the reader's address changes [memory]: KILLED (26 of 27 tests fail)
+an instant moved later moves back [memory]: KILLED (25 of 27 tests fail)
+an instant is before itself [memory]: KILLED (21 of 27 tests fail)
+an order paid for a time is placed at once [memory]: KILLED (11 of 27 tests fail)
+any time is taken as the paid order's [memory]: KILLED (1 of 27 tests fail)
+a second order is placed beside a scheduled one [memory]: KILLED (1 of 27 tests fail)
+memory keeps no order's time [memory]: KILLED (11 of 27 tests fail)
+a send places another order [memory]: KILLED (1 of 27 tests fail)
+a send places an order that is not scheduled [memory]: KILLED (1 of 27 tests fail)
+the time chosen is not kept [memory]: KILLED (16 of 27 tests fail)
+a time sent after its window starts is taken [memory]: KILLED (1 of 27 tests fail)
+PostgreSQL keeps the first time chosen [postgres]: KILLED (4 of 27 tests fail)
+PostgreSQL forgets the time chosen [postgres]: KILLED (16 of 27 tests fail)
+PostgreSQL reads an order's window as when it is sent [postgres]: KILLED (6 of 27 tests fail)
+PostgreSQL keeps the first order's reference for a later order's time [postgres]: KILLED (1 of 27 tests fail)
+53 of 53 mutants killed
+memory bound: no process was stopped

@@ -974,6 +974,23 @@ integrator's rulings of 2026-10-17):
   verifies 39054436657 and 39091059482. This was not a flake: WebKitGTK's
   network process crashed (the entry under the browsers' navigation above).
 
+**What train-10's landing found in the evidence's harness** (2026-10-19):
+- `evidence_is_current` holds 14 of the 20 committed components
+  (`docs/evidence/E10/*.wasm`) to the compiler, by a list kept by hand,
+  and the development server's unit tests run the committed ones. A
+  component left out can go stale unseen: the store's three hours
+  components did on train-10, and 107 server tests ran the old code until
+  they were regenerated before it landed. The other three left out
+  (`store.page.MenuLine`, `store.page.MenuSize`,
+  `store.reviews.StoreRatings`) are what the compiler builds at the
+  landing. Train-11 derives the list from the build.
+- Neither the planner nor the evidence fetch sees a change to a binary
+  file (`git diff -U0` gives it no `+++` line): a component's change
+  plans no recipe and stales no evidence, so the recipes that read one
+  are chosen by hand.
+- A failing browser run's trace survives only where no later Playwright
+  run in its shard clears `test-results/` first (NEXT).
+
 **Findings about the evidence itself, fixed on train-10** (ADR-0344,
 ADR-0349): stale Python bytecode no longer decides a mutant's verdict; an
 evidence file's counts are held to its script's; the corpus's `@rule`

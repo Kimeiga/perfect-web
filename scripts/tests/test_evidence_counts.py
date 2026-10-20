@@ -217,6 +217,26 @@ class Counts(unittest.TestCase):
             ],
         )
 
+    def test_a_verdict_that_says_what_killed_its_mutant_is_read(self):
+        # The guide's script (ADR-0343) says what killed each mutant: a test,
+        # the spec, the checker. Until train-10's landing such a verdict was
+        # read as none, and the guide's evidence named none of its mutants.
+        said = (
+            AGREES.replace("[core]: KILLED (1 of 4", "[core]: KILLED by a_test_of_sinks (1 of 4")
+            .replace("[core]: KILLED (3 of 4", "[core]: KILLED by the spec (3 of 4")
+            .replace("[server]: KILLED (1 of 4 tests fail)", "[server]: KILLED by the checker (PW5048)")
+        )
+        self.assertEqual(self.found(said), {})
+        # The control: a kill that says nothing in parentheses is no verdict.
+        bare = said.replace("KILLED by the checker (PW5048)", "KILLED by the checker")
+        self.assertEqual(
+            [what for _, _, what in self.found(bare)["e14-x"]],
+            [
+                "x_mutations.py: counts 3 mutants above 2 verdicts",
+                "x_mutations.py: counts 3 killed; 2 verdicts say KILLED",
+            ],
+        )
+
     def test_its_killed_are_the_verdicts_that_say_killed(self):
         evidence = AGREES.replace("[server]: KILLED (1 of 4 tests fail)", "[server]: SURVIVED")
         self.assertEqual(

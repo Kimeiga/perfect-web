@@ -1,8 +1,8 @@
 ADR-0221 - a form control's value is written where HTML reads it
 
 produced by: just e14-form-controls
-commit: 5d147285f6e2957e5a5c0a5ac159c7269d1721b7
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38277655867 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: ddaeeb1dfba9630371b7dd5b127c23855d245c74
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39131257549 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
@@ -13,7 +13,7 @@ test the_template_refuses_what_the_check_refuses ... ok
 test a_textareas_value_is_written_as_its_text ... ok
 test the_browser_sets_a_textareas_value_in_place ... ok
 test a_value_html_does_not_read_is_refused_where_it_is_written ... ok
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.87s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.80s
 
 == the renderer's escaping matrix (runtime/pw-render/tests/security.rs)
 
@@ -25,27 +25,27 @@ test an_attribute_breakout_stays_inside_one_attribute ... ok
 test a_textareas_value_is_its_text ... ok
 test an_ordinary_url_is_not_mangled ... ok
 test an_unquoted_breakout_attempt_stays_inside_the_quotes ... ok
-test lone_surrogates_cannot_reach_the_renderer ... ok
 test embedded_json_cannot_end_its_script ... ok
-test raw_html_requires_the_capability_and_is_not_a_flag_on_a_string ... ok
+test lone_surrogates_cannot_reach_the_renderer ... ok
 test quotes_and_angles_are_encoded_where_they_matter ... ok
 test text_injection_becomes_inert_text ... ok
 test the_matrix_can_fail ... ok
+test raw_html_requires_the_capability_and_is_not_a_flag_on_a_string ... ok
 test unicode_passes_through_unchanged ... ok
 test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 == the corpus (C15) and generality
 
-accepted: 34 files
-accepted: 34/34 charter §16 categories covered
-rejected: 65 files
-rejected: 65/65 charter §16 categories covered
+accepted: 42 files
+accepted: 42/42 charter §16 categories covered
+rejected: 87 files
+rejected: 87/87 charter §16 categories covered
 corpus-check: OK
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 88.07s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 102.33s
 
 == bound fields in three engines (e2e/bind.spec.mjs)
 
-  24 passed (2.1m)
+  24 passed (5.2m)
 
 == mutation controls (scripts/form_controls_mutations.py)
 

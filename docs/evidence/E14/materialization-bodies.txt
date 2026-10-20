@@ -1,8 +1,8 @@
 ADR-0273 - a materialization is a value its body derives
 
 produced by: just e14-materialization-bodies
-commit: 92fdd6e34743e33a80914939976125a9eb307842
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38559878637 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: ddaeeb1dfba9630371b7dd5b127c23855d245c74
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39131257549 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == derived, read and stated once (compiler/pw-core/tests/materialization_bodies.rs, calls_name_terms.rs)
@@ -17,8 +17,8 @@ test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 test a_fragment_the_host_renders_is_no_value_to_read ... ok
 test a_materializations_body_is_held_to_its_type ... ok
 test a_page_reads_a_public_one_the_host_keeps ... ok
-test one_that_derives_its_value_reads_another_and_a_cycle_of_reads_is_refused ... ok
 test what_it_depends_on_is_stated_once_by_reading_it ... ok
+test one_that_derives_its_value_reads_another_and_a_cycle_of_reads_is_refused ... ok
 test a_body_begins_where_the_clauses_end_whatever_it_begins_with ... ok
 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.20s
 
