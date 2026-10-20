@@ -83,6 +83,9 @@ const ACCEPTED_CATEGORIES: &[&str] = &[
     "a reference between tables one source holds",
     "a reference across sources by a field that may name no row",
     "a table's change from its released schema, stated",
+    // Track `device-store` (ADR-XXXX), corpus C28: a value the device keeps,
+    // read and written by a page and never sent.
+    "a value the reader's device keeps",
 ];
 
 /// Charter §16.2: "Create at least one minimal file for each".
@@ -211,6 +214,10 @@ const REJECTED_CATEGORIES: &[&str] = &[
     "a reference whose field holds no key of its target",
     "a field dropped from a released schema with no migrate",
     "a field renamed from a released schema with no migrate",
+    // Track `device-store` (ADR-XXXX), corpus C28: PW6801 and PW6802, each
+    // beside its accepted control (A-054).
+    "a value the device keeps sent as a command's argument",
+    "a query keyed by a value the device keeps",
 ];
 
 /// Milestone 0 gate (charter §14 M0): ">= 10 accepted and 20 rejected".

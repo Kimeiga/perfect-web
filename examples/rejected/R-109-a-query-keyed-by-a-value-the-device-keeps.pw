@@ -5,6 +5,7 @@
 // @invariant: device_value_keys_a_query
 // @charter: §7.8, §9.1
 // @milestone: 14
+// @expect-error: `shown` holds what this device keeps, and a query's key is sent to the server to read it again
 //
 // A page's query keyed by a signal is read again, for the new key, by a
 // request that names the key (ADR-0152): a value the device keeps there is

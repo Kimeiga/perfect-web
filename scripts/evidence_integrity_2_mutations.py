@@ -252,6 +252,22 @@ MUTANTS = [
         "            excluded = {rel for rel in self.text if parent(rel) == parent(root) and rel != root}\n",
         "            excluded = set()\n",
     ),
+    # A named mutant is judged across the programs that hold its source
+    # (track `device-store`, 2026-10-20).
+    (
+        "a named mutant is wrong where any one program checks it",
+        "programs",
+        PROGRAMS,
+        "        if m[5] and clean.get((m[0], m[1])) and all(clean[(m[0], m[1])]):\n",
+        "        if m[5] and clean.get((m[0], m[1])) and any(clean[(m[0], m[1])]):\n",
+    ),
+    (
+        "a named mutant every program checks is let be",
+        "programs",
+        PROGRAMS,
+        "        if m[5] and clean.get((m[0], m[1])) and all(clean[(m[0], m[1])]):\n",
+        "        if False:\n",
+    ),
     # 5. No comparison translates an old number.
     (
         "the registry translates an old number again",

@@ -27,6 +27,18 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 EVENTS = ROOT / "packages/pw-platform-web/events.pw"
 RUNTIME = ROOT / "spikes/own-renderer/public/pw-runtime.mjs"
 
+# The platform mutants the checker refuses a program for, by the rule that is
+# the protection each takes away (`scripts/mutant_programs.py`): TodoMVC's
+# program names both events, its row's label `on:dblclick` and its edit
+# field `on:blur`, so where one is not declared it is refused (PW5022), and
+# where one is declared with a key's record its handler's is (PW0602).
+CHECKED = {
+    "a double press is not declared": {"PW5022"},
+    "a blur is not declared": {"PW5022"},
+    "a double press is given a key's record": {"PW0602"},
+    "a blur is given a key's record": {"PW0602"},
+}
+
 # (what, suite, file, anchor, replacement)
 MUTANTS = [
     (
