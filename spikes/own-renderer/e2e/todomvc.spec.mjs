@@ -548,6 +548,30 @@ test("no request carries a todo: the server is told none", async ({ page }) => {
   expect(sent.filter((r) => r.includes(marker))).toEqual([]);
 });
 
+test("a todo's row is one element across each change, matched by its key", async ({ page }) => {
+  await open(page);
+  await add(page, ONE, TWO, THREE);
+  const first = await items(page).nth(0).elementHandle();
+  const second = await items(page).nth(1).elementHandle();
+  // Toggled, the row is the same element, as TodoMVC's own tests hold it.
+  await items(page).nth(0).locator(".toggle").check();
+  await expect(items(page).nth(0)).toHaveClass(/completed/);
+  expect(await first.evaluate((li) => li.isConnected && li.classList.contains("completed"))).toBe(true);
+  // A row before it destroyed, the second is still its own element, its todo's.
+  await items(page).nth(0).hover();
+  await items(page).nth(0).locator(".destroy").click();
+  await expect(items(page)).toHaveText([TWO, THREE]);
+  expect(await first.evaluate((li) => li.isConnected)).toBe(false);
+  expect(await second.evaluate((li) => li.isConnected && li.textContent.includes("feed the cat"))).toBe(true);
+  // A box a person pressed follows what the list says after: all completed,
+  // then none.
+  await items(page).nth(0).locator(".toggle").check();
+  await page.locator(".toggle-all").check({ force: true });
+  await page.locator(".toggle-all").uncheck({ force: true });
+  await expect(items(page).nth(0)).not.toHaveClass(/completed/);
+  await expect(items(page).nth(0).locator(".toggle")).not.toBeChecked();
+});
+
 test("another visitor has a list of their own", async ({ page, browser, baseURL }) => {
   await open(page);
   await add(page, ONE);

@@ -98,6 +98,37 @@ test("nothing the device decides is shown before the device is read, and the pag
   expect(await page.evaluate(() => document.documentElement.dataset.pwDevice)).toBe("read");
 });
 
+test("what the device decides stays hidden until it is rendered at the device's value", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "demo-notes@2",
+      JSON.stringify([
+        { id: "a", text: "kept", pinned: false },
+        { id: "b", text: "kept too", pinned: false },
+      ]),
+    );
+  });
+  // The runtime runs; what computes the count from the notes is held back.
+  let release;
+  const held = new Promise((resolve) => (release = resolve));
+  await page.route("**/computed/demo.device.DevicePage.mjs", async (route) => {
+    await held;
+    await route.continue();
+  });
+  await page.goto(PAGE);
+  await page.waitForFunction(() =>
+    (window.__pw?.log ?? []).some((l) => l === "device: demo-notes read"),
+  );
+  // Read, not yet rendered: the default is not shown in its place.
+  await expect(page.locator("#count")).toBeHidden();
+  await expect(page.locator("#draft")).toBeVisible();
+  release();
+  await expect(page.locator("#count")).toBeVisible();
+  await expect(page.locator("#count")).toHaveText("2 notes");
+});
+
 test("with scripts off, the declared default is shown", async ({ browser }) => {
   const context = await browser.newContext({ javaScriptEnabled: false });
   const page = await context.newPage();
@@ -306,6 +337,7 @@ test("the store's own limit, in this engine", async ({ page }, info) => {
     return kept;
   });
   info.annotations.push({ type: "localStorage limit", description: `${bytes} UTF-16 code units` });
-  console.log(`localStorage limit (${info.project.name}): ${bytes} UTF-16 code units`);
+  // A line the evidence keeps (scripts/run_suite.sh keeps `EVIDENCE` lines).
+  console.log(`EVIDENCE localStorage limit (${info.project.name}): ${bytes} UTF-16 code units`);
   expect(bytes).toBeGreaterThan(1024 * 1024);
 });

@@ -2149,11 +2149,20 @@ async function readDevice() {
   if (deviceHeld.size === 0) return;
   const store = deviceStore();
   try {
+    // Each value read first, then all of them set at once: one render shows
+    // them, and the mark waits for that render. Set as each was read, a
+    // value read later started a render of its own, and the mark waited for
+    // that one alone, so an earlier value's part was shown at its default
+    // while it was still being computed.
+    const read = [];
     for (const held of deviceHeld.values()) {
       const got = await readKept(store, held);
       deviceState[held.signal] = got.state;
       if (got.state === "unreadable") log.push(`device: ${held.name} unreadable: ${got.why}`);
       log.push(`device: ${held.name} ${got.state}`);
+      read.push([held, got]);
+    }
+    for (const [held, got] of read) {
       if ("value" in got) setSignal(held.signal, got.value, null, false);
     }
     if (parts.fragment) followFragment(parts.fragment);
