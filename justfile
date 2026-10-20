@@ -44,6 +44,7 @@ import 'just/browser-host-map.just'
 import 'just/parallel-mutants.just'
 import 'just/kiokun-cache.just'
 import 'just/ci-diagnostics.just'
+import 'just/fuzz-floor.just'
 
 default:
     @just --list

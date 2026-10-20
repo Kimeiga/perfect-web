@@ -12,8 +12,17 @@
 # and `pw-render-wasm` (`spikes/own-renderer/run.sh`). It was installed on the
 # development machine by hand and listed nowhere, until the first verification
 # run on a fresh runner could not build it (ADR-0245).
+#
+# `llvm-tools` is `llvm-profdata`, which the coverage-guided fuzzer
+# (`tools/fuzz`, `just fuzz`) reads its coverage with, from the toolchain's own
+# `lib/rustlib/<host>/bin/`. Nothing listed it, and the fuzzer looked for it at
+# one machine's own path, so everywhere else it measured nothing and reported
+# success (found 2026-10-20; track fuzz-floor, ADR-XXXX). The
+# channel manifest names the component `llvm-tools-preview` and renames
+# `llvm-tools` to it, as it does `clippy` and `rustfmt`. A fresh install
+# fetches 39 MB more (x86_64; 31 MB on arm64) and unpacks 225 MB more.
 [toolchain]
 channel = "1.97.1"
-components = ["rustfmt", "clippy"]
+components = ["rustfmt", "clippy", "llvm-tools"]
 targets = ["wasm32-wasip2", "wasm32-unknown-unknown"]
 profile = "minimal"
