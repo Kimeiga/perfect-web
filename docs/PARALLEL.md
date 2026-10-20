@@ -2208,6 +2208,32 @@ Each a decision for a track, with its date; a track's ADR records it too.
     39131257548, passed (`check_latency` 321.67 ms a thousand lines on
     ARM, 262.04 on x86).
 
+- **2026-10-20, train-11 landed** (`track/train-11`, verify 39442025240 at
+  `320c52a4`, and dispatch 39478386992 at `2b8a8b81`, both green where the
+  first was not): render-merge (ADR-0354), the committed components and
+  the binary planner (ADR-0355), the browser host map (ADR-0356), the
+  allocator (ADR-0357), kiokun-cache (ADR-0358), ci-diagnostics twice
+  (ADR-0359), fuzz-floor (ADR-0360), check-is-build (ADR-0361),
+  guide-producer-validity (ADR-0362), bounded-race, and Wasmtime 48.0.7
+  (ADR-0363), on train-10's master. Generic and contributor-dx stay out.
+  - **Its run: 43 jobs (plan, 39 recipe shards, 3 browsers), 157 recipes,
+    6 failed.** Five on one conflict no merge showed: check-is-build's
+    complete check refuses four accepted programs, and five recipes still
+    required `pw check` on the accepted corpus clean (now one list every
+    corpus check reads, twelve places routed). One a survivor on CI's
+    Python 3.12.3 alone: a 2000-level JSON test that 3.10 and 3.12.1 raise
+    on and 3.12.3 parses (100,000 levels now, with the raise as its
+    precondition). The dispatch re-ran the six, green. Fetched: 150 files
+    and 151 recipes' seconds from the run (`--known summary`, the six and
+    `e10-names` skipped), 6 files from the dispatch.
+  - **Corrections first.** Check-is-build's "nothing newly refused" (the
+    accepted corpus has four refusals); generic-finish's "all reached
+    scripts green" (two scripts with survivors; generic stays out);
+    render-merge's evidence missed a layouts survivor (fixed on the train).
+  - **Done on the PC before the push**: every script each merge's plan
+    reached, whole (974 of 974 at the last pass, and every earlier pass
+    clean but for flakes re-run), and `just ci`; then, by the owner's rule
+    of 2026-10-20, heavy runs on GitHub (`wip/train-11`).
 - **2026-10-19, train-10 landed** (`track/train-10`, verify 39131257549 and
   three dispatches: 39270030023 for the ten recipes its spec changes reach,
   39325789224 for the 72 recipes whose server tests read the store's

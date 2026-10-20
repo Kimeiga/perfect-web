@@ -1,8 +1,8 @@
 ADR-0296 - a change is derived outside the table, and what reaches a document is recorded
 
 produced by: just e14-derived-outside
-commit: 64cc7da190695fa62cadf247d14fd9ebdc24f6e9
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38348107940 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 320c52a44840a80423609ab476eb847c04de34a6
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39442025240 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 python: Python 3.12.3
 
@@ -12,13 +12,17 @@ test tests::a_documents_trail_says_what_happened_to_its_frames ... ok
 test tests::a_document_changed_while_its_change_is_derived_is_derived_against_again ... ok
 test tests::a_document_changed_at_every_attempt_is_still_told ... ok
 test tests::a_keyed_read_whose_document_changed_while_it_derived_is_derived_again ... ok
-test tests::the_table_is_free_while_a_telling_derives ... ok
 test tests::the_table_is_free_while_a_keyed_read_derives ... ok
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 489 filtered out; finished in 20.49s
+test tests::the_table_is_free_while_a_telling_derives ... ok
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 665 filtered out; finished in 5.37s
 
 == a red baseline's records (scripts/tests/test_mutation_baseline.py)
 
 test_imported_it_bounds_every_process_the_script_starts (scripts.tests.test_mutation_baseline.Bounded.test_imported_it_bounds_every_process_the_script_starts) ... ok
+test_guarded_bytecode_left_before_for_a_mutated_source_is_not_read (scripts.tests.test_mutation_baseline.Bytecode.test_guarded_bytecode_left_before_for_a_mutated_source_is_not_read) ... ok
+test_guarded_no_bytecode_is_written_so_the_restored_source_runs (scripts.tests.test_mutation_baseline.Bytecode.test_guarded_no_bytecode_is_written_so_the_restored_source_runs) ... ok
+test_unguarded_the_restored_source_runs_its_mutants_bytecode (scripts.tests.test_mutation_baseline.Bytecode.test_unguarded_the_restored_source_runs_its_mutants_bytecode) ... ok
+test_each_call_follows_a_red_baseline_or_one_of_those_named (scripts.tests.test_mutation_baseline.EveryCallOfExplain.test_each_call_follows_a_red_baseline_or_one_of_those_named) ... ok
 test_every_red_baseline_says_what_failed (scripts.tests.test_mutation_baseline.EveryScript.test_every_red_baseline_says_what_failed) ... ok
 test_every_script_keeps_what_its_commands_say_from_its_start (scripts.tests.test_mutation_baseline.EveryScript.test_every_script_keeps_what_its_commands_say_from_its_start) ... ok
 test_a_browser_suites_failure_read_through_its_escapes (scripts.tests.test_mutation_baseline.Failures.test_a_browser_suites_failure_read_through_its_escapes) ... ok
@@ -34,13 +38,19 @@ test_explain_runs_nothing_again (scripts.tests.test_mutation_baseline.Heard.test
 test_explain_shows_a_failing_tests_records (scripts.tests.test_mutation_baseline.Heard.test_explain_shows_a_failing_tests_records) ... ok
 test_only_the_last_commands_are_kept (scripts.tests.test_mutation_baseline.Heard.test_only_the_last_commands_are_kept) ... ok
 test_what_a_command_said_is_kept_with_how_it_ended (scripts.tests.test_mutation_baseline.Heard.test_what_a_command_said_is_kept_with_how_it_ended) ... ok
-Ran 16 tests in 5.302s
+test_a_browser_run_that_passed_keeps_nothing (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun.test_a_browser_run_that_passed_keeps_nothing) ... ok
+test_a_failure_to_keep_is_said_and_what_failed_still_is (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun.test_a_failure_to_keep_is_said_and_what_failed_still_is) ... ok
+test_a_mutants_browser_run_is_not_kept (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun.test_a_mutants_browser_run_is_not_kept) ... ok
+test_a_red_baselines_failed_browser_run_is_kept_apart (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun.test_a_red_baselines_failed_browser_run_is_kept_apart) ... ok
+test_the_benchmark_harness_run_is_kept_under_its_own_directory (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun.test_the_benchmark_harness_run_is_kept_under_its_own_directory) ... ok
+test_what_an_earlier_recipe_left_is_not_kept (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun.test_what_an_earlier_recipe_left_is_not_kept) ... ok
+Ran 26 tests in 5.996s
 OK
 
 == mutation controls (scripts/derived_outside_mutations.py)
 
 baseline (host): 6 passed, 0 failed
-baseline (scripts): 16 passed, 0 failed
+baseline (scripts): 26 passed, 0 failed
 a telling derives inside the table [host]: KILLED (3 of 6 tests fail)
 a keyed read derives inside the table [host]: KILLED (2 of 6 tests fail)
 a telling pushes what it derived against what is no longer shown [host]: KILLED (2 of 6 tests fail)
@@ -49,7 +59,7 @@ what is shown is the same whatever replaced it [host]: KILLED (3 of 6 tests fail
 the last attempt is derived outside too [host]: KILLED (1 of 6 tests fail)
 a document's trail is not kept [host]: KILLED (1 of 6 tests fail)
 a document's trail is answered to another session [host]: KILLED (1 of 6 tests fail)
-a red baseline shows no record [scripts]: KILLED (1 of 16 tests fail)
-every line is a record [scripts]: KILLED (1 of 16 tests fail)
+a red baseline shows no record [scripts]: KILLED (1 of 26 tests fail)
+every line is a record [scripts]: KILLED (1 of 26 tests fail)
 10 of 10 mutants killed
 memory bound: no process was stopped

@@ -394,6 +394,15 @@ value that never leaves the device, and a test that each refusal still fires
 for a value a host holds. This is that, written at the train-12 merge; its
 test and mutants are the train's.
 
+*Clarified and accepted under the owner's delegation, 2026-10-20:* this
+scope includes every browser signal, provided every input is a signal.
+Host-, query- and parameter-derived values retain the refusals below. The
+host renders the program's declared initial values; subsequent signal
+values belong to the browser (ADR-0130). The `Device` rules add confinement,
+not a prerequisite for computing from browser-local state. The mixed
+host-and-signal witness and all three mutation controls below remain
+required.
+
 **What is lifted is lifted for the browser's values**: the page's signals,
 the values the device keeps among them. A signal's first value is the
 declaration's, which a host renders; every later one is the browser's alone

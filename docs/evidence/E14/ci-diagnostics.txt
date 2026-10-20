@@ -1,136 +1,137 @@
 Track ci-diagnostics - a failure's trace is kept, the checker's latency is measured under load, a mutant's build is incremental, and the nightly does not repeat a verified head
 
 produced by: just e14-ci-diagnostics
-commit: a17cf2467e4ab90b3f97a4071ed30e5c281d410c
+commit: 320c52a44840a80423609ab476eb847c04de34a6
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39442025240 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
-python: Python 3.10.12
+python: Python 3.12.3
 
 == 1. a failing browser run's output is kept where the next run does not clear it (scripts/keep_traces.py, run_suite.sh, mutation_baseline.py, ci_recipes.py, verify.yml)
 
-test_a_missing_or_empty_output_creates_nothing (scripts.tests.test_keep_traces.Keeping) ... ok
-test_a_name_never_leaves_the_root (scripts.tests.test_keep_traces.Keeping) ... ok
-test_each_entry_of_a_failed_run_is_kept (scripts.tests.test_keep_traces.Keeping) ... ok
-test_the_budget_is_the_environments_where_it_names_one (scripts.tests.test_keep_traces.Keeping) ... ok
-test_the_budget_is_the_roots_whatever_was_kept_there_before (scripts.tests.test_keep_traces.Keeping) ... ok
-test_the_command_line_keeps_a_run_and_says_so (scripts.tests.test_keep_traces.Keeping) ... ok
-test_what_does_not_fit_the_budget_is_named_and_not_copied (scripts.tests.test_keep_traces.Keeping) ... ok
-test_a_recipe_runs_with_its_name_in_pw_recipe (scripts.tests.test_keep_traces.Recipes) ... ok
-test_the_directory_is_ignored_by_git (scripts.tests.test_keep_traces.Uploads) ... ok
-test_the_reader_of_the_workflow_reads_a_dropped_path (scripts.tests.test_keep_traces.Uploads) ... ok
-test_the_traces_and_browser_uploads_name_every_kept_traces (scripts.tests.test_keep_traces.Uploads) ... ok
-test_a_call_it_cannot_read_is_refused (scripts.tests.test_run_suite.RunSuite) ... ok
-test_a_failed_suite_fails_and_its_failure_is_recorded (scripts.tests.test_run_suite.RunSuite) ... ok
-test_a_failure_to_keep_does_not_change_the_status (scripts.tests.test_run_suite.RunSuite) ... ok
-test_a_passed_suite_passes_and_keeps_its_tests_and_evidence_lines (scripts.tests.test_run_suite.RunSuite) ... ok
-test_a_run_that_fails_keeps_its_output_though_the_next_run_clears_it (scripts.tests.test_run_suite.RunSuite) ... ok
-test_a_run_that_passes_keeps_nothing (scripts.tests.test_run_suite.RunSuite) ... ok
-test_a_run_that_says_nothing_kept_shows_its_last_lines (scripts.tests.test_run_suite.RunSuite) ... ok
-test_a_suite_that_passed_no_test_fails (scripts.tests.test_run_suite.RunSuite) ... ok
-test_each_run_that_failed_is_kept_apart_from_the_others (scripts.tests.test_run_suite.RunSuite) ... ok
-test_every_run_runs_and_the_first_failure_is_its_status (scripts.tests.test_run_suite.RunSuite) ... ok
-test_it_is_kept_under_the_recipe_that_ran_it_or_local (scripts.tests.test_run_suite.RunSuite) ... ok
-test_it_runs_from_the_directory_it_is_given (scripts.tests.test_run_suite.RunSuite) ... ok
-test_its_status_is_any_exit_but_zero (scripts.tests.test_run_suite.RunSuite) ... ok
-test_the_benchmark_harness_keeps_under_its_own_directory (scripts.tests.test_run_suite.RunSuite) ... ok
-test_two_calls_in_a_recipe_keep_apart (scripts.tests.test_run_suite.RunSuite) ... ok
-test_what_is_kept_is_bounded_and_the_rest_is_named (scripts.tests.test_run_suite.RunSuite) ... ok
-test_imported_it_bounds_every_process_the_script_starts (scripts.tests.test_mutation_baseline.Bounded) ... ok
-test_guarded_bytecode_left_before_for_a_mutated_source_is_not_read (scripts.tests.test_mutation_baseline.Bytecode) ... ok
-test_guarded_no_bytecode_is_written_so_the_restored_source_runs (scripts.tests.test_mutation_baseline.Bytecode) ... ok
-test_unguarded_the_restored_source_runs_its_mutants_bytecode (scripts.tests.test_mutation_baseline.Bytecode) ... ok
-test_each_call_follows_a_red_baseline_or_one_of_five_named (scripts.tests.test_mutation_baseline.EveryCallOfExplain) ... ok
-test_every_red_baseline_says_what_failed (scripts.tests.test_mutation_baseline.EveryScript) ... ok
-test_every_script_keeps_what_its_commands_say_from_its_start (scripts.tests.test_mutation_baseline.EveryScript) ... ok
-test_a_browser_suites_failure_read_through_its_escapes (scripts.tests.test_mutation_baseline.Failures) ... ok
-test_a_build_that_failed (scripts.tests.test_mutation_baseline.Failures) ... ok
-test_a_failed_commands_output_with_no_result_is_shown_as_it_ended (scripts.tests.test_mutation_baseline.Failures) ... ok
-test_a_failing_test_and_its_panic (scripts.tests.test_mutation_baseline.Failures) ... ok
-test_a_failing_tests_records_are_shown_as_it_printed_them (scripts.tests.test_mutation_baseline.Failures) ... ok
-test_a_command_not_captured_keeps_how_it_ended (scripts.tests.test_mutation_baseline.Heard) ... ok
-test_a_command_stopped_past_its_bound_keeps_what_it_said_by_then (scripts.tests.test_mutation_baseline.Heard) ... ok
-test_commands_that_ended_well_say_what_each_counted (scripts.tests.test_mutation_baseline.Heard) ... ok
-test_explain_names_what_failed_as_it_failed (scripts.tests.test_mutation_baseline.Heard) ... ok
-test_explain_runs_nothing_again (scripts.tests.test_mutation_baseline.Heard) ... ok
-test_explain_shows_a_failing_tests_records (scripts.tests.test_mutation_baseline.Heard) ... ok
-test_only_the_last_commands_are_kept (scripts.tests.test_mutation_baseline.Heard) ... ok
-test_what_a_command_said_is_kept_with_how_it_ended (scripts.tests.test_mutation_baseline.Heard) ... ok
-test_a_browser_run_that_passed_keeps_nothing (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun) ... ok
-test_a_failure_to_keep_is_said_and_what_failed_still_is (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun) ... ok
-test_a_mutants_browser_run_is_not_kept (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun) ... ok
-test_a_red_baselines_failed_browser_run_is_kept_apart (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun) ... ok
-test_the_benchmark_harness_run_is_kept_under_its_own_directory (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun) ... ok
-test_what_an_earlier_recipe_left_is_not_kept (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun) ... ok
-Ran 53 tests in 6.790s
+test_a_missing_or_empty_output_creates_nothing (scripts.tests.test_keep_traces.Keeping.test_a_missing_or_empty_output_creates_nothing) ... ok
+test_a_name_never_leaves_the_root (scripts.tests.test_keep_traces.Keeping.test_a_name_never_leaves_the_root) ... ok
+test_each_entry_of_a_failed_run_is_kept (scripts.tests.test_keep_traces.Keeping.test_each_entry_of_a_failed_run_is_kept) ... ok
+test_the_budget_is_the_environments_where_it_names_one (scripts.tests.test_keep_traces.Keeping.test_the_budget_is_the_environments_where_it_names_one) ... ok
+test_the_budget_is_the_roots_whatever_was_kept_there_before (scripts.tests.test_keep_traces.Keeping.test_the_budget_is_the_roots_whatever_was_kept_there_before) ... ok
+test_the_command_line_keeps_a_run_and_says_so (scripts.tests.test_keep_traces.Keeping.test_the_command_line_keeps_a_run_and_says_so) ... ok
+test_what_does_not_fit_the_budget_is_named_and_not_copied (scripts.tests.test_keep_traces.Keeping.test_what_does_not_fit_the_budget_is_named_and_not_copied) ... ok
+test_a_recipe_runs_with_its_name_in_pw_recipe (scripts.tests.test_keep_traces.Recipes.test_a_recipe_runs_with_its_name_in_pw_recipe) ... ok
+test_the_directory_is_ignored_by_git (scripts.tests.test_keep_traces.Uploads.test_the_directory_is_ignored_by_git) ... ok
+test_the_reader_of_the_workflow_reads_a_dropped_path (scripts.tests.test_keep_traces.Uploads.test_the_reader_of_the_workflow_reads_a_dropped_path) ... ok
+test_the_traces_and_browser_uploads_name_every_kept_traces (scripts.tests.test_keep_traces.Uploads.test_the_traces_and_browser_uploads_name_every_kept_traces) ... ok
+test_a_call_it_cannot_read_is_refused (scripts.tests.test_run_suite.RunSuite.test_a_call_it_cannot_read_is_refused) ... ok
+test_a_failed_suite_fails_and_its_failure_is_recorded (scripts.tests.test_run_suite.RunSuite.test_a_failed_suite_fails_and_its_failure_is_recorded) ... ok
+test_a_failure_to_keep_does_not_change_the_status (scripts.tests.test_run_suite.RunSuite.test_a_failure_to_keep_does_not_change_the_status) ... ok
+test_a_passed_suite_passes_and_keeps_its_tests_and_evidence_lines (scripts.tests.test_run_suite.RunSuite.test_a_passed_suite_passes_and_keeps_its_tests_and_evidence_lines) ... ok
+test_a_run_that_fails_keeps_its_output_though_the_next_run_clears_it (scripts.tests.test_run_suite.RunSuite.test_a_run_that_fails_keeps_its_output_though_the_next_run_clears_it) ... ok
+test_a_run_that_passes_keeps_nothing (scripts.tests.test_run_suite.RunSuite.test_a_run_that_passes_keeps_nothing) ... ok
+test_a_run_that_says_nothing_kept_shows_its_last_lines (scripts.tests.test_run_suite.RunSuite.test_a_run_that_says_nothing_kept_shows_its_last_lines) ... ok
+test_a_suite_that_passed_no_test_fails (scripts.tests.test_run_suite.RunSuite.test_a_suite_that_passed_no_test_fails) ... ok
+test_each_run_that_failed_is_kept_apart_from_the_others (scripts.tests.test_run_suite.RunSuite.test_each_run_that_failed_is_kept_apart_from_the_others) ... ok
+test_every_run_runs_and_the_first_failure_is_its_status (scripts.tests.test_run_suite.RunSuite.test_every_run_runs_and_the_first_failure_is_its_status) ... ok
+test_it_is_kept_under_the_recipe_that_ran_it_or_local (scripts.tests.test_run_suite.RunSuite.test_it_is_kept_under_the_recipe_that_ran_it_or_local) ... ok
+test_it_runs_from_the_directory_it_is_given (scripts.tests.test_run_suite.RunSuite.test_it_runs_from_the_directory_it_is_given) ... ok
+test_its_status_is_any_exit_but_zero (scripts.tests.test_run_suite.RunSuite.test_its_status_is_any_exit_but_zero) ... ok
+test_the_benchmark_harness_keeps_under_its_own_directory (scripts.tests.test_run_suite.RunSuite.test_the_benchmark_harness_keeps_under_its_own_directory) ... ok
+test_two_calls_in_a_recipe_keep_apart (scripts.tests.test_run_suite.RunSuite.test_two_calls_in_a_recipe_keep_apart) ... ok
+test_what_is_kept_is_bounded_and_the_rest_is_named (scripts.tests.test_run_suite.RunSuite.test_what_is_kept_is_bounded_and_the_rest_is_named) ... ok
+test_imported_it_bounds_every_process_the_script_starts (scripts.tests.test_mutation_baseline.Bounded.test_imported_it_bounds_every_process_the_script_starts) ... ok
+test_guarded_bytecode_left_before_for_a_mutated_source_is_not_read (scripts.tests.test_mutation_baseline.Bytecode.test_guarded_bytecode_left_before_for_a_mutated_source_is_not_read) ... ok
+test_guarded_no_bytecode_is_written_so_the_restored_source_runs (scripts.tests.test_mutation_baseline.Bytecode.test_guarded_no_bytecode_is_written_so_the_restored_source_runs) ... ok
+test_unguarded_the_restored_source_runs_its_mutants_bytecode (scripts.tests.test_mutation_baseline.Bytecode.test_unguarded_the_restored_source_runs_its_mutants_bytecode) ... ok
+test_each_call_follows_a_red_baseline_or_one_of_those_named (scripts.tests.test_mutation_baseline.EveryCallOfExplain.test_each_call_follows_a_red_baseline_or_one_of_those_named) ... ok
+test_every_red_baseline_says_what_failed (scripts.tests.test_mutation_baseline.EveryScript.test_every_red_baseline_says_what_failed) ... ok
+test_every_script_keeps_what_its_commands_say_from_its_start (scripts.tests.test_mutation_baseline.EveryScript.test_every_script_keeps_what_its_commands_say_from_its_start) ... ok
+test_a_browser_suites_failure_read_through_its_escapes (scripts.tests.test_mutation_baseline.Failures.test_a_browser_suites_failure_read_through_its_escapes) ... ok
+test_a_build_that_failed (scripts.tests.test_mutation_baseline.Failures.test_a_build_that_failed) ... ok
+test_a_failed_commands_output_with_no_result_is_shown_as_it_ended (scripts.tests.test_mutation_baseline.Failures.test_a_failed_commands_output_with_no_result_is_shown_as_it_ended) ... ok
+test_a_failing_test_and_its_panic (scripts.tests.test_mutation_baseline.Failures.test_a_failing_test_and_its_panic) ... ok
+test_a_failing_tests_records_are_shown_as_it_printed_them (scripts.tests.test_mutation_baseline.Failures.test_a_failing_tests_records_are_shown_as_it_printed_them) ... ok
+test_a_command_not_captured_keeps_how_it_ended (scripts.tests.test_mutation_baseline.Heard.test_a_command_not_captured_keeps_how_it_ended) ... ok
+test_a_command_stopped_past_its_bound_keeps_what_it_said_by_then (scripts.tests.test_mutation_baseline.Heard.test_a_command_stopped_past_its_bound_keeps_what_it_said_by_then) ... ok
+test_commands_that_ended_well_say_what_each_counted (scripts.tests.test_mutation_baseline.Heard.test_commands_that_ended_well_say_what_each_counted) ... ok
+test_explain_names_what_failed_as_it_failed (scripts.tests.test_mutation_baseline.Heard.test_explain_names_what_failed_as_it_failed) ... ok
+test_explain_runs_nothing_again (scripts.tests.test_mutation_baseline.Heard.test_explain_runs_nothing_again) ... ok
+test_explain_shows_a_failing_tests_records (scripts.tests.test_mutation_baseline.Heard.test_explain_shows_a_failing_tests_records) ... ok
+test_only_the_last_commands_are_kept (scripts.tests.test_mutation_baseline.Heard.test_only_the_last_commands_are_kept) ... ok
+test_what_a_command_said_is_kept_with_how_it_ended (scripts.tests.test_mutation_baseline.Heard.test_what_a_command_said_is_kept_with_how_it_ended) ... ok
+test_a_browser_run_that_passed_keeps_nothing (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun.test_a_browser_run_that_passed_keeps_nothing) ... ok
+test_a_failure_to_keep_is_said_and_what_failed_still_is (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun.test_a_failure_to_keep_is_said_and_what_failed_still_is) ... ok
+test_a_mutants_browser_run_is_not_kept (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun.test_a_mutants_browser_run_is_not_kept) ... ok
+test_a_red_baselines_failed_browser_run_is_kept_apart (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun.test_a_red_baselines_failed_browser_run_is_kept_apart) ... ok
+test_the_benchmark_harness_run_is_kept_under_its_own_directory (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun.test_the_benchmark_harness_run_is_kept_under_its_own_directory) ... ok
+test_what_an_earlier_recipe_left_is_not_kept (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun.test_what_an_earlier_recipe_left_is_not_kept) ... ok
+Ran 53 tests in 6.876s
 OK
 
 == 2. check_latency's ceiling bounds the fastest of seven or more checks, not their median (compiler/pw-core/tests/check_latency.rs): the statistic on checks that cost what a script says, then the measurement itself
 
-load: 30.26 40.44 47.88 32/2976 3166435
-test a_checker_made_slow_is_not_let_through_by_the_waiting ... ok
+load: 2.12 1.29 0.54 1/276 7831
 test a_clock_that_reads_nothing_is_refused_by_the_control ... ok
-test a_quiet_machine_is_asked_for_seven_checks_and_no_more ... ok
+test a_checker_made_slow_is_not_let_through_by_the_waiting ... ok
 test a_loaded_machine_is_waited_on_while_it_may_quiet_down ... ok
 test producing_diagnostics_is_judged_at_the_fastest_of_both ... ok
 test the_ceiling_bounds_the_fastest_check_not_the_median ... ok
+test a_quiet_machine_is_asked_for_seven_checks_and_no_more ... ok
 test the_ceiling_is_800_ms_a_thousand_lines_and_a_check_is_judged_by_it ... ok
 test the_fastest_is_of_the_threads_cpu_time_not_of_the_wall_clock ... ok
 test the_waiting_ends_with_the_window_or_the_most_checks ... ok
-check-latency reject 1752.38 ms   (cpu 1752.34 ms; clean 3901.13 ms, cpu 3196.65 ms; the fastest of 7 and 7 checks, which the ratio bounds: cpu 1612.11 ms, clean cpu 2684.20 ms)
+check-latency reject 1641.41 ms   (cpu 1641.31 ms; clean 3093.78 ms, cpu 3093.65 ms; the fastest of 7 and 7 checks, which the ratio bounds: cpu 1636.49 ms, clean cpu 3087.72 ms)
 test a_rejected_program_is_not_measurably_slower_than_a_clean_one ... ok
 test the_whole_program_and_one_edit_are_both_measured has been running for over 60 seconds
-check-latency cold   2961.61 ms   (cpu 2676.03 ms; 6568 lines, cpu 407.43 ms a thousand lines; the fastest of 7 checks, which the ceiling bounds: cpu 2429.20 ms, 369.85 ms a thousand lines)
-check-latency edit   2373.76 ms   (cpu 2370.95 ms; 56 files, no query system: an edit costs a full check)
+check-latency cold   3107.45 ms   (cpu 3107.24 ms; 6568 lines, cpu 473.09 ms a thousand lines; the fastest of 7 checks, which the ceiling bounds: cpu 3087.35 ms, 470.06 ms a thousand lines)
+check-latency edit   3101.49 ms   (cpu 3101.34 ms; 56 files, no query system: an edit costs a full check)
 test the_whole_program_and_one_edit_are_both_measured ... ok
-test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 83.12s
-load: 42.90 41.47 47.56 43/3236 3198706
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 76.58s
+load: 1.43 1.28 0.60 1/276 7900
 
 == 3. a mutant's builds are incremental where the run asks, and the caches are bounded (scripts/mutant_incremental.py, mutation_baseline.py, ci_recipes.py, verify.yml)
 
-test_a_mutation_script_and_what_it_starts_have_cargos_defaults_when_asked (scripts.tests.test_mutant_incremental.Asked) ... ok
-test_asked_it_removes_a_recipes_own_zero_leaving_cargos_defaults (scripts.tests.test_mutant_incremental.Asked) ... ok
-test_not_asked_it_leaves_the_environment_as_the_recipe_has_it (scripts.tests.test_mutant_incremental.Asked) ... ok
-test_the_run_asks_with_one (scripts.tests.test_mutant_incremental.Asked) ... ok
-test_a_command_that_is_no_cargos_removes_nothing (scripts.tests.test_mutant_incremental.Bounded) ... mutant_incremental: the incremental caches held 0 MiB, past 0; removed
-test_a_mutation_scripts_cargo_command_removes_the_caches_past_the_limit (scripts.tests.test_mutant_incremental.Bounded) ... mutant_incremental: the incremental caches held 0 MiB, past 0; removed
-test_both_a_profiles_and_a_triples_caches_are_found (scripts.tests.test_mutant_incremental.Bounded) ... ok
-test_past_the_limit_every_cache_is_removed_and_the_rest_stays (scripts.tests.test_mutant_incremental.Bounded) ... mutant_incremental: the incremental caches held 0 MiB, past 0; removed
-test_the_limit_is_the_environments_where_it_names_one (scripts.tests.test_mutant_incremental.Bounded) ... ok
-test_where_the_run_did_not_ask_nothing_is_removed (scripts.tests.test_mutant_incremental.Bounded) ... ok
-test_within_the_limit_nothing_is_removed (scripts.tests.test_mutant_incremental.Bounded) ... ok
-test_a_one_makes_a_browser_build_incremental_too_which_is_why_it_is_not_set (scripts.tests.test_mutant_incremental.CargosDefaults) ... ok
-test_a_zero_makes_neither_incremental (scripts.tests.test_mutant_incremental.CargosDefaults) ... ok
-test_with_the_variable_removed_a_dev_build_is_incremental_and_a_browser_build_is_not (scripts.tests.test_mutant_incremental.CargosDefaults) ... ok
-test_every_cache_is_removed_between_recipes_a_triples_among_them (scripts.tests.test_mutant_incremental.Pruned) ... ok
-test_no_recipe_line_is_edited_for_it (scripts.tests.test_mutant_incremental.Workflow) ... ok
-test_the_recipes_step_asks_and_no_other_does (scripts.tests.test_mutant_incremental.Workflow) ... ok
-test_the_workflows_own_zero_stands_for_every_other_build (scripts.tests.test_mutant_incremental.Workflow) ... ok
-Ran 18 tests in 16.819s
+test_a_mutation_script_and_what_it_starts_have_cargos_defaults_when_asked (scripts.tests.test_mutant_incremental.Asked.test_a_mutation_script_and_what_it_starts_have_cargos_defaults_when_asked) ... ok
+test_asked_it_removes_a_recipes_own_zero_leaving_cargos_defaults (scripts.tests.test_mutant_incremental.Asked.test_asked_it_removes_a_recipes_own_zero_leaving_cargos_defaults) ... ok
+test_not_asked_it_leaves_the_environment_as_the_recipe_has_it (scripts.tests.test_mutant_incremental.Asked.test_not_asked_it_leaves_the_environment_as_the_recipe_has_it) ... ok
+test_the_run_asks_with_one (scripts.tests.test_mutant_incremental.Asked.test_the_run_asks_with_one) ... ok
+test_a_command_that_is_no_cargos_removes_nothing (scripts.tests.test_mutant_incremental.Bounded.test_a_command_that_is_no_cargos_removes_nothing) ... mutant_incremental: the incremental caches held 0 MiB, past 0; removed
+test_a_mutation_scripts_cargo_command_removes_the_caches_past_the_limit (scripts.tests.test_mutant_incremental.Bounded.test_a_mutation_scripts_cargo_command_removes_the_caches_past_the_limit) ... mutant_incremental: the incremental caches held 0 MiB, past 0; removed
+test_both_a_profiles_and_a_triples_caches_are_found (scripts.tests.test_mutant_incremental.Bounded.test_both_a_profiles_and_a_triples_caches_are_found) ... ok
+test_past_the_limit_every_cache_is_removed_and_the_rest_stays (scripts.tests.test_mutant_incremental.Bounded.test_past_the_limit_every_cache_is_removed_and_the_rest_stays) ... mutant_incremental: the incremental caches held 0 MiB, past 0; removed
+test_the_limit_is_the_environments_where_it_names_one (scripts.tests.test_mutant_incremental.Bounded.test_the_limit_is_the_environments_where_it_names_one) ... ok
+test_where_the_run_did_not_ask_nothing_is_removed (scripts.tests.test_mutant_incremental.Bounded.test_where_the_run_did_not_ask_nothing_is_removed) ... ok
+test_within_the_limit_nothing_is_removed (scripts.tests.test_mutant_incremental.Bounded.test_within_the_limit_nothing_is_removed) ... ok
+test_a_one_makes_a_browser_build_incremental_too_which_is_why_it_is_not_set (scripts.tests.test_mutant_incremental.CargosDefaults.test_a_one_makes_a_browser_build_incremental_too_which_is_why_it_is_not_set) ... ok
+test_a_zero_makes_neither_incremental (scripts.tests.test_mutant_incremental.CargosDefaults.test_a_zero_makes_neither_incremental) ... ok
+test_with_the_variable_removed_a_dev_build_is_incremental_and_a_browser_build_is_not (scripts.tests.test_mutant_incremental.CargosDefaults.test_with_the_variable_removed_a_dev_build_is_incremental_and_a_browser_build_is_not) ... ok
+test_every_cache_is_removed_between_recipes_a_triples_among_them (scripts.tests.test_mutant_incremental.Pruned.test_every_cache_is_removed_between_recipes_a_triples_among_them) ... ok
+test_no_recipe_line_is_edited_for_it (scripts.tests.test_mutant_incremental.Workflow.test_no_recipe_line_is_edited_for_it) ... ok
+test_the_recipes_step_asks_and_no_other_does (scripts.tests.test_mutant_incremental.Workflow.test_the_recipes_step_asks_and_no_other_does) ... ok
+test_the_workflows_own_zero_stands_for_every_other_build (scripts.tests.test_mutant_incremental.Workflow.test_the_workflows_own_zero_stands_for_every_other_build) ... ok
+Ran 18 tests in 4.983s
 OK
 
 == 4. the nightly is skipped where master's head has a successful run, never on Sunday's, and the override stands (scripts/nightly_skip.py, verify.yml)
 
-test_an_api_that_fails_or_answers_nonsense_runs_it (scripts.tests.test_nightly_skip.AsksTheApi) ... ok
-test_it_asks_for_the_heads_successful_runs_of_verify (scripts.tests.test_nightly_skip.AsksTheApi) ... ok
-test_its_exit_status_says_skip_run_or_misuse (scripts.tests.test_nightly_skip.AsksTheApi) ... ok
-test_a_dispatchs_run_does_not_verify_the_head (scripts.tests.test_nightly_skip.Decides) ... ok
-test_a_pushs_run_that_succeeded_at_the_head_skips_the_nightly (scripts.tests.test_nightly_skip.Decides) ... ok
-test_a_run_that_did_not_succeed_does_not_verify_it (scripts.tests.test_nightly_skip.Decides) ... ok
-test_an_earlier_nightlys_run_skips_it_too (scripts.tests.test_nightly_skip.Decides) ... ok
-test_an_error_runs_the_nightly_never_skips_it (scripts.tests.test_nightly_skip.Decides) ... ok
-test_any_other_schedule_is_asked (scripts.tests.test_nightly_skip.Decides) ... ok
-test_no_run_at_the_head_runs_the_nightly (scripts.tests.test_nightly_skip.Decides) ... ok
-test_the_events_that_verify_a_head_are_the_ones_a_push_to_master_trusts (scripts.tests.test_nightly_skip.Decides) ... ok
-test_the_first_covering_run_among_others_is_the_one_named (scripts.tests.test_nightly_skip.Decides) ... ok
-test_the_weekly_run_is_never_skipped (scripts.tests.test_nightly_skip.Decides) ... ok
-test_a_dispatch_is_planned_whatever_has_passed (scripts.tests.test_nightly_skip.PlanStep) ... ok
-test_a_nightly_at_a_head_a_run_succeeded_at_plans_nothing_and_says_why (scripts.tests.test_nightly_skip.PlanStep) ... ok
-test_a_nightly_at_a_head_none_has_is_planned_in_full (scripts.tests.test_nightly_skip.PlanStep) ... ok
-test_a_nightly_whose_api_fails_is_planned_in_full (scripts.tests.test_nightly_skip.PlanStep) ... ok
-test_sundays_nightly_is_planned_in_full_though_the_head_was_verified (scripts.tests.test_nightly_skip.PlanStep) ... ok
-test_only_the_nightly_asks (scripts.tests.test_nightly_skip.Workflow) ... ok
-test_the_plan_step_hands_the_schedule_that_fired_to_the_script (scripts.tests.test_nightly_skip.Workflow) ... ok
-test_the_schedules_are_weekdays_and_sunday_and_sunday_is_the_scripts_weekly (scripts.tests.test_nightly_skip.Workflow) ... ok
-Ran 21 tests in 0.789s
+test_an_api_that_fails_or_answers_nonsense_runs_it (scripts.tests.test_nightly_skip.AsksTheApi.test_an_api_that_fails_or_answers_nonsense_runs_it) ... ok
+test_it_asks_for_the_heads_successful_runs_of_verify (scripts.tests.test_nightly_skip.AsksTheApi.test_it_asks_for_the_heads_successful_runs_of_verify) ... ok
+test_its_exit_status_says_skip_run_or_misuse (scripts.tests.test_nightly_skip.AsksTheApi.test_its_exit_status_says_skip_run_or_misuse) ... ok
+test_a_dispatchs_run_does_not_verify_the_head (scripts.tests.test_nightly_skip.Decides.test_a_dispatchs_run_does_not_verify_the_head) ... ok
+test_a_pushs_run_that_succeeded_at_the_head_skips_the_nightly (scripts.tests.test_nightly_skip.Decides.test_a_pushs_run_that_succeeded_at_the_head_skips_the_nightly) ... ok
+test_a_run_that_did_not_succeed_does_not_verify_it (scripts.tests.test_nightly_skip.Decides.test_a_run_that_did_not_succeed_does_not_verify_it) ... ok
+test_an_earlier_nightlys_run_skips_it_too (scripts.tests.test_nightly_skip.Decides.test_an_earlier_nightlys_run_skips_it_too) ... ok
+test_an_error_runs_the_nightly_never_skips_it (scripts.tests.test_nightly_skip.Decides.test_an_error_runs_the_nightly_never_skips_it) ... ok
+test_any_other_schedule_is_asked (scripts.tests.test_nightly_skip.Decides.test_any_other_schedule_is_asked) ... ok
+test_no_run_at_the_head_runs_the_nightly (scripts.tests.test_nightly_skip.Decides.test_no_run_at_the_head_runs_the_nightly) ... ok
+test_the_events_that_verify_a_head_are_the_ones_a_push_to_master_trusts (scripts.tests.test_nightly_skip.Decides.test_the_events_that_verify_a_head_are_the_ones_a_push_to_master_trusts) ... ok
+test_the_first_covering_run_among_others_is_the_one_named (scripts.tests.test_nightly_skip.Decides.test_the_first_covering_run_among_others_is_the_one_named) ... ok
+test_the_weekly_run_is_never_skipped (scripts.tests.test_nightly_skip.Decides.test_the_weekly_run_is_never_skipped) ... ok
+test_a_dispatch_is_planned_whatever_has_passed (scripts.tests.test_nightly_skip.PlanStep.test_a_dispatch_is_planned_whatever_has_passed) ... ok
+test_a_nightly_at_a_head_a_run_succeeded_at_plans_nothing_and_says_why (scripts.tests.test_nightly_skip.PlanStep.test_a_nightly_at_a_head_a_run_succeeded_at_plans_nothing_and_says_why) ... ok
+test_a_nightly_at_a_head_none_has_is_planned_in_full (scripts.tests.test_nightly_skip.PlanStep.test_a_nightly_at_a_head_none_has_is_planned_in_full) ... ok
+test_a_nightly_whose_api_fails_is_planned_in_full (scripts.tests.test_nightly_skip.PlanStep.test_a_nightly_whose_api_fails_is_planned_in_full) ... ok
+test_sundays_nightly_is_planned_in_full_though_the_head_was_verified (scripts.tests.test_nightly_skip.PlanStep.test_sundays_nightly_is_planned_in_full_though_the_head_was_verified) ... ok
+test_only_the_nightly_asks (scripts.tests.test_nightly_skip.Workflow.test_only_the_nightly_asks) ... ok
+test_the_plan_step_hands_the_schedule_that_fired_to_the_script (scripts.tests.test_nightly_skip.Workflow.test_the_plan_step_hands_the_schedule_that_fired_to_the_script) ... ok
+test_the_schedules_are_weekdays_and_sunday_and_sunday_is_the_scripts_weekly (scripts.tests.test_nightly_skip.Workflow.test_the_schedules_are_weekdays_and_sunday_and_sunday_is_the_scripts_weekly) ... ok
+Ran 21 tests in 0.498s
 OK
 
 == mutation controls (scripts/ci_diagnostics_mutations.py)

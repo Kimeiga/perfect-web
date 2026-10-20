@@ -1,13 +1,14 @@
 ADR-0358 - Kiokun cache publication and reader lifetime
 
 produced by: just e14-kiokun-cache
-commit: 7ec6a5342acb27a4c5b498d365e88fb3a6b9668a + uncommitted changes
+commit: 320c52a44840a80423609ab476eb847c04de34a6
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39442025240 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 
 running 10 tests
 ..........
-test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 575 filtered out; finished in 0.93s
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 661 filtered out; finished in 2.30s
 
 baseline: 10 passed, 0 failed
 builders share one staging directory: KILLED (3 of 10 tests fail)

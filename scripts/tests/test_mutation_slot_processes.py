@@ -574,11 +574,18 @@ class ProducerResults(MockedProcesses):
         self.assertEqual(outcome.executed, 2)
 
     def test_invalid_shared_outcome_contains_no_positive_evidence(self):
+        # Deep enough that json.loads raises RecursionError on any Python (train-11: 2000 levels
+        # raised on 3.10 and 3.12.1 but parsed on CI's 3.12.3, whose C recursion limit is higher, and
+        # "deep malformed JSON escapes validation" survived there). Held as a precondition, so a
+        # Python that parses it fails this test instead of passing it for nothing.
+        DEEP = '[' * 100000 + '0' + ']' * 100000
+        with self.assertRaises(RecursionError):
+            json.loads(DEEP)
         spec = importlib.util.spec_from_file_location('invalid_outcome_test', SCRIPTS / 'unittest_protocol.py')
         protocol = importlib.util.module_from_spec(spec); spec.loader.exec_module(protocol)
         report = self.report(True); report['refusals'] = ['actual fixture']
         for status, text in ((1,json.dumps(report)), (137,json.dumps(self.report(True))), (1,'{'),
-                             (1,'['*2000+'0'+']'*2000)):
+                             (1,DEEP)):
             with self.subTest(status=status, text=text):
                 try:
                     outcome = protocol.validate_result(status,text,self.IDS)

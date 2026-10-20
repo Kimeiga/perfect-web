@@ -177,6 +177,16 @@ fn accepted_corpus_has_exactly_its_known_backend_refusals() {
         .map(|p| (p.display().to_string(), std::fs::read_to_string(p).unwrap()))
         .collect();
     let report = pw_core::program::validate_sources(&files);
+    let list: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(root.join("examples/accepted/build-refusals.json")).unwrap(),
+    )
+    .unwrap();
+    let listed = list["refused"].as_array().unwrap().clone();
+    let listed_ref = &listed;
+    assert!(
+        listed.iter().all(|entry| entry["code"] == "PW6601"),
+        "{listed:?}"
+    );
     let files_ref = &files;
     // D1's accepted cross-source reference is a warning, separate from the
     // executable backend's four errors. Pin its native structured identity.
@@ -236,15 +246,14 @@ fn accepted_corpus_has_exactly_its_known_backend_refusals() {
             ds.iter().filter(|d| d.is_error()).map(move |d| {
                 assert_eq!(d.code, "PW6601");
                 let src = &files_ref.iter().find(|(p, _)| p == path).unwrap().1;
-                let responsible = match Path::new(path).file_name().unwrap().to_str().unwrap() {
-                    "A-007-map-widget-resource-with-cleanup.pw" => "view StoreLocation",
-                    "A-008-streamed-public-recommendations.pw" => "query Recommendations",
-                    "A-013-build-time-deterministic-page.pw" => "page Terms",
-                    "A-018-resize-observation-updates-derived-state.pw" => {
-                        "style:grid-template-columns"
-                    }
-                    other => panic!("unexpected support-refused source: {other}"),
-                };
+                let name = Path::new(path).file_name().unwrap().to_str().unwrap();
+                let responsible = listed_ref
+                    .iter()
+                    .find(|entry| entry["file"] == name)
+                    .unwrap_or_else(|| panic!("unexpected support-refused source: {name}"))
+                    ["responsible"]
+                    .as_str()
+                    .unwrap();
                 assert!(src[d.primary_span.clone()].contains(responsible), "{d:?}");
                 (
                     Path::new(path)
@@ -260,12 +269,18 @@ fn accepted_corpus_has_exactly_its_known_backend_refusals() {
         })
         .collect();
     got.sort();
-    let mut expected = vec![
-        ("A-007-map-widget-resource-with-cleanup.pw".to_string(), "backend_template", "a template part the renderer cannot render: store.map_widget.StoreLocation: `<map resource={..}>`: an element that mounts a resource is not compiled".to_string()),
-        ("A-008-streamed-public-recommendations.pw".to_string(), "backend_wit", "the generated WIT does not parse: duplicate item named `store-recommendations-recommendations-api`".to_string()),
-        ("A-013-build-time-deterministic-page.pw".to_string(), "backend_page", "`marketing.terms.Terms`'s values: part 0 computes a value that performs `build.input.read<WorkspaceFile>`, and a host computes only a value that performs nothing".to_string()),
-        ("A-018-resize-observation-updates-derived-state.pw".to_string(), "backend_template", "a template part the renderer cannot render: store.responsive_menu.ResponsiveMenu: `style:grid-template-columns`: `style:grid-template-columns` is a directive, and only `on:` directives are compiled".to_string()),
-    ];
+    // The one list every corpus check reads (examples/accepted/build-refusals.json, the
+    // coordinator's ruling of 2026-10-20): each refused program, its stage and its exact message.
+    let mut expected: Vec<_> = listed
+        .iter()
+        .map(|entry| {
+            (
+                entry["file"].as_str().unwrap().to_string(),
+                entry["stage"].as_str().unwrap(),
+                entry["message"].as_str().unwrap().to_string(),
+            )
+        })
+        .collect();
     expected.sort();
     assert_eq!(
         got, expected,
@@ -301,7 +316,7 @@ fn accepted_corpus_has_exactly_its_known_backend_refusals() {
                 .lines()
                 .filter(|line| line.starts_with("error: ["))
                 .collect();
-            assert_eq!(errors.len(), 4, "{text}");
+            assert_eq!(errors.len(), listed.len(), "{text}");
             assert!(
                 errors
                     .iter()

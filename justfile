@@ -2572,8 +2572,7 @@ e14-ids:
        cargo test --locked -p pw-core --test corpus_history --test generality --test checking_source 2>&1 \
          | grep -E '^test (the_c10|the_c9|the_pre_change|generality_is|every_rejected|every_caught|a_caught_file|every_diagnostic)|^test result|^---- |panicked at'; \
        echo; echo "== every program the repository checks"; echo; \
-       cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw \
-         examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | tail -1; \
+       python3 scripts/accepted_corpus.py; \
        cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw \
          examples/domain.pw examples/lib/*.pw examples/store/*.pw examples/demo/*.pw 2>&1 | tail -1; \
        cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/kiokun/*.pw 2>&1 | tail -1; \
@@ -2599,8 +2598,7 @@ e14-links:
        cargo test --locked -p pw-core --test generality --test checking_source 2>&1 \
          | grep -E '^test (generality_is|every_rejected|every_caught|a_caught_file|every_diagnostic)|^test result|^---- |panicked at'; \
        echo; echo "== every program the repository checks"; echo; \
-       cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw \
-         examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | tail -1; \
+       python3 scripts/accepted_corpus.py; \
        cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw \
          examples/domain.pw examples/lib/*.pw examples/store/*.pw examples/demo/*.pw 2>&1 | tail -1; \
        cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/kiokun/*.pw 2>&1 | tail -1; \
@@ -3179,7 +3177,7 @@ e14-clause-heads:
        echo; echo "== the store, kiokun and the accepted corpus"; echo; \
        cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/store/*.pw 2>&1 | tail -1; \
        cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/kiokun/*.pw 2>&1 | tail -1; \
-       cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | tail -1; \
+       python3 scripts/accepted_corpus.py; \
        echo; echo "== mutation controls (scripts/clause_heads_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/clause_heads_mutations.py; \
      } > docs/evidence/E14/clause-heads.txt
@@ -3242,7 +3240,7 @@ e14-opaque-value:
        echo "== the rule (compiler/pw-core/tests/members.rs)"; echo; \
        cargo test --locked -p pw-core --test members 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the accepted corpus, A-015 to A-017 included"; echo; \
-       cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | tail -3; \
+       python3 scripts/accepted_corpus.py; \
        echo; echo "== mutation controls (scripts/opaque_value_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/opaque_value_mutations.py; \
      } > docs/evidence/E14/opaque-value.txt
@@ -3515,8 +3513,7 @@ e14-metadata:
        cargo test --locked -p pw-core --test generality --test checking_source 2>&1 \
          | grep -E '^test (generality_is|every_rejected|every_caught|a_caught_file|every_diagnostic)|^test result|^---- |panicked at'; \
        echo; echo "== every program the repository checks"; echo; \
-       cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw \
-         examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | tail -1; \
+       python3 scripts/accepted_corpus.py; \
        cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw \
          examples/domain.pw examples/lib/*.pw examples/store/*.pw examples/demo/*.pw 2>&1 | tail -1; \
        cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/kiokun/*.pw 2>&1 | tail -1; \
@@ -3580,7 +3577,7 @@ e14-case-and-delivery:
        echo "== the tests (compiler/pw-core/tests/case_and_delivery.rs)"; echo; \
        cargo test --locked -p pw-core --test case_and_delivery 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the store, the accepted corpus and the demos check as before"; echo; \
-       for program in store accepted demo; do \
+       python3 scripts/accepted_corpus.py; for program in store demo; do \
          printf '%s: ' "$program"; \
          cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw \
            examples/domain.pw examples/lib/*.pw examples/$program/*.pw 2>&1 | tail -1; \
@@ -3663,8 +3660,7 @@ e14-streams:
        echo; echo "== the server, its streamed response among it (spikes/own-renderer/server)"; echo; \
        cargo test --locked -p pw-dev-server 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the accepted corpus, A-008 among it, checks as one program"; echo; \
-       cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw \
-         examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | tail -1; \
+       python3 scripts/accepted_corpus.py; \
        echo; echo "== the browser (e2e/stream.spec.mjs), three engines and the host's Chrome"; echo; \
        bash scripts/run_suite.sh -- pnpm exec playwright test e2e/stream.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/streams_mutations.py)"; echo; \
@@ -3971,7 +3967,7 @@ e10-callbacks:
        echo; echo "== an effect through a callback (compiler/pw-core/tests/causal_evidence.rs)"; echo; \
        cargo test --locked -p pw-core --test causal_evidence 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== what must stay clean: errors reported"; echo; \
-       printf 'accepted corpus: %s\n' "$(./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -cE '^error' || true)"; \
+       python3 scripts/accepted_corpus.py; \
        printf 'store: %s\n' "$(./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/store/*.pw 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -cE '^error' || true)"; \
        printf 'kiokun: %s\n' "$(./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/kiokun/*.pw 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -cE '^error' || true)"; \
        echo; echo "== mutation controls (scripts/callback_mutations.py)"; echo; \
@@ -4064,7 +4060,7 @@ e10-members:
        echo "== the member tests (compiler/pw-core/tests/members.rs)"; echo; \
        cargo test --locked -p pw-core --test members 2>&1 | grep -E '^test result|^---- |panicked at'; \
        echo; echo "== what must stay clean: errors reported"; echo; \
-       printf 'accepted corpus: %s\n' "$(./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -cE '^error' || true)"; \
+       python3 scripts/accepted_corpus.py; \
        printf 'store: %s\n' "$(./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/store/*.pw 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -cE '^error' || true)"; \
        printf 'kiokun: %s\n' "$(./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/kiokun/*.pw 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -cE '^error' || true)"; \
        echo; echo "== what the audit decided (member relations, the accepted corpus)"; echo; \
@@ -4088,7 +4084,7 @@ e10-names:
        echo "== the name tests (compiler/pw-core/tests/every_name_resolves.rs)"; echo; \
        cargo test --locked -p pw-core --test every_name_resolves 2>&1 | grep -E '^test result|^---- |panicked at'; \
        echo; echo "== what must stay clean: errors reported"; echo; \
-       printf 'accepted corpus: %s\n' "$(./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -cE '^error' || true)"; \
+       python3 scripts/accepted_corpus.py; \
        printf 'store: %s\n' "$(./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/domain.pw examples/lib/*.pw examples/store/*.pw 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -cE '^error' || true)"; \
        printf 'kiokun: %s\n' "$(./target/debug/pw check packages/pw-std/*.pw packages/pw-platform-web/*.pw examples/kiokun/*.pw 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -cE '^error' || true)"; \
        echo; echo "== mutation controls (scripts/names_mutations.py)"; echo; \
@@ -5005,8 +5001,7 @@ e14-resource-clauses:
        echo; echo "== the generality witnesses (examples/generality/affine_not_consumed_once)"; echo; \
        cargo test --locked -p pw-core --test generality 2>&1 | grep -E '^test result|^---- |panicked at'; \
        echo; echo "== the accepted corpus, A-007, A-019 and A-024 among it, checks as one program"; echo; \
-       cargo run --quiet --locked -p pw-cli -- check packages/pw-std/*.pw packages/pw-platform-web/*.pw \
-         examples/domain.pw examples/lib/*.pw examples/accepted/*.pw 2>&1 | tail -1; \
+       python3 scripts/accepted_corpus.py; \
        echo; echo "== mutation controls (scripts/resource_clauses_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/resource_clauses_mutations.py; \
      } > docs/evidence/E14/resource-clauses.txt
