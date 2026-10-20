@@ -725,8 +725,6 @@ mod materializations;
 mod messages;
 // TRACK SEAM (kiokun): kiokun's dictionary, read (docs/PARALLEL.md, W6).
 mod kiokun;
-// TRACK SEAM (todomvc): a session's todos (docs/PARALLEL.md, W7).
-mod todomvc;
 // TRACK SEAM (device-store): a document of a page that holds values the
 // device keeps (ADR-XXXX).
 mod device;
@@ -1489,17 +1487,6 @@ impl Server {
             #[cfg(not(test))]
             let kiokun = kiokun::KiokunData::new()?;
             (Arc::new(store::StoreData::new()), Arc::new(kiokun))
-        } else if contracts
-            .iter()
-            .flat_map(|c| &c.imports)
-            .any(|i| i.interface.starts_with("todomvc:"))
-        {
-            // TRACK SEAM (todomvc): a session's todos, in memory, where the
-            // program imports `todomvc:data/…` (docs/PARALLEL.md, W7).
-            (
-                Arc::new(store::StoreData::new()),
-                Arc::new(todomvc::TodoData::new()),
-            )
         } else {
             #[cfg(test)]
             let store = store.unwrap_or_else(store::layer_for_tests);
@@ -6022,7 +6009,7 @@ impl Server {
 
     /// **A computed value's component, run with `json`** (ADR-0227), typed
     /// by its parameter as a command's argument is: pure, with what it reads.
-    fn computed_from(&self, id: &str, json: &[serde_json::Value]) -> Result<Val, String> {
+    fn computed_from(&self, id: &str, inputs: &[serde_json::Value]) -> Result<Val, String> {
         let loaded = self
             .components
             .get(id)
@@ -6034,7 +6021,7 @@ impl Server {
             .and_then(|c| c.exports.first())
             .and_then(|e| e.component.clone())
             .ok_or_else(|| format!("`{id}`'s contract does not locate its export"))?;
-        let args = loaded.prepared.arguments_for(&export, json)?;
+        let args = loaded.prepared.arguments_for(&export, inputs)?;
         self.run(id, "", &BTreeMap::new(), &args)?
             .into_iter()
             .next()

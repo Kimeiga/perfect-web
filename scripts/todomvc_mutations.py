@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 """Mutation controls for track `todomvc`: TodoMVC in Pleris, held to its own
-spec (ADR-XXXX).
+spec (ADR-XXXX), its todos on the device since track `device-store`
+(ADR-XXXX).
 
-Each mutant undoes one thing the spec states, or one thing the layer keeps:
-- the program (`examples/todomvc/app.pw`): the hidden main and footer, the
-  trim, the counter's words and what it counts, the toggle-all's rule and its
-  checked state, each filter and the fragment's forms, the editing mode (which
-  row, its class, its field and what it holds, Enter, Escape and blur), the
-  clear button, a todo's toggle, an edit trimmed to nothing, the key the page
-  reads by, and the field's focus and clearing;
-- the layer (`spikes/own-renderer/server/src/todomvc.rs`): where a todo is
-  added, ids a destroyed todo had, each write, the bound, and the session
-  each operation holds a command to;
+Each mutant undoes one thing the spec states:
+- the program (`examples/todomvc/app.pw`): the todos kept on the device, under
+  the spec's name; the hidden main and footer, the trim, the counter's words
+  and what it counts, the toggle-all's rule and its checked state, each
+  filter and the fragment's forms, the editing mode (which row, its class,
+  its field and what it holds, Enter, Escape and blur), the clear button, a
+  todo's toggle, an edit trimmed to nothing, an id one more than any before
+  it, where a todo is added, and the field's focus and clearing;
 - the host's media type for the checkbox's drawings;
 - the browser's runtime (`spikes/own-renderer/public/pw-runtime.mjs`), where
   a patch sets a checkbox's state as well as its attribute, and the edit
   field a patch inserts takes focus (the runtime's own `autofocus` is
-  controlled in `scripts/autofocus_mutations.py`). A mutant of the runtime
+  controlled in `scripts/autofocus_mutations.py`, its device store and its
+  morph in `scripts/device_store_mutations.py`). A mutant of the runtime
   rebuilds the pages too (`run.sh`), as every control that changes it does:
   the Playwright config refuses to run against a `dist` built with another
   runtime, and a suite that did not run kills nothing.
@@ -45,12 +45,10 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 APP = ROOT / "examples/todomvc/app.pw"
-LAYER = ROOT / "spikes/own-renderer/server/src/todomvc.rs"
 SERVER = ROOT / "spikes/own-renderer/server/src/main.rs"
 RUNTIME_FILE = ROOT / "spikes/own-renderer/public/pw-runtime.mjs"
 
 PROGRAM = "program"
-LAYERED = "layer"
 HOST = "host"
 RUNTIME = "runtime"
 
@@ -59,26 +57,38 @@ RUNTIME = "runtime"
 # here leaves a program that checks. Each is killed by the checker, and no test
 # is run for it.
 CHECKED = {
-    # `toggle` writes `Todo` and does not invalidate `Board`, which reads it.
-    "a toggle tells no page": {"PW5106"},
-    # `Board`'s `key` omits `filter`, which its body reads.
-    "the board is read the same for each filter": {"PW0336"},
+    # The todos kept on the device say not whose they are.
+    "the todos say not whose they are": {"PW6805"},
 }
 
 # (what is undone, which tests, file, anchor, replacement)
 MUTANTS = [
     (
+        "the todos are kept under another name than the spec's",
+        PROGRAM,
+        APP,
+        '    storage  device "todos-pleris"\n',
+        '    storage  device "pleris-todos"\n',
+    ),
+    (
+        "the todos say not whose they are",
+        PROGRAM,
+        APP,
+        "    privacy  Device\n    conflict last_write_wins\n",
+        "    conflict last_write_wins\n",
+    ),
+    (
         "main is not hidden with no todos",
         PROGRAM,
         APP,
-        '            <section class="main" hidden={board.total == 0}>\n',
+        '            <section class="main" hidden={List.length(todos) == 0}>\n',
         '            <section class="main">\n',
     ),
     (
         "the footer is not hidden with no todos",
         PROGRAM,
         APP,
-        '            <footer class="footer" hidden={board.total == 0}>\n',
+        '            <footer class="footer" hidden={List.length(todos) == 0}>\n',
         '            <footer class="footer">\n',
     ),
     (
@@ -99,29 +109,29 @@ MUTANTS = [
         "the counter counts the completed",
         PROGRAM,
         APP,
-        "    let left = List.length(List.filter(todos, (t) => !t.completed))\n",
-        "    let left = List.length(List.filter(todos, (t) => t.completed))\n",
+        "fn left(todos: List<Todo>) -> Int !{} {\n    List.length(List.filter(todos, (t) => !t.completed))\n",
+        "fn left(todos: List<Todo>) -> Int !{} {\n    List.length(List.filter(todos, (t) => t.completed))\n",
     ),
     (
         "the toggle-all completes only when every todo is active",
         PROGRAM,
         APP,
-        "    Ok(complete_all(current_session(), List.any(todos_of(current_session()), (t) => !t.completed)))\n",
-        "    Ok(complete_all(current_session(), List.all(todos_of(current_session()), (t) => !t.completed)))\n",
+        "    let any_active = List.any(todos, (t) => !t.completed)\n",
+        "    let any_active = List.all(todos, (t) => !t.completed)\n",
     ),
     (
         "the toggle-all is checked with no todos",
         PROGRAM,
         APP,
-        'checked={board.left == 0 & board.total > 0}',
-        'checked={board.left == 0}',
+        "    List.length(todos) > 0 & List.all(todos, (t) => t.completed)\n",
+        "    List.all(todos, (t) => t.completed)\n",
     ),
     (
         "the toggle-all does what clearing the completed does",
         PROGRAM,
         APP,
-        "                    on:press={() => match toggle_all() {\n",
-        "                    on:press={() => match clear_completed() {\n",
+        "                    on:press={() => todos = toggled_all(todos)} />\n",
+        "                    on:press={() => todos = cleared(todos)} />\n",
     ),
     (
         "the active filter shows the completed",
@@ -148,29 +158,22 @@ MUTANTS = [
         "the model does not filter",
         PROGRAM,
         APP,
-        "        rows: List.map(List.filter(todos, (t) => shown(t, filter)), (t) => row_of(t, editing)),\n",
-        "        rows: List.map(todos, (t) => row_of(t, editing)),\n",
-    ),
-    (
-        "the total is what the filter shows",
-        PROGRAM,
-        APP,
-        "        total: List.length(todos),\n",
-        "        total: List.length(List.filter(todos, (t) => shown(t, filter))),\n",
+        "    List.map(List.filter(todos, (t) => shown(t, filter)), (t) => Row {\n",
+        "    List.map(todos, (t) => Row {\n",
     ),
     (
         "the clear button counts what is left",
         PROGRAM,
         APP,
-        "        done: List.length(todos) - left,\n",
-        "        done: left,\n",
+        "fn done(todos: List<Todo>) -> Int !{} {\n    List.length(List.filter(todos, (t) => t.completed))\n",
+        "fn done(todos: List<Todo>) -> Int !{} {\n    List.length(List.filter(todos, (t) => !t.completed))\n",
     ),
     (
         "no row is the one being edited",
         PROGRAM,
         APP,
-        "editing: t.id.value == editing }\n",
-        "editing: false }\n",
+        "        editing: t.id == editing,\n",
+        "        editing: false,\n",
     ),
     (
         "an edited todo that is completed is not shown completed",
@@ -197,43 +200,43 @@ MUTANTS = [
         "a toggle sets what the todo already is",
         PROGRAM,
         APP,
-        "        Some(t) => complete(current_session(), id, !t.completed),\n",
-        "        Some(t) => complete(current_session(), id, t.completed),\n",
+        "        Todo { id: t.id, title: t.title, completed: !t.completed }\n",
+        "        Todo { id: t.id, title: t.title, completed: t.completed }\n",
     ),
     (
-        "an edit trimmed to nothing is refused, not destroyed",
+        "an edit trimmed to nothing is kept, not destroyed",
         PROGRAM,
         APP,
-        "        None => remove(current_session(), id),\n",
-        "        None => Err(NotFound),\n",
+        "        None => removed(todos, id),\n",
+        "        None => todos,\n",
     ),
     (
         "destroy keeps the todo",
         PROGRAM,
         APP,
-        "{\n    remove(current_session(), id)\n}\n\ncommand clear_completed",
-        "{\n    Ok(id)\n}\n\ncommand clear_completed",
+        "    List.filter(todos, (t) => t.id != id)\n",
+        "    List.filter(todos, (t) => t.id == t.id)\n",
     ),
     (
         "clear completed clears none",
         PROGRAM,
         APP,
-        "    Ok(remove_completed(current_session()))\n",
-        "    Ok(0)\n",
+        "fn cleared(todos: List<Todo>) -> List<Todo> !{} {\n    List.filter(todos, (t) => !t.completed)\n",
+        "fn cleared(todos: List<Todo>) -> List<Todo> !{} {\n    todos\n",
     ),
     (
-        "a toggle tells no page",
+        "a todo is added at the top of the list",
         PROGRAM,
         APP,
-        "command toggle(id: TodoId) -> Result<Todo, TodoError>\n    idempotent_by InteractionId\n    emits         TodosChanged(current_session())\n{\n",
-        "command toggle(id: TodoId) -> Result<Todo, TodoError>\n    idempotent_by InteractionId\n{\n",
+        "    List.concat(todos, [Todo { id: last + 1, title: title, completed: false }])\n",
+        "    List.concat([Todo { id: last + 1, title: title, completed: false }], todos)\n",
     ),
     (
-        "the board is read the same for each filter",
+        "an id is one before it again",
         PROGRAM,
         APP,
-        "    key            session, filter, editing\n",
-        "    key            session, editing\n",
+        "    let last = List.fold(todos, 0, (m, t) => if t.id > m {\n",
+        "    let last = List.fold(todos, 0, (m, t) => if t.id < m {\n",
     ),
     (
         "the active link goes to the completed",
@@ -267,15 +270,15 @@ MUTANTS = [
         "a double press does not begin an edit",
         PROGRAM,
         APP,
-        "                                    editing = row.id\n                                }}>{row.title}</label>\n",
-        '                                    editing = ""\n                                }}>{row.title}</label>\n',
+        "                                        editing = row.id\n",
+        "                                        editing = 0\n",
     ),
     (
         "beginning an edit forgets the title",
         PROGRAM,
         APP,
-        "                                    edit_text = row.title\n",
-        '                                    edit_text = ""\n',
+        "                                        edit_text = row.title\n",
+        '                                        edit_text = ""\n',
     ),
     (
         "the field starts empty",
@@ -295,29 +298,29 @@ MUTANTS = [
         "Escape does not leave editing",
         PROGRAM,
         APP,
-        '                                    } else if e.key == "Escape" {\n                                        editing = ""\n',
-        '                                    } else if e.key == "Escape" {\n                                        editing = editing\n',
+        '                                        } else if e.key == "Escape" {\n                                            editing = 0\n',
+        '                                        } else if e.key == "Escape" {\n                                            editing = editing\n',
     ),
     (
         "blur does not save",
         PROGRAM,
         APP,
-        '                                    on:blur={(e: BlurEvent) => if editing != "" {\n',
-        '                                    on:blur={(e: BlurEvent) => if editing == "?" {\n',
+        "                                        on:blur={(e: BlurEvent) => if editing != 0 {\n",
+        "                                        on:blur={(e: BlurEvent) => if editing == -1 {\n",
     ),
     (
-        "the answer to a blur's save ends another todo's edit",
+        "Enter does not save",
         PROGRAM,
         APP,
-        '                                    on:blur={(e: BlurEvent) => if editing != "" {\n                                        let saved = editing\n                                        match save_edit(TodoId(saved), edit_text) {\n                                            Ok(_) => if editing == saved {\n',
-        '                                    on:blur={(e: BlurEvent) => if editing != "" {\n                                        let saved = editing\n                                        match save_edit(TodoId(saved), edit_text) {\n                                            Ok(_) => if true {\n',
+        '                                        on:keydown={(e: KeyEvent) => if e.key == "Enter" {\n                                            todos = retitled(todos, editing, edit_text)\n',
+        '                                        on:keydown={(e: KeyEvent) => if e.key == "Enter" {\n                                            todos = todos\n',
     ),
     (
         "the new-todo field is not cleared",
         PROGRAM,
         APP,
-        '                                let typed = draft\n                                draft = ""\n',
-        "                                let typed = draft\n                                draft = draft\n",
+        '                                todos = added(todos, title)\n                                draft = ""\n',
+        "                                todos = added(todos, title)\n                                draft = draft\n",
     ),
     (
         "a title of blanks clears the field",
@@ -332,76 +335,6 @@ MUTANTS = [
         APP,
         '<input class="new-todo" placeholder="What needs to be done?" aria-label="New todo" autofocus\n',
         '<input class="new-todo" placeholder="What needs to be done?" aria-label="New todo"\n',
-    ),
-    (
-        "a todo is added at the top of the list",
-        LAYERED,
-        LAYER,
-        "                    list.rows.push(row);\n",
-        "                    list.rows.insert(0, row);\n",
-    ),
-    (
-        "an id is a destroyed todo's again",
-        LAYERED,
-        LAYER,
-        '                        id: format!("t{}", s.written + added + 1),\n',
-        '                        id: format!("t{}", s.rows.len() + added + 1),\n',
-    ),
-    (
-        "a todo is completed the other way",
-        LAYERED,
-        LAYER,
-        "                    if let Some(row) = list.rows.iter_mut().find(|r| r.id == id) {\n                        row.completed = done;\n",
-        "                    if let Some(row) = list.rows.iter_mut().find(|r| r.id == id) {\n                        row.completed = !done;\n",
-    ),
-    (
-        "complete-all completes one todo",
-        LAYERED,
-        LAYER,
-        "                    for row in &mut list.rows {\n                        row.completed = done;\n",
-        "                    for row in list.rows.iter_mut().take(1) {\n                        row.completed = done;\n",
-    ),
-    (
-        "a retitle changes nothing",
-        LAYERED,
-        LAYER,
-        "                        row.title = title;\n",
-        "                        let _ = title;\n",
-    ),
-    (
-        "a destroy removes nothing",
-        LAYERED,
-        LAYER,
-        "                Change::Remove(id) => list.rows.retain(|r| r.id != id),\n",
-        "                Change::Remove(_) => {}\n",
-    ),
-    (
-        "clear completed removes every todo",
-        LAYERED,
-        LAYER,
-        "                Change::RemoveCompleted => list.rows.retain(|r| !r.completed),\n",
-        "                Change::RemoveCompleted => list.rows.retain(|_| false),\n",
-    ),
-    (
-        "a session's list is unbounded",
-        LAYERED,
-        LAYER,
-        "                    if s.rows.len() + added >= MAX_TODOS {\n",
-        "                    if false && s.rows.len() + added >= MAX_TODOS {\n",
-    ),
-    (
-        "an operation acts for another session than its command's",
-        LAYERED,
-        LAYER,
-        "    if called == session {\n        Ok(called)\n",
-        "    if true || called == session {\n        Ok(called)\n",
-    ),
-    (
-        "a read gives the first session's todos",
-        LAYERED,
-        LAYER,
-        "            .sessions\n            .get(session)\n            .cloned()\n            .unwrap_or_default();\n        reads_of(session, Arc::new(list))\n",
-        "            .sessions\n            .values()\n            .next()\n            .cloned()\n            .unwrap_or_default();\n        reads_of(session, Arc::new(list))\n",
     ),
     (
         "the checkbox's drawings are served as any file",
@@ -526,7 +459,6 @@ def runtime_browser_tests(_what=None):
 # What each kind of mutant is run against, in order.
 RUNS = {
     PROGRAM: [("server", server_tests), ("browser", browser_tests)],
-    LAYERED: [("server", server_tests), ("browser", browser_tests)],
     HOST: [("browser", browser_tests)],
     RUNTIME: [("browser", runtime_browser_tests)],
 }
