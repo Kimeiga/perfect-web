@@ -2,7 +2,7 @@
 
 Status: proposed by track `ci-diagnostics` (2026-10-19) for the integrator;
 local gates and the track's recipe recorded below; not yet in a train.
-Date: 2026-10-19. Milestone: E14; the evidence's own harness (ADR-0245,
+Date: 2026-10-19 to 2026-10-20. Milestone: E14; the evidence's own harness (ADR-0245,
 ADR-0281, ADR-0344, ADR-0349).
 Track `ci-diagnostics`, on `8c5618c8` (`track/train-10`'s head), not on
 `master` `32757966` (the first correction).
@@ -41,11 +41,10 @@ Amends ADR-0349's `scripts/run_suite.sh` and ADR-0344's section 4
   build, or beside 64 busy loops (loads of 25 to 60), and 333 to 644 at
   loads of 49 to 116 (the table), against 800. The failures the coordinator
   saw (three of five local `just ci` runs at load 40 to 80) need the
-  complete-validation
-  checker of track `check-is-build` (2.0 to 2.9 times the work: 508 to 809
-  ms a thousand lines at loads of 21 to 55, its own notes), which is not
-  on this base. So the proof of section 2 runs the checker also made two
-  and three times over, as that one will be.
+  complete-validation checker of track `check-is-build` (2.0 to 2.9 times
+  the work: 508 to 809 ms a thousand lines at loads of 21 to 55, its own
+  notes), which is not on this base. So the proof of section 2 runs the
+  checker also made two and three times over, as that one will be.
 
 ## 1. A failing run's output is kept
 
@@ -69,8 +68,8 @@ Amends ADR-0349's `scripts/run_suite.sh` and ADR-0344's section 4
     once per mutant, many in a shard (`e14-refusal` alone plants 12 browser
     mutants, each failing tests); its trace says nothing the kill does not,
     and they are the swamp the brief names. A red baseline is a
-    real failure that stops the script, and it was lost with the shard's
-    later runs as `e10-browser`'s was. `mutation_baseline.explain()`, which
+    real failure that stops the script, and it would be lost with the
+    shard's later runs as `e10-browser`'s second run was. `mutation_baseline.explain()`, which
     all 277 call sites call where a baseline is red, now also keeps the
     output of the script's last command where that was a browser run that
     failed, in `<suite dir>/kept-traces/<recipe>/<time>/<script>-baseline/`.
@@ -111,8 +110,8 @@ Amends ADR-0349's `scripts/run_suite.sh` and ADR-0344's section 4
 
 ## What the planner plans when `run_suite.sh` or `verify.yml` changes
 
-Measured with `scripts/ci_plan.py` on this track's first two commits
-(`a5649409`, `061fdba8`), each changed file alone:
+Measured with `scripts/ci_plan.py` on this track's commits, each changed
+file alone (`scripts/ci_plan.py` as `recipes_for` reads a file's hunks):
 
 - **`scripts/run_suite.sh` alone plans 91 recipes** of the 362 CI can run:
   every recipe whose lines name the helper's path (`reads_what_changed`'s
@@ -127,15 +126,18 @@ Measured with `scripts/ci_plan.py` on this track's first two commits
   would plan `e14-evidence-integrity`, as before).
 - `scripts/mutation_baseline.py` plans three, by mutants anchored near the
   hunk (`e14-ci-diagnostics`, `e14-derived-outside`,
+  `e14-evidence-integrity`); `check_latency.rs` two (`e14-ci-diagnostics`,
   `e14-evidence-integrity`); `ci_recipes.py`, `keep_traces.py`, the
   `.gitignore`s and the recipe file plan this track's recipe alone.
 - **Together, against train-10's head (`8c5618c8`): 92 recipes in 33
-  shards** (`ci_plan.py --shards 9 --changed 8c5618c8 HEAD --current`, which
-  leaves none out). **Against `master`, which is where a track's push
-  measures from (`git merge-base origin/master`): 178 in 39**, since
+  shards**, 91 in 32 with `--current` (`ci_plan.py --shards 9 --changed
+  8c5618c8 HEAD --current`, which leaves out `e14-ci-diagnostics`, its
+  evidence current). **Against `master`, which is where a track's push
+  measures from (`git merge-base origin/master`): 177 in 39**, since
   train-10's own changes count there, `--current` leaving out `e14-tables`.
-  So a push of this branch starts a verify of 178 recipes, hours of runners
-  repeating train-10's dispatches. The integrator may cancel it (train-6's
+  So a push of this branch starts a verify of 177 recipes (43 jobs: the
+  plan, three browsers, 39 shards), hours of runners repeating train-10's
+  dispatches. The integrator may cancel it (train-6's
   and train-10's precedent) and dispatch what the change reaches:
   `e14-ci-diagnostics e14-evidence-integrity e14-evidence-integrity-2
   e14-derived-outside e10-browser`.
@@ -220,8 +222,8 @@ Measured with `scripts/ci_plan.py` on this track's first two commits
   fastest, so no number of checks lets it through). The old statistic
   failed the checker two times over in 2 of 5 runs and three times over in
   4 of 4, which the fastest of seven or more passes; one run of the latter
-  took 12 checks, waiting for a quieter moment (its first seven's median
-  was 1,181). At loads of 77 to 89, an earlier build of the same test (90 s
+  took 12 checks, waiting for a quieter moment (the median of its 12 was
+  1,181). At loads of 77 to 89, an earlier build of the same test (90 s
   window), the checker three times over failed both (the fastest 985, the
   median 1,209 and 1,329): see the next bullet.
 - **Not claimed.** That the ceiling is proof against any load: a machine
@@ -236,8 +238,7 @@ Measured with `scripts/ci_plan.py` on this track's first two commits
   640 to 930 against the 800, which is the integrator's to rule on, and
   no measurement here changes). A calibration loop would hold the verdict
   at any load, and needs a constant per machine class that only the ARM
-  runner can give. That CPU time is
-  the work. That `e9-latency`'s wording ("median of 7 runs") changed: it
+  runner can give. That CPU time is the work. That `e9-latency`'s wording ("median of 7 runs") changed: it
   prints the medians still, and the fastest beside them. The real
   measurement's assertion lines are tested through `fast_enough` and
   `happened`, not mutated in place.
