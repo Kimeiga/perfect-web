@@ -50,6 +50,7 @@ import pathlib
 import re
 import subprocess
 import sys
+import time
 
 # No bytecode written from here on, by the script (`dont_write_bytecode`) or
 # by any process it starts, each of which inherits the environment's word.
@@ -233,4 +234,58 @@ def explain(out=None):
             print(f"  {shown(args)}: {result(said) or '(no test result)'}", file=out)
     if not heard:
         print("  (no command it ran was kept)", file=out)
+    keep_browser_output(out)
     out.flush()
+
+
+# **A red baseline keeps its browser run's output** (track ci-diagnostics,
+# 2026-10-19). Playwright clears `test-results/` at the start of each run, and
+# every run after this script's in a CI shard is another's: the baseline's
+# failure was lost with the shard's later runs. Its trace is kept, apart from
+# those, in the suite's `kept-traces/<recipe>/<time>/<script>-baseline/`
+# (`keep_traces.py`: bounded, uploaded by `verify.yml`).
+#
+# **Only a baseline's.** A mutant's browser run fails by design, once per
+# mutant and hundreds to a shard, and its trace says nothing that the kill
+# does not: they would swamp the artifact. `explain()` is called where the
+# baseline is red, before any mutant has run, and where a script stops at a
+# mutant's producer it refused (277 calls, 5 of those), so what is kept is
+# the output of the LAST command the script ran, and only where that was a
+# browser run that failed: a refused producer's call finds a cargo command
+# last, and keeps nothing.
+SUITES = ("spikes/own-renderer", "benchmarks/harness")
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+# When this script began: a `test-results/` older than that is an earlier
+# recipe's, and is not this baseline's to keep.
+STARTED = time.time()
+
+
+def runs_a_suite(args):
+    """Whether a kept command is a Playwright run: `... playwright test ...`,
+    as a list of words or as one command line."""
+    words = [str(a) for a in args] if isinstance(args, (list, tuple)) else str(args).split()
+    return "test" in words and any("playwright" in w for w in words)
+
+
+def keep_browser_output(out):
+    """Keep the output of the script's last command where it was a browser run
+    that failed, in each suite directory it left some in since the script
+    began. Says where, or why not; never raises, since it runs where a
+    baseline has failed already."""
+    last = heard[-1] if heard else None
+    if last is None or last[1] == 0 or not runs_a_suite(last[0]):
+        return
+    try:
+        import keep_traces
+
+        script = pathlib.Path(getattr(sys.modules.get("__main__"), "__file__", None) or "script").stem
+        tag = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+        for suite in SUITES:
+            source = ROOT / suite / "test-results"
+            if not source.is_dir() or source.stat().st_mtime < STARTED:
+                continue
+            root = ROOT / suite / "kept-traces"
+            dest = keep_traces.destination(root, os.environ.get("PW_RECIPE"), tag, f"{script}-baseline")
+            print(f"  its browser run's output: {keep_traces.keep(source, dest, root).says()}", file=out)
+    except Exception as error:  # noqa: BLE001 - a failed baseline is told anyway
+        print(f"  its browser run's output could not be kept: {error}", file=out)

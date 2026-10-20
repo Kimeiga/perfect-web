@@ -23,6 +23,16 @@
 # green run (e14-navigate's did, 2026-10-10). A known failure is a job's
 # `--known` at the fetch (ADR-0281), never a recipe that swallows its suite's
 # status; `scripts/suite_status.py` holds every recipe to this helper.
+#
+# **A run that fails keeps its output** (track ci-diagnostics, 2026-10-19).
+# Playwright clears `test-results/` at the start of each run, so a failure
+# followed by a passing run (`e10-browser`'s three, a mutation control's after
+# it in the same CI shard) lost its trace. Each failing run's `test-results/`
+# is copied, as it ends, to `kept-traces/<recipe>/<time>/run-<i>/` in DIR
+# (`scripts/keep_traces.py`: bounded, 32 MiB in all, `PW_KEPT_TRACES_KIB`),
+# the recipe being `$PW_RECIPE` (`ci_recipes.py` sets it; `local` where
+# unset). `verify.yml` uploads every `kept-traces/`. The status is the
+# suite's, whether or not its output could be kept.
 set -uo pipefail
 
 dir="spikes/own-renderer"
@@ -53,6 +63,18 @@ KEEP='^ +[0-9]+\) |Error:|^ +(Expected|Received)|^ +(✓|✘|-) |EVIDENCE|^ +[0-
 first=0
 out="$(mktemp)"
 trap 'rm -f "$out"' EXIT
+
+# Where a failing run's output is kept, apart from the next run's (see above).
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+tag="$(date -u +%Y%m%dT%H%M%SZ)-$$"
+keep_output() {
+  [ -d "$dir/test-results" ] || return 0
+  local said
+  said="$(python3 "$here/keep_traces.py" "$dir/test-results" --root "$dir/kept-traces" \
+    --label "${PW_RECIPE:-}" --tag "$tag" --run "run-$1" 2>&1)" || true
+  echo "  run_suite: $said"
+}
+
 for i in $(seq "$runs"); do
   if [ "$runs" -gt 1 ]; then
     echo "== run $i of $runs"
@@ -77,6 +99,8 @@ for i in $(seq "$runs"); do
       echo "  run_suite: the suite's last lines:"
       tail -n 5 "$out" | sed 's/^/    /'
     fi
+    # Before the next run clears the directory it is in.
+    keep_output "$i"
     echo "  run_suite: exit $status"
     if [ "$first" -eq 0 ]; then
       first=$status
