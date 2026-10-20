@@ -43,6 +43,15 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: never
+  # Off, for the builds whose target Swatinem/rust-cache saves: "this action
+  # automatically sets `CARGO_INCREMENTAL=0` to disable incremental
+  # compilation, so that the Rust compiler doesn't waste time creating the
+  # additional artifacts required for incremental builds", and the cache it
+  # saves "is cleaned of ... Incremental build artifacts" (its README, `v2`;
+  # `cleanTargetDir` keeps a profile's `build`, `.fingerprint` and `deps` and
+  # removes the rest). A mutation script's mutants are another matter: see
+  # `PW_MUTANT_INCREMENTAL`, on the `Recipes` step (track ci-diagnostics,
+  # 2026-10-20).
   CARGO_INCREMENTAL: "0"
   # Debug info is most of a debug build's size, and nothing here debugs.
   CARGO_PROFILE_DEV_DEBUG: "0"
@@ -190,6 +199,18 @@ jobs:
         env:
           RECIPES: ${{ join(matrix.shard.recipes, ' ') }}
           DATABASE: ${{ matrix.shard.database && 'postgresql://postgres:pw@localhost:5432/pw_feed_test' || '' }}
+          # **Each mutant of a mutation script is built incrementally**: it
+          # undoes one line, so its build redoes what the line reaches, not a
+          # crate whole (a one-line `pw-core` mutant's test binaries: 21 to 23
+          # s against 33 to 37, on the PC at load 37; train-9's verify ran
+          # 1,391 mutants). `scripts/mutation_baseline.py` turns
+          # `CARGO_INCREMENTAL=1` on for the script and what it starts, over
+          # its recipe's own `CARGO_INCREMENTAL=0` (the Mac's disk, 2026-09-24:
+          # no recipe's line is edited), and removes the caches past 6 GiB
+          # (`scripts/mutant_incremental.py`); `ci_recipes.py` removes them
+          # between recipes. Nothing else of this job builds incrementally:
+          # the `Build` step above fills the cache above's way.
+          PW_MUTANT_INCREMENTAL: "1"
         run: |
           for _ in $(seq 150); do [ -e /tmp/disk-freed ] && break; sleep 2; done
           runner="$(lsb_release -ds) on GitHub Actions, $(uname -m)"

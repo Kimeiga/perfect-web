@@ -25,6 +25,16 @@ Each mutant undoes one piece:
    medians; the control (a check that happened) reads the median, or nothing.
    (The checker made pathological, and the clock that reads nothing, are
    `evidence_integrity_mutations.py`'s, which run the measurement itself.)
+3. a mutation script's mutants are built incrementally where the run asks
+   (`mutant_incremental.py`, `mutation_baseline.py`, `ci_recipes.py`,
+   `verify.yml`): the run's word is not heard, or is taken whether given or
+   not, or does not win over the recipe's own `CARGO_INCREMENTAL=0`; the
+   script never starts it, or the caches are never looked at after a command,
+   or are removed whatever they hold, or never, or a target triple's are
+   missed, or a command that is no cargo's is looked at, or incremental
+   compilation off is no reason to leave them, or the limit is not the
+   environment's, or a hundred times the default; the recipes' prune leaves a
+   triple's; the `Recipes` step does not ask, or every build is incremental.
 
 Each runs the suite that holds it: `scripts/tests/`'s, by `unittest`, or
 `pw-core`'s statistic tests, by `cargo test`. At least one test must fail.
@@ -49,6 +59,7 @@ VERIFY = ROOT / ".github/workflows/verify.yml"
 IGNORE = ROOT / ".gitignore"
 RENDERER_IGNORE = ROOT / "spikes/own-renderer/.gitignore"
 LATENCY = ROOT / "compiler/pw-core/tests/check_latency.rs"
+INCREMENTAL = ROOT / "scripts/mutant_incremental.py"
 
 # (what, suite, file, anchor, replacement)
 MUTANTS = [
@@ -328,6 +339,112 @@ MUTANTS = [
         "    cost.fastest > Duration::from_micros(200)\n",
         "    true\n",
     ),
+    # 3. A mutant's builds are incremental where the run asks, and bounded.
+    (
+        "a run that asks for incremental builds is not heard",
+        "incremental",
+        INCREMENTAL,
+        '    return (os.environ if env is None else env).get("PW_MUTANT_INCREMENTAL") == "1"\n',
+        "    return False\n",
+    ),
+    (
+        "every run is taken to ask",
+        "incremental",
+        INCREMENTAL,
+        '    return (os.environ if env is None else env).get("PW_MUTANT_INCREMENTAL") == "1"\n',
+        "    return True\n",
+    ),
+    (
+        "a recipe's own zero wins over the run's word",
+        "incremental",
+        INCREMENTAL,
+        '        os.environ["CARGO_INCREMENTAL"] = "1"\n',
+        '        os.environ.setdefault("CARGO_INCREMENTAL", "1")\n',
+    ),
+    (
+        "the script never starts it",
+        "incremental",
+        BASELINE,
+        "\nmutant_incremental.start()\n",
+        "\npass\n",
+    ),
+    (
+        "the caches are never looked at after a command",
+        "incremental",
+        BASELINE,
+        "            mutant_incremental.bounded(self.args)\n",
+        "            pass\n",
+    ),
+    (
+        "the caches are never removed",
+        "incremental",
+        INCREMENTAL,
+        "    if held <= limit:\n",
+        "    if True:\n",
+    ),
+    (
+        "the caches are removed whatever they hold",
+        "incremental",
+        INCREMENTAL,
+        "    if held <= limit:\n",
+        "    if False:\n",
+    ),
+    (
+        "a target triple's caches are missed",
+        "incremental",
+        INCREMENTAL,
+        '    for pattern in ("*/incremental", "*/*/incremental"):\n',
+        '    for pattern in ("*/incremental",):\n',
+    ),
+    (
+        "a command that is no cargo's is looked at",
+        "incremental",
+        INCREMENTAL,
+        '    if os.environ.get("CARGO_INCREMENTAL") != "1" or not runs_cargo(args):\n',
+        '    if os.environ.get("CARGO_INCREMENTAL") != "1":\n',
+    ),
+    (
+        "the caches are removed where incremental builds are off",
+        "incremental",
+        INCREMENTAL,
+        '    if os.environ.get("CARGO_INCREMENTAL") != "1" or not runs_cargo(args):\n',
+        "    if not runs_cargo(args):\n",
+    ),
+    (
+        "the limit is not the environment's",
+        "incremental",
+        INCREMENTAL,
+        "    return (int(said) if said.isdigit() else MAX_MIB) * 1024 * 1024\n",
+        "    return MAX_MIB * 1024 * 1024\n",
+    ),
+    (
+        "the limit is a hundred times as much",
+        "incremental",
+        INCREMENTAL,
+        "MAX_MIB = 6 * 1024\n",
+        "MAX_MIB = 600 * 1024\n",
+    ),
+    (
+        "the recipes' prune leaves a target triple's caches",
+        "incremental",
+        RECIPES,
+        '    for pattern in ("*/incremental", "*/*/incremental"):\n',
+        '    for pattern in ("*/incremental",):\n',
+    ),
+    (
+        "the Recipes step does not ask for incremental builds",
+        "incremental",
+        VERIFY,
+        '          PW_MUTANT_INCREMENTAL: "1"\n',
+        "",
+    ),
+    (
+        "every build of the workflow is incremental",
+        "incremental",
+        VERIFY,
+        '  CARGO_INCREMENTAL: "0"\n',
+        '  CARGO_INCREMENTAL: "1"\n',
+    ),
 ]
 
 UNITTEST = [sys.executable, "-m", "unittest"]
@@ -335,6 +452,7 @@ SUITES = {
     "helper": UNITTEST + ["scripts/tests/test_run_suite.py"],
     "keep": UNITTEST + ["scripts/tests/test_keep_traces.py"],
     "baseline": UNITTEST + ["scripts/tests/test_mutation_baseline.py"],
+    "incremental": UNITTEST + ["scripts/tests/test_mutant_incremental.py"],
     # The statistic's tests, which run no check: no timing in them.
     "latency": [
         "cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "check_latency", "--",
