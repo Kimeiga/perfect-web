@@ -731,17 +731,20 @@ pub(crate) fn package_prepared(
     no_collisions(contracts.iter().map(|c| c.component_id.clone()))?;
 
     // The declaration behind each contract, by the path the contract names.
-    // Contracts are keyed by `module.Name`, which is how `contracts()` builds a
-    // component id — read rather than reconstructed, for the same reason the
+    // Contract keys retain their namespace via `contract::component_id` — read
+    // rather than reconstructed, for the same reason the
     // planner reads the exporter map rather than reformatting an id.
     let mut decls: BTreeMap<String, (DefId, &Decl)> = BTreeMap::new();
     for (unit, hir) in hirs.iter().enumerate() {
         for (id, d) in hir.all_decls() {
-            // A type is never a component. One named as a query is, in the
-            // other namespace, took the query's place here until 2026-09-26,
-            // so a query `Either` beside a type `Either` had no signature and
-            // the whole package failed.
-            if matches!(d.kind, DeclKind::Type | DeclKind::Opaque) {
+            // Only component/callable namespaces can supply a contract's
+            // declaration. An event named as a query otherwise replaces its
+            // executable body with NoBody(Event), depending on source order
+            // (ADR-0373); types already required the same separation.
+            if !matches!(
+                crate::resolve::Namespace::of(d.kind),
+                Some(crate::resolve::Namespace::Term | crate::resolve::Namespace::Ui)
+            ) {
                 continue;
             }
             decls.insert(

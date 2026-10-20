@@ -57,3 +57,11 @@ canonical component identity; Type, Effect, Event and Predicate use review-only
 written type references retain raw type paths. A query/type freshness witness
 also failed before repair and covers both declaration orders. No noncomponent
 WIT identity changes are made by this review repair.
+
+A second concrete map-overwrite witness is a query Same followed by event Same:
+build exited successfully with one query contract and zero executable components,
+reporting the query as a bodyless Event. Reversing source order emitted the query.
+WIT's contract-declaration map now admits Term/Ui namespaces only, the namespaces
+of its component and callable declarations. Other namespaces keep their existing
+WIT naming; they cannot replace a contract's declaration. The regression requires
+both source orders to retain the query's signature and audited executable body.

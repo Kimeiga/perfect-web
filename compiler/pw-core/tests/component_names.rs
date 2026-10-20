@@ -385,3 +385,28 @@ fn same_named_query_cannot_hide_an_unbounded_view_cycle() {
         "{diagnostics:?}"
     );
 }
+
+#[test]
+fn a_same_named_event_never_replaces_the_executable_query() {
+    let query = "query Same() -> Int { 7 }\n";
+    let event = "event Same(value: String)\n";
+    for declarations in [format!("{query}{event}"), format!("{event}{query}")] {
+        let source = format!("module names\n{declarations}");
+        let built = pw_core::program::build(&units(&source)).expect("both namespaces build");
+        assert_eq!(built.contracts.len(), 1);
+        assert_eq!(built.contracts[0].component_id, "names.Same");
+        assert!(built.wit.contains("same: func() -> s64;"), "{}", built.wit);
+        assert_eq!(built.components.len(), 1);
+        assert!(
+            matches!(
+                &built.components[0].1,
+                pw_core::backend::component::Built::Component { audited: 1, .. }
+            ),
+            "the executable query must survive an event of the same name: {:?}",
+            built.components
+        );
+        let model = pw_core::semantic::Model::of(&units(&source)).expect("review builds");
+        assert_eq!(model.declarations["names.Same"].kind, "query");
+        assert_eq!(model.declarations["names.Same~event"].kind, "event");
+    }
+}

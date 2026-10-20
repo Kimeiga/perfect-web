@@ -76,6 +76,27 @@ MUTANTS = [
         '    format!("{path}{suffix}")',
         '    format!("{path}{}", &suffix[..0])',
     ),
+    (
+        "noncomponent declarations replace executable contract declarations",
+        CORE / "wit.rs",
+        """            // Only component/callable namespaces can supply a contract's
+            // declaration. An event named as a query otherwise replaces its
+            // executable body with NoBody(Event), depending on source order
+            // (ADR-0373); types already required the same separation.
+            if !matches!(
+                crate::resolve::Namespace::of(d.kind),
+                Some(crate::resolve::Namespace::Term | crate::resolve::Namespace::Ui)
+            ) {
+                continue;
+            }""",
+        """            // A type is never a component. One named as a query is, in the
+            // other namespace, took the query's place here until 2026-09-26,
+            // so a query `Either` beside a type `Either` had no signature and
+            // the whole package failed.
+            if matches!(d.kind, DeclKind::Type | DeclKind::Opaque) {
+                continue;
+            }""",
+    ),
 ]
 
 TESTS = ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "component_names"]
