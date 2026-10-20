@@ -496,15 +496,16 @@ Recorded on the PC, 2026-10-19/20 (WSL2, 32 threads shared with other
 workers, load averages 40-100 through these runs), PostgreSQL 18.6, rustc
 1.97.1, Playwright 1.58.0:
 
-- **`just e14-second-host`** at 5cf742f2, clean
-  (`docs/evidence/E14/second-host.txt`, 61 min, PORT=9264):
+- **`just e14-second-host`** at 773fa9c4, clean
+  (`docs/evidence/E14/second-host.txt`, 79 min, PORT=9264, load 70-135):
   `tests::second_host::` 22 passed; `tests::feed_pg::` and
   `tests::store_pg::` on PostgreSQL 32 passed;
   `e2e-hosts/second-host.spec.mjs` 12 passed (4 tests in Chromium, Firefox
-  and WebKit, 1.2 min); `scripts/second_host_mutations.py` **34 of 34
+  and WebKit, 1.1 min); `scripts/second_host_mutations.py` **34 of 34
   mutants killed** (31 by the two-host tests, 1 by the store's, 2 by the
   browser suite), every baseline green, no process stopped by the memory
-  bound.
+  bound. The same at 5cf742f2 (61 min), before 773fa9c4 named two of
+  `Tail::heard`'s types for clippy, which only `e14-second-host` reaches.
 - **Every mutation script the branch reaches** (`ci_plan.py --changed
   origin/master HEAD`: twelve recipes), each run whole on this branch's code
   (057801ce, the same code as 5cf742f2), in this worktree and two
