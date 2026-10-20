@@ -14206,6 +14206,10 @@ public query Store(",
     // TRACK SEAM (todomvc): TodoMVC, built and served (docs/PARALLEL.md, W7).
     mod todomvc;
 
+    // TRACK SEAM (device-store): a page that holds a value the device keeps,
+    // served (ADR-XXXX).
+    mod device_store;
+
     // TRACK SEAM (store-search): the store's search page, served (W9).
     mod store_search;
 

@@ -25,8 +25,8 @@ e14-device-store:
        echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
        echo "== the compiler (compiler/pw-core/tests/device_store.rs)"; echo; \
        cargo test --locked -p pw-core --test device_store 2>&1 | grep -E '^(test |test result)|panicked at'; \
-       echo; echo "== the host (tests::todomvc, the document of a page that holds one)"; echo; \
-       cargo test --locked -p pw-dev-server -- tests::todomvc:: 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== the host (tests::todomvc, tests::device_store: the document of a page that holds one, and its steps)"; echo; \
+       cargo test --locked -p pw-dev-server -- tests::todomvc:: tests::device_store:: 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the browser in three engines (e2e/device-store.spec.mjs, e2e/todomvc.spec.mjs)"; echo; \
        bash scripts/run_suite.sh -- pnpm exec playwright test e2e/device-store.spec.mjs e2e/todomvc.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/device_store_mutations.py)"; echo; \

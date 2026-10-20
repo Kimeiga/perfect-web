@@ -28,7 +28,7 @@ Each mutant undoes one piece:
   computed part is computed again for.
 
 A checker or plan mutant must fail `compiler/pw-core/tests/device_store.rs`;
-a host mutant, the server's `tests::todomvc::`; a browser mutant,
+a host mutant, the server's `tests::todomvc::` and `tests::device_store::`; a browser mutant,
 `e2e/device-store.spec.mjs` or `e2e/todomvc.spec.mjs` in Chromium, after the
 pages are built again (`run.sh`, `todomvc.sh`).
 
@@ -328,6 +328,13 @@ MUTANTS = [
         "            let _ = device::READING;\n",
     ),
     (
+        "the policy does not allow the style shown with scripts off",
+        "host",
+        SERVER,
+        "            needs.styles.insert(device::UNSCRIPTED.to_string());\n",
+        "            let _ = device::UNSCRIPTED;\n",
+    ),
+    (
         "the manifest carries nothing of the device",
         "host",
         DEVICE,
@@ -343,7 +350,7 @@ MUTANTS = [
     ),
     (
         "the steps between versions are not served",
-        "browser",
+        "host",
         SERVER,
         "        || device::migrates(plan);\n",
         "        || (device::migrates(plan) && false);\n",
@@ -476,7 +483,8 @@ CARGO = {
         "cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "device_store",
     ],
     "host": [
-        "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--", "tests::todomvc::",
+        "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--",
+        "tests::todomvc::", "tests::device_store::",
     ],
 }
 SPECS = {

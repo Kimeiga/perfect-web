@@ -94,6 +94,17 @@ fn the_host_renders_the_default_and_hides_what_the_device_decides() {
         html.contains(&format!("<style>{}</style>", crate::device::READING)),
         "{html}"
     );
+    // Each style the head holds is one the document's policy allows by its
+    // hash (ADR-0333), so the browser applies it: else what the device
+    // decides would show at the default while it is read.
+    let policy = html
+        .lines()
+        .find(|l| l.starts_with("content-security-policy:"))
+        .unwrap_or_else(|| panic!("a policy in {html}"));
+    for style in [crate::device::READING, crate::device::UNSCRIPTED] {
+        let hash = crate::csp::sha256_source(style);
+        assert!(policy.contains(&hash), "{hash} in {policy}");
+    }
     for marker in ["class=\"main\"", "class=\"footer\""] {
         let tag = tag_of(&html, marker);
         assert!(tag.contains(" hidden"), "{tag}");
