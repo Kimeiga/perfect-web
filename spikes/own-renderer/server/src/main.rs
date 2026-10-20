@@ -764,6 +764,14 @@ impl Gate {
         assert!(!timeout.timed_out(), "the gate was not asked {polls} times");
     }
 
+    /// **A test's: how many reads wait at the gate now.** For a test that has
+    /// seen something end and asks whether a read it holds was still held
+    /// when it did (`held` waits for one to be; this does not wait).
+    #[cfg(test)]
+    fn waiting_now(&self) -> usize {
+        self.state.lock().expect("gate").waiting
+    }
+
     /// **A test's: returns once `reads` reads wait at the gate**, ten seconds
     /// at most (then it fails, saying so).
     #[cfg(test)]
@@ -11100,19 +11108,23 @@ public query Store(",
         path: &str,
         session: Option<&str>,
     ) -> Vec<(std::time::Duration, String)> {
-        fetched_stepwise(s, path, session, |_| {})
+        fetched_stepwise(s, path, session, |_, _| {})
     }
 
     /// [`fetched_as`], **telling `heard` all the response has carried so far
     /// each time a chunk of it arrives**, before the next is read: a test
     /// that holds a source at a gate lets it go when the response shows what
     /// it waits for (an event), where a delay it guessed was a silence a slow
-    /// machine made too.
+    /// machine made too. And once more, last, with `over` true, when the
+    /// connection closes: the response is over, and what stood then is asked
+    /// there. (This returns when the server's handler does, which may be long
+    /// after: a source it gave up on is waited for, so a test that holds one
+    /// lets it go when the response is over.)
     fn fetched_stepwise(
         s: &Server,
         path: &str,
         session: Option<&str>,
-        mut heard: impl FnMut(&str),
+        mut heard: impl FnMut(&str, bool),
     ) -> Vec<(std::time::Duration, String)> {
         let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
         let at = listener.local_addr().expect("address");
@@ -11148,8 +11160,12 @@ public query Store(",
                 if n == 0 {
                     assert!(pending.is_empty(), "the response ends inside a character");
                     // The close, which is what tells a browser the document
-                    // is complete: the last chunk, empty, when it came.
+                    // is complete: the last chunk, empty, when it came. Told
+                    // too, as the last of what is heard: a test asks what
+                    // stood when the response was over.
                     chunks.push((started.elapsed(), String::new()));
+                    let so_far: String = chunks.iter().map(|(_, c)| c.as_str()).collect();
+                    heard(&so_far, true);
                     break;
                 }
                 pending.extend_from_slice(&buf[..n]);
@@ -11164,7 +11180,7 @@ public query Store(",
                         String::from_utf8(pending.drain(..whole).collect()).expect("decoded above");
                     chunks.push((started.elapsed(), text));
                     let so_far: String = chunks.iter().map(|(_, c)| c.as_str()).collect();
-                    heard(&so_far);
+                    heard(&so_far, false);
                 }
             }
             chunks
@@ -11238,7 +11254,7 @@ public query Store(",
         let s = served_from(|app| patient(&with_recommendations(app)), None);
         let recommender = hold_recommender(&s);
         let mut document: Option<String> = None;
-        let chunks = fetched_stepwise(&s, "/StorePage.html", None, |so_far| {
+        let chunks = fetched_stepwise(&s, "/StorePage.html", None, |so_far, _| {
             if document.is_none()
                 && so_far.contains("<?start name=")
                 && so_far.contains("import(\"/pw-runtime.mjs\")")
@@ -11285,7 +11301,28 @@ public query Store(",
         // not because the source answered (it cannot have), which a bound of
         // 2.5 s on a source of 3 s measured with the machine's speed.
         let recommender = hold_recommender(&s);
-        let chunks = fetched(&s, "/StorePage.html");
+        let mut at_its_gate = false;
+        let mut held_at_the_close = None;
+        let chunks = fetched_stepwise(&s, "/StorePage.html", None, |_, over| {
+            // The source is at its gate before the response is read on: that
+            // it is still there when the response ends is then a fact, not a
+            // thread that was slow to start.
+            if !std::mem::replace(&mut at_its_gate, true) {
+                recommender.held(1);
+            }
+            // **The response is over, its connection closed with its last
+            // region, while the source it gave up on is held still**: the
+            // server does not wait for an abandoned source to end the
+            // response. Asked as the close is heard, and the source let go
+            // then, for the handler waits for it. (Ended when the source's
+            // thread was, the connection closes after the gate's ten seconds,
+            // and the source has left by then. A bound of 2.5 s on a source
+            // of 3 s said the same, by the machine's speed.)
+            if over {
+                held_at_the_close = Some(recommender.waiting_now());
+                recommender.open();
+            }
+        });
         let whole: String = chunks.iter().map(|(_, c)| c.as_str()).collect();
         let arm = &whole[whole.find("<template for=").expect("arm")..];
         assert!(arm.contains("Unavailable"), "{arm}");
@@ -11293,7 +11330,11 @@ public query Store(",
             !arm.contains("Cortado"),
             "the held recommender answered: {arm}"
         );
-        recommender.open();
+        assert_eq!(
+            held_at_the_close,
+            Some(1),
+            "the response ended only when the abandoned source did"
+        );
     }
 
     #[test]
@@ -18576,7 +18617,7 @@ public query Store(",
         // What had come when each source was let go, and each arm's patch.
         let mut document: Option<(String, String, String)> = None;
         let mut estimate_came: Option<String> = None;
-        let chunks = fetched_stepwise(&s, "/stores/47", Some("a"), |so_far| {
+        let chunks = fetched_stepwise(&s, "/stores/47", Some("a"), |so_far, _| {
             if document.is_none()
                 && own.iter().all(|text| so_far.contains(text))
                 && let (Some(delivery), Some(recs)) = (
