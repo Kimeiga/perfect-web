@@ -1,0 +1,28 @@
+pw check: 23 file(s), no diagnostics
+pw build: 1 template(s), 10 handler(s), 11 component(s), 12 contract(s) -> /home/haki/code/pw-wt/todomvc-toggle-all-visible-precondition/spikes/own-renderer/dist-todomvc/build
+  handler    2070bd5321ef2f86  `` calls ``  331 bytes
+  handler    f80d574d379ee9e9  `` calls ``  3414 bytes
+  handler    d5f9bbe064dac9b8  `` calls ``  1084 bytes
+  handler    8412388d5acb6c91  `` calls ``  1226 bytes
+  handler    f2e32fa2b1f78a9e  `` calls ``  739 bytes
+  handler    193d816ea0363990  `` calls ``  970 bytes
+  handler    d95d929b5da50861  `` calls ``  335 bytes
+  handler    7bed2c9f49c8c146  `` calls ``  3432 bytes
+  handler    8002f6408eb906fa  `` calls ``  3194 bytes
+  handler    debad9c9dcefd01e  `` calls ``  919 bytes
+  no body    todomvc.app.Todos~ui  a Page
+  component  todomvc.app.Todos~ui.derived_19  2022 bytes (664 core), 1 function(s) audited, imports []
+  component  todomvc.app.Todos~ui.derived_20  2141 bytes (783 core), 1 function(s) audited, imports []
+  component  todomvc.app.Todos~ui.derived_21  2245 bytes (887 core), 1 function(s) audited, imports []
+  component  todomvc.app.Todos~ui.derived_22  1809 bytes (813 core), 1 function(s) audited, imports []
+  component  todomvc.app.Todos~ui.derived_23  1812 bytes (816 core), 1 function(s) audited, imports []
+  component  todomvc.app.Todos~ui.derived_24  1815 bytes (819 core), 1 function(s) audited, imports []
+  component  todomvc.app.Todos~ui.derived_25  2149 bytes (791 core), 1 function(s) audited, imports []
+  component  todomvc.app.Todos~ui.derived_3  2000 bytes (660 core), 1 function(s) audited, imports []
+  component  todomvc.app.Todos~ui.derived_4  2084 bytes (744 core), 1 function(s) audited, imports []
+  component  todomvc.app.Todos~ui.derived_6  2000 bytes (660 core), 1 function(s) audited, imports []
+  component  todomvc.app.Todos~ui.derived_7  3035 bytes (1356 core), 1 function(s) audited, imports []
+  page       todomvc.app.Todos~ui  0 binding(s), 0 part(s)
+  computed   todomvc.app.Todos~ui  4839 bytes
+  build      b2af469b3c5694171
+built TodoMVC into /home/haki/code/pw-wt/todomvc-toggle-all-visible-precondition/spikes/own-renderer/dist-todomvc

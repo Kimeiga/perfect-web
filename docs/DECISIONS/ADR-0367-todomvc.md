@@ -100,6 +100,36 @@ each browser run. Raw focused logs and structured receipts are in
 /tmp/train12-toggle-visible-proof7; this local focused proof is not a whole
 43-control campaign or hosted verification.
 
+## Amendment: edit actions have visible-field preconditions, 2026-10-21
+
+The original program operators 16 (a row never enters editing) and 30 (a
+label double-press never begins editing) can leave the label visible while the
+edit input is absent. Several tests double-pressed a label and immediately
+filled or pressed the edit locator; those locator actions timed out before the
+browser producer could write a complete receipt. Each such edit interaction now
+asserts that its input is visible before filling or pressing it. The completed-
+todo edit test also asserts input visibility: its existing row-class assertion
+was insufficient because the mutation removes the row's editing data while the
+row class can still say editing. No test title or ID, operator, helper,
+producer, parser, or runtime behavior changed; the same 50-test inventory and
+all 43 application controls remain.
+
+On the current source, server baseline and restored receipts each passed the
+exact four host IDs. The Chromium baseline and restored receipts each passed the
+same exact 50 IDs. Each unchanged program mutant passed pw check (23 files,
+no diagnostics) and produced a complete, valid 50-ID browser receipt with 35
+passes and 15 assertion failures. Neither mutant produced a locator action or
+test timeout in the completed proof. The proof completed in 49.7 seconds. Raw
+receipts, output, build logs, and exact ID inventory are in
+[the focused diagnostics](../diagnostics/train-12/todomvc-edit-preconditions/final/).
+
+An earlier focused attempt caught one missed visibility precondition in the
+completed-todo edit test: operator 16 then produced a 30-second fill timeout
+and no complete receipt. That invalid attempt is retained separately under
+[preliminary diagnostics](../diagnostics/train-12/todomvc-edit-preconditions/preliminary-incomplete/)
+and is not counted as a kill. The corrected proof above is the accepted local
+result; whole 43-control hosted verification remains due.
+
 ## Context
 
 - **The owner's reference app, familiar to everyone** ("something people are

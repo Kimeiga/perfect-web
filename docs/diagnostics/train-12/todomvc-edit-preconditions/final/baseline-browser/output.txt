@@ -1,0 +1,63 @@
+e2e/feed.spec.mjs is not run: dist-feed is not built: run feed.sh
+e2e/guestbook.spec.mjs is not run: dist-guestbook is not built: run guestbook.sh
+e2e/identity.spec.mjs is not run: dist-feed is not built: run feed.sh
+e2e/keyed.spec.mjs is not run: dist-keyed is not built: run keyed-store.sh
+e2e/kiokun-site.spec.mjs is not run: dist-kiokun is not built: run kiokun-site.sh
+e2e/messages.spec.mjs is not run: dist-feed is not built: run feed.sh
+e2e/notifications.spec.mjs is not run: dist-feed is not built: run feed.sh
+e2e/uploads.spec.mjs is not run: dist-feed is not built: run feed.sh
+browser host map: 1 of 80 hosts for 50 selected tests
+
+Running 50 tests using 16 workers
+
+[1A[2K[1/50] [chromium] › e2e/todomvc.spec.mjs:75:1 › with a todo, main and footer are shown; with none again, hidden again
+[1A[2K[2/50] [chromium] › e2e/todomvc.spec.mjs:129:1 › the text is trimmed
+[1A[2K[3/50] [chromium] › e2e/todomvc.spec.mjs:172:1 › the toggle-all completes every todo, and again clears every one
+[1A[2K[4/50] [chromium] › e2e/todomvc.spec.mjs:123:1 › new todos are appended to the bottom of the list
+[1A[2K[5/50] [chromium] › e2e/todomvc.spec.mjs:111:1 › Enter creates the todo, appends it, and clears the field
+[1A[2K[6/50] [chromium] › e2e/todomvc.spec.mjs:135:1 › a title that is nothing once trimmed creates no todo, and is left to be corrected
+[1A[2K[7/50] [chromium] › e2e/todomvc.spec.mjs:163:1 › a title that is markup is shown as text
+[1A[2K[8/50] [chromium] › e2e/todomvc.spec.mjs:62:1 › with no todos, main and footer are hidden, though they are there
+[1A[2K[9/50] [chromium] › e2e/todomvc.spec.mjs:152:1 › a title is at most a thousand characters
+[1A[2K[10/50] [chromium] › e2e/todomvc.spec.mjs:197:1 › the toggle-all, pressed, still follows the todos: unchecked when one is cleared, checked when all are
+[1A[2K[11/50] [chromium] › e2e/todomvc.spec.mjs:245:1 › the same checkbox, pressed again, un-completes it
+[1A[2K[12/50] [chromium] › e2e/todomvc.spec.mjs:215:1 › the toggle-all, pressed, is not checked for a todo added once the completed are cleared
+[1A[2K[13/50] [chromium] › e2e/todomvc.spec.mjs:106:1 › the field is focused when the page is loaded
+[1A[2K[14/50] [chromium] › e2e/todomvc.spec.mjs:234:1 › a todo's checkbox completes it, toggling the class on its li
+[1A[2K[15/50] [chromium] › e2e/todomvc.spec.mjs:183:1 › the toggle-all completes the rest where some are completed
+[1A[2K[16/50] [chromium] › e2e/todomvc.spec.mjs:90:1 › served without script: the header, the field, and a hidden main and footer
+[1A[2K[17/50] [chromium] › e2e/todomvc.spec.mjs:255:1 › a checkbox another tab cleared is shown cleared, though this tab had pressed it
+[1A[2K[18/50] [chromium] › e2e/todomvc.spec.mjs:271:1 › hovering over a todo shows its remove button, which removes it
+[1A[2K[19/50] [chromium] › e2e/todomvc.spec.mjs:304:1 › the edit field is focused as it appears, and is the one typed in
+[1A[2K[20/50] [chromium] › e2e/todomvc.spec.mjs:285:1 › a double press on the label begins editing: a field holds the title, and the other controls are hidden
+[1A[2K[21/50] [chromium] › e2e/todomvc.spec.mjs:320:1 › Enter saves the edit and leaves editing
+[1A[2K[22/50] [chromium] › e2e/todomvc.spec.mjs:334:1 › blur saves the edit and leaves editing
+[1A[2K[23/50] [chromium] › e2e/todomvc.spec.mjs:347:1 › clicking away saves the edit too
+[1A[2K[24/50] [chromium] › e2e/todomvc.spec.mjs:358:1 › Enter or blur with nothing changed keeps the todo as it is
+[1A[2K[25/50] [chromium] › e2e/todomvc.spec.mjs:373:1 › a completed todo being edited is shown completed, and stays so
+[1A[2K[26/50] [chromium] › e2e/todomvc.spec.mjs:389:1 › the edit is trimmed
+[1A[2K[27/50] [chromium] › e2e/todomvc.spec.mjs:400:1 › an edit trimmed to nothing destroys the todo
+[1A[2K[28/50] [chromium] › e2e/todomvc.spec.mjs:411:1 › an edit emptied and left by blur destroys the todo too
+[1A[2K[29/50] [chromium] › e2e/todomvc.spec.mjs:421:1 › Escape leaves editing and discards the changes
+[1A[2K[30/50] [chromium] › e2e/todomvc.spec.mjs:440:1 › editing mode is not persisted: a reload shows no field
+[1A[2K[31/50] [chromium] › e2e/todomvc.spec.mjs:452:1 › editing another todo saves the first
+[1A[2K[32/50] [chromium] › e2e/todomvc.spec.mjs:467:1 › the counter says how many are left, the number in a strong
+[1A[2K[33/50] [chromium] › e2e/todomvc.spec.mjs:485:1 › clear completed shows its text and removes the completed
+[1A[2K[34/50] [chromium] › e2e/todomvc.spec.mjs:496:1 › clear completed is hidden where none is completed
+[1A[2K[35/50] [chromium] › e2e/todomvc.spec.mjs:509:1 › the todos are the framework's to keep: they outlive a reload, as they were
+[1A[2K[36/50] [chromium] › e2e/todomvc.spec.mjs:524:1 › the todos are kept in the browser's own storage, as TodoMVC's spec names them
+[1A[2K[37/50] [chromium] › e2e/todomvc.spec.mjs:551:1 › no request carries a todo: the server is told none
+[1A[2K[38/50] [chromium] › e2e/todomvc.spec.mjs:570:1 › a todo's row is one element across each change, matched by its key
+[1A[2K[39/50] [chromium] › e2e/todomvc.spec.mjs:594:1 › another visitor has a list of their own
+[1A[2K[40/50] [chromium] › e2e/todomvc.spec.mjs:607:1 › a second tab on the same device shows the same list, and each change reaches it
+[1A[2K[41/50] [chromium] › e2e/todomvc.spec.mjs:623:1 › all is the default route, its link selected
+[1A[2K[42/50] [chromium] › e2e/todomvc.spec.mjs:632:1 › #/active shows the active todos, #/completed the completed, and each link is selected
+[1A[2K[43/50] [chromium] › e2e/todomvc.spec.mjs:652:1 › the counter counts every todo whatever the filter shows
+[1A[2K[44/50] [chromium] › e2e/todomvc.spec.mjs:662:1 › an item updated while filtered is updated accordingly
+[1A[2K[45/50] [chromium] › e2e/todomvc.spec.mjs:704:1 › the back button respects the routes
+[1A[2K[46/50] [chromium] › e2e/todomvc.spec.mjs:682:1 › a todo added under a filter that shows it appears, and under one that does not, does not
+[1A[2K[47/50] [chromium] › e2e/todomvc.spec.mjs:724:1 › a page opened at a route shows it, and the route is kept on reload
+[1A[2K[48/50] [chromium] › e2e/todomvc.spec.mjs:749:1 › a fragment that is no route shows every todo
+[1A[2K[49/50] [chromium] › e2e/todomvc.spec.mjs:760:1 › the markup is the template's, which the official tests' selectors are written over
+[1A[2K[50/50] [chromium] › e2e/todomvc.spec.mjs:790:1 › the stylesheets are TodoMVC's own, and shown
+[1A[2K  50 passed (3.5s)

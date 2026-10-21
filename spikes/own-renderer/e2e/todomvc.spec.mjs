@@ -322,6 +322,7 @@ test("Enter saves the edit and leaves editing", async ({ page }) => {
   await add(page, ONE, TWO, THREE);
   const second = items(page).nth(1);
   await second.locator("label").dblclick();
+  await expect(second.locator(".edit")).toBeVisible();
   await second.locator(".edit").fill("buy some sausages");
   await second.locator(".edit").press("Enter");
   await expect(second.locator("label")).toHaveText("buy some sausages");
@@ -335,6 +336,7 @@ test("blur saves the edit and leaves editing", async ({ page }) => {
   await add(page, ONE, TWO, THREE);
   const second = items(page).nth(1);
   await second.locator("label").dblclick();
+  await expect(second.locator(".edit")).toBeVisible();
   await second.locator(".edit").fill("buy some sausages");
   await second.locator(".edit").blur();
   await expect(second.locator("label")).toHaveText("buy some sausages");
@@ -346,6 +348,7 @@ test("clicking away saves the edit too", async ({ page }) => {
   await open(page);
   await add(page, ONE, TWO);
   await items(page).nth(0).locator("label").dblclick();
+  await expect(items(page).nth(0).locator(".edit")).toBeVisible();
   await items(page).nth(0).locator(".edit").fill("changed");
   await page.locator("h1").click();
   await expect(items(page).nth(0).locator("label")).toHaveText("changed");
@@ -356,6 +359,7 @@ test("Enter or blur with nothing changed keeps the todo as it is", async ({ page
   await open(page);
   await add(page, ONE, TWO);
   await items(page).nth(0).locator("label").dblclick();
+  await expect(items(page).nth(0).locator(".edit")).toBeVisible();
   await items(page).nth(0).locator(".edit").press("Enter");
   await expect(items(page).nth(0)).not.toHaveClass(/editing/);
   await expect(items(page)).toHaveText([ONE, TWO]);
@@ -374,6 +378,7 @@ test("a completed todo being edited is shown completed, and stays so", async ({ 
   await items(page).nth(0).locator("label").dblclick();
   await expect(items(page).nth(0)).toHaveClass(/editing/);
   await expect(items(page).nth(0)).toHaveClass(/completed/);
+  await expect(items(page).nth(0).locator(".edit")).toBeVisible();
   await items(page).nth(0).locator(".edit").fill("changed");
   await items(page).nth(0).locator(".edit").press("Enter");
   await expect(items(page).nth(0).locator("label")).toHaveText("changed");
@@ -385,6 +390,7 @@ test("the edit is trimmed", async ({ page }) => {
   await open(page);
   await add(page, ONE, TWO);
   await items(page).nth(1).locator("label").dblclick();
+  await expect(items(page).nth(1).locator(".edit")).toBeVisible();
   await items(page).nth(1).locator(".edit").fill("    buy some sausages    ");
   await items(page).nth(1).locator(".edit").press("Enter");
   await expect(items(page).nth(1).locator("label")).toHaveText("buy some sausages");
@@ -395,6 +401,7 @@ test("an edit trimmed to nothing destroys the todo", async ({ page }) => {
   await open(page);
   await add(page, ONE, TWO, THREE);
   await items(page).nth(1).locator("label").dblclick();
+  await expect(items(page).nth(1).locator(".edit")).toBeVisible();
   await items(page).nth(1).locator(".edit").fill("   ");
   await items(page).nth(1).locator(".edit").press("Enter");
   await expect(items(page)).toHaveCount(2);
@@ -405,6 +412,7 @@ test("an edit emptied and left by blur destroys the todo too", async ({ page }) 
   await open(page);
   await add(page, ONE, TWO);
   await items(page).nth(0).locator("label").dblclick();
+  await expect(items(page).nth(0).locator(".edit")).toBeVisible();
   await items(page).nth(0).locator(".edit").fill("");
   await items(page).nth(0).locator(".edit").blur();
   await expect(items(page)).toHaveText([TWO]);
@@ -415,6 +423,7 @@ test("Escape leaves editing and discards the changes", async ({ page }) => {
   await add(page, ONE, TWO, THREE);
   const second = items(page).nth(1);
   await second.locator("label").dblclick();
+  await expect(second.locator(".edit")).toBeVisible();
   await second.locator(".edit").fill("foo");
   await second.locator(".edit").press("Escape");
   await expect(second).not.toHaveClass(/editing/);
@@ -444,6 +453,7 @@ test("editing another todo saves the first", async ({ page }) => {
   await open(page);
   await add(page, ONE, TWO);
   await items(page).nth(0).locator("label").dblclick();
+  await expect(items(page).nth(0).locator(".edit")).toBeVisible();
   await items(page).nth(0).locator(".edit").fill("first, changed");
   await items(page).nth(1).locator("label").dblclick();
   await expect(items(page).nth(0).locator("label")).toHaveText("first, changed");
@@ -546,6 +556,7 @@ test("no request carries a todo: the server is told none", async ({ page }) => {
   await add(page, marker);
   await items(page).nth(0).locator(".toggle").check();
   await items(page).nth(0).locator("label").dblclick();
+  await expect(items(page).nth(0).locator(".edit")).toBeVisible();
   await items(page).nth(0).locator(".edit").fill(`${marker} edited`);
   await items(page).nth(0).locator(".edit").press("Enter");
   await expect(items(page)).toHaveText([`${marker} edited`]);

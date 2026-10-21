@@ -1,0 +1,258 @@
+== 1. the pages are checked before they are rendered ==
+pw check: 2 file(s), no diagnostics
+
+== 2. checked template IR ==
+   2248 bytes
+
+== 3. HTML, by pw-render ==
+pw-render: 2 file(s) written to /home/haki/code/pw-wt/todomvc-toggle-all-visible-precondition/spikes/own-renderer/dist
+
+== 3b. one build: the store's handlers compiled from their bodies (E10), its plan ==
+pw build: 33 template(s), 83 handler(s), 76 component(s), 115 contract(s) -> /home/haki/code/pw-wt/todomvc-toggle-all-visible-precondition/spikes/own-renderer/dist/build
+  handler    ce4501910ab2a49a  `add_to_cart` calls `store.page.add_to_cart`  2953 bytes
+  handler    15483a28f370066a  `decrease_in_cart` calls `store.page.decrease_in_cart`  1456 bytes
+  handler    e54d74c7f76a6a78  `increase_in_cart` calls `store.page.increase_in_cart`  1946 bytes
+  handler    0884d13a19812a03  `remove_from_cart` calls `store.page.remove_from_cart`  1456 bytes
+  handler    b5c3e56ff370a6a8  `clear_cart` calls `store.page.clear_cart`  1391 bytes
+  handler    15483a28f370066a  `decrease_in_cart` calls `store.page.decrease_in_cart`  1456 bytes
+  handler    e54d74c7f76a6a78  `increase_in_cart` calls `store.page.increase_in_cart`  1946 bytes
+  handler    0884d13a19812a03  `remove_from_cart` calls `store.page.remove_from_cart`  1456 bytes
+  handler    029fa6a984724f1c  `` calls ``  330 bytes
+  handler    a1b9d04f6c3d6962  `apply_promo` calls `store.page.apply_promo`  6387 bytes
+  handler    481e071528717f3b  `remove_promo` calls `store.page.remove_promo`  6351 bytes
+  handler    dc95ff389eaac1f1  `choose_tip` calls `store.page.choose_tip`  1828 bytes
+  handler    1788d84a81fb0dc3  `choose_tip` calls `store.page.choose_tip`  1829 bytes
+  handler    6157a6a5babb44ef  `choose_tip` calls `store.page.choose_tip`  1830 bytes
+  handler    8e028bbd31639049  `choose_tip` calls `store.page.choose_tip`  1828 bytes
+  handler    55314a08032a0a1d  `` calls ``  335 bytes
+  handler    18a30e7eda6408b5  `dollars_typed` calls `store.page.choose_tip`  8867 bytes
+  handler    b5c3e56ff370a6a8  `clear_cart` calls `store.page.clear_cart`  1391 bytes
+  handler    0567c01c8c1d4702  `place_order` calls `store.page.place_order`  21028 bytes
+  handler    88497d21af8270bf  `choose_time` calls `store.page.choose_time`  3738 bytes
+  handler    54002ec8f031143d  `choose_time` calls `store.page.choose_time`  4459 bytes
+  handler    6f4329b46ef92224  `cancel_order` calls `store.page.cancel_order`  1909 bytes
+  handler    8ef712ee855dff03  `` calls ``  331 bytes
+  handler    8d96aa03266aae5b  `choose_address` calls `store.page.choose_address`  1380 bytes
+  handler    26058453d2c7def8  `address_label` calls `store.page.rename_address`  2346 bytes
+  handler    2a2607ad200b08c0  `remove_address` calls `store.page.remove_address`  1344 bytes
+  handler    9b11646e3891a94e  `address_label` calls `store.page.add_address`  2875 bytes
+  handler    609a1cdc3f764fa0  `` calls ``  599 bytes
+  handler    137b05e28516165a  `` calls ``  599 bytes
+  handler    caef098036bb24e4  `` calls ``  599 bytes
+  handler    144ae10590824570  `` calls ``  599 bytes
+  handler    8c99633129a756a0  `` calls ``  599 bytes
+  handler    b2ef12af35e8d84f  `` calls ``  333 bytes
+  handler    8d037e136bada386  `stars_of` calls `store.rate.rate_order`  4773 bytes
+  handler    3255eed53307cb12  `` calls ``  330 bytes
+  handler    8e9b09de56af2cc7  `` calls ``  482 bytes
+  handler    9fc425c267d4af5e  `` calls ``  262 bytes
+  handler    afd000d4345902db  `` calls ``  329 bytes
+  handler    afad58ebad1cefc9  `` calls ``  256 bytes
+  handler    e50e065e1fb71a47  `` calls ``  262 bytes
+  handler    618576d48cd2bd3a  `` calls ``  330 bytes
+  handler    2070bd5321ef2f86  `` calls ``  331 bytes
+  handler    25bb7ae9c1d99415  `` calls ``  1858 bytes
+  handler    c3c83ec120206656  `` calls ``  296 bytes
+  handler    371e6fd63c9863fc  `` calls ``  344 bytes
+  handler    f4d829114c8459be  `` calls ``  845 bytes
+  handler    6cc022122df117cd  `` calls ``  265 bytes
+  handler    2148f1ab1c3a3239  `` calls ``  266 bytes
+  handler    2148f1ab1c3a3239  `` calls ``  266 bytes
+  handler    3329e4542602448e  `` calls ``  922 bytes
+  handler    85d534c1e184b56c  `` calls ``  261 bytes
+  handler    287bf4233374a893  `` calls ``  262 bytes
+  handler    10311fd4e84fb087  `` calls ``  841 bytes
+  handler    40daab4cebeebdbc  `` calls ``  331 bytes
+  handler    abbf0bf0f1d6e7f9  `` calls ``  324 bytes
+  handler    d54db51d69d9f2e0  `` calls ``  839 bytes
+  handler    485529526e3500ff  `` calls ``  843 bytes
+  handler    1b6130282d3cbcbc  `` calls ``  1137 bytes
+  handler    128cb24c8ebca79b  `` calls ``  335 bytes
+  handler    e50e065e1fb71a47  `` calls ``  262 bytes
+  handler    44c58606e306e659  `` calls ``  262 bytes
+  handler    618576d48cd2bd3a  `` calls ``  330 bytes
+  handler    1287a96bab8f35d2  `` calls ``  489 bytes
+  handler    f4d829114c8459be  `` calls ``  845 bytes
+  handler    caef098036bb24e4  `` calls ``  599 bytes
+  handler    b8d58fc31fc26bcc  `` calls ``  599 bytes
+  handler    dd4608b44f124694  `` calls ``  331 bytes
+  handler    1f5fd53672729afd  `stars_of` calls `demo.invariants.rate`  3380 bytes
+  handler    10311fd4e84fb087  `` calls ``  841 bytes
+  handler    f4d829114c8459be  `` calls ``  845 bytes
+  handler    beff49cd96c227a6  `` calls ``  484 bytes
+  handler    96b744d1fa294d00  `` calls ``  484 bytes
+  handler    861671f5ddddfb1b  `` calls ``  276 bytes
+  handler    c745364958a26426  `` calls ``  484 bytes
+  handler    c745364958a26426  `` calls ``  484 bytes
+  handler    e3008a903d875462  `pick` calls `demo.pick.pick`  913 bytes
+  handler    f4d829114c8459be  `` calls ``  845 bytes
+  handler    bb2f6648cff292bc  `` calls ``  289 bytes
+  handler    ed11f9c4dc8d6745  `upvote` calls `demo.thread.upvote`  1271 bytes
+  handler    5bd93e3a756ecd7f  `` calls ``  300 bytes
+  handler    8b00f989e20b494c  `` calls ``  5434 bytes
+  handler    6a1f59cfd709304a  `keep` calls `demo.thread.keep`  2472 bytes
+  handler    73a3598835d46de6  `` calls ``  294 bytes
+  todo       Resources.Cart  a placeholder body; nothing built depends on it
+  todo       Resources.Menu  a placeholder body; nothing built depends on it
+  todo       Resources.Order  a placeholder body; nothing built depends on it
+  todo       Resources.Store  a placeholder body; nothing built depends on it
+  todo       Saved.SavedFor  a placeholder body; nothing built depends on it
+  component  UserCarts.line_count  2625 bytes (727 core), 1 function(s) audited, imports []
+  component  UserCarts.subtotal  2802 bytes (866 core), 1 function(s) audited, imports []
+  no body    demo.about.AboutPage~ui  a Page
+  no body    demo.bind.BindPage~ui  a Page
+  no body    demo.device.DevicePage~ui  a Page
+  component  demo.device.DevicePage~ui.derived_3  3434 bytes (2024 core), 1 function(s) audited, imports []
+  component  demo.device.DevicePage~ui.derived_4  2358 bytes (966 core), 1 function(s) audited, imports []
+  component  demo.device.DevicePage~ui.derived_5  2064 bytes (672 core), 1 function(s) audited, imports []
+  component  demo.device.DevicePage~ui.derived_6  2206 bytes (796 core), 1 function(s) audited, imports []
+  no body    demo.dialog.DialogPage~ui  a Page
+  no body    demo.drawer.CartButton~ui  a View
+  no body    demo.drawer.CartDrawer~ui  a View
+  no body    demo.drawer.Counter~ui  a View
+  no body    demo.drawer.Panel~ui  a View
+  no body    demo.events.EventsPage~ui  a Page
+  no body    demo.focus.FocusPage~ui  a Page
+  no body    demo.fragment.FragmentPage~ui  a Page
+  component  demo.fragment.FragmentPage~ui.derived_1  1923 bytes (843 core), 1 function(s) audited, imports []
+  component  demo.fragment.FragmentPage~ui.derived_2  1839 bytes (759 core), 1 function(s) audited, imports []
+  no body    demo.invariants.InvariantsPage~ui  a Page
+  component  demo.invariants.InvariantsPage~ui.derived_1  1766 bytes (682 core), 1 function(s) audited, imports []
+  component  demo.invariants.InvariantsPage~ui.derived_3  1766 bytes (682 core), 1 function(s) audited, imports []
+  component  demo.invariants.annotate  2399 bytes (767 core), 1 function(s) audited, imports []
+  component  demo.invariants.mark  2672 bytes (768 core), 1 function(s) audited, imports []
+  component  demo.invariants.rate  2740 bytes (644 core), 1 function(s) audited, imports []
+  component  demo.invariants.rate_all  2661 bytes (665 core), 1 function(s) audited, imports []
+  component  demo.namespaces.Card  1417 bytes (617 core), 1 function(s) audited, imports []
+  no body    demo.namespaces.Card~ui  a View
+  component  demo.namespaces.Home  1417 bytes (617 core), 1 function(s) audited, imports []
+  no body    demo.namespaces.Home~ui  a Page
+  component  demo.namespaces.Home~ui.derived_2  1650 bytes (678 core), 1 function(s) audited, imports []
+  component  demo.namespaces.Home~ui.derived_4  1650 bytes (678 core), 1 function(s) audited, imports []
+  no body    demo.panel.Greeting~ui  a View
+  no body    demo.panel.HelpLines~ui  a View
+  no body    demo.panel.PanelPage~ui  a Page
+  no body    demo.pick.PickOne~ui  a View
+  no body    demo.pick.PickPage~ui  a Page
+  component  demo.pick.pick  2284 bytes (636 core), 1 function(s) audited, imports []
+  no body    demo.provide.ProvidePage~ui  a Page
+  no body    demo.search.SearchPage~ui  a Page
+  component  demo.streamed.Picks  3625 bytes (680 core), 2 function(s) audited, imports [store:data/recommendations#for-store]
+  no body    demo.streamed.StreamedPage~ui  a Page
+  component  demo.thread.Discussion  3102 bytes (1659 core), 1 function(s) audited, imports []
+  no body    demo.thread.Outline~ui  a View
+  no body    demo.thread.ThreadPage~ui  a Page
+  no body    demo.thread.Thread~ui  a View
+  component  demo.thread.keep  2930 bytes (878 core), 1 function(s) audited, imports []
+  component  demo.thread.upvote  2215 bytes (640 core), 1 function(s) audited, imports []
+  component  domain.count  1676 bytes (598 core), 1 function(s) audited, imports []
+  component  domain.display  3243 bytes (2182 core), 1 function(s) audited, imports []
+  component  domain.total  2288 bytes (633 core), 1 function(s) audited, imports []
+  component  store.hours.CartHours  16628 bytes (13430 core), 5 function(s) audited, imports [store:data/hours#for-cart, pw:host/clock#today, pw:host/clock#at, pw:host/clock#passed]
+  component  store.hours.StoreStatus  27007 bytes (22907 core), 5 function(s) audited, imports [store:data/hours#for-store, pw:host/clock#today, pw:host/clock#at, pw:host/clock#passed]
+  component  store.hours.StoresOpen  29652 bytes (25175 core), 7 function(s) audited, imports [store:data/stores#list, store:data/hours#for-stores, store:data/ratings#for-stores, pw:host/clock#today, pw:host/clock#at, pw:host/clock#passed]
+  no body    store.page.AddressPage~ui  a Page
+  component  store.page.Cart  4090 bytes (663 core), 2 function(s) audited, imports [store:data/user-carts#current]
+  no body    store.page.CartPage~ui  a Page
+  component  store.page.Checkout  71360 bytes (62656 core), 12 function(s) audited, imports [store:data/checkout#parts, store:data/fees#for-stores, store:data/checkout#chosen, store:data/promos#find, pw:host/clock#passed, store:data/hours#for-stores, store:data/user-estimates#for-stores, pw:host/clock#today, pw:host/clock#at, pw:host/clock#date, pw:host/clock#time]
+  component  store.page.Estimate  4136 bytes (686 core), 2 function(s) audited, imports [store:data/user-estimates#for-store]
+  no body    store.page.HomePage~ui  a Page
+  component  store.page.Menu  4085 bytes (659 core), 2 function(s) audited, imports [store:data/menus#sections]
+  component  store.page.MenuLine  3622 bytes (1564 core), 2 function(s) audited, imports [pw:host/reads#store-page-menu-size]
+  component  store.page.MenuSize  3380 bytes (857 core), 2 function(s) audited, imports [pw:host/reads#store-page-menu]
+  component  store.page.Order  4393 bytes (668 core), 2 function(s) audited, imports [store:data/user-orders#current]
+  no body    store.page.OrderPage~ui  a Page
+  component  store.page.OrderPage~ui.derived_3  4241 bytes (1823 core), 1 function(s) audited, imports []
+  component  store.page.OrderPage~ui.derived_4  3669 bytes (901 core), 1 function(s) audited, imports []
+  component  store.page.OrderPage~ui.derived_9  3408 bytes (882 core), 1 function(s) audited, imports []
+  component  store.page.OrderTotal  3316 bytes (775 core), 2 function(s) audited, imports [store:data/user-orders#charged]
+  component  store.page.Places  2609 bytes (652 core), 2 function(s) audited, imports [store:data/places#list]
+  component  store.page.Reach  3236 bytes (667 core), 2 function(s) audited, imports [store:data/coverage#for-store]
+  component  store.page.Recommendations  3811 bytes (715 core), 2 function(s) audited, imports [store:data/recommendations#for-store]
+  component  store.page.SavedAddresses  3257 bytes (704 core), 2 function(s) audited, imports [store:data/addresses#list]
+  component  store.page.Store  3396 bytes (659 core), 2 function(s) audited, imports [store:data/stores#get]
+  no body    store.page.StoreLayout~ui  a Layout
+  component  store.page.StoreList  2915 bytes (669 core), 2 function(s) audited, imports [store:data/stores#list]
+  no body    store.page.StorePage~ui  a Page
+  no body    store.page.TimePage~ui  a Page
+  component  store.page.TimesOffered  26746 bytes (20747 core), 9 function(s) audited, imports [store:data/hours#for-cart, store:data/checkout#chosen, store:data/user-estimates#for-stores, pw:host/clock#today, pw:host/clock#at, pw:host/clock#passed, pw:host/clock#date, pw:host/clock#time]
+  component  store.page.add_address  5691 bytes (888 core), 5 function(s) audited, imports [pw:host/principal#read, pw:host/invalidations#store-page-saved-addresses, pw:host/outbox#addresses-changed, store:data/addresses#add]
+  component  store.page.add_to_cart  7623 bytes (1163 core), 7 function(s) audited, imports [pw:host/principal#read, pw:host/invalidations#store-page-cart, pw:host/outbox#user-cart-changed, store:data/menus#is-available, store:data/coverage#reaches, store:data/user-carts#add]
+  component  store.page.apply_promo  7988 bytes (2203 core), 8 function(s) audited, imports [pw:host/principal#read, pw:host/invalidations#store-page-checkout, pw:host/outbox#user-cart-changed, store:data/promos#find, store:data/checkout#parts, pw:host/clock#passed, store:data/checkout#set-promo]
+  component  store.page.cancel_order  9619 bytes (1757 core), 12 function(s) audited, imports [pw:host/principal#read, pw:host/invalidations#store-page-cart, pw:host/invalidations#store-page-order, pw:host/invalidations#store-page-checkout, pw:host/invalidations#store-page-order-total, pw:host/outbox#user-cart-changed, pw:host/outbox#user-order-changed, store:data/user-orders#awaited, pw:host/schedules#store-page-expire-order-cancel, pw:host/payments#cancel, store:data/user-orders#settle]
+  component  store.page.choose_address  5250 bytes (903 core), 5 function(s) audited, imports [pw:host/principal#read, pw:host/invalidations#store-page-saved-addresses, pw:host/outbox#addresses-changed, store:data/addresses#choose]
+  component  store.page.choose_time  19656 bytes (11765 core), 10 function(s) audited, imports [pw:host/principal#read, pw:host/invalidations#store-page-checkout, pw:host/outbox#user-cart-changed, store:data/hours#for-cart, store:data/user-estimates#for-stores, pw:host/clock#today, pw:host/clock#at, pw:host/clock#passed, store:data/checkout#set-time]
+  component  store.page.choose_tip  5041 bytes (1119 core), 5 function(s) audited, imports [pw:host/principal#read, pw:host/invalidations#store-page-checkout, pw:host/outbox#user-cart-changed, store:data/checkout#set-tip]
+  component  store.page.clear_cart  5436 bytes (868 core), 5 function(s) audited, imports [pw:host/principal#read, pw:host/invalidations#store-page-cart, pw:host/outbox#user-cart-changed, store:data/user-carts#clear]
+  component  store.page.decrease_in_cart  5804 bytes (903 core), 5 function(s) audited, imports [pw:host/principal#read, pw:host/invalidations#store-page-cart, pw:host/outbox#user-cart-changed, store:data/user-carts#decrease]
+  component  store.page.expire_order  9277 bytes (1851 core), 11 function(s) audited, imports [pw:host/principal#read, pw:host/invalidations#store-page-cart, pw:host/invalidations#store-page-order, pw:host/invalidations#store-page-checkout, pw:host/invalidations#store-page-order-total, pw:host/outbox#user-cart-changed, pw:host/outbox#user-order-changed, store:data/user-orders#awaited, pw:host/payments#cancel, store:data/user-orders#settle]
+  component  store.page.increase_in_cart  6408 bytes (1029 core), 6 function(s) audited, imports [pw:host/principal#read, pw:host/invalidations#store-page-cart, pw:host/outbox#user-cart-changed, store:data/menus#is-available, store:data/user-carts#add]
+  component  store.page.place_order  70644 bytes (55800 core), 25 function(s) audited, imports [pw:host/principal#read, pw:host/invalidations#store-page-cart, pw:host/invalidations#store-page-order, pw:host/invalidations#store-page-checkout, pw:host/invalidations#store-page-order-total, pw:host/outbox#user-cart-changed, pw:host/outbox#user-order-changed, store:data/checkout#chosen, store:data/hours#for-cart, store:data/user-estimates#for-stores, pw:host/clock#today, pw:host/clock#at, pw:host/clock#passed, store:data/checkout#parts, store:data/fees#for-stores, store:data/promos#find, pw:host/clock#date, pw:host/clock#time, store:data/user-orders#await-payment, pw:host/payments#begin, pw:host/schedules#store-page-expire-order-after, store:data/user-orders#paying, store:data/user-orders#settle, pw:host/schedules#store-page-send-to-store-at]
+  component  store.page.remove_address  5250 bytes (903 core), 5 function(s) audited, imports [pw:host/principal#read, pw:host/invalidations#store-page-saved-addresses, pw:host/outbox#addresses-changed, store:data/addresses#remove]
+  component  store.page.remove_from_cart  5790 bytes (901 core), 5 function(s) audited, imports [pw:host/principal#read, pw:host/invalidations#store-page-cart, pw:host/outbox#user-cart-changed, store:data/user-carts#remove]
+  component  store.page.remove_promo  5303 bytes (980 core), 5 function(s) audited, imports [pw:host/principal#read, pw:host/invalidations#store-page-checkout, pw:host/outbox#user-cart-changed, store:data/checkout#set-promo]
+  component  store.page.rename_address  5645 bytes (903 core), 5 function(s) audited, imports [pw:host/principal#read, pw:host/invalidations#store-page-saved-addresses, pw:host/outbox#addresses-changed, store:data/addresses#rename]
+  component  store.page.send_to_store  6914 bytes (890 core), 5 function(s) audited, imports [pw:host/principal#read, pw:host/invalidations#store-page-order, pw:host/outbox#user-order-changed, store:data/user-orders#send]
+  component  store.page.settle_payment  9979 bytes (1503 core), 11 function(s) audited, imports [pw:host/principal#read, pw:host/invalidations#store-page-cart, pw:host/invalidations#store-page-order, pw:host/invalidations#store-page-checkout, pw:host/invalidations#store-page-order-total, pw:host/outbox#user-cart-changed, pw:host/outbox#user-order-changed, pw:host/schedules#store-page-expire-order-cancel, store:data/user-orders#settle, pw:host/schedules#store-page-send-to-store-at]
+  no body    store.rate.RatePage~ui  a Page
+  component  store.rate.RatePage~ui.derived_10  1654 bytes (664 core), 1 function(s) audited, imports []
+  component  store.rate.RatePage~ui.derived_12  1654 bytes (664 core), 1 function(s) audited, imports []
+  component  store.rate.RatePage~ui.derived_14  1654 bytes (664 core), 1 function(s) audited, imports []
+  component  store.rate.RatePage~ui.derived_16  2074 bytes (1081 core), 1 function(s) audited, imports []
+  component  store.rate.RatePage~ui.derived_6  1632 bytes (660 core), 1 function(s) audited, imports []
+  component  store.rate.RatePage~ui.derived_8  1632 bytes (660 core), 1 function(s) audited, imports []
+  component  store.rate.rate_order  6060 bytes (1023 core), 7 function(s) audited, imports [pw:host/principal#read, pw:host/invalidations#store-reviews-order-ratings, pw:host/invalidations#store-reviews-store-to-rate, pw:host/outbox#user-cart-changed, pw:host/outbox#store-rated, store:data/ratings#rate]
+  component  store.reviews.OrderRatings  4411 bytes (1687 core), 2 function(s) audited, imports [store:data/ratings#for-order]
+  component  store.reviews.StoreRatings  5061 bytes (2156 core), 3 function(s) audited, imports [store:data/ratings#for-stores, store:data/ratings#reviews]
+  component  store.reviews.StoreToRate  5134 bytes (2288 core), 2 function(s) audited, imports [store:data/ratings#for-order]
+  component  store.search.Search  35204 bytes (29380 core), 7 function(s) audited, imports [store:data/search#find-for, store:data/hours#for-stores, store:data/ratings#for-stores, pw:host/clock#today, pw:host/clock#at, pw:host/clock#passed]
+  no body    store.search.SearchPage~ui  a Page
+  module     demo.namespaces.Card  142 bytes
+  module     demo.namespaces.Home  143 bytes
+  module     demo.thread.Discussion  950 bytes
+  page       store.page.StorePage~ui  8 binding(s), 9 part(s), 2 stream(s)
+  page       store.page.CartPage~ui  5 binding(s), 5 part(s)
+  page       store.page.TimePage~ui  2 binding(s), 3 part(s)
+  page       store.page.HomePage~ui  3 binding(s), 2 part(s)
+  page       store.page.OrderPage~ui  4 binding(s), 1 part(s)
+  page       store.page.AddressPage~ui  3 binding(s), 1 part(s)
+  page       store.rate.RatePage~ui  2 binding(s), 3 part(s)
+  page       store.search.SearchPage~ui  2 binding(s), 2 part(s)
+  page       demo.about.AboutPage~ui  0 binding(s), 0 part(s)
+  page       demo.bind.BindPage~ui  0 binding(s), 0 part(s)
+  page       demo.device.DevicePage~ui  0 binding(s), 0 part(s)
+  page       demo.dialog.DialogPage~ui  0 binding(s), 0 part(s)
+  page       demo.events.EventsPage~ui  0 binding(s), 0 part(s)
+  page       demo.focus.FocusPage~ui  0 binding(s), 0 part(s)
+  page       demo.fragment.FragmentPage~ui  0 binding(s), 0 part(s)
+  page       demo.invariants.InvariantsPage~ui  0 binding(s), 0 part(s)
+  page       demo.namespaces.Home~ui  2 binding(s), 3 part(s)
+  page       demo.panel.PanelPage~ui  0 binding(s), 0 part(s)
+  page       demo.pick.PickPage~ui  0 binding(s), 0 part(s)
+  page       demo.provide.ProvidePage~ui  0 binding(s), 0 part(s)
+  page       demo.search.SearchPage~ui  0 binding(s), 0 part(s)
+  page       demo.streamed.StreamedPage~ui  0 binding(s), 0 part(s), 1 stream(s)
+  page       demo.thread.ThreadPage~ui  1 binding(s), 0 part(s)
+  speculate  store.page.StorePage~ui  store.page.add_to_cart, store.page.decrease_in_cart, store.page.increase_in_cart, store.page.remove_from_cart on cart  18477 bytes
+  speculate  store.page.CartPage~ui  store.page.decrease_in_cart, store.page.increase_in_cart, store.page.remove_from_cart on cart  12692 bytes
+  computed   store.rate.RatePage~ui  1203 bytes
+  computed   demo.device.DevicePage~ui  3480 bytes
+  computed   demo.fragment.FragmentPage~ui  522 bytes
+  computed   demo.invariants.InvariantsPage~ui  411 bytes
+  computed   demo.namespaces.Home~ui  501 bytes
+  build      bd95ba469f4796a27
+
+== 3c. the store page, with its parts manifest and the E7V decision ==
+pw-render: 8 file(s) written to /home/haki/code/pw-wt/todomvc-toggle-all-visible-precondition/spikes/own-renderer/dist
+
+== 3d. the browser's WebAssembly ==
+   AddressPage.html CartPage.html HelloStatic.html HomePage.html OrderPage.html RatePage.html SearchPage.html StorePage.html TimePage.html Tricky.html build pw-render.wasm pw-resume.wasm pw-runtime.mjs 
+
+== 4. the STATIC pages ship no script ==
+   0 script tags in HelloStatic and Tricky
+   StorePage carries 2 script element(s):
+     the parts manifest, and the runtime that reads it
+
+== 5. determinism: the same IR renders to the same bytes ==
+pw-render: 2 file(s) written to /home/haki/code/pw-wt/todomvc-toggle-all-visible-precondition/spikes/own-renderer/dist.again
+   byte-identical
