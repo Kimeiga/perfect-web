@@ -138,6 +138,10 @@ evidence. No failed result is promoted by this summary.
   15-test baseline before controls: a short native timeout elapsed before
   child/grandchild fixture readiness. A bounded readiness handshake repair and
   the complete campaign are required; no ownership control is credited.
+  Its `e14-bind` campaign also refused one of14 controls because five tests
+  used `expect("builds")` instead of an assertion on their valid fixture.
+  The repaired unchanged lowering fault completes all9 tests as assertions,
+  followed by restored9green; the complete hosted campaign remains required.
 - Canonical fetch of the completed239-recipe run imported82 eligible files
   after skipping155 changed recipes and excluding all11 invalid outcomes.
   A post-fetch count gate exposed ambiguous bare witness metadata in

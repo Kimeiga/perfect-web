@@ -119,3 +119,21 @@ not be written. That is the first half of every form.
   attribute a signal decides, and anything a signal decides inside a loop a
   query decides.
 - **Forms** as one typed record (ADR-0131, ruling 6).
+
+
+## Train-12: a valid build is an asserted fixture contract
+
+Verify39538607183 at `34f3c2d1` completed the binding baseline (four binding
+and five render-again tests) but detected only13/14 controls. Removing binding
+lowering yielded four valid assertions and five ordinary `expect("builds")`
+panics from the shared render-again fixture. The strict native authority
+correctly refused that result; no panic is newly accepted as a mutation kill.
+
+The fixture now asserts that its valid program bundle builds before extracting
+its template refusals. The original lowering operator therefore completes all
+nine tests with actual assertion failures. The focused sequence is9green,
+9assertion failures, then restored9green; targeted Clippy passes. All fourteen
+operators, test names, and acceptance rules remain unchanged. The complete
+campaign and every reached consumer still require a hosted rerun.
+[The diagnostic record](../diagnostics/train-12/bind-lowering-proof.txt) retains
+the failed hosted file and local native before/fault/after output.

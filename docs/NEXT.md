@@ -26,6 +26,11 @@ recipe failed its 15-test baseline before any controls: the timeout fixture's
 child/grandchild readiness file was absent when its 0.3-second deadline elapsed.
 A bounded readiness handshake must precede that timeout while preserving native
 process cancellation and descendant cleanup; the whole campaign remains due.
+The same run's `e14-bind` completed its baseline but refused one of14 controls:
+five render-again tests panicked at an expected-build extraction. An explicit
+valid-build assertion now gives a complete9-test assertion failure under the
+unchanged lowering fault; the restored9 pass. The whole campaign and its
+reached consumers remain due.
 
 The graph repair now retains all19 operators and25 native identities with strict
 completed-assertion validation. Targeted renderer faults and the mutual-type

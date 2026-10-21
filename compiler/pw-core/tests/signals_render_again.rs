@@ -63,8 +63,14 @@ fn refused(src: &str) -> Vec<String> {
             src,
         })
         .collect();
-    pw_core::build::build(&units)
-        .expect("builds")
+    let built = pw_core::build::build(&units);
+    assert!(
+        built.is_ok(),
+        "the checked store fixture builds: {:?}",
+        built.as_ref().err()
+    );
+    built
+        .unwrap()
         .refusals()
         .into_iter()
         .filter(|r| r.contains("`t.P~ui`"))
