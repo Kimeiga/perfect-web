@@ -1,0 +1,7 @@
+baseline-server {"native_status": 0, "parsed": {"valid": true, "passed": 4, "failed": 0, "failure_names": [], "reason": ""}}
+baseline-browser {"native_status": 0, "valid": true, "reason": "", "passed": 50, "failed": 0, "elapsed": 11.428137020906433}
+operator-16 {"native_status": 1, "valid": true, "reason": "", "passed": 35, "failed": 15, "elapsed": 24.73599969292991}
+operator-30 {"native_status": 1, "valid": true, "reason": "", "passed": 35, "failed": 15, "elapsed": 38.330789509927854}
+restored-server {"native_status": 0, "parsed": {"valid": true, "passed": 4, "failed": 0, "failure_names": [], "reason": ""}}
+restored-browser {"native_status": 0, "valid": true, "reason": "", "passed": 50, "failed": 0, "elapsed": 49.70988019998185}
+PASS: exact4/50 inventories; baseline, original operators16/30, and restored source; elapsed 49.709920764900744
