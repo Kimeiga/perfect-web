@@ -808,3 +808,24 @@ mutation controls use the existing canonical `guide_python` assertion receipts.
 `just e14-device-producer` records these checks; whole device/TodoMVC campaigns
 remain required on the combined remote train. No full-campaign result is claimed
 by the local probes in `docs/evidence/tooling/device-integration-probes.txt`.
+
+## Integration amendment: qualified signal reads (2026-10-20)
+
+A device signal keeps the type and privacy of its resolved declaration whether
+read through a selective import (`word`) or a module path (`prefs.word`). The
+integration review found that the latter checked without PW6801 at a command
+boundary: the value typer considered qualified declarations only as callables,
+and the label reader never asked the signal's label for a field-shaped path.
+The build already refused its handler because `prefs` was not a bound receiver;
+this repair restores the semantic diagnostic, not an executable data-leak fix.
+
+Use the existing Term namespace resolver and canonical DefId. The existing
+lexical path predicate remains authoritative: a local record called `prefs`
+reads its own `word` field, and is never relabelled as a module's device signal.
+The diagnostic identifies the declaration which supplied the Device label.
+
+This amendment does not add qualified signal lowering. A permitted browser-only
+read through a module path may still check and then receive the existing build
+refusal; selective imports remain the supported backend form. Regression tests
+must execute the real build and retain that refusal until backend support is
+separately designed, tested and approved.

@@ -645,6 +645,15 @@ impl<'a> Labels<'a> {
             // A field of a secret record is secret. The record's own label is
             // the floor; a field with its own declared label joins on top.
             Expr::Field { base, .. } => {
+                // A module's signal has the same label through its qualified
+                // path. A lexical record with that prefix keeps its own value.
+                if self.types.lexical().unbound_path(body, id)
+                    && let Some(label) = self
+                        .sigs
+                        .signal_label(self.module, &crate::infer::path_of(body, id))
+                {
+                    return label;
+                }
                 // `secrets.payments` named as a value: a declaration, as a
                 // name is (ADR-0079).
                 if let Some(sig) = self.declaration_named(&crate::infer::path_of(body, id)) {

@@ -238,10 +238,10 @@ pub fn check(
         let body = hir.body(b);
         // Only a body that names one: no other value can carry its label,
         // since server code cannot read a signal (ADR-0130, R8).
-        let names_one = body
-            .walk()
-            .into_iter()
-            .any(|e| matches!(body.expr(e), Expr::Name(n) if names.contains(n.as_str())));
+        let names_one = body.walk().into_iter().any(|e| match body.expr(e) {
+            Expr::Name(n) | Expr::Field { name: n, .. } => names.contains(n.as_str()),
+            _ => false,
+        });
         if !names_one {
             continue;
         }
@@ -676,6 +676,18 @@ struct Flows<'a> {
 }
 
 impl Flows<'_> {
+    /// A qualified signal read, never a field of a lexical receiver.
+    fn qualified_signal(&self, e: ExprId) -> Option<(String, DefId)> {
+        if !matches!(self.body.expr(e), Expr::Field { .. })
+            || !self.lexical.unbound_path(self.body, e)
+        {
+            return None;
+        }
+        let path = crate::infer::path_of(self.body, e);
+        let def = self.sigs.signal_named(self.unit, &path)?;
+        self.kept.contains_key(&def).then_some((path, def))
+    }
+
     fn device(&self, e: ExprId) -> bool {
         self.labels
             .label(self.body, e)
@@ -687,6 +699,14 @@ impl Flows<'_> {
     /// device keeps named in it, or else the first name holding a value of
     /// one (a page's signal it was assigned to, a binding made from it).
     fn blamed(&self, e: ExprId) -> (String, bool) {
+        if let Some((path, _)) = self
+            .body
+            .walk_from(e)
+            .into_iter()
+            .find_map(|x| self.qualified_signal(x))
+        {
+            return (format!("`{path}`"), true);
+        }
         let names: Vec<(ExprId, &String)> = self
             .body
             .walk_from(e)
@@ -712,6 +732,17 @@ impl Flows<'_> {
     /// declaration of the signal the device keeps it names, or else where the
     /// binding holding one acquired it.
     fn origin(&self, e: ExprId) -> Related {
+        for x in self.body.walk_from(e) {
+            if let Some((path, def)) = self.qualified_signal(x)
+                && let Some(decl) = crate::resolve::declaration(self.hirs, def)
+            {
+                return Related::in_unit(
+                    def.unit,
+                    decl.name_span.clone(),
+                    format!("`{path}` is kept on the device, `privacy Device`, here"),
+                );
+            }
+        }
         for x in self.body.walk_from(e) {
             let Expr::Name(n) = self.body.expr(x) else {
                 continue;

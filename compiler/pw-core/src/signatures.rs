@@ -563,7 +563,18 @@ impl Signatures {
     /// `Device` for one the device keeps, and nothing for any other, which
     /// holds what a page or view provides (track `device-store`).
     pub fn signal_label(&self, module: Option<&str>, name: &str) -> Option<Label> {
-        let unit = self.unit_of(module)?;
+        match self.signal_named(self.unit_of(module)?, name) {
+            Some(def) if self.device.contains(&def) => {
+                // The declaration supplies privacy through either spelling.
+                Some(Label::device())
+            }
+            _ => None,
+        }
+    }
+
+    /// A module signal's canonical declaration, through a selective import or
+    /// a visible module path. Callers first exclude lexical receiver paths.
+    pub(crate) fn signal_named(&self, unit: usize, name: &str) -> Option<DefId> {
         let found = if name.contains('.') {
             self.workspace.resolve_path_in(unit, Namespace::Term, name)
         } else {
@@ -571,9 +582,9 @@ impl Signatures {
         };
         match found {
             Resolution::Local(def) | Resolution::Imported { def, .. }
-                if self.device.contains(&def) =>
+                if self.kind_of(def) == Some(DeclKind::Signal) =>
             {
-                Some(Label::device())
+                Some(def)
             }
             _ => None,
         }

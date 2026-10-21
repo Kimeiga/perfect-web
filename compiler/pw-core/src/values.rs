@@ -2249,6 +2249,7 @@ impl<'a> Typer<'a> {
                     .sigs
                     .by_def(d)
                     .map(function_type)
+                    .or_else(|| self.sigs.signal_type(d)?.resolved().map(Ty::of))
                     .unwrap_or(Ty::Unknown),
                 _ => Ty::Unknown,
             };

@@ -661,15 +661,7 @@ impl<'a> Types<'a> {
     /// from this body's module.
     fn module_signal(&self, n: &str) -> Option<ResolvedType> {
         let unit = self.sigs.unit_of(self.module.as_deref())?;
-        let def = match self
-            .sigs
-            .workspace()
-            .resolve_in(unit, crate::resolve::Namespace::Term, n)
-        {
-            crate::resolve::Resolution::Local(d)
-            | crate::resolve::Resolution::Imported { def: d, .. } => d,
-            _ => return None,
-        };
+        let def = self.sigs.signal_named(unit, n)?;
         self.sigs.signal_type(def)?.resolved().cloned()
     }
 
