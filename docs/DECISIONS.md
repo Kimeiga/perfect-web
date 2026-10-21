@@ -3217,3 +3217,7 @@ Only a current keyed read retries after newer frames (train-12 integration; fina
 [ADR-0375](DECISIONS/ADR-0375-effect-convergence.md):
 Inferred effects reach a fixed point before checks and contracts (train-12 integration; final combined gates pending).
 - Remove the silent eight-sweep limit; deep and cyclic helper chains preserve their effects regardless of declaration order. Bounded scale measurements record the additional work.
+
+[ADR-0376](DECISIONS/ADR-0376-producer-process-ownership.md):
+Mutation producers own their child through launch, cancellation and reaping (train-12 integration; final combined gates pending).
+- Defer cancellation while acquiring and cleaning the child; reap its owned process group before source restoration. Native launch-window, running, repeated-signal and timeout controls hold the lifecycle.
