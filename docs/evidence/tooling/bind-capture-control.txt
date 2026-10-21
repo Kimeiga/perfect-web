@@ -1,0 +1,120 @@
+Binding capture control proof
+Base d52e048a; new diagnostic inventory PW5304/PW0609. Original mutant addsPW5008 and fails the native assertion. All14 operators remainunchanged; fullhostedcampaignpending.
+feb0eb1fe122d10d958381bffa37d751bfc56cc6a3002f9f8421bc74bdbec26c  compiler/pw-core/tests/bind.rs
+a3bb23a4d1236a68774795488851983f8fc6138196cac40b15484d1a06e53391  scripts/bind_mutations.py
+5700a7c5ddcebe87c850979fc09fbce3295518e547f93d456883916799566d1f  scripts/cargo_assertion_results.py
+8b8d0f22b04d519fc13e6c227b09a9262cea918cce26fb2471ee1cdc353ca219  scripts/tests/test_cargo_assertion_results.py
+
+=== /tmp/bind-capture-baseline.log ===
+
+running 4 tests
+test a_binding_is_a_value_and_a_handler ... ok
+test a_non_signal_binding_reports_its_owner_without_capturing_its_target ... ok
+test a_binding_binds_a_signal_of_string_by_its_name ... ok
+test a_block_is_rendered_again_only_for_what_it_cannot_set_in_place ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+
+
+running 5 tests
+test what_a_handler_captures_in_a_signal_s_block_is_the_block_s ... ok
+test a_list_a_signal_holds_is_rendered_again_only_inside_its_block ... ok
+test a_signal_read_in_a_block_a_query_decides_is_refused ... ok
+test an_attribute_a_signal_decides_is_set_in_place_or_refused ... ok
+test a_block_a_signal_decides_reads_the_signals_and_its_own_names ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.97s
+
+
+=== /tmp/bind-capture-witness-red.log ===
+
+running 1 test
+test a_non_signal_binding_reports_its_owner_without_capturing_its_target ... FAILED
+
+failures:
+
+---- a_non_signal_binding_reports_its_owner_without_capturing_its_target stdout ----
+
+thread 'a_non_signal_binding_reports_its_owner_without_capturing_its_target' (3818405) panicked at compiler/pw-core/tests/bind.rs:193:5:
+assertion `left == right` failed: [
+    "PW5008 handler captures `fixed: fn(String) -> String`, which is not serializable",
+    "PW5304 `bind:value` binds `fixed`, which is not a signal: what is typed would change nothing the browser holds",
+    "PW0609 `value` is `fn(String) -> String`, which has no text form",
+]
+  left: ["PW5008", "PW5304", "PW0609"]
+ right: ["PW5304", "PW0609"]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    a_non_signal_binding_reports_its_owner_without_capturing_its_target
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.05s
+
+error: test failed, to rerun pass `-p pw-core --test bind`
+
+Result(valid=True, passed=0, failed=1, failure_names=('a_non_signal_binding_reports_its_owner_without_capturing_its_target',), reason='')
+
+running 1 test
+test a_non_signal_binding_reports_its_owner_without_capturing_its_target ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.14s
+
+
+
+=== /tmp/bind-capture-native-producer.log ===
+test_exit_inventory_and_source_disagreement_are_refused (scripts.tests.test_cargo_assertion_results.CargoAssertions) ... ok
+test_native_build_failure_is_refused (scripts.tests.test_cargo_assertion_results.CargoAssertions) ... ok
+test_native_green_and_custom_comparison_have_exact_inventory (scripts.tests.test_cargo_assertion_results.CargoAssertions) ... ok
+test_native_runtime_and_same_line_operand_panics_are_refused (scripts.tests.test_cargo_assertion_results.CargoAssertions) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.375s
+
+OK
+
+=== /tmp/bind-capture-anchors.log ===
+mutation anchors: 4318 mutants in 304 scripts, each matching once
+memory bound: no process was stopped
+
+=== /tmp/bind-capture-casecheck.log ===
+case-check: OK (3475 paths)
+
+=== /tmp/train12-bind-independent-baseline.txt ===
+All 14 original mutation operators byte-semantically unchanged
+Shared effect-reviewed source exact: scripts/cargo_assertion_results.py 5700a7c5ddcebe87c850979fc09fbce3295518e547f93d456883916799566d1f
+Shared effect-reviewed source exact: scripts/tests/test_cargo_assertion_results.py 8b8d0f22b04d519fc13e6c227b09a9262cea918cce26fb2471ee1cdc353ca219
+
+running 4 tests
+test a_binding_is_a_value_and_a_handler ... ok
+test a_non_signal_binding_reports_its_owner_without_capturing_its_target ... ok
+test a_binding_binds_a_signal_of_string_by_its_name ... ok
+test a_block_is_rendered_again_only_for_what_it_cannot_set_in_place ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+
+
+
+running 5 tests
+test what_a_handler_captures_in_a_signal_s_block_is_the_block_s ... ok
+test a_list_a_signal_holds_is_rendered_again_only_inside_its_block ... ok
+test an_attribute_a_signal_decides_is_set_in_place_or_refused ... ok
+test a_block_a_signal_decides_reads_the_signals_and_its_own_names ... ok
+test a_signal_read_in_a_block_a_query_decides_is_refused ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.47s
+
+
+Independent strict bind baseline: (True, 9, 0)
+Frozen inventories: {'bind': 4, 'signals_render_again': 5}
+
+=== /tmp/train12-bind-independent-assertions.txt ===
+test_exit_inventory_and_source_disagreement_are_refused (test_cargo_assertion_results.CargoAssertions) ... ok
+test_native_build_failure_is_refused (test_cargo_assertion_results.CargoAssertions) ... ok
+test_native_green_and_custom_comparison_have_exact_inventory (test_cargo_assertion_results.CargoAssertions) ... ok
+test_native_runtime_and_same_line_operand_panics_are_refused (test_cargo_assertion_results.CargoAssertions) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.467s
+
+OK

@@ -172,6 +172,53 @@ fn a_binding_binds_a_signal_of_string_by_its_name() {
 }
 
 #[test]
+fn a_non_signal_binding_reports_its_owner_without_capturing_its_target() {
+    let source = |markup| {
+        page(markup)
+            .replace(
+                "module t\n\n",
+                "module t\n\nfn echo(value: String) -> String !{} { value }\n\n",
+            )
+            .replace(
+                "let fixed = \"x\"",
+                "let fixed: fn(String) -> String = echo",
+            )
+    };
+    // A function is not a bindable signal. The lowered synthetic handler
+    // must leave that defect to PW5304 instead of also capturing the target
+    // and reporting a resume-serialization error. The lowered value has its
+    // independent PW0609: a function has no text form.
+    let invalid = source("<input type=\"text\" aria-label=\"N\" bind:value={fixed} />");
+    let invalid_diagnostics = reported(&invalid);
+    assert_eq!(
+        invalid_diagnostics
+            .iter()
+            .map(|d| d.split_whitespace().next().unwrap())
+            .collect::<Vec<_>>(),
+        ["PW5304", "PW0609"],
+        "{invalid_diagnostics:#?}"
+    );
+    assert!(
+        invalid_diagnostics[0]
+            .starts_with("PW5304 `bind:value` binds `fixed`, which is not a signal")
+    );
+    // A real signal stays valid, even beside an unrelated function value.
+    assert_eq!(reported(&source(FIELD)), Vec::<String>::new());
+    // An ordinary source-written handler still captures the function it
+    // calls, and must retain the canonical resume-boundary diagnostic.
+    let ordinary =
+        source("<button type=\"button\" on:press={() => fixed(\"Grace\")}>Call</button>");
+    let found = reported(&ordinary);
+    assert_eq!(found.len(), 1, "{found:#?}");
+    assert!(
+        found[0].starts_with(
+            "PW5008 handler captures `fixed: fn(String) -> String`, which is not serializable"
+        ),
+        "{found:#?}"
+    );
+}
+
+#[test]
 fn a_block_is_rendered_again_only_for_what_it_cannot_set_in_place() {
     let src = page(&format!(
         "{{#if editing}}<section>{FIELD}<p>{{name}}</p></section>{{/if}}"
