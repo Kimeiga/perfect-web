@@ -191,14 +191,23 @@ fn a_hosts_graph_for_a_browser_is_the_trees_nodes_in_level_order() {
     for _ in 0..CASES {
         let c = comment(&mut rng, 5);
         let g = graph(&c);
-        let args = echo.arguments(std::slice::from_ref(&g)).expect("a graph");
+        let args = echo.arguments(std::slice::from_ref(&g));
+        assert!(
+            args.is_ok(),
+            "the model's valid graph must be accepted: {args:?}"
+        );
+        let args = args.unwrap();
         let nested = echo
             .call_untangled(&host(), &args)
             .expect("answered")
             .remove(0);
         let written = echo.browser_value(nested).expect("written");
         assert_eq!(written, g);
-        echo.arguments(&[written]).expect("read again");
+        let read = echo.arguments(&[written]);
+        assert!(
+            read.is_ok(),
+            "the host's written graph must be read again: {read:?}"
+        );
     }
 }
 
@@ -212,7 +221,12 @@ fn a_hosts_graphs_inside_another_value_are_each_its_own() {
     for _ in 0..CASES / 10 {
         let c = comment(&mut rng, 4);
         let g = graph(&c);
-        let args = wrap.arguments(std::slice::from_ref(&g)).expect("a graph");
+        let args = wrap.arguments(std::slice::from_ref(&g));
+        assert!(
+            args.is_ok(),
+            "the model's valid graph must be accepted: {args:?}"
+        );
+        let args = args.unwrap();
         let nested = wrap
             .call_untangled(&host(), &args)
             .expect("answered")
@@ -285,7 +299,14 @@ fn a_graph_that_is_not_a_tree_traps_in_the_component() {
 #[test]
 fn what_is_not_a_graph_is_refused_by_the_host() {
     let size = compiled("thread.Size");
-    let refused = |j: serde_json::Value| size.arguments(&[j]).expect_err("refused");
+    let refused = |j: serde_json::Value| {
+        let result = size.arguments(&[j]);
+        assert!(
+            result.is_err(),
+            "malformed graph input must be refused: {result:?}"
+        );
+        result.unwrap_err()
+    };
     // Nested, as a value of no such type is written.
     assert!(refused(json!({ "text": "", "likes": 0, "replies": [] })).contains("`$graph`"));
     assert!(refused(json!({ "$graph": [3] })).contains("expected an object"));

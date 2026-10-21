@@ -1,0 +1,510 @@
+Strict graph witness follow-up to verify 39542637844 at c714d1c35cee98ec923946aac6c873624c971b7f
+Source base: 52e773c7e2b6a064e7debeed9a01fce49119a363 plus the two graph-test witness changes.
+Original operators 1, 12, 17 and 18, unchanged; all four native suites per phase.
+This is focused diagnostic proof, not accepted whole-campaign evidence.
+
+
+=== baseline ===
+
+running 6 tests
+test a_graph_that_is_not_a_tree_is_refused ... ok
+test a_graph_is_the_value_its_nodes_make ... ok
+test the_reader_keeps_each_item_and_field_in_its_place ... ok
+test a_copy_is_the_value_and_its_own ... ok
+test nested_json_as_deep_as_its_data_is_read_without_recursion ... ok
+test a_value_as_deep_as_its_data_is_held_without_recursion ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.94s
+
+
+
+running 6 tests
+test the_build_writes_a_first_value_as_its_nodes ... ok
+test a_handler_sends_a_command_a_value_as_its_nodes ... ok
+test each_node_holds_the_next_run_in_the_order_its_fields_are_declared ... ok
+test a_graph_that_is_not_a_tree_traps_in_the_handler ... ok
+test what_a_host_writes_of_one_and_two_types_that_hold_each_other_are_refused ... ok
+test a_handler_reads_a_signal_from_its_nodes_and_writes_one_as_its_nodes ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+
+
+
+running 7 tests
+test a_type_that_contains_itself_crosses_as_its_nodes ... ok
+test an_invariant_inside_a_tree_holds_at_every_node ... ok
+test a_type_that_contains_itself_in_place_is_compiled_boxed ... ok
+test a_value_of_a_type_that_contains_itself_is_put_on_the_browsers_wire_as_its_nodes ... ok
+test a_type_that_contains_itself_otherwise_crosses_no_boundary_yet ... ok
+test a_type_no_finite_value_has_is_refused_where_it_is_declared ... ok
+test a_type_that_can_be_built_without_itself_is_not ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+
+
+
+running 6 tests
+test what_is_not_a_graph_is_refused_by_the_host ... ok
+test a_graph_that_is_not_a_tree_traps_in_the_component ... ok
+test a_hosts_graphs_inside_another_value_are_each_its_own ... ok
+test a_hosts_graph_for_a_browser_is_the_trees_nodes_in_level_order ... ok
+test a_browsers_graph_is_the_tree_its_nodes_make ... ok
+test a_chain_as_deep_as_its_data_crosses_from_a_browser ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.72s
+
+
+STRICT RECEIPT {"phase": "baseline", "valid": true, "passed": 25, "failed": 0, "total": 25}
+
+=== original operator 1: the renderer takes a node twice ===
+
+running 6 tests
+test a_graph_that_is_not_a_tree_is_refused ... FAILED
+test a_graph_is_the_value_its_nodes_make ... FAILED
+test a_copy_is_the_value_and_its_own ... ok
+test the_reader_keeps_each_item_and_field_in_its_place ... ok
+test a_value_as_deep_as_its_data_is_held_without_recursion ... FAILED
+test nested_json_as_deep_as_its_data_is_read_without_recursion ... FAILED
+
+failures:
+
+---- a_graph_that_is_not_a_tree_is_refused stdout ----
+
+thread 'a_graph_that_is_not_a_tree_is_refused' (671467) panicked at runtime/pw-render/tests/graphs.rs:94:5:
+assertion failed: refused(json!({
+                "$graph":
+                [{ "a": { "$node": 1 }, "b": { "$node": 1 } }, { "x": 1 },]
+            })).contains("held twice")
+
+---- a_graph_is_the_value_its_nodes_make stdout ----
+
+thread 'a_graph_is_the_value_its_nodes_make' (671466) panicked at runtime/pw-render/tests/graphs.rs:17:5:
+the valid wire value is accepted: Err("a `$graph` whose node no other holds")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- a_value_as_deep_as_its_data_is_held_without_recursion stdout ----
+
+thread 'a_value_as_deep_as_its_data_is_held_without_recursion' (671468) panicked at runtime/pw-render/tests/graphs.rs:25:5:
+the small valid tree is accepted: Err("a `$graph` whose node no other holds")
+
+---- nested_json_as_deep_as_its_data_is_read_without_recursion stdout ----
+
+thread 'nested_json_as_deep_as_its_data_is_read_without_recursion' (671469) panicked at runtime/pw-render/tests/graphs.rs:25:5:
+the small valid tree is accepted: Err("a `$graph` whose node no other holds")
+
+
+failures:
+    a_graph_is_the_value_its_nodes_make
+    a_graph_that_is_not_a_tree_is_refused
+    a_value_as_deep_as_its_data_is_held_without_recursion
+    nested_json_as_deep_as_its_data_is_read_without_recursion
+
+test result: FAILED. 2 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p pw-render --test graphs`
+
+
+running 6 tests
+test the_build_writes_a_first_value_as_its_nodes ... FAILED
+test a_handler_sends_a_command_a_value_as_its_nodes ... ok
+test each_node_holds_the_next_run_in_the_order_its_fields_are_declared ... ok
+test a_graph_that_is_not_a_tree_traps_in_the_handler ... ok
+test what_a_host_writes_of_one_and_two_types_that_hold_each_other_are_refused ... ok
+test a_handler_reads_a_signal_from_its_nodes_and_writes_one_as_its_nodes ... ok
+
+failures:
+
+---- the_build_writes_a_first_value_as_its_nodes stdout ----
+
+thread 'the_build_writes_a_first_value_as_its_nodes' (671840) panicked at compiler/pw-core/tests/graphs_on_the_wire.rs:180:5:
+the valid first-value graph must be read: Err("a `$graph` whose node no other holds")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    the_build_writes_a_first_value_as_its_nodes
+
+test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+
+error: test failed, to rerun pass `-p pw-core --test graphs_on_the_wire`
+
+
+running 7 tests
+test an_invariant_inside_a_tree_holds_at_every_node ... ok
+test a_type_that_contains_itself_crosses_as_its_nodes ... ok
+test a_type_that_contains_itself_in_place_is_compiled_boxed ... ok
+test a_value_of_a_type_that_contains_itself_is_put_on_the_browsers_wire_as_its_nodes ... ok
+test a_type_that_contains_itself_otherwise_crosses_no_boundary_yet ... ok
+test a_type_no_finite_value_has_is_refused_where_it_is_declared ... ok
+test a_type_that_can_be_built_without_itself_is_not ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+
+
+running 6 tests
+test what_is_not_a_graph_is_refused_by_the_host ... ok
+test a_graph_that_is_not_a_tree_traps_in_the_component ... ok
+test a_hosts_graphs_inside_another_value_are_each_its_own ... ok
+test a_hosts_graph_for_a_browser_is_the_trees_nodes_in_level_order ... ok
+test a_browsers_graph_is_the_tree_its_nodes_make ... ok
+test a_chain_as_deep_as_its_data_crosses_from_a_browser ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.69s
+
+
+STRICT RECEIPT {"phase": "original operator 1: the renderer takes a node twice", "valid": true, "passed": 20, "failed": 5, "total": 25}
+
+=== original operator 12: a signal is read as written nested ===
+
+running 6 tests
+test a_graph_that_is_not_a_tree_is_refused ... ok
+test a_copy_is_the_value_and_its_own ... ok
+test a_graph_is_the_value_its_nodes_make ... ok
+test the_reader_keeps_each_item_and_field_in_its_place ... ok
+test nested_json_as_deep_as_its_data_is_read_without_recursion ... ok
+test a_value_as_deep_as_its_data_is_held_without_recursion ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.87s
+
+
+
+running 6 tests
+test a_handler_sends_a_command_a_value_as_its_nodes ... FAILED
+test the_build_writes_a_first_value_as_its_nodes ... ok
+test a_handler_reads_a_signal_from_its_nodes_and_writes_one_as_its_nodes ... FAILED
+test a_graph_that_is_not_a_tree_traps_in_the_handler ... FAILED
+test each_node_holds_the_next_run_in_the_order_its_fields_are_declared ... FAILED
+test what_a_host_writes_of_one_and_two_types_that_hold_each_other_are_refused ... FAILED
+
+failures:
+
+---- a_handler_sends_a_command_a_value_as_its_nodes stdout ----
+
+thread 'a_handler_sends_a_command_a_value_as_its_nodes' (673127) panicked at compiler/pw-core/tests/graphs_on_the_wire.rs:106:5:
+the valid graph program must encode its handler writing `context.command("m.save"`: [Err("Unsupported { construct: \"a handler outside the JavaScript backend\", reason: \"a captured Nominal(DefId { unit: 22, decl: 2 }, []), which holds a type that contains itself: the browser's wire does not carry one yet\" }"), Err("Unsupported { construct: \"a handler outside the JavaScript backend\", reason: \"a captured Nominal(DefId { unit: 22, decl: 2 }, []), which holds a type that contains itself: the browser's wire does not carry one yet\" }")]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- a_handler_reads_a_signal_from_its_nodes_and_writes_one_as_its_nodes stdout ----
+
+thread 'a_handler_reads_a_signal_from_its_nodes_and_writes_one_as_its_nodes' (673126) panicked at compiler/pw-core/tests/graphs_on_the_wire.rs:106:5:
+the valid graph program must encode its handler writing `context.set("draft"`: [Err("Unsupported { construct: \"a handler outside the JavaScript backend\", reason: \"a captured Nominal(DefId { unit: 22, decl: 2 }, []), which holds a type that contains itself: the browser's wire does not carry one yet\" }"), Err("Unsupported { construct: \"a handler outside the JavaScript backend\", reason: \"a captured Nominal(DefId { unit: 22, decl: 2 }, []), which holds a type that contains itself: the browser's wire does not carry one yet\" }")]
+
+---- a_graph_that_is_not_a_tree_traps_in_the_handler stdout ----
+
+thread 'a_graph_that_is_not_a_tree_traps_in_the_handler' (673125) panicked at compiler/pw-core/tests/graphs_on_the_wire.rs:106:5:
+the valid graph program must encode its handler writing `context.set("draft"`: [Err("Unsupported { construct: \"a handler outside the JavaScript backend\", reason: \"a captured Nominal(DefId { unit: 22, decl: 2 }, []), which holds a type that contains itself: the browser's wire does not carry one yet\" }"), Err("Unsupported { construct: \"a handler outside the JavaScript backend\", reason: \"a captured Nominal(DefId { unit: 22, decl: 2 }, []), which holds a type that contains itself: the browser's wire does not carry one yet\" }")]
+
+---- each_node_holds_the_next_run_in_the_order_its_fields_are_declared stdout ----
+
+thread 'each_node_holds_the_next_run_in_the_order_its_fields_are_declared' (673128) panicked at compiler/pw-core/tests/graphs_on_the_wire.rs:106:5:
+the valid graph program must encode its handler writing `context.set("tree"`: [Err("Unsupported { construct: \"a handler outside the JavaScript backend\", reason: \"a captured Nominal(DefId { unit: 22, decl: 1 }, []), which holds a type that contains itself: the browser's wire does not carry one yet\" }")]
+
+---- what_a_host_writes_of_one_and_two_types_that_hold_each_other_are_refused stdout ----
+
+thread 'what_a_host_writes_of_one_and_two_types_that_hold_each_other_are_refused' (673130) panicked at compiler/pw-core/tests/graphs_on_the_wire.rs:310:5:
+["Unsupported { construct: \"a handler outside the JavaScript backend\", reason: \"a captured Nominal(DefId { unit: 22, decl: 2 }, []), which holds a type that contains itself: the browser's wire does not carry one yet\" }", "Unsupported { construct: \"a handler outside the JavaScript backend\", reason: \"a captured Nominal(DefId { unit: 22, decl: 2 }, []), which holds a type that contains itself: the browser's wire does not carry one yet\" }"]
+
+
+failures:
+    a_graph_that_is_not_a_tree_traps_in_the_handler
+    a_handler_reads_a_signal_from_its_nodes_and_writes_one_as_its_nodes
+    a_handler_sends_a_command_a_value_as_its_nodes
+    each_node_holds_the_next_run_in_the_order_its_fields_are_declared
+    what_a_host_writes_of_one_and_two_types_that_hold_each_other_are_refused
+
+test result: FAILED. 1 passed; 5 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+error: test failed, to rerun pass `-p pw-core --test graphs_on_the_wire`
+
+
+running 7 tests
+test an_invariant_inside_a_tree_holds_at_every_node ... ok
+test a_type_that_contains_itself_crosses_as_its_nodes ... ok
+test a_type_that_contains_itself_in_place_is_compiled_boxed ... ok
+test a_value_of_a_type_that_contains_itself_is_put_on_the_browsers_wire_as_its_nodes ... ok
+test a_type_that_contains_itself_otherwise_crosses_no_boundary_yet ... ok
+test a_type_no_finite_value_has_is_refused_where_it_is_declared ... ok
+test a_type_that_can_be_built_without_itself_is_not ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+
+
+
+running 6 tests
+test what_is_not_a_graph_is_refused_by_the_host ... ok
+test a_graph_that_is_not_a_tree_traps_in_the_component ... ok
+test a_hosts_graphs_inside_another_value_are_each_its_own ... ok
+test a_hosts_graph_for_a_browser_is_the_trees_nodes_in_level_order ... ok
+test a_browsers_graph_is_the_tree_its_nodes_make ... ok
+test a_chain_as_deep_as_its_data_crosses_from_a_browser ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.71s
+
+
+STRICT RECEIPT {"phase": "original operator 12: a signal is read as written nested", "valid": true, "passed": 20, "failed": 5, "total": 25}
+
+=== original operator 17: the host refuses a browser's graph ===
+
+running 6 tests
+test a_copy_is_the_value_and_its_own ... ok
+test a_graph_that_is_not_a_tree_is_refused ... ok
+test a_graph_is_the_value_its_nodes_make ... ok
+test the_reader_keeps_each_item_and_field_in_its_place ... ok
+test nested_json_as_deep_as_its_data_is_read_without_recursion ... ok
+test a_value_as_deep_as_its_data_is_held_without_recursion ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.87s
+
+
+
+running 6 tests
+test the_build_writes_a_first_value_as_its_nodes ... ok
+test a_handler_sends_a_command_a_value_as_its_nodes ... ok
+test each_node_holds_the_next_run_in_the_order_its_fields_are_declared ... ok
+test a_graph_that_is_not_a_tree_traps_in_the_handler ... ok
+test what_a_host_writes_of_one_and_two_types_that_hold_each_other_are_refused ... ok
+test a_handler_reads_a_signal_from_its_nodes_and_writes_one_as_its_nodes ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+
+
+running 7 tests
+test an_invariant_inside_a_tree_holds_at_every_node ... ok
+test a_type_that_contains_itself_crosses_as_its_nodes ... ok
+test a_type_that_contains_itself_in_place_is_compiled_boxed ... ok
+test a_value_of_a_type_that_contains_itself_is_put_on_the_browsers_wire_as_its_nodes ... ok
+test a_type_that_contains_itself_otherwise_crosses_no_boundary_yet ... ok
+test a_type_no_finite_value_has_is_refused_where_it_is_declared ... ok
+test a_type_that_can_be_built_without_itself_is_not ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+
+
+running 6 tests
+test what_is_not_a_graph_is_refused_by_the_host ... FAILED
+test a_graph_that_is_not_a_tree_traps_in_the_component ... FAILED
+test a_hosts_graph_for_a_browser_is_the_trees_nodes_in_level_order ... FAILED
+test a_hosts_graphs_inside_another_value_are_each_its_own ... FAILED
+test a_browsers_graph_is_the_tree_its_nodes_make ... FAILED
+test a_chain_as_deep_as_its_data_crosses_from_a_browser ... FAILED
+
+failures:
+
+---- what_is_not_a_graph_is_refused_by_the_host stdout ----
+
+thread 'what_is_not_a_graph_is_refused_by_the_host' (675424) panicked at compiler/pw-conformance/tests/browser_graphs.rs:311:5:
+assertion failed: refused(json!({ "text": "", "likes": 0, "replies": [] })).contains("`$graph`")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- a_graph_that_is_not_a_tree_traps_in_the_component stdout ----
+
+thread 'a_graph_that_is_not_a_tree_traps_in_the_component' (675421) panicked at compiler/pw-conformance/tests/browser_graphs.rs:296:5:
+assertion `left == right` failed
+  left: Err("argument 1 (`arg0`): no graph")
+ right: Ok(S64(3))
+
+---- a_hosts_graph_for_a_browser_is_the_trees_nodes_in_level_order stdout ----
+
+thread 'a_hosts_graph_for_a_browser_is_the_trees_nodes_in_level_order' (675422) panicked at compiler/pw-conformance/tests/browser_graphs.rs:195:9:
+the model's valid graph must be accepted: Err("argument 1 (`arg0`): no graph")
+
+---- a_hosts_graphs_inside_another_value_are_each_its_own stdout ----
+
+thread 'a_hosts_graphs_inside_another_value_are_each_its_own' (675423) panicked at compiler/pw-conformance/tests/browser_graphs.rs:225:9:
+the model's valid graph must be accepted: Err("argument 1 (`arg0`): no graph")
+
+---- a_browsers_graph_is_the_tree_its_nodes_make stdout ----
+
+thread 'a_browsers_graph_is_the_tree_its_nodes_make' (675419) panicked at compiler/pw-conformance/tests/browser_graphs.rs:175:9:
+assertion `left == right` failed: {"$graph":[{"likes":124,"replies":[],"text":"😀"}]}
+  left: Err("argument 1 (`arg0`): no graph")
+ right: Ok(S64(1))
+
+---- a_chain_as_deep_as_its_data_crosses_from_a_browser stdout ----
+
+thread 'a_chain_as_deep_as_its_data_crosses_from_a_browser' (675420) panicked at compiler/pw-conformance/tests/browser_graphs.rs:269:5:
+assertion `left == right` failed
+  left: Err("argument 1 (`arg0`): no graph")
+ right: Ok(String("top"))
+
+
+failures:
+    a_browsers_graph_is_the_tree_its_nodes_make
+    a_chain_as_deep_as_its_data_crosses_from_a_browser
+    a_graph_that_is_not_a_tree_traps_in_the_component
+    a_hosts_graph_for_a_browser_is_the_trees_nodes_in_level_order
+    a_hosts_graphs_inside_another_value_are_each_its_own
+    what_is_not_a_graph_is_refused_by_the_host
+
+test result: FAILED. 0 passed; 6 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.47s
+
+error: test failed, to rerun pass `-p pw-conformance --test browser_graphs`
+
+STRICT RECEIPT {"phase": "original operator 17: the host refuses a browser's graph", "valid": true, "passed": 19, "failed": 6, "total": 25}
+
+=== original operator 18: the host reads a node's slots as any field ===
+
+running 6 tests
+test a_copy_is_the_value_and_its_own ... ok
+test a_graph_that_is_not_a_tree_is_refused ... ok
+test the_reader_keeps_each_item_and_field_in_its_place ... ok
+test a_graph_is_the_value_its_nodes_make ... ok
+test nested_json_as_deep_as_its_data_is_read_without_recursion ... ok
+test a_value_as_deep_as_its_data_is_held_without_recursion ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.88s
+
+
+
+running 6 tests
+test the_build_writes_a_first_value_as_its_nodes ... ok
+test a_handler_sends_a_command_a_value_as_its_nodes ... ok
+test each_node_holds_the_next_run_in_the_order_its_fields_are_declared ... ok
+test a_graph_that_is_not_a_tree_traps_in_the_handler ... ok
+test what_a_host_writes_of_one_and_two_types_that_hold_each_other_are_refused ... ok
+test a_handler_reads_a_signal_from_its_nodes_and_writes_one_as_its_nodes ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+
+
+
+running 7 tests
+test an_invariant_inside_a_tree_holds_at_every_node ... ok
+test a_type_that_contains_itself_crosses_as_its_nodes ... ok
+test a_type_that_contains_itself_in_place_is_compiled_boxed ... ok
+test a_value_of_a_type_that_contains_itself_is_put_on_the_browsers_wire_as_its_nodes ... ok
+test a_type_that_contains_itself_otherwise_crosses_no_boundary_yet ... ok
+test a_type_no_finite_value_has_is_refused_where_it_is_declared ... ok
+test a_type_that_can_be_built_without_itself_is_not ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+
+
+
+running 6 tests
+test what_is_not_a_graph_is_refused_by_the_host ... FAILED
+test a_hosts_graph_for_a_browser_is_the_trees_nodes_in_level_order ... FAILED
+test a_graph_that_is_not_a_tree_traps_in_the_component ... FAILED
+test a_hosts_graphs_inside_another_value_are_each_its_own ... FAILED
+test a_browsers_graph_is_the_tree_its_nodes_make ... FAILED
+test a_chain_as_deep_as_its_data_crosses_from_a_browser ... FAILED
+
+failures:
+
+---- what_is_not_a_graph_is_refused_by_the_host stdout ----
+
+thread 'what_is_not_a_graph_is_refused_by_the_host' (676020) panicked at compiler/pw-conformance/tests/browser_graphs.rs:304:9:
+malformed graph input must be refused: Ok([List([Record([("text", String("")), ("likes", S64(0)), ("replies", List([U32(1)]))])])])
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- a_hosts_graph_for_a_browser_is_the_trees_nodes_in_level_order stdout ----
+
+thread 'a_hosts_graph_for_a_browser_is_the_trees_nodes_in_level_order' (676018) panicked at compiler/pw-conformance/tests/browser_graphs.rs:195:9:
+the model's valid graph must be accepted: Err("argument 1 (`arg0`).$graph[0].replies[0]: expected an integer, got {\"$node\":1}")
+
+---- a_graph_that_is_not_a_tree_traps_in_the_component stdout ----
+
+thread 'a_graph_that_is_not_a_tree_traps_in_the_component' (676017) panicked at compiler/pw-conformance/tests/browser_graphs.rs:296:5:
+assertion `left == right` failed
+  left: Err("argument 1 (`arg0`).$graph[0].replies[0]: expected an integer, got {\"$node\":1}")
+ right: Ok(S64(3))
+
+---- a_hosts_graphs_inside_another_value_are_each_its_own stdout ----
+
+thread 'a_hosts_graphs_inside_another_value_are_each_its_own' (676019) panicked at compiler/pw-conformance/tests/browser_graphs.rs:225:9:
+the model's valid graph must be accepted: Err("argument 1 (`arg0`).$graph[0].replies[0]: expected an integer, got {\"$node\":1}")
+
+---- a_browsers_graph_is_the_tree_its_nodes_make stdout ----
+
+thread 'a_browsers_graph_is_the_tree_its_nodes_make' (676015) panicked at compiler/pw-conformance/tests/browser_graphs.rs:175:9:
+assertion `left == right` failed: {"$graph":[{"likes":307,"replies":[{"$node":1},{"$node":2},{"$node":3}],"text":"a"},{"likes":-259,"replies":[{"$node":4}],"text":"Root"},{"likes":-203,"replies":[],"text":""},{"likes":458,"replies":[{"$node":5},{"$node":6},{"$node":7}],"text":"a"},{"likes":226,"replies":[],"text":"人"},{"likes":248,"replies":[{"$node":8},{"$node":9},{"$node":10}],"text":"quote\"d"},{"likes":178,"replies":[{"$node":11},{"$node":12}],"text":"a"},{"likes":362,"replies":[{"$node":13},{"$node":14},{"$node":15}],"text":"Root"},{"likes":-101,"replies":[{"$node":16}],"text":"quote\"d"},{"likes":181,"replies":[{"$node":17}],"text":"😀"},{"likes":167,"replies":[{"$node":18}],"text":"a"},{"likes":-350,"replies":[],"text":""},{"likes":-12,"replies":[{"$node":19},{"$node":20}],"text":""},{"likes":-499,"replies":[],"text":"Root"},{"likes":-257,"replies":[],"text":"quote\"d"},{"likes":-212,"replies":[{"$node":21},{"$node":22}],"text":"人"},{"likes":186,"replies":[{"$node":23}],"text":""},{"likes":453,"replies":[{"$node":24},{"$node":25},{"$node":26}],"text":""},{"likes":-178,"replies":[{"$node":27},{"$node":28},{"$node":29}],"text":"😀"},{"likes":439,"replies":[],"text":"人"},{"likes":-359,"replies":[{"$node":30}],"text":"人"},{"likes":-113,"replies":[{"$node":31},{"$node":32},{"$node":33}],"text":"Root"},{"likes":-155,"replies":[{"$node":34},{"$node":35}],"text":"Root"},{"likes":-381,"replies":[],"text":"Root"},{"likes":-173,"replies":[],"text":"😀"},{"likes":-381,"replies":[],"text":"a"},{"likes":-427,"replies":[],"text":"Root"},{"likes":-383,"replies":[],"text":"Root"},{"likes":-339,"replies":[],"text":"人"},{"likes":-223,"replies":[],"text":"😀"},{"likes":378,"replies":[],"text":"😀"},{"likes":-441,"replies":[],"text":"quote\"d"},{"likes":134,"replies":[],"text":"a"},{"likes":-283,"replies":[],"text":"quote\"d"},{"likes":-173,"replies":[],"text":"quote\"d"},{"likes":-350,"replies":[],"text":"a"}]}
+  left: Err("argument 1 (`arg0`).$graph[0].replies[0]: expected an integer, got {\"$node\":1}")
+ right: Ok(S64(36))
+
+---- a_chain_as_deep_as_its_data_crosses_from_a_browser stdout ----
+
+thread 'a_chain_as_deep_as_its_data_crosses_from_a_browser' (676016) panicked at compiler/pw-conformance/tests/browser_graphs.rs:269:5:
+assertion `left == right` failed
+  left: Err("argument 1 (`arg0`).$graph[0].replies[0]: expected an integer, got {\"$node\":1}")
+ right: Ok(String("top"))
+
+
+failures:
+    a_browsers_graph_is_the_tree_its_nodes_make
+    a_chain_as_deep_as_its_data_crosses_from_a_browser
+    a_graph_that_is_not_a_tree_traps_in_the_component
+    a_hosts_graph_for_a_browser_is_the_trees_nodes_in_level_order
+    a_hosts_graphs_inside_another_value_are_each_its_own
+    what_is_not_a_graph_is_refused_by_the_host
+
+test result: FAILED. 0 passed; 6 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s
+
+error: test failed, to rerun pass `-p pw-conformance --test browser_graphs`
+
+STRICT RECEIPT {"phase": "original operator 18: the host reads a node's slots as any field", "valid": true, "passed": 19, "failed": 6, "total": 25}
+
+=== restored ===
+
+running 6 tests
+test a_graph_that_is_not_a_tree_is_refused ... ok
+test the_reader_keeps_each_item_and_field_in_its_place ... ok
+test a_graph_is_the_value_its_nodes_make ... ok
+test a_copy_is_the_value_and_its_own ... ok
+test nested_json_as_deep_as_its_data_is_read_without_recursion ... ok
+test a_value_as_deep_as_its_data_is_held_without_recursion ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.89s
+
+
+
+running 6 tests
+test the_build_writes_a_first_value_as_its_nodes ... ok
+test a_handler_sends_a_command_a_value_as_its_nodes ... ok
+test each_node_holds_the_next_run_in_the_order_its_fields_are_declared ... ok
+test a_graph_that_is_not_a_tree_traps_in_the_handler ... ok
+test what_a_host_writes_of_one_and_two_types_that_hold_each_other_are_refused ... ok
+test a_handler_reads_a_signal_from_its_nodes_and_writes_one_as_its_nodes ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+
+
+
+running 7 tests
+test an_invariant_inside_a_tree_holds_at_every_node ... ok
+test a_type_that_contains_itself_crosses_as_its_nodes ... ok
+test a_type_that_contains_itself_in_place_is_compiled_boxed ... ok
+test a_value_of_a_type_that_contains_itself_is_put_on_the_browsers_wire_as_its_nodes ... ok
+test a_type_that_contains_itself_otherwise_crosses_no_boundary_yet ... ok
+test a_type_no_finite_value_has_is_refused_where_it_is_declared ... ok
+test a_type_that_can_be_built_without_itself_is_not ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+
+
+
+running 6 tests
+test what_is_not_a_graph_is_refused_by_the_host ... ok
+test a_graph_that_is_not_a_tree_traps_in_the_component ... ok
+test a_hosts_graphs_inside_another_value_are_each_its_own ... ok
+test a_hosts_graph_for_a_browser_is_the_trees_nodes_in_level_order ... ok
+test a_browsers_graph_is_the_tree_its_nodes_make ... ok
+test a_chain_as_deep_as_its_data_crosses_from_a_browser ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.72s
+
+
+STRICT RECEIPT {"phase": "restored", "valid": true, "passed": 25, "failed": 0, "total": 25}
+SOURCE RESTORATION {"changed": [], "seconds": 48.80403549398761}
+All four original faults completed strict 25-case inventories.
+
+Targeted Clippy, both changed test targets, native status 0:
+    Checking pw-render v0.0.0 (/home/haki/code/pw-wt/train-12/runtime/pw-render)
+    Checking pw-core v0.0.0 (/home/haki/code/pw-wt/train-12/compiler/pw-core)
+    Finished `dev` profile [unoptimized] target(s) in 3.01s
+    Checking pw-core v0.0.0 (/home/haki/code/pw-wt/train-12/compiler/pw-core)
+    Checking pw-host v0.0.0 (/home/haki/code/pw-wt/train-12/runtime/pw-host)
+    Checking pw-conformance v0.0.0 (/home/haki/code/pw-wt/train-12/compiler/pw-conformance)
+    Finished `dev` profile [unoptimized] target(s) in 3.90s

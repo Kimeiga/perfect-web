@@ -205,3 +205,26 @@ classification changes. The complete relevant six-test suite passed baseline,
 produced exactly five passes and one native assertion failure under the fault,
 and passed again after restoration. This focused proof is retained in the same
 diagnostic record. Full nineteen-model hosted verification remains due.
+
+
+### Full-campaign graph witness follow-up
+
+The first strict hosted campaign, verify `39542637844` at `c714d1c3`,
+completed 15/19 valid kills and refused four, with no survivors or memory stop.
+The renderer clone fault reached an `expect` on a valid first-value graph;
+the nested-signal fault reached a manual missing-handler panic; both host
+reader faults reached `expect` or `expect_err` extractions. Those ordinary
+panics are invalid evidence even when other tests fail by assertion.
+
+The same tests now assert their actual graph contracts before extraction:
+a valid graph has a compiled handler and can be read, a written graph can be
+read back, and malformed graph input is refused. Setup operations retain their
+existing authority. The 19 original operators, 25 test identities, stress
+workloads, producer parser and narrow stack-property boundary are unchanged.
+The focused proof completed in 49 seconds: all 25 baseline tests passed;
+the four unchanged faults produced respectively 5, 5, 6 and 6 valid assertion
+failures, each with all 25 cases completed; all 25 restored tests passed.
+Both changed test targets pass Clippy. The [native diagnostic](../diagnostics/train-12/graphs-host-followup.txt)
+retains every receipt and transcript. The full campaign and reached consumers
+still need a hosted rerun. The hosted failed record remains failed; no shortened
+inventory or ordinary panic is credited.

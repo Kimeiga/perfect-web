@@ -98,11 +98,16 @@ fn handlers(program: &str) -> Vec<Result<String, String>> {
 
 /// The module whose source writes `marker`.
 fn handler(program: &str, marker: &str) -> String {
-    handlers(program)
-        .into_iter()
-        .filter_map(Result::ok)
-        .find(|s| s.contains(marker))
-        .unwrap_or_else(|| panic!("no handler writes `{marker}`"))
+    let compiled = handlers(program);
+    let found = compiled
+        .iter()
+        .filter_map(|result| result.as_ref().ok())
+        .find(|source| source.contains(marker));
+    assert!(
+        found.is_some(),
+        "the valid graph program must encode its handler writing `{marker}`: {compiled:?}"
+    );
+    found.unwrap().clone()
 }
 
 /// What a module sets and sends, run under Node with `signals` held.
@@ -171,8 +176,13 @@ fn the_build_writes_a_first_value_as_its_nodes() {
         { "id": 2, "text": "b", "replies": [{ "id": 4, "text": "d", "replies": [] }] },
         { "id": 3, "text": "c", "replies": [] },
     ]});
+    let tree = pw_render::Value::from_wire(&draft.initial);
+    assert!(
+        tree.is_ok(),
+        "the valid first-value graph must be read: {tree:?}"
+    );
     assert_eq!(
-        pw_render::Value::from_wire(&draft.initial).expect("a tree"),
+        tree.unwrap(),
         pw_render::Value::from_wire(&nested).expect("a value")
     );
 }
