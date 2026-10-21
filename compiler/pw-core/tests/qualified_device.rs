@@ -166,3 +166,64 @@ fn qualified_browser_only_read_still_refuses_unsupported_backend_lowering() {
         built.refusals()
     );
 }
+
+#[test]
+fn a_captured_public_record_prefix_does_not_steal_the_device_origin() {
+    for prefix in ["prefs", "publicPrefs"] {
+        let nested = format!(
+            "signal {prefix}: PublicPrefs = PublicPrefs {{ word: \"public\" }}\n    fn submit() -> Result<Unit, String> {{ send(\"{{{prefix}.word}} {{secret}}\") }}"
+        );
+        let mut files = sources(
+            "import prefs\nimport prefs.{ secret }",
+            &nested,
+            "match submit() { Ok(_) => draft = \"\", Err(_) => draft = \"\", }",
+            "String",
+        );
+        let prefs = &mut files
+            .iter_mut()
+            .find(|(path, _)| path == "prefs.pw")
+            .expect("prefs source")
+            .1;
+        prefs.push_str("\nsignal secret: String = \"\"\n    storage device \"prefs-secret\"\n    privacy Device\n    conflict last_write_wins\n");
+        let prefs = prefs.clone();
+        let app = &files
+            .iter()
+            .find(|(path, _)| path == "app.pw")
+            .expect("app source")
+            .1;
+        let found = diagnostics(&files);
+        // The nested function is independently disallowed from calling a command
+        // and reading a signal; its Device diagnostic must still name the source
+        // actually carrying Device, never the captured public record's field.
+        let mut codes: Vec<_> = found.iter().map(|d| d.code).collect();
+        codes.sort();
+        assert_eq!(codes, ["PW0339", "PW5301", "PW6801"], "{prefix}: {found:?}");
+        let device: Vec<_> = found.iter().filter(|d| d.code == "PW6801").collect();
+        assert_eq!(device.len(), 1, "{prefix}: {found:?}");
+        let device = device[0];
+        assert!(
+            device
+                .message
+                .starts_with("`secret` is kept on this device"),
+            "{prefix}: {device:?}"
+        );
+        assert_eq!(
+            app.get(device.primary_span.clone()),
+            Some(format!("\"{{{prefix}.word}} {{secret}}\"").as_str()),
+            "{prefix}: {device:?}"
+        );
+        assert!(
+            device
+                .related
+                .iter()
+                .any(|related| related.file.as_deref() == Some("prefs.pw")
+                    && prefs.get(related.span.clone()) == Some("secret")
+                    && related.label.contains("privacy Device")),
+            "{prefix}: {device:?}"
+        );
+        assert!(
+            build(&files).is_err(),
+            "the independently refused nested function must not build"
+        );
+    }
+}

@@ -252,7 +252,8 @@ pub fn check(
             unit,
             body,
             labels: &labels,
-            lexical: crate::lexical::Lexical::build(decl, body),
+            lexical: crate::lexical::Lexical::build_in(hir, id)
+                .unwrap_or_else(|| crate::lexical::Lexical::build(decl, body)),
             hirs,
         };
         cx.provides(&mut out);

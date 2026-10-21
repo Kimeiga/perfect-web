@@ -29,6 +29,9 @@ MUTANTS = [
     ('qualified signal names resolve as bare names', CORE / 'signatures.rs',
      '    pub(crate) fn signal_named(&self, unit: usize, name: &str) -> Option<DefId> {\n        let found = if name.contains(\'.\') {\n            self.workspace.resolve_path_in(unit, Namespace::Term, name)',
      '    pub(crate) fn signal_named(&self, unit: usize, name: &str) -> Option<DefId> {\n        let found = if name.contains(\'.\') {\n            self.workspace.resolve_in(unit, Namespace::Term, name)'),
+    ('captured record prefixes are mistaken for module paths', CORE / 'device_store.rs',
+     '            lexical: crate::lexical::Lexical::build_in(hir, id)\n                .unwrap_or_else(|| crate::lexical::Lexical::build(decl, body)),',
+     '            lexical: crate::lexical::Lexical::build(decl, body),'),
 ]
 BOUND = 300
 INVENTORY = None

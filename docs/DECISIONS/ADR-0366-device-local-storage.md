@@ -830,6 +830,14 @@ refusal; selective imports remain the supported backend form. Regression tests
 must execute the real build and retain that refusal until backend support is
 separately designed, tested and approved.
 
+The integration review also found that a nested declaration's origin reader
+used only its immediate binders, unlike the type and label readers. The same
+lexical environment must include captured outer binders: in an argument made
+from a public record `prefs.word` and imported Device `secret`, the diagnostic
+names `secret` even when `prefs` also names an imported module. The nested
+function in this witness remains independently refused by PW0339 and PW5301;
+this corrects the diagnostic's origin, not which programs can execute.
+
 
 ### An assertion operand is not an assertion failure (2026-10-20)
 
