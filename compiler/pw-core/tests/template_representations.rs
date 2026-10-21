@@ -323,19 +323,19 @@ fn first<T>(items: List<Id<T>>) -> String !{} {
             let body = hir.body(body_id);
             let types = pw_core::infer::Types::of_decl(&sigs, hir, id, body);
             for (expr, node, _) in body.exprs() {
-                if let pw_core::hir::Expr::Field { base, name } = node {
-                    if name == "value" {
-                        assert!(
-                            types.of(body, *base).is_none(),
-                            "this witness reaches the nominal fallback"
-                        );
-                        reads.push(pw_core::template_ir::value_path_typed(
-                            (&sigs, &ws),
-                            (&hirs, at, id),
-                            body,
-                            expr,
-                        ));
-                    }
+                if let pw_core::hir::Expr::Field { base, name } = node
+                    && name == "value"
+                {
+                    assert!(
+                        types.of(body, *base).is_none(),
+                        "this witness reaches the nominal fallback"
+                    );
+                    reads.push(pw_core::template_ir::value_path_typed(
+                        (&sigs, &ws),
+                        (&hirs, at, id),
+                        body,
+                        expr,
+                    ));
                 }
             }
         }
