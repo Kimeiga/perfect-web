@@ -205,6 +205,23 @@ export function sandbox(task, stack) {
   }
 }
 
+/**
+ * **The lines a run changed**: added and removed, in the files the agent
+ * edited and in the files it made, what the sandbox ignores aside. `git diff
+ * --numstat` alone lists only the files git tracks, and until 2026-10-21 a
+ * patch that makes a file counted only its edits: T06's Next.js reference,
+ * its 41-line form in a file of its own, counted 3. Intent to add puts each
+ * new file in the diff without staging what it holds.
+ */
+export function changedLines(app) {
+  const marked = sh("git", ["add", "--intent-to-add", "--all"], { cwd: app });
+  if (!marked.ok) throw new Error(`the changed files could not be listed: ${tail(marked.out)}`);
+  const diff = sh("git", ["diff", "--numstat"], { cwd: app }).out.trim();
+  return diff
+    ? diff.split("\n").reduce((n, l) => n + l.split("\t").slice(0, 2).map(Number).reduce((a, b) => a + (b || 0), 0), 0)
+    : 0;
+}
+
 // --- the agent -------------------------------------------------------------
 
 function runAgent(task, stack, agent, box) {
@@ -377,10 +394,7 @@ export async function run({ task: id, stack, agent }) {
   // However the run ends (ADR-0158), unless it is kept to be looked at.
   try {
     const agentRun = runAgent(task, stack, agent, box);
-    const diff = sh("git", ["diff", "--numstat"], { cwd: box.app }).out.trim();
-    const changed = diff
-      ? diff.split("\n").reduce((n, l) => n + l.split("\t").slice(0, 2).map(Number).reduce((a, b) => a + (b || 0), 0), 0)
-      : 0;
+    const changed = changedLines(box.app);
     const stages = agentRun.ok ? await grade(task, stack, box) : [];
     const score = agentRun.ok && stages.length > 0 && stages.every((s) => s.ok) ? 1 : 0;
     const failedAt = !agentRun.ok ? "agent" : stages.find((s) => !s.ok)?.name ?? null;

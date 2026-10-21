@@ -90,3 +90,19 @@ is not evidence of a difference; E14-C's twelve are the first that can be.
   baselines are stripped of design comments needs a ruling before E14-E.
 - **Query behaviour on Pleris** (ADR-0123): T02, T07 and T09 cannot be graded
   on Pleris yet.
+
+## Amended 2026-10-21: the lines changed include the files made
+
+"The lines changed", which a run's grading records (item 4 above), read
+`git diff --numstat`, which lists only the files git tracks, so a run that
+made a file counted only its edits.
+Next.js's references made files in four tasks and were undercounted: T01 27
+lines (really 77), T06 3 (48), T08 32 (52), T11 10 (37), their unsafe
+patches alike; Pleris's and SvelteKit's patches only edit. `changedLines`
+now marks each new file with intent to add before counting, ignores what the
+sandbox ignores, and refuses changes git cannot list rather than count none
+(`benchmarks/harness/test/changed-lines.test.mjs`,
+`scripts/bench_footprint_mutations.py`, `just e14-bench-footprint`). The
+committed `harness-T01`, `T06`, `T08` and `T11` traces keep the old counts
+until `just e14-harness` records them again on a machine with the
+frameworks' stores.
