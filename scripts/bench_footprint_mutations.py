@@ -31,37 +31,42 @@ TEST = "test/changed-lines.test.mjs"
 MADE = "a file the agent makes counts with the lines it edits, and an ignored one does not"
 REFUSED = "changes git cannot list are refused, not counted as none"
 
-# (what is undone, witness test, file, anchor, replacement)
+# (what is undone, file, anchor, replacement); each one's witness test is in
+# WITNESSES.
 MUTANTS = [
     (
         "a file the agent makes is not counted",
-        MADE,
         BENCH,
         '  const marked = sh("git", ["add", "--intent-to-add", "--all"], { cwd: app });\n',
         '  const marked = { ok: true, out: "" };\n',
     ),
     (
         "what the sandbox ignores is counted",
-        MADE,
         BENCH,
         '  const marked = sh("git", ["add", "--intent-to-add", "--all"], { cwd: app });\n',
         '  const marked = sh("git", ["add", "--intent-to-add", "--all", "--force"], { cwd: app });\n',
     ),
     (
         "removed lines are not counted",
-        MADE,
         BENCH,
         '    ? diff.split("\\n").reduce((n, l) => n + l.split("\\t").slice(0, 2)',
         '    ? diff.split("\\n").reduce((n, l) => n + l.split("\\t").slice(0, 1)',
     ),
     (
         "changes git cannot list are counted as none",
-        REFUSED,
         BENCH,
         "  if (!marked.ok) throw new Error(`the changed files could not be listed: ${tail(marked.out)}`);\n",
         "",
     ),
 ]
+
+# The test each mutant must fail, by an assertion.
+WITNESSES = {
+    "a file the agent makes is not counted": MADE,
+    "what the sandbox ignores is counted": MADE,
+    "removed lines are not counted": MADE,
+    "changes git cannot list are counted as none": REFUSED,
+}
 
 # How long one run may take before it is a hang: killed, and no kill.
 BOUND = 600
@@ -112,14 +117,15 @@ def main():
         print("FAIL: the unmutated baseline is not green; no mutant can mean anything")
         mutation_baseline.explain()
         return 1
-    missing = sorted({m[1] for m in MUTANTS} - set(baseline))
+    missing = sorted(set(WITNESSES.values()) - set(baseline))
     if missing:
         print("FAIL: a mutant names a test the suite does not have: " + "; ".join(missing))
         return 1
 
     killed = refused = survivors = 0
     original = BENCH.read_text()
-    for what, witness, path, anchor, replacement in MUTANTS:
+    for what, path, anchor, replacement in MUTANTS:
+        witness = WITNESSES[what]
         if original.count(anchor) != 1:
             print(f"{what}: REFUSED (anchor not unique in {path.name})", flush=True)
             refused += 1
