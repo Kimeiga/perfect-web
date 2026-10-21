@@ -74,6 +74,32 @@ negative controls. The server-backed version and old unchanged-suite
 requirements described below are the historical decision; this amendment
 supersedes their execution method and does not retroactively change results.
 
+## Amendment: the toggle-all witness reaches a valid browser receipt, 2026-10-21
+
+Verify 39545311229 at a0602009 exposed an invalid native browser witness for
+"the toggle-all does what clearing the completed does": the toggle-all fault
+left todos active, so the affected test clicked a hidden Clear completed button
+and timed out before the browser producer could issue its complete receipt.
+The original raw run remains at
+C:/Users/haki/code/perfect-web-handoff/tracks/evidence/train12-eight/verify-39545311229/evidence-0/evidence/docs/evidence/E14/todomvc.txt
+(SHA-256 5266673e48698fef68472d42c2d2aef5b8b5f2342daed183232e567a2b59da1b).
+
+The existing test now asserts Clear completed is visible before clicking it.
+The other clear-completed test that clicks after toggling a todo now asserts the
+same visible precondition; the test that already checked visibility remains
+unchanged. These assertions describe the UI state required for the action and
+keep all 50 test IDs and titles. No producer, parser, model, or runtime behavior
+changed.
+
+The focused current-source receipt has the unchanged four server IDs and 50
+Chromium IDs: server baseline 4/4, browser baseline 50/50, the unchanged
+operator fault passed pw check and produced a complete valid browser result
+with 46 passes and four assertion failures (including the repaired witness),
+then restored server 4/4 and browser 50/50. The same 50 IDs were reported at
+each browser run. Raw focused logs and structured receipts are in
+/tmp/train12-toggle-visible-proof7; this local focused proof is not a whole
+43-control campaign or hosted verification.
+
 ## Context
 
 - **The owner's reference app, familiar to everyone** ("something people are

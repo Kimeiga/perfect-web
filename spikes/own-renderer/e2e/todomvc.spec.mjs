@@ -219,7 +219,9 @@ test("the toggle-all, pressed, is not checked for a todo added once the complete
   await add(page, ONE);
   await page.locator(".toggle-all").check({ force: true });
   await expect(page.locator(".toggle-all")).toBeChecked();
-  await page.locator(".clear-completed").click();
+  const clearCompleted = page.locator(".clear-completed");
+  await expect(clearCompleted).toBeVisible();
+  await clearCompleted.click();
   await expect(items(page)).toHaveCount(0);
   await expect(page.locator(".toggle-all")).not.toBeChecked();
   await add(page, TWO);
@@ -474,8 +476,10 @@ test("clear completed shows its text and removes the completed", async ({ page }
   await open(page);
   await add(page, ONE, TWO, THREE);
   await items(page).nth(1).locator(".toggle").check();
-  await expect(page.locator(".clear-completed")).toHaveText("Clear completed");
-  await page.locator(".clear-completed").click();
+  const clearCompleted = page.locator(".clear-completed");
+  await expect(clearCompleted).toHaveText("Clear completed");
+  await expect(clearCompleted).toBeVisible();
+  await clearCompleted.click();
   await expect(items(page)).toHaveText([ONE, THREE]);
 });
 

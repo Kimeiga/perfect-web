@@ -185,3 +185,42 @@ PASS: actual clean -> exact named PW6805 -> restored clean
 
 === /tmp/t12-todomvc-anchors.txt ===
 mutation anchors: 4396 mutants in 309 scripts, each matching once
+
+
+=== Verify 39545311229: hidden Clear completed precondition ===
+
+Original raw invalid witness, retained unchanged at:
+C:/Users/haki/code/perfect-web-handoff/tracks/evidence/train12-eight/verify-39545311229/evidence-0/evidence/docs/evidence/E14/todomvc.txt
+SHA-256 5266673e48698fef68472d42c2d2aef5b8b5f2342daed183232e567a2b59da1b
+
+The unchanged operator "the toggle-all does what clearing the completed does"
+left todos active. In test "the toggle-all, pressed, is not checked for a todo
+added once the completed are cleared", the checked-box assertion passed but
+clicking hidden .clear-completed timed out. The shared producer correctly
+refused the incomplete result instead of crediting a kill. Repair asserts that
+.clear-completed is visible before click. Inspection found one sibling
+clear-completed click with the same unchecked UI precondition; it now asserts
+visibility after checking its todo. A second sibling already asserted
+visibility. No helper, producer, parser, mutation, or runtime code changed.
+
+Focused current-source producer receipts (source
+/home/haki/code/pw-wt/todomvc-toggle-all-visible-precondition, base
+ a0602009d8f7d4f178bb9ce082ab08919ebc1130, script
+/tmp/train12-toggle-visible-proof.py, raw outputs
+/tmp/train12-toggle-visible-proof7):
+- Server baseline: native status 0, complete exact four-ID assertion receipt,
+  4 passed / 0 failed.
+- Chromium baseline: native status 0, complete exact 50-ID receipt,
+  50 passed / 0 failed.
+- Mutant pw check: native status 0, 23 files, no diagnostics.
+- Unchanged toggle-all/clear-completed operator fault: native browser status 1,
+  complete exact same 50-ID receipt, 46 passed / 4 failed, all four recorded as
+  body assertions; one is the repaired Clear completed visibility assertion.
+  The other three are existing toggle-all semantic assertions at lines 172,
+  183, and 197.
+- Restored server: native status 0, exact four IDs, 4 passed / 0 failed.
+- Restored Chromium: native status 0, exact same 50 IDs, 50 passed / 0 failed.
+
+The first baseline browser inventory defines the 50 IDs; the strict parser
+validated baseline, mutant, and restored structured receipts. This focused
+result does not replace the whole 43-control campaign or hosted verification.
