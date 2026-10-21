@@ -13,6 +13,7 @@ import tempfile
 from typing import NamedTuple
 
 import unittest_protocol
+import producer_process
 
 ROOT = Path(__file__).resolve().parent.parent
 PRODUCER = ROOT / "scripts/unittest_producer.py"
@@ -46,27 +47,25 @@ def _launch(directory, command, search_dirs, timeout):
     # timestamp/size cache. No existing cache is deleted or trusted.
     env["PYTHONPYCACHEPREFIX"] = str(directory / "fresh-bytecode")
     env["PYTHONDONTWRITEBYTECODE"] = "1"
-    timed_out = False
-    with (directory / "stdout.txt").open("w") as stdout, (directory / "stderr.txt").open("w") as stderr:
-        child = subprocess.Popen(command, cwd=ROOT, env=env, stdout=stdout, stderr=stderr, text=True)
-        try:
-            actual_status = child.wait(timeout=timeout)
-        except subprocess.TimeoutExpired:
-            timed_out = True
-            child.terminate()
-            try:
-                actual_status = child.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                child.kill()
-                actual_status = child.wait()
-    status = None if timed_out else actual_status
-    output = (directory / "stdout.txt").read_text(errors="replace") + (directory / "stderr.txt").read_text(errors="replace")
-    metadata = {"command": list(map(str, command)), "cwd": str(ROOT), "pid": child.pid,
-                "actual_status": actual_status, "validated_status": status,
-                "timed_out": timed_out, "child_reaped": True,
+    metadata = {"command": list(map(str, command)), "cwd": str(ROOT),
                 "deployment_env_absent": True, "fresh_bytecode_prefix": env["PYTHONPYCACHEPREFIX"]}
-    (directory / "process.json").write_text(json.dumps(metadata, indent=2) + "\n")
-    return status, output
+
+    def reaped(pid, actual_status, timed_out, cancelled):
+        metadata.update(pid=pid, actual_status=actual_status,
+                        validated_status=None if timed_out or cancelled else actual_status,
+                        timed_out=timed_out, cancelled=cancelled, child_reaped=True)
+        (directory / "process.json").write_text(json.dumps(metadata, indent=2) + "\n")
+
+    with (directory / "stdout.txt").open("w") as stdout, (directory / "stderr.txt").open("w") as stderr:
+        try:
+            producer_process.run(command, cwd=ROOT, env=env, stdout=stdout, stderr=stderr,
+                                 text=True, timeout=timeout, on_reaped=reaped, grace=2)
+        except subprocess.TimeoutExpired:
+            # The owner already stopped the group, reaped the native child and
+            # retained its actual status. A timed-out result cannot validate.
+            pass
+    output = (directory / "stdout.txt").read_text(errors="replace") + (directory / "stderr.txt").read_text(errors="replace")
+    return metadata["validated_status"], output
 
 
 def _read_report(path):

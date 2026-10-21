@@ -17,7 +17,7 @@ MUTANTS = [
      '                out, err = child.communicate()\n',
      '                signal.signal(signal.SIGTERM, previous[signal.SIGTERM])\n                out, err = child.communicate()\n'),
     ('default cancellation kills the parent without restoring source', 'test_default_cancellation_raises_through_source_restoration',
-     '        raise SystemExit(128 + number)\n', '        signal.raise_signal(number)\n'),
+     '            raise SystemExit(128 + number)\n', '            signal.raise_signal(number)\n'),
     ('ignored cancellation is captured', 'test_ignored_parent_cancellation_stays_ignored',
      '            if previous[number] != signal.SIG_IGN:\n', '            if True:\n'),
     ('native failed status is changed to success', 'test_native_output_and_nonzero_status_are_unchanged',
