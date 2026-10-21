@@ -3223,3 +3223,7 @@ Inferred effects reach a fixed point before checks and contracts (train-12 integ
 [ADR-0376](DECISIONS/ADR-0376-producer-process-ownership.md):
 Mutation producers own their child through launch, cancellation and reaping (train-12 integration; final combined gates pending).
 - Defer cancellation while acquiring and cleaning the child; reap its owned process group before source restoration. Native launch-window, running, repeated-signal and timeout controls hold the lifecycle.
+
+[ADR-0377](DECISIONS/ADR-0377-todomvc-cypress-compatibility-copy.md):
+Execute an identified TodoMVC Cypress compatibility copy (train-12 integration; final combined gates pending).
+- Preserve the seven upstream blobs, verify exactly two compatibility patches and the runner pin, and require all 29 cases with native status zero. The launcher owns and reaps its actual host; failed and ineffective probes remain recorded.

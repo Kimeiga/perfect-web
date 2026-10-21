@@ -17,7 +17,8 @@ storage assertion, persistence assertion or known-issue table is changed.
 Every report must identify this as **official TodoMVC cases with pinned
 Cypress compatibility patch v1**. It is not unchanged upstream execution.
 The source hashes, runner pin, unique patch anchors, output hashes and
-staged manifest are checked before launch. The runner must own and reap
+staged manifest are checked before launch, as specified by
+[ADR-0377](ADR-0377-todomvc-cypress-compatibility-copy.md). The runner must own and reap
 its host; another process answering the chosen port is not readiness proof.
 
 Acceptance still requires all 29 cases to execute and pass, no pending,

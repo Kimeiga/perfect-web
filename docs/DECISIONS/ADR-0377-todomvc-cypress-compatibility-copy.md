@@ -1,6 +1,7 @@
-# ADR-XXXX: Execute an identified TodoMVC Cypress compatibility copy
+# ADR-0377: Execute an identified TodoMVC Cypress compatibility copy
 
-Status: proposed for train integration; E14. Original vendored files remain
+Status: accepted by the integrator, 2026-10-20; E14. Combined gates remain
+pending. Original vendored files remain
 the seven upstream blobs recorded in `spikes/todomvc-cypress/UPSTREAM.md`.
 
 ## Finding
@@ -64,7 +65,7 @@ its separately owned test file; combined validation must cover them.
 
 Raw native outputs, manifest, exact copied-app edits and source hashes:
 [compatibility proof](../evidence/tooling/todomvc-compat-native.txt).
-Whole existing producer controls and exact combined CI remain pending. Root's
+Whole existing producer controls and exact combined CI remain pending. The integrator's
 earlier scratch 29/29 and the failed first probe are diagnostic history only.
 Historical failed unchanged runs remain failed. This adapter establishes
 neither an unchanged-suite pass nor broader TodoMVC correctness.
