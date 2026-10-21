@@ -3,6 +3,8 @@
 import ast
 from pathlib import Path
 import sys
+import signal
+from contextlib import contextmanager
 import tempfile
 
 import guide_python
@@ -44,6 +46,17 @@ WITNESSES = [
 ]
 
 
+@contextmanager
+def termination_unwinds():
+    previous = signal.getsignal(signal.SIGTERM)
+    def unwind(signum, _frame):
+        raise SystemExit(128 + signum)
+    signal.signal(signal.SIGTERM, unwind)
+    try:
+        yield
+    finally:
+        signal.signal(signal.SIGTERM, previous)
+
 def main():
     import mutation_baseline  # metadata imports must not start mutation execution
     watch = mutation_baseline.mutation_bound.start()
@@ -56,25 +69,26 @@ def main():
         return 1
     print(f"baseline: {len(expected)} passed, 0 failed", flush=True)
     killed = 0
-    for (name, path, anchor, replacement), method in zip(MUTANTS, WITNESSES, strict=True):
-        original = path.read_text()
-        witness = SELECTOR + ".Compatibility." + method
-        if original.count(anchor) != 1 or witness not in expected:
-            print(f"REFUSED: {name}: authority or frozen witness changed")
-            return 1
-        mutant = original.replace(anchor, replacement, 1)
-        ast.parse(mutant)
-        with mutation_source.changed(path, original, mutant):
-            run = guide_python.run(SELECTOR, expected, TESTS, evidence)
-        print(run.output, flush=True)
-        if not run.result.valid or run.result.body_errors or watch.stopped:
-            print(f"REFUSED: {name}: invalid or stopped producer; no kill")
-            return 1
-        if witness in run.result.assertion_failed:
-            killed += 1
-            print(f"{name}: KILLED by {witness}", flush=True)
-        else:
-            print(f"{name}: SURVIVED", flush=True)
+    with termination_unwinds():
+        for (name, path, anchor, replacement), method in zip(MUTANTS, WITNESSES, strict=True):
+            original = path.read_text()
+            witness = SELECTOR + ".Compatibility." + method
+            if original.count(anchor) != 1 or witness not in expected:
+                print(f"REFUSED: {name}: authority or frozen witness changed")
+                return 1
+            mutant = original.replace(anchor, replacement, 1)
+            ast.parse(mutant)
+            with mutation_source.changed(path, original, mutant):
+                run = guide_python.run(SELECTOR, expected, TESTS, evidence)
+            print(run.output, flush=True)
+            if not run.result.valid or run.result.body_errors or watch.stopped:
+                print(f"REFUSED: {name}: invalid or stopped producer; no kill")
+                return 1
+            if witness in run.result.assertion_failed:
+                killed += 1
+                print(f"{name}: KILLED by {witness} ({len(run.result.assertion_failed)} assertion methods fail)", flush=True)
+            else:
+                print(f"{name}: SURVIVED", flush=True)
     print(f"{killed} of {len(MUTANTS)} mutants killed", flush=True)
     return int(killed != len(MUTANTS))
 

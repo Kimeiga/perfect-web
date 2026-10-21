@@ -103,6 +103,25 @@ Y_AGREES = (
 
 
 class Counts(unittest.TestCase):
+    def test_historical_browser_assertion_verdicts_match_frozen_mutants(self):
+        module = counts.load(SCRIPTS / "playwright_assertion_mutations.py")
+        historical = """expect steps earn kills without native proof: KILLED by scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_missing_native_proof_is_refused (1 assertion methods fail)
+old native proof earns a kill: KILLED by scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_stale_native_proof_is_refused (1 assertion methods fail)
+browser/API errors are branded as matcher failures: KILLED by scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_closed_browser_is_not_a_comparison (1 assertion methods fail)
+negated comparisons lose native proof: KILLED by scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_native_comparisons_messages_and_negation_produce_proof (1 assertion methods fail)
+native error causes are discarded: KILLED by scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_native_cause_is_preserved_under_proof (1 assertion methods fail)
+poll equality uses ordinary numeric equality: KILLED by scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_poll_preserves_object_is_and_completed_mismatches (1 assertion methods fail)
+callback exceptions become observed mismatches: KILLED by scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_poll_callback_errors_are_not_assertion_results (1 assertion methods fail)
+a final clamped interval restarts the poll callback: KILLED by scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_final_poll_interval_never_restarts_an_early_callback (1 assertion methods fail)
+an unfinished callback becomes an observed mismatch: KILLED by scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_pending_poll_callback_is_not_a_mismatch (1 assertion methods fail)
+"""
+        verdicts = historical.splitlines()
+        self.assertEqual(len(verdicts), 9)
+        for line, mutant in zip(verdicts, module.MUTANTS, strict=True):
+            said = counts.VERDICT.fullmatch(line)
+            self.assertIsNotNone(said, line)
+            self.assertTrue(counts.names(said.group(1), mutant), line)
+
     def tree(self, files: dict[str, str]) -> pathlib.Path:
         root = pathlib.Path(tempfile.mkdtemp(prefix="pw-counts-"))
         self.addCleanup(shutil.rmtree, root, True)
