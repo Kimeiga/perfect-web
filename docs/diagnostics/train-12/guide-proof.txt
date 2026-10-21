@@ -1,0 +1,1061 @@
+Guide strict producer migration — native diagnostic record
+
+Source commit: 2834b50955d165fab1be611ba54db532f19b7b28
+Base: 8b73c9982435eddcfa4ecfdfe095b999725bb475
+
+These raw checks ran on the working tree before the source commit. The final
+control label describing Python runtime-error invalidation was clarified after
+the run; its anchor, replacement and intended assertion were unchanged.
+This is diagnostic history, including deliberately failed checks and repaired
+controls. It is not accepted current E14 evidence. The integrated source needs
+its canonical hosted guide/producer/guestbook consumers before landing.
+
+Final native checks: 74/74 semantic controls; 18/18 producer controls with49
+full native test IDs; no refusals/survivors or memory stops. Four-case Chromium
+baseline and each five browser faults completed all four IDs; assertion failure
+counts were0,1,3,4,1,1. Three CHECKED native refusals remainedPW5048/PW5048/PW5107,
+with exact24files/1error/0warnings. All74 identities, targets, MUST and CHECKED
+remain equal to base; one equivalent trailing-space comparison reanchor.
+
+Independent reviewers train12 and generic_review found no remaining false-credit
+or inventory issue in the final scope; generic independently ran49consumer tests.
+Additional local checks: cargo fmt, git diff --check, node --check;4353mutation
+anchors in305scripts; case-check3487paths. Existing recipe harness reports[]
+problems for e14-guide under inherited bash-euo-pipefail; no masking bug claimed.
+
+===== guide-strict-bodyerror-red.log; SHA256 f0f3fed0c16ecf83dc05b0cefa3bb8f040b662763967eccf7be94c99d376eb74 =====
+F
+======================================================================
+FAIL: test_native_body_error_earns_no_assertion_kill (test_guide_producer_results.GuideNativeProtocol)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/guide-strict/scripts/tests/test_guide_producer_results.py", line 441, in test_native_body_error_earns_no_assertion_kill
+    self.assertNotEqual(code, 0)
+AssertionError: 0 == 0
+
+----------------------------------------------------------------------
+Ran 1 test in 0.822s
+
+FAILED (failures=1)
+===== guide-strict-diagnostic-state-red.log; SHA256 ed7e8f40ddafafa15776e9a067471e531577ce93300069608e180afcca92a17f =====
+F
+======================================================================
+FAIL: test_checked_refusal_requires_complete_error_inventory (test_guide_producer_results.GuideProducers)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/guide-strict/scripts/tests/test_guide_producer_results.py", line 308, in test_checked_refusal_requires_complete_error_inventory
+    self.assertEqual(module.compiler_codes(status, output), set())
+AssertionError: Items in the first set but not the second:
+'PW5048'
+
+----------------------------------------------------------------------
+Ran 1 test in 0.005s
+
+FAILED (failures=1)
+===== guide-strict-whole-first.log; SHA256 91bc376ff41315d300d5cc614fd235bfc2bc449263e044147b37c4c2c640c1b0 =====
+Python frozen full IDs: ['test_guide_diagnostics.Current.test_every_registered_code_has_a_row', 'test_guide_diagnostics.Current.test_the_committed_page_is_what_the_registry_writes', 'test_guide_diagnostics.Reading.test_a_line_that_is_no_entry_is_refused_not_skipped', 'test_guide_diagnostics.Reading.test_a_pipe_in_a_cell_is_escaped', 'test_guide_diagnostics.Reading.test_a_retired_code_with_its_reason_continued_across_lines', 'test_guide_diagnostics.Reading.test_an_owner_without_a_title_is_written_from_its_name', 'test_guide_diagnostics.Reading.test_each_entry_with_its_invariant_and_the_adrs_its_comment_cites']; evidence /tmp/pw-guide-python-evidence-0wfp9a8g
+baseline: the guide's tests, 22 ran, 0 failed
+baseline: the guestbook in Chromium, 4 ran, 0 failed
+an example no longer type-checks: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust body assertion)
+an example is not as `pw fmt` writes it: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust body assertion)
+an example checks clean and `pw build` refuses it: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust body assertion)
+a refused example is refused no more: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust body assertion)
+a refused example is refused by another code: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust body assertion)
+output a page shows is not what `pw check` prints: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust body assertion)
+a block says nothing of what it is: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust body assertion)
+a block is in a language the guide is not written in: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust body assertion)
+a fence is indented: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust body assertion)
+a fence is never closed: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust body assertion)
+a page's files no longer check together: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust body assertion)
+the tutorial and the app differ by a byte: REFUSED (invalid or stopped guide producer; no kill)
+    Finished `test` profile [unoptimized] target(s) in 0.04s
+     Running tests/guide.rs (target/debug/deps/guide-171ef653322e12f7)
+
+running 15 tests
+test a_fence_is_read_as_commonmark_reads_it ... ok
+test a_page_with_no_example_or_a_block_unseen_is_reported ... ok
+test a_gaps_build_output_belongs_to_the_gap_before_it ... ok
+test a_program_differs_from_a_directory_by_a_file_or_a_byte ... ok
+test a_refused_examples_codes_are_read_from_its_output ... ok
+test a_pages_file_blocks_are_its_program_in_order ... ok
+test a_page_is_held_to_the_directory_it_names ... ok
+test an_info_string_says_what_a_block_is ... ok
+test an_unclosed_or_indented_fence_is_refused ... ok
+test shown_output_belongs_to_the_refused_example_before_it ... ok
+test the_reference_is_held_to_the_registry ... ok
+test a_pages_program_is_the_directory_it_names ... FAILED
+test the_diagnostic_reference_lists_every_registered_code ... ok
+test every_example_in_the_guide_compiles_as_it_says ... ok
+test a_wrong_example_is_reported_and_a_right_one_is_not ... ok
+
+failures:
+
+---- a_pages_program_is_the_directory_it_names stdout ----
+
+thread 'a_pages_program_is_the_directory_it_names' (90882) panicked at compiler/pw-cli/tests/guide.rs:696:13:
+tutorial.md and its directory: `pages.pw` differs: the tutorial and the app differ
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    a_pages_program_is_the_directory_it_names
+
+test result: FAILED. 14 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.07s
+
+error: test failed, to rerun pass `-p pw-cli --test guide`
+
+Cargo result refused: 
+the tutorial builds a file the app does not have: REFUSED (invalid or stopped guide producer; no kill)
+ be declared here or brought in by an explicit import.
+           
+           A call that resolves to nothing is not caught by anything downstream. Inference contributes no effects for it, privacy no label, placement no constraint and the contract no capability, and each of those answers is what a harmless call produces too.
+   = help: import the module that declares `remove`, or declare it here
+error: [PW5016] `entry` has no type the resume manifest can name
+  --> pages.pw:39:106
+   |
+ 1 | / session page Book() {
+ 2 | |     route     "/"
+ 3 | |     placement origin
+ 4 | |     cache     private
+...  |
+39 | |                         {#if SignedIn}{#if entry.mine}<button type="button" on:press={() => match remove(entry.id) {
+   | |                                                                                                          ^^^^^ `entry` has no type the resume manifest can name
+...  |
+49 | | }
+   | |_- `Book` declares the handler
+   |
+   = note: A resume manifest carries a schema hash derived from what a handler captures, and the running code compares it against the schema its own build produced. A capture whose type this build cannot determine yields a hash derived from a guess, which matches nothing — so every resume of `Book` would fail after deployment, for a reason nobody could diagnose from the deployment. Name the type here, where it is still a compile error.
+   = help: annotate `entry`, or capture a value whose type is declared
+error: [PW0408] the type of `entry` is not known here, so what `.id` reads cannot be checked
+  --> pages.pw:39:106
+   |
+39 |                         {#if SignedIn}{#if entry.mine}<button type="button" on:press={() => match remove(entry.id) {
+   |                                                                                                          -----^^^
+   |                                                                                                          |
+   |                                                                                                          the type of `entry` is not known here, so what `.id` reads cannot be checked
+   |                                                                                                          no declaration gives this value a type, and no call solves one
+   |
+   = note: A member read is a call (ADR-0048), found by its receiver's type: which `id` this is, the effects it performs and the label of what it gives are each read through that type, and `Book` cannot be checked against a read no analysis can see.
+   = help: write `entry`'s type where it is bound, as `(x: Item) => ..` does for a lambda's parameter
+pw check: 25 file(s), 21 error(s), 0 warning(s)
+
+
+
+failures:
+    a_pages_program_is_the_directory_it_names
+    every_example_in_the_guide_compiles_as_it_says
+
+test result: FAILED. 13 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.11s
+
+error: test failed, to rerun pass `-p pw-cli --test guide`
+
+Cargo result refused: 
+the closed title gap claims check still accepts it: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust body assertion)
+a build gap is closed: the build accepts it: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust body assertion)
+a check gap is closed: the check refuses it: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust body assertion)
+the closed two-signal gap is claimed to be refused still: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust body assertion)
+the reference has no row for a code: KILLED by test_the_committed_page_is_what_the_registry_writes, the_diagnostic_reference_lists_every_registered_code (2 of 22 tests fail; Rust body assertion, Python body assertion)
+the reference gives a code another invariant: KILLED by test_the_committed_page_is_what_the_registry_writes, the_diagnostic_reference_lists_every_registered_code (2 of 22 tests fail; Rust body assertion, Python body assertion)
+the reference has a row for a code the compiler lacks: KILLED by test_the_committed_page_is_what_the_registry_writes, the_diagnostic_reference_lists_every_registered_code (2 of 22 tests fail; Rust body assertion, Python body assertion)
+a clean example need not check clean: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust body assertion)
+an example need not be as `pw fmt` writes it: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust body assertion)
+an example that parses is held to the format only where it is clean: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust body assertion)
+a clean example need not build: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust body assertion)
+a build gap may build: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust body assertion)
+a gap's build output need not be what is shown: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust body assertion)
+a refused example need not be refused: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust body assertion)
+a refusal's codes are compared as a subset of what is reported: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust body assertion)
+a refusal's codes are compared as a superset of what is reported: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust body assertion)
+output a page shows of a refusal need not be what is printed: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust body assertion)
+output a page shows keeps the closing count `pw check` prints: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust body assertion)
+a fence of another character closes a block: KILLED by an_unclosed_or_indented_fence_is_refused (1 of 22 tests fail; Rust body assertion)
+a closing fence may carry text: KILLED by an_unclosed_or_indented_fence_is_refused (1 of 22 tests fail; Rust body assertion)
+a shorter fence closes a block: KILLED by a_page_with_no_example_or_a_block_unseen_is_reported (1 of 22 tests fail; Rust body assertion)
+an indented fence is accepted: KILLED by an_unclosed_or_indented_fence_is_refused (1 of 22 tests fail; Rust body assertion)
+a fence never closed is accepted: KILLED by an_unclosed_or_indented_fence_is_refused (1 of 22 tests fail; Rust body assertion)
+two backticks are a fence: KILLED by a_fence_is_read_as_commonmark_reads_it (1 of 22 tests fail; Rust body assertion)
+an attribute a block does not take is skipped: KILLED by an_info_string_says_what_a_block_is (1 of 22 tests fail; Rust body assertion)
+an attribute may be given twice: KILLED by an_info_string_says_what_a_block_is (1 of 22 tests fail; Rust body assertion)
+a file may be outside the page's tree: KILLED by an_info_string_says_what_a_block_is (1 of 22 tests fail; Rust body assertion)
+a block may be a gap and a refusal: KILLED by an_info_string_says_what_a_block_is (1 of 22 tests fail; Rust body assertion)
+another language's block takes attributes: KILLED by an_info_string_says_what_a_block_is (1 of 22 tests fail; Rust body assertion)
+a language the guide is not written in passes: KILLED by an_info_string_says_what_a_block_is (1 of 22 tests fail; Rust body assertion)
+a page's pieces are joined with no blank line: REFUSED (invalid or stopped guide producer; no kill)
+   Compiling pw-cli v0.0.0 (/home/haki/code/pw-wt/guide-strict/compiler/pw-cli)
+    Finished `test` profile [unoptimized] target(s) in 0.58s
+     Running tests/guide.rs (target/debug/deps/guide-171ef653322e12f7)
+
+running 15 tests
+test a_fence_is_read_as_commonmark_reads_it ... ok
+test a_page_is_held_to_the_directory_it_names ... ok
+test a_page_with_no_example_or_a_block_unseen_is_reported ... ok
+test a_gaps_build_output_belongs_to_the_gap_before_it ... ok
+test a_pages_file_blocks_are_its_program_in_order ... FAILED
+test a_program_differs_from_a_directory_by_a_file_or_a_byte ... ok
+test a_refused_examples_codes_are_read_from_its_output ... ok
+test an_unclosed_or_indented_fence_is_refused ... ok
+test an_info_string_says_what_a_block_is ... ok
+test shown_output_belongs_to_the_refused_example_before_it ... ok
+test the_reference_is_held_to_the_registry ... ok
+test a_pages_program_is_the_directory_it_names ... FAILED
+test the_diagnostic_reference_lists_every_registered_code ... ok
+test every_example_in_the_guide_compiles_as_it_says ... ok
+test a_wrong_example_is_reported_and_a_right_one_is_not ... ok
+
+failures:
+
+---- a_pages_file_blocks_are_its_program_in_order stdout ----
+
+thread 'a_pages_file_blocks_are_its_program_in_order' (103043) panicked at compiler/pw-cli/tests/guide.rs:1070:5:
+assertion `left == right` failed
+  left: [("g/app.pw", "module g.app\nfn f() -> Int !{} { 1 }\n")]
+ right: [("g/app.pw", "module g.app\n\nfn f() -> Int !{} { 1 }\n")]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- a_pages_program_is_the_directory_it_names stdout ----
+
+thread 'a_pages_program_is_the_directory_it_names' (103044) panicked at compiler/pw-cli/tests/guide.rs:693:13:
+tutorial.md and its directory: `book.pw` differs: the tutorial and the app differ
+
+
+failures:
+    a_pages_file_blocks_are_its_program_in_order
+    a_pages_program_is_the_directory_it_names
+
+test result: FAILED. 13 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.15s
+
+error: test failed, to rerun pass `-p pw-cli --test guide`
+
+Cargo result refused: 
+output belongs to any block before it: KILLED by shown_output_belongs_to_the_refused_example_before_it (1 of 22 tests fail; Rust body assertion)
+a build's output belongs to any block before it: KILLED by a_gaps_build_output_belongs_to_the_gap_before_it (1 of 22 tests fail; Rust body assertion)
+a build gap need not show what `pw build` prints: KILLED by a_gaps_build_output_belongs_to_the_gap_before_it (1 of 22 tests fail; Rust body assertion)
+a page with no example is accepted: KILLED by a_page_with_no_example_or_a_block_unseen_is_reported (1 of 22 tests fail; Rust body assertion)
+a Pleris block the reader of pages did not see goes unnoticed: KILLED by a_page_with_no_example_or_a_block_unseen_is_reported (1 of 22 tests fail; Rust body assertion)
+a page's pieces are not counted: KILLED by a_page_with_no_example_or_a_block_unseen_is_reported, every_example_in_the_guide_compiles_as_it_says (2 of 22 tests fail; Rust body assertion)
+the index is held to show Pleris: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust body assertion)
+a page's program is not compared with the directory it names: KILLED by a_page_is_held_to_the_directory_it_names (1 of 22 tests fail; Rust body assertion)
+a page that names a directory and builds nothing in it is accepted: KILLED by a_page_is_held_to_the_directory_it_names (1 of 22 tests fail; Rust body assertion)
+the directory a page names is read with its spaces: REFUSED (invalid or stopped guide producer; no kill)
+   Compiling pw-cli v0.0.0 (/home/haki/code/pw-wt/guide-strict/compiler/pw-cli)
+    Finished `test` profile [unoptimized] target(s) in 0.51s
+     Running tests/guide.rs (target/debug/deps/guide-171ef653322e12f7)
+
+running 15 tests
+test a_fence_is_read_as_commonmark_reads_it ... ok
+test a_gaps_build_output_belongs_to_the_gap_before_it ... ok
+test a_page_is_held_to_the_directory_it_names ... FAILED
+test a_page_with_no_example_or_a_block_unseen_is_reported ... ok
+test a_pages_file_blocks_are_its_program_in_order ... ok
+test a_refused_examples_codes_are_read_from_its_output ... ok
+test a_program_differs_from_a_directory_by_a_file_or_a_byte ... ok
+test an_unclosed_or_indented_fence_is_refused ... ok
+test an_info_string_says_what_a_block_is ... ok
+test shown_output_belongs_to_the_refused_example_before_it ... ok
+test the_reference_is_held_to_the_registry ... ok
+test a_pages_program_is_the_directory_it_names ... FAILED
+test the_diagnostic_reference_lists_every_registered_code ... ok
+test every_example_in_the_guide_compiles_as_it_says ... ok
+test a_wrong_example_is_reported_and_a_right_one_is_not ... ok
+
+failures:
+
+---- a_page_is_held_to_the_directory_it_names stdout ----
+
+thread 'a_page_is_held_to_the_directory_it_names' (107993) panicked at compiler/pw-cli/tests/guide.rs:1191:5:
+assertion `left == right` failed
+  left: Some(" app/guestbook ")
+ right: Some("app/guestbook")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- a_pages_program_is_the_directory_it_names stdout ----
+
+thread 'a_pages_program_is_the_directory_it_names' (107996) panicked at compiler/pw-cli/tests/guide.rs:688:74:
+ examples/guestbook : No such file or directory (os error 2)
+
+
+failures:
+    a_page_is_held_to_the_directory_it_names
+    a_pages_program_is_the_directory_it_names
+
+test result: FAILED. 13 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.10s
+
+error: test failed, to rerun pass `-p pw-cli --test guide`
+
+Cargo result refused: 
+a file the page lacks is not noticed: REFUSED (invalid or stopped guide producer; no kill)
+   Compiling pw-cli v0.0.0 (/home/haki/code/pw-wt/guide-strict/compiler/pw-cli)
+    Finished `test` profile [unoptimized] target(s) in 0.53s
+     Running tests/guide.rs (target/debug/deps/guide-171ef653322e12f7)
+
+running 15 tests
+test a_fence_is_read_as_commonmark_reads_it ... ok
+test a_page_is_held_to_the_directory_it_names ... FAILED
+test a_page_with_no_example_or_a_block_unseen_is_reported ... ok
+test a_pages_file_blocks_are_its_program_in_order ... ok
+test a_gaps_build_output_belongs_to_the_gap_before_it ... ok
+test a_program_differs_from_a_directory_by_a_file_or_a_byte ... FAILED
+test a_refused_examples_codes_are_read_from_its_output ... ok
+test an_info_string_says_what_a_block_is ... ok
+test an_unclosed_or_indented_fence_is_refused ... ok
+test shown_output_belongs_to_the_refused_example_before_it ... ok
+test the_reference_is_held_to_the_registry ... ok
+test a_pages_program_is_the_directory_it_names ... ok
+test the_diagnostic_reference_lists_every_registered_code ... ok
+test every_example_in_the_guide_compiles_as_it_says ... ok
+test a_wrong_example_is_reported_and_a_right_one_is_not ... ok
+
+failures:
+
+---- a_page_is_held_to_the_directory_it_names stdout ----
+
+thread 'a_page_is_held_to_the_directory_it_names' (108342) panicked at compiler/pw-cli/tests/guide.rs:1207:5:
+assertion failed: program_problem("t.md", md, &more).is_some()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- a_program_differs_from_a_directory_by_a_file_or_a_byte stdout ----
+
+thread 'a_program_differs_from_a_directory_by_a_file_or_a_byte' (108346) panicked at compiler/pw-cli/tests/guide.rs:716:47:
+no entry found for key
+
+
+failures:
+    a_page_is_held_to_the_directory_it_names
+    a_program_differs_from_a_directory_by_a_file_or_a_byte
+
+test result: FAILED. 13 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.11s
+
+error: test failed, to rerun pass `-p pw-cli --test guide`
+
+Cargo result refused: 
+trailing space is no difference: KILLED by a_program_differs_from_a_directory_by_a_file_or_a_byte (2 of 22 tests fail; Rust body assertion)
+a row's invariant is not compared with the registry's: KILLED by the_reference_is_held_to_the_registry (1 of 22 tests fail; Rust body assertion)
+a code with no row is not reported: KILLED by the_reference_is_held_to_the_registry (1 of 22 tests fail; Rust body assertion)
+a row for a code the compiler lacks is not reported: KILLED by the_reference_is_held_to_the_registry (1 of 22 tests fail; Rust body assertion)
+an ADR a comment cites twice is listed twice: KILLED by test_each_entry_with_its_invariant_and_the_adrs_its_comment_cites (1 of 22 tests fail; Python body assertion)
+a comment is taken by the entry after the next: KILLED by test_each_entry_with_its_invariant_and_the_adrs_its_comment_cites (2 of 22 tests fail; Python body assertion)
+a line that is no entry is skipped: KILLED by test_a_line_that_is_no_entry_is_refused_not_skipped (1 of 22 tests fail; Python body assertion)
+a pipe in a cell ends it: KILLED by test_a_pipe_in_a_cell_is_escaped (2 of 22 tests fail; Python body assertion)
+a retired code's reason loses its continuation: KILLED by test_a_retired_code_with_its_reason_continued_across_lines (2 of 22 tests fail; Python body assertion)
+the retired codes are left out of the page: KILLED by test_the_committed_page_is_what_the_registry_writes (1 of 22 tests fail; Python body assertion)
+the last code of each owner is left out of the page: KILLED by test_the_committed_page_is_what_the_registry_writes (2 of 22 tests fail; Python body assertion)
+a signed entry does not clear the draft: KILLED by the spec (1 of 4 tests fail)
+Remove is offered on another reader's entry and not on one's own: REFUSED (invalid browser/build producer; no kill)
+  1) [chromium] › e2e/guestbook.spec.mjs:65:1 › a guest signs up, signs, and the entry is theirs alone to remove 
+    Error: expect(locator).toHaveCount(expected) failed
+    Expected: 1
+    Received: 0
+      - Expect "toHaveCount" with timeout 5000ms
+      - waiting for locator('main > ul > li').filter({ hasText: 'Thanks for having us, from chromium 1792551399556' }).getByRole('button', { name: 'Remove' })
+          - unexpected value "0"
+    [cause]: Error: PW_ASSERTION:c58fdcad927128a734f9abc3eacb42010b6e523717025c42694362c1bbf33543
+  2) [chromium] › e2e/guestbook.spec.mjs:84:1 › an entry is shown before the server answers, and offers no Remove until it has 
+    Error: expect(locator).toHaveCount(expected) failed
+    Expected: 0
+    Received: 1
+      - Expect "toHaveCount" with timeout 5000ms
+      - waiting for locator('main > ul > li').filter({ hasText: 'Shown at once, from chromium 1792551405832' }).getByRole('button', { name: 'Remove' })
+          - unexpected value "1"
+    [cause]: Error: PW_ASSERTION:c58fdcad927128a734f9abc3eacb42010b6e523717025c42694362c1bbf33543
+  3) [chromium] › e2e/guestbook.spec.mjs:114:1 › another reader's open page is told of an entry, and of its removal 
+    Error: locator.click: Test ended.
+      - waiting for locator('main > ul > li').filter({ hasText: 'Live, from chromium 1792551412163' }).getByRole('button', { name: 'Remove' })
+  3 failed
+  1 passed (43.4s)
+  run_suite: kept 4 of 4 entries of its output (2.8 KiB) in kept-traces/local/20261021T025636Z-113033/run-1
+  run_suite: exit 1
+
+Browser receipt refused: missing complete browser receipt
+a reader signed out is shown the signed-in half: REFUSED (invalid browser/build producer; no kill)
+  1) [chromium] › e2e/guestbook.spec.mjs:54:1 › a signed-out reader reads the entries and is given no composer 
+    Error: expect(locator).toHaveText(expected) failed
+    Expected: "Sign in to sign the guestbook."
+    Error: element(s) not found
+      - Expect "toHaveText" with timeout 5000ms
+      - waiting for locator('#signed-out')
+    [cause]: Error: PW_ASSERTION:200660947b3997927f2e89cf49f288d2e09987424c502f799204513dcc8a8666
+  2) [chromium] › e2e/guestbook.spec.mjs:65:1 › a guest signs up, signs, and the entry is theirs alone to remove 
+    Error: locator.click: Test ended.
+      - waiting for getByRole('button', { name: 'Sign up' })
+  3) [chromium] › e2e/guestbook.spec.mjs:84:1 › an entry is shown before the server answers, and offers no Remove until it has 
+    Error: locator.click: Test ended.
+      - waiting for getByRole('button', { name: 'Sign up' })
+  4) [chromium] › e2e/guestbook.spec.mjs:114:1 › another reader's open page is told of an entry, and of its removal 
+    Error: locator.click: Test ended.
+      - waiting for getByRole('button', { name: 'Sign up' })
+  4 failed
+  run_suite: kept 5 of 5 entries of its output (1.7 KiB) in kept-traces/local/20261021T025722Z-114141/run-1
+  run_suite: exit 1
+
+Browser receipt refused: missing complete browser receipt
+the entry is shown last, not first, before the server answers: KILLED by the spec (1 of 4 tests fail)
+the entry can be removed before the server has it: KILLED by the spec (1 of 4 tests fail)
+the composer is shown to a reader signed out: KILLED by the checker (PW5048)
+Remove is shown to a reader signed out: KILLED by the checker (PW5048)
+the entries are not told of a signed entry: KILLED by the checker (PW5107)
+67 of 74 mutants killed; 7 refused; 0 survived
+memory bound: no process was stopped
+===== guide-strict-whole-final.log; SHA256 059b983b42e2af7eab7d838a608931c37a853d5c3b67a28ea0b7b444e1e7dc53 =====
+Python frozen full IDs: ['test_guide_diagnostics.Current.test_every_registered_code_has_a_row', 'test_guide_diagnostics.Current.test_the_committed_page_is_what_the_registry_writes', 'test_guide_diagnostics.Reading.test_a_line_that_is_no_entry_is_refused_not_skipped', 'test_guide_diagnostics.Reading.test_a_pipe_in_a_cell_is_escaped', 'test_guide_diagnostics.Reading.test_a_retired_code_with_its_reason_continued_across_lines', 'test_guide_diagnostics.Reading.test_an_owner_without_a_title_is_written_from_its_name', 'test_guide_diagnostics.Reading.test_each_entry_with_its_invariant_and_the_adrs_its_comment_cites']; evidence /tmp/pw-guide-python-evidence-m0zwtbuw
+baseline: the guide's tests, 22 ran, 0 failed
+baseline: the guestbook in Chromium, 4 ran, 0 failed
+an example no longer type-checks: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust body assertion)
+an example is not as `pw fmt` writes it: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust body assertion)
+an example checks clean and `pw build` refuses it: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust body assertion)
+a refused example is refused no more: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust body assertion)
+a refused example is refused by another code: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust body assertion)
+output a page shows is not what `pw check` prints: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust body assertion)
+a block says nothing of what it is: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust body assertion)
+a block is in a language the guide is not written in: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust body assertion)
+a fence is indented: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust body assertion)
+a fence is never closed: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust body assertion)
+a page's files no longer check together: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust body assertion)
+the tutorial and the app differ by a byte: KILLED by a_pages_program_is_the_directory_it_names (1 of 22 tests fail; Rust body assertion)
+the tutorial builds a file the app does not have: KILLED by a_pages_program_is_the_directory_it_names (2 of 22 tests fail; Rust body assertion)
+the closed title gap claims check still accepts it: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust body assertion)
+a build gap is closed: the build accepts it: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust body assertion)
+a check gap is closed: the check refuses it: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust body assertion)
+the closed two-signal gap is claimed to be refused still: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust body assertion)
+the reference has no row for a code: KILLED by test_the_committed_page_is_what_the_registry_writes, the_diagnostic_reference_lists_every_registered_code (2 of 22 tests fail; Rust body assertion, Python body assertion)
+the reference gives a code another invariant: KILLED by test_the_committed_page_is_what_the_registry_writes, the_diagnostic_reference_lists_every_registered_code (2 of 22 tests fail; Rust body assertion, Python body assertion)
+the reference has a row for a code the compiler lacks: KILLED by test_the_committed_page_is_what_the_registry_writes, the_diagnostic_reference_lists_every_registered_code (2 of 22 tests fail; Rust body assertion, Python body assertion)
+a clean example need not check clean: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust body assertion)
+an example need not be as `pw fmt` writes it: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust body assertion)
+an example that parses is held to the format only where it is clean: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust body assertion)
+a clean example need not build: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust body assertion)
+a build gap may build: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust body assertion)
+a gap's build output need not be what is shown: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust body assertion)
+a refused example need not be refused: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust body assertion)
+a refusal's codes are compared as a subset of what is reported: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust body assertion)
+a refusal's codes are compared as a superset of what is reported: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust body assertion)
+output a page shows of a refusal need not be what is printed: KILLED by a_wrong_example_is_reported_and_a_right_one_is_not (1 of 22 tests fail; Rust body assertion)
+output a page shows keeps the closing count `pw check` prints: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust body assertion)
+a fence of another character closes a block: KILLED by an_unclosed_or_indented_fence_is_refused (1 of 22 tests fail; Rust body assertion)
+a closing fence may carry text: KILLED by an_unclosed_or_indented_fence_is_refused (1 of 22 tests fail; Rust body assertion)
+a shorter fence closes a block: KILLED by a_page_with_no_example_or_a_block_unseen_is_reported (1 of 22 tests fail; Rust body assertion)
+an indented fence is accepted: KILLED by an_unclosed_or_indented_fence_is_refused (1 of 22 tests fail; Rust body assertion)
+a fence never closed is accepted: KILLED by an_unclosed_or_indented_fence_is_refused (1 of 22 tests fail; Rust body assertion)
+two backticks are a fence: KILLED by a_fence_is_read_as_commonmark_reads_it (1 of 22 tests fail; Rust body assertion)
+an attribute a block does not take is skipped: KILLED by an_info_string_says_what_a_block_is (1 of 22 tests fail; Rust body assertion)
+an attribute may be given twice: KILLED by an_info_string_says_what_a_block_is (1 of 22 tests fail; Rust body assertion)
+a file may be outside the page's tree: KILLED by an_info_string_says_what_a_block_is (1 of 22 tests fail; Rust body assertion)
+a block may be a gap and a refusal: KILLED by an_info_string_says_what_a_block_is (1 of 22 tests fail; Rust body assertion)
+another language's block takes attributes: KILLED by an_info_string_says_what_a_block_is (1 of 22 tests fail; Rust body assertion)
+a language the guide is not written in passes: KILLED by an_info_string_says_what_a_block_is (1 of 22 tests fail; Rust body assertion)
+a page's pieces are joined with no blank line: KILLED by a_pages_file_blocks_are_its_program_in_order (2 of 22 tests fail; Rust body assertion)
+output belongs to any block before it: KILLED by shown_output_belongs_to_the_refused_example_before_it (1 of 22 tests fail; Rust body assertion)
+a build's output belongs to any block before it: KILLED by a_gaps_build_output_belongs_to_the_gap_before_it (1 of 22 tests fail; Rust body assertion)
+a build gap need not show what `pw build` prints: KILLED by a_gaps_build_output_belongs_to_the_gap_before_it (1 of 22 tests fail; Rust body assertion)
+a page with no example is accepted: KILLED by a_page_with_no_example_or_a_block_unseen_is_reported (1 of 22 tests fail; Rust body assertion)
+a Pleris block the reader of pages did not see goes unnoticed: KILLED by a_page_with_no_example_or_a_block_unseen_is_reported (1 of 22 tests fail; Rust body assertion)
+a page's pieces are not counted: KILLED by a_page_with_no_example_or_a_block_unseen_is_reported, every_example_in_the_guide_compiles_as_it_says (2 of 22 tests fail; Rust body assertion)
+the index is held to show Pleris: KILLED by every_example_in_the_guide_compiles_as_it_says (1 of 22 tests fail; Rust body assertion)
+a page's program is not compared with the directory it names: KILLED by a_page_is_held_to_the_directory_it_names (1 of 22 tests fail; Rust body assertion)
+a page that names a directory and builds nothing in it is accepted: KILLED by a_page_is_held_to_the_directory_it_names (1 of 22 tests fail; Rust body assertion)
+the directory a page names is read with its spaces: KILLED by a_page_is_held_to_the_directory_it_names (2 of 22 tests fail; Rust body assertion)
+a file the page lacks is not noticed: KILLED by a_program_differs_from_a_directory_by_a_file_or_a_byte (2 of 22 tests fail; Rust body assertion)
+trailing space is no difference: KILLED by a_program_differs_from_a_directory_by_a_file_or_a_byte (2 of 22 tests fail; Rust body assertion)
+a row's invariant is not compared with the registry's: KILLED by the_reference_is_held_to_the_registry (1 of 22 tests fail; Rust body assertion)
+a code with no row is not reported: KILLED by the_reference_is_held_to_the_registry (1 of 22 tests fail; Rust body assertion)
+a row for a code the compiler lacks is not reported: KILLED by the_reference_is_held_to_the_registry (1 of 22 tests fail; Rust body assertion)
+an ADR a comment cites twice is listed twice: KILLED by test_each_entry_with_its_invariant_and_the_adrs_its_comment_cites (1 of 22 tests fail; Python body assertion)
+a comment is taken by the entry after the next: KILLED by test_each_entry_with_its_invariant_and_the_adrs_its_comment_cites (2 of 22 tests fail; Python body assertion)
+a line that is no entry is skipped: KILLED by test_a_line_that_is_no_entry_is_refused_not_skipped (1 of 22 tests fail; Python body assertion)
+a pipe in a cell ends it: KILLED by test_a_pipe_in_a_cell_is_escaped (2 of 22 tests fail; Python body assertion)
+a retired code's reason loses its continuation: KILLED by test_a_retired_code_with_its_reason_continued_across_lines (2 of 22 tests fail; Python body assertion)
+the retired codes are left out of the page: KILLED by test_the_committed_page_is_what_the_registry_writes (1 of 22 tests fail; Python body assertion)
+the last code of each owner is left out of the page: KILLED by test_the_committed_page_is_what_the_registry_writes (2 of 22 tests fail; Python body assertion)
+a signed entry does not clear the draft: KILLED by the spec (1 of 4 tests fail)
+Remove is offered on another reader's entry and not on one's own: KILLED by the spec (3 of 4 tests fail)
+a reader signed out is shown the signed-in half: KILLED by the spec (4 of 4 tests fail)
+the entry is shown last, not first, before the server answers: KILLED by the spec (1 of 4 tests fail)
+the entry can be removed before the server has it: KILLED by the spec (1 of 4 tests fail)
+the composer is shown to a reader signed out: KILLED by the checker (PW5048)
+Remove is shown to a reader signed out: KILLED by the checker (PW5048)
+the entries are not told of a signed entry: KILLED by the checker (PW5107)
+74 of 74 mutants killed; 0 refused; 0 survived
+memory bound: no process was stopped
+===== guide-strict-controls-first.log; SHA256 643f7fbe9db7e7ff3b7c1508598c096b3fc4e3ae3228900be2beb274239d03e4 =====
+structured instrument receipts: /tmp/pw-guide-producer-controls-m_mbnzg1
+baseline: 48 executed; 0 failed; valid=True
+Cargo result validity is ignored: KILLED by test_guide_producer_results.GuideProducers.test_cargo_refuses_invalid_failure_status (10 actual body assertions)
+Python canonical result validity is ignored: KILLED by test_guide_producer_results.GuideNativeProtocol.test_native_setup_failures_earn_no_kill_and_never_enter_body (7 actual body assertions)
+browser command bypasses canonical suite authority: KILLED by test_guide_producer_results.GuideProducers.test_browser_uses_canonical_authority_and_exact_selection (1 actual body assertions)
+browser status and counts need not agree: KILLED by test_guide_producer_results.GuideProducers.test_browser_refuses_invalid_failure_status (3 actual body assertions)
+Python frozen full IDs: ['test_guide_diagnostics.Current.test_every_registered_code_has_a_row', 'test_guide_diagnostics.Current.test_the_committed_page_is_what_the_registry_writes', 'test_guide_diagnostics.Reading.test_a_line_that_is_no_entry_is_refused_not_skipped', 'test_guide_diagnostics.Reading.test_a_pipe_in_a_cell_is_escaped', 'test_guide_diagnostics.Reading.test_a_retired_code_with_its_reason_continued_across_lines', 'test_guide_diagnostics.Reading.test_an_owner_without_a_title_is_written_from_its_name', 'test_guide_diagnostics.Reading.test_each_entry_with_its_invariant_and_the_adrs_its_comment_cites']; evidence /tmp/pw-guide-python-evidence-z1vp3er4
+baseline: the guide's tests, 1 ran, 0 failed
+test_native_body_assertion_is_a_named_assertion_kill (test_guide_producer_results.GuideNativeProtocol) ... ok
+test_native_body_error_earns_no_assertion_kill (test_guide_producer_results.GuideNativeProtocol) ... ok
+test_native_fresh_cache_does_not_read_same_timestamp_prior_mutant (test_guide_producer_results.GuideNativeProtocol) ... ok
+test_native_guide_discovery_preserves_exact_original_seven_ids (test_guide_producer_results.GuideNativeProtocol) ... ok
+test_native_setup_failures_earn_no_kill_and_never_enter_body (test_guide_producer_results.GuideNativeProtocol) ... ok
+test_native_skip_expected_and_deferred_bodies_earn_no_kill (test_guide_producer_results.GuideNativeProtocol) ... ok
+test_native_teardown_failures_earn_no_kill_after_body_entry (test_guide_producer_results.GuideNativeProtocol) ... ok
+test_native_timeout_refuses_and_reaps_its_owned_child (test_guide_producer_results.GuideNativeProtocol) ... ok
+test_browser_accepts_actual_assertion_failure (test_guide_producer_results.GuideProducers) ... ok
+test_browser_accepts_green_producer (test_guide_producer_results.GuideProducers) ... ok
+test_browser_freezes_mapping_only_from_green_complete_baseline (test_guide_producer_results.GuideProducers) ... ok
+test_browser_json_and_prose_do_not_authorize_outcomes (test_guide_producer_results.GuideProducers) ... ok
+test_browser_refuses_empty_or_missing_summary (test_guide_producer_results.GuideProducers) ... ok
+test_browser_refuses_invalid_failure_status (test_guide_producer_results.GuideProducers) ... ok
+test_browser_refuses_invalid_green_status (test_guide_producer_results.GuideProducers) ... ok
+test_browser_refuses_missing_and_disagreeing_metadata (test_guide_producer_results.GuideProducers) ... ok
+test_browser_refuses_partial_stale_and_duplicate_receipts (test_guide_producer_results.GuideProducers) ... ok
+test_browser_uses_canonical_authority_and_exact_selection (test_guide_producer_results.GuideProducers) ... ok
+test_cargo_accepts_actual_assertion_failure (test_guide_producer_results.GuideProducers) ... ok
+test_cargo_additional_empty_binary_is_refused (test_guide_producer_results.GuideProducers) ... ok
+test_cargo_all_binary_summaries_must_agree (test_guide_producer_results.GuideProducers) ... ok
+test_cargo_quiet_failure_without_inventory_is_refused (test_guide_producer_results.GuideProducers) ... ok
+test_cargo_refuses_build_or_stop_diagnostics_after_partial_results (test_guide_producer_results.GuideProducers) ... ok
+test_cargo_refuses_empty_or_missing_summary (test_guide_producer_results.GuideProducers) ... ok
+test_cargo_refuses_invalid_failure_status (test_guide_producer_results.GuideProducers) ... ok
+test_cargo_refuses_invalid_green_status (test_guide_producer_results.GuideProducers) ... ok
+test_cargo_requires_exact_inventory_and_assertion_site (test_guide_producer_results.GuideProducers) ... ok
+test_checked_refusal_requires_complete_error_inventory (test_guide_producer_results.GuideProducers) ... FAIL
+test_final_restored_build_failure_fails_campaign (test_guide_producer_results.GuideProducers) ... ok
+test_guide_accepts_green_producers (test_guide_producer_results.GuideProducers) ... ok
+test_guide_retains_earlier_producer_output (test_guide_producer_results.GuideProducers) ... ok
+test_main_accepts_exact_named_compiler_refusal (test_guide_producer_results.GuideProducers) ... ok
+test_main_accepts_valid_intended_assertion_neighbours (test_guide_producer_results.GuideProducers) ... ok
+test_main_cancellation_restores_source_and_preserves_exit (test_guide_producer_results.GuideProducers) ... ok
+test_main_green_neighbours_are_survivors (test_guide_producer_results.GuideProducers) ... ok
+test_main_refuses_additional_named_codes (test_guide_producer_results.GuideProducers) ... ok
+test_main_refuses_bound_stop_with_valid_partial_summary (test_guide_producer_results.GuideProducers) ... ok
+test_main_refuses_browser_invalid_status_without_kill (test_guide_producer_results.GuideProducers) ... ok
+test_main_refuses_cargo_invalid_status_without_kill (test_guide_producer_results.GuideProducers) ... ok
+test_main_refuses_invalid_green_baseline (test_guide_producer_results.GuideProducers) ... ok
+test_main_refuses_named_codes_after_invalid_build_status (test_guide_producer_results.GuideProducers) ... ok
+test_main_refuses_python_invalid_status_without_kill (test_guide_producer_results.GuideProducers) ... ok
+test_main_refuses_unlisted_compiler_refusal (test_guide_producer_results.GuideProducers) ... ok
+test_original_rust_inventory_is_frozen_exactly (test_guide_producer_results.GuideProducers) ... ok
+test_python_accepts_actual_assertion_failure (test_guide_producer_results.GuideProducers) ... ok
+test_python_refuses_empty_or_missing_summary (test_guide_producer_results.GuideProducers) ... ok
+test_python_refuses_invalid_failure_status (test_guide_producer_results.GuideProducers) ... ok
+test_python_refuses_invalid_green_status (test_guide_producer_results.GuideProducers) ... ok
+
+======================================================================
+FAIL: test_checked_refusal_requires_complete_error_inventory (test_guide_producer_results.GuideProducers)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/guide-strict/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/guide-strict/scripts/tests/test_guide_producer_results.py", line 299, in test_checked_refusal_requires_complete_error_inventory
+    self.assertEqual(module.compiler_codes(status, output), set())
+AssertionError: Items in the first set but not the second:
+'PW5048'
+
+----------------------------------------------------------------------
+Ran 48 tests in 9.775s
+
+FAILED (failures=1)
+
+Python structured receipt: /tmp/pw-guide-producer-controls-m_mbnzg1/pw-guide-result-zspr4yaa
+{"valid": true, "reason": "complete", "passed": ["test_guide_producer_results.GuideNativeProtocol.test_native_body_assertion_is_a_named_assertion_kill", "test_guide_producer_results.GuideNativeProtocol.test_native_body_error_earns_no_assertion_kill", "test_guide_producer_results.GuideNativeProtocol.test_native_fresh_cache_does_not_read_same_timestamp_prior_mutant", "test_guide_producer_results.GuideNativeProtocol.test_native_guide_discovery_preserves_exact_original_seven_ids", "test_guide_producer_results.GuideNativeProtocol.test_native_setup_failures_earn_no_kill_and_never_enter_body", "test_guide_producer_results.GuideNativeProtocol.test_native_skip_expected_and_deferred_bodies_earn_no_kill", "test_guide_producer_results.GuideNativeProtocol.test_native_teardown_failures_earn_no_kill_after_body_entry", "test_guide_producer_results.GuideNativeProtocol.test_native_timeout_refuses_and_reaps_its_owned_child", "test_guide_producer_results.GuideProducers.test_browser_accepts_actual_assertion_failure", "test_guide_producer_results.GuideProducers.test_browser_accepts_green_producer", "test_guide_producer_results.GuideProducers.test_browser_freezes_mapping_only_from_green_complete_baseline", "test_guide_producer_results.GuideProducers.test_browser_json_and_prose_do_not_authorize_outcomes", "test_guide_producer_results.GuideProducers.test_browser_refuses_empty_or_missing_summary", "test_guide_producer_results.GuideProducers.test_browser_refuses_invalid_failure_status", "test_guide_producer_results.GuideProducers.test_browser_refuses_invalid_green_status", "test_guide_producer_results.GuideProducers.test_browser_refuses_missing_and_disagreeing_metadata", "test_guide_producer_results.GuideProducers.test_browser_refuses_partial_stale_and_duplicate_receipts", "test_guide_producer_results.GuideProducers.test_browser_uses_canonical_authority_and_exact_selection", "test_guide_producer_results.GuideProducers.test_cargo_accepts_actual_assertion_failure", "test_guide_producer_results.GuideProducers.test_cargo_additional_empty_binary_is_refused", "test_guide_producer_results.GuideProducers.test_cargo_all_binary_summaries_must_agree", "test_guide_producer_results.GuideProducers.test_cargo_quiet_failure_without_inventory_is_refused", "test_guide_producer_results.GuideProducers.test_cargo_refuses_build_or_stop_diagnostics_after_partial_results", "test_guide_producer_results.GuideProducers.test_cargo_refuses_empty_or_missing_summary", "test_guide_producer_results.GuideProducers.test_cargo_refuses_invalid_failure_status", "test_guide_producer_results.GuideProducers.test_cargo_refuses_invalid_green_status", "test_guide_producer_results.GuideProducers.test_cargo_requires_exact_inventory_and_assertion_site", "test_guide_producer_results.GuideProducers.test_final_restored_build_failure_fails_campaign", "test_guide_producer_results.GuideProducers.test_guide_accepts_green_producers", "test_guide_producer_results.GuideProducers.test_guide_retains_earlier_producer_output", "test_guide_producer_results.GuideProducers.test_main_accepts_exact_named_compiler_refusal", "test_guide_producer_results.GuideProducers.test_main_accepts_valid_intended_assertion_neighbours", "test_guide_producer_results.GuideProducers.test_main_cancellation_restores_source_and_preserves_exit", "test_guide_producer_results.GuideProducers.test_main_green_neighbours_are_survivors", "test_guide_producer_results.GuideProducers.test_main_refuses_additional_named_codes", "test_guide_producer_results.GuideProducers.test_main_refuses_bound_stop_with_valid_partial_summary", "test_guide_producer_results.GuideProducers.test_main_refuses_browser_invalid_status_without_kill", "test_guide_producer_results.GuideProducers.test_main_refuses_cargo_invalid_status_without_kill", "test_guide_producer_results.GuideProducers.test_main_refuses_invalid_green_baseline", "test_guide_producer_results.GuideProducers.test_main_refuses_named_codes_after_invalid_build_status", "test_guide_producer_results.GuideProducers.test_main_refuses_python_invalid_status_without_kill", "test_guide_producer_results.GuideProducers.test_main_refuses_unlisted_compiler_refusal", "test_guide_producer_results.GuideProducers.test_original_rust_inventory_is_frozen_exactly", "test_guide_producer_results.GuideProducers.test_python_accepts_actual_assertion_failure", "test_guide_producer_results.GuideProducers.test_python_refuses_empty_or_missing_summary", "test_guide_producer_results.GuideProducers.test_python_refuses_invalid_failure_status", "test_guide_producer_results.GuideProducers.test_python_refuses_invalid_green_status"], "assertion_failed": ["test_guide_producer_results.GuideProducers.test_checked_refusal_requires_complete_error_inventory"], "body_errors": [], "executed": 48, "report_sha256": "12545656c2556959e1b616338708e7e3e219a0f54e9c65c1c99b666c6e8ca5fb"}
+
+partial codes after an invalid compiler exit earn a checker kill: SURVIVED (no intended body assertion)
+invalid guide producer is credited as killed: KILLED by test_guide_producer_results.GuideProducers.test_main_refuses_cargo_invalid_status_without_kill (7 actual body assertions)
+bound stop with partial valid output is ignored: KILLED by test_guide_producer_results.GuideProducers.test_main_refuses_bound_stop_with_valid_partial_summary (1 actual body assertions)
+final restored build failure is ignored: KILLED by test_guide_producer_results.GuideProducers.test_final_restored_build_failure_fails_campaign (1 actual body assertions)
+Python runtime error earns an assertion kill: KILLED by test_guide_producer_results.GuideNativeProtocol.test_native_body_error_earns_no_assertion_kill (1 actual body assertions)
+Cargo named inventory is not checked: KILLED by test_guide_producer_results.GuideProducers.test_cargo_requires_exact_inventory_and_assertion_site (1 actual body assertions)
+browser metadata may change its intended title: KILLED by test_guide_producer_results.GuideProducers.test_browser_refuses_missing_and_disagreeing_metadata (1 actual body assertions)
+Python frozen full IDs: ['test_guide_diagnostics.Current.test_every_registered_code_has_a_row', 'test_guide_diagnostics.Current.test_the_committed_page_is_what_the_registry_writes', 'test_guide_diagnostics.Reading.test_a_line_that_is_no_entry_is_refused_not_skipped', 'test_guide_diagnostics.Reading.test_a_pipe_in_a_cell_is_escaped', 'test_guide_diagnostics.Reading.test_a_retired_code_with_its_reason_continued_across_lines', 'test_guide_diagnostics.Reading.test_an_owner_without_a_title_is_written_from_its_name', 'test_guide_diagnostics.Reading.test_each_entry_with_its_invariant_and_the_adrs_its_comment_cites']; evidence /tmp/pw-guide-python-evidence-1pu61ahs
+baseline: the guide's tests, 1 ran, 0 failed
+test_native_body_assertion_is_a_named_assertion_kill (test_guide_producer_results.GuideNativeProtocol) ... ok
+test_native_body_error_earns_no_assertion_kill (test_guide_producer_results.GuideNativeProtocol) ... ok
+test_native_fresh_cache_does_not_read_same_timestamp_prior_mutant (test_guide_producer_results.GuideNativeProtocol) ... ok
+test_native_guide_discovery_preserves_exact_original_seven_ids (test_guide_producer_results.GuideNativeProtocol) ... ok
+test_native_setup_failures_earn_no_kill_and_never_enter_body (test_guide_producer_results.GuideNativeProtocol) ... ok
+test_native_skip_expected_and_deferred_bodies_earn_no_kill (test_guide_producer_results.GuideNativeProtocol) ... ok
+test_native_teardown_failures_earn_no_kill_after_body_entry (test_guide_producer_results.GuideNativeProtocol) ... ok
+test_native_timeout_refuses_and_reaps_its_owned_child (test_guide_producer_results.GuideNativeProtocol) ... ok
+test_browser_accepts_actual_assertion_failure (test_guide_producer_results.GuideProducers) ... ok
+test_browser_accepts_green_producer (test_guide_producer_results.GuideProducers) ... ok
+test_browser_freezes_mapping_only_from_green_complete_baseline (test_guide_producer_results.GuideProducers) ... ok
+test_browser_json_and_prose_do_not_authorize_outcomes (test_guide_producer_results.GuideProducers) ... ok
+test_browser_refuses_empty_or_missing_summary (test_guide_producer_results.GuideProducers) ... ok
+test_browser_refuses_invalid_failure_status (test_guide_producer_results.GuideProducers) ... ok
+test_browser_refuses_invalid_green_status (test_guide_producer_results.GuideProducers) ... ok
+test_browser_refuses_missing_and_disagreeing_metadata (test_guide_producer_results.GuideProducers) ... ok
+test_browser_refuses_partial_stale_and_duplicate_receipts (test_guide_producer_results.GuideProducers) ... ok
+test_browser_uses_canonical_authority_and_exact_selection (test_guide_producer_results.GuideProducers) ... ok
+test_cargo_accepts_actual_assertion_failure (test_guide_producer_results.GuideProducers) ... ok
+test_cargo_additional_empty_binary_is_refused (test_guide_producer_results.GuideProducers) ... ok
+test_cargo_all_binary_summaries_must_agree (test_guide_producer_results.GuideProducers) ... ok
+test_cargo_quiet_failure_without_inventory_is_refused (test_guide_producer_results.GuideProducers) ... ok
+test_cargo_refuses_build_or_stop_diagnostics_after_partial_results (test_guide_producer_results.GuideProducers) ... ok
+test_cargo_refuses_empty_or_missing_summary (test_guide_producer_results.GuideProducers) ... ok
+test_cargo_refuses_invalid_failure_status (test_guide_producer_results.GuideProducers) ... ok
+test_cargo_refuses_invalid_green_status (test_guide_producer_results.GuideProducers) ... ok
+test_cargo_requires_exact_inventory_and_assertion_site (test_guide_producer_results.GuideProducers) ... ok
+test_checked_refusal_requires_complete_error_inventory (test_guide_producer_results.GuideProducers) ... ok
+test_final_restored_build_failure_fails_campaign (test_guide_producer_results.GuideProducers) ... ok
+test_guide_accepts_green_producers (test_guide_producer_results.GuideProducers) ... ok
+test_guide_retains_earlier_producer_output (test_guide_producer_results.GuideProducers) ... ok
+test_main_accepts_exact_named_compiler_refusal (test_guide_producer_results.GuideProducers) ... ok
+test_main_accepts_valid_intended_assertion_neighbours (test_guide_producer_results.GuideProducers) ... ok
+test_main_cancellation_restores_source_and_preserves_exit (test_guide_producer_results.GuideProducers) ... ok
+test_main_green_neighbours_are_survivors (test_guide_producer_results.GuideProducers) ... ok
+test_main_refuses_additional_named_codes (test_guide_producer_results.GuideProducers) ... ok
+test_main_refuses_bound_stop_with_valid_partial_summary (test_guide_producer_results.GuideProducers) ... ok
+test_main_refuses_browser_invalid_status_without_kill (test_guide_producer_results.GuideProducers) ... ok
+test_main_refuses_cargo_invalid_status_without_kill (test_guide_producer_results.GuideProducers) ... ok
+test_main_refuses_invalid_green_baseline (test_guide_producer_results.GuideProducers) ... ok
+test_main_refuses_named_codes_after_invalid_build_status (test_guide_producer_results.GuideProducers) ... ok
+test_main_refuses_python_invalid_status_without_kill (test_guide_producer_results.GuideProducers) ... ok
+test_main_refuses_unlisted_compiler_refusal (test_guide_producer_results.GuideProducers) ... ok
+test_original_rust_inventory_is_frozen_exactly (test_guide_producer_results.GuideProducers) ... ok
+test_python_accepts_actual_assertion_failure (test_guide_producer_results.GuideProducers) ... ok
+test_python_refuses_empty_or_missing_summary (test_guide_producer_results.GuideProducers) ... ok
+test_python_refuses_invalid_failure_status (test_guide_producer_results.GuideProducers) ... ok
+test_python_refuses_invalid_green_status (test_guide_producer_results.GuideProducers) ... ok
+
+----------------------------------------------------------------------
+Ran 48 tests in 7.171s
+
+OK
+
+Python structured receipt: /tmp/pw-guide-producer-controls-m_mbnzg1/pw-guide-result-5gsa3iic
+{"valid": true, "reason": "complete", "passed": ["test_guide_producer_results.GuideNativeProtocol.test_native_body_assertion_is_a_named_assertion_kill", "test_guide_producer_results.GuideNativeProtocol.test_native_body_error_earns_no_assertion_kill", "test_guide_producer_results.GuideNativeProtocol.test_native_fresh_cache_does_not_read_same_timestamp_prior_mutant", "test_guide_producer_results.GuideNativeProtocol.test_native_guide_discovery_preserves_exact_original_seven_ids", "test_guide_producer_results.GuideNativeProtocol.test_native_setup_failures_earn_no_kill_and_never_enter_body", "test_guide_producer_results.GuideNativeProtocol.test_native_skip_expected_and_deferred_bodies_earn_no_kill", "test_guide_producer_results.GuideNativeProtocol.test_native_teardown_failures_earn_no_kill_after_body_entry", "test_guide_producer_results.GuideNativeProtocol.test_native_timeout_refuses_and_reaps_its_owned_child", "test_guide_producer_results.GuideProducers.test_browser_accepts_actual_assertion_failure", "test_guide_producer_results.GuideProducers.test_browser_accepts_green_producer", "test_guide_producer_results.GuideProducers.test_browser_freezes_mapping_only_from_green_complete_baseline", "test_guide_producer_results.GuideProducers.test_browser_json_and_prose_do_not_authorize_outcomes", "test_guide_producer_results.GuideProducers.test_browser_refuses_empty_or_missing_summary", "test_guide_producer_results.GuideProducers.test_browser_refuses_invalid_failure_status", "test_guide_producer_results.GuideProducers.test_browser_refuses_invalid_green_status", "test_guide_producer_results.GuideProducers.test_browser_refuses_missing_and_disagreeing_metadata", "test_guide_producer_results.GuideProducers.test_browser_refuses_partial_stale_and_duplicate_receipts", "test_guide_producer_results.GuideProducers.test_browser_uses_canonical_authority_and_exact_selection", "test_guide_producer_results.GuideProducers.test_cargo_accepts_actual_assertion_failure", "test_guide_producer_results.GuideProducers.test_cargo_additional_empty_binary_is_refused", "test_guide_producer_results.GuideProducers.test_cargo_all_binary_summaries_must_agree", "test_guide_producer_results.GuideProducers.test_cargo_quiet_failure_without_inventory_is_refused", "test_guide_producer_results.GuideProducers.test_cargo_refuses_build_or_stop_diagnostics_after_partial_results", "test_guide_producer_results.GuideProducers.test_cargo_refuses_empty_or_missing_summary", "test_guide_producer_results.GuideProducers.test_cargo_refuses_invalid_failure_status", "test_guide_producer_results.GuideProducers.test_cargo_refuses_invalid_green_status", "test_guide_producer_results.GuideProducers.test_cargo_requires_exact_inventory_and_assertion_site", "test_guide_producer_results.GuideProducers.test_checked_refusal_requires_complete_error_inventory", "test_guide_producer_results.GuideProducers.test_final_restored_build_failure_fails_campaign", "test_guide_producer_results.GuideProducers.test_guide_accepts_green_producers", "test_guide_producer_results.GuideProducers.test_guide_retains_earlier_producer_output", "test_guide_producer_results.GuideProducers.test_main_accepts_exact_named_compiler_refusal", "test_guide_producer_results.GuideProducers.test_main_accepts_valid_intended_assertion_neighbours", "test_guide_producer_results.GuideProducers.test_main_cancellation_restores_source_and_preserves_exit", "test_guide_producer_results.GuideProducers.test_main_green_neighbours_are_survivors", "test_guide_producer_results.GuideProducers.test_main_refuses_additional_named_codes", "test_guide_producer_results.GuideProducers.test_main_refuses_bound_stop_with_valid_partial_summary", "test_guide_producer_results.GuideProducers.test_main_refuses_browser_invalid_status_without_kill", "test_guide_producer_results.GuideProducers.test_main_refuses_cargo_invalid_status_without_kill", "test_guide_producer_results.GuideProducers.test_main_refuses_invalid_green_baseline", "test_guide_producer_results.GuideProducers.test_main_refuses_named_codes_after_invalid_build_status", "test_guide_producer_results.GuideProducers.test_main_refuses_python_invalid_status_without_kill", "test_guide_producer_results.GuideProducers.test_main_refuses_unlisted_compiler_refusal", "test_guide_producer_results.GuideProducers.test_original_rust_inventory_is_frozen_exactly", "test_guide_producer_results.GuideProducers.test_python_accepts_actual_assertion_failure", "test_guide_producer_results.GuideProducers.test_python_refuses_empty_or_missing_summary", "test_guide_producer_results.GuideProducers.test_python_refuses_invalid_failure_status", "test_guide_producer_results.GuideProducers.test_python_refuses_invalid_green_status"], "assertion_failed": [], "body_errors": [], "executed": 48, "report_sha256": "10172c25583d78c160c2f7a3676979658ac4272562cab90ac456a10f7394aa8f"}
+
+browser metadata need not match authenticated IDs: SURVIVED (no intended body assertion)
+Python frozen full IDs: ['test_guide_diagnostics.Current.test_every_registered_code_has_a_row', 'test_guide_diagnostics.Current.test_the_committed_page_is_what_the_registry_writes', 'test_guide_diagnostics.Reading.test_a_line_that_is_no_entry_is_refused_not_skipped', 'test_guide_diagnostics.Reading.test_a_pipe_in_a_cell_is_escaped', 'test_guide_diagnostics.Reading.test_a_retired_code_with_its_reason_continued_across_lines', 'test_guide_diagnostics.Reading.test_an_owner_without_a_title_is_written_from_its_name', 'test_guide_diagnostics.Reading.test_each_entry_with_its_invariant_and_the_adrs_its_comment_cites']; evidence /tmp/pw-guide-python-evidence-wdewd85k
+baseline: the guide's tests, 1 ran, 0 failed
+test_native_body_assertion_is_a_named_assertion_kill (test_guide_producer_results.GuideNativeProtocol) ... ok
+test_native_body_error_earns_no_assertion_kill (test_guide_producer_results.GuideNativeProtocol) ... ok
+test_native_fresh_cache_does_not_read_same_timestamp_prior_mutant (test_guide_producer_results.GuideNativeProtocol) ... ok
+test_native_guide_discovery_preserves_exact_original_seven_ids (test_guide_producer_results.GuideNativeProtocol) ... ok
+test_native_setup_failures_earn_no_kill_and_never_enter_body (test_guide_producer_results.GuideNativeProtocol) ... ok
+test_native_skip_expected_and_deferred_bodies_earn_no_kill (test_guide_producer_results.GuideNativeProtocol) ... ok
+test_native_teardown_failures_earn_no_kill_after_body_entry (test_guide_producer_results.GuideNativeProtocol) ... ok
+test_native_timeout_refuses_and_reaps_its_owned_child (test_guide_producer_results.GuideNativeProtocol) ... ok
+test_browser_accepts_actual_assertion_failure (test_guide_producer_results.GuideProducers) ... ok
+test_browser_accepts_green_producer (test_guide_producer_results.GuideProducers) ... ok
+test_browser_freezes_mapping_only_from_green_complete_baseline (test_guide_producer_results.GuideProducers) ... ok
+test_browser_json_and_prose_do_not_authorize_outcomes (test_guide_producer_results.GuideProducers) ... ok
+test_browser_refuses_empty_or_missing_summary (test_guide_producer_results.GuideProducers) ... ok
+test_browser_refuses_invalid_failure_status (test_guide_producer_results.GuideProducers) ... ok
+test_browser_refuses_invalid_green_status (test_guide_producer_results.GuideProducers) ... ok
+test_browser_refuses_missing_and_disagreeing_metadata (test_guide_producer_results.GuideProducers) ... ok
+test_browser_refuses_partial_stale_and_duplicate_receipts (test_guide_producer_results.GuideProducers) ... ok
+test_browser_uses_canonical_authority_and_exact_selection (test_guide_producer_results.GuideProducers) ... ok
+test_cargo_accepts_actual_assertion_failure (test_guide_producer_results.GuideProducers) ... ok
+test_cargo_additional_empty_binary_is_refused (test_guide_producer_results.GuideProducers) ... ok
+test_cargo_all_binary_summaries_must_agree (test_guide_producer_results.GuideProducers) ... ok
+test_cargo_quiet_failure_without_inventory_is_refused (test_guide_producer_results.GuideProducers) ... ok
+test_cargo_refuses_build_or_stop_diagnostics_after_partial_results (test_guide_producer_results.GuideProducers) ... ok
+test_cargo_refuses_empty_or_missing_summary (test_guide_producer_results.GuideProducers) ... ok
+test_cargo_refuses_invalid_failure_status (test_guide_producer_results.GuideProducers) ... ok
+test_cargo_refuses_invalid_green_status (test_guide_producer_results.GuideProducers) ... ok
+test_cargo_requires_exact_inventory_and_assertion_site (test_guide_producer_results.GuideProducers) ... ok
+test_checked_refusal_requires_complete_error_inventory (test_guide_producer_results.GuideProducers) ... ok
+test_final_restored_build_failure_fails_campaign (test_guide_producer_results.GuideProducers) ... ok
+test_guide_accepts_green_producers (test_guide_producer_results.GuideProducers) ... ok
+test_guide_retains_earlier_producer_output (test_guide_producer_results.GuideProducers) ... ok
+test_main_accepts_exact_named_compiler_refusal (test_guide_producer_results.GuideProducers) ... ok
+test_main_accepts_valid_intended_assertion_neighbours (test_guide_producer_results.GuideProducers) ... ok
+test_main_cancellation_restores_source_and_preserves_exit (test_guide_producer_results.GuideProducers) ... ok
+test_main_green_neighbours_are_survivors (test_guide_producer_results.GuideProducers) ... ok
+test_main_refuses_additional_named_codes (test_guide_producer_results.GuideProducers) ... ok
+test_main_refuses_bound_stop_with_valid_partial_summary (test_guide_producer_results.GuideProducers) ... ok
+test_main_refuses_browser_invalid_status_without_kill (test_guide_producer_results.GuideProducers) ... ok
+test_main_refuses_cargo_invalid_status_without_kill (test_guide_producer_results.GuideProducers) ... ok
+test_main_refuses_invalid_green_baseline (test_guide_producer_results.GuideProducers) ... ok
+test_main_refuses_named_codes_after_invalid_build_status (test_guide_producer_results.GuideProducers) ... ok
+test_main_refuses_python_invalid_status_without_kill (test_guide_producer_results.GuideProducers) ... ok
+test_main_refuses_unlisted_compiler_refusal (test_guide_producer_results.GuideProducers) ... ok
+test_original_rust_inventory_is_frozen_exactly (test_guide_producer_results.GuideProducers) ... ok
+test_python_accepts_actual_assertion_failure (test_guide_producer_results.GuideProducers) ... ok
+test_python_refuses_empty_or_missing_summary (test_guide_producer_results.GuideProducers) ... ok
+test_python_refuses_invalid_failure_status (test_guide_producer_results.GuideProducers) ... ok
+test_python_refuses_invalid_green_status (test_guide_producer_results.GuideProducers) ... ok
+
+----------------------------------------------------------------------
+Ran 48 tests in 7.184s
+
+OK
+
+Python structured receipt: /tmp/pw-guide-producer-controls-m_mbnzg1/pw-guide-result-sav4j8e5
+{"valid": true, "reason": "complete", "passed": ["test_guide_producer_results.GuideNativeProtocol.test_native_body_assertion_is_a_named_assertion_kill", "test_guide_producer_results.GuideNativeProtocol.test_native_body_error_earns_no_assertion_kill", "test_guide_producer_results.GuideNativeProtocol.test_native_fresh_cache_does_not_read_same_timestamp_prior_mutant", "test_guide_producer_results.GuideNativeProtocol.test_native_guide_discovery_preserves_exact_original_seven_ids", "test_guide_producer_results.GuideNativeProtocol.test_native_setup_failures_earn_no_kill_and_never_enter_body", "test_guide_producer_results.GuideNativeProtocol.test_native_skip_expected_and_deferred_bodies_earn_no_kill", "test_guide_producer_results.GuideNativeProtocol.test_native_teardown_failures_earn_no_kill_after_body_entry", "test_guide_producer_results.GuideNativeProtocol.test_native_timeout_refuses_and_reaps_its_owned_child", "test_guide_producer_results.GuideProducers.test_browser_accepts_actual_assertion_failure", "test_guide_producer_results.GuideProducers.test_browser_accepts_green_producer", "test_guide_producer_results.GuideProducers.test_browser_freezes_mapping_only_from_green_complete_baseline", "test_guide_producer_results.GuideProducers.test_browser_json_and_prose_do_not_authorize_outcomes", "test_guide_producer_results.GuideProducers.test_browser_refuses_empty_or_missing_summary", "test_guide_producer_results.GuideProducers.test_browser_refuses_invalid_failure_status", "test_guide_producer_results.GuideProducers.test_browser_refuses_invalid_green_status", "test_guide_producer_results.GuideProducers.test_browser_refuses_missing_and_disagreeing_metadata", "test_guide_producer_results.GuideProducers.test_browser_refuses_partial_stale_and_duplicate_receipts", "test_guide_producer_results.GuideProducers.test_browser_uses_canonical_authority_and_exact_selection", "test_guide_producer_results.GuideProducers.test_cargo_accepts_actual_assertion_failure", "test_guide_producer_results.GuideProducers.test_cargo_additional_empty_binary_is_refused", "test_guide_producer_results.GuideProducers.test_cargo_all_binary_summaries_must_agree", "test_guide_producer_results.GuideProducers.test_cargo_quiet_failure_without_inventory_is_refused", "test_guide_producer_results.GuideProducers.test_cargo_refuses_build_or_stop_diagnostics_after_partial_results", "test_guide_producer_results.GuideProducers.test_cargo_refuses_empty_or_missing_summary", "test_guide_producer_results.GuideProducers.test_cargo_refuses_invalid_failure_status", "test_guide_producer_results.GuideProducers.test_cargo_refuses_invalid_green_status", "test_guide_producer_results.GuideProducers.test_cargo_requires_exact_inventory_and_assertion_site", "test_guide_producer_results.GuideProducers.test_checked_refusal_requires_complete_error_inventory", "test_guide_producer_results.GuideProducers.test_final_restored_build_failure_fails_campaign", "test_guide_producer_results.GuideProducers.test_guide_accepts_green_producers", "test_guide_producer_results.GuideProducers.test_guide_retains_earlier_producer_output", "test_guide_producer_results.GuideProducers.test_main_accepts_exact_named_compiler_refusal", "test_guide_producer_results.GuideProducers.test_main_accepts_valid_intended_assertion_neighbours", "test_guide_producer_results.GuideProducers.test_main_cancellation_restores_source_and_preserves_exit", "test_guide_producer_results.GuideProducers.test_main_green_neighbours_are_survivors", "test_guide_producer_results.GuideProducers.test_main_refuses_additional_named_codes", "test_guide_producer_results.GuideProducers.test_main_refuses_bound_stop_with_valid_partial_summary", "test_guide_producer_results.GuideProducers.test_main_refuses_browser_invalid_status_without_kill", "test_guide_producer_results.GuideProducers.test_main_refuses_cargo_invalid_status_without_kill", "test_guide_producer_results.GuideProducers.test_main_refuses_invalid_green_baseline", "test_guide_producer_results.GuideProducers.test_main_refuses_named_codes_after_invalid_build_status", "test_guide_producer_results.GuideProducers.test_main_refuses_python_invalid_status_without_kill", "test_guide_producer_results.GuideProducers.test_main_refuses_unlisted_compiler_refusal", "test_guide_producer_results.GuideProducers.test_original_rust_inventory_is_frozen_exactly", "test_guide_producer_results.GuideProducers.test_python_accepts_actual_assertion_failure", "test_guide_producer_results.GuideProducers.test_python_refuses_empty_or_missing_summary", "test_guide_producer_results.GuideProducers.test_python_refuses_invalid_failure_status", "test_guide_producer_results.GuideProducers.test_python_refuses_invalid_green_status"], "assertion_failed": [], "body_errors": [], "executed": 48, "report_sha256": "10172c25583d78c160c2f7a3676979658ac4272562cab90ac456a10f7394aa8f"}
+
+browser duplicate metadata identity is accepted: SURVIVED (no intended body assertion)
+browser title map can freeze after a failed baseline: KILLED by test_guide_producer_results.GuideProducers.test_browser_freezes_mapping_only_from_green_complete_baseline (1 actual body assertions)
+checker summary error count is not complete: KILLED by test_guide_producer_results.GuideProducers.test_checked_refusal_requires_complete_error_inventory (1 actual body assertions)
+cancellation restores mutated source: KILLED by test_guide_producer_results.GuideProducers.test_main_cancellation_restores_source_and_preserves_exit (17 actual body assertions)
+13 of 16 mutants killed; 0 refused; 3 survived
+memory bound: no process was stopped
+===== guide-strict-controls-final.log; SHA256 55a069fc729ac123c8891a1b0bec3c0d7c215eadde55dd48802ccfcd30b8d6eb =====
+structured instrument receipts: /tmp/pw-guide-producer-controls-2hyv01qq
+baseline: 49 executed; 0 failed; valid=True
+Cargo result validity is ignored: KILLED by test_guide_producer_results.GuideProducers.test_cargo_refuses_invalid_failure_status (10 actual body assertions)
+Python canonical result validity is ignored: KILLED by test_guide_producer_results.GuideNativeProtocol.test_native_setup_failures_earn_no_kill_and_never_enter_body (7 actual body assertions)
+browser command bypasses canonical suite authority: KILLED by test_guide_producer_results.GuideProducers.test_browser_uses_canonical_authority_and_exact_selection (1 actual body assertions)
+browser status and counts need not agree: KILLED by test_guide_producer_results.GuideProducers.test_browser_refuses_invalid_failure_status (3 actual body assertions)
+partial codes after an invalid compiler exit earn a checker kill: KILLED by test_guide_producer_results.GuideProducers.test_main_refuses_named_codes_after_invalid_build_status (2 actual body assertions)
+invalid guide producer is credited as killed: KILLED by test_guide_producer_results.GuideProducers.test_main_refuses_cargo_invalid_status_without_kill (7 actual body assertions)
+bound stop with partial valid output is ignored: KILLED by test_guide_producer_results.GuideProducers.test_main_refuses_bound_stop_with_valid_partial_summary (1 actual body assertions)
+final restored build failure is ignored: KILLED by test_guide_producer_results.GuideProducers.test_final_restored_build_failure_fails_campaign (1 actual body assertions)
+Python runtime error earns an assertion kill: KILLED by test_guide_producer_results.GuideNativeProtocol.test_native_body_error_earns_no_assertion_kill (1 actual body assertions)
+Cargo named inventory is not checked: KILLED by test_guide_producer_results.GuideProducers.test_cargo_requires_exact_inventory_and_assertion_site (1 actual body assertions)
+browser metadata may change its intended title: KILLED by test_guide_producer_results.GuideProducers.test_browser_refuses_missing_and_disagreeing_metadata (1 actual body assertions)
+browser metadata need not match authenticated IDs: KILLED by test_guide_producer_results.GuideProducers.test_browser_refuses_missing_and_disagreeing_metadata (1 actual body assertions)
+browser duplicate metadata identity is accepted: KILLED by test_guide_producer_results.GuideProducers.test_browser_refuses_missing_and_disagreeing_metadata (1 actual body assertions)
+browser title map can freeze after a failed baseline: KILLED by test_guide_producer_results.GuideProducers.test_browser_freezes_mapping_only_from_green_complete_baseline (1 actual body assertions)
+checker summary error count is not complete: KILLED by test_guide_producer_results.GuideProducers.test_checked_refusal_requires_complete_error_inventory (1 actual body assertions)
+cancellation restores mutated source: KILLED by test_guide_producer_results.GuideProducers.test_main_cancellation_restores_source_and_preserves_exit (17 actual body assertions)
+unrecognized compiler output earns a semantic refusal: KILLED by test_guide_producer_results.GuideProducers.test_checked_refusal_requires_complete_error_inventory (1 actual body assertions)
+17 of 17 mutants killed; 0 refused; 0 survived
+memory bound: no process was stopped
+===== guide-strict-controls-18-final.log; SHA256 38a7dc2079e1c033910c690e8252518691757f1888c39aa3c3aae981239ef37c =====
+structured instrument receipts: /tmp/pw-guide-producer-controls-uirph8mb
+baseline: 49 executed; 0 failed; valid=True
+Cargo result validity is ignored: KILLED by test_guide_producer_results.GuideProducers.test_cargo_refuses_invalid_failure_status (10 actual body assertions)
+Python canonical result validity is ignored: KILLED by test_guide_producer_results.GuideNativeProtocol.test_native_setup_failures_earn_no_kill_and_never_enter_body (7 actual body assertions)
+browser command bypasses canonical suite authority: KILLED by test_guide_producer_results.GuideProducers.test_browser_uses_canonical_authority_and_exact_selection (1 actual body assertions)
+browser status and counts need not agree: KILLED by test_guide_producer_results.GuideProducers.test_browser_refuses_invalid_failure_status (3 actual body assertions)
+partial codes after an invalid compiler exit earn a checker kill: KILLED by test_guide_producer_results.GuideProducers.test_main_refuses_named_codes_after_invalid_build_status (2 actual body assertions)
+invalid guide producer is credited as killed: KILLED by test_guide_producer_results.GuideProducers.test_main_refuses_cargo_invalid_status_without_kill (7 actual body assertions)
+bound stop with partial valid output is ignored: KILLED by test_guide_producer_results.GuideProducers.test_main_refuses_bound_stop_with_valid_partial_summary (1 actual body assertions)
+final restored build failure is ignored: KILLED by test_guide_producer_results.GuideProducers.test_final_restored_build_failure_fails_campaign (1 actual body assertions)
+Python runtime error earns an assertion kill: KILLED by test_guide_producer_results.GuideNativeProtocol.test_native_body_error_earns_no_assertion_kill (1 actual body assertions)
+Cargo named inventory is not checked: KILLED by test_guide_producer_results.GuideProducers.test_cargo_requires_exact_inventory_and_assertion_site (1 actual body assertions)
+browser metadata may change its intended title: KILLED by test_guide_producer_results.GuideProducers.test_browser_refuses_missing_and_disagreeing_metadata (1 actual body assertions)
+browser metadata need not match authenticated IDs: KILLED by test_guide_producer_results.GuideProducers.test_browser_refuses_missing_and_disagreeing_metadata (1 actual body assertions)
+browser duplicate metadata identity is accepted: KILLED by test_guide_producer_results.GuideProducers.test_browser_refuses_missing_and_disagreeing_metadata (1 actual body assertions)
+browser title map can freeze after a failed baseline: KILLED by test_guide_producer_results.GuideProducers.test_browser_freezes_mapping_only_from_green_complete_baseline (1 actual body assertions)
+checker summary error count is not complete: KILLED by test_guide_producer_results.GuideProducers.test_checked_refusal_requires_complete_error_inventory (1 actual body assertions)
+cancellation restores mutated source: KILLED by test_guide_producer_results.GuideProducers.test_main_cancellation_restores_source_and_preserves_exit (17 actual body assertions)
+unrecognized compiler output earns a semantic refusal: KILLED by test_guide_producer_results.GuideProducers.test_checked_refusal_requires_complete_error_inventory (1 actual body assertions)
+diagnostic continuation can precede a diagnostic: KILLED by test_guide_producer_results.GuideProducers.test_checked_refusal_requires_complete_error_inventory (1 actual body assertions)
+18 of 18 mutants killed; 0 refused; 0 survived
+memory bound: no process was stopped
+===== guide-strict-49-final-tests.log; SHA256 ecf0f7a9345e8ad019eea220feea85a0f37f8e0866cb6258bc14fb6733401776 =====
+...Python frozen full IDs: ['test_guide_diagnostics.Current.test_every_registered_code_has_a_row', 'test_guide_diagnostics.Current.test_the_committed_page_is_what_the_registry_writes', 'test_guide_diagnostics.Reading.test_a_line_that_is_no_entry_is_refused_not_skipped', 'test_guide_diagnostics.Reading.test_a_pipe_in_a_cell_is_escaped', 'test_guide_diagnostics.Reading.test_a_retired_code_with_its_reason_continued_across_lines', 'test_guide_diagnostics.Reading.test_an_owner_without_a_title_is_written_from_its_name', 'test_guide_diagnostics.Reading.test_each_entry_with_its_invariant_and_the_adrs_its_comment_cites']; evidence /tmp/pw-guide-python-evidence-5qg3ko11
+..............................................
+----------------------------------------------------------------------
+Ran 49 tests in 7.055s
+
+OK
+baseline: the guide's tests, 1 ran, 0 failed
+===== guide-strict-checked-native.log; SHA256 05b022d853900290de36ec22c2343aca4d9678e3fe8deaf231233d54ebfbd227 =====
+the composer is shown to a reader signed out 1 {'PW5048'}
+error: [PW5048] this control sends `sign`, which `requires SignedIn`, and is shown where the page does not ask `SignedIn`
+  --> pages.pw:30:13
+   |
+ 8 | /  session page Book() {
+ 9 | |      route     "/"
+10 | |      placement origin
+11 | |      cache     private
+...  |
+30 | |/             <form on:submit|prevent={() => match words(draft) {
+31 | ||                 Some(text) => match sign(text) {
+32 | ||                     Ok(_) => draft = "",
+33 | ||                     Err(_) => (),
+...  ||
+38 | ||                 <button type="submit" disabled={String.length(draft) == 0}>Sign</button>
+39 | ||             </form>
+   | ||___________________^ this control sends `sign`, which `requires SignedIn`, and is shown where the page does not ask `SignedIn`
+...  |
+56 | |  }
+   | |__- `Book`
+   |
+   = note: A press the server refuses was a dead control: the owner, signed out, pressed Post and the post went with no word (2026-10-08). A page asks a predicate of its reader by naming it, and the deployment answers it as it answers `requires`, so a control shown under it is refused only if the reader changed since the page was rendered, and then told where the press was (ADR-0302). `SignedIn` is the program's to declare (`predicate SignedIn says "…"`) where only the deployment knows it.
+   = help: show it where `SignedIn` holds: `{#if SignedIn}` around it, or `hidden={!SignedIn}` on it; where no reader's answer can decide it, as in a part served to everyone, mark its event `|refusable`
+pw check: 24 file(s), 1 error(s), 0 warning(s)
+
+Remove is shown to a reader signed out 1 {'PW5048'}
+error: [PW5048] this control sends `remove`, which `requires SignedIn`, and is shown where the page does not ask `SignedIn`
+  --> pages.pw:46:57
+   |
+ 8 | /  session page Book() {
+ 9 | |      route     "/"
+10 | |      placement origin
+11 | |      cache     private
+...  |
+46 | |                          {#if entry.mine}{#if entry.mine}<button type="button" on:press={() => match remove(entry.id) {
+   | | _________________________________________________________^
+47 | ||                             Ok(_) => (),
+48 | ||                             Err(_) => (),
+49 | ||                         }}>Remove</button>{/if}{/if}
+   | ||__________________________________________^ this control sends `remove`, which `requires SignedIn`, and is shown where the page does not ask `SignedIn`
+...  |
+56 | |  }
+   | |__- `Book`
+   |
+   = note: A press the server refuses was a dead control: the owner, signed out, pressed Post and the post went with no word (2026-10-08). A page asks a predicate of its reader by naming it, and the deployment answers it as it answers `requires`, so a control shown under it is refused only if the reader changed since the page was rendered, and then told where the press was (ADR-0302). `SignedIn` is the program's to declare (`predicate SignedIn says "…"`) where only the deployment knows it.
+   = help: show it where `SignedIn` holds: `{#if SignedIn}` around it, or `hidden={!SignedIn}` on it; where no reader's answer can decide it, as in a part served to everyone, mark its event `|refusable`
+pw check: 24 file(s), 1 error(s), 0 warning(s)
+
+the entries are not told of a signed entry 1 {'PW5107'}
+error: [PW5107] `sign` speculates on `Entries` and does not invalidate it
+  --> book.pw:95:19
+   |
+91 | / command sign(text: Words) -> Result<Post, BookError>
+92 | |     requires      SignedIn
+93 | |     idempotent_by InteractionId
+94 | |     emits         Signed(author(current_session()))
+95 | |     optimistic    Entries(current_session(), _) as shown => pending(shown, text)
+   | |     --------------^^^^^^^^^^^^^^^^^^^^^^^^^^^^^---------------------------------
+   | |     |             |
+   | |     |             `sign` speculates on `Entries` and does not invalidate it
+   | |     the speculation
+96 | | {
+97 | |     publish(current_session(), text)
+98 | | }
+   | |_- `sign` is the command
+   |
+   = note: An optimistic transition shows a speculative value until the command answers (ADR-0025). If it succeeds, what it committed replaces the speculation, and that happens through the entry: a command that `invalidates` it, or emits an event it listens for. `sign` does neither for `Entries`, so the speculation stays on the page as if it had been committed, whatever was.
+   = help: declare `invalidates Entries(..)` on `sign`
+   = help: or emit `Removed`, which `Entries` listens for
+pw check: 24 file(s), 1 error(s), 0 warning(s)
+
+===== guide-strict-catalog-proof.json; SHA256 6176215fee4de48d86b3142c708272623913b0637076850fdef79ad8f1c51537 =====
+{
+  "base": "8b73c9982435eddcfa4ecfdfe095b999725bb475",
+  "semantic_models": 74,
+  "identities_targets_MUST_CHECKED_unchanged": true,
+  "equivalent_reanchors": [
+    {
+      "what": "trailing space is no difference",
+      "old": [
+        "        .find(|(name, text)| **text != on_disk[*name])",
+        "        .find(|(name, text)| text.trim_end() != on_disk[*name].trim_end())"
+      ],
+      "new": [
+        "**text != *other",
+        "text.trim_end() != other.trim_end()"
+      ]
+    }
+  ]
+}
+===== guide-strict-recipe-gate.log; SHA256 37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570 =====
+[]
+===== train12-guide-final-boundary-review.txt; SHA256 26ea2be439c349fc3e968fe076ba2530ceda3d449fd5e518a5378083f4316258 =====
+Native CHECKED 0 ['PW5048'] accepted; extraneous top-level/indented/orphan continuation, wrong status and inventory refused.
+Native CHECKED 1 ['PW5048'] accepted; extraneous top-level/indented/orphan continuation, wrong status and inventory refused.
+Native CHECKED 2 ['PW5107'] accepted; extraneous top-level/indented/orphan continuation, wrong status and inventory refused.
+Actual native four-case title mapping unchanged by falsified JSON outcomes; nonce receipt remains sole outcome authority.
+===== generic-review-guide-producer-native.log; SHA256 2515238c42025e0bd5d83ec8d4bec87998aea85feb8ff9b11daece16fe49710c =====
+test_native_body_assertion_is_a_named_assertion_kill (__main__.GuideNativeProtocol) ... ok
+test_native_body_error_earns_no_assertion_kill (__main__.GuideNativeProtocol) ... ok
+test_native_fresh_cache_does_not_read_same_timestamp_prior_mutant (__main__.GuideNativeProtocol) ... ok
+test_native_guide_discovery_preserves_exact_original_seven_ids (__main__.GuideNativeProtocol) ... Python frozen full IDs: ['test_guide_diagnostics.Current.test_every_registered_code_has_a_row', 'test_guide_diagnostics.Current.test_the_committed_page_is_what_the_registry_writes', 'test_guide_diagnostics.Reading.test_a_line_that_is_no_entry_is_refused_not_skipped', 'test_guide_diagnostics.Reading.test_a_pipe_in_a_cell_is_escaped', 'test_guide_diagnostics.Reading.test_a_retired_code_with_its_reason_continued_across_lines', 'test_guide_diagnostics.Reading.test_an_owner_without_a_title_is_written_from_its_name', 'test_guide_diagnostics.Reading.test_each_entry_with_its_invariant_and_the_adrs_its_comment_cites']; evidence /tmp/pw-guide-python-evidence-6_b7fn88
+ok
+test_native_setup_failures_earn_no_kill_and_never_enter_body (__main__.GuideNativeProtocol) ... ok
+test_native_skip_expected_and_deferred_bodies_earn_no_kill (__main__.GuideNativeProtocol) ... ok
+test_native_teardown_failures_earn_no_kill_after_body_entry (__main__.GuideNativeProtocol) ... ok
+test_native_timeout_refuses_and_reaps_its_owned_child (__main__.GuideNativeProtocol) ... ok
+test_browser_accepts_actual_assertion_failure (__main__.GuideProducers) ... ok
+test_browser_accepts_green_producer (__main__.GuideProducers) ... ok
+test_browser_freezes_mapping_only_from_green_complete_baseline (__main__.GuideProducers) ... ok
+test_browser_json_and_prose_do_not_authorize_outcomes (__main__.GuideProducers) ... ok
+test_browser_refuses_empty_or_missing_summary (__main__.GuideProducers) ... ok
+test_browser_refuses_invalid_failure_status (__main__.GuideProducers) ... ok
+test_browser_refuses_invalid_green_status (__main__.GuideProducers) ... ok
+test_browser_refuses_missing_and_disagreeing_metadata (__main__.GuideProducers) ... ok
+test_browser_refuses_partial_stale_and_duplicate_receipts (__main__.GuideProducers) ... ok
+test_browser_uses_canonical_authority_and_exact_selection (__main__.GuideProducers) ... ok
+test_cargo_accepts_actual_assertion_failure (__main__.GuideProducers) ... ok
+test_cargo_additional_empty_binary_is_refused (__main__.GuideProducers) ... ok
+test_cargo_all_binary_summaries_must_agree (__main__.GuideProducers) ... ok
+test_cargo_quiet_failure_without_inventory_is_refused (__main__.GuideProducers) ... ok
+test_cargo_refuses_build_or_stop_diagnostics_after_partial_results (__main__.GuideProducers) ... ok
+test_cargo_refuses_empty_or_missing_summary (__main__.GuideProducers) ... ok
+test_cargo_refuses_invalid_failure_status (__main__.GuideProducers) ... ok
+test_cargo_refuses_invalid_green_status (__main__.GuideProducers) ... ok
+test_cargo_requires_exact_inventory_and_assertion_site (__main__.GuideProducers) ... ok
+test_checked_plain_diagnostic_continuations_are_supported (__main__.GuideProducers) ... ok
+test_checked_refusal_requires_complete_error_inventory (__main__.GuideProducers) ... ok
+test_final_restored_build_failure_fails_campaign (__main__.GuideProducers) ... ok
+test_guide_accepts_green_producers (__main__.GuideProducers) ... ok
+test_guide_retains_earlier_producer_output (__main__.GuideProducers) ... ok
+test_main_accepts_exact_named_compiler_refusal (__main__.GuideProducers) ... ok
+test_main_accepts_valid_intended_assertion_neighbours (__main__.GuideProducers) ... ok
+test_main_cancellation_restores_source_and_preserves_exit (__main__.GuideProducers) ... ok
+test_main_green_neighbours_are_survivors (__main__.GuideProducers) ... ok
+test_main_refuses_additional_named_codes (__main__.GuideProducers) ... ok
+test_main_refuses_bound_stop_with_valid_partial_summary (__main__.GuideProducers) ... ok
+test_main_refuses_browser_invalid_status_without_kill (__main__.GuideProducers) ... ok
+test_main_refuses_cargo_invalid_status_without_kill (__main__.GuideProducers) ... ok
+test_main_refuses_invalid_green_baseline (__main__.GuideProducers) ... ok
+test_main_refuses_named_codes_after_invalid_build_status (__main__.GuideProducers) ... ok
+test_main_refuses_python_invalid_status_without_kill (__main__.GuideProducers) ... ok
+test_main_refuses_unlisted_compiler_refusal (__main__.GuideProducers) ... ok
+test_original_rust_inventory_is_frozen_exactly (__main__.GuideProducers) ... ok
+test_python_accepts_actual_assertion_failure (__main__.GuideProducers) ... ok
+test_python_refuses_empty_or_missing_summary (__main__.GuideProducers) ... ok
+test_python_refuses_invalid_failure_status (__main__.GuideProducers) ... ok
+test_python_refuses_invalid_green_status (__main__.GuideProducers) ... ok
+
+----------------------------------------------------------------------
+Ran 49 tests in 7.081s
+
+OK
+baseline: the guide's tests, 1 ran, 0 failed
+===== generic-review-guide-inventory.txt; SHA256 8cd18c546cd43bce258373f528b0f8cc37476d1aba011bfd78d595fa3a0ed0a2 =====
+Exactly74 semantic controls retained; only changed original tuple: 55 trailing space is no difference
+===== final native browser receipt index =====
+[
+  {
+    "directory": "pw-guide-browser-ufp1pmtb",
+    "complete": true,
+    "tests": [
+      [
+        "aec2952baa857cc999be-1244cf3d3f8f821f5c4d",
+        "passed"
+      ],
+      [
+        "aec2952baa857cc999be-8168883520d9cdb52ce5",
+        "passed"
+      ],
+      [
+        "aec2952baa857cc999be-b39eb00fa8cd83d37f18",
+        "passed"
+      ],
+      [
+        "aec2952baa857cc999be-bcf8960c52d2c6a19db8",
+        "passed"
+      ]
+    ],
+    "sha256": {
+      "assertions.json": "066bde3d4df8cb988fd00088bda4f2cd5194f71752b2db8d688560b0dab596b7",
+      "metadata.json": "7f170c5614448e35264bab3b0216b8d0694b7f94941280e32cdc9c42c8debb43",
+      "output.txt": "f407b53bcece4cac4e364b7c6f84853b5c29d57b866c437bd9fc33570d47cca8"
+    }
+  },
+  {
+    "directory": "pw-guide-browser-hafg29cb",
+    "complete": true,
+    "tests": [
+      [
+        "aec2952baa857cc999be-1244cf3d3f8f821f5c4d",
+        "passed"
+      ],
+      [
+        "aec2952baa857cc999be-8168883520d9cdb52ce5",
+        "failed"
+      ],
+      [
+        "aec2952baa857cc999be-b39eb00fa8cd83d37f18",
+        "passed"
+      ],
+      [
+        "aec2952baa857cc999be-bcf8960c52d2c6a19db8",
+        "passed"
+      ]
+    ],
+    "sha256": {
+      "assertions.json": "7ee62c636a6256f96b5fe11b33cffbb0383fba0a6f416025b3ecc2303844d923",
+      "metadata.json": "d20776c11562acc9b6b1d14c3b2fdce9e06d6fe6dad6a574aa9209a93e3c2018",
+      "output.txt": "430a44b36ebb6343c56d954eea105a4f9ac539d0bec510abfb41f288df67b5ac"
+    }
+  },
+  {
+    "directory": "pw-guide-browser-qvqgxc7m",
+    "complete": true,
+    "tests": [
+      [
+        "aec2952baa857cc999be-1244cf3d3f8f821f5c4d",
+        "passed"
+      ],
+      [
+        "aec2952baa857cc999be-8168883520d9cdb52ce5",
+        "failed"
+      ],
+      [
+        "aec2952baa857cc999be-b39eb00fa8cd83d37f18",
+        "failed"
+      ],
+      [
+        "aec2952baa857cc999be-bcf8960c52d2c6a19db8",
+        "failed"
+      ]
+    ],
+    "sha256": {
+      "assertions.json": "895acfa34620e7edeff84a1d379e1b4199cca3afbc21c9707be580123059b84d",
+      "metadata.json": "4c163344ac144a831d4ec8b77d7bb208006a1201e592741e29c61b8cee85ed6b",
+      "output.txt": "95de54b4e9f7104b05d6c33cdc3fb7024cfed3296bae7de8dda6689e43d49d8b"
+    }
+  },
+  {
+    "directory": "pw-guide-browser-txesju0s",
+    "complete": true,
+    "tests": [
+      [
+        "aec2952baa857cc999be-1244cf3d3f8f821f5c4d",
+        "failed"
+      ],
+      [
+        "aec2952baa857cc999be-8168883520d9cdb52ce5",
+        "failed"
+      ],
+      [
+        "aec2952baa857cc999be-b39eb00fa8cd83d37f18",
+        "failed"
+      ],
+      [
+        "aec2952baa857cc999be-bcf8960c52d2c6a19db8",
+        "failed"
+      ]
+    ],
+    "sha256": {
+      "assertions.json": "8ad82bedbbd975cb1d5c02c71e181a39c7a81e96c04f5bf54d7f0e8fc0344053",
+      "metadata.json": "338fc0eac5b3f8410a58a2d56bbb12d7fa72829f45bda9f8ae8bdf6a060b73ab",
+      "output.txt": "1031e14d4d0db16409a06002a8e76009d027fd07c46c2672959e8a62610a6e91"
+    }
+  },
+  {
+    "directory": "pw-guide-browser-cd_jy6o5",
+    "complete": true,
+    "tests": [
+      [
+        "aec2952baa857cc999be-1244cf3d3f8f821f5c4d",
+        "passed"
+      ],
+      [
+        "aec2952baa857cc999be-8168883520d9cdb52ce5",
+        "passed"
+      ],
+      [
+        "aec2952baa857cc999be-b39eb00fa8cd83d37f18",
+        "passed"
+      ],
+      [
+        "aec2952baa857cc999be-bcf8960c52d2c6a19db8",
+        "failed"
+      ]
+    ],
+    "sha256": {
+      "assertions.json": "b3f5b0e49f64a145ffb571e020ebba97aadf0fc4e881ca50bfb56eb51b387711",
+      "metadata.json": "5663b8386d59069d208dbc29bee9b5f1bdcc9759ff6ba6ae9832bdc6eb80769b",
+      "output.txt": "a6d4187e6cf7b0fcc38bbe2757ca1515b3f7efceb1badac42cda4825c17bc9b7"
+    }
+  },
+  {
+    "directory": "pw-guide-browser-4lro7viv",
+    "complete": true,
+    "tests": [
+      [
+        "aec2952baa857cc999be-1244cf3d3f8f821f5c4d",
+        "passed"
+      ],
+      [
+        "aec2952baa857cc999be-8168883520d9cdb52ce5",
+        "passed"
+      ],
+      [
+        "aec2952baa857cc999be-b39eb00fa8cd83d37f18",
+        "passed"
+      ],
+      [
+        "aec2952baa857cc999be-bcf8960c52d2c6a19db8",
+        "failed"
+      ]
+    ],
+    "sha256": {
+      "assertions.json": "a962cfe94523effde946201b138d824d8693e62bcf661582e28e61b8307ac817",
+      "metadata.json": "464ab025e6cd3eec1f9665140fb3cbda78a06997f195e77bbf029f958a178ca9",
+      "output.txt": "6edea82bdd3c3a19cc356c10cab4215791f45ff678078874c8d17f883f980450"
+    }
+  }
+]

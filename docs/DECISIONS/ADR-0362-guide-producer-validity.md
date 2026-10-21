@@ -338,3 +338,6 @@ partial inventories, invalid exits and unrelated assertions earn no kill.
 Historical counts and broader body-error acceptance above describe previous
 versions, not this assertion-only contract. Native checks of the final source
 and the full current hosted guide campaign must be recorded before landing.
+The [native diagnostic record](../diagnostics/train-12/guide-proof.txt) preserves
+the failing initial checks, final74/18 runs, exact catalog comparison and
+independent reviews. It is diagnostic history, not current hosted E14 evidence.
