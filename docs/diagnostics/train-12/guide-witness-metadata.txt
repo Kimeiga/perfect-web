@@ -1,0 +1,40 @@
+Guide witness metadata diagnostic
+The thirteen original fault models and frozen fifteen-test baseline are unchanged.
+The exact historical13 verdict lines identify the canonical catalog after full-ID qualification.
+Original metadata fails the regression by assertion; qualified metadata passes.
+This is metadata proof only: the whole13 campaign must run once on combined WIT readiness-fixture plus this source.
+No new whole13 success is claimed here; historical f151 bulk remains failed.
+
+Commands:
+  python3 -m unittest -v scripts/tests/test_guide_ownership_metadata.py scripts/tests/test_producer_ownership_metadata.py
+  python3 scripts/mutation_anchors.py
+  bash scripts/case-check.sh
+  git diff --check
+
+===== /tmp/guide-metadata-regression.txt =====
+test_actual_native_verdicts_have_exact_owner_and_catalog (test_guide_ownership_metadata.Metadata) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.000s
+
+OK
+All13 original models unchanged; fixture byte-exact historical output.
+Original metadata: 1 tests 1 assertion failures 0 errors
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/producer-metadata/scripts/tests/test_guide_ownership_metadata.py", line 43, in test_actual_native_verdicts_have_exact_owner_and_catalog
+    self.assertEqual(evidence_counts.disagree(catalog, killed, total, verdicts), [])
+AssertionError: Lists differ: [(1, "'only the immediate child is stopped[995 chars]pt")] != []
+
+First list contains 12 additional elements.
+First extra element 0:
+(1, "'only the immediate child is stopped' names no mutant of its script")
+
+Diff is 1172 characters long. Set self.maxDiff to None to see it.
+
+
+===== /tmp/guide-metadata-anchors.txt =====
+mutation anchors: 4395 mutants in 309 scripts, each matching once
+
+===== /tmp/guide-metadata-case.txt =====
+case-check: OK (3510 paths)
+

@@ -45,6 +45,8 @@ MUTANTS = [
      '            if child is not None and (not complete or pending):\n'),
 
 ]
+MUTANTS = [(name, 'test_guide_process_ownership.GuideOwnership.' + witness, path, anchor, replacement)
+           for name, witness, path, anchor, replacement in MUTANTS]
 
 
 def main():
@@ -62,12 +64,11 @@ def main():
         return 1
     print(f'baseline: {len(expected)} passed, 0 failed')
     killed = 0
-    for name, method, path, anchor, replacement in MUTANTS:
+    for name, witness, path, anchor, replacement in MUTANTS:
         original = path.read_text()
         if original.count(anchor) != 1:
             print(f'REFUSED: {name}: anchor is not unique')
             return 1
-        witness = selector + '.GuideOwnership.' + method
         if witness not in expected:
             print(f'REFUSED: {name}: witness not in frozen inventory')
             return 1
