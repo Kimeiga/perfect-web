@@ -25,6 +25,10 @@ def running(pid):
         return False
 
 
+@unittest.skipUnless(
+    sys.platform.startswith('linux') and Path('/proc/self/stat').is_file()
+    and all(hasattr(os, name) for name in ('waitid', 'P_PID', 'WEXITED', 'WNOHANG', 'WNOWAIT')),
+    'Linux /proc and waitid native process-group witnesses')
 class GuideOwnership(unittest.TestCase):
     def probe(self, phase, ignores_term=False):
         with tempfile.TemporaryDirectory() as directory:
