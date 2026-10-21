@@ -141,6 +141,66 @@ fn deep_helper_effects_reach_the_query_contract_in_either_declaration_order() {
     }
 }
 
+#[test]
+fn late_named_function_values_reach_the_query_contract_through_cycles() {
+    for reverse in [false, true] {
+        for cycle in [false, true] {
+            for (leaf, expected) in [
+                ("label(item)", vec!["database.read<Item>".to_string()]),
+                ("item.name", vec![]),
+            ] {
+                let mut source = chain(15, reverse, cycle, leaf, QUERY);
+                for n in 0..15 {
+                    source = source.replace(
+                        &format!("hop{n}(item)"),
+                        &format!("{{ let f = hop{n}; f(item) }}"),
+                    );
+                }
+                assert_eq!(reported(&source), [], "the function-value program is valid");
+                assert_eq!(
+                    required(&source, "t.Answer"),
+                    expected,
+                    "reverse={reverse}, cycle={cycle}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn late_noninvoked_member_values_reach_purity_and_contracts() {
+    for reverse in [false, true] {
+        for (leaf, effectful) in [("i.label", true), ("i.name", false)] {
+            let mut declarations = [
+                "fn held(i: Item) -> String { let f = i.decorate; i.name }".to_string(),
+                format!("fn decorate(i: Item, suffix: String) -> String {{ {leaf} }}"),
+            ];
+            if reverse {
+                declarations.reverse();
+            }
+            let prefix = format!(
+                "module t\n\ntype Item = Item {{ name: String }}\n\nfn label(i: Item) -> String !{{ database.read<Item> }}\n    host \"shop:data/items#label\"\n\n{}\n\n",
+                declarations.join("\n\n")
+            );
+            let source = format!("{prefix}query Answer(i: Item) -> String {{ held(i) }}");
+            assert_eq!(reported(&source), [], "the member-value query is valid");
+            let expected = if effectful {
+                vec!["database.read<Item>".to_string()]
+            } else {
+                vec![]
+            };
+            assert_eq!(required(&source, "t.Answer"), expected);
+            let view = format!("{prefix}view Menu(i: Item) !{{}} {{ <p>{{held(i)}}</p> }}");
+            let expected = if effectful {
+                vec![("PW0401".to_string(), "held(i)".to_string())]
+            } else {
+                vec![]
+            };
+            assert_eq!(reported(&view), expected, "reverse={reverse}");
+        }
+    }
+}
+
 /// Timing evidence is opt-in: the ordinary suite has no machine-speed gate.
 #[test]
 #[ignore = "bounded checker scale smoke; run with --ignored --nocapture"]

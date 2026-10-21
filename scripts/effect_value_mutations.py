@@ -13,9 +13,11 @@ output. The source is restored after every mutant, whatever happens.
 """
 
 import pathlib
-import re
 import subprocess
 import sys
+import cargo_assertion_results
+import mutation_source
+import producer_process
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 EFFECTS = ROOT / "compiler/pw-core/src/effects.rs"
@@ -25,7 +27,7 @@ MUTANTS = [
     (
         "a function named as a value is not counted",
         EFFECTS,
-        "        self.value_effects(unit, body, body.root, types, &mut out);\n",
+        "        self.value_effects(unit, body, body.root, types, &mut out, reads);\n",
         "",
     ),
     (
@@ -37,11 +39,8 @@ MUTANTS = [
     (
         "a helper declaring no row carries only what it calls",
         EFFECTS,
-        "                let found = self.infer_in_at(*unit, body, types);",
-        "                let found = {\n"
-        "                    let _ = types;\n"
-        "                    self.infer_at(*unit, body)\n"
-        "                };",
+        "            let found = self.infer_in_reading(*unit, body, types, Some(&mut reads));",
+        "            let found = self.calls_with_types(*unit, body, body.root, Some(types), Some(&mut reads));",
     ),
     (
         "a function named as a value is said to be called",
@@ -55,27 +54,36 @@ TESTS = [
     ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "effects_through_values"],
     ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "generality"],
 ]
+INVENTORY = {}
 
 def run_tests():
-    """(built, passed, failed) over every test command."""
-    built, passed, failed = True, 0, 0
+    """Complete named inventories; only native body assertions earn kills."""
+    passed = failed = 0
     for cmd in TESTS:
-        r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
-        out = r.stdout + r.stderr
-        m = re.search(r"test result: \w+\. (\d+) passed; (\d+) failed", out)
-        if m is None:
-            built = False
-            continue
-        passed += int(m.group(1))
-        failed += int(m.group(2))
-    return built, passed, failed
+        try:
+            child = producer_process.run([*cmd, '--', '--format=pretty'], cwd=ROOT, timeout=600)
+        except subprocess.TimeoutExpired as expired:
+            print(expired.output, flush=True)
+            return False, 0, 0
+        key = tuple(cmd)
+        source = ROOT / 'compiler/pw-core/tests' / (cmd[-1] + '.rs')
+        result = cargo_assertion_results.validate(child.returncode, child.stdout,
+            root=ROOT, sources=[source], expected=INVENTORY.get(key))
+        print(child.stdout, flush=True)
+        if not result.valid:
+            return False, 0, 0
+        INVENTORY.setdefault(key, cargo_assertion_results.names(child.stdout))
+        passed += result.passed
+        failed += result.failed
+    return True, passed, failed
 
 
 def main():
     import mutation_baseline  # keeps what each command says, for a red baseline
+    watch = mutation_baseline.mutation_bound.start()
     built, passed, failed = run_tests()
     print(f"baseline: {passed} passed, {failed} failed")
-    if not built or failed or not passed:
+    if not built or failed or not passed or watch.stopped:
         print("FAIL: the unmutated baseline is not green; no mutant can mean anything")
         mutation_baseline.explain()
         return 1
@@ -87,13 +95,11 @@ def main():
             print(f"{what}: ANCHOR NOT FOUND EXACTLY ONCE in {path.name}")
             survivors += 1
             continue
-        try:
-            path.write_text(original.replace(anchor, replacement, 1))
+        with mutation_source.changed(path, original, original.replace(anchor, replacement, 1)):
             built, passed, failed = run_tests()
-        finally:
-            path.write_text(original)
-        if not built:
-            verdict = "KILLED (does not build)"
+        if not built or watch.stopped:
+            verdict = "REFUSED (invalid native assertion producer)"
+            survivors += 1
         elif failed:
             verdict = f"KILLED ({failed} of {passed + failed} tests fail)"
         else:

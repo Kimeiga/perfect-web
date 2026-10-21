@@ -36,7 +36,7 @@
 //! The third is the one an approximation gets wrong, which is why the body
 //! grammar parses lambdas properly rather than skipping them.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use crate::hir::{Body, Decl, Expr, ExprId, Hir, Span};
 use crate::ontology::Facet;
@@ -233,9 +233,9 @@ fn is_broader(declared: &str, effect: &str) -> bool {
 
 /// Infer the effects of every declaration in a program.
 ///
-/// Two passes over the call graph, so a helper defined after its caller still
-/// contributes. Deeper chains converge by iterating until nothing changes,
-/// bounded because the set of effects is finite.
+/// Bodies are revisited when a row they read grows, including declarations
+/// named as values and non-invoked members. Propagation reaches a fixed point;
+/// the set of source effects is finite.
 pub struct Inference<'a> {
     sigs: &'a Signatures,
     /// Declaration name → the effects its body performs.
@@ -276,6 +276,8 @@ pub struct Inference<'a> {
     /// Which unit each `Hir` in the last `run` was, so a declaration can be
     /// given the same `DefId` the workspace gave it.
     workspace: &'a Workspace,
+    #[cfg(test)]
+    body_visits: usize,
 }
 
 impl<'a> Inference<'a> {
@@ -287,6 +289,8 @@ impl<'a> Inference<'a> {
             lexicals: BTreeMap::new(),
             types: BTreeMap::new(),
             workspace,
+            #[cfg(test)]
+            body_visits: 0,
         }
     }
 
@@ -301,6 +305,10 @@ impl<'a> Inference<'a> {
     /// Seed from every declared row in the program, then iterate to a fixed
     /// point over local helpers.
     pub fn run(&mut self, hirs: &[&Hir]) {
+        #[cfg(test)]
+        {
+            self.body_visits = 0;
+        }
         for (unit, hir) in hirs.iter().enumerate() {
             for (id, d) in hir.all_decls() {
                 if let Some(row) = &d.declared_effects {
@@ -351,31 +359,50 @@ impl<'a> Inference<'a> {
         for (unit, id, _, _, types) in &typed {
             self.lexicals.insert((*unit, *id), types.lexical().clone());
         }
-        // Each known row only grows, and every effect string comes from
-        // a finite source row/signature or another known row: propagation
-        // never synthesizes new effect strings. Continue until that finite
-        // union stabilizes. A fixed sweep limit silently erased effects
-        // behind deeper caller-first helper chains (and their contracts).
-        loop {
-            let mut changed = false;
-            for (unit, id, body, implemented, types) in &typed {
-                if !*implemented {
-                    continue;
-                }
-                let found = self.infer_in_at(*unit, body, types);
-                let def = self.def_of(*unit, *id);
-                let entry = self.known.entry(def).or_default();
-                let before = entry.len();
-                entry.extend(found.effects.iter().cloned());
-                if entry.len() != before {
-                    changed = true;
-                }
-                self.performed.insert(def, found);
+        // Observe dependencies at the canonical row reads, including empty
+        // and absent rows. The call graph alone omits named function values
+        // and members that are read without being invoked. Register readers
+        // before publishing growth so a recursive body can enqueue itself.
+        let mut readers: BTreeMap<DefId, BTreeSet<usize>> = BTreeMap::new();
+        let mut pending: VecDeque<usize> = typed
+            .iter()
+            .enumerate()
+            .filter_map(|(index, (_, _, _, implemented, _))| implemented.then_some(index))
+            .collect();
+        let mut queued: Vec<bool> = typed
+            .iter()
+            .map(|(_, _, _, implemented, _)| *implemented)
+            .collect();
+        while let Some(index) = pending.pop_front() {
+            queued[index] = false;
+            #[cfg(test)]
+            {
+                self.body_visits += 1;
             }
-            if !changed {
-                break;
+            let (unit, id, body, _, types) = &typed[index];
+            let mut reads = BTreeSet::new();
+            let found = self.infer_in_reading(*unit, body, types, Some(&mut reads));
+            for read in reads {
+                readers.entry(read).or_default().insert(index);
             }
+            let def = self.def_of(*unit, *id);
+            let entry = self.known.entry(def).or_default();
+            let before = entry.len();
+            entry.extend(found.effects.iter().cloned());
+            if entry.len() != before {
+                for &reader in readers.get(&def).into_iter().flatten() {
+                    if !queued[reader] {
+                        queued[reader] = true;
+                        pending.push_back(reader);
+                    }
+                }
+            }
+            // A declared row may already contain an arriving effect. Its
+            // body's sources, calls and provenance still need this refresh.
+            self.performed.insert(def, found);
         }
+        // Rows only grow by union with finite source/signature effects. Only
+        // row growth schedules readers, so cycles converge without a cap.
         for (unit, id, _, _, types) in typed {
             self.types.insert((unit, id), types);
         }
@@ -383,7 +410,14 @@ impl<'a> Inference<'a> {
 
     /// One canonical declared-plus-inferred row for a resolved member:
     /// effect charging and invocation accounting must agree (ADR-0351).
-    fn member_performs(&self, sig: &crate::signatures::Signature) -> BTreeSet<Effect> {
+    fn member_performs(
+        &self,
+        sig: &crate::signatures::Signature,
+        reads: Option<&mut BTreeSet<DefId>>,
+    ) -> BTreeSet<Effect> {
+        if let Some(reads) = reads {
+            reads.insert(sig.definition);
+        }
         sig.effects
             .iter()
             .cloned()
@@ -409,9 +443,20 @@ impl<'a> Inference<'a> {
         body: &Body,
         types: &crate::infer::Types<'_>,
     ) -> Inferred {
-        let mut out = self.calls_with_types(unit, body, body.root, Some(types));
-        self.member_effects(body, body.root, types, &mut out);
-        self.value_effects(unit, body, body.root, types, &mut out);
+        self.infer_in_reading(unit, body, types, None)
+    }
+
+    fn infer_in_reading(
+        &self,
+        unit: usize,
+        body: &Body,
+        types: &crate::infer::Types<'_>,
+        mut reads: Option<&mut BTreeSet<DefId>>,
+    ) -> Inferred {
+        let mut out =
+            self.calls_with_types(unit, body, body.root, Some(types), reads.as_deref_mut());
+        self.member_effects(body, body.root, types, &mut out, reads.as_deref_mut());
+        self.value_effects(unit, body, body.root, types, &mut out, reads);
         out
     }
 
@@ -429,6 +474,7 @@ impl<'a> Inference<'a> {
         root: ExprId,
         types: &crate::infer::Types<'_>,
         out: &mut Inferred,
+        mut reads: Option<&mut BTreeSet<DefId>>,
     ) {
         // A callee is the call walk's, and a path's head is not a value.
         let mut not_values: BTreeSet<ExprId> = BTreeSet::new();
@@ -492,11 +538,15 @@ impl<'a> Inference<'a> {
             }
             let effects: Vec<Effect> = match self.sigs.by_path(&path) {
                 Some(sig) => sig.effects.clone(),
-                None => self
-                    .resolved(unit, &path)
-                    .and_then(|def| self.known.get(&def))
-                    .map(|s| s.iter().cloned().collect())
-                    .unwrap_or_default(),
+                None => {
+                    let def = self.resolved(unit, &path);
+                    if let (Some(def), Some(reads)) = (def, reads.as_deref_mut()) {
+                        reads.insert(def);
+                    }
+                    def.and_then(|def| self.known.get(&def))
+                        .map(|s| s.iter().cloned().collect())
+                        .unwrap_or_default()
+                }
             };
             for e in effects {
                 out.effects.insert(e.clone());
@@ -524,6 +574,7 @@ impl<'a> Inference<'a> {
         root: ExprId,
         types: &crate::infer::Types<'_>,
         out: &mut Inferred,
+        mut reads: Option<&mut BTreeSet<DefId>>,
     ) {
         // Which lambdas were handed to which function, so a member call inside
         // a callback names the callback rather than only itself.
@@ -605,7 +656,7 @@ impl<'a> Inference<'a> {
             // what its body performs, as a call to it is charged. Until then
             // its row alone, so a member that declares none, read as a
             // property, performed nothing whatever its body did.
-            let performs = self.member_performs(sig);
+            let performs = self.member_performs(sig, reads.as_deref_mut());
             for e in &performs {
                 // Through the callback, if it is inside one — and depending on
                 // the resolution, so the chain is walkable rather than three
@@ -696,8 +747,8 @@ impl<'a> Inference<'a> {
     pub fn infer_rooted(&self, unit: usize, body: &Body, root: ExprId) -> Inferred {
         let mut out = self.calls_from(unit, body, root);
         if let Some(types) = self.types.get(&(unit, body.owner)) {
-            self.member_effects(body, root, types, &mut out);
-            self.value_effects(unit, body, root, types, &mut out);
+            self.member_effects(body, root, types, &mut out, None);
+            self.value_effects(unit, body, root, types, &mut out, None);
         }
         out
     }
@@ -707,7 +758,7 @@ impl<'a> Inference<'a> {
     /// [`Inference::infer_in_at`] each complete with the members and the
     /// values the subtree reads.
     fn calls_from(&self, unit: usize, body: &Body, root: ExprId) -> Inferred {
-        self.calls_with_types(unit, body, root, self.types.get(&(unit, body.owner)))
+        self.calls_with_types(unit, body, root, self.types.get(&(unit, body.owner)), None)
     }
 
     fn calls_with_types(
@@ -716,6 +767,7 @@ impl<'a> Inference<'a> {
         body: &Body,
         root: ExprId,
         types: Option<&crate::infer::Types<'_>>,
+        mut reads: Option<&mut BTreeSet<DefId>>,
     ) -> Inferred {
         let mut out = Inferred::default();
         // A member Call evaluates its callee Field once. That Field is not
@@ -784,7 +836,7 @@ impl<'a> Inference<'a> {
                             _ => self.sigs.property_receiver(sig).is_some(),
                         };
                         if invokes {
-                            let effects = self.member_performs(sig);
+                            let effects = self.member_performs(sig, reads.as_deref_mut());
                             out.calls.push(Called {
                                 call: id,
                                 callee: sig.definition,
@@ -830,6 +882,9 @@ impl<'a> Inference<'a> {
                 Some(sig) => (Some(sig.definition), sig.effects.clone()),
                 None => {
                     let def = self.resolved(unit, &path);
+                    if let (Some(def), Some(reads)) = (def, reads.as_deref_mut()) {
+                        reads.insert(def);
+                    }
                     let effects = def
                         .and_then(|def| self.known.get(&def))
                         .map(|s| s.iter().cloned().collect())
@@ -1509,6 +1564,9 @@ pub fn forbidden_in(
         _ => None,
     }
 }
+
+#[cfg(test)]
+mod queue_tests;
 
 #[cfg(test)]
 mod tests {
