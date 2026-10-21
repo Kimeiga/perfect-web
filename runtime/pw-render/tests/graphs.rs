@@ -9,6 +9,31 @@
 use pw_render::Value;
 use serde_json::json;
 
+#[path = "graphs/stack_probe.rs"]
+mod stack_probe;
+
+fn wire_value(json: &serde_json::Value) -> Value {
+    let value = Value::from_wire(json);
+    assert!(value.is_ok(), "the valid wire value is accepted: {value:?}");
+    value.unwrap()
+}
+
+fn small_value_contract() {
+    // Establish bounded semantic neighbors before allocating deep stress data.
+    let graph = json!({ "$graph": [{ "n": 1, "next": { "$node": 1 } }, { "n": 2 }] });
+    let parsed = Value::from_wire(&graph);
+    assert!(
+        parsed.is_ok(),
+        "the small valid tree is accepted: {parsed:?}"
+    );
+    assert_ne!(Value::Int(1), Value::Int(2));
+    let parsed = parsed.unwrap();
+    assert!(matches!(&parsed, Value::Record(fields)
+        if matches!(fields.get("n"), Some(Value::Int(1)))
+        && matches!(fields.get("next"), Some(Value::Record(next))
+            if matches!(next.get("n"), Some(Value::Int(2))))));
+}
+
 /// A comment, nested, as JSON writes a value of no such type.
 fn comment(id: i64, replies: Vec<serde_json::Value>) -> serde_json::Value {
     json!({ "id": id, "replies": replies })
@@ -27,10 +52,7 @@ fn a_graph_is_the_value_its_nodes_make() {
         1,
         vec![comment(2, vec![]), comment(3, vec![comment(4, vec![])])],
     );
-    assert_eq!(
-        Value::from_wire(&graph).expect("a tree"),
-        Value::from_wire(&nested).expect("a value")
-    );
+    assert_eq!(wire_value(&graph), wire_value(&nested));
     // A node held where a case holds it, `Some(next)`.
     let chain = json!({ "$graph": [
         { "n": 1, "next": { "$case": "some", "value": { "$node": 1 } } },
@@ -38,10 +60,7 @@ fn a_graph_is_the_value_its_nodes_make() {
     ]});
     let nested = json!({ "n": 1, "next": { "$case": "some", "value":
         { "n": 2, "next": { "$case": "none" } } } });
-    assert_eq!(
-        Value::from_wire(&chain).expect("a tree"),
-        Value::from_wire(&nested).expect("a value")
-    );
+    assert_eq!(wire_value(&chain), wire_value(&nested));
     // Another type's graph inside a node is its own: its `$node`s are its.
     let inner = json!({ "$graph": [
         { "id": 1, "replies": [{ "$node": 1 }] },
@@ -55,15 +74,16 @@ fn a_graph_is_the_value_its_nodes_make() {
     let nested = json!({ "tag": "a", "thread": thread, "kids": [
         { "tag": "b", "thread": thread, "kids": [] }
     ]});
-    assert_eq!(
-        Value::from_wire(&outer).expect("a tree"),
-        Value::from_wire(&nested).expect("a value")
-    );
+    assert_eq!(wire_value(&outer), wire_value(&nested));
 }
 
 #[test]
 fn a_graph_that_is_not_a_tree_is_refused() {
-    let refused = |j: serde_json::Value| Value::from_wire(&j).expect_err("refused");
+    let refused = |j: serde_json::Value| {
+        let result = Value::from_wire(&j);
+        assert!(result.is_err(), "the malformed tree is refused");
+        result.unwrap_err()
+    };
     // A node held by one before it, or by itself: a cycle.
     assert!(
         refused(json!({ "$graph": [{ "next": [] }, { "back": { "$node": 0 } }] }))
@@ -90,27 +110,25 @@ fn a_graph_that_is_not_a_tree_is_refused() {
 
 #[test]
 fn a_value_as_deep_as_its_data_is_held_without_recursion() {
-    // A chain 100,000 nodes deep, as JSON three values deep: read, cloned,
-    // compared and dropped on a thread with 256 KiB of stack, an eighth of
-    // a server worker's.
+    small_value_contract();
     const DEEP: usize = 100_000;
-    let nodes: Vec<serde_json::Value> = (0..DEEP)
-        .map(|k| {
-            if k + 1 < DEEP {
-                json!({ "n": k, "next": [{ "$node": k + 1 }] })
-            } else {
-                json!({ "n": k, "next": [] })
-            }
-        })
-        .collect();
-    let graph = json!({ "$graph": nodes });
-    let deepest = std::thread::Builder::new()
-        .stack_size(256 * 1024)
-        .spawn(move || {
-            let value = Value::from_wire(&graph).expect("a tree");
+    let observation = stack_probe::observe(
+        "a_value_as_deep_as_its_data_is_held_without_recursion",
+        3,
+        || {
+            let nodes: Vec<serde_json::Value> = (0..DEEP)
+                .map(|k| {
+                    if k + 1 < DEEP {
+                        json!({ "n": k, "next": [{ "$node": k + 1 }] })
+                    } else {
+                        json!({ "n": k, "next": [] })
+                    }
+                })
+                .collect();
+            let graph = json!({ "$graph": nodes });
+            let value = Value::from_wire(&graph).expect("the deep valid tree");
             let copy = value.clone();
-            assert_eq!(value, copy);
-            // The last node, as deep as the chain.
+            let equal = value == copy;
             let mut at = &copy;
             let mut depth = 0;
             while let Value::Record(fields) = at {
@@ -122,29 +140,43 @@ fn a_value_as_deep_as_its_data_is_held_without_recursion() {
                     _ => break,
                 }
             }
-            // Differing at the bottom only: found unequal.
             let mut other = value.clone();
             let mut cursor = &mut other;
             loop {
                 let Value::Record(fields) = cursor else {
-                    unreachable!()
+                    panic!("invalid deep record")
                 };
                 if !matches!(fields.get("next"), Some(Value::List(next)) if !next.is_empty()) {
                     fields.insert("n".into(), Value::Int(-1));
                     break;
                 }
                 let Some(Value::List(next)) = fields.get_mut("next") else {
-                    unreachable!()
+                    panic!("invalid deep next")
                 };
                 cursor = &mut next[0];
             }
-            assert_ne!(value, other);
-            depth
-        })
-        .expect("spawns")
-        .join()
-        .expect("returns");
-    assert_eq!(deepest, DEEP - 1);
+            let different = value != other;
+            (
+                vec![depth, usize::from(equal), usize::from(different)],
+                vec![value, copy, other],
+            )
+        },
+    )
+    .unwrap_or_else(|error| panic!("{error}"));
+    let Some(observation) = observation else {
+        return;
+    };
+    assert!(
+        !observation.overflow,
+        "the exact deep drop fits its 256KiB stack: {}",
+        observation.output
+    );
+    assert_eq!(
+        observation.values,
+        vec![DEEP - 1, 1, 1],
+        "{}",
+        observation.output
+    );
 }
 
 #[test]
@@ -155,7 +187,7 @@ fn a_copy_is_the_value_and_its_own() {
         { "id": 2, "tags": [], "replies": [{ "id": 4, "tags": ["z"], "replies": [] }] },
         { "id": 3, "tags": ["w"], "replies": [] },
     ], "state": { "$case": "some", "value": { "seen": true } } });
-    let value = Value::from_wire(&tree).expect("a value");
+    let value = wire_value(&tree);
     let copy = value.clone();
     assert_eq!(copy, value);
     assert_eq!(format!("{copy:?}"), format!("{value:?}"));
@@ -185,10 +217,7 @@ fn a_copy_is_the_value_and_its_own() {
         ),
         (json!("1"), json!(1)),
     ] {
-        let (x, y) = (
-            Value::from_wire(&a).expect("a value"),
-            Value::from_wire(&b).expect("a value"),
-        );
+        let (x, y) = (wire_value(&a), wire_value(&b));
         assert_ne!(x, y, "{a} {b}");
         assert_eq!(x.clone(), x, "{a}");
     }
@@ -202,33 +231,39 @@ fn a_copy_is_the_value_and_its_own() {
 
 #[test]
 fn nested_json_as_deep_as_its_data_is_read_without_recursion() {
-    // What no browser's module writes for such a type, and the renderer
-    // reads all the same: 50,000 lists, one inside another, read on a
-    // thread with 256 KiB of stack. The JSON is leaked, not dropped:
-    // serde_json drops its own values by recursion.
+    small_value_contract();
     const DEEP: usize = 50_000;
-    let mut j = json!(0);
-    for _ in 0..DEEP {
-        j = serde_json::Value::Array(vec![j]);
-    }
-    let j: &'static serde_json::Value = Box::leak(Box::new(j));
-    let depth = std::thread::Builder::new()
-        .stack_size(256 * 1024)
-        .spawn(move || {
-            let v = Value::from_wire(j).expect("a value");
-            let mut at = &v;
+    let observation = stack_probe::observe(
+        "nested_json_as_deep_as_its_data_is_read_without_recursion",
+        2,
+        || {
+            let mut json = json!(0);
+            for _ in 0..DEEP {
+                json = serde_json::Value::Array(vec![json]);
+            }
+            // serde_json itself drops recursively; that is outside this contract.
+            let json: &'static serde_json::Value = Box::leak(Box::new(json));
+            let value = Value::from_wire(json).expect("the deep valid JSON");
+            let mut at = &value;
             let mut depth = 0;
             while let Value::List(items) = at {
                 at = &items[0];
                 depth += 1;
             }
-            assert_eq!(at, &Value::Int(0));
-            depth
-        })
-        .expect("spawns")
-        .join()
-        .expect("returns");
-    assert_eq!(depth, DEEP);
+            let leaf = at == &Value::Int(0);
+            (vec![depth, usize::from(leaf)], vec![value])
+        },
+    )
+    .unwrap_or_else(|error| panic!("{error}"));
+    let Some(observation) = observation else {
+        return;
+    };
+    assert!(
+        !observation.overflow,
+        "the exact nested drop fits its 256KiB stack: {}",
+        observation.output
+    );
+    assert_eq!(observation.values, vec![DEEP, 1], "{}", observation.output);
 }
 
 #[test]
@@ -244,7 +279,7 @@ fn the_reader_keeps_each_item_and_field_in_its_place() {
         )
     };
     assert_eq!(
-        Value::from_wire(&json!([1, "a", true])).expect("a value"),
+        wire_value(&json!([1, "a", true])),
         Value::List(vec![
             Value::Int(1),
             Value::Text("a".into()),
@@ -252,7 +287,7 @@ fn the_reader_keeps_each_item_and_field_in_its_place() {
         ])
     );
     assert_eq!(
-        Value::from_wire(&json!({ "a": 1, "b": "x", "c": [2, 3] })).expect("a value"),
+        wire_value(&json!({ "a": 1, "b": "x", "c": [2, 3] })),
         record(&[
             ("a", Value::Int(1)),
             ("b", Value::Text("x".into())),
@@ -260,7 +295,7 @@ fn the_reader_keeps_each_item_and_field_in_its_place() {
         ])
     );
     assert_eq!(
-        Value::from_wire(&json!({ "$case": "some", "value": [4, 5] })).expect("a value"),
+        wire_value(&json!({ "$case": "some", "value": [4, 5] })),
         Value::Variant {
             case: "some".into(),
             payload: Some(Box::new(Value::List(vec![Value::Int(4), Value::Int(5)]))),

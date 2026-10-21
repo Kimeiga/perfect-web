@@ -129,3 +129,59 @@ Recorded by `just e14-graphs-on-the-wire` in
 - **A component's own recursion over a deep value**, which traps
   (ADR-0050).
 - **A deep value printed with `{:?}`**, which recurses.
+
+
+## Train-12: complete graph evidence and an explicit stack property
+
+The historical `f15117de` campaign in verify `39526960864` printed 19/19
+kills despite a memory stop: replacing `Option::take` with `clone` retained
+every tail of the 100,000-node chain, so the renderer exceeded 3.9 GiB. The
+legacy runner manufactured a failure for the aborted binary and reported
+only 20 results instead of 25. Its wrapper log omitted the stop, but its
+written evidence retained both guard messages. The current shared CI
+summary/fetch validity function already rejects this row; it is unchanged.
+
+All nineteen operators remain unchanged. The runner now requires the exact
+six renderer, six graph-compiler, seven recursive-type and six host identities
+through shared native Cargo assertion authority. Build errors, arbitrary
+panics, aborts, timeout, partial inventory and memory stops earn no kill.
+It owns commands and source restoration through `producer_process` and
+`mutation_source`, and requires a green restored inventory before success.
+The recipe names its producer controls and semantic controls explicitly.
+
+Small valid-tree, field-placement and value-comparison assertions precede
+expensive stress. They fail the same semantic faults before those faults can
+cause unrelated quadratic allocation or deep debug printing. The original
+100,000-node and 50,000-level workloads and six renderer test names remain.
+Their read/copy/comparison observations return to the parent for assertions.
+
+The integrator approved one narrow subprocess property boundary for the
+explicit 256 KiB drop-stack contract. The already-built test binary reruns
+exactly the selected workload in its existing owned process group. A fresh
+invocation identity binds ordered ready, observation, drop and completion
+receipts. Observation arity and boolean fields are checked before any
+semantic assertion. Only the intended drop phase followed by native SIGABRT
+and the exact named-thread stack-overflow diagnostic is an observed failure
+of this stack property. The parent asserts that this observation is false.
+It does not classify arbitrary child nonzero statuses as failed assertions.
+Missing/foreign/duplicate receipts, malformed observations, unrelated panic
+or abort, failed setup, timeout and memory stops remain invalid. The 30-second
+child lifetime is bounded; timeout kills and reaps the child and retains its
+output/status as invalid. No detached child session is created.
+
+Six native property-validity regressions cover success, malformed protocol
+and statuses, unrelated panic/exit/abort and timeout. Ten Python regressions
+hold the strict campaign. Fifteen producer controls require their intended
+native assertion with a complete frozen inventory. Their recipe output uses
+the canonical count/verdict format and names both campaign owners once.
+
+Local proof retains the four original renderer faults for clone/take,
+recursive drop, field assignment and numeric comparison: each produces a
+complete six-case native assertion result, then restored source passes.
+The six property tests, ten Python tests and all fifteen producer controls
+pass, as do renderer Clippy, formatting and baseline conventions. The whole
+25-case/19-model campaign and reached consumers remain due on the combined
+hosted source; historical shortened counts are not newly credited.
+[The diagnostic record](../diagnostics/train-12/graphs-bound-proof.txt)
+retains native output and the original stop without presenting either as
+current accepted E14 evidence.

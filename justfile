@@ -2762,7 +2762,7 @@ e14-graphs-on-the-wire:
        echo "rust: $(rustc --version)"; echo "node: $(node --version)"; \
        echo "playwright: $(cd spikes/own-renderer && pnpm exec playwright --version)"; echo; \
        echo "== the renderer (runtime/pw-render/tests/graphs.rs)"; echo; \
-       cargo test --locked -p pw-render --test graphs 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       cargo test --locked -p pw-render --test graphs --test graph_stack_probe 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the browser's modules, under Node (compiler/pw-core/tests/graphs_on_the_wire.rs, recursive_types.rs)"; echo; \
        cargo test --locked -p pw-core --test graphs_on_the_wire 2>&1 | grep -E '^(test |test result)|panicked at'; \
        cargo test --locked -p pw-core --test recursive_types 2>&1 | grep -E '^test result|^---- |panicked at'; \
@@ -2771,6 +2771,7 @@ e14-graphs-on-the-wire:
        echo; echo "== the thread page (spikes/own-renderer/e2e/thread.spec.mjs), three engines"; echo; \
        bash scripts/run_suite.sh -- pnpm exec playwright test e2e/thread.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/graphs_on_the_wire_mutations.py)"; echo; \
+       python3 scripts/graphs_producer_mutations.py; \
        CARGO_INCREMENTAL=0 python3 scripts/graphs_on_the_wire_mutations.py; \
      } > docs/evidence/E14/graphs-on-the-wire.txt
     @grep -E "^test result|passed|mutants killed|^---- |panicked at" docs/evidence/E14/graphs-on-the-wire.txt

@@ -1,0 +1,429 @@
+Graphs-on-the-wire invalid-producer repair diagnostic
+Base: 2f6dd58b54cddbc5cbcec8b10ca46ab6310395f3
+Current source preserves all19 original operators and all25 semantic test names.
+No current whole19 campaign claim: complete hosted follow-up remains due.
+Local commands:
+  CARGO_TARGET_DIR=/home/haki/code/pw-wt/device-witnesses/target cargo test --quiet --locked -p pw-render --test graphs --test graph_stack_probe -- --format=pretty
+  CARGO_TARGET_DIR=/home/haki/code/pw-wt/device-witnesses/target python3 scripts/graphs_producer_mutations.py
+  python3 -m unittest -v scripts/tests/test_graphs_producers.py
+  cargo clippy --quiet --locked -p pw-render --tests -- -D warnings
+  cargo fmt --all -- --check
+  python3 -m unittest -v scripts/tests/test_mutation_baseline.py
+Targeted fault command invokes the unchanged operators1,3,6,7 with shared
+mutation_source/producers_process ownership and the complete six-case native
+renderer assertion authority. The reproduction script is retained below.
+
+Source SHA256:
+0e037449ea7e4755da908bc0b5472e4660ab0e5a7e50c3cef8741c56be4c2556 runtime/pw-render/tests/graphs.rs
+c9716a6d912e94496c11f72919b4b115ab8323bb9a08643fa23e93f098c20770 runtime/pw-render/tests/graphs/stack_probe.rs
+c8bd32b2dc58eeda1fe4a7ca68153997ac7cf46e522adba7f3665d82ea9340d0 runtime/pw-render/tests/graph_stack_probe.rs
+474e2f9dcd57681d3d90031fd2f708b4b56bbb0be024653f77ad8e7b46a47ab1 scripts/graphs_on_the_wire_mutations.py
+af8a1233ecddc00d0ae7b8d44e008ec8f709a317b793700f6d3a5d94dbeac2ef scripts/graphs_producer_mutations.py
+e87e1e4e609f2cabc7f259094866399d32af9e44dca292d578e17ba3f0fdfe1b scripts/tests/test_graphs_producers.py
+
+===== /tmp/train12-graphs-bound-authority.txt =====
+Current root base2f6dd58b, canonical recipe_memory_failures on preserved historicalartifact:
+{
+  "recipe": "e14-graphs-on-the-wire",
+  "status": 0,
+  "seconds": 312.3,
+  "wrote": [
+    "docs/evidence/E14/graphs-on-the-wire.txt"
+  ],
+  "free": "95.2 GiB"
+}
+memory bound: stopped `graphs`, which held more than 3.9 GiB
+memory bound: a process was stopped in 1 of 19 mutants' runs, each perhaps killed by the bound alone: the renderer takes a node twice
+REJECTED: native0 does not authorize this stopped producer. No summary/fetch production defect.
+
+===== /tmp/graphs-render-original-baseline.txt =====
+
+running 6 tests
+test a_graph_that_is_not_a_tree_is_refused ... ok
+test the_reader_keeps_each_item_and_field_in_its_place ... ok
+test a_copy_is_the_value_and_its_own ... ok
+test a_graph_is_the_value_its_nodes_make ... ok
+test nested_json_as_deep_as_its_data_is_read_without_recursion ... ok
+test a_value_as_deep_as_its_data_is_held_without_recursion ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.88s
+
+
+===== /tmp/graphs-render-targeted-proof.py =====
+from pathlib import Path
+import sys,os
+sys.path.insert(0,'scripts')
+import graphs_on_the_wire_mutations as campaign,mutation_source,producer_process,cargo_assertion_results
+root=Path.cwd();source=root/'runtime/pw-render/tests/graphs.rs'
+cmd=['cargo','test','--quiet','--locked','-p','pw-render','--test','graphs','--','--format=pretty']
+env={**os.environ,'CARGO_TARGET_DIR':'/home/haki/code/pw-wt/device-witnesses/target'}
+names=('a_graph_is_the_value_its_nodes_make','a_graph_that_is_not_a_tree_is_refused','a_value_as_deep_as_its_data_is_held_without_recursion','a_copy_is_the_value_and_its_own','nested_json_as_deep_as_its_data_is_read_without_recursion','the_reader_keeps_each_item_and_field_in_its_place')
+for index in [1,3,6,7]:
+ what,path,anchor,replacement=campaign.MUTANTS[index]
+ original=path.read_text();assert original.count(anchor)==1
+ with mutation_source.changed(path,original,original.replace(anchor,replacement,1)):
+  result=producer_process.run(cmd,cwd=root,env=env,timeout=45)
+  print('\n== original operator',index,what,'native',result.returncode,flush=True)
+  print(result.stdout,flush=True)
+  parsed=cargo_assertion_results.validate(result.returncode,result.stdout,root=root,sources=[source],expected=names)
+  print('strict result:',parsed,flush=True)
+  assert parsed.valid and parsed.failed
+print('All four original operators produce complete six-case assertion evidence; source restored.',flush=True)
+result=producer_process.run(cmd,cwd=root,env=env,timeout=45)
+print('\n== restored baseline\n'+result.stdout,flush=True)
+assert result.returncode==0
+
+===== /tmp/graphs-render-targeted-proof.txt =====
+
+== original operator 1 the renderer takes a node twice native 101
+
+running 6 tests
+test a_graph_that_is_not_a_tree_is_refused ... FAILED
+test a_graph_is_the_value_its_nodes_make ... FAILED
+test a_copy_is_the_value_and_its_own ... ok
+test a_value_as_deep_as_its_data_is_held_without_recursion ... FAILED
+test nested_json_as_deep_as_its_data_is_read_without_recursion ... FAILED
+test the_reader_keeps_each_item_and_field_in_its_place ... ok
+
+failures:
+
+---- a_graph_that_is_not_a_tree_is_refused stdout ----
+
+thread 'a_graph_that_is_not_a_tree_is_refused' (469649) panicked at runtime/pw-render/tests/graphs.rs:94:5:
+assertion failed: refused(json!({
+                "$graph":
+                [{ "a": { "$node": 1 }, "b": { "$node": 1 } }, { "x": 1 },]
+            })).contains("held twice")
+
+---- a_graph_is_the_value_its_nodes_make stdout ----
+
+thread 'a_graph_is_the_value_its_nodes_make' (469648) panicked at runtime/pw-render/tests/graphs.rs:17:5:
+the valid wire value is accepted: Err("a `$graph` whose node no other holds")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- a_value_as_deep_as_its_data_is_held_without_recursion stdout ----
+
+thread 'a_value_as_deep_as_its_data_is_held_without_recursion' (469650) panicked at runtime/pw-render/tests/graphs.rs:25:5:
+the small valid tree is accepted: Err("a `$graph` whose node no other holds")
+
+---- nested_json_as_deep_as_its_data_is_read_without_recursion stdout ----
+
+thread 'nested_json_as_deep_as_its_data_is_read_without_recursion' (469651) panicked at runtime/pw-render/tests/graphs.rs:25:5:
+the small valid tree is accepted: Err("a `$graph` whose node no other holds")
+
+
+failures:
+    a_graph_is_the_value_its_nodes_make
+    a_graph_that_is_not_a_tree_is_refused
+    a_value_as_deep_as_its_data_is_held_without_recursion
+    nested_json_as_deep_as_its_data_is_read_without_recursion
+
+test result: FAILED. 2 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p pw-render --test graphs`
+
+strict result: Result(valid=True, passed=2, failed=4, failure_names=('a_graph_is_the_value_its_nodes_make', 'a_graph_that_is_not_a_tree_is_refused', 'a_value_as_deep_as_its_data_is_held_without_recursion', 'nested_json_as_deep_as_its_data_is_read_without_recursion'), reason='')
+
+== original operator 3 a value is dropped by recursion native 101
+
+running 6 tests
+test a_graph_that_is_not_a_tree_is_refused ... ok
+test a_copy_is_the_value_and_its_own ... ok
+test a_graph_is_the_value_its_nodes_make ... ok
+test the_reader_keeps_each_item_and_field_in_its_place ... ok
+test nested_json_as_deep_as_its_data_is_read_without_recursion ... FAILED
+test a_value_as_deep_as_its_data_is_held_without_recursion ... FAILED
+
+failures:
+
+---- nested_json_as_deep_as_its_data_is_read_without_recursion stdout ----
+
+thread 'nested_json_as_deep_as_its_data_is_read_without_recursion' (470074) panicked at runtime/pw-render/tests/graphs.rs:261:5:
+the exact nested drop fits its 256KiB stack: child status: signal: 6 (SIGABRT) (core dumped)
+stdout:
+
+running 1 test
+test nested_json_as_deep_as_its_data_is_read_without_recursion ... 
+PW_GRAPH_STACK 470069-1792554048235183187 ready nested_json_as_deep_as_its_data_is_read_without_recursion
+
+PW_GRAPH_STACK 470069-1792554048235183187 values 50000,1
+
+PW_GRAPH_STACK 470069-1792554048235183187 drop nested_json_as_deep_as_its_data_is_read_without_recursion
+
+stderr:
+
+thread 'graph-stack-contract' (470080) has overflowed its stack
+fatal runtime error: stack overflow, aborting
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- a_value_as_deep_as_its_data_is_held_without_recursion stdout ----
+
+thread 'a_value_as_deep_as_its_data_is_held_without_recursion' (470073) panicked at runtime/pw-render/tests/graphs.rs:169:5:
+the exact deep drop fits its 256KiB stack: child status: signal: 6 (SIGABRT) (core dumped)
+stdout:
+
+running 1 test
+test a_value_as_deep_as_its_data_is_held_without_recursion ... 
+PW_GRAPH_STACK 470069-1792554048235124441 ready a_value_as_deep_as_its_data_is_held_without_recursion
+
+PW_GRAPH_STACK 470069-1792554048235124441 values 99999,1,1
+
+PW_GRAPH_STACK 470069-1792554048235124441 drop a_value_as_deep_as_its_data_is_held_without_recursion
+
+stderr:
+
+thread 'graph-stack-contract' (470081) has overflowed its stack
+fatal runtime error: stack overflow, aborting
+
+
+
+failures:
+    a_value_as_deep_as_its_data_is_held_without_recursion
+    nested_json_as_deep_as_its_data_is_read_without_recursion
+
+test result: FAILED. 4 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.75s
+
+error: test failed, to rerun pass `-p pw-render --test graphs`
+
+strict result: Result(valid=True, passed=4, failed=2, failure_names=('a_value_as_deep_as_its_data_is_held_without_recursion', 'nested_json_as_deep_as_its_data_is_read_without_recursion'), reason='')
+
+== original operator 6 the reader gives a record's fields another's values native 101
+
+running 6 tests
+test a_graph_that_is_not_a_tree_is_refused ... ok
+test a_copy_is_the_value_and_its_own ... ok
+test a_value_as_deep_as_its_data_is_held_without_recursion ... FAILED
+test a_graph_is_the_value_its_nodes_make ... ok
+test nested_json_as_deep_as_its_data_is_read_without_recursion ... FAILED
+test the_reader_keeps_each_item_and_field_in_its_place ... FAILED
+
+failures:
+
+---- a_value_as_deep_as_its_data_is_held_without_recursion stdout ----
+
+thread 'a_value_as_deep_as_its_data_is_held_without_recursion' (470591) panicked at runtime/pw-render/tests/graphs.rs:31:5:
+assertion failed: matches!(&parsed, Value::Record(fields) if
+    matches!(fields.get("n"), Some(Value::Int(1))) &&
+    matches!(fields.get("next"), Some(Value::Record(next)) if
+    matches!(next.get("n"), Some(Value::Int(2)))))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- nested_json_as_deep_as_its_data_is_read_without_recursion stdout ----
+
+thread 'nested_json_as_deep_as_its_data_is_read_without_recursion' (470592) panicked at runtime/pw-render/tests/graphs.rs:31:5:
+assertion failed: matches!(&parsed, Value::Record(fields) if
+    matches!(fields.get("n"), Some(Value::Int(1))) &&
+    matches!(fields.get("next"), Some(Value::Record(next)) if
+    matches!(next.get("n"), Some(Value::Int(2)))))
+
+---- the_reader_keeps_each_item_and_field_in_its_place stdout ----
+
+thread 'the_reader_keeps_each_item_and_field_in_its_place' (470593) panicked at runtime/pw-render/tests/graphs.rs:289:5:
+assertion `left == right` failed
+  left: Record({"a": List([Int(2), Int(3)]), "b": Text("x"), "c": Int(1)})
+ right: Record({"a": Int(1), "b": Text("x"), "c": List([Int(2), Int(3)])})
+
+
+failures:
+    a_value_as_deep_as_its_data_is_held_without_recursion
+    nested_json_as_deep_as_its_data_is_read_without_recursion
+    the_reader_keeps_each_item_and_field_in_its_place
+
+test result: FAILED. 3 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p pw-render --test graphs`
+
+strict result: Result(valid=True, passed=3, failed=3, failure_names=('a_value_as_deep_as_its_data_is_held_without_recursion', 'nested_json_as_deep_as_its_data_is_read_without_recursion', 'the_reader_keeps_each_item_and_field_in_its_place'), reason='')
+
+== original operator 7 two numbers compare equal native 101
+
+running 6 tests
+test a_copy_is_the_value_and_its_own ... FAILED
+test a_value_as_deep_as_its_data_is_held_without_recursion ... FAILED
+test a_graph_that_is_not_a_tree_is_refused ... ok
+test a_graph_is_the_value_its_nodes_make ... ok
+test nested_json_as_deep_as_its_data_is_read_without_recursion ... FAILED
+test the_reader_keeps_each_item_and_field_in_its_place ... ok
+
+failures:
+
+---- a_copy_is_the_value_and_its_own stdout ----
+
+thread 'a_copy_is_the_value_and_its_own' (471003) panicked at runtime/pw-render/tests/graphs.rs:200:5:
+assertion `left != right` failed
+  left: Record({"id": Int(9), "replies": List([Record({"id": Int(2), "replies": List([Record({"id": Int(4), "replies": List([]), "tags": List([Text("z")])})]), "tags": List([])}), Record({"id": Int(3), "replies": List([]), "tags": List([Text("w")])})]), "state": Variant { case: "some", payload: Some(Record({"seen": Bool(true)})) }, "tags": List([Text("x"), Text("y")])})
+ right: Record({"id": Int(1), "replies": List([Record({"id": Int(2), "replies": List([Record({"id": Int(4), "replies": List([]), "tags": List([Text("z")])})]), "tags": List([])}), Record({"id": Int(3), "replies": List([]), "tags": List([Text("w")])})]), "state": Variant { case: "some", payload: Some(Record({"seen": Bool(true)})) }, "tags": List([Text("x"), Text("y")])})
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- a_value_as_deep_as_its_data_is_held_without_recursion stdout ----
+
+thread 'a_value_as_deep_as_its_data_is_held_without_recursion' (471006) panicked at runtime/pw-render/tests/graphs.rs:29:5:
+assertion `left != right` failed
+  left: Int(1)
+ right: Int(2)
+
+---- nested_json_as_deep_as_its_data_is_read_without_recursion stdout ----
+
+thread 'nested_json_as_deep_as_its_data_is_read_without_recursion' (471007) panicked at runtime/pw-render/tests/graphs.rs:29:5:
+assertion `left != right` failed
+  left: Int(1)
+ right: Int(2)
+
+
+failures:
+    a_copy_is_the_value_and_its_own
+    a_value_as_deep_as_its_data_is_held_without_recursion
+    nested_json_as_deep_as_its_data_is_read_without_recursion
+
+test result: FAILED. 3 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p pw-render --test graphs`
+
+strict result: Result(valid=True, passed=3, failed=3, failure_names=('a_copy_is_the_value_and_its_own', 'a_value_as_deep_as_its_data_is_held_without_recursion', 'nested_json_as_deep_as_its_data_is_read_without_recursion'), reason='')
+All four original operators produce complete six-case assertion evidence; source restored.
+
+== restored baseline
+
+running 6 tests
+test a_graph_that_is_not_a_tree_is_refused ... ok
+test a_copy_is_the_value_and_its_own ... ok
+test a_graph_is_the_value_its_nodes_make ... ok
+test the_reader_keeps_each_item_and_field_in_its_place ... ok
+test nested_json_as_deep_as_its_data_is_read_without_recursion ... ok
+test a_value_as_deep_as_its_data_is_held_without_recursion ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.89s
+
+
+
+===== /tmp/graphs-stack-validity-tests.txt =====
+
+running 6 tests
+test only_the_complete_property_or_identified_native_overflow_is_observed ... ok
+test a_native_exit_without_the_workload_receipt_is_invalid ... ok
+test a_native_setup_panic_is_invalid ... ok
+test a_native_unrelated_abort_is_invalid ... ok
+test a_native_valid_workload_completes_with_its_observations ... ok
+test a_native_timeout_is_reaped_and_invalid ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+
+running 6 tests
+test a_copy_is_the_value_and_its_own ... ok
+test a_graph_that_is_not_a_tree_is_refused ... ok
+test a_graph_is_the_value_its_nodes_make ... ok
+test the_reader_keeps_each_item_and_field_in_its_place ... ok
+test nested_json_as_deep_as_its_data_is_read_without_recursion ... ok
+test a_value_as_deep_as_its_data_is_held_without_recursion ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.86s
+
+
+===== /tmp/graphs-producer-tests.txt =====
+test_bad_native_status_build_panic_or_abort_is_invalid (scripts.tests.test_graphs_producers.Producers) ... ok
+test_baseline_must_be_complete_and_green (scripts.tests.test_graphs_producers.Producers) ... ok
+test_cancellation_restores_source_and_identity (scripts.tests.test_graphs_producers.Producers) ... ok
+test_complete_results_and_assertions_are_valid (scripts.tests.test_graphs_producers.Producers) ... ok
+test_exact_inventory_is_required (scripts.tests.test_graphs_producers.Producers) ... ok
+test_invalid_or_stopped_results_earn_no_kill (scripts.tests.test_graphs_producers.Producers) ... ok
+test_partial_command_set_is_invalid (scripts.tests.test_graphs_producers.Producers) ... ok
+test_recipe_names_each_evidence_owner_once (scripts.tests.test_graphs_producers.Producers) ... ok
+test_restored_source_must_pass (scripts.tests.test_graphs_producers.Producers) ... ok
+test_timeout_keeps_invalid_native_status (scripts.tests.test_graphs_producers.Producers) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.042s
+
+OK
+memory bound: no process was stopped
+
+===== /tmp/graphs-producer-controls.txt =====
+invalid Cargo results are accepted [python]: KILLED by test_graphs_producers.Producers.test_bad_native_status_build_panic_or_abort_is_invalid (3 of 10 tests fail)
+the complete Cargo inventory is optional [python]: KILLED by test_graphs_producers.Producers.test_exact_inventory_is_required (1 of 10 tests fail)
+an invalid command contributes a kill [python]: KILLED by test_graphs_producers.Producers.test_partial_command_set_is_invalid (1 of 10 tests fail)
+a timeout supplies a failed status [python]: KILLED by test_graphs_producers.Producers.test_timeout_keeps_invalid_native_status (1 of 10 tests fail)
+an invalid producer earns a kill [python]: KILLED by test_graphs_producers.Producers.test_invalid_or_stopped_results_earn_no_kill (1 of 10 tests fail)
+a stopped producer earns a kill [python]: KILLED by test_graphs_producers.Producers.test_invalid_or_stopped_results_earn_no_kill (1 of 10 tests fail)
+an invalid baseline runs controls [python]: KILLED by test_graphs_producers.Producers.test_baseline_must_be_complete_and_green (1 of 10 tests fail)
+failed restored tests are ignored [python]: KILLED by test_graphs_producers.Producers.test_restored_source_must_pass (1 of 10 tests fail)
+cancelled mutation source is retained [python]: KILLED by test_graphs_producers.Producers.test_cancellation_restores_source_and_identity (3 of 10 tests fail)
+unrelated native abort is a stack observation [rust]: KILLED by only_the_complete_property_or_identified_native_overflow_is_observed (1 of 6 tests fail)
+the property need not reach the declared drop phase [rust]: KILLED by only_the_complete_property_or_identified_native_overflow_is_observed (1 of 6 tests fail)
+the child need not identify its intended workload [rust]: KILLED by only_the_complete_property_or_identified_native_overflow_is_observed (1 of 6 tests fail)
+completion may omit its terminal receipt [rust]: KILLED by only_the_complete_property_or_identified_native_overflow_is_observed (1 of 6 tests fail)
+a malformed observation shape is semantic evidence [rust]: KILLED by only_the_complete_property_or_identified_native_overflow_is_observed (1 of 6 tests fail)
+a malformed boolean is semantic evidence [rust]: KILLED by only_the_complete_property_or_identified_native_overflow_is_observed (1 of 6 tests fail)
+15 of 15 mutants killed; 0 refused; 0 survived
+memory bound: no process was stopped
+
+===== historical unchanged failed evidence; SHA256 ca9b61fc19d31051f7b23571459d5738f937fc903003cef04ad5178b55c0a7bc =====
+ADR-0205 - a value of a type that contains itself crosses the browser's wire as its nodes
+
+produced by: just e14-graphs-on-the-wire
+commit: f15117dede242fac2bc2d54aa973180e47cad1c6
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+node: v22.21.1
+playwright: Version 1.58.0
+
+== the renderer (runtime/pw-render/tests/graphs.rs)
+
+test a_graph_that_is_not_a_tree_is_refused ... ok
+test a_copy_is_the_value_and_its_own ... ok
+test a_graph_is_the_value_its_nodes_make ... ok
+test the_reader_keeps_each_item_and_field_in_its_place ... ok
+test nested_json_as_deep_as_its_data_is_read_without_recursion ... ok
+test a_value_as_deep_as_its_data_is_held_without_recursion ... ok
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.51s
+
+== the browser's modules, under Node (compiler/pw-core/tests/graphs_on_the_wire.rs, recursive_types.rs)
+
+test a_handler_sends_a_command_a_value_as_its_nodes ... ok
+test each_node_holds_the_next_run_in_the_order_its_fields_are_declared ... ok
+test a_graph_that_is_not_a_tree_traps_in_the_handler ... ok
+test the_build_writes_a_first_value_as_its_nodes ... ok
+test a_handler_reads_a_signal_from_its_nodes_and_writes_one_as_its_nodes ... ok
+test what_a_host_writes_of_one_and_two_types_that_hold_each_other_are_refused ... ok
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.64s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.61s
+
+== the host and a component (compiler/pw-conformance/tests/browser_graphs.rs)
+
+test a_graph_that_is_not_a_tree_traps_in_the_component ... ok
+test a_hosts_graph_for_a_browser_is_the_trees_nodes_in_level_order ... ok
+test a_hosts_graphs_inside_another_value_are_each_its_own ... ok
+test what_is_not_a_graph_is_refused_by_the_host ... ok
+test a_browsers_graph_is_the_tree_its_nodes_make ... ok
+test a_chain_as_deep_as_its_data_crosses_from_a_browser ... ok
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.49s
+
+== the thread page (spikes/own-renderer/e2e/thread.spec.mjs), three engines
+
+  18 passed (19.2s)
+
+== mutation controls (scripts/graphs_on_the_wire_mutations.py)
+
+baseline: 25 passed, 0 failed
+the renderer takes an earlier node: KILLED (1 of 25 tests fail)
+  memory bound: stopped `graphs`, which held more than 3.9 GiB
+the renderer takes a node twice: KILLED (2 of 20 tests fail)
+the renderer keeps a node no other holds: KILLED (1 of 25 tests fail)
+a value is dropped by recursion: KILLED (1 of 20 tests fail)
+a list's copies come back in another order: KILLED (2 of 25 tests fail)
+the reader puts a list's items in another order: KILLED (1 of 25 tests fail)
+the reader gives a record's fields another's values: KILLED (2 of 25 tests fail)
+two numbers compare equal: KILLED (1 of 20 tests fail)
+the browser takes an earlier node: KILLED (1 of 25 tests fail)
+the browser takes a node twice: KILLED (1 of 25 tests fail)
+the browser keeps a node no other holds: KILLED (1 of 25 tests fail)
+the browser numbers a node one past its place: KILLED (3 of 25 tests fail)
+a signal is read as written nested: KILLED (5 of 25 tests fail)
+a captured value is read as its nodes: KILLED (1 of 25 tests fail)
+two types that hold each other are put on the wire: KILLED (1 of 20 tests fail)
+the build puts a node's fields in another order: KILLED (1 of 25 tests fail)
+the build writes a first value nested: KILLED (3 of 25 tests fail)
+the host refuses a browser's graph: KILLED (6 of 25 tests fail)
+the host reads a node's slots as any field: KILLED (6 of 25 tests fail)
+19 of 19 mutants killed
+memory bound: a process was stopped in 1 of 19 mutants' runs, each perhaps killed by the bound alone: the renderer takes a node twice

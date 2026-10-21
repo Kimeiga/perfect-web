@@ -14,17 +14,23 @@ Each mutant undoes one piece:
   are declared;
 - the host reading a browser's graph, each node's slots as indices.
 
-Every mutant must fail `graphs.rs`, `graphs_on_the_wire.rs`,
-`browser_graphs.rs` or `recursive_types.rs`.
+Every mutant must complete all 25 named Cargo tests, with a native assertion
+failure in `graphs.rs`, `graphs_on_the_wire.rs`, `browser_graphs.rs` or
+`recursive_types.rs`. Builds, panics, incomplete runs and process stops are
+invalid evidence. The explicit deep-drop property alone can observe a
+nonce-bound native stack overflow before its parent asserts the contract.
 
 Run from the repository root; `just e14-graphs-on-the-wire` records the
 output. The source is restored after every mutant, whatever happens.
 """
 
 import pathlib
-import re
+import signal
 import subprocess
 import sys
+import cargo_assertion_results
+import mutation_source
+import producer_process
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 RENDER = ROOT / "runtime/pw-render/src/lib.rs"
@@ -167,66 +173,125 @@ MUTANTS = [
     ),
 ]
 
-TESTS = [
-    ["cargo", "test", "--quiet", "--locked", "-p", "pw-render", "--test", "graphs"],
-    ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "graphs_on_the_wire"],
-    ["cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "recursive_types"],
-    ["cargo", "test", "--quiet", "--locked", "-p", "pw-conformance", "--test", "browser_graphs"],
-]
+CARGO = {
+    "render": ["cargo", "test", "--quiet", "--locked", "-p", "pw-render",
+             "--test", "graphs", "--", "--format=pretty"],
+    "core": ["cargo", "test", "--quiet", "--locked", "-p", "pw-core",
+             "--test", "graphs_on_the_wire", "--", "--format=pretty"],
+    "recursive": ["cargo", "test", "--quiet", "--locked", "-p", "pw-core",
+             "--test", "recursive_types", "--", "--format=pretty"],
+    "host": ["cargo", "test", "--quiet", "--locked", "-p", "pw-conformance",
+             "--test", "browser_graphs", "--", "--format=pretty"],
+}
+SOURCES = {
+    "render": ROOT / "runtime/pw-render/tests/graphs.rs",
+    "core": ROOT / "compiler/pw-core/tests/graphs_on_the_wire.rs",
+    "recursive": ROOT / "compiler/pw-core/tests/recursive_types.rs",
+    "host": ROOT / "compiler/pw-conformance/tests/browser_graphs.rs",
+}
+NAMES = {
+    "render": (
+        "a_graph_is_the_value_its_nodes_make",
+        "a_graph_that_is_not_a_tree_is_refused",
+        "a_value_as_deep_as_its_data_is_held_without_recursion",
+        "a_copy_is_the_value_and_its_own",
+        "nested_json_as_deep_as_its_data_is_read_without_recursion",
+        "the_reader_keeps_each_item_and_field_in_its_place",
+    ),
+    "core": (
+        "the_build_writes_a_first_value_as_its_nodes",
+        "a_handler_reads_a_signal_from_its_nodes_and_writes_one_as_its_nodes",
+        "a_graph_that_is_not_a_tree_traps_in_the_handler",
+        "a_handler_sends_a_command_a_value_as_its_nodes",
+        "what_a_host_writes_of_one_and_two_types_that_hold_each_other_are_refused",
+        "each_node_holds_the_next_run_in_the_order_its_fields_are_declared",
+    ),
+    "recursive": (
+        "a_type_no_finite_value_has_is_refused_where_it_is_declared",
+        "a_type_that_can_be_built_without_itself_is_not",
+        "a_type_that_contains_itself_crosses_as_its_nodes",
+        "a_type_that_contains_itself_otherwise_crosses_no_boundary_yet",
+        "a_type_that_contains_itself_in_place_is_compiled_boxed",
+        "an_invariant_inside_a_tree_holds_at_every_node",
+        "a_value_of_a_type_that_contains_itself_is_put_on_the_browsers_wire_as_its_nodes",
+    ),
+    "host": (
+        "a_browsers_graph_is_the_tree_its_nodes_make",
+        "a_hosts_graph_for_a_browser_is_the_trees_nodes_in_level_order",
+        "a_hosts_graphs_inside_another_value_are_each_its_own",
+        "a_chain_as_deep_as_its_data_crosses_from_a_browser",
+        "a_graph_that_is_not_a_tree_traps_in_the_component",
+        "what_is_not_a_graph_is_refused_by_the_host",
+    ),
+}
+BOUND = 1200
+
+def bounded(cmd, **kw):
+    """The native status, or None after the shared owner reaps a timeout."""
+    try:
+        result = producer_process.run(cmd, timeout=BOUND, **kw)
+        return result.stdout, result.returncode
+    except subprocess.TimeoutExpired as expired:
+        return expired.output, None
+
+
+def cargo_result(suite, code, out):
+    result = cargo_assertion_results.validate(code, out, root=ROOT,
+        sources=[SOURCES[suite]], expected=NAMES[suite])
+    return (True, result.passed, result.failed) if result.valid else (False, 0, 0)
 
 
 def run():
-    """(built, passed, failed) over every test command. A test binary that
-    aborts, as one overflowing its stack does, is a failure."""
-    built, passed, failed = True, 0, 0
-    for cmd in TESTS:
-        r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
-        out = r.stdout + r.stderr
-        found = re.findall(r"test result: \w+\. (\d+) passed; (\d+) failed", out)
-        if not found:
-            if "error[" in out or "could not compile" in out:
-                built = False
-            else:
-                failed += 1
-            continue
-        for p, f in found:
-            passed += int(p)
-            failed += int(f)
-        if r.returncode != 0 and not any(int(f) for _, f in found):
-            failed += 1
-    return built, passed, failed
+    """All 25 names, with failures only at actual parent assertion sites."""
+    passed = failed = 0
+    for suite, cmd in CARGO.items():
+        out, code = bounded(cmd, cwd=ROOT)
+        print(out, flush=True)
+        valid, good, bad = cargo_result(suite, code, out)
+        if not valid:
+            return False, 0, 0
+        passed += good
+        failed += bad
+    return True, passed, failed
 
 
 def main():
     import mutation_baseline  # keeps what each command says, for a red baseline
-    built, passed, failed = run()
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(1))
+    watch = mutation_baseline.mutation_bound.start()
+    valid, passed, failed = run()
     print(f"baseline: {passed} passed, {failed} failed")
-    if not built or failed or not passed:
+    if not valid or failed or not passed or watch.stopped:
         print("FAIL: the unmutated baseline is not green; no mutant can mean anything")
         mutation_baseline.explain()
         return 1
-    survivors = 0
+    killed = refused = survivors = 0
     for what, path, anchor, replacement in MUTANTS:
         original = path.read_text()
         if original.count(anchor) != 1:
-            print(f"{what}: ANCHOR NOT FOUND EXACTLY ONCE in {path.name}")
-            survivors += 1
+            print(f"{what}: REFUSED (anchor not unique in {path.name})")
+            refused += 1
             continue
-        try:
-            path.write_text(original.replace(anchor, replacement, 1))
-            built, passed, failed = run()
-        finally:
-            path.write_text(original)
-        if not built:
-            verdict = "KILLED (does not build)"
+        with mutation_source.changed(path, original, original.replace(anchor, replacement, 1)):
+            valid, passed, failed = run()
+        if not valid or watch.stopped:
+            verdict = "REFUSED (invalid or stopped producer; no kill)"
+            refused += 1
         elif failed:
             verdict = f"KILLED ({failed} of {passed + failed} tests fail)"
+            killed += 1
         else:
             verdict = "SURVIVED"
             survivors += 1
         print(f"{what}: {verdict}", flush=True)
-    print(f"{len(MUTANTS) - survivors} of {len(MUTANTS)} mutants killed")
-    return 1 if survivors else 0
+        if watch.stopped:
+            return 1
+    valid, passed, failed = run()
+    if not valid or failed or not passed or watch.stopped:
+        print("REFUSED: restored source does not complete its green inventory")
+        return 1
+    print(f"{killed} of {len(MUTANTS)} mutants killed; {refused} refused; {survivors} survived")
+    return int(bool(refused or survivors))
 
 
 if __name__ == "__main__":
