@@ -1,8 +1,8 @@
 ADR-0305 - a page's commands run in the order it sent them
 
 produced by: just e14-command-order
-commit: 320c52a44840a80423609ab476eb847c04de34a6
-ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39442025240 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 34f3c2d1de6bfa075a1db82ae5a61fddf4af4e95
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39538607183 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
@@ -12,22 +12,22 @@ playwright: Version 1.58.0
 test order::tests::a_command_that_vanished_is_waited_for_again ... ok
 test order::tests::a_command_whose_named_one_was_answered_early_is_answered_early ... ok
 test order::tests::a_command_whose_named_one_was_answered_runs ... ok
-test order::tests::a_command_whose_named_one_never_comes_is_answered_early_after_the_wait ... ok
 test order::tests::a_command_waits_for_the_one_it_names_to_arrive_and_run ... ok
+test order::tests::a_command_whose_named_one_never_comes_is_answered_early_after_the_wait ... ok
 test order::tests::a_session_forgotten_takes_its_fates ... ok
-test order::tests::another_sessions_command_of_the_same_name_is_not_the_one_named ... ok
 test order::tests::a_command_still_here_is_kept_past_the_bound ... ok
-test tests::a_pages_command_whose_first_never_comes_is_answered_early_and_runs_nothing ... ok
+test order::tests::another_sessions_command_of_the_same_name_is_not_the_one_named ... ok
 test tests::a_session_forgotten_takes_its_commands_order ... ok
+test tests::a_pages_command_whose_first_never_comes_is_answered_early_and_runs_nothing ... ok
 test tests::a_pages_command_after_one_closed_unrun_waits_for_it_sent_again ... ok
 test tests::a_pages_command_here_before_the_one_it_follows_runs_after_it ... ok
-test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 659 filtered out; finished in 10.78s
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 700 filtered out; finished in 10.03s
 
 == in three engines (e2e/command-order.spec.mjs; optimistic.spec, navigate.spec)
 
-  12 passed (40.5s)
+  12 passed (38.0s)
   2 skipped
-  43 passed (52.1s)
+  43 passed (50.5s)
 
 == mutation controls (scripts/command_order_mutations.py)
 

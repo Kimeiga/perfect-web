@@ -1,8 +1,8 @@
 ADR-0292 - a mutation script's processes are bounded in memory
 
 produced by: just e14-mutation-bound
-commit: 320c52a44840a80423609ab476eb847c04de34a6
-ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39442025240 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 34f3c2d1de6bfa075a1db82ae5a61fddf4af4e95
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39538607183 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 python: Python 3.12.3
 platform: Linux x86_64
 
@@ -49,27 +49,43 @@ test_a_mutants_browser_run_is_not_kept (scripts.tests.test_mutation_baseline.Kee
 test_a_red_baselines_failed_browser_run_is_kept_apart (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun.test_a_red_baselines_failed_browser_run_is_kept_apart) ... ok
 test_the_benchmark_harness_run_is_kept_under_its_own_directory (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun.test_the_benchmark_harness_run_is_kept_under_its_own_directory) ... ok
 test_what_an_earlier_recipe_left_is_not_kept (scripts.tests.test_mutation_baseline.KeepsABaselinesBrowserRun.test_what_an_earlier_recipe_left_is_not_kept) ... ok
-Ran 41 tests in 8.075s
+Ran 41 tests in 7.743s
 OK
 
 == mutation controls (scripts/mutation_bound_mutations.py)
 
-baseline: 127 passed, 0 failed
-a process past the bound is said stopped and runs on: KILLED (3 of 127 tests fail)
-only the processes the script started itself are watched: KILLED (3 of 127 tests fail)
-a process stopped is said again at each look: KILLED (1 of 127 tests fail)
-a process at the bound is stopped: KILLED (1 of 127 tests fail)
-the script itself is watched: KILLED (2 of 127 tests fail)
-every process is watched: KILLED (2 of 127 tests fail)
-a process is stopped on the first reading alone: KILLED (1 of 127 tests fail)
-a number used again is never watched again: KILLED (1 of 127 tests fail)
-the bound is the machine's memory: KILLED (1 of 127 tests fail)
-a watch that cannot read the processes stops without a word: KILLED (1 of 127 tests fail)
-the macOS footprint is read where the resident size is: KILLED (1 of 127 tests fail)
-a stop is not named after the verdict it may have decided: KILLED (2 of 127 tests fail)
-a run the bound did not touch says nothing: KILLED (2 of 127 tests fail)
-an indented note is read as a verdict: KILLED (1 of 127 tests fail)
-the run's summary leaves out what the bound stopped: KILLED (1 of 127 tests fail)
-a mutation script starts no bound: KILLED (2 of 127 tests fail)
-16 of 16 mutants killed
+structured instrument receipts: /tmp/pw-bound-controls-9l264hqb
+baseline: 137 tests; valid=True
+a process past the bound is said stopped and runs on: KILLED by test_mutation_bound.Bound.test_a_process_past_the_bound_is_stopped_and_said (actual body assertion)
+only the processes the script started itself are watched: KILLED by test_mutation_bound.Bound.test_the_processes_watched_are_those_the_root_started_and_theirs (actual body assertion)
+a process stopped is said again at each look: KILLED by test_mutation_bound.Bound.test_only_the_scripts_own_are_read_each_stop_said_once (actual body assertion)
+a process at the bound is stopped: KILLED by test_mutation_bound.Bound.test_only_the_scripts_own_are_read_each_stop_said_once (actual body assertion)
+the script itself is watched: KILLED by test_mutation_bound.Bound.test_only_the_scripts_own_are_read_each_stop_said_once (actual body assertion)
+every process is watched: KILLED by test_mutation_bound.Bound.test_only_the_scripts_own_are_read_each_stop_said_once (actual body assertion)
+a process is stopped on the first reading alone: KILLED by test_mutation_bound.Bound.test_one_whose_parents_read_again_are_anothers_is_left_alone (actual body assertion)
+a number used again is never watched again: KILLED by test_mutation_bound.Bound.test_a_number_used_again_is_watched_again (actual body assertion)
+the bound is the machine's memory: KILLED by test_mutation_bound.Bound.test_the_bound_is_4_GiB_or_a_quarter_of_the_machine (actual body assertion)
+a watch that cannot read the processes stops without a word: KILLED by test_mutation_bound.Bound.test_a_watch_that_cannot_read_the_processes_says_so (actual body assertion)
+the macOS footprint is read where the resident size is: KILLED by test_mutation_bound.Bound.test_the_structures_read_on_macos_are_the_sdks (actual body assertion)
+a stop is not named after the verdict it may have decided: KILLED by test_mutation_bound.Bound.test_a_stop_names_the_verdict_after_it_a_kind_of_its_own (actual body assertion)
+a run the bound did not touch says nothing: KILLED by test_mutation_bound.Bound.test_a_run_the_bound_did_not_touch_says_so (actual body assertion)
+an indented note is read as a verdict: KILLED by test_mutation_bound.Bound.test_a_stop_names_the_verdict_after_it_a_kind_of_its_own (actual body assertion)
+the run's summary leaves out what the bound stopped: KILLED by test_ci_scripts.Summary.test_a_kill_perhaps_the_memory_bounds_alone_fails_the_recipe (actual body assertion)
+a mutation script starts no bound: KILLED by test_mutation_baseline.Bounded.test_imported_it_bounds_every_process_the_script_starts (actual body assertion)
+an indented immediate stop is ignored: KILLED by test_ci_scripts.BoundEvidence.test_summary_refuses_each_stop_and_failed_watcher (actual body assertion)
+a final stop summary is ignored: KILLED by test_ci_scripts.BoundEvidence.test_summary_refuses_each_stop_and_failed_watcher (actual body assertion)
+a failed memory watcher is ignored: KILLED by test_ci_scripts.BoundEvidence.test_summary_refuses_each_stop_and_failed_watcher (actual body assertion)
+a later no-stop line erases an earlier failure: KILLED by test_ci_scripts.BoundEvidence.test_summary_refuses_each_stop_and_failed_watcher (actual body assertion)
+the recipe log is not read for memory stops: KILLED by test_ci_scripts.BoundEvidence.test_recipe_log_alone_invalidates_summary_fetch_and_preverify (actual body assertion)
+fetch reads native status without guard validity: KILLED by test_ci_scripts.BoundEvidence.test_fetch_excludes_all_outputs_and_completed_timing_of_stopped_recipe (actual body assertion)
+fetch copies a stopped recipes files: KILLED by test_ci_scripts.BoundEvidence.test_known_summary_cannot_copy_stopped_recipe_from_historical_green_run (actual body assertion)
+a stopped recipe retains completed timing: KILLED by test_ci_scripts.BoundEvidence.test_fetch_excludes_all_outputs_and_completed_timing_of_stopped_recipe (actual body assertion)
+local preverification ignores guard validity: KILLED by test_ci_scripts.BoundEvidence.test_recipe_log_alone_invalidates_summary_fetch_and_preverify (actual body assertion)
+an exact no-stop result is refused: KILLED by test_ci_scripts.BoundEvidence.test_exact_no_stop_and_absent_guard_remain_valid (actual body assertion)
+invalid control receipts earn a kill: KILLED by test_ci_scripts.BoundEvidence.test_bound_controls_require_a_complete_actual_intended_assertion (actual body assertion)
+an erroneous control body earns a kill: KILLED by test_ci_scripts.BoundEvidence.test_bound_controls_require_a_complete_actual_intended_assertion (actual body assertion)
+an incomplete control inventory earns a kill: KILLED by test_ci_scripts.BoundEvidence.test_bound_controls_require_a_complete_actual_intended_assertion (actual body assertion)
+a stopped control producer earns a kill: KILLED by test_ci_scripts.BoundEvidence.test_bound_controls_require_a_complete_actual_intended_assertion (actual body assertion)
+an unrelated body assertion earns a kill: KILLED by test_ci_scripts.BoundEvidence.test_bound_controls_require_a_complete_actual_intended_assertion (actual body assertion)
+31 of 31 mutants killed; 0 refused; 0 survived
 memory bound: no process was stopped

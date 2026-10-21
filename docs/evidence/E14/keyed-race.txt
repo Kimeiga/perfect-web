@@ -1,17 +1,17 @@
 ADR-0224 - a longer read is not applied over a commit it did not see
 
 produced by: just e14-keyed-race
-commit: ddaeeb1dfba9630371b7dd5b127c23855d245c74
-ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39131257549 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 34f3c2d1de6bfa075a1db82ae5a61fddf4af4e95
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39538607183 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the server (spikes/own-renderer/server/src/main.rs)
 
-test tests::under_cancel_a_newer_key_stops_the_old_keys_read ... ok
 test tests::under_supersede_the_old_keys_read_runs_on_unshown ... ok
+test tests::under_cancel_a_newer_key_stops_the_old_keys_read ... ok
 test tests::a_page_that_reads_more_holds_what_it_shows ... ok
 test tests::a_longer_read_is_not_applied_over_a_commit_it_did_not_see ... ok
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 625 filtered out; finished in 9.40s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 708 filtered out; finished in 3.22s
 
 == mutation controls (scripts/keyed_race_mutations.py)
 

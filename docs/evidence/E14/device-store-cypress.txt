@@ -1,37 +1,64 @@
-ADR-0366 - TodoMVC's own Cypress suite over TodoMVC on the device, and the Cypress it runs in
+ADR-0366 - official TodoMVC cases with pinned Cypress compatibility patch v1, and static runner probes
 
 produced by: just e14-device-store-cypress
-commit: b3fe0365cf34681ff5dfba3797c933f12b37bee6
+commit: 34f3c2d1de6bfa075a1db82ae5a61fddf4af4e95
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39538607183 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 node: v22.21.1
 cypress: Cypress package version: 15.21.1 Cypress binary version: 15.21.1 Electron version: 37.6.0 Bundled Node version: 22.19.0 
 
-== the acceptance (spikes/todomvc-cypress/run.sh): all 29 must pass, and it is not met where it says FAILED
+== compatibility acceptance (spikes/todomvc-cypress/run.sh): all 29 must pass; native failures remain NOT MET
 
 todomvc-cypress: 7 files are upstream's, byte for byte; cypress 15.21.1
 cypress: Cypress package version: 15.21.1 Cypress binary version: 15.21.1 Electron version: 37.6.0 Bundled Node version: 22.19.0 
+todomvc-cypress-compat-v1: create; original 7 upstream blobs unchanged; exact 2-patch execution copy; manifest sha256 b6d69228730abacebc1d698211fffe453f6a378a3c889fa7226c21666fcb9012
+{
+  "cypress_binary": "15.21.1",
+  "cypress_package": "15.21.1",
+  "identity": "todomvc-cypress-compat-v1",
+  "output_sha256": {
+    "LICENSE-todomvc.md": "32238c5c6759b589ea768661b6eb0fcb42449b74d57cdf09928743f2e1eb748d",
+    "cypress.config.js": "e1e01ccb3aa9901bd2c47577c79fb7b039928ebadd6b4071dabbbd49627e245c",
+    "cypress/e2e/spec.cy.js": "c353401d93731945f77c3f8341fcded3bb5479b2d36944349133a72ac09cd88c",
+    "cypress/fixtures/example.json": "6c88ef752eb4a0e9dc7d1a9ea16624eda9084fea2cc967a89d5a9304aa32be9d",
+    "cypress/support/commands.js": "4aa73053c8323b9bf93fdbf706147968d2f43627e6d4366e8c86cddbd580d843",
+    "cypress/support/e2e.js": "c183589133eaf583809727f3f9f52aff93db86e200a71ae045de2a381f87b9c1",
+    "package.json": "f867221162a60c2d75a35a203226d4d42dc0c8cde143a8abee67760cad145c2b",
+    "tests/knownIssues.js": "dc628ff3e0198c4559e501a566cb6c344bf75a7e0dc7cae11e1e50de90feca90"
+  },
+  "patches": [
+    "spy-reset-history",
+    "fresh-created-todo-query"
+  ],
+  "patchset_sha256": "25d26eb59c020b9ea261f65861f0b7dad4cb698fce1ade1d3f4b9276f03ed3ee",
+  "upstream_blobs": {
+    "LICENSE-todomvc.md": "9275d4371020294b6a107e454a0d1819f8b71c31",
+    "cypress.config.js": "9557466f8850fd01fe05406acbc69d2e713fccd1",
+    "cypress/e2e/spec.cy.js": "478bcfb17f407d56b4db19c4bffadcd0aa1e0972",
+    "cypress/fixtures/example.json": "da87594a2465392b86ba23faaa7ac1d971c32091",
+    "cypress/support/commands.js": "029abdbaf932cd1dded89e79c7943aa2fcab9c36",
+    "cypress/support/e2e.js": "8edffddd850ceaa49a30c8b4542df5f02d16676a",
+    "tests/knownIssues.js": "808649f49a9cde966e2fb8185eac394a0f975217"
+  },
+  "upstream_revision": "ff43b02e59dfa604386bb382034b2cd07c2bcd8a"
+}
+todomvc-cypress-compat-v1: verify; original 7 upstream blobs unchanged; exact 2-patch execution copy; manifest sha256 b6d69228730abacebc1d698211fffe453f6a378a3c889fa7226c21666fcb9012
 Acceptance requires all 29 official Cypress tests to execute and pass, with exit status zero.
 Storage, timing and skipped-test mismatches remain unmet requirements even when understood.
 
-acceptance: 24 of 29 passed; 3 failed (2 tests, 1 hook); 2 not run
-cypress 15.21.1 on Electron 138 (headless); exit status 3
+acceptance: 29 of 29 passed
+cypress 15.21.1 on Electron 138 (headless); exit status 0
 
   1  pass    [When page is initially opened] should focus on the todo input field  (spec.cy.js:533)
   2  pass    [No Todos] starts with nothing  (spec.cy.js:547)
   3  pass    [No Todos] should hide #main and #footer  (spec.cy.js:551)
-  4  FAIL    [New Todo] should allow me to add todo items  (spec.cy.js:561)
-             unmet official requirement: checkItemSaved, checkNumberOfTodosInLocalStorage
-             cypress: CypressError: Timed out retrying after 4000ms: `cy.invoke()` errored because the property: `reset` does not exist on your subject.
+  4  pass    [New Todo] should allow me to add todo items  (spec.cy.js:561)
   5  pass    [New Todo] should clear text input field when an item is added  (spec.cy.js:589)
   6  pass    [New Todo] should append new items to the bottom of the list  (spec.cy.js:595)
   7  pass    [New Todo] should trim text input  (spec.cy.js:613)
   8  pass    [New Todo] should show #main and #footer when items added  (spec.cy.js:632)
-  9  HOOK    [Mark all as completed] should allow me to mark all items as completed  (spec.cy.js:663)
-             its beforeEach failed: the polling loops of the failed tests before it read a localStorage that Cypress had cleared away, which throws in the spec's own window and is charged to this hook; Cypress then skips the rest of the suite
-             cypress: CypressError: Timed out retrying after 4000ms: `cy.invoke()` errored because the property: `reset` does not exist on your subject.
- 10  not run [Mark all as completed] should allow me to clear the complete state of all items  (spec.cy.js:677)
-             not run (a failed hook skipped it); it asks localStorage (checkItemSaved, checkNumberOfCompletedTodosInLocalStorage, checkNumberOfTodosInLocalStorage (its context's beforeEach asks it too)): it would fail there, by design
- 11  not run [Mark all as completed] complete all checkbox should update state when items are completed / cleared  (spec.cy.js:690)
-             not run (a failed hook skipped it); it asks localStorage (checkItemSaved, checkNumberOfCompletedTodosInLocalStorage, checkNumberOfTodosInLocalStorage (its context's beforeEach asks it too)): it would fail there, by design
+  9  pass    [Mark all as completed] should allow me to mark all items as completed  (spec.cy.js:663)
+ 10  pass    [Mark all as completed] should allow me to clear the complete state of all items  (spec.cy.js:677)
+ 11  pass    [Mark all as completed] complete all checkbox should update state when items are completed / cleared  (spec.cy.js:690)
  12  pass    [Item] should allow me to mark items as complete  (spec.cy.js:728)
  13  pass    [Item] should allow me to un-mark items as complete  (spec.cy.js:747)
  14  pass    [Item] should allow me to edit an item  (spec.cy.js:763)
@@ -44,23 +71,15 @@ cypress 15.21.1 on Electron 138 (headless); exit status 3
  21  pass    [Clear completed button] should display the correct text  (spec.cy.js:895)
  22  pass    [Clear completed button] should remove completed items when clicked  (spec.cy.js:900)
  23  pass    [Clear completed button] should be hidden when there are no items that are completed  (spec.cy.js:913)
- 24  FAIL    [Persistence] should persist its data  (spec.cy.js:921)
-             unmet official requirement: checkCompletedKeywordInLocalStorage, checkNumberOfCompletedTodosInLocalStorage, checkTodosInLocalStorage
-             cypress: CypressError: Timed out retrying after 4000ms: `cy.should()` failed because the page updated as a result of this command, but you tried to continue the command chain. The subject is no longer attached to the DOM, and Cypress cannot requery the page after commands such as `cy.should()`.
+ 24  pass    [Persistence] should persist its data  (spec.cy.js:921)
  25  pass    [Routing] should allow me to display active items  (spec.cy.js:970)
  26  pass    [Routing] should respect the back button  (spec.cy.js:981)
  27  pass    [Routing] should allow me to display completed items  (spec.cy.js:1004)
  28  pass    [Routing] should allow me to display all items  (spec.cy.js:1011)
  29  pass    [Routing] should highlight the currently applied filter  (spec.cy.js:1020)
 
-PROBLEM: acceptance requires Cypress exit status 0, explicitly recorded
-PROBLEM: test 4 ('should allow me to add todo items') is fail: acceptance requires every official test to pass
-PROBLEM: test 9 ('should allow me to mark all items as completed') is hook: acceptance requires every official test to pass
-PROBLEM: test 10 ('should allow me to clear the complete state of all items') is skip: acceptance requires every official test to pass
-PROBLEM: test 11 ('complete all checkbox should update state when items are completed / cleared') is skip: acceptance requires every official test to pass
-PROBLEM: test 24 ('should persist its data') is fail: acceptance requires every official test to pass
-acceptance: FAILED: 6 problem(s): the required test outcomes did not pass
-acceptance: exit 1: NOT MET
+acceptance: the required test outcomes passed
+acceptance: exit 0
 
 == the probes, with no app (spikes/todomvc-cypress-probes/run.sh)
 

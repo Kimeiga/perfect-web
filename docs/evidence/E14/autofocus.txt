@@ -1,0 +1,21 @@
+ADR-0367 - an element a block shows with autofocus takes focus as it appears
+
+produced by: just e14-autofocus
+commit: 34f3c2d1de6bfa075a1db82ae5a61fddf4af4e95
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39538607183 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+node: v22.21.1
+playwright: Version 1.58.0
+
+== the browser in three engines (e2e/focus.spec.mjs)
+
+  12 passed (20.8s)
+
+== mutation controls (scripts/autofocus_mutations.py)
+
+baseline (browser): 4 passed, 0 failed
+an element that asks for focus is not given it [browser]: KILLED (3 of 4 tests fail)
+what is put into the page is not looked at [browser]: KILLED (3 of 4 tests fail)
+an input that does not ask for focus is given it [browser]: KILLED (2 of 4 tests fail)
+3 of 3 mutants killed
+memory bound: no process was stopped

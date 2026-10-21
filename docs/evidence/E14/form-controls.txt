@@ -1,8 +1,8 @@
 ADR-0221 - a form control's value is written where HTML reads it
 
 produced by: just e14-form-controls
-commit: 320c52a44840a80423609ab476eb847c04de34a6
-ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39442025240 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 34f3c2d1de6bfa075a1db82ae5a61fddf4af4e95
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39538607183 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
@@ -13,54 +13,54 @@ test the_template_refuses_what_the_check_refuses ... ok
 test the_browser_sets_a_textareas_value_in_place ... ok
 test a_textareas_value_is_written_as_its_text ... ok
 test a_value_html_does_not_read_is_refused_where_it_is_written ... ok
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.91s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.16s
 
 == the renderer's escaping matrix (runtime/pw-render/tests/security.rs)
 
 test a_record_field_in_a_hostile_position_is_escaped_the_same_way ... ok
-test a_style_value_that_executes_is_dropped ... ok
-test a_javascript_url_is_replaced_rather_than_escaped ... ok
 test a_textareas_value_is_its_text ... ok
+test a_style_value_that_executes_is_dropped ... ok
 test ampersands_are_encoded_in_both_contexts ... ok
+test a_javascript_url_is_replaced_rather_than_escaped ... ok
 test an_attribute_breakout_stays_inside_one_attribute ... ok
 test an_ordinary_url_is_not_mangled ... ok
 test an_unquoted_breakout_attempt_stays_inside_the_quotes ... ok
-test lone_surrogates_cannot_reach_the_renderer ... ok
 test embedded_json_cannot_end_its_script ... ok
+test lone_surrogates_cannot_reach_the_renderer ... ok
 test quotes_and_angles_are_encoded_where_they_matter ... ok
 test raw_html_requires_the_capability_and_is_not_a_flag_on_a_string ... ok
 test text_injection_becomes_inert_text ... ok
-test unicode_passes_through_unchanged ... ok
 test the_matrix_can_fail ... ok
+test unicode_passes_through_unchanged ... ok
 test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 == the corpus (C15) and generality
 
-accepted: 42 files
-accepted: 42/42 charter §16 categories covered
-rejected: 87 files
-rejected: 87/87 charter §16 categories covered
+accepted: 44 files
+accepted: 44/44 charter §16 categories covered
+rejected: 95 files
+rejected: 95/95 charter §16 categories covered
 corpus-check: OK
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 134.11s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 173.84s
 
 == bound fields in three engines (e2e/bind.spec.mjs)
 
-  24 passed (26.7s)
+  24 passed (25.8s)
 
 == mutation controls (scripts/form_controls_mutations.py)
 
-baseline: 22 passed, 0 failed
-a textarea's value is written as an attribute: KILLED (2 of 22 tests fail)
-the renderer writes a textarea's value as an attribute: KILLED (2 of 22 tests fail)
-a newline a value starts with is dropped: KILLED (2 of 22 tests fail)
-a patch carries a textarea's value as text: KILLED (1 of 22 tests fail)
-the browser does not set a textarea's value in place: KILLED (1 of 22 tests fail)
-a select's value is not refused: KILLED (1 of 22 tests fail)
-a textarea with a value and text is not refused: KILLED (1 of 22 tests fail)
-a textarea's value read from no signal is not refused: KILLED (1 of 22 tests fail)
-a value in a textarea's text is not refused: KILLED (1 of 22 tests fail)
-the template writes a select's value: KILLED (1 of 22 tests fail)
-the template writes a textarea's value and its text: KILLED (1 of 22 tests fail)
-the template writes a value in a textarea's text: KILLED (1 of 22 tests fail)
+baseline: 23 passed, 0 failed
+a textarea's value is written as an attribute: KILLED (2 of 23 tests fail)
+the renderer writes a textarea's value as an attribute: KILLED (2 of 23 tests fail)
+a newline a value starts with is dropped: KILLED (2 of 23 tests fail)
+a patch carries a textarea's value as text: KILLED (1 of 23 tests fail)
+the browser does not set a textarea's value in place: KILLED (1 of 23 tests fail)
+a select's value is not refused: KILLED (1 of 23 tests fail)
+a textarea with a value and text is not refused: KILLED (1 of 23 tests fail)
+a textarea's value read from no signal is not refused: KILLED (1 of 23 tests fail)
+a value in a textarea's text is not refused: KILLED (1 of 23 tests fail)
+the template writes a select's value: KILLED (1 of 23 tests fail)
+the template writes a textarea's value and its text: KILLED (1 of 23 tests fail)
+the template writes a value in a textarea's text: KILLED (1 of 23 tests fail)
 12 of 12 mutants killed
 memory bound: no process was stopped

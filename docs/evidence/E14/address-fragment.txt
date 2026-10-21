@@ -1,0 +1,81 @@
+ADR-0367 - a page binds a signal to its address's fragment
+
+produced by: just e14-address-fragment
+commit: 34f3c2d1de6bfa075a1db82ae5a61fddf4af4e95
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39538607183 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+node: v22.21.1
+playwright: Version 1.58.0
+
+== the compiler (tests/address_fragment.rs, the policy table's tests)
+
+test a_page_states_its_fragment_once_and_a_page_alone_does ... ok
+test the_address_is_the_signals_only_writer ... ok
+test a_clause_binds_a_signal_to_the_fragment_and_the_plan_carries_it ... ok
+test a_link_to_a_fragment_names_a_form_the_page_takes ... ok
+test the_clause_names_a_signal_the_page_declares ... ok
+test the_signal_is_a_string_since_a_fragment_is_text ... ok
+test the_signal_starts_at_a_value_a_form_gives ... ok
+test the_forms_are_pairs_of_the_characters_a_fragment_holds ... ok
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.37s
+test codes::tests::a_retired_code_is_never_reused ... ok
+test codes::tests::a_tracks_block_holds_only_its_tracks_codes ... ok
+test codes::tests::an_invariant_reads_as_a_sentence_about_the_program ... ok
+test codes::tests::an_old_number_is_no_registered_rule ... ok
+test codes::tests::every_code_sits_in_its_owner_range ... ok
+test codes::tests::every_code_is_unique ... ok
+test codes::tests::every_alias_resolves_to_a_registered_code ... ok
+test codes::tests::every_known_gap_names_an_owner_and_the_missing_analysis ... ok
+test codes::tests::every_retired_code_says_why_and_what_replaced_it ... ok
+test codes::tests::every_corpus_rule_is_registered_or_an_owned_known_gap ... ok
+test policy::tests::an_operator_belongs_to_one_domain ... ok
+test policy::tests::every_policy_keyword_has_a_domain ... ok
+test policy::tests::every_clause_head_takes_its_value_on_its_line ... ok
+test policy::tests::operator_ids_are_unique_and_namespaced ... ok
+test policy::tests::only_executable_positions_carry_terms ... ok
+test policy::tests::the_table_describes_only_policies_the_language_has ... ok
+test codes::tests::every_code_a_checker_writes_is_registered ... ok
+test codes::tests::every_registered_code_is_one_a_checker_can_emit ... ok
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 180 filtered out; finished in 3.82s
+
+== the host (tests::address_fragment)
+
+test tests::address_fragment::the_host_renders_the_first_value_whatever_the_fragment ... ok
+test tests::address_fragment::the_document_of_a_page_that_reads_queries_names_its_binding ... ok
+test tests::address_fragment::the_document_of_a_page_of_signals_alone_names_its_binding ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 709 filtered out; finished in 0.00s
+
+== the browser in three engines (e2e/fragment.spec.mjs)
+
+  30 passed (26.4s)
+
+== mutation controls (scripts/address_fragment_mutations.py)
+
+baseline (core): 8 passed, 0 failed
+baseline (host): 3 passed, 0 failed
+baseline (browser): 10 passed, 0 failed
+a clause naming a signal the page does not declare is accepted [core]: KILLED (1 of 8 tests fail)
+a signal that is no String is accepted [core]: KILLED (1 of 8 tests fail)
+a form with a character a fragment does not hold is accepted [core]: KILLED (1 of 8 tests fail)
+a form with a percent sign is accepted [core]: KILLED (1 of 8 tests fail)
+a form with an escape is accepted [core]: KILLED (1 of 8 tests fail)
+a form written twice is accepted [core]: KILLED (1 of 8 tests fail)
+a comma that ends the forms is accepted [core]: KILLED (1 of 8 tests fail)
+a form with no arrow is accepted [core]: KILLED (1 of 8 tests fail)
+a first value no form gives is accepted [core]: KILLED (1 of 8 tests fail)
+a handler's assignment of the bound signal is accepted [core]: KILLED (1 of 8 tests fail)
+an assignment of any signal is refused [core]: KILLED (1 of 8 tests fail)
+a link to a fragment no form names is accepted [core]: KILLED (1 of 8 tests fail)
+a link to a form is refused [core]: KILLED (1 of 8 tests fail)
+a page binds nothing in its plan [core]: KILLED (1 of 8 tests fail)
+a page of signals alone does not say its binding [host]: KILLED (1 of 3 tests fail)
+a page that reads queries does not say its binding [host]: KILLED (1 of 3 tests fail)
+the fragment is not read at start [browser]: KILLED (1 of 10 tests fail)
+the fragment is not followed on a change [browser]: KILLED (7 of 10 tests fail)
+a fragment that is no form leaves the signal as it was [browser]: KILLED (3 of 10 tests fail)
+the signal is set again to the value it holds [browser]: KILLED (1 of 10 tests fail)
+a form is compared with its hash sign [browser]: KILLED (7 of 10 tests fail)
+a form is compared without its case [browser]: KILLED (1 of 10 tests fail)
+a page that binds nothing follows the fragment [browser]: KILLED (1 of 10 tests fail)
+23 of 23 mutants killed
+memory bound: no process was stopped
