@@ -3,7 +3,7 @@
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
 Reviewed 2026-10-21 against assembled train-12 source
-`af0d64c3` (with combined hosted verification still pending).
+`4db12570` (with combined hosted verification still pending).
 [The complete prior ledger](STATUS-HISTORY-2026-10.md) remains verbatim,
 including failed runs, corrections and their original scope.
 
@@ -148,7 +148,17 @@ evidence. No failed result is promoted by this summary.
   fault whose disabled-button clicks timed out. The downstream
   `e14-evidence-integrity` recipe correctly rejected the short computed result
   written earlier in its shard. Both need follow-up; this is not evidence of
-  a separate integrity-guard defect.
+  a separate integrity-guard defect. Ten valid-draft enabled-state assertions
+  now produce complete native browser receipts: 66 baseline passes, 42 valid
+  assertion failures plus 24 passes under the unchanged fault, then 66 restored
+  passes. All 20 reached consumers and the explicit integrity rerun remain due.
+  The same run also reports `e14-check-is-build` at 50/51 controls after a
+  complete 626/626 source census and 99-test baseline: generated WIT source
+  identity has a surviving fault. `e14-todomvc` reports 39/43 application
+  controls, with four checked-state/autofocus survivors, despite passing
+  server/browser baselines and its separate 54/54 Cypress producer controls.
+  Its legacy campaign must also stop crediting setup, build or timeout failures.
+  Both repairs and current full campaigns remain required.
 - Canonical fetch of the completed239-recipe run imported 82 eligible files
   after skipping 155 changed recipes and excluding all 11 invalid outcomes.
   A post-fetch count gate exposed ambiguous bare witness metadata in

@@ -8,7 +8,7 @@ The assembled candidate is unlanded; master remains the verified train-11
 commit recorded in [STATUS](STATUS.md). Finish the combined gates before
 starting another feature batch.
 
-The assembled repair candidate `34f3c2d1` is published on `wip/train-12`.
+The earlier assembled repair candidate `34f3c2d1` began the first follow-up on `wip/train-12`.
 [Verify39538607183](https://github.com/studiokimeiga/perfect-web/actions/runs/39538607183)
 runs 155 of the 156 required recipes; the known-invalid graph campaign remains
 an explicit separate obligation below. Exact-source
@@ -37,8 +37,28 @@ The same run's `e14-computed-conditions` detected 11 of 12 controls and refused
 the browser fault that omits a block's computed values: disabled-button clicks
 timed out rather than producing valid assertion receipts. Preserve the fault
 and complete 66-test inventory, repair its semantic witness, and rerun the whole
-campaign. `e14-evidence-integrity` then correctly rejected that short result in
-the same shard; it needs a fresh run after the computed campaign is repaired.
+campaign. Ten valid-draft enabled-state assertions now preserve all 66 cases:
+baseline and restored runs pass 66/66, while the unchanged fault completes
+with 42 assertion failures and 24 passes, without action/request timeouts
+([diagnostic](diagnostics/train-12/computed-browser-post-precondition.txt)).
+All 20 reached feed consumers still require current hosted verification.
+`e14-evidence-integrity` correctly rejected the earlier short result in the
+same shard; it needs an explicit fresh run after that repair.
+
+The same 155-recipe run exposed two further native failures.
+`e14-check-is-build` now covers all 626 source files in 453 assemblies and
+passes its 99-test baseline, but detects only 50/51 controls: the parsed WIT
+failure loses its generated source identity without an assertion failing.
+`e14-todomvc` passes its server/browser baselines and the separate 54/54
+Cypress producer controls, but its application campaign detects 39/43 faults.
+The four survivors concern empty toggle-all checked state, removing or setting
+checked state during patching, and inserted edit-field autofocus. Repair the
+witnesses and migrate its legacy timeout/build-failure kill logic to strict
+completed native assertion receipts, preserving all 43 intended faults.
+Intentional assertion transcripts in Cypress producer diagnostics also contain
+reserved survivor markers; separate those raw diagnostics from accepted
+evidence without weakening the canonical summary guard. Both full recipes
+need current replacements; neither failed result is accepted.
 
 The graph repair now retains all 19 operators and 25 native identities with strict
 completed-assertion validation. Targeted renderer faults and the mutual-type
