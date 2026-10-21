@@ -825,6 +825,10 @@ struct ConnectionFaults {
     /// The next command's connection, closed with no answer: before the
     /// command runs, or after it has committed. Once.
     drop_command: Option<DropAt>,
+    /// The next command's connection, held open with no answer, or with an
+    /// answer begun and never finished, until its page gives up on it
+    /// (ADR-0381). Once.
+    hold_command: Option<HoldAt>,
     /// When the session's subscriptions were last cut off: each one open
     /// then ends.
     cut_from: Option<std::time::Instant>,
@@ -840,6 +844,22 @@ enum DropAt {
     /// The command run, and committed if it did, and its answer not sent.
     After,
 }
+
+/// Where a command's connection is held open, unanswered (ADR-0381): a
+/// network that neither answers nor fails, as a page meets one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HoldAt {
+    /// The request read, nothing run, and no answer begun.
+    Before,
+    /// The command run, and committed if it did, and no answer begun.
+    After,
+    /// The command run, and its answer's head and part of its body sent.
+    Body,
+}
+
+/// **How long a held connection is held at most** (ADR-0381): a test's
+/// fault, never a thread kept for a page that will not close it.
+const HOLD_AT_MOST: std::time::Duration = std::time::Duration::from_secs(30);
 
 /// **The wall clock, as an `Instant` holds it** (ADR-0180): the
 /// milliseconds since 1970-01-01T00:00Z.
@@ -3165,6 +3185,16 @@ impl Server {
             .expect("connection faults")
             .get_mut(session)
             .and_then(|f| f.drop_command.take())
+    }
+
+    /// **Whether the session's next command connection is held open, and
+    /// where** (ADR-0381): taken, so it is held once.
+    fn take_command_hold(&self, session: &str) -> Option<HoldAt> {
+        self.connection_faults
+            .lock()
+            .expect("connection faults")
+            .get_mut(session)
+            .and_then(|f| f.hold_command.take())
     }
 
     /// **Is a subscription of the session's, opened at `opened`, cut off
@@ -8705,6 +8735,19 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
                 }
                 return;
             }
+            // ADR-0381's fault: the connection held open with no answer, or
+            // with an answer begun and never finished, until its page gives
+            // up on it.
+            let hold_at = server.take_command_hold(&session);
+            if hold_at == Some(HoldAt::Before) {
+                // Never run, as a request that never came: what follows it
+                // waits for it to be sent again.
+                if let Some(arrival) = arrival {
+                    arrival.vanish();
+                }
+                hold_open(&mut stream);
+                return;
+            }
             // TRACK SEAM (identity): a `requires` refusal is answered as its
             // own case, 403 and the predicate, never shaped like a declared
             // error. Taken before the command, so none is left from another.
@@ -8714,6 +8757,12 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
                 None => server.command_answer(id, &session, &args, interaction.as_deref()),
             };
             if drop_at == Some(DropAt::After) {
+                return;
+            }
+            if hold_at == Some(HoldAt::After) {
+                // Run, and what follows it may run; its answer never begun.
+                drop(arrival);
+                hold_open(&mut stream);
                 return;
             }
             // TRACK SEAM (identity): the refusal, where `requires` refused,
@@ -8771,6 +8820,13 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
                     // tell the customer about.
                     if let Some(result) = answered.result {
                         body["result"] = result;
+                    }
+                    if hold_at == Some(HoldAt::Body) {
+                        // Run, and its answer begun and never finished.
+                        drop(arrival);
+                        respond_in_part(&mut stream, 202, &session, fresh, &body.to_string());
+                        hold_open(&mut stream);
+                        return;
                     }
                     respond_json(&mut stream, 202, &session, fresh, &body.to_string());
                 }
@@ -9327,6 +9383,41 @@ fn answer_connection(server: &Server, mut stream: TcpStream) {
                 .entry(session.clone())
                 .or_default()
                 .drop_command = Some(at);
+            respond_json(&mut stream, 200, &session, fresh, "{}");
+        }
+        // **A connection that neither answers nor fails** (ADR-0381): this
+        // session's next command connection is held open with no answer,
+        // before the command runs (`at=before`) or after it has committed
+        // (`at=after`), or with its answer's head and part of its body sent
+        // (`at=body`), until its page gives up on it. Once.
+        ("POST", "/bench/hold") => {
+            let q = |k: &str| {
+                query
+                    .split('&')
+                    .find_map(|p| p.strip_prefix(&format!("{k}=")))
+            };
+            let at = match (q("next"), q("at")) {
+                (Some("command"), Some("before")) => HoldAt::Before,
+                (Some("command"), Some("after")) => HoldAt::After,
+                (Some("command"), Some("body")) => HoldAt::Body,
+                _ => {
+                    respond_json(
+                        &mut stream,
+                        400,
+                        &session,
+                        fresh,
+                        "{\"error\":\"next is `command`, and at is `before`, `after` or `body`\"}",
+                    );
+                    return;
+                }
+            };
+            server
+                .connection_faults
+                .lock()
+                .expect("connection faults")
+                .entry(session.clone())
+                .or_default()
+                .hold_command = Some(at);
             respond_json(&mut stream, 200, &session, fresh, "{}");
         }
         // **A forced reconnect** (charter §15.5, ADR-0175): this session's
@@ -10943,6 +11034,48 @@ fn respond_json(stream: &mut TcpStream, code: u16, session: &str, fresh: bool, b
         fresh,
         body.as_bytes(),
     );
+}
+
+/// **An answer begun and never finished** (ADR-0381's fault): its head, whose
+/// `content-length` promises the whole body, and the body's first half.
+fn respond_in_part(stream: &mut TcpStream, code: u16, session: &str, fresh: bool, body: &str) {
+    let cookie = if fresh {
+        identity::session_cookie(session)
+    } else {
+        String::new()
+    };
+    let head = format!(
+        "HTTP/1.1 {code} {reason}\r\ncontent-type: application/json; charset=utf-8\r\n\
+         content-length: {length}\r\n{NOSNIFF}{PRIVATE}{cookie}connection: close\r\n\r\n",
+        reason = reason(code),
+        length = body.len(),
+    );
+    let _ = stream.write_all(head.as_bytes());
+    let _ = stream.write_all(&body.as_bytes()[..body.len() / 2]);
+    let _ = stream.flush();
+}
+
+/// **A connection held open** (ADR-0381's fault): nothing more is written to
+/// it, and it is read until its client closes it, or for [`HOLD_AT_MOST`], so
+/// the hold ends with the page that gave up on it.
+fn hold_open(stream: &mut TcpStream) {
+    let until = std::time::Instant::now() + HOLD_AT_MOST;
+    let _ = stream.set_read_timeout(Some(std::time::Duration::from_millis(50)));
+    let mut read = [0u8; 64];
+    while std::time::Instant::now() < until {
+        match stream.read(&mut read) {
+            // Closed by its client.
+            Ok(0) => return,
+            Ok(_) => {}
+            Err(e)
+                if matches!(
+                    e.kind(),
+                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                ) => {}
+            // Reset by its client.
+            Err(_) => return,
+        }
+    }
 }
 
 /// **A status code's reason phrase** (RFC 9110 §15). A client ignores it
@@ -13422,6 +13555,57 @@ public query Store(",
         posted_with(s, path, session, &headers, body)
     }
 
+    /// [`posted`], given up on as a page gives up on an answer that does not
+    /// come (ADR-0381): what came back within `wait` of the last byte, and
+    /// whether the request's thread ended within a second of the connection
+    /// being closed.
+    fn given_up(
+        s: &Server,
+        path: &str,
+        session: &str,
+        interaction: &str,
+        body: &str,
+        wait: std::time::Duration,
+    ) -> (String, bool) {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+        let at = listener.local_addr().expect("address");
+        let (tx, ended) = std::sync::mpsc::channel::<()>();
+        std::thread::scope(|scope| {
+            scope.spawn(move || {
+                let (stream, _) = listener.accept().expect("accept");
+                handle(s, stream);
+                let _ = tx.send(());
+            });
+            let mut client = TcpStream::connect(at).expect("connect");
+            client
+                .write_all(
+                    format!(
+                        "POST {path} HTTP/1.1\r\nHost: t\r\nCookie: pw-session={session}\r\n\
+                         pw-interaction: {interaction}\r\ncontent-type: application/json\r\n\
+                         content-length: {}\r\n\r\n{body}",
+                        body.len()
+                    )
+                    .as_bytes(),
+                )
+                .expect("request");
+            client.set_read_timeout(Some(wait)).expect("a read timeout");
+            let mut answer = Vec::new();
+            let mut chunk = [0u8; 4096];
+            // Until it is closed, or nothing comes within `wait`.
+            while let Ok(n) = client.read(&mut chunk) {
+                if n == 0 {
+                    break;
+                }
+                answer.extend_from_slice(&chunk[..n]);
+            }
+            drop(client);
+            let thread_ended = ended
+                .recv_timeout(std::time::Duration::from_secs(1))
+                .is_ok();
+            (String::from_utf8_lossy(&answer).into_owned(), thread_ended)
+        })
+    }
+
     /// [`posted`], with `headers`, each line ending in CRLF.
     fn posted_with(s: &Server, path: &str, session: &str, headers: &str, body: &str) -> String {
         let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
@@ -13495,6 +13679,88 @@ public query Store(",
             [("cortado".to_string(), 2)],
             "once"
         );
+    }
+
+    /// **A connection that neither answers nor fails** (ADR-0381): the
+    /// session's next command connection is held open with no answer, before
+    /// the command runs or after it has committed, or with its answer begun
+    /// and never finished, until its page gives up on it. Sent again with
+    /// the same interaction, the request is answered with what happened,
+    /// once, and the hold is taken: the command after it is answered.
+    #[test]
+    fn a_held_command_connection_is_answered_by_nothing_until_it_is_given_up() {
+        let s = rendering_server();
+        let body = serde_json::json!([shown("cortado"), 1]).to_string();
+        let path = format!("/command/{ADD}");
+        let hold = |at: HoldAt| {
+            s.connection_faults
+                .lock()
+                .unwrap()
+                .entry("session-9".into())
+                .or_default()
+                .hold_command = Some(at);
+        };
+        let wait = std::time::Duration::from_millis(300);
+
+        hold(HoldAt::Before);
+        let (answer, ended) = given_up(&s, &path, "session-9", "press-1", &body, wait);
+        assert_eq!(answer, "", "no answer");
+        assert!(ended, "the hold ends with its connection");
+        assert_eq!(quantities(&s, "session-9"), [], "and nothing ran");
+        let again = posted(&s, &path, "session-9", "press-1", &body);
+        assert!(again.contains("\"committed\":true"), "{again}");
+        assert_eq!(quantities(&s, "session-9"), [("cortado".to_string(), 1)]);
+
+        hold(HoldAt::After);
+        let (answer, ended) = given_up(&s, &path, "session-9", "press-2", &body, wait);
+        assert_eq!(answer, "", "no answer");
+        assert!(ended, "the hold ends with its connection");
+        assert_eq!(
+            quantities(&s, "session-9"),
+            [("cortado".to_string(), 2)],
+            "but it committed"
+        );
+        let again = posted(&s, &path, "session-9", "press-2", &body);
+        assert!(again.contains("\"committed\":true"), "{again}");
+        assert_eq!(
+            quantities(&s, "session-9"),
+            [("cortado".to_string(), 2)],
+            "once"
+        );
+
+        hold(HoldAt::Body);
+        let (answer, ended) = given_up(&s, &path, "session-9", "press-3", &body, wait);
+        assert!(ended, "the hold ends with its connection");
+        // Its head, whose length promises a body, and less than that body.
+        let (head, part) = answer.split_once("\r\n\r\n").unwrap_or((&answer, ""));
+        assert!(head.starts_with("HTTP/1.1 202"), "{answer}");
+        let promised = head
+            .lines()
+            .find_map(|l| l.strip_prefix("content-length: "))
+            .and_then(|n| n.trim().parse::<usize>().ok())
+            .unwrap_or(0);
+        assert!(
+            !part.is_empty() && part.len() < promised,
+            "{} of {promised} bytes: {part}",
+            part.len()
+        );
+        assert_eq!(
+            quantities(&s, "session-9"),
+            [("cortado".to_string(), 3)],
+            "it committed"
+        );
+        let again = posted(&s, &path, "session-9", "press-3", &body);
+        assert!(again.contains("\"committed\":true"), "{again}");
+        assert_eq!(
+            quantities(&s, "session-9"),
+            [("cortado".to_string(), 3)],
+            "once"
+        );
+
+        // Held once: the next command is answered.
+        let next = posted(&s, &path, "session-9", "press-4", &body);
+        assert!(next.contains("\"committed\":true"), "{next}");
+        assert_eq!(quantities(&s, "session-9"), [("cortado".to_string(), 4)]);
     }
 
     /// **A page that shows what the clock decides is told when the clock

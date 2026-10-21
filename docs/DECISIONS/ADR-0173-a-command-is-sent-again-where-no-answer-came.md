@@ -109,3 +109,12 @@ those words to the page's status announcer. `spikes/own-renderer/e2e/retry.spec.
 checks the failure marker and rollback for exhausted retries. This does not
 cover a request whose fetch or response-body read remains pending; that gap
 remains as stated above.
+
+## Amended by ADR-0381 (2026-10-21)
+
+"A request that hangs waits" and "a cut-off answer is untested" no longer
+hold. Each send now has ten seconds for its whole answer, its body included;
+one that has none by then is aborted and is no answer, sent again by the
+`retry` clause's rule above (ADR-0381). `e2e/command-deadline.spec.mjs` holds
+a request at the network, and the host holds one before it runs, after it
+committed and partway through its answer's body (`/bench/hold`).

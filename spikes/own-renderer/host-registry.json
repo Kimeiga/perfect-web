@@ -356,6 +356,11 @@
         "mutable:cart"
       ]
     },
+    "command-deadline.spec.mjs": {
+      "roles": [
+        "base"
+      ]
+    },
     "command-order.spec.mjs": {
       "roles": [
         "base"

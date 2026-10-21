@@ -957,14 +957,29 @@ awaited in order. What remains:
   While a public query's origin fails, its last value is shown, and nothing
   tells the reader it is from before. `fallback empty` is checked and read
   by nothing.
-- **A command request that never settles remains pending** (ADR-0173). A
-  command declares no `timeout`: if its connection remains open without
-  headers, or its response body never completes, `fetch`/`response.text()`
-  does not reject and the retry path is never reached. The retry suite covers
-  rejected requests and exhausted retries, not a request or response body that
-  remains open. A rejected request that exhausts its retries is reported by
-  the runtime on the control and its live status announcer; see the current
-  correction in ADR-0173.
+- **A command's send is given up at ten seconds, and what it then knows is
+  limited** (ADR-0381, which replaced "a command request that never settles
+  remains pending" of ADR-0173). Each send has ten seconds for its whole
+  answer, its body included, and is sent again as `retry` allows; a press
+  therefore settles within its sends' deadlines, but:
+  - a press whose sends are all given up is told it "could not be sent"
+    (ADR-0302's words), though it may have reached the host and committed;
+    the page shows what its subscription brings, and nothing says the
+    outcome was unknown;
+  - the host never hears that a page gave up: a command still running, or
+    arriving late, can run after the next command its page sent, naming none;
+  - the host's own side has no deadline (a command's run, the session's turn,
+    the database pool, the wait for a running predecessor), and each resend
+    of a request it is still running parks another thread, at most `retry`'s
+    `max`;
+  - a resend that arrives while its first is still running, from a document
+    the host no longer holds, is refused rather than answered (ADR-0318);
+  - a command declares no `timeout` (PW5105): the deadline is the platform's;
+  - a hidden page's timers fire late, so the bound is the browser's timer's;
+  - a handler's or speculation's module that never loads (`import()`) still
+    holds its press and the presses after it (ADR-0152).
+  A rejected request that exhausts its retries is reported on the control
+  and by the page's live status announcer (ADR-0173's correction).
 - **Each Add carries the whole item** (ADR-0172), its description too,
   though the command reads its id and the transition its name and price. A
   narrower record is the program's to declare.

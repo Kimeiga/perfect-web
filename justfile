@@ -60,6 +60,7 @@ import 'just/second-host.just'
 import 'just/node-audit.just'
 import 'just/keyed-retry.just'
 import 'just/effect-convergence.just'
+import 'just/command-deadline.just'
 
 default:
     @just --list

@@ -52,12 +52,13 @@ MUTANTS = [
     ),
     (
         # Re-anchored by ADR-0302: a request with no answer is thrown as
-        # unreachable.
+        # unreachable. And by ADR-0381: a send held for the one before it is
+        # told apart first.
         "a failed request stays counted",
         RUNTIME,
         "      if (keepalive) keptAlive -= bytes;\n"
-        "      if (!retry || attempt >= retry.max) throw new Unreachable(component, error);\n",
-        "      if (!retry || attempt >= retry.max) throw new Unreachable(component, error);\n",
+        "      // **Held for the one before it, not lost** (ADR-0381): the host runs a\n",
+        "      // **Held for the one before it, not lost** (ADR-0381): the host runs a\n",
     ),
     (
         "a body is counted in characters",

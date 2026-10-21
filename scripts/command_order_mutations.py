@@ -96,12 +96,16 @@ MUTANTS = [
         "                drop(arrival);\n",
     ),
     (
+        # Re-anchored by ADR-0381: a command held before it runs vanishes by
+        # the same lines, so the drop's are named by its comment.
         "a command closed unrun is taken for one that ran",
         "server",
         SERVER,
+        "                // Never run: what follows it waits for it to be sent again.\n"
         "                if let Some(arrival) = arrival {\n"
         "                    arrival.vanish();\n"
         "                }\n",
+        "                // Never run: what follows it waits for it to be sent again.\n"
         "                drop(arrival);\n",
     ),
     (
@@ -164,18 +168,26 @@ MUTANTS = [
         "    if (false) {\n",
     ),
     (
+        # Re-anchored by ADR-0381: a send given up while the one before it is
+        # unanswered waits its turn by the same lines, so the early answer's
+        # are named by the line before them.
         "an early answer is sent again at once",
         "browser",
         RUNTIME,
+        "        log.push(`${component} sent again: the one before it had not arrived`);\n"
         "        await Promise.all(before);\n",
-        "",
+        "        log.push(`${component} sent again: the one before it had not arrived`);\n",
     ),
     (
+        # Re-anchored by ADR-0381, as above.
         "an early answer is sent again naming the one before it",
         "browser",
         RUNTIME,
+        "        log.push(`${component} sent again: the one before it had not arrived`);\n"
+        "        await Promise.all(before);\n"
         "        after = undefined;\n",
-        "",
+        "        log.push(`${component} sent again: the one before it had not arrived`);\n"
+        "        await Promise.all(before);\n",
     ),
     (
         "a command is kept unanswered after its answer",

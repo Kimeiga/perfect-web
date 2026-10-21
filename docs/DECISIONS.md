@@ -3239,3 +3239,7 @@ Speculation absence names an existing page, and controls require native assertio
 [ADR-0380](DECISIONS/ADR-0380-effect-inference-queue.md):
 Effect inference revisits readers only when dependency rows grow (landed with train-12 at `e7664d2e`, 2026-10-21).
 - Preserve canonical effect rows, performed metadata and convergence while replacing repeated whole-program sweeps with a deduplicated reader queue. Bounded alternating measurements establish the deep-chain improvement, not an application-wide speedup.
+
+[ADR-0381](DECISIONS/ADR-0381-a-commands-send-is-answered-within-its-deadline.md):
+A command's send is answered within its deadline, or it is no answer (track `command-deadline`; not landed).
+- Each send has ten seconds for its whole answer, its body included, and is then sent again as `retry` allows; a send held for the command before it waits its turn, as an early answer does. Every press settles in bounded time; an outcome the page cannot know is still told as "could not be sent".

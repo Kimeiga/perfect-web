@@ -468,6 +468,8 @@ window.__pw = {
   /** The bytes of command bodies kept alive and not yet answered, and what
    * they may come to (ADR-0268). */
   keepalive: () => ({ inFlight: keptAlive, budget: keepaliveBudget }),
+  /** How long each send of a command waits for its answer (ADR-0381). */
+  deadline: () => sendDeadline,
   /** Each streamed region that settled after boot, and who filled it:
    * `browser` where the platform applied its patch, `runtime` where this
    * did (ADR-0148). */
@@ -612,6 +614,12 @@ const unanswered = new Map();
  * the server in time, and this one ran nothing. That is no outcome: it is sent
  * again once each command sent `before` it is answered, naming none, and it
  * is no resend of the `retry` clause's.
+ *
+ * **Answered within its deadline, or not at all** (ADR-0381): each send has
+ * `sendDeadline` for its whole answer, its body's last byte included. Past
+ * it the request is aborted, and that is no answer, as a request the network
+ * dropped is: until 2026-10-21 a connection held open was waited for without
+ * end, its press pending, and every press the page's order put behind it.
  */
 async function send(component, args, interaction, retry, after, before) {
   const sent = JSON.stringify(args);
@@ -621,6 +629,7 @@ async function send(component, args, interaction, retry, after, before) {
     let body;
     const keepalive = keptAlive + bytes <= keepaliveBudget;
     if (keepalive) keptAlive += bytes;
+    const unheard = AbortSignal.timeout(sendDeadline);
     try {
       response = await fetch(`/command/${encodeURIComponent(component)}`, {
         method: "POST",
@@ -643,13 +652,26 @@ async function send(component, args, interaction, retry, after, before) {
         },
         body: sent,
         keepalive,
+        signal: unheard,
       });
       // An answer cut off in transit is no answer.
       if (response.ok) body = await response.text();
     } catch (error) {
       if (keepalive) keptAlive -= bytes;
+      // **Held for the one before it, not lost** (ADR-0381): the host runs a
+      // command once the one it names has (ADR-0305), so a send given up
+      // while that one is unanswered was waiting its turn. As an early
+      // answer is, it is no outcome and no resend of the `retry` clause's.
+      if (unheard.aborted && unanswered.has(after)) {
+        log.push(`${component} sent again: no answer within ${sendDeadline} ms, the one before it unanswered`);
+        await Promise.all(before);
+        after = undefined;
+        attempt -= 1;
+        continue;
+      }
       if (!retry || attempt >= retry.max) throw new Unreachable(component, error);
-      log.push(`resent ${component}: no answer (${error.message ?? error})`);
+      const why = unheard.aborted ? ` within ${sendDeadline} ms` : ` (${error.message ?? error})`;
+      log.push(`resent ${component}: no answer${why}`);
       await new Promise((resolve) => setTimeout(resolve, resendDelay(retry, attempt)));
       continue;
     }
@@ -702,6 +724,18 @@ function resendDelay(retry, attempt) {
   const bound = Math.min(1000 * 2 ** attempt, 30000);
   return retry.jitter ? Math.random() * bound : bound;
 }
+
+/**
+ * **How long a send waits for its whole answer** (ADR-0381): ten seconds, as
+ * ky gives an attempt and .NET's standard resilience handler does. A press
+ * then settles within its sends' deadlines and the waits between them, which
+ * its `retry` clause bounds: ten seconds with no retry, about 33 for the
+ * store's two resends. `?deadline=` lowers it, so that a test reaches it in a
+ * second or two, as `?keepalive=` lowers the keepalive budget; it never
+ * raises it, and what is no time above zero asks for nothing.
+ */
+const askedDeadline = Number(new URLSearchParams(location.search).get("deadline"));
+const sendDeadline = askedDeadline > 0 ? Math.min(10_000, askedDeadline) : 10_000;
 
 // --- ADR-0122: optimistic transitions -----------------------------------
 //

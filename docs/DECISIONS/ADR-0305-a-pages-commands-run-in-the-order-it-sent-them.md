@@ -148,3 +148,14 @@ runs, and its command commits after.
   host never saw, and the next press waits the two seconds and is sent again.
 - **An upload**, which goes by its own route (the uploads track), is no
   command the runtime sends, and is in no order.
+
+## Extended by ADR-0381 (2026-10-21)
+
+Decision 4's runtime waited for each command sent before without end: a
+command that never reached the host and was never answered held the next
+one's resend for ever (`e2e/command-deadline.spec.mjs` at `e7664d2e`). Each
+send now has a deadline, so every command before it settles. A send given up
+at its deadline while the command it names is unanswered was held for it, not
+lost: as an early answer is, it is sent again once each command sent before
+it is answered or has failed, naming none, and is no resend of the `retry`
+clause's.
