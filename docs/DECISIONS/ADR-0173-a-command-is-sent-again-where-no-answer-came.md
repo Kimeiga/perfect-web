@@ -98,3 +98,14 @@ Recorded by `just e14-command-retry` in `docs/evidence/E14/command-retry.txt`:
   match "not sent", since a command's result type has no such case.
 - **Offline is not waited out.** The runtime sends again without asking
   whether the browser is online.
+
+## Current-source note (2026-10-21)
+
+The preceding statement that a press whose resends all fail says nothing a
+reader hears describes the earlier runtime and is stale at the current source.
+`spikes/own-renderer/public/pw-runtime.mjs` reports an exhausted transport
+failure through `tell`, which marks the control, adds its message, and sends
+those words to the page's status announcer. `spikes/own-renderer/e2e/retry.spec.mjs`
+checks the failure marker and rollback for exhausted retries. This does not
+cover a request whose fetch or response-body read remains pending; that gap
+remains as stated above.

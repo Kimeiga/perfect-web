@@ -952,13 +952,14 @@ awaited in order. What remains:
   While a public query's origin fails, its last value is shown, and nothing
   tells the reader it is from before. `fallback empty` is checked and read
   by nothing.
-- **A command's request that hangs waits** (ADR-0173). A command declares
-  no `timeout`, so a request with its connection open and no answer is not
-  a failure, and is not sent again.
-- **A press whose resends all fail says nothing a reader hears** (ADR-0173).
-  Its control is marked and its line goes; a handler cannot match "not
-  sent". The runtime sends again without asking whether the browser is
-  online.
+- **A command request that never settles remains pending** (ADR-0173). A
+  command declares no `timeout`: if its connection remains open without
+  headers, or its response body never completes, `fetch`/`response.text()`
+  does not reject and the retry path is never reached. The retry suite covers
+  rejected requests and exhausted retries, not a request or response body that
+  remains open. A rejected request that exhausts its retries is reported by
+  the runtime on the control and its live status announcer; see the current
+  correction in ADR-0173.
 - **Each Add carries the whole item** (ADR-0172), its description too,
   though the command reads its id and the transition its name and price. A
   narrower record is the program's to declare.
