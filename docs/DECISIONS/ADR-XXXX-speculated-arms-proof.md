@@ -66,3 +66,6 @@ reached-consumer evidence remain pending.
 The feed import and mode change reach existing feed campaigns; the canonical
 planner determines their required whole reruns. These tests are bounded
 regressions, not a guarantee against all compiler or application bugs.
+Raw local commands, input hashes, the original fault's red output and the whole
+campaign output are retained in [the diagnostic tooling record](../evidence/tooling/speculated-arms-proof.txt).
+It explicitly predates the source commit and does not replace hosted evidence.
