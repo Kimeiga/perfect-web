@@ -37,11 +37,19 @@ source is restored after every mutant, whatever happens.
 """
 
 import os
+import json
 import pathlib
 import re
+import secrets
 import signal
 import subprocess
 import sys
+import tempfile
+
+import browser_test_results
+import cargo_assertion_results
+import mutation_source
+import producer_process
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 APP = ROOT / "examples/todomvc/app.pw"
@@ -347,108 +355,161 @@ MUTANTS = [
         "a patch that removes `checked` leaves the box as a person left it",
         RUNTIME,
         RUNTIME_FILE,
-        '    if (op.name === "checked" && "checked" in element) element.checked = false;\n',
-        "",
+        # Device-backed TodoMVC changes now reach live parts. Preserve every
+        # other boolean attribute and the opposite checked transition.
+        '      if (typeof el[live.attribute] === "boolean") el[live.attribute] = on;\n',
+        '      if (typeof el[live.attribute] === "boolean" && (live.attribute !== "checked" || on)) el[live.attribute] = on;\n',
     ),
     (
         "a patch that sets `checked` leaves the box as a person left it",
         RUNTIME,
         RUNTIME_FILE,
-        '  if (op.name === "checked" && "checked" in element) element.checked = true;\n',
-        "",
+        '      if (typeof el[live.attribute] === "boolean") el[live.attribute] = on;\n',
+        '      if (typeof el[live.attribute] === "boolean" && (live.attribute !== "checked" || !on)) el[live.attribute] = on;\n',
     ),
     (
         "an edit field inside the row a patch inserts is not given focus",
         RUNTIME,
         RUNTIME_FILE,
-        'node.matches("[autofocus]") ? [node] : [...node.querySelectorAll("[autofocus]")]',
-        'node.matches("[autofocus]") ? [node] : []',
+        # The morph inserts the edit input itself, so removing only descendant
+        # search no longer reaches its focus. Omit the insertion-time lookup;
+        # initial document autofocus remains the browser's.
+        '    const el = autofocusIn(records.flatMap((r) => [...r.addedNodes]));\n',
+        '    const el = null;\n',
     ),
 ]
 
 SERVER_TESTS = [
-    "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--", "tests::todomvc::",
+    "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--bin", "pw-dev-server",
+    "--", "tests::todomvc::", "--format=pretty",
 ]
+SERVER_SOURCE = ROOT / "spikes/own-renderer/server/src/tests/todomvc.rs"
+SERVER_NAMES = {
+    "tests::todomvc::the_host_renders_the_default_and_hides_what_the_device_decides",
+    "tests::todomvc::the_document_says_what_the_device_keeps",
+    "tests::todomvc::no_host_holds_a_todo",
+    "tests::todomvc::the_page_has_the_templates_markup",
+}
 SPEC = ["e2e/todomvc.spec.mjs", "--project=chromium"]
+BROWSER_COUNT = 50
+INVENTORIES = {}
 
-# How long one command may run. Past the bound it is killed with everything
-# it started, and the run counts as failing.
+# A stopped, incomplete or erroneous producer is invalid, never a test failure.
 BOUND = 1800
 
 
 def bounded(cmd, **kw):
-    """(output, returncode), or (output, None) when it ran past the bound."""
-    p = subprocess.Popen(cmd, start_new_session=True, stdout=subprocess.PIPE,
-                         stderr=subprocess.STDOUT, text=True, **kw)
+    """The shared owner reaps its native process before source restoration."""
     try:
-        out, _ = p.communicate(timeout=BOUND)
-        return out, p.returncode
-    except subprocess.TimeoutExpired:
-        os.killpg(p.pid, signal.SIGKILL)
-        out, _ = p.communicate()
-        return out, None
+        result = producer_process.run(cmd, timeout=BOUND, **kw)
+        return result.stdout, result.returncode
+    except subprocess.TimeoutExpired as expired:
+        return expired.output, None
+
+
+def program_files():
+    return [str(path) for directory in ("packages/pw-std", "packages/pw-platform-web", "examples/todomvc")
+            for path in sorted((ROOT / directory).glob("*.pw"))]
+
+
+def checker_result(code, output, files):
+    """Native complete pw-check output: clean, exact diagnosed refusal, or invalid.
+
+    This is the same plain diagnostic grammar as the guide producer. A Cargo
+    error, warning, panic, truncated summary or arbitrary line cannot mint a
+    named CHECKED kill merely by mentioning PW6805.
+    """
+    if type(code) is not int or code not in (0, 1) or not isinstance(output, str):
+        return False, False, set()
+    lines = output.splitlines()
+    if code == 0:
+        clean = lines == [f"pw check: {files} file(s), no diagnostics"]
+        return clean, clean, set()
+    if not lines:
+        return False, False, set()
+    summary = re.fullmatch(r"pw check: (\d+) file\(s\), (\d+) error\(s\), 0 warning\(s\)", lines[-1])
+    errors = [line for line in lines if line.startswith("error:")]
+    codes = [re.fullmatch(r"error: \[(PW\d{4})\] .+", line) for line in errors]
+    started = False
+    for line in lines[:-1]:
+        if line.startswith("error:"):
+            started = True
+        elif line and (not started or re.fullmatch(
+                r"(?:\s*(?:\d+|\.\.\.)?\s*\|.*|  --> .+:\d+:\d+|   = (?:note|help):.*)", line) is None):
+            return False, False, set()
+    if (summary is None or int(summary[1]) != files or int(summary[2]) != len(errors)
+            or not errors or not all(codes)):
+        return False, False, set()
+    return True, False, {match[1] for match in codes}
 
 
 def checks():
-    """Whether the program, as it is now, checks: what makes a mutant of it a
-    mutant and not a refusal."""
+    """The program must check, except the one explicitly named rule witness."""
+    files = program_files()
     out, code = bounded(
         ["cargo", "run", "--quiet", "--locked", "-p", "pw-cli", "--", "check", "--plain",
-         *sorted(map(str, (ROOT / "packages/pw-std").glob("*.pw"))),
-         *sorted(map(str, (ROOT / "packages/pw-platform-web").glob("*.pw"))),
-         *sorted(map(str, (ROOT / "examples/todomvc").glob("*.pw")))],
+         *files],
         cwd=ROOT,
     )
-    return code == 0, out
+    result = checker_result(code, out, len(files))
+    if not result[0]:
+        print(out, flush=True)
+    return result
 
 
 def server_tests(_what=None):
-    """(built, passed, failed) over the server's TodoMVC tests."""
+    """Four complete named Cargo tests, with native assertion-site authority."""
     out, code = bounded(SERVER_TESTS, cwd=ROOT)
-    if code is None:
-        return True, 0, 1
-    found = re.findall(r"test result: \w+\. (\d+) passed; (\d+) failed", out)
-    if not found:
-        return False, 0, 0
-    return True, sum(int(p) for p, _ in found), sum(int(f) for _, f in found)
+    result = cargo_assertion_results.validate(code, out, root=ROOT,
+        sources=[SERVER_SOURCE], expected=SERVER_NAMES)
+    if not result.valid or result.failed:
+        print(out, flush=True)
+    return (True, result.passed, result.failed) if result.valid else (False, 0, 0)
+
+
+def build(pages=False):
+    """Build actual source; no failed build is a mutation witness."""
+    commands = []
+    if pages:
+        commands.append((["bash", "spikes/own-renderer/run.sh"], {"BUILD_ONLY": "1"}))
+    commands.extend([
+        (["bash", "spikes/own-renderer/todomvc.sh"], {}),
+        (["cargo", "build", "--quiet", "--locked", "-p", "pw-dev-server", "-p", "kiokun-server"], {}),
+    ])
+    for command, extra in commands:
+        out, code = bounded(command, cwd=ROOT, env={**os.environ, **extra})
+        if code != 0:
+            print(out, flush=True)
+            return False
+    return True
 
 
 def browser_tests(_what=None, pages=False):
-    """(built, passed, failed) over the browser's, after TodoMVC is built
-    again from the source as it is and the server with it; with `pages`, the
-    demo's pages too (`run.sh`), which the Playwright config holds to the
-    runtime it serves."""
-    if pages:
-        rebuilt = subprocess.run(
-            ["bash", "spikes/own-renderer/run.sh"],
-            cwd=ROOT,
-            env={**os.environ, "BUILD_ONLY": "1"},
-            capture_output=True,
-            text=True,
+    """Fresh complete assertion receipt, with the baseline's frozen fifty IDs."""
+    if not build(pages):
+        return False, 0, 0
+    with tempfile.TemporaryDirectory(prefix="pw-todomvc-browser-") as directory:
+        receipt = pathlib.Path(directory) / "result.json"
+        nonce = secrets.token_hex(32)
+        out, code = bounded(
+            ["bash", str(ROOT / "scripts/run_suite.sh"), "-C", ".", "--",
+             "pnpm", "exec", "playwright", "test", *SPEC, "--retries=0",
+             "--reporter=line,./assertion-result-reporter.mjs"],
+            cwd=ROOT / "spikes/own-renderer",
+            env={**os.environ, "PW_ASSERTION_REPORT": str(receipt), "PW_ASSERTION_NONCE": nonce},
         )
-        if rebuilt.returncode != 0:
+        try:
+            report = json.loads(receipt.read_text())
+        except (OSError, ValueError):
+            report = None
+        result = browser_test_results.parse(code, report, nonce, INVENTORIES.get("browser"))
+        if not result.valid or result.failed:
+            print(out, flush=True)
+        if not result.valid or result.passed + result.failed != BROWSER_COUNT:
+            print(f"REFUSED browser producer: {result.reason or 'expected fifty tests'}", flush=True)
             return False, 0, 0
-    built = subprocess.run(
-        ["bash", "spikes/own-renderer/todomvc.sh"], cwd=ROOT, capture_output=True, text=True
-    )
-    if built.returncode != 0:
-        return False, 0, 0
-    server = subprocess.run(
-        ["cargo", "build", "--quiet", "--locked", "-p", "pw-dev-server", "-p", "kiokun-server"],
-        cwd=ROOT, capture_output=True, text=True,
-    )
-    if server.returncode != 0:
-        return False, 0, 0
-    out, code = bounded(
-        ["pnpm", "exec", "playwright", "test", *SPEC, "--reporter=line"],
-        cwd=ROOT / "spikes/own-renderer",
-    )
-    if code is None:
-        return True, 0, 1
-    out = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", out)
-    passed = sum(int(n) for n in re.findall(r"(\d+) passed", out))
-    failed = sum(int(n) for n in re.findall(r"(\d+) failed", out))
-    return passed + failed > 0, passed, failed
+        INVENTORIES.setdefault("browser", result.inventory)
+        return True, result.passed, result.failed
 
 
 def runtime_browser_tests(_what=None):
@@ -466,59 +527,73 @@ RUNS = {
 
 def main():
     import mutation_baseline  # keeps what each command says, for a red baseline
-    # Stopped from outside, the source is still restored: SIGTERM raises
-    # here, and the `finally` below runs.
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(1))
+    watch = mutation_baseline.mutation_bound.start()
+    INVENTORIES.clear()
     for name, run in (("server", server_tests), ("browser", browser_tests)):
-        built, passed, failed = run()
+        valid, passed, failed = run()
         print(f"baseline ({name}): {passed} passed, {failed} failed", flush=True)
-        if not built or failed or not passed:
+        if not valid or failed or not passed or watch.stopped:
             print("FAIL: the unmutated baseline is not green; no mutant can mean anything")
             mutation_baseline.explain()
             return 1
 
-    survivors = 0
+    killed = refused = survivors = 0
     for what, kind, path, anchor, replacement in MUTANTS:
         original = path.read_text()
         if original.count(anchor) != 1:
-            print(f"{what}: ANCHOR NOT FOUND EXACTLY ONCE in {path.name}")
-            survivors += 1
-            continue
+            print(f"{what}: REFUSED (anchor not unique in {path.name})")
+            refused += 1
+            break
         verdict = None
-        try:
-            path.write_text(original.replace(anchor, replacement, 1))
+        with mutation_source.changed(path, original, original.replace(anchor, replacement, 1)):
             if kind == PROGRAM:
-                ok, said = checks()
+                valid, clean, codes = checks()
                 named = CHECKED.get(what, set())
-                refused = set(re.findall(r"error: \[(PW\d{4})\]", said))
-                if not ok and refused and refused <= named:
-                    verdict = f"KILLED by the checker ({', '.join(sorted(refused))}, the rule this mutant takes away)"
-                elif not ok:
-                    verdict = "INVALID: the mutant does not check, so it is no mutant"
-                    print(said[-600:])
+                if not valid or watch.stopped:
+                    verdict = "REFUSED (invalid or stopped checker; no kill)"
+                elif not clean:
+                    if named and codes == named:
+                        verdict = f"KILLED by the checker ({', '.join(sorted(codes))}, the rule this mutant takes away)"
+                    else:
+                        verdict = f"REFUSED (unexpected checker diagnostics: {sorted(codes)})"
                 elif named:
-                    verdict = f"INVALID: the script names {sorted(named)}, and the program the mutant leaves checks"
+                    verdict = "SURVIVED (the checker accepts the named rule's mutant)"
             if verdict is None:
                 for name, run in RUNS[kind]:
-                    built, passed, failed = run()
-                    if not built:
-                        verdict = f"KILLED (does not build, {name})"
+                    valid, passed, failed = run()
+                    if not valid or not passed + failed or watch.stopped:
+                        verdict = f"REFUSED (invalid or stopped {name} producer; no kill)"
                     elif failed:
-                        verdict = f"KILLED by the {name}'s tests ({failed} of {passed + failed} fail)"
+                        verdict = f"KILLED by the {name}'s tests ({failed} of {passed + failed} tests fail)"
                     if verdict:
                         break
                 else:
                     verdict = "SURVIVED"
-        finally:
-            path.write_text(original)
-        if verdict.startswith(("SURVIVED", "INVALID")):
+        if verdict.startswith("KILLED"):
+            killed += 1
+        elif verdict.startswith("REFUSED"):
+            refused += 1
+        else:
             survivors += 1
         print(f"{what} [{kind}]: {verdict}", flush=True)
-    # The pages and the server are built again from the restored source.
-    browser_tests(pages=True)
+        if refused or watch.stopped:
+            break
+    # Rebuild and execute the full frozen suites on restored source. A failed
+    # restoration check refuses the campaign even if every mutant was killed.
+    if watch.stopped:
+        print("REFUSED: memory guard stopped the campaign")
+        return 1
+    for name, run in (("server", server_tests), ("browser", runtime_browser_tests)):
+        valid, passed, failed = run()
+        print(f"restored ({name}): {passed} passed, {failed} failed", flush=True)
+        if not valid or failed or not passed or watch.stopped:
+            print(f"REFUSED: restored {name} producer is not green", flush=True)
+            refused += 1
+            break
 
-    print(f"{len(MUTANTS) - survivors} of {len(MUTANTS)} mutants killed")
-    return 1 if survivors else 0
+    print(f"{killed} of {len(MUTANTS)} mutants killed; {refused} refused; {survivors} survived")
+    return int(bool(refused or survivors or killed != len(MUTANTS)))
 
 
 if __name__ == "__main__":

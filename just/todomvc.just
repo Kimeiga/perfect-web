@@ -126,6 +126,8 @@ e14-todomvc:
        DIAGNOSTIC=1 bash spikes/todomvc-cypress/run.sh; \
        echo; echo "== mutation controls: the Cypress acceptance's checks (scripts/todomvc_cypress_mutations.py)"; echo; \
        python3 scripts/todomvc_cypress_mutations.py; \
+       echo; echo "== native mutation-result authority controls (scripts/todomvc_producer_mutations.py)"; echo; \
+       python3 scripts/todomvc_producer_mutations.py; \
        echo; echo "== mutation controls (scripts/todomvc_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/todomvc_mutations.py; \
      } > docs/evidence/E14/todomvc.txt

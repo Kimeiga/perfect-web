@@ -1,0 +1,58 @@
+TodoMVC native mutation authority, 2026-10-21
+
+Source based on4db12570; isolated /home/haki/code/pw-wt/todomvc-strict.
+No full43 semantic application campaign is claimed here: it remains hosted.
+Root independent review found and required outer SIGTERM unwind + final restored suite; both fixed.
+AST comparison:43 original semantic models, only zero-based40,41,42 runtime anchors changed, as root approved and train12 proved natively. Other40 tuples identical.
+Shared native producer consumer suite:15 tests. Whole17 fault controls below each select an authentic intended assertion; zero refused/survived, restored15-method suite validated before success.
+Canonical evidence_counts independently read17 verdicts, exact owner/catalog, literal e14-todomvc recipe command.
+Historical diagnostic /tmp/todomvc-strict-controls-v2.txt was FAILED15/17: self-control anchor matched its own quoted definition. Full-line anchors corrected; no invalid result was credited.
+
+== python3 scripts/todomvc_producer_mutations.py (final full run) ==
+invalid native Cargo results earn credit: KILLED by test_todomvc_producers.Producers.test_server_refuses_timeout_build_error_and_native_disagreement (2 of 15 tests fail)
+foreign Cargo test identities are accepted: KILLED by test_todomvc_producers.Producers.test_server_requires_exact_four_ids_and_assertion_site (1 of 15 tests fail)
+a failed build launches the browser: KILLED by test_todomvc_producers.Producers.test_build_failure_or_timeout_cannot_launch_browser (1 of 15 tests fail)
+browser inventory changes after baseline: KILLED by test_todomvc_producers.Producers.test_browser_requires_fifty_complete_frozen_ids (1 of 15 tests fail)
+short baseline browser inventory is accepted: KILLED by test_todomvc_producers.Producers.test_browser_requires_fifty_complete_frozen_ids (1 of 15 tests fail)
+invalid browser provenance earns credit: KILLED by test_todomvc_producers.Producers.test_browser_requires_fresh_receipt_and_native_exit (2 of 15 tests fail)
+checker exit can be an infrastructure failure: KILLED by test_todomvc_producers.Producers.test_checker_accepts_only_complete_native_diagnostics (1 of 15 tests fail)
+checker summary need not account for diagnostics: KILLED by test_todomvc_producers.Producers.test_checker_accepts_only_complete_native_diagnostics (1 of 15 tests fail)
+a subset of named checker codes is enough: KILLED by test_todomvc_producers.Producers.test_checker_kill_requires_exact_named_codes (1 of 15 tests fail)
+an invalid producer earns a kill: KILLED by test_todomvc_producers.Producers.test_invalid_or_stopped_producer_never_earns_kill (2 of 15 tests fail)
+a stopped producer prints a kill before refusing: KILLED by test_todomvc_producers.Producers.test_invalid_or_stopped_producer_never_earns_kill (1 of 15 tests fail)
+an invalid result reaches another control: KILLED by test_todomvc_producers.Producers.test_invalid_result_stops_before_the_next_control (1 of 15 tests fail)
+failed restored source is ignored: KILLED by test_todomvc_producers.Producers.test_restored_source_result_is_required (1 of 15 tests fail)
+cancellation restores the planted source: KILLED by test_todomvc_producers.Producers.test_cancellation_restores_owned_source (5 of 15 tests fail)
+timeout claims a native test failure status: KILLED by test_todomvc_producers.Producers.test_timeout_uses_shared_owner_and_remains_invalid (1 of 15 tests fail)
+producer cancellation bypasses source restoration: KILLED by test_todomvc_producers.Producers.test_outer_sigterm_restores_real_owned_source (1 of 15 tests fail)
+producer restored suite is not required: KILLED by test_todomvc_producers.Producers.test_outer_requires_restored_full_suite (1 of 15 tests fail)
+17 of 17 mutants killed; 0 refused; 0 survived
+memory bound: no process was stopped
+
+== Actual isolated pw check: clean, original named privacy mutant, restored ==
+native status: 0
+pw check: 23 file(s), no diagnostics
+
+native status: 1
+error: [PW6805] `todos` is kept on the device, and does not say whose it is
+  --> app.pw:50:8
+   |
+50 | signal todos: List<Todo> = []
+   |        ^^^^^
+   |        |
+   |        `todos` is kept on the device, and does not say whose it is
+   |        `todos` is declared here, a signal the device keeps
+   |
+   = note: A module's signal with a value is one the device keeps (ADR-0366): its clauses say where it rests and under what name, whose it is, and what two tabs' writes do, so that none of the three is a default nobody chose. The first version keeps a value on the device alone, the device's own, the whole value written last being every tab's.
+   = help: say it is the device's own, and never leaves it: `privacy Device`
+pw check: 23 file(s), 1 error(s), 0 warning(s)
+
+native status: 0
+pw check: 23 file(s), no diagnostics
+
+PASS: actual clean -> exact named PW6805 -> restored clean
+
+The checker proof uses this script checks()/checker_result() and shared process/source ownership, native statuses and complete23-file output.
+Train12 owns separate full4/50 witness/native reanchor proof and ADR0367 amendment. No original Cypress blobs, runtime, app or test method inventory is changed by this producer commit.
+
+Retained full baseline+17controls+restored19 native guide invocations: tracks/evidence/todomvc-strict/final17-native (handoff, 122 files; SHA256 manifest integrity.json). Original root /tmp/pw-todomvc-producers-h54huq18.
