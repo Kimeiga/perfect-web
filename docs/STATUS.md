@@ -3,7 +3,7 @@
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
 Reviewed 2026-10-21 against assembled train-12 source
-`df2397f8` (with combined hosted verification still pending).
+`a130a860` (with combined hosted verification still pending).
 [The complete prior ledger](STATUS-HISTORY-2026-10.md) remains verbatim,
 including failed runs, corrections and their original scope.
 
@@ -75,7 +75,30 @@ evidence. No failed result is promoted by this summary.
 
 ## failing gate items
 
-- The latest source `df2397f8` incorporates reviewed graph, WIT-source and
+- Source `a130a860` integrates exact Playwright witness names, canonical
+  TodoMVC compatibility verdicts and SIGTERM source restoration. All nine
+  Playwright controls and eight compatibility controls pass locally; bounded
+  isolated-child probes verify restoration through the actual runner mains.
+  The combined 18 count/restoration tests pass. Raw refusal and successful
+  receipts remain in [diagnostics](diagnostics/train-12/metadata-cancellation/).
+- The [eight-recipe run](https://github.com/studiokimeiga/perfect-web/actions/runs/39545311229)
+  at `a0602009` has passing native graph 19/19, check/build 51/51 and device
+  storage 62/62 campaigns, without memory stops; all three full browser jobs
+  passed. TodoMVC correctly refused an action timeout under its unchanged
+  toggle-all fault. Visible-state assertions now produce complete 50-case
+  assertion receipts for that fault and two edit-field faults, between passing
+  host4/browser50 baselines and restored runs. All 43 operators and 50 browser
+  identities remain. Whole current TodoMVC verification is still required.
+- The original [155-recipe run](https://github.com/studiokimeiga/perfect-web/actions/runs/39538607183)
+  completed with 149 valid native results and the six failures recorded below.
+  Its separate Chromium setup failure remains historical. Final artifact
+  count/header checks and eligible evidence import are being reconciled.
+  The current changed-file plan reaches seven recipes: `e10-browser`,
+  `e14-todomvc`, `e14-device-store`, `e14-second-host`,
+  `e14-browser-assertions`, `e14-evidence-integrity` and `e14-ci-test-reach`.
+  Their current hosted results and final exact-commit CI are still pending.
+
+- Earlier source `df2397f8` incorporated reviewed graph, WIT-source and
   TodoMVC witness/producer repairs. Graph's four remaining invalid controls
   now yield complete 25-test assertion results; WIT's escaped source-identity
   control fails in its unchanged 12-test inventory; TodoMVC's four escaped
@@ -139,7 +162,7 @@ evidence. No failed result is promoted by this summary.
   framework-wide performance result.
 - Published repair candidate `34f3c2d1` has
   [155-recipe verification](https://github.com/studiokimeiga/perfect-web/actions/runs/39538607183)
-  in progress. Its [exact-source CI](https://github.com/studiokimeiga/perfect-web/actions/runs/39538597877)
+  completed as summarized above. Its [exact-source CI](https://github.com/studiokimeiga/perfect-web/actions/runs/39538597877)
   failed on x64 and ARM at Clippy's `collapsible_if` lint in the generic
   representation test; evidence gates passed before lint and the separate
   license/advisory job passed. The semantics-preserving repair `4623d304`
