@@ -1,0 +1,702 @@
+Guide ownership readiness: preserved diagnostic transcripts
+Source change: 7f90138e; qualified metadata from ca809dcf (local cherry-pick530dc34e).
+These local checks ran against the exact source bytes subsequently committed
+as7f90138e, before the source commit. They are diagnostic proof, not canonical
+hosted E14 replacement evidence. The hosted failure remains failed.
+
+Cause: fixture startup competed with the direct .3s and nested .5s execution
+deadlines. Deterministic original-fixture delayed starts reproduced both
+absent-receipt assertions. The fix gates constructor return on bounded native
+readiness; unchanged native execution deadlines begin afterward. Startup
+failure owns cleanup before rethrowing and is never eligible evidence.
+
+The direct original proof used .6s startup delay. A first recursive .8s probe
+could become ready during cleanup; the retained recursive red uses3s so that
+it proves the actual absent-leaf boundary. The fixed positive uses the same3s.
+A preliminary fixed run exposed an invalid test assumption that readiness
+must remain absent even during cleanup; its failed output is preserved below.
+That assumption was removed: deadline failure plus cleanup/restoration are
+required, regardless of a later ready marker.
+
+Final whole campaign: frozen15 native methods, all13 original mutation models
+killed by complete assertion receipts; no memory stop. Final raw output's13
+verdicts also satisfy canonical evidence_counts owner/disagree. Production
+producer_process.py and guide_python.py byte-identical to basece7c1135.
+Independent train12 review ran all15 and checked identity-safe fallback before
+the final bounded pidfd poll addition; the final whole campaign covers that
+addition. Whole hosted guide replacement remains required after integration.
+
+===== C:\Users\haki\code\perfect-web-handoff\tracks\evidence\wit-unique\verify-39538607183\evidence-12\evidence\docs\evidence\E14\guide-ownership.txt =====
+ADR-0376 - canonical guide process ownership
+produced by: just e14-guide-ownership
+commit: 34f3c2d1de6bfa075a1db82ae5a61fddf4af4e95
+test_abort_retains_the_leader_until_the_final_group_signal (test_guide_process_ownership.GuideOwnership.test_abort_retains_the_leader_until_the_final_group_signal) ... ok
+test_budget_is_capped_and_reserved_without_mutating_environments (test_guide_process_ownership.GuideOwnership.test_budget_is_capped_and_reserved_without_mutating_environments) ... ok
+test_callback_storage_error_does_not_mask_cancellation_or_restoration (test_guide_process_ownership.GuideOwnership.test_callback_storage_error_does_not_mask_cancellation_or_restoration) ... ok
+test_cancellation_after_native_completion_never_signals_a_reaped_group (test_guide_process_ownership.GuideOwnership.test_cancellation_after_native_completion_never_signals_a_reaped_group) ... ok
+test_exhausted_or_malformed_budget_refuses_before_native_launch (test_guide_process_ownership.GuideOwnership.test_exhausted_or_malformed_budget_refuses_before_native_launch) ... ok
+test_exited_leader_does_not_spare_a_term_ignoring_grandchild (test_guide_process_ownership.GuideOwnership.test_exited_leader_does_not_spare_a_term_ignoring_grandchild) ... 
+  test_exited_leader_does_not_spare_a_term_ignoring_grandchild (test_guide_process_ownership.GuideOwnership.test_exited_leader_does_not_spare_a_term_ignoring_grandchild) (phase='timeout') ... FAIL
+test_launch_cancellation_reaps_before_restoration_and_stops_its_group (test_guide_process_ownership.GuideOwnership.test_launch_cancellation_reaps_before_restoration_and_stops_its_group) ... ok
+test_missing_waitid_uses_bounded_grace_without_early_reaping (test_guide_process_ownership.GuideOwnership.test_missing_waitid_uses_bounded_grace_without_early_reaping) ... ok
+test_native_files_status_and_clean_import_environment_are_preserved (test_guide_process_ownership.GuideOwnership.test_native_files_status_and_clean_import_environment_are_preserved) ... ok
+test_nested_cancellation_restores_both_owners_even_when_leaf_ignores_term (test_guide_process_ownership.GuideOwnership.test_nested_cancellation_restores_both_owners_even_when_leaf_ignores_term) ... ok
+test_nested_timeout_restores_both_owners_even_when_leaf_ignores_term (test_guide_process_ownership.GuideOwnership.test_nested_timeout_restores_both_owners_even_when_leaf_ignores_term) ... ok
+test_recursive_cancellation_has_descending_cleanup_deadlines (test_guide_process_ownership.GuideOwnership.test_recursive_cancellation_has_descending_cleanup_deadlines) ... ok
+test_recursive_timeout_has_descending_cleanup_deadlines (test_guide_process_ownership.GuideOwnership.test_recursive_timeout_has_descending_cleanup_deadlines) ... ok
+test_running_cancellation_reaps_before_restoration_and_stops_its_group (test_guide_process_ownership.GuideOwnership.test_running_cancellation_reaps_before_restoration_and_stops_its_group) ... ok
+test_timeout_stops_same_group_grandchild_and_cannot_validate (test_guide_process_ownership.GuideOwnership.test_timeout_stops_same_group_grandchild_and_cannot_validate) ... ok
+
+======================================================================
+FAIL: test_exited_leader_does_not_spare_a_term_ignoring_grandchild (test_guide_process_ownership.GuideOwnership.test_exited_leader_does_not_spare_a_term_ignoring_grandchild) (phase='timeout')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/runner/work/perfect-web/perfect-web/scripts/tests/test_guide_process_ownership.py", line 229, in test_exited_leader_does_not_spare_a_term_ignoring_grandchild
+    with self.subTest(phase=phase): self.probe(phase,ignores_term=True)
+                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/perfect-web/perfect-web/scripts/tests/test_guide_process_ownership.py", line 91, in probe
+    self.assertTrue(pidfile.exists(),'owned child/grandchild did not launch')
+AssertionError: False is not true : owned child/grandchild did not launch
+
+----------------------------------------------------------------------
+Ran 15 tests in 8.906s
+
+FAILED (failures=1)
+
+===== \\wsl.localhost\Ubuntu\tmp\guide-readiness-red.log =====
+test_exited_leader_does_not_spare_a_term_ignoring_grandchild (scripts.tests.test_guide_process_ownership.GuideOwnership) ... /usr/lib/python3.10/unittest/case.py:613: ResourceWarning: unclosed file <_io.TextIOWrapper name=3 encoding='UTF-8'>
+  outcome.errors.clear()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+
+======================================================================
+FAIL: test_exited_leader_does_not_spare_a_term_ignoring_grandchild (scripts.tests.test_guide_process_ownership.GuideOwnership) (phase='timeout')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 229, in test_exited_leader_does_not_spare_a_term_ignoring_grandchild
+    with self.subTest(phase=phase): self.probe(phase,ignores_term=True, startup_delay=.6 if phase=='timeout' else 0)
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 91, in probe
+    self.assertTrue(pidfile.exists(),'owned child/grandchild did not launch')
+AssertionError: False is not true : owned child/grandchild did not launch
+
+----------------------------------------------------------------------
+Ran 1 test in 0.811s
+
+FAILED (failures=1)
+
+===== \\wsl.localhost\Ubuntu\tmp\guide-readiness-nested-red.log =====
+test_recursive_timeout_has_descending_cleanup_deadlines (__main__.GuideOwnership) ... FAIL
+/usr/lib/python3.10/unittest/case.py:613: ResourceWarning: unclosed file <_io.TextIOWrapper name=3 encoding='UTF-8'>
+  outcome.errors.clear()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+
+======================================================================
+FAIL: test_recursive_timeout_has_descending_cleanup_deadlines (__main__.GuideOwnership)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/guide-readiness-nested-red-test.py", line 232, in test_recursive_timeout_has_descending_cleanup_deadlines
+    self.nested(True,True,recursive=True)
+  File "/tmp/guide-readiness-nested-red-test.py", line 187, in nested
+    self.assertTrue((tmp/'leaf-pid').exists(),'nested leaf did not launch')
+AssertionError: False is not true : nested leaf did not launch
+
+----------------------------------------------------------------------
+Ran 1 test in 1.772s
+
+FAILED (failures=1)
+
+===== \\wsl.localhost\Ubuntu\tmp\guide-readiness-green.log =====
+test_abort_retains_the_leader_until_the_final_group_signal (test_guide_process_ownership.GuideOwnership) ... ok
+test_budget_is_capped_and_reserved_without_mutating_environments (test_guide_process_ownership.GuideOwnership) ... ok
+test_callback_storage_error_does_not_mask_cancellation_or_restoration (test_guide_process_ownership.GuideOwnership) ... ok
+test_cancellation_after_native_completion_never_signals_a_reaped_group (test_guide_process_ownership.GuideOwnership) ... ok
+test_exhausted_or_malformed_budget_refuses_before_native_launch (test_guide_process_ownership.GuideOwnership) ... ok
+test_exited_leader_does_not_spare_a_term_ignoring_grandchild (test_guide_process_ownership.GuideOwnership) ... ok
+test_launch_cancellation_reaps_before_restoration_and_stops_its_group (test_guide_process_ownership.GuideOwnership) ... ok
+test_missing_waitid_uses_bounded_grace_without_early_reaping (test_guide_process_ownership.GuideOwnership) ... ok
+test_native_files_status_and_clean_import_environment_are_preserved (test_guide_process_ownership.GuideOwnership) ... ok
+test_nested_cancellation_restores_both_owners_even_when_leaf_ignores_term (test_guide_process_ownership.GuideOwnership) ... ok
+test_nested_timeout_restores_both_owners_even_when_leaf_ignores_term (test_guide_process_ownership.GuideOwnership) ... ok
+test_recursive_cancellation_has_descending_cleanup_deadlines (test_guide_process_ownership.GuideOwnership) ... ok
+test_recursive_timeout_has_descending_cleanup_deadlines (test_guide_process_ownership.GuideOwnership) ... FAIL
+test_running_cancellation_reaps_before_restoration_and_stops_its_group (test_guide_process_ownership.GuideOwnership) ... ok
+test_timeout_stops_same_group_grandchild_and_cannot_validate (test_guide_process_ownership.GuideOwnership) ... ok
+
+======================================================================
+FAIL: test_recursive_timeout_has_descending_cleanup_deadlines (test_guide_process_ownership.GuideOwnership)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 306, in test_recursive_timeout_has_descending_cleanup_deadlines
+    self.nested(True,True,recursive=True,startup_delay=.8,startup_bound=.2,startup_fails=True)
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 248, in nested
+    self.assertFalse((tmp/'leaf-pid').exists(),output)
+AssertionError: True is not false : Traceback (most recent call last):
+  File "<string>", line 35, in <module>
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/guide_python.py", line 61, in _launch
+    producer_process.run(command, cwd=ROOT, env=env, stdout=stdout, stderr=stderr,
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/producer_process.py", line 81, in run
+    child = subprocess.Popen(cmd, start_new_session=True, **kwargs)
+  File "<string>", line 21, in __init__
+RuntimeError: fixture startup did not become ready
+
+
+----------------------------------------------------------------------
+Ran 15 tests in 13.346s
+
+FAILED (failures=1)
+
+===== \\wsl.localhost\Ubuntu\tmp\guide-readiness-green-owned.log =====
+test_abort_retains_the_leader_until_the_final_group_signal (test_guide_process_ownership.GuideOwnership) ... ok
+test_budget_is_capped_and_reserved_without_mutating_environments (test_guide_process_ownership.GuideOwnership) ... ok
+test_callback_storage_error_does_not_mask_cancellation_or_restoration (test_guide_process_ownership.GuideOwnership) ... ok
+test_cancellation_after_native_completion_never_signals_a_reaped_group (test_guide_process_ownership.GuideOwnership) ... ok
+test_exhausted_or_malformed_budget_refuses_before_native_launch (test_guide_process_ownership.GuideOwnership) ... ok
+test_exited_leader_does_not_spare_a_term_ignoring_grandchild (test_guide_process_ownership.GuideOwnership) ... ok
+test_launch_cancellation_reaps_before_restoration_and_stops_its_group (test_guide_process_ownership.GuideOwnership) ... ok
+test_missing_waitid_uses_bounded_grace_without_early_reaping (test_guide_process_ownership.GuideOwnership) ... ok
+test_native_files_status_and_clean_import_environment_are_preserved (test_guide_process_ownership.GuideOwnership) ... ok
+test_nested_cancellation_restores_both_owners_even_when_leaf_ignores_term (test_guide_process_ownership.GuideOwnership) ... ok
+test_nested_timeout_restores_both_owners_even_when_leaf_ignores_term (test_guide_process_ownership.GuideOwnership) ... ok
+test_recursive_cancellation_has_descending_cleanup_deadlines (test_guide_process_ownership.GuideOwnership) ... ok
+test_recursive_timeout_has_descending_cleanup_deadlines (test_guide_process_ownership.GuideOwnership) ... ok
+test_running_cancellation_reaps_before_restoration_and_stops_its_group (test_guide_process_ownership.GuideOwnership) ... ok
+test_timeout_stops_same_group_grandchild_and_cannot_validate (test_guide_process_ownership.GuideOwnership) ... ok
+
+----------------------------------------------------------------------
+Ran 15 tests in 15.464s
+
+OK
+
+===== \\wsl.localhost\Ubuntu\tmp\train12-guide-readiness-native-review.txt =====
+test_abort_retains_the_leader_until_the_final_group_signal (test_guide_process_ownership.GuideOwnership) ... ok
+test_budget_is_capped_and_reserved_without_mutating_environments (test_guide_process_ownership.GuideOwnership) ... ok
+test_callback_storage_error_does_not_mask_cancellation_or_restoration (test_guide_process_ownership.GuideOwnership) ... ok
+test_cancellation_after_native_completion_never_signals_a_reaped_group (test_guide_process_ownership.GuideOwnership) ... ok
+test_exhausted_or_malformed_budget_refuses_before_native_launch (test_guide_process_ownership.GuideOwnership) ... ok
+test_exited_leader_does_not_spare_a_term_ignoring_grandchild (test_guide_process_ownership.GuideOwnership) ... ok
+test_launch_cancellation_reaps_before_restoration_and_stops_its_group (test_guide_process_ownership.GuideOwnership) ... ok
+test_missing_waitid_uses_bounded_grace_without_early_reaping (test_guide_process_ownership.GuideOwnership) ... ok
+test_native_files_status_and_clean_import_environment_are_preserved (test_guide_process_ownership.GuideOwnership) ... ok
+test_nested_cancellation_restores_both_owners_even_when_leaf_ignores_term (test_guide_process_ownership.GuideOwnership) ... ok
+test_nested_timeout_restores_both_owners_even_when_leaf_ignores_term (test_guide_process_ownership.GuideOwnership) ... ok
+test_recursive_cancellation_has_descending_cleanup_deadlines (test_guide_process_ownership.GuideOwnership) ... ok
+test_recursive_timeout_has_descending_cleanup_deadlines (test_guide_process_ownership.GuideOwnership) ... ok
+test_running_cancellation_reaps_before_restoration_and_stops_its_group (test_guide_process_ownership.GuideOwnership) ... ok
+test_timeout_stops_same_group_grandchild_and_cannot_validate (test_guide_process_ownership.GuideOwnership) ... ok
+
+----------------------------------------------------------------------
+Ran 15 tests in 15.256s
+
+OK
+
+===== \\wsl.localhost\Ubuntu\tmp\train12-guide-readiness-structure-review.txt =====
+Original and revised native inventories: same 15 method names
+scripts/producer_process.py: byte-identical to HEAD
+scripts/guide_python.py: byte-identical to HEAD
+scripts/guide_ownership_mutations.py: byte-identical to HEAD
+Emergency cleanup: mismatched start identity leaves owned native child alive
+Emergency cleanup: matching identity terminates exact native child, reaped by reviewer
+Reviewed test source SHA256 ad5cc6e3c611c23fab0a7a2f3cda0fbc1fc6d0a94707f7326c65e189bdca8eb7
+
+===== \\wsl.localhost\Ubuntu\tmp\guide-readiness-controls.log =====
+test_abort_retains_the_leader_until_the_final_group_signal (test_guide_process_ownership.GuideOwnership) ... ok
+test_budget_is_capped_and_reserved_without_mutating_environments (test_guide_process_ownership.GuideOwnership) ... ok
+test_callback_storage_error_does_not_mask_cancellation_or_restoration (test_guide_process_ownership.GuideOwnership) ... ok
+test_cancellation_after_native_completion_never_signals_a_reaped_group (test_guide_process_ownership.GuideOwnership) ... ok
+test_exhausted_or_malformed_budget_refuses_before_native_launch (test_guide_process_ownership.GuideOwnership) ... ok
+test_exited_leader_does_not_spare_a_term_ignoring_grandchild (test_guide_process_ownership.GuideOwnership) ... ok
+test_launch_cancellation_reaps_before_restoration_and_stops_its_group (test_guide_process_ownership.GuideOwnership) ... ok
+test_missing_waitid_uses_bounded_grace_without_early_reaping (test_guide_process_ownership.GuideOwnership) ... ok
+test_native_files_status_and_clean_import_environment_are_preserved (test_guide_process_ownership.GuideOwnership) ... ok
+test_nested_cancellation_restores_both_owners_even_when_leaf_ignores_term (test_guide_process_ownership.GuideOwnership) ... ok
+test_nested_timeout_restores_both_owners_even_when_leaf_ignores_term (test_guide_process_ownership.GuideOwnership) ... ok
+test_recursive_cancellation_has_descending_cleanup_deadlines (test_guide_process_ownership.GuideOwnership) ... ok
+test_recursive_timeout_has_descending_cleanup_deadlines (test_guide_process_ownership.GuideOwnership) ... ok
+test_running_cancellation_reaps_before_restoration_and_stops_its_group (test_guide_process_ownership.GuideOwnership) ... ok
+test_timeout_stops_same_group_grandchild_and_cannot_validate (test_guide_process_ownership.GuideOwnership) ... ok
+
+----------------------------------------------------------------------
+Ran 15 tests in 14.728s
+
+OK
+
+Python structured receipt: /tmp/pw-guide-ownership-hfgop7nr/pw-guide-result-sue_jr5b
+{"valid": true, "reason": "complete", "passed": ["test_guide_process_ownership.GuideOwnership.test_abort_retains_the_leader_until_the_final_group_signal", "test_guide_process_ownership.GuideOwnership.test_budget_is_capped_and_reserved_without_mutating_environments", "test_guide_process_ownership.GuideOwnership.test_callback_storage_error_does_not_mask_cancellation_or_restoration", "test_guide_process_ownership.GuideOwnership.test_cancellation_after_native_completion_never_signals_a_reaped_group", "test_guide_process_ownership.GuideOwnership.test_exhausted_or_malformed_budget_refuses_before_native_launch", "test_guide_process_ownership.GuideOwnership.test_exited_leader_does_not_spare_a_term_ignoring_grandchild", "test_guide_process_ownership.GuideOwnership.test_launch_cancellation_reaps_before_restoration_and_stops_its_group", "test_guide_process_ownership.GuideOwnership.test_missing_waitid_uses_bounded_grace_without_early_reaping", "test_guide_process_ownership.GuideOwnership.test_native_files_status_and_clean_import_environment_are_preserved", "test_guide_process_ownership.GuideOwnership.test_nested_cancellation_restores_both_owners_even_when_leaf_ignores_term", "test_guide_process_ownership.GuideOwnership.test_nested_timeout_restores_both_owners_even_when_leaf_ignores_term", "test_guide_process_ownership.GuideOwnership.test_recursive_cancellation_has_descending_cleanup_deadlines", "test_guide_process_ownership.GuideOwnership.test_recursive_timeout_has_descending_cleanup_deadlines", "test_guide_process_ownership.GuideOwnership.test_running_cancellation_reaps_before_restoration_and_stops_its_group", "test_guide_process_ownership.GuideOwnership.test_timeout_stops_same_group_grandchild_and_cannot_validate"], "assertion_failed": [], "body_errors": [], "executed": 15, "report_sha256": "83619bb1b306c1597643acfcdf934c7e239288e5db6a0c4c7646833aa32f6679"}
+
+baseline: 15 passed, 0 failed
+test_timeout_stops_same_group_grandchild_and_cannot_validate (test_guide_process_ownership.GuideOwnership) ... FAIL
+
+======================================================================
+FAIL: test_timeout_stops_same_group_grandchild_and_cannot_validate (test_guide_process_ownership.GuideOwnership)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 219, in test_timeout_stops_same_group_grandchild_and_cannot_validate
+    self.probe('timeout')
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 190, in probe
+    self.assertEqual(json.loads(receipt.read_text()),
+AssertionError: {'running': [False, True], 'leader_exists': False} != {'running': [False, False], 'leader_exists': False}
+- {'leader_exists': False, 'running': [False, True]}
+?                                             ^^^
+
++ {'leader_exists': False, 'running': [False, False]}
+?                                             ^^^^
+ : 
+
+----------------------------------------------------------------------
+Ran 1 test in 2.617s
+
+FAILED (failures=1)
+
+Python structured receipt: /tmp/pw-guide-ownership-hfgop7nr/pw-guide-result-stixto8z
+{"valid": true, "reason": "complete", "passed": [], "assertion_failed": ["test_guide_process_ownership.GuideOwnership.test_timeout_stops_same_group_grandchild_and_cannot_validate"], "body_errors": [], "executed": 1, "report_sha256": "69f2fbc330143603000c0596bd7e415bad3ab0b73b3d50d0573ebc1ac4738856"}
+
+only the immediate child is stopped: KILLED by test_guide_process_ownership.GuideOwnership.test_timeout_stops_same_group_grandchild_and_cannot_validate (1 assertion methods fail)
+test_launch_cancellation_reaps_before_restoration_and_stops_its_group (test_guide_process_ownership.GuideOwnership) ... FAIL
+
+======================================================================
+FAIL: test_launch_cancellation_reaps_before_restoration_and_stops_its_group (test_guide_process_ownership.GuideOwnership)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 213, in test_launch_cancellation_reaps_before_restoration_and_stops_its_group
+    self.probe('launch')
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 193, in probe
+    self.assertTrue((evidence/'process.json').exists(),'ownership receipt is missing')
+AssertionError: False is not true : ownership receipt is missing
+
+----------------------------------------------------------------------
+Ran 1 test in 0.312s
+
+FAILED (failures=1)
+
+Python structured receipt: /tmp/pw-guide-ownership-hfgop7nr/pw-guide-result-r2h_sb6v
+{"valid": true, "reason": "complete", "passed": [], "assertion_failed": ["test_guide_process_ownership.GuideOwnership.test_launch_cancellation_reaps_before_restoration_and_stops_its_group"], "body_errors": [], "executed": 1, "report_sha256": "cf01e8bf09dcb13504a8bc3b3feae746cf329bfd120f3e09fa7f0b38e6ed0a07"}
+
+reaped cancellation has no retained native receipt: KILLED by test_guide_process_ownership.GuideOwnership.test_launch_cancellation_reaps_before_restoration_and_stops_its_group (1 assertion methods fail)
+test_timeout_stops_same_group_grandchild_and_cannot_validate (test_guide_process_ownership.GuideOwnership) ... FAIL
+
+======================================================================
+FAIL: test_timeout_stops_same_group_grandchild_and_cannot_validate (test_guide_process_ownership.GuideOwnership)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 219, in test_timeout_stops_same_group_grandchild_and_cannot_validate
+    self.probe('timeout')
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 196, in probe
+    self.assertIsNone(metadata['validated_status'])
+AssertionError: -15 is not None
+
+----------------------------------------------------------------------
+Ran 1 test in 0.603s
+
+FAILED (failures=1)
+
+Python structured receipt: /tmp/pw-guide-ownership-hfgop7nr/pw-guide-result-6_el4ca5
+{"valid": true, "reason": "complete", "passed": [], "assertion_failed": ["test_guide_process_ownership.GuideOwnership.test_timeout_stops_same_group_grandchild_and_cannot_validate"], "body_errors": [], "executed": 1, "report_sha256": "69f2fbc330143603000c0596bd7e415bad3ab0b73b3d50d0573ebc1ac4738856"}
+
+timeout status is eligible for validation: KILLED by test_guide_process_ownership.GuideOwnership.test_timeout_stops_same_group_grandchild_and_cannot_validate (1 assertion methods fail)
+test_native_files_status_and_clean_import_environment_are_preserved (test_guide_process_ownership.GuideOwnership) ... FAIL
+
+======================================================================
+FAIL: test_native_files_status_and_clean_import_environment_are_preserved (test_guide_process_ownership.GuideOwnership)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 228, in test_native_files_status_and_clean_import_environment_are_preserved
+    self.assertEqual((tmp/'stderr.txt').read_text(),'separate stderr\n')
+AssertionError: '' != 'separate stderr\n'
++ separate stderr
+
+
+----------------------------------------------------------------------
+Ran 1 test in 0.066s
+
+FAILED (failures=1)
+
+Python structured receipt: /tmp/pw-guide-ownership-hfgop7nr/pw-guide-result-t29najne
+{"valid": true, "reason": "complete", "passed": [], "assertion_failed": ["test_guide_process_ownership.GuideOwnership.test_native_files_status_and_clean_import_environment_are_preserved"], "body_errors": [], "executed": 1, "report_sha256": "d95f2ebba5b5bab5ad6ae5d78b127f9a43c1518006553658706e2306d350d031"}
+
+native stderr is merged into stdout: KILLED by test_guide_process_ownership.GuideOwnership.test_native_files_status_and_clean_import_environment_are_preserved (1 assertion methods fail)
+test_nested_timeout_restores_both_owners_even_when_leaf_ignores_term (test_guide_process_ownership.GuideOwnership) ... 
+======================================================================
+FAIL: test_nested_timeout_restores_both_owners_even_when_leaf_ignores_term (test_guide_process_ownership.GuideOwnership) (ignores_term=False)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/unittest_producer.py", line 348, in subtest
+    yield
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 335, in test_nested_timeout_restores_both_owners_even_when_leaf_ignores_term
+    with self.subTest(ignores_term=ignores_term): self.nested(True,ignores_term,startup_delay=.8)
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 301, in nested
+    self.assertTrue((tmp/'leaf-pid').exists(),'nested leaf did not launch')
+AssertionError: False is not true : nested leaf did not launch
+
+======================================================================
+FAIL: test_nested_timeout_restores_both_owners_even_when_leaf_ignores_term (test_guide_process_ownership.GuideOwnership) (ignores_term=True)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/unittest_producer.py", line 348, in subtest
+    yield
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 335, in test_nested_timeout_restores_both_owners_even_when_leaf_ignores_term
+    with self.subTest(ignores_term=ignores_term): self.nested(True,ignores_term,startup_delay=.8)
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 301, in nested
+    self.assertTrue((tmp/'leaf-pid').exists(),'nested leaf did not launch')
+AssertionError: False is not true : nested leaf did not launch
+
+----------------------------------------------------------------------
+Ran 1 test in 10.418s
+
+FAILED (failures=2)
+
+Python structured receipt: /tmp/pw-guide-ownership-hfgop7nr/pw-guide-result-lrxao4xc
+{"valid": true, "reason": "complete", "passed": [], "assertion_failed": ["test_guide_process_ownership.GuideOwnership.test_nested_timeout_restores_both_owners_even_when_leaf_ignores_term"], "body_errors": [], "executed": 1, "report_sha256": "f7d7fc4de4b29cf3a6014c5357d2dfd9d689d2f613755e3c7232da9096adb537"}
+
+guide cancellation cannot unwind the nested direct owner: KILLED by test_guide_process_ownership.GuideOwnership.test_nested_timeout_restores_both_owners_even_when_leaf_ignores_term (1 assertion methods fail)
+test_recursive_cancellation_has_descending_cleanup_deadlines (test_guide_process_ownership.GuideOwnership) ... FAIL
+
+======================================================================
+FAIL: test_recursive_cancellation_has_descending_cleanup_deadlines (test_guide_process_ownership.GuideOwnership)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 351, in test_recursive_cancellation_has_descending_cleanup_deadlines
+    self.nested(False,True,recursive=True)
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 306, in nested
+    self.assertEqual((tmp/'inner-source').read_text(),'original',output)
+AssertionError: 'mutant' != 'original'
+- mutant
++ original
+ : 
+
+----------------------------------------------------------------------
+Ran 1 test in 1.794s
+
+FAILED (failures=1)
+
+Python structured receipt: /tmp/pw-guide-ownership-hfgop7nr/pw-guide-result-repenr5a
+{"valid": true, "reason": "complete", "passed": [], "assertion_failed": ["test_guide_process_ownership.GuideOwnership.test_recursive_cancellation_has_descending_cleanup_deadlines"], "body_errors": [], "executed": 1, "report_sha256": "a3468a0fdb10ee335a0a23d0f76a5900ef7f6b6541748024cfac2ee54cb3b133"}
+
+equal grace deadlines let the outer owner skip inner restoration: KILLED by test_guide_process_ownership.GuideOwnership.test_recursive_cancellation_has_descending_cleanup_deadlines (1 assertion methods fail)
+test_exited_leader_does_not_spare_a_term_ignoring_grandchild (test_guide_process_ownership.GuideOwnership) ... 
+======================================================================
+FAIL: test_exited_leader_does_not_spare_a_term_ignoring_grandchild (test_guide_process_ownership.GuideOwnership) (phase='timeout')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/unittest_producer.py", line 348, in subtest
+    yield
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 344, in test_exited_leader_does_not_spare_a_term_ignoring_grandchild
+    with self.subTest(phase=phase): self.probe(phase,ignores_term=True, startup_delay=.6 if phase=='timeout' else 0)
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 190, in probe
+    self.assertEqual(json.loads(receipt.read_text()),
+AssertionError: {'running': [False, True], 'leader_exists': False} != {'running': [False, False], 'leader_exists': False}
+- {'leader_exists': False, 'running': [False, True]}
+?                                             ^^^
+
++ {'leader_exists': False, 'running': [False, False]}
+?                                             ^^^^
+ : 
+
+======================================================================
+FAIL: test_exited_leader_does_not_spare_a_term_ignoring_grandchild (test_guide_process_ownership.GuideOwnership) (phase='running')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/unittest_producer.py", line 348, in subtest
+    yield
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 344, in test_exited_leader_does_not_spare_a_term_ignoring_grandchild
+    with self.subTest(phase=phase): self.probe(phase,ignores_term=True, startup_delay=.6 if phase=='timeout' else 0)
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 190, in probe
+    self.assertEqual(json.loads(receipt.read_text()),
+AssertionError: {'running': [False, True], 'leader_exists': False} != {'running': [False, False], 'leader_exists': False}
+- {'leader_exists': False, 'running': [False, True]}
+?                                             ^^^
+
++ {'leader_exists': False, 'running': [False, False]}
+?                                             ^^^^
+ : 
+
+----------------------------------------------------------------------
+Ran 1 test in 5.535s
+
+FAILED (failures=2)
+
+Python structured receipt: /tmp/pw-guide-ownership-hfgop7nr/pw-guide-result-e2sc69xa
+{"valid": true, "reason": "complete", "passed": [], "assertion_failed": ["test_guide_process_ownership.GuideOwnership.test_exited_leader_does_not_spare_a_term_ignoring_grandchild"], "body_errors": [], "executed": 1, "report_sha256": "0a76eff907856db452c4ddc97cd2a2769b6ef86b06e5ccc2eb9cea62e7970a08"}
+
+exited leader spares its surviving group: KILLED by test_guide_process_ownership.GuideOwnership.test_exited_leader_does_not_spare_a_term_ignoring_grandchild (1 assertion methods fail)
+test_abort_retains_the_leader_until_the_final_group_signal (test_guide_process_ownership.GuideOwnership) ... FAIL
+
+======================================================================
+FAIL: test_abort_retains_the_leader_until_the_final_group_signal (test_guide_process_ownership.GuideOwnership)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 401, in test_abort_retains_the_leader_until_the_final_group_signal
+    self.assertEqual(seen,[True],'leader must remain waitable until its final group signal')
+AssertionError: Lists differ: [False] != [True]
+
+First differing element 0:
+False
+True
+
+- [False]
++ [True] : leader must remain waitable until its final group signal
+
+----------------------------------------------------------------------
+Ran 1 test in 0.303s
+
+FAILED (failures=1)
+
+Python structured receipt: /tmp/pw-guide-ownership-hfgop7nr/pw-guide-result-2bouuz9o
+{"valid": true, "reason": "complete", "passed": [], "assertion_failed": ["test_guide_process_ownership.GuideOwnership.test_abort_retains_the_leader_until_the_final_group_signal"], "body_errors": [], "executed": 1, "report_sha256": "8de2e3769ab43ea9aabc68fa66591c4757a8bec50e601cd48a0041079dcd849e"}
+
+grace reaps the leader before the final group signal: KILLED by test_guide_process_ownership.GuideOwnership.test_abort_retains_the_leader_until_the_final_group_signal (1 assertion methods fail)
+test_budget_is_capped_and_reserved_without_mutating_environments (test_guide_process_ownership.GuideOwnership) ... 
+======================================================================
+FAIL: test_budget_is_capped_and_reserved_without_mutating_environments (test_guide_process_ownership.GuideOwnership) (allowance='1500', requested=2)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/unittest_producer.py", line 348, in subtest
+    yield
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 364, in test_budget_is_capped_and_reserved_without_mutating_environments
+    self.assertEqual(result.stdout.strip(),expected)
+AssertionError: '1500' != '1000'
+- 1500
+?  ^
++ 1000
+?  ^
+
+
+======================================================================
+FAIL: test_budget_is_capped_and_reserved_without_mutating_environments (test_guide_process_ownership.GuideOwnership) (allowance='500', requested=2)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/unittest_producer.py", line 348, in subtest
+    yield
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 364, in test_budget_is_capped_and_reserved_without_mutating_environments
+    self.assertEqual(result.stdout.strip(),expected)
+AssertionError: '1500' != '0'
+- 1500
++ 0
+
+
+----------------------------------------------------------------------
+Ran 1 test in 0.054s
+
+FAILED (failures=2)
+
+Python structured receipt: /tmp/pw-guide-ownership-hfgop7nr/pw-guide-result-przz54tv
+{"valid": true, "reason": "complete", "passed": [], "assertion_failed": ["test_guide_process_ownership.GuideOwnership.test_budget_is_capped_and_reserved_without_mutating_environments"], "body_errors": [], "executed": 1, "report_sha256": "f1c89680ef8bba04e8168b9460eb2c2e15f30be5c519a5ac7014f904d028ec79"}
+
+nested cleanup request ignores inherited cap: KILLED by test_guide_process_ownership.GuideOwnership.test_budget_is_capped_and_reserved_without_mutating_environments (1 assertion methods fail)
+test_exhausted_or_malformed_budget_refuses_before_native_launch (test_guide_process_ownership.GuideOwnership) ... 
+======================================================================
+FAIL: test_exhausted_or_malformed_budget_refuses_before_native_launch (test_guide_process_ownership.GuideOwnership) (allowance='0')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/unittest_producer.py", line 348, in subtest
+    yield
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 382, in test_exhausted_or_malformed_budget_refuses_before_native_launch
+    self.assertTrue(refused,'invalid or exhausted parent authority was accepted')
+AssertionError: False is not true : invalid or exhausted parent authority was accepted
+
+======================================================================
+FAIL: test_exhausted_or_malformed_budget_refuses_before_native_launch (test_guide_process_ownership.GuideOwnership) (allowance='-1')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/unittest_producer.py", line 348, in subtest
+    yield
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 383, in test_exhausted_or_malformed_budget_refuses_before_native_launch
+    self.assertFalse(marker.exists(),'invalid authority launched a native child')
+AssertionError: True is not false : invalid authority launched a native child
+
+======================================================================
+FAIL: test_exhausted_or_malformed_budget_refuses_before_native_launch (test_guide_process_ownership.GuideOwnership) (allowance='2001')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/unittest_producer.py", line 348, in subtest
+    yield
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 383, in test_exhausted_or_malformed_budget_refuses_before_native_launch
+    self.assertFalse(marker.exists(),'invalid authority launched a native child')
+AssertionError: True is not false : invalid authority launched a native child
+
+======================================================================
+FAIL: test_exhausted_or_malformed_budget_refuses_before_native_launch (test_guide_process_ownership.GuideOwnership) (allowance='NaN')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/unittest_producer.py", line 348, in subtest
+    yield
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 383, in test_exhausted_or_malformed_budget_refuses_before_native_launch
+    self.assertFalse(marker.exists(),'invalid authority launched a native child')
+AssertionError: True is not false : invalid authority launched a native child
+
+======================================================================
+FAIL: test_exhausted_or_malformed_budget_refuses_before_native_launch (test_guide_process_ownership.GuideOwnership) (allowance='inf')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/unittest_producer.py", line 348, in subtest
+    yield
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 383, in test_exhausted_or_malformed_budget_refuses_before_native_launch
+    self.assertFalse(marker.exists(),'invalid authority launched a native child')
+AssertionError: True is not false : invalid authority launched a native child
+
+======================================================================
+FAIL: test_exhausted_or_malformed_budget_refuses_before_native_launch (test_guide_process_ownership.GuideOwnership) (allowance='1.5')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/unittest_producer.py", line 348, in subtest
+    yield
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 383, in test_exhausted_or_malformed_budget_refuses_before_native_launch
+    self.assertFalse(marker.exists(),'invalid authority launched a native child')
+AssertionError: True is not false : invalid authority launched a native child
+
+======================================================================
+FAIL: test_exhausted_or_malformed_budget_refuses_before_native_launch (test_guide_process_ownership.GuideOwnership) (allowance=' 500')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/unittest_producer.py", line 348, in subtest
+    yield
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 383, in test_exhausted_or_malformed_budget_refuses_before_native_launch
+    self.assertFalse(marker.exists(),'invalid authority launched a native child')
+AssertionError: True is not false : invalid authority launched a native child
+
+======================================================================
+FAIL: test_exhausted_or_malformed_budget_refuses_before_native_launch (test_guide_process_ownership.GuideOwnership) (allowance='+500')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/unittest_producer.py", line 348, in subtest
+    yield
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 383, in test_exhausted_or_malformed_budget_refuses_before_native_launch
+    self.assertFalse(marker.exists(),'invalid authority launched a native child')
+AssertionError: True is not false : invalid authority launched a native child
+
+======================================================================
+FAIL: test_exhausted_or_malformed_budget_refuses_before_native_launch (test_guide_process_ownership.GuideOwnership) (allowance='５００')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/unittest_producer.py", line 348, in subtest
+    yield
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 383, in test_exhausted_or_malformed_budget_refuses_before_native_launch
+    self.assertFalse(marker.exists(),'invalid authority launched a native child')
+AssertionError: True is not false : invalid authority launched a native child
+
+======================================================================
+FAIL: test_exhausted_or_malformed_budget_refuses_before_native_launch (test_guide_process_ownership.GuideOwnership) (allowance='')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/unittest_producer.py", line 348, in subtest
+    yield
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 383, in test_exhausted_or_malformed_budget_refuses_before_native_launch
+    self.assertFalse(marker.exists(),'invalid authority launched a native child')
+AssertionError: True is not false : invalid authority launched a native child
+
+----------------------------------------------------------------------
+Ran 1 test in 0.014s
+
+FAILED (failures=10)
+
+Python structured receipt: /tmp/pw-guide-ownership-hfgop7nr/pw-guide-result-y_vxl_ro
+{"valid": true, "reason": "complete", "passed": [], "assertion_failed": ["test_guide_process_ownership.GuideOwnership.test_exhausted_or_malformed_budget_refuses_before_native_launch"], "body_errors": [], "executed": 1, "report_sha256": "1c6c3e431b63debf953b6240e02b504edaf3e5521246f328008cb25e05147f62"}
+
+exhausted authority can still launch a native child: KILLED by test_guide_process_ownership.GuideOwnership.test_exhausted_or_malformed_budget_refuses_before_native_launch (1 assertion methods fail)
+test_budget_is_capped_and_reserved_without_mutating_environments (test_guide_process_ownership.GuideOwnership) ... 
+======================================================================
+FAIL: test_budget_is_capped_and_reserved_without_mutating_environments (test_guide_process_ownership.GuideOwnership) (allowance='1500', requested=2)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/unittest_producer.py", line 348, in subtest
+    yield
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 364, in test_budget_is_capped_and_reserved_without_mutating_environments
+    self.assertEqual(result.stdout.strip(),expected)
+AssertionError: '9999' != '1000'
+- 9999
++ 1000
+
+
+======================================================================
+FAIL: test_budget_is_capped_and_reserved_without_mutating_environments (test_guide_process_ownership.GuideOwnership) (allowance='500', requested=2)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/unittest_producer.py", line 348, in subtest
+    yield
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 364, in test_budget_is_capped_and_reserved_without_mutating_environments
+    self.assertEqual(result.stdout.strip(),expected)
+AssertionError: '9999' != '0'
+- 9999
++ 0
+
+
+======================================================================
+FAIL: test_budget_is_capped_and_reserved_without_mutating_environments (test_guide_process_ownership.GuideOwnership) (allowance='1500', requested=0)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/unittest_producer.py", line 348, in subtest
+    yield
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 364, in test_budget_is_capped_and_reserved_without_mutating_environments
+    self.assertEqual(result.stdout.strip(),expected)
+AssertionError: '9999' != '0'
+- 9999
++ 0
+
+
+----------------------------------------------------------------------
+Ran 1 test in 0.054s
+
+FAILED (failures=3)
+
+Python structured receipt: /tmp/pw-guide-ownership-hfgop7nr/pw-guide-result-c81zbd49
+{"valid": true, "reason": "complete", "passed": [], "assertion_failed": ["test_guide_process_ownership.GuideOwnership.test_budget_is_capped_and_reserved_without_mutating_environments"], "body_errors": [], "executed": 1, "report_sha256": "f18217f7b6e57bdf88211056705aac0dbba1d2c7d18bab873f04cd786bb49512"}
+
+caller environment resets inherited cleanup authority: KILLED by test_guide_process_ownership.GuideOwnership.test_budget_is_capped_and_reserved_without_mutating_environments (1 assertion methods fail)
+test_callback_storage_error_does_not_mask_cancellation_or_restoration (test_guide_process_ownership.GuideOwnership) ... FAIL
+
+======================================================================
+FAIL: test_callback_storage_error_does_not_mask_cancellation_or_restoration (test_guide_process_ownership.GuideOwnership)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 438, in test_callback_storage_error_does_not_mask_cancellation_or_restoration
+    self.assertIsInstance(caught,SystemExit,'storage failure must not mask the saved cancellation handler')
+AssertionError: OSError('receipt storage unavailable') is not an instance of <class 'SystemExit'> : storage failure must not mask the saved cancellation handler
+
+----------------------------------------------------------------------
+Ran 1 test in 0.104s
+
+FAILED (failures=1)
+
+Python structured receipt: /tmp/pw-guide-ownership-hfgop7nr/pw-guide-result-vwgim88n
+{"valid": true, "reason": "complete", "passed": [], "assertion_failed": ["test_guide_process_ownership.GuideOwnership.test_callback_storage_error_does_not_mask_cancellation_or_restoration"], "body_errors": [], "executed": 1, "report_sha256": "9ad875ff2768761e27da5092f1ff1d5495ef0fff70b902429fa39497bc10d3d8"}
+
+receipt failure masks pending cancellation: KILLED by test_guide_process_ownership.GuideOwnership.test_callback_storage_error_does_not_mask_cancellation_or_restoration (1 assertion methods fail)
+test_cancellation_after_native_completion_never_signals_a_reaped_group (test_guide_process_ownership.GuideOwnership) ... FAIL
+
+======================================================================
+FAIL: test_cancellation_after_native_completion_never_signals_a_reaped_group (test_guide_process_ownership.GuideOwnership)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/guide-readiness/scripts/tests/test_guide_process_ownership.py", line 473, in test_cancellation_after_native_completion_never_signals_a_reaped_group
+    self.assertEqual(stopped.call_count,0,'a completed/reaped group identity must not be signalled')
+AssertionError: 1 != 0 : a completed/reaped group identity must not be signalled
+
+----------------------------------------------------------------------
+Ran 1 test in 0.019s
+
+FAILED (failures=1)
+
+Python structured receipt: /tmp/pw-guide-ownership-hfgop7nr/pw-guide-result-xef8fdu9
+{"valid": true, "reason": "complete", "passed": [], "assertion_failed": ["test_guide_process_ownership.GuideOwnership.test_cancellation_after_native_completion_never_signals_a_reaped_group"], "body_errors": [], "executed": 1, "report_sha256": "7ec5aac36e1669cd215e0598ea29b5165fc281daf81b987b988c125399a19416"}
+
+late cancellation signals a reaped native group: KILLED by test_guide_process_ownership.GuideOwnership.test_cancellation_after_native_completion_never_signals_a_reaped_group (1 assertion methods fail)
+13 of 13 mutants killed
+memory bound: no process was stopped
+
+===== \\wsl.localhost\Ubuntu\tmp\guide-readiness-final-check.log =====
+15 method identities unchanged; production owner/guide byte-identical to base; final13 native verdicts have exact canonical owner/catalog
+test SHA256: e47f51cb8d618193bd7e78eeca4a5c53a1a647b74f360c47216856b1a14a988c
