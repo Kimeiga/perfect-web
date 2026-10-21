@@ -93,24 +93,41 @@ fn a_case_of_another_type_spelled_alike_is_not_this_ones() {
         "u.pw".to_string(),
         "module u\n\ntype Other =\n    | Placed\n    | Gone\n".to_string(),
     ));
-    sources.push((
-        "t.pw".to_string(),
-        order_page("{#if status == Other.Placed}<p>placed</p>{/if}")
-            .replace("module t\n", "module t\n\nimport u.{ Other }\n"),
-    ));
-    let reported: Vec<String> = check_sources(&sources)
-        .into_iter()
-        .filter(|(n, _)| n == "t.pw")
-        .flat_map(|(_, ds)| ds.into_iter().map(|d| format!("{} {}", d.code, d.message)))
-        .collect();
-    assert!(with("PW0337", &reported).is_empty(), "{reported:?}");
+    for condition in [
+        "status == Other.Placed",
+        "Other.Placed == status",
+        "status != Other.Placed",
+    ] {
+        let mut sources = sources.clone();
+        sources.push((
+            "t.pw".to_string(),
+            order_page(&format!("{{#if {condition}}}<p>placed</p>{{/if}}"))
+                .replace("module t\n", "module t\n\nimport u.{ Other }\n"),
+        ));
+        let codes: Vec<String> = check_sources(&sources)
+            .into_iter()
+            .filter(|(n, _)| n == "t.pw")
+            .flat_map(|(_, ds)| ds.into_iter().map(|d| d.code.to_string()))
+            .collect();
+        // This comparison is already ill-typed. Its sole refusal is the
+        // mismatched operands, never the misleading repair to match Status.
+        assert_eq!(codes, ["PW0609"], "{condition}: {codes:?}");
+    }
 }
 
 #[test]
 fn a_value_compared_with_a_computed_one_is_not_a_case_test() {
     // `other` is a value of the same type, not one of its cases.
-    let markup = "{#if status == other}<p>same</p>{/if}";
-    assert!(with("PW0337", &reported(&order_page(markup))).is_empty());
+    for markup in [
+        "{#if status == other}<p>same</p>{/if}",
+        "{#if other != status}<p>different</p>{/if}",
+    ] {
+        assert_eq!(
+            reported(&order_page(markup)),
+            Vec::<String>::new(),
+            "{markup}"
+        );
+    }
 }
 
 // --- ADR-0154 ------------------------------------------------------------------

@@ -47,6 +47,36 @@ keep a catch-all.
 - The corpus and the twelve tasks check as before: none tests a case with
   `{#if}`.
 
+## Qualifier-control repair, 2026-10-20
+
+The generic-effects change (ADR-0351) gives a qualified case its canonical
+solved type through `infer::Types::of`. The old qualifier mutation changed
+only `case_test`'s fallback for an untyped qualified operand. It survived
+even when that fallback was changed to panic: both operands now have types,
+and the nominal identity comparison handles them before the fallback.
+
+The control now removes that comparison's identity equality, preserving
+the original fault: another type's same-spelled case is mistaken for this
+type's. Its regression checks both operand orders and inequality. The only
+diagnostic for that already ill-typed comparison is PW0609, with no spurious
+PW0337 repair; valid value comparisons and exhaustive matches stay clean.
+No production rule changes, and all six mutation operators remain.
+
+The campaign now requires the complete six-test inventory, native Cargo
+exit agreement and each failed test's assertion site in the test file.
+Build errors, incomplete runs, foreign/setup panics and process stops are
+refused rather than credited. Five producer regressions cover these paths
+and source restoration. Reproduce with `cargo test --locked -p pw-core
+--test case_and_delivery`, `python3 -m unittest discover -s scripts/tests
+-p test_case_delivery_producer.py`, and the whole
+`python3 scripts/case_and_delivery_mutations.py`; the existing
+`just e14-case-and-delivery` recipe records the combined evidence.
+
+Local results on the assembled train's code: 6 tests pass, 6 of 6 controls
+fail by authenticated test assertions, 0 refused, 0 survivors, no stopped
+process; all 5 producer regressions pass. The combined hosted verification
+is still required before landing.
+
 ## Not claimed
 
 - **A function a template calls can still map a state to nothing**:
