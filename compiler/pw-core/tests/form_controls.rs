@@ -86,7 +86,7 @@ fn rendered(src: &str) -> String {
     let compiled = pw_core::backend::signals::compile(&units).expect("checks");
     let first = compiled
         .iter()
-        .find(|c| c.page == "t.P")
+        .find(|c| c.page == "t.P~ui")
         .expect("the page's signals")
         .signals
         .as_ref()
