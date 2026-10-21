@@ -64,14 +64,20 @@ starting another feature batch.
    passed when reserved host names were allowed. Preserve the host contract
    and all fault models; demonstrate the actual assertion failure and rerun
    the complete campaign.
-10. Rerecord `e14-guide-ownership` on the current source: the post-dispatch
+10. Repair the invalid `e14-graphs-on-the-wire` campaign: native status zero
+   concealed a memory guard stop for "the renderer takes a node twice". The
+   canonical summary/fetch guard rejects the written evidence. Preserve the
+   fault model, require a real completed assertion failure, and rerun all19
+   controls; a memory stop is never mutation credit.
+11. Rerecord `e14-guide-ownership` on the current source: the post-dispatch
    Linux/procfs capability guard changes its proof scope. Unsupported hosts
    skip explicitly and cannot satisfy the strict mutation baseline.
-11. Reconcile eligible current evidence under ADR-0281, run exact-commit CI
+12. Reconcile eligible current evidence under ADR-0281, run exact-commit CI
    and all reached follow-ups, then land only the verified combined tree.
-   All ten failed recipe results remain failed and none is fetched as a
-   pass. Separate effect-inference scaling work awaits its own
-   exact-commit CI and whole campaigns before integration.
+   All ten failed recipe results and the memory-stopped graph campaign
+   remain invalid and none is fetched as a pass. The effect queue passed its
+   isolated exact-source CI and eight reached campaigns; its integrated
+   source still needs the combined verification.
 
 The older follow-ups below retain their dated context. A-008's WIT
 collision, generic-result effects and producer-ownership repairs are now

@@ -3235,3 +3235,7 @@ Binding capture controls exercise diagnostic ownership (train-12 integration; fi
 [ADR-0379](DECISIONS/ADR-0379-speculated-arms-proof.md):
 Speculation absence names an existing page, and controls require native assertions (train-12 integration; final combined gates pending).
 - Derive the canonical page identity before asserting absence; keep all eight fault models and require complete Cargo/browser receipts. Feed cases remain sequential and continue after failures.
+
+[ADR-0380](DECISIONS/ADR-0380-effect-inference-queue.md):
+Effect inference revisits readers only when dependency rows grow (train-12 integration; final combined gates pending).
+- Preserve canonical effect rows, performed metadata and convergence while replacing repeated whole-program sweeps with a deduplicated reader queue. Bounded alternating measurements establish the deep-chain improvement, not an application-wide speedup.

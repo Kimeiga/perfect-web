@@ -1,7 +1,7 @@
-# Effect inference revisits readers when their dependencies grow
+# ADR-0380: effect inference revisits readers when their dependencies grow
 
-Status: isolated candidate; numbering, exact hosted verification and integration
-remain pending. This does not change the verified master or the frozen train.
+Status: integrated in the unlanded train-12 candidate, 2026-10-21.
+Combined hosted verification and landing remain pending.
 
 ADR-0375 removed an unsound eight-sweep limit. A caller-first chain of 250
 helpers then required repeated scans of every body: the original bounded local
@@ -89,3 +89,14 @@ chain improvement; it does not imply a whole-framework speedup or replace exact
 hosted verification. The new recipe is `just e14-effect-queue`; existing reached
 recipes include `e14-effect-convergence`, `e10-effects-through-values` and
 `e14-generic-effects`.
+
+
+## Isolated verification before integration
+
+The final isolated source `fb0bea666bc1006c68df42a4ef5786ec6f1c1423` passed
+[x64, ARM and license/advisory CI](https://github.com/studiokimeiga/perfect-web/actions/runs/39532444813).
+[The four primary campaigns](https://github.com/studiokimeiga/perfect-web/actions/runs/39532460938)
+and [the four additional reached campaigns](https://github.com/studiokimeiga/perfect-web/actions/runs/39532757857)
+completed successfully, including all three browser engines in both runs.
+This establishes the isolated candidate; the assembled train reruns its
+canonical affected campaigns and exact-source CI before landing.

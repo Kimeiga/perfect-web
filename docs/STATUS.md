@@ -2,8 +2,8 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-Reviewed 2026-10-20 against assembled train-12 source
-`152a4a41` (with final verification still pending).
+Reviewed 2026-10-21 against assembled train-12 source
+`2f6dd58b` (with combined hosted verification still pending).
 [The complete prior ledger](STATUS-HISTORY-2026-10.md) remains verbatim,
 including failed runs, corrections and their original scope.
 
@@ -102,6 +102,23 @@ evidence. No failed result is promoted by this summary.
   and their whole affected follow-ups are pending; [NEXT](NEXT.md) records
   the causes and acceptance obligations. Post-dispatch guide ownership
   scope changes also require current evidence.
+- The graph-on-the-wire campaign returned native status zero, but its written
+  evidence records a memory guard stopping the renderer mutation above 3.9 GiB.
+  That campaign is invalid. The canonical summary/fetch guard reads the evidence
+  files and rejects it; an earlier status/log-only audit missed that stop.
+  Its witness and complete rerun are now a separate follow-up.
+- The assembled repair gate at `1549c4bb` completed 1,015 tests in 240.385s
+  with five explicit skips, and formatting, path-case and all 4,374 mutation
+  anchors passed. The guard still rejects failed historical records as accepted
+  evidence; mixed transcripts are retained byte-identically in
+  [diagnostics](diagnostics/README.md). Subsequent effect-queue integration
+  still requires combined hosted verification.
+- The isolated effect queue at `fb0bea66` passed
+  [CI39532444813](https://github.com/studiokimeiga/perfect-web/actions/runs/39532444813)
+  on x64/ARM and both eight-campaign verification batches. Its bounded deep
+  helper-chain checker improvement is recorded in
+  [ADR-0380](DECISIONS/ADR-0380-effect-inference-queue.md); this is not a
+  framework-wide performance result.
 - Exact-source [CI39527396553](https://github.com/studiokimeiga/perfect-web/actions/runs/39527396553)
   at `152a4a41` passed x64, ARM and license/advisory checks. Subsequent
   repairs still require their own exact-source CI; this pass does not
