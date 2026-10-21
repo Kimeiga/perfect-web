@@ -126,6 +126,19 @@ waits" and extends ADR-0305's early answer.
   re-anchored, the turn's lines now standing in two places; the campaigns the
   change reaches run whole.
 
+**Recorded at `bfda9ae5`** (2026-10-21): CI
+[39658029334](https://github.com/studiokimeiga/perfect-web/actions/runs/39658029334)
+passed x64, ARM and licenses; verify
+[39658074296](https://github.com/studiokimeiga/perfect-web/actions/runs/39658074296)
+ran the 141 recipes the change reaches, with `e14-pleris-controls`, and the
+three full browser jobs, and its 142 records were fetched whole. The spec
+passed 24 of 24 (eight tests in three engines); the strict campaign killed
+14 of 14, none refused; `e10-browser`'s three runs each passed 1,282 with 20
+skipped; every reached campaign killed all its controls, command-order's 20
+and keepalive's 8 among them; the benchmark's twelve Pleris controls hold.
+The local red baseline at `e7664d2e` failed all eight tests, each at an
+assertion. Not landed: landing is the owner's to approve.
+
 ## Not claimed
 
 - **An outcome told as unknown.** A press whose sends are all given up is told

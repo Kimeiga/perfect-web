@@ -17,21 +17,29 @@ states its proof limits. The promotion steps of the next section are done.
 
 In order:
 
-1. **Track `command-deadline`** (`wip/command-deadline`, in progress). A
-   command request that never settles leaves its press pending
-   ([KNOWN_LIMITATIONS](KNOWN_LIMITATIONS.md), ADR-0173's "not claimed"),
-   and through the page's order (ADR-0152, ADR-0305, ADR-0280) later presses
-   and navigations wait on it. Acceptance: an ADR that decides the semantics
-   before any timeout is chosen; failing-first browser tests for a send never
-   answered, an answer whose body never completes and a press behind one;
-   the repair; positive, negative and neighbour behaviour in Chromium,
-   Firefox and WebKit; whole affected mutation scripts; exact-commit CI and
-   the planned verification.
-2. **E14-E, decision-ready.** The benchmark's models, budget and teaching
-   method are the owner's choices, made before any paid run. Prepare the
-   zero-cost parts: a bounded study design, the configurations to choose
-   between, and the controls the harness runs offline.
-3. **Device-local durability** (ADR-0366): specify a durable-acknowledgement
+1. **Land track `command-deadline`** (ADR-0381), with the owner's approval.
+   Verified at `bfda9ae5`: CI 39658029334 and verify 39658074296 (141
+   reached recipes, `e14-pleris-controls`, three browser engines), evidence
+   fetched at `973fbbcc`. What remains is exact-commit CI at the commit that
+   lands, and the merge.
+2. **Track `press-modules`** (`wip/press-modules`, stacked on the above).
+   Reproduced 2026-10-21 in Chromium: after one failed load of the store's
+   speculation module (`/speculation/store.page.StorePage~ui.mjs`), every
+   later Add fails with the same error and the network is not asked again;
+   `speculations()` keeps the rejected load (`??=`), as `renderModule()` and
+   `computedValues()` keep theirs. A handler's or speculation's module that
+   never loads holds its press and, by ADR-0152, the presses after it.
+   Acceptance: an ADR; failing-first tests for a failed and a held module on
+   the press path; a failed load loaded again at the next press under a new
+   specifier, as `loadHandler` does; a press whose speculation cannot load
+   sent unspeculated, if the ADR so rules; strict controls; the reached
+   verification.
+3. **E14-E, decision-ready** (`wip/e14-readiness`). The decision brief
+   (`docs/milestones/E14-E-decision-brief.md`) and the changed-lines repair
+   (Next.js's footprint was undercounted in T01, T06, T08 and T11) await
+   hosted CI and the owner's choices of models, budget and teaching method;
+   nothing paid runs before them.
+4. **Device-local durability** (ADR-0366): specify a durable-acknowledgement
    boundary, or state a scope-limited guarantee, before changing the
    runtime; test it against real navigation and reload races with the
    privacy invariants held.

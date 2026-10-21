@@ -25,12 +25,16 @@ namespaces, keyed-read retry and effect convergence (ADR-0351, ADR-0365 to
 ADR-0380). The [acceptance record](diagnostics/train-12/acceptance-record-2026-10-21.md)
 states what its evidence proves and what it does not.
 
-**In progress, not landed:** track `command-deadline`
-(`wip/command-deadline`). A command request that never settles leaves its
-press pending, and the ordering of ADR-0152, ADR-0305 and ADR-0280 makes
-later presses and navigations of the page wait on it
-([KNOWN_LIMITATIONS](KNOWN_LIMITATIONS.md)). Nothing about the repair is
-verified until its own gates pass.
+**Verified, not landed:** track `command-deadline` (`wip/command-deadline`,
+[ADR-0381](DECISIONS/ADR-0381-a-commands-send-is-answered-within-its-deadline.md)).
+Each send of a command now has ten seconds for its whole answer and is then
+sent again as `retry` allows, so a press settles in bounded time; a send held
+for the command before it waits its turn. At `bfda9ae5`, CI
+[39658029334](https://github.com/studiokimeiga/perfect-web/actions/runs/39658029334)
+and verify [39658074296](https://github.com/studiokimeiga/perfect-web/actions/runs/39658074296)
+passed (141 reached recipes, `e14-pleris-controls` and the three browser
+engines); the evidence is fetched at `973fbbcc`. Landing waits for the
+owner's approval and for exact-commit CI at the landed commit.
 
 ## last passing commit
 
@@ -116,13 +120,19 @@ evidence. No failed result is promoted by this summary.
 
 ## failing gate items
 
-- **A command request that never settles holds its press, and the page's
-  order behind it** (ADR-0173's "not claimed";
-  [KNOWN_LIMITATIONS](KNOWN_LIMITATIONS.md)). Neither the command's `fetch`
-  nor its body read has a deadline, and no command declares a `timeout`.
-  A 2026-10-21 local diagnostic held one request 1.5 s and saw its line stay
-  with no failure marker; a finite hold proves nothing about an endless one.
-  Track `command-deadline` is repairing it; no repair is verified yet.
+- **On master, a command request that never settles holds its press, and
+  the page's order behind it** (ADR-0173's "not claimed"). The repair is
+  verified on `wip/command-deadline` (above) and not landed. Its own limits
+  stay open after it lands: an unknown outcome is told as "could not be
+  sent", a command given up may still run after those behind it, and the
+  host's waits have no deadline (ADR-0381,
+  [KNOWN_LIMITATIONS](KNOWN_LIMITATIONS.md)).
+- **A press's modules** (found 2026-10-21, reproduced in Chromium): one
+  failed load of a page's speculation module is kept, so every later press
+  that speculates fails the same way until the page is reloaded (the network
+  is not asked again); and a handler's or speculation's module that never
+  loads holds its press and, by ADR-0152, the presses after it. Not
+  repaired; track `press-modules` is to repair it.
 - Hosted evidence does not prove the local-only performance, memory, load
   or Kiokun obligations. E14 agent benchmarking still requires the owner's
   model, budget and teaching choices. Neither performance universality nor
@@ -216,14 +226,13 @@ to older frame attribution.
 
 ## next three concrete tasks
 
-1. Land track `command-deadline`: every press's command is answered, refused
-   or told that no answer came within a stated budget, its resends inside
-   it, with failing-first tests, mutation controls, exact-commit CI and the
-   affected verification.
-2. Prepare E14-E's runs for the owner's model, budget and teaching-method
-   choices as a decision-ready proposal with zero-cost controls; run nothing
-   paid on an assumed choice.
-3. Specify device-local write durability (ADR-0366's boundary) and resolve
-   the remaining [NEXT](NEXT.md) follow-ups from their recorded
-   reproductions: the scheduled-order timeout, WebKit traffic, and the
-   adapter and estimator gaps.
+1. With the owner's approval, land `wip/command-deadline` (verified at
+   `bfda9ae5`, evidence `973fbbcc`) once exact-commit CI passes at the
+   commit that lands; no other gate is outstanding.
+2. Track `press-modules`: a page's speculation module loaded again after a
+   failed load, and every module a press needs bounded by the deadline, with
+   failing-first tests, strict controls and the reached verification.
+3. E14-E: the owner's model, budget and teaching choices, from the decision
+   brief and the changed-lines repair on `wip/e14-readiness`; run nothing paid
+   on an assumed choice. Then device-local durability (ADR-0366's boundary)
+   and the remaining [NEXT](NEXT.md) follow-ups.
