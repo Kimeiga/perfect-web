@@ -276,8 +276,6 @@ pub struct Inference<'a> {
     /// Which unit each `Hir` in the last `run` was, so a declaration can be
     /// given the same `DefId` the workspace gave it.
     workspace: &'a Workspace,
-    #[cfg(test)]
-    body_visits: usize,
 }
 
 impl<'a> Inference<'a> {
@@ -289,8 +287,6 @@ impl<'a> Inference<'a> {
             lexicals: BTreeMap::new(),
             types: BTreeMap::new(),
             workspace,
-            #[cfg(test)]
-            body_visits: 0,
         }
     }
 
@@ -305,10 +301,12 @@ impl<'a> Inference<'a> {
     /// Seed from every declared row in the program, then iterate to a fixed
     /// point over local helpers.
     pub fn run(&mut self, hirs: &[&Hir]) {
-        #[cfg(test)]
-        {
-            self.body_visits = 0;
-        }
+        self.run_observing(hirs, || {});
+    }
+
+    /// Keep visit-count witnesses on the same inference path without storing
+    /// instrumentation in the inference state or changing its public API.
+    fn run_observing(&mut self, hirs: &[&Hir], mut visit: impl FnMut()) {
         for (unit, hir) in hirs.iter().enumerate() {
             for (id, d) in hir.all_decls() {
                 if let Some(row) = &d.declared_effects {
@@ -375,10 +373,7 @@ impl<'a> Inference<'a> {
             .collect();
         while let Some(index) = pending.pop_front() {
             queued[index] = false;
-            #[cfg(test)]
-            {
-                self.body_visits += 1;
-            }
+            visit();
             let (unit, id, body, _, types) = &typed[index];
             let mut reads = BTreeSet::new();
             let found = self.infer_in_reading(*unit, body, types, Some(&mut reads));
