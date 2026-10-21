@@ -69,7 +69,7 @@ def main():
             return 1
         if witness in result.assertion_failed:
             killed += 1
-            print(f'{name}: KILLED by {witness}')
+            print(f'{name}: KILLED by {witness} ({len(result.assertion_failed)} assertion methods fail)')
         else:
             print(f'{name}: SURVIVED')
     print(f'{killed} of {len(MUTANTS)} mutants killed')
