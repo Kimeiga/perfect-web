@@ -1,0 +1,500 @@
+Local diagnostic evidence for the isolated effect queue candidate. This is not exact-commit hosted verification.
+Base source: git HEAD fd922fa8 (combined source plus root test-only fixes); queue effects.rs hash is recorded below.
+Commands: python3 /tmp/effect-queue-benchmark.py; python3 -m unittest scripts.tests.test_cargo_assertion_results -v
+The benchmark compares23 full semantic snapshots and exact capability assertions in every old/queue iteration. Full raw canonical output is preserved in perfect-web-handoff/tracks/evidence/effect-scaling/.
+
+
+== effect-queue-benchmark.py
+"""Alternate exact old/new source, restore it, compare canonical outcomes."""
+import hashlib
+import json
+import os
+from pathlib import Path
+import sys
+
+ROOT = Path.cwd()
+sys.path.insert(0, str(ROOT / 'scripts'))
+import mutation_source
+import producer_process
+
+
+def run(command, *, env=None):
+    child = producer_process.run(command, timeout=300, cwd=ROOT, env=env)
+    if child.returncode:
+        raise RuntimeError(child.stdout)
+    return child.stdout
+
+
+effects = ROOT / 'compiler/pw-core/src/effects.rs'
+original = effects.read_text()
+old = run(['git', 'show', 'HEAD:compiler/pw-core/src/effects.rs'])
+assert 'while let Some(index) = pending.pop_front()' in original
+assert 'let mut changed = false;' in old
+target = Path(json.loads(run(['cargo', 'metadata', '--no-deps', '--format-version=1']))['target_directory'])
+first_semantics = None
+print('Machine:', run(['uname', '-a']).strip(), flush=True)
+print('Rust:', run(['rustc', '--version']).strip(), flush=True)
+print('Sources old/new SHA256:', hashlib.sha256(old.encode()).hexdigest(), hashlib.sha256(original.encode()).hexdigest(), flush=True)
+for iteration, (label, source) in enumerate([('old', old), ('queue', original), ('old', old), ('queue', original)]):
+    with mutation_source.changed(effects, original, source):
+        output = run(['cargo', 'test', '--quiet', '--locked', '-p', 'pw-core', '--test', 'effect_convergence', '--', '--ignored', '--nocapture'])
+        Path(f'/tmp/effect-queue-{iteration}-{label}-full.log').write_text(output)
+        print(f'== iteration {iteration} {label} full checker', flush=True)
+        print(output, flush=True)
+        def library(name):
+            return max((target / 'debug/deps').glob('lib' + name + '-*.rlib'), key=lambda p: p.stat().st_mtime_ns)
+        binary = '/tmp/effect-queue-phase'
+        run(['rustc', '--edition=2024', '/tmp/effect-queue-phase.rs', '-o', binary,
+             '--extern', 'pw_core=' + str(library('pw_core')),
+             '--extern', 'pw_syntax=' + str(library('pw_syntax')),
+             '-L', 'dependency=' + str(target / 'debug/deps')],
+            env={**os.environ, 'CARGO_MANIFEST_DIR': str(ROOT / 'compiler/pw-core')})
+        output = run([binary])
+        Path(f'/tmp/effect-queue-{iteration}-{label}-phase.log').write_text(output)
+        semantics = '\n'.join(line for line in output.splitlines() if line.startswith('SEMANTIC '))
+        assert len(semantics.splitlines()) == 23
+        if first_semantics is None:
+            first_semantics = semantics
+        assert semantics == first_semantics, f'canonical semantic change in {label} iteration {iteration}'
+        print('canonical rows/sources/calls SHA256:', hashlib.sha256(semantics.encode()).hexdigest(), 'equal; exact contract assertions passed', flush=True)
+        print('\n'.join(line for line in output.splitlines() if not line.startswith('SEMANTIC ')), flush=True)
+assert effects.read_text() == original
+print('old/queue/old/queue complete; source restored; 23 canonical snapshots identical in every iteration', flush=True)
+
+
+== effect-queue-phase.rs
+// Standalone read-only timing witness from effect_convergence.rs.
+
+use pw_core::check::check_sources;
+
+fn program(src: &str) -> Vec<(String, String)> {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let mut out = Vec::new();
+    for d in ["packages/pw-std", "packages/pw-platform-web"] {
+        let mut paths: Vec<std::path::PathBuf> = std::fs::read_dir(root.join(d))
+            .unwrap_or_else(|e| panic!("{d}: {e}"))
+            .map(|e| e.expect("entry").path())
+            .filter(|p| p.extension().is_some_and(|x| x == "pw"))
+            .collect();
+        paths.sort();
+        for p in paths {
+            out.push((
+                p.display().to_string(),
+                std::fs::read_to_string(&p).expect("read"),
+            ));
+        }
+    }
+    out.push(("t.pw".to_string(), src.to_string()));
+    out
+}
+
+/// Each diagnostic on `t.pw`, as its code and the text its primary span
+/// covers: where it is reported is part of what is claimed.
+fn reported(src: &str) -> Vec<(String, String)> {
+    check_sources(&program(src))
+        .into_iter()
+        .filter(|(n, _)| n == "t.pw")
+        .flat_map(|(_, ds)| {
+            ds.into_iter().map(|d| {
+                let at = src.get(d.primary_span.clone()).unwrap_or("?").to_string();
+                (d.code.to_string(), at)
+            })
+        })
+        .collect()
+}
+
+fn required(src: &str, component: &str) -> Vec<String> {
+    use pw_core::contract::{Capability, contracts};
+    let files = program(src);
+    let hirs: Vec<pw_core::hir::Hir> = files
+        .iter()
+        .map(|(_, s)| pw_core::lower::lower_file(s, &pw_syntax::parse_tree(s).green))
+        .collect();
+    let refs: Vec<&pw_core::hir::Hir> = hirs.iter().collect();
+    let ws = pw_core::resolve::Workspace::build(&refs);
+    let sigs = pw_core::signatures::Signatures::build(&ws, &refs);
+    contracts(&refs, &sigs, &ws)
+        .into_iter()
+        .find(|c| c.component_id == component)
+        .unwrap_or_else(|| panic!("no contract for {component}"))
+        .required_capabilities
+        .iter()
+        .map(Capability::name)
+        .collect()
+}
+
+fn chain(depth: usize, reverse: bool, cycle: bool, leaf: &str, boundary: &str) -> String {
+    let mut helpers = (0..depth)
+        .map(|n| {
+            let expression = if n + 1 < depth {
+                format!("hop{}(item)", n + 1)
+            } else if cycle {
+                format!("if item.name == \"stop\" {{ {leaf} }} else {{ hop0(item) }}")
+            } else {
+                leaf.to_string()
+            };
+            format!("fn hop{n}(item: Item) -> String {{\n    {expression}\n}}\n\n")
+        })
+        .collect::<Vec<_>>();
+    if reverse {
+        helpers.reverse();
+    }
+    format!(
+        "module t\n\ntype Item = Item {{ name: String }}\n\nfn label(item: Item) -> String !{{ database.read<Item> }}\n    host \"shop:data/items#label\"\n\n{}{boundary}\n",
+        helpers.join("")
+    )
+}
+
+const VIEW: &str = "view Menu(item: Item) !{} { <p>{hop0(item)}</p> }";
+const QUERY: &str = "query Answer(item: Item) -> String { hop0(item) }";
+
+fn view_refuses(leaf: &str, cycle: bool) {
+    for reverse in [false, true] {
+        let source = chain(15, reverse, cycle, leaf, VIEW);
+        assert_eq!(
+            reported(&source),
+            [("PW0401".to_string(), "hop0(item)".to_string())],
+            "effect escaped: reverse={reverse}, cycle={cycle}, leaf={leaf}"
+        );
+        let pure = chain(15, reverse, cycle, "item.name", VIEW);
+        assert_eq!(
+            reported(&pure),
+            [],
+            "pure neighbor: reverse={reverse}, cycle={cycle}"
+        );
+    }
+}
+
+#[test]
+fn a_deep_direct_helper_chain_is_effectful_in_either_declaration_order() {
+    view_refuses("label(item)", false);
+}
+
+#[test]
+fn a_deep_member_helper_chain_is_effectful_in_either_declaration_order() {
+    view_refuses("item.label", false);
+}
+
+#[test]
+fn recursive_helper_cycles_converge_with_and_without_an_effect() {
+    for leaf in ["label(item)", "item.label"] {
+        view_refuses(leaf, true);
+    }
+}
+
+#[test]
+fn deep_helper_effects_reach_the_query_contract_in_either_declaration_order() {
+    for reverse in [false, true] {
+        for cycle in [false, true] {
+            for leaf in ["label(item)", "item.label"] {
+                let source = chain(15, reverse, cycle, leaf, QUERY);
+                assert_eq!(reported(&source), [], "the effectful query is valid");
+                assert_eq!(
+                    required(&source, "t.Answer"),
+                    ["database.read<Item>"],
+                    "capability escaped: reverse={reverse}, cycle={cycle}, leaf={leaf}"
+                );
+            }
+            let pure = chain(15, reverse, cycle, "item.name", QUERY);
+            assert_eq!(reported(&pure), [], "the pure query is valid");
+            assert_eq!(
+                required(&pure, "t.Answer"),
+                Vec::<String>::new(),
+                "pure neighbor gains no capability"
+            );
+        }
+    }
+}
+
+/// Timing evidence is opt-in: the ordinary suite has no machine-speed gate.
+#[test]
+#[ignore = "bounded checker scale smoke; run with --ignored --nocapture"]
+fn a_bounded_deep_chain_scale_smoke() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let feed = std::fs::read_to_string(root.join("examples/feed/app.pw")).expect("reference feed");
+    let mut sources = vec![("reference_feed".to_string(), feed, 0)];
+    for depth in [15, 100, 250] {
+        for reverse in [false, true] {
+            sources.push((
+                format!("chain_{depth}_reverse_{reverse}"),
+                chain(depth, reverse, false, "item.label", VIEW),
+                1,
+            ));
+        }
+    }
+    let mut all_expected = true;
+    for (name, source, expected) in sources {
+        let files = program(&source);
+        let mut times = Vec::new();
+        let mut count = 0;
+        for _ in 0..6 {
+            let started = std::time::Instant::now();
+            let findings = check_sources(&files);
+            count = findings.iter().map(|(_, ds)| ds.len()).sum::<usize>();
+            all_expected &= count == expected;
+            times.push(started.elapsed().as_micros());
+        }
+        times.remove(0);
+        times.sort();
+        println!(
+            "{name}: median_us={}, min_us={}, max_us={}, diagnostics={count}",
+            times[2], times[0], times[4]
+        );
+    }
+    assert!(
+        all_expected,
+        "every measured program must retain its expected diagnostic count"
+    );
+}
+
+
+fn phase(source: &str, repeats: usize) -> (u128, std::collections::BTreeMap<String, String>) {
+    use pw_core::{effects::Inference, hir::Hir, resolve::{DefId,Workspace}, signatures::Signatures};
+    let files=program(source);
+    let hirs: Vec<Hir>=files.iter().map(|(_,s)| pw_core::lower::lower_file(s,&pw_syntax::parse_tree(s).green)).collect();
+    let refs:Vec<&Hir>=hirs.iter().collect();
+    let ws=Workspace::build(&refs);
+    let sigs=Signatures::build(&ws,&refs);
+    let unit=hirs.len()-1;
+    let name=|def:DefId| {
+        if let Some(path)=sigs.path_of(def) { return path.to_string(); }
+        let hir=&hirs[def.unit];
+        let mut current=pw_core::hir::DeclId(def.decl);
+        let mut parts=vec![hir.decl(current).name.clone()];
+        while let Some((id,parent))=hir.all_decls().find(|(_,d)| d.children.contains(&current)) {
+            parts.push(parent.name.clone()); current=id;
+        }
+        parts.reverse();
+        format!("{}::{}", sigs.module_name(def.unit).unwrap_or("?"), parts.join("."))
+    };
+    let mut times=Vec::new();
+    let mut previous=None;
+    for _ in 0..repeats {
+        let mut effects=Inference::new(&sigs,&ws);
+        let start=std::time::Instant::now();
+        effects.run(&refs);
+        times.push(start.elapsed().as_micros());
+        let mut rows=std::collections::BTreeMap::new();
+        for (id,d) in hirs[unit].all_decls() {
+            let def=DefId{unit,decl:id.0};
+            let required=effects.effective_effects(unit,&hirs[unit],id);
+            let details=effects.performed_of(def).map(|f| {
+                let sources=f.sources.iter().map(|s| (s.effect.clone(),source.get(s.span.clone()).unwrap_or("?").to_string(),format!("{:?}",s.via))).collect::<Vec<_>>();
+                let calls=f.calls.iter().map(|c|(name(c.callee),c.effects.clone())).collect::<Vec<_>>();
+                format!("performed={:?}; sources={sources:?}; calls={calls:?}",f.effects)
+            });
+            let key = if sigs.by_def(def).is_some() { name(def) } else { format!("{:?}:{}:{}", d.kind, d.name, id.0) };
+            assert!(rows.insert(key,format!("required={required:?}; {details:?}")).is_none(), "duplicate snapshot identity: {}", d.name);
+        }
+        if let Some(old)=&previous { assert_eq!(old,&rows,"repetition changed semantics"); }
+        previous=Some(rows);
+    }
+    if times.len()>1 { times.remove(0); }
+    times.sort();
+    (times[times.len()/2],previous.unwrap())
+}
+fn main() {
+    let root=std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let feed=std::fs::read_to_string(root.join("examples/feed/app.pw")).unwrap();
+    assert_eq!(reported(&feed), []);
+    let (us,rows)=phase(&feed,6);
+    println!("SEMANTIC {:?}", rows);
+    println!("inference_reference_feed: median_us={us}");
+    for depth in [15,100,250] {
+        let mut prior=None;
+        for reverse in [false,true] {
+            let source=chain(depth,reverse,false,"item.label",VIEW);
+            assert_eq!(reported(&source),[("PW0401".into(),"hop0(item)".into())]);
+            let (us,rows)=phase(&source,6);
+            if let Some(old)=&prior { assert_eq!(old,&rows,"order changed canonical rows, sources or calls"); }
+            println!("SEMANTIC {:?}", rows); prior=Some(rows);
+            println!("inference_depth_{depth}_reverse_{reverse}: median_us={us}; canonical_rows_sources_calls=equal");
+        }
+    }
+    for cycle in [false,true] {
+        for mode in ["direct","member","value","pure"] {
+            let leaf=match mode { "direct"|"value"=>"label(item)","member"=>"item.label",_=>"item.name" };
+            let mut prior=None;
+            for reverse in [false,true] {
+                let mut source=chain(15,reverse,cycle,leaf,QUERY);
+                if mode=="value" {
+                    for n in 0..15 {source=source.replace(&format!("hop{n}(item)"),&format!("{{ let f = hop{n}; f(item) }}"));}
+                }
+                assert_eq!(reported(&source),[],"invalid fixture mode={mode} cycle={cycle} reverse={reverse}");
+                let want:Vec<String>=if mode=="pure" {vec![]}else{vec!["database.read<Item>".into()]};
+                assert_eq!(required(&source,"t.Answer"),want);
+                let (_,rows)=phase(&source,1);
+                if let Some(old)=&prior {assert_eq!(old,&rows,"order changed mode={mode} cycle={cycle}");}
+                println!("SEMANTIC {:?}", rows); prior=Some(rows);
+            }
+            println!("semantic_pair mode={mode} cycle={cycle}: rows_sources_calls_and_contract_equal");
+        }
+    }
+}
+
+
+== effect-queue-benchmark.log
+Machine: Linux colo 6.18.54.1-microsoft-standard-WSL2 #1 SMP PREEMPT_DYNAMIC Tue Oct  6 19:13:07 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
+Rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+Sources old/new SHA256: d7e2c59f6ef5099eb0dabdf3402605c244cd6b08a130c53a527752c9f22954f3 e2e4c28cbc69cb1755ddc45c9c37ab4df20cc6491589310fa1840138dcc187ca
+== iteration 0 old full checker
+
+running 1 test
+reference_feed: median_us=226321, min_us=219909, max_us=227671, diagnostics=0
+chain_15_reverse_false: median_us=59920, min_us=58143, max_us=61122, diagnostics=1
+chain_15_reverse_true: median_us=49640, min_us=47816, max_us=50305, diagnostics=1
+chain_100_reverse_false: median_us=200879, min_us=196387, max_us=210917, diagnostics=1
+chain_100_reverse_true: median_us=91064, min_us=85865, max_us=91642, diagnostics=1
+chain_250_reverse_false: median_us=754890, min_us=730527, max_us=765060, diagnostics=1
+chain_250_reverse_true: median_us=201782, min_us=195735, max_us=238933, diagnostics=1
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 9.51s
+
+
+canonical rows/sources/calls SHA256: b44f959070f36c9c111686817acb9590f8e281e0e42ff2a73f1f0a3398690c1d equal; exact contract assertions passed
+inference_reference_feed: median_us=9310
+inference_depth_15_reverse_false: median_us=11329; canonical_rows_sources_calls=equal
+inference_depth_15_reverse_true: median_us=2226; canonical_rows_sources_calls=equal
+inference_depth_100_reverse_false: median_us=125205; canonical_rows_sources_calls=equal
+inference_depth_100_reverse_true: median_us=4646; canonical_rows_sources_calls=equal
+inference_depth_250_reverse_false: median_us=573384; canonical_rows_sources_calls=equal
+inference_depth_250_reverse_true: median_us=9967; canonical_rows_sources_calls=equal
+semantic_pair mode=direct cycle=false: rows_sources_calls_and_contract_equal
+semantic_pair mode=member cycle=false: rows_sources_calls_and_contract_equal
+semantic_pair mode=value cycle=false: rows_sources_calls_and_contract_equal
+semantic_pair mode=pure cycle=false: rows_sources_calls_and_contract_equal
+semantic_pair mode=direct cycle=true: rows_sources_calls_and_contract_equal
+semantic_pair mode=member cycle=true: rows_sources_calls_and_contract_equal
+semantic_pair mode=value cycle=true: rows_sources_calls_and_contract_equal
+semantic_pair mode=pure cycle=true: rows_sources_calls_and_contract_equal
+== iteration 1 queue full checker
+
+running 1 test
+reference_feed: median_us=220706, min_us=213626, max_us=225945, diagnostics=0
+chain_15_reverse_false: median_us=50843, min_us=47868, max_us=54226, diagnostics=1
+chain_15_reverse_true: median_us=48598, min_us=47676, max_us=49596, diagnostics=1
+chain_100_reverse_false: median_us=86961, min_us=86383, max_us=88743, diagnostics=1
+chain_100_reverse_true: median_us=86819, min_us=85374, max_us=88511, diagnostics=1
+chain_250_reverse_false: median_us=193536, min_us=190999, max_us=202888, diagnostics=1
+chain_250_reverse_true: median_us=200259, min_us=187465, max_us=209840, diagnostics=1
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 5.32s
+
+
+canonical rows/sources/calls SHA256: b44f959070f36c9c111686817acb9590f8e281e0e42ff2a73f1f0a3398690c1d equal; exact contract assertions passed
+inference_reference_feed: median_us=6015
+inference_depth_15_reverse_false: median_us=2002; canonical_rows_sources_calls=equal
+inference_depth_15_reverse_true: median_us=1670; canonical_rows_sources_calls=equal
+inference_depth_100_reverse_false: median_us=4262; canonical_rows_sources_calls=equal
+inference_depth_100_reverse_true: median_us=3471; canonical_rows_sources_calls=equal
+inference_depth_250_reverse_false: median_us=9810; canonical_rows_sources_calls=equal
+inference_depth_250_reverse_true: median_us=8109; canonical_rows_sources_calls=equal
+semantic_pair mode=direct cycle=false: rows_sources_calls_and_contract_equal
+semantic_pair mode=member cycle=false: rows_sources_calls_and_contract_equal
+semantic_pair mode=value cycle=false: rows_sources_calls_and_contract_equal
+semantic_pair mode=pure cycle=false: rows_sources_calls_and_contract_equal
+semantic_pair mode=direct cycle=true: rows_sources_calls_and_contract_equal
+semantic_pair mode=member cycle=true: rows_sources_calls_and_contract_equal
+semantic_pair mode=value cycle=true: rows_sources_calls_and_contract_equal
+semantic_pair mode=pure cycle=true: rows_sources_calls_and_contract_equal
+== iteration 2 old full checker
+
+running 1 test
+reference_feed: median_us=220862, min_us=214754, max_us=223152, diagnostics=0
+chain_15_reverse_false: median_us=61355, min_us=58375, max_us=62282, diagnostics=1
+chain_15_reverse_true: median_us=49509, min_us=49272, max_us=56941, diagnostics=1
+chain_100_reverse_false: median_us=206589, min_us=201415, max_us=211773, diagnostics=1
+chain_100_reverse_true: median_us=94762, min_us=85305, max_us=94986, diagnostics=1
+chain_250_reverse_false: median_us=755649, min_us=730357, max_us=770392, diagnostics=1
+chain_250_reverse_true: median_us=198090, min_us=191353, max_us=203978, diagnostics=1
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 9.49s
+
+
+canonical rows/sources/calls SHA256: b44f959070f36c9c111686817acb9590f8e281e0e42ff2a73f1f0a3398690c1d equal; exact contract assertions passed
+inference_reference_feed: median_us=9747
+inference_depth_15_reverse_false: median_us=11322; canonical_rows_sources_calls=equal
+inference_depth_15_reverse_true: median_us=2354; canonical_rows_sources_calls=equal
+inference_depth_100_reverse_false: median_us=117206; canonical_rows_sources_calls=equal
+inference_depth_100_reverse_true: median_us=4532; canonical_rows_sources_calls=equal
+inference_depth_250_reverse_false: median_us=556906; canonical_rows_sources_calls=equal
+inference_depth_250_reverse_true: median_us=10474; canonical_rows_sources_calls=equal
+semantic_pair mode=direct cycle=false: rows_sources_calls_and_contract_equal
+semantic_pair mode=member cycle=false: rows_sources_calls_and_contract_equal
+semantic_pair mode=value cycle=false: rows_sources_calls_and_contract_equal
+semantic_pair mode=pure cycle=false: rows_sources_calls_and_contract_equal
+semantic_pair mode=direct cycle=true: rows_sources_calls_and_contract_equal
+semantic_pair mode=member cycle=true: rows_sources_calls_and_contract_equal
+semantic_pair mode=value cycle=true: rows_sources_calls_and_contract_equal
+semantic_pair mode=pure cycle=true: rows_sources_calls_and_contract_equal
+== iteration 3 queue full checker
+
+running 1 test
+reference_feed: median_us=221610, min_us=215186, max_us=227106, diagnostics=0
+chain_15_reverse_false: median_us=48959, min_us=48828, max_us=50450, diagnostics=1
+chain_15_reverse_true: median_us=49482, min_us=48483, max_us=51215, diagnostics=1
+chain_100_reverse_false: median_us=86521, min_us=85775, max_us=86619, diagnostics=1
+chain_100_reverse_true: median_us=86066, min_us=85386, max_us=86980, diagnostics=1
+chain_250_reverse_false: median_us=192902, min_us=184992, max_us=197147, diagnostics=1
+chain_250_reverse_true: median_us=190459, min_us=187011, max_us=199811, diagnostics=1
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 5.27s
+
+
+canonical rows/sources/calls SHA256: b44f959070f36c9c111686817acb9590f8e281e0e42ff2a73f1f0a3398690c1d equal; exact contract assertions passed
+inference_reference_feed: median_us=5741
+inference_depth_15_reverse_false: median_us=1799; canonical_rows_sources_calls=equal
+inference_depth_15_reverse_true: median_us=1626; canonical_rows_sources_calls=equal
+inference_depth_100_reverse_false: median_us=4097; canonical_rows_sources_calls=equal
+inference_depth_100_reverse_true: median_us=3439; canonical_rows_sources_calls=equal
+inference_depth_250_reverse_false: median_us=9558; canonical_rows_sources_calls=equal
+inference_depth_250_reverse_true: median_us=8124; canonical_rows_sources_calls=equal
+semantic_pair mode=direct cycle=false: rows_sources_calls_and_contract_equal
+semantic_pair mode=member cycle=false: rows_sources_calls_and_contract_equal
+semantic_pair mode=value cycle=false: rows_sources_calls_and_contract_equal
+semantic_pair mode=pure cycle=false: rows_sources_calls_and_contract_equal
+semantic_pair mode=direct cycle=true: rows_sources_calls_and_contract_equal
+semantic_pair mode=member cycle=true: rows_sources_calls_and_contract_equal
+semantic_pair mode=value cycle=true: rows_sources_calls_and_contract_equal
+semantic_pair mode=pure cycle=true: rows_sources_calls_and_contract_equal
+old/queue/old/queue complete; source restored; 23 canonical snapshots identical in every iteration
+
+
+== effect-queue-producer-tests.log
+test_exit_inventory_and_source_disagreement_are_refused (scripts.tests.test_cargo_assertion_results.CargoAssertions) ... ok
+test_native_build_failure_is_refused (scripts.tests.test_cargo_assertion_results.CargoAssertions) ... ok
+test_native_green_and_custom_comparison_have_exact_inventory (scripts.tests.test_cargo_assertion_results.CargoAssertions) ... ok
+test_native_runtime_and_same_line_operand_panics_are_refused (scripts.tests.test_cargo_assertion_results.CargoAssertions) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.271s
+
+OK
+
+
+== completed local control summary effect-queue-controls-final.log
+SHA256 db8d52d8a24c728c13e33e514ea20b5cd9a9e4a8688a48b7fcd3d0893e9d17f5
+baseline: 5 passed, 0 failed
+direct callers do not subscribe to row growth: KILLED by effects::queue_tests::single_effect_chains_visit_only_the_bodies_whose_rows_changed (4 assertion failures)
+named function values do not subscribe to row growth: KILLED by effects::queue_tests::single_effect_chains_visit_only_the_bodies_whose_rows_changed (1 assertion failures)
+typed members do not subscribe to row growth: KILLED by effects::queue_tests::late_rows_refresh_declared_metadata_and_noninvoked_member_values (2 assertion failures)
+unchanged permitted rows discard performed metadata: KILLED by effects::queue_tests::late_rows_refresh_declared_metadata_and_noninvoked_member_values (2 assertion failures)
+already pending readers are queued repeatedly: KILLED by effects::queue_tests::many_growing_dependencies_enqueue_their_pending_reader_only_once (1 assertion failures)
+only the first row growth notifies readers: KILLED by effects::queue_tests::readers_remain_registered_when_a_dependency_grows_again (1 assertion failures)
+6 of 6 mutants killed
+
+== completed local control summary effect-convergence-controls-queue.log
+SHA256 0f8ad99af0e6f03fa294f884382f08de2681db0f6d090a480f82a2f0e840db00
+baseline: 6 passed, 0 failed
+effect propagation stops after eight queue waves: KILLED (5 assertion failures)
+effect propagation stops before reaching its fixed point: KILLED (6 assertion failures)
+2 of 2 mutants killed
+
+== completed local control summary effect-value-controls-queue.log
+SHA256 1c894ddeb9ab292098c52527877df2c7421465c87304e09115e4e8b2c9a31fc5
+baseline: 12 passed, 0 failed
+a function named as a value is not counted: KILLED (5 of 12 tests fail)
+a binding in scope is read as the declaration it shadows: KILLED (4 of 12 tests fail)
+a helper declaring no row carries only what it calls: KILLED (1 of 12 tests fail)
+a function named as a value is said to be called: KILLED (1 of 12 tests fail)
+4 of 4 mutants killed

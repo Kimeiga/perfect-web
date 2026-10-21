@@ -4,71 +4,73 @@
 Only complete Cargo results for the four selected witnesses earn credit.
 Build errors, interrupted commands and missing witnesses fail the campaign.
 """
-import os
 import pathlib
 import signal
 import subprocess
 import sys
 
-import cargo_test_results
+import cargo_assertion_results
 import mutation_source
+import producer_process
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 EFFECTS = ROOT / "compiler/pw-core/src/effects.rs"
 MUTANTS = [
-    ("effect propagation stops after eight sweeps", EFFECTS,
-     "        loop {\n            let mut changed = false;",
-     "        for _ in 0..8 {\n            let mut changed = false;"),
+    ("effect propagation stops after eight queue waves", EFFECTS,
+     "        while let Some(index) = pending.pop_front() {\n            queued[index] = false;",
+     "        let mut rounds_left = 8;\n"
+     "        let mut remaining_in_round = pending.len();\n"
+     "        while let Some(index) = pending.pop_front() {\n"
+     "            if remaining_in_round == 0 {\n"
+     "                rounds_left -= 1;\n"
+     "                if rounds_left == 0 { break; }\n"
+     "                remaining_in_round = pending.len() + 1;\n"
+     "            }\n"
+     "            remaining_in_round -= 1;\n"
+     "            queued[index] = false;"),
     ("effect propagation stops before reaching its fixed point", EFFECTS,
-     "            if !changed {\n                break;",
-     "            if true {\n                break;"),
+     "        while let Some(index) = pending.pop_front() {\n            queued[index] = false;",
+     "        let mut remaining_in_round = pending.len();\n"
+     "        while let Some(index) = pending.pop_front() {\n"
+     "            if remaining_in_round == 0 { break; }\n"
+     "            remaining_in_round -= 1;\n"
+     "            queued[index] = false;"),
 ]
 NAMES = [
     "a_deep_direct_helper_chain_is_effectful_in_either_declaration_order",
     "a_deep_member_helper_chain_is_effectful_in_either_declaration_order",
     "recursive_helper_cycles_converge_with_and_without_an_effect",
     "deep_helper_effects_reach_the_query_contract_in_either_declaration_order",
+    "late_named_function_values_reach_the_query_contract_through_cycles",
+    "late_noninvoked_member_values_reach_purity_and_contracts",
 ]
 COMMAND = ["cargo", "test", "--quiet", "--locked", "-p", "pw-core",
-           "--test", "effect_convergence", "--", "--exact", *NAMES]
+           "--test", "effect_convergence", "--", "--format=pretty", "--exact", *NAMES]
+SOURCES = [ROOT / "compiler/pw-core/tests/effect_convergence.rs"]
 
-def run():
-    child = subprocess.Popen(COMMAND, cwd=ROOT, stdout=subprocess.PIPE,
-                             stderr=subprocess.STDOUT, text=True, start_new_session=True)
+
+def run(command=COMMAND, expected=NAMES, sources=SOURCES):
     try:
-        output, _ = child.communicate(timeout=600)
-    except BaseException:
-        os.killpg(child.pid, signal.SIGKILL)
-        child.communicate()
-        raise
-    result = cargo_test_results.parse(child.returncode, output)
-    if (not result.valid or result.passed + result.failed != len(NAMES)
-            or len(result.failure_names) != result.failed
-            or not set(result.failure_names) <= set(NAMES)):
-        print(output, flush=True)
+        child = producer_process.run(command, timeout=600, cwd=ROOT)
+    except subprocess.TimeoutExpired as expired:
+        print(expired.output, flush=True)
+        print("INVALID RESULT: timed out native producer", flush=True)
+        return None
+    result = cargo_assertion_results.validate(child.returncode, child.stdout,
+        root=ROOT, sources=sources, expected=expected)
+    print(child.stdout, flush=True)
+    if not result.valid:
         print(f"INVALID RESULT: {result}", flush=True)
         return None
-    if result.failed:
-        # These witnesses fail by equality assertion, not by compilation,
-        # timeouts, gate failures or setup/teardown panics.
-        sections = output.split("---- ")[1:]
-        assertions = {
-            section.split(" stdout ----", 1)[0]
-            for section in sections
-            if "assertion `left == right` failed" in section
-        }
-        if not set(result.failure_names) <= assertions:
-            print(output, flush=True)
-            print("INVALID RESULT: a witness failed without its equality assertion", flush=True)
-            return None
     return result
 
 
 def main():
     import mutation_baseline
+    watch = mutation_baseline.mutation_bound.start()
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(1))
     baseline = run()
-    if baseline is None or baseline.failed:
+    if baseline is None or baseline.failed or watch.stopped:
         print("FAIL: every selected baseline witness must pass", flush=True)
         return 1
     print(f"baseline: {baseline.passed} passed, 0 failed", flush=True)
@@ -80,7 +82,7 @@ def main():
             return 1
         with mutation_source.changed(path, original, original.replace(anchor, replacement, 1)):
             result = run()
-        if result is None:
+        if result is None or watch.stopped:
             print(f"{what}: INVALID RESULT (not a kill)", flush=True)
             return 1
         if result.failed:
