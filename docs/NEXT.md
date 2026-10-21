@@ -8,29 +8,28 @@ The assembled candidate is unlanded; master remains the verified train-11
 commit recorded in [STATUS](STATUS.md). Finish the combined gates before
 starting another feature batch.
 
-The latest source `a130a860` incorporates the graph and WIT-source repairs,
-TodoMVC state assertions and strict producers, exact witness metadata, and
-SIGTERM restoration through bounded isolated-child tests. Local proofs retain
-all 43 TodoMVC operators and all 50 browser identities. The toggle-all fault
-now completes with four assertion failures; the two edit-field faults each
-complete with 15 assertion failures, between passing host4/browser50 baselines
-and restored runs. These are focused proofs, not a whole campaign result.
+The latest source `d2e14292` retains all 43 TodoMVC controls and 50 browser
+identities. Its filtered-update test now starts with mixed active/completed
+rows and asserts exact visible identities before acting across filter changes.
+It also retains the last completed item becoming an empty Completed list.
+Final-source controls 10 and 11 produce valid complete assertion receipts,
+with passing host4/browser50 baseline and restored suites. The prior 12–20
+sweep is explicitly tied to its earlier source hash.
 
-The [eight-recipe run](https://github.com/studiokimeiga/perfect-web/actions/runs/39545311229)
-at `a0602009` has valid native graph19/19, check/build51/51 and device62/62
-results; all three full browser jobs passed. Its TodoMVC failure remains failed.
-The earlier [155-recipe run](https://github.com/studiokimeiga/perfect-web/actions/runs/39538607183)
-is complete: 149 valid native results, six invalid. The
-[21-recipe follow-up](https://github.com/studiokimeiga/perfect-web/actions/runs/39543811122)
-continues. Five eligible files from the completed seven-recipe run were imported
-at `40672cc8`; failed or stale files were excluded.
+The [seven-recipe run](https://github.com/studiokimeiga/perfect-web/actions/runs/39549550596)
+at `bd267ad6` correctly refused control 10 after a stale list observation led
+to an action timeout. Preserve that failure. Run the four reached recipes:
+`e10-browser`, `e14-todomvc`, `e14-device-store`, and `e14-second-host`, plus
+the workflow's full browser suites. The whole 43-control result remains due.
 
-Run the seven currently reached recipes: `e10-browser`, `e14-todomvc`,
-`e14-device-store`, `e14-second-host`, `e14-browser-assertions`,
-`e14-evidence-integrity` and `e14-ci-test-reach`. Finish canonical source,
-count/header and native-result reconciliation across all runs, import only
-eligible evidence, and require final exact-commit CI before landing. The dated
-failure details below preserve the original findings and their repair history.
+Completed audited imports include 125 eligible files from the original
+155-recipe run, four from the eight-recipe run, and seventeen from the
+successful 21-recipe run; the respective import commits are `bd267ad6`,
+`693e0d7c`, and `eb1b2e35`. After the seven-run completes, import only its
+still-current valid files. Reconcile canonical source, count/header and native
+results across all runs, include any remaining canonical stale obligations,
+and require exact final-commit CI before landing. The dated details below
+preserve the original failures and requirements as recorded then.
 
 The earlier assembled repair candidate `34f3c2d1` began the first follow-up on `wip/train-12`.
 [Verify39538607183](https://github.com/studiokimeiga/perfect-web/actions/runs/39538607183)

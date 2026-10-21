@@ -3,7 +3,7 @@
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
 Reviewed 2026-10-21 against assembled train-12 source
-`a130a860` (with combined hosted verification still pending).
+`d2e14292` (with final hosted verification still pending).
 [The complete prior ledger](STATUS-HISTORY-2026-10.md) remains verbatim,
 including failed runs, corrections and their original scope.
 
@@ -75,28 +75,37 @@ evidence. No failed result is promoted by this summary.
 
 ## failing gate items
 
-- Source `a130a860` integrates exact Playwright witness names, canonical
-  TodoMVC compatibility verdicts and SIGTERM source restoration. All nine
-  Playwright controls and eight compatibility controls pass locally; bounded
-  isolated-child probes verify restoration through the actual runner mains.
-  The combined 18 count/restoration tests pass. Raw refusal and successful
-  receipts remain in [diagnostics](diagnostics/train-12/metadata-cancellation/).
-- The [eight-recipe run](https://github.com/studiokimeiga/perfect-web/actions/runs/39545311229)
-  at `a0602009` has passing native graph 19/19, check/build 51/51 and device
-  storage 62/62 campaigns, without memory stops; all three full browser jobs
-  passed. TodoMVC correctly refused an action timeout under its unchanged
-  toggle-all fault. Visible-state assertions now produce complete 50-case
-  assertion receipts for that fault and two edit-field faults, between passing
-  host4/browser50 baselines and restored runs. All 43 operators and 50 browser
-  identities remain. Whole current TodoMVC verification is still required.
-- The original [155-recipe run](https://github.com/studiokimeiga/perfect-web/actions/runs/39538607183)
-  completed with 149 valid native results and the six failures recorded below.
-  Its separate Chromium setup failure remains historical. Final artifact
-  count/header checks and eligible evidence import are being reconciled.
-  The current changed-file plan reaches seven recipes: `e10-browser`,
-  `e14-todomvc`, `e14-device-store`, `e14-second-host`,
-  `e14-browser-assertions`, `e14-evidence-integrity` and `e14-ci-test-reach`.
-  Their current hosted results and final exact-commit CI are still pending.
+- Source `d2e14292` preserves all 43 TodoMVC operators and 50 browser
+  identities. A mixed completed/active fixture now observes exact row titles
+  before acting after a filter transition, and retains the last completed row
+  becoming an empty filtered list. Final-source controls 10 and 11 each yield
+  complete native assertion failures between passing host4/browser50 baseline
+  and restored suites. The earlier controls 12–20 sweep belongs to its recorded
+  earlier source hash, not this final source. See the
+  [native diagnostics](diagnostics/train-12/todomvc-filter-boundaries/).
+- The [seven-recipe follow-up](https://github.com/studiokimeiga/perfect-web/actions/runs/39549550596)
+  at `bd267ad6` correctly refused TodoMVC control 10: a stale list count could
+  match before filtering, and the subsequent action timed out. That failed
+  result remains failed. The repaired source reaches four whole recipes:
+  `e10-browser`, `e14-todomvc`, `e14-device-store`, and `e14-second-host`.
+  Their full current verification, final evidence reconciliation, and exact
+  final-commit CI remain required.
+- Completed artifact audits validate native status, exact commit headers,
+  recipe coverage and counts using the complete immutable recipe sources.
+  Eligible imports now include 125 files from the original 155-recipe run
+  (`bd267ad6`), four from the eight-recipe run (`693e0d7c`), and seventeen
+  from the successful [21-recipe run](https://github.com/studiokimeiga/perfect-web/actions/runs/39543811122)
+  (`eb1b2e35`). Stale and invalid files were excluded. The 21-run and eight-run
+  full browser jobs passed on all three engines. Changed test source still
+  requires the new four-recipe run and current browser suites.
+- Exact witness metadata, canonical compatibility verdicts and isolated
+  SIGTERM restoration probes are integrated: nine Playwright controls, eight
+  compatibility controls and the combined 18 count/restoration tests pass
+  locally. These are scoped results, not final combined verification.
+
+The following entries retain the earlier findings and repair obligations as
+recorded at their cited sources. Their later replacements are reconciled above;
+none of the original failed runs becomes a pass.
 
 - Earlier source `df2397f8` incorporated reviewed graph, WIT-source and
   TodoMVC witness/producer repairs. Graph's four remaining invalid controls
