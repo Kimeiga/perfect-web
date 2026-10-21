@@ -35,6 +35,7 @@ def programs():
     accepted = paths('examples/accepted/*.pw')
     out = [('accepted', base + accepted), ('store', base + paths('examples/store/*.pw')),
         ('feed', std + paths('examples/feed/*.pw')), ('kiokun', std + paths('examples/kiokun/*.pw')),
+        ('todomvc', std + paths('examples/todomvc/*.pw')),
         ('kiokun-site', std + paths('examples/kiokun/Shards.pw') + paths('examples/kiokun/dictionary.pw') + paths('examples/kiokun-site/*.pw')),
         ('demo', base + paths('examples/demo/*.pw')),
         # Track `tables` (ADR-0338): the program tables.rs builds, the

@@ -29,13 +29,23 @@ starting another feature batch.
    refused and none survived. Compile errors, setup panics and browser
    timeouts do not prove a bug was caught. Preserve each intended fault,
    correct the invalid witness, and rerun the whole affected campaign.
-4. Rerecord `e14-guide-ownership` on the current source: the post-dispatch
+4. Rerun `e14-check-is-build` after adding TodoMVC's normal program roots
+   to its census. The original run covered 625/626 tracked source files
+   and correctly refused the missing `examples/todomvc/app.pw`. Focused
+   inventory validation now covers 626/626 across 453 assemblies, and the
+   actual 23-file TodoMVC program checks clean. All 453 complete checks
+   and the rest of the recipe remain to be rerun together.
+5. Repair the surviving `e14-bind` control, "a binding's handler captures
+   what it sets". The baseline passed eight tests, but only 13/14 controls
+   were detected. Preserve the intended captured-value fault and prove the
+   complete campaign; a green baseline is not sufficient.
+6. Rerecord `e14-guide-ownership` on the current source: the post-dispatch
    Linux/procfs capability guard changes its proof scope. Unsupported hosts
    skip explicitly and cannot satisfy the strict mutation baseline.
-5. Reconcile eligible current evidence under ADR-0281, run exact-commit CI
+7. Reconcile eligible current evidence under ADR-0281, run exact-commit CI
    and all reached follow-ups, then land only the verified combined tree.
-   The failed TodoMVC and device-store results remain failed; neither is
-   fetched as a pass. Separate effect-inference scaling work awaits its own
+   All four failed recipe results remain failed and none is fetched as a
+   pass. Separate effect-inference scaling work awaits its own
    exact-commit CI and whole campaigns before integration.
 
 The older follow-ups below retain their dated context. A-008's WIT

@@ -1,0 +1,12 @@
+TodoMVC census repair, 2026-10-20
+Parent source e53e31dd plus the one TodoMVC program-root addition.
+The failed hosted census covered625/626; this focused proof covers626/626.
+This is inventory completeness plus native TodoMVC validation, not a rerun
+of all453 program checks. Whole e14-check-is-build remains due on GitHub.
+
+census: 453 assemblies; 626 of 626 tracked source files; missing= []
+TodoMVC matches the normal build script source roots: 23 files
+command: target/debug/pw check --plain /home/haki/code/pw-wt/train-12/packages/pw-std/decode.pw /home/haki/code/pw-wt/train-12/packages/pw-std/effects.pw /home/haki/code/pw-wt/train-12/packages/pw-std/float.pw /home/haki/code/pw-wt/train-12/packages/pw-std/list.pw /home/haki/code/pw-wt/train-12/packages/pw-std/map.pw /home/haki/code/pw-wt/train-12/packages/pw-std/set.pw /home/haki/code/pw-wt/train-12/packages/pw-std/stream.pw /home/haki/code/pw-wt/train-12/packages/pw-std/string.pw /home/haki/code/pw-wt/train-12/packages/pw-platform-web/browser.pw /home/haki/code/pw-wt/train-12/packages/pw-platform-web/build.pw /home/haki/code/pw-wt/train-12/packages/pw-platform-web/capability.pw /home/haki/code/pw-wt/train-12/packages/pw-platform-web/clock.pw /home/haki/code/pw-wt/train-12/packages/pw-platform-web/context.pw /home/haki/code/pw-wt/train-12/packages/pw-platform-web/device.pw /home/haki/code/pw-wt/train-12/packages/pw-platform-web/document.pw /home/haki/code/pw-wt/train-12/packages/pw-platform-web/effects.pw /home/haki/code/pw-wt/train-12/packages/pw-platform-web/events.pw /home/haki/code/pw-wt/train-12/packages/pw-platform-web/html.pw /home/haki/code/pw-wt/train-12/packages/pw-platform-web/log.pw /home/haki/code/pw-wt/train-12/packages/pw-platform-web/payments.pw /home/haki/code/pw-wt/train-12/packages/pw-platform-web/secrets.pw /home/haki/code/pw-wt/train-12/packages/pw-platform-web/style.pw /home/haki/code/pw-wt/train-12/examples/todomvc/app.pw
+pw check: 23 file(s), no diagnostics
+
+native exit: 0
