@@ -51,11 +51,13 @@ MUTANTS = [
      '    if (False\n'),
     ('cancellation leaves owned child running', 'DeviceProducers.test_cancellation_reaps_child_before_source_restoration', DEVICE,
      "    except BaseException:\n        # Cancellation must reap our process group before the caller restores\n        # a mutant's source. Otherwise the old child can still read that source.\n        try:\n            os.killpg(p.pid, signal.SIGKILL)\n        except ProcessLookupError:\n            pass\n        p.communicate()\n        raise\n", '    except BaseException:\n        raise\n'),
+    ('an assertion operand panic earns a kill', 'DeviceProducers.test_cargo_refuses_assertion_operand_panics', DEVICE,
+     '            if int(column) != macro_column:\n', '            if False:\n'),
  ]
 SELECTOR = "test_device_producer_results"
 SEARCH = ROOT / "scripts/tests"
 PATTERN = "test_device_producer_results.py"
-EXPECTED_COUNT = 16
+EXPECTED_COUNT = 17
 TIMEOUT = 120
 
 

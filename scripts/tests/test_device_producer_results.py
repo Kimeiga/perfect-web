@@ -95,6 +95,15 @@ class DeviceProducers(unittest.TestCase):
         for site in ('compiler/pw-core/src/device_store.rs:1:1', 'compiler/pw-core/tests/device_store.rs:1:1', '/tmp/foreign.rs:1:1'):
             self.assertFalse(device.cargo_result('core', 101, self.cargo(True, site))[0])
 
+    def test_cargo_refuses_assertion_operand_panics(self):
+        genuine = self.cargo(True)
+        self.assertEqual(device.cargo_result('core', 101, genuine), (True, 0, 1))
+        # Same line, but inside the operand rather than the assertion macro.
+        operand = genuine.replace(':5:\nassertion failed', ':27:\ncalled `Option::unwrap()` on a `None` value')
+        self.assertFalse(device.cargo_result('core', 101, operand)[0])
+        custom = genuine.replace('assertion failed', 'custom expected behavior')
+        self.assertEqual(device.cargo_result('core', 101, custom), (True, 0, 1))
+
     def test_cargo_inventory_must_be_complete_and_frozen(self):
         self.assertTrue(device.cargo_result('core', 0, self.cargo())[0])
         self.assertFalse(device.cargo_result('core', 0, self.cargo().replace('test one', 'test other'))[0])

@@ -1,0 +1,176 @@
+rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+First infrastructure attempt used the rustup shim outside a toolchain directory and was refused before compilation. This run resolves rustup which rustc from the repository first.
+Native fixture source:
+#[test]
+fn ordinary_assertion() {
+    assert_eq!(1, 2);
+}
+#[test]
+fn custom_assertion() {
+    assert!(false, "custom invariant");
+}
+#[test]
+fn operand_unwrap() {
+    assert_eq!(None::<u8>.unwrap(), 1);
+}
+#[test]
+fn message_operand_unwrap() {
+    assert!(false, "{}", None::<u8>.unwrap());
+}
+
+Compile: <rustup which rustc> --test compiler/pw-core/tests/device_store.rs -o instrument
+Each run: ./instrument --exact <name> --format=pretty
+Both parsers receive the same native exit/output and temporary selected test source.
+== ordinary_assertion: nativeexit=101; old=(True, 0, 1); new=(True, 0, 1); expectedvalid=True
+
+running 1 test
+test ordinary_assertion ... FAILED
+
+failures:
+
+---- ordinary_assertion stdout ----
+
+thread 'ordinary_assertion' (2924744) panicked at compiler/pw-core/tests/device_store.rs:3:5:
+assertion `left == right` failed
+  left: 1
+ right: 2
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    ordinary_assertion
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+
+== custom_assertion: nativeexit=101; old=(True, 0, 1); new=(True, 0, 1); expectedvalid=True
+
+running 1 test
+test custom_assertion ... FAILED
+
+failures:
+
+---- custom_assertion stdout ----
+
+thread 'custom_assertion' (2924746) panicked at compiler/pw-core/tests/device_store.rs:7:5:
+custom invariant
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    custom_assertion
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+
+== operand_unwrap: nativeexit=101; old=(True, 0, 1); new=(False, 0, 0); expectedvalid=False
+
+running 1 test
+test operand_unwrap ... FAILED
+
+failures:
+
+---- operand_unwrap stdout ----
+
+thread 'operand_unwrap' (2924748) panicked at compiler/pw-core/tests/device_store.rs:11:27:
+called `Option::unwrap()` on a `None` value
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    operand_unwrap
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+
+== message_operand_unwrap: nativeexit=101; old=(True, 0, 1); new=(False, 0, 0); expectedvalid=False
+
+running 1 test
+test message_operand_unwrap ... FAILED
+
+failures:
+
+---- message_operand_unwrap stdout ----
+
+thread 'message_operand_unwrap' (2924750) panicked at compiler/pw-core/tests/device_store.rs:15:37:
+called `Option::unwrap()` on a `None` value
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    message_operand_unwrap
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+
+Native protocol: 4 of 4 expected outcomes; both real assertions accepted, both operand panics refused.
+
+Focused regressions: python3 -m unittest discover -s scripts/tests -p test_device_producer_results.py -v
+test_authentic_assertion_kills (test_device_producer_results.DeviceProducers) ... ok
+test_browser_inventory_is_complete_and_frozen (test_device_producer_results.DeviceProducers) ... ok
+test_browser_native_exit_must_agree (test_device_producer_results.DeviceProducers) ... ok
+test_browser_requires_complete_fresh_receipt (test_device_producer_results.DeviceProducers) ... ok
+test_build_failure_and_timeout_are_invalid (test_device_producer_results.DeviceProducers) ... ok
+test_cancellation_reaps_child_before_source_restoration (test_device_producer_results.DeviceProducers) ... ok
+test_cargo_authentic_assertion_and_green (test_device_producer_results.DeviceProducers) ... ok
+test_cargo_inventory_must_be_complete_and_frozen (test_device_producer_results.DeviceProducers) ... ok
+test_cargo_refuses_assertion_operand_panics (test_device_producer_results.DeviceProducers) ... ok
+test_cargo_refuses_nonassertion_panics (test_device_producer_results.DeviceProducers) ... ok
+test_cargo_refuses_status_and_build_errors (test_device_producer_results.DeviceProducers) ... ok
+test_invalid_producer_earns_no_kill (test_device_producer_results.DeviceProducers) ... ok
+test_reporter_accepts_body_assertions_and_green (test_device_producer_results.DeviceProducers) ... ok
+test_reporter_refuses_hook_and_runtime_errors (test_device_producer_results.DeviceProducers) ... ok
+test_reporter_refuses_incomplete_and_duplicate_callbacks (test_device_producer_results.DeviceProducers) ... ok
+test_reporter_refuses_timeout_skip_retry_and_expected_failure (test_device_producer_results.DeviceProducers) ... ok
+test_restored_build_failure_fails_campaign (test_device_producer_results.DeviceProducers) ... ok
+
+----------------------------------------------------------------------
+Ran 17 tests in 0.337s
+
+OK
+memory bound: no process was stopped
+
+Named twentieth control via guide_python.freeze/run, complete17test inventory, mutation restored byte-for-byte:
+baseline: Result(valid=True, reason='complete', passed=('test_device_producer_results.DeviceProducers.test_authentic_assertion_kills', 'test_device_producer_results.DeviceProducers.test_browser_inventory_is_complete_and_frozen', 'test_device_producer_results.DeviceProducers.test_browser_native_exit_must_agree', 'test_device_producer_results.DeviceProducers.test_browser_requires_complete_fresh_receipt', 'test_device_producer_results.DeviceProducers.test_build_failure_and_timeout_are_invalid', 'test_device_producer_results.DeviceProducers.test_cancellation_reaps_child_before_source_restoration', 'test_device_producer_results.DeviceProducers.test_cargo_authentic_assertion_and_green', 'test_device_producer_results.DeviceProducers.test_cargo_inventory_must_be_complete_and_frozen', 'test_device_producer_results.DeviceProducers.test_cargo_refuses_assertion_operand_panics', 'test_device_producer_results.DeviceProducers.test_cargo_refuses_nonassertion_panics', 'test_device_producer_results.DeviceProducers.test_cargo_refuses_status_and_build_errors', 'test_device_producer_results.DeviceProducers.test_invalid_producer_earns_no_kill', 'test_device_producer_results.DeviceProducers.test_reporter_accepts_body_assertions_and_green', 'test_device_producer_results.DeviceProducers.test_reporter_refuses_hook_and_runtime_errors', 'test_device_producer_results.DeviceProducers.test_reporter_refuses_incomplete_and_duplicate_callbacks', 'test_device_producer_results.DeviceProducers.test_reporter_refuses_timeout_skip_retry_and_expected_failure', 'test_device_producer_results.DeviceProducers.test_restored_build_failure_fails_campaign'), assertion_failed=(), body_errors=(), executed=17)
+memory bound: no process was stopped
+test_authentic_assertion_kills (test_device_producer_results.DeviceProducers) ... ok
+test_browser_inventory_is_complete_and_frozen (test_device_producer_results.DeviceProducers) ... ok
+test_browser_native_exit_must_agree (test_device_producer_results.DeviceProducers) ... ok
+test_browser_requires_complete_fresh_receipt (test_device_producer_results.DeviceProducers) ... ok
+test_build_failure_and_timeout_are_invalid (test_device_producer_results.DeviceProducers) ... ok
+test_cancellation_reaps_child_before_source_restoration (test_device_producer_results.DeviceProducers) ... ok
+test_cargo_authentic_assertion_and_green (test_device_producer_results.DeviceProducers) ... ok
+test_cargo_inventory_must_be_complete_and_frozen (test_device_producer_results.DeviceProducers) ... ok
+test_cargo_refuses_assertion_operand_panics (test_device_producer_results.DeviceProducers) ... FAIL
+test_cargo_refuses_nonassertion_panics (test_device_producer_results.DeviceProducers) ... ok
+test_cargo_refuses_status_and_build_errors (test_device_producer_results.DeviceProducers) ... ok
+test_invalid_producer_earns_no_kill (test_device_producer_results.DeviceProducers) ... ok
+test_reporter_accepts_body_assertions_and_green (test_device_producer_results.DeviceProducers) ... ok
+test_reporter_refuses_hook_and_runtime_errors (test_device_producer_results.DeviceProducers) ... ok
+test_reporter_refuses_incomplete_and_duplicate_callbacks (test_device_producer_results.DeviceProducers) ... ok
+test_reporter_refuses_timeout_skip_retry_and_expected_failure (test_device_producer_results.DeviceProducers) ... ok
+test_restored_build_failure_fails_campaign (test_device_producer_results.DeviceProducers) ... ok
+
+======================================================================
+FAIL: test_cargo_refuses_assertion_operand_panics (test_device_producer_results.DeviceProducers)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/train12-device-integration/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/train12-device-integration/scripts/tests/test_device_producer_results.py", line 103, in test_cargo_refuses_assertion_operand_panics
+    self.assertFalse(device.cargo_result('core', 101, operand)[0])
+AssertionError: True is not false
+
+----------------------------------------------------------------------
+Ran 17 tests in 0.363s
+
+FAILED (failures=1)
+
+Python structured receipt: /tmp/pw-device-column-control-9dlg1sz2/pw-guide-result-rbr90aag
+{"valid": true, "reason": "complete", "passed": ["test_device_producer_results.DeviceProducers.test_authentic_assertion_kills", "test_device_producer_results.DeviceProducers.test_browser_inventory_is_complete_and_frozen", "test_device_producer_results.DeviceProducers.test_browser_native_exit_must_agree", "test_device_producer_results.DeviceProducers.test_browser_requires_complete_fresh_receipt", "test_device_producer_results.DeviceProducers.test_build_failure_and_timeout_are_invalid", "test_device_producer_results.DeviceProducers.test_cancellation_reaps_child_before_source_restoration", "test_device_producer_results.DeviceProducers.test_cargo_authentic_assertion_and_green", "test_device_producer_results.DeviceProducers.test_cargo_inventory_must_be_complete_and_frozen", "test_device_producer_results.DeviceProducers.test_cargo_refuses_nonassertion_panics", "test_device_producer_results.DeviceProducers.test_cargo_refuses_status_and_build_errors", "test_device_producer_results.DeviceProducers.test_invalid_producer_earns_no_kill", "test_device_producer_results.DeviceProducers.test_reporter_accepts_body_assertions_and_green", "test_device_producer_results.DeviceProducers.test_reporter_refuses_hook_and_runtime_errors", "test_device_producer_results.DeviceProducers.test_reporter_refuses_incomplete_and_duplicate_callbacks", "test_device_producer_results.DeviceProducers.test_reporter_refuses_timeout_skip_retry_and_expected_failure", "test_device_producer_results.DeviceProducers.test_restored_build_failure_fails_campaign"], "assertion_failed": ["test_device_producer_results.DeviceProducers.test_cargo_refuses_assertion_operand_panics"], "body_errors": [], "executed": 17, "report_sha256": "be5bb1a4c43dd09d0eb5f92534f22c50b530b3bd511f891e65e1f9e71296d948"}
+
+mutant: Result(valid=True, reason='complete', passed=('test_device_producer_results.DeviceProducers.test_authentic_assertion_kills', 'test_device_producer_results.DeviceProducers.test_browser_inventory_is_complete_and_frozen', 'test_device_producer_results.DeviceProducers.test_browser_native_exit_must_agree', 'test_device_producer_results.DeviceProducers.test_browser_requires_complete_fresh_receipt', 'test_device_producer_results.DeviceProducers.test_build_failure_and_timeout_are_invalid', 'test_device_producer_results.DeviceProducers.test_cancellation_reaps_child_before_source_restoration', 'test_device_producer_results.DeviceProducers.test_cargo_authentic_assertion_and_green', 'test_device_producer_results.DeviceProducers.test_cargo_inventory_must_be_complete_and_frozen', 'test_device_producer_results.DeviceProducers.test_cargo_refuses_nonassertion_panics', 'test_device_producer_results.DeviceProducers.test_cargo_refuses_status_and_build_errors', 'test_device_producer_results.DeviceProducers.test_invalid_producer_earns_no_kill', 'test_device_producer_results.DeviceProducers.test_reporter_accepts_body_assertions_and_green', 'test_device_producer_results.DeviceProducers.test_reporter_refuses_hook_and_runtime_errors', 'test_device_producer_results.DeviceProducers.test_reporter_refuses_incomplete_and_duplicate_callbacks', 'test_device_producer_results.DeviceProducers.test_reporter_refuses_timeout_skip_retry_and_expected_failure', 'test_device_producer_results.DeviceProducers.test_restored_build_failure_fails_campaign'), assertion_failed=('test_device_producer_results.DeviceProducers.test_cargo_refuses_assertion_operand_panics',), body_errors=(), executed=17)
+an assertion operand panic earns a kill: KILLED by test_device_producer_results.DeviceProducers.test_cargo_refuses_assertion_operand_panics
+
+Earlier real Device List mutant revalidated under exact columns: valid=True,8passed,7failed.

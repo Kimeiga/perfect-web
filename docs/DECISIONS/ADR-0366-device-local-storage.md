@@ -803,7 +803,7 @@ assertions, runtime errors, test and setup timeouts, skipping and retry recovery
 invalid. The focused Python suite checks the transport, reporter lifecycle,
 Cargo producer, campaign verdict and final restored build. Cancellation kills
 and reaps the owned process group before restoring source; a real child-process
-regression holds this order. Its nineteen named
+regression holds this order. Its twenty named
 mutation controls use the existing canonical `guide_python` assertion receipts.
 `just e14-device-producer` records these checks; whole device/TodoMVC campaigns
 remain required on the combined remote train. No full-campaign result is claimed
@@ -829,3 +829,21 @@ read through a module path may still check and then receive the existing build
 refusal; selective imports remain the supported backend form. Regression tests
 must execute the real build and retain that refusal until backend support is
 separately designed, tested and approved.
+
+
+### An assertion operand is not an assertion failure (2026-10-20)
+
+Independent integration review found a remaining attribution gap: an `unwrap`
+panic inside an assertion operand shares the assertion's source line. Rust
+1.97.1 reports its operand column (27 or 37 in the native probes), while an
+ordinary failed `assert_eq!` and a failed `assert!` with a custom message both
+point to the assertion macro's first column (5). The device producer now checks
+that exact source column as well as the selected test path, line and macro.
+It continues to accept custom assertion messages; message text is not authority.
+
+[`device-assertion-columns.txt`](../evidence/tooling/device-assertion-columns.txt)
+records the native four-case fixture, commands and actual exit-101 output. The
+old producer accepts all four as assertion failures; the new one accepts only
+the two real assertions and refuses panics in the compared operand and message
+operand. A seventeenth regression and twentieth producer control hold this rule.
+Whole campaign validation remains part of the combined remote train.

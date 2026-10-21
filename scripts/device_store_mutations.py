@@ -578,10 +578,10 @@ def cargo_result(suite, code, out):
         allowed = ({"compiler/pw-core/tests/device_store.rs"} if suite == "core" else
                    {"spikes/own-renderer/server/src/tests/device_store.rs", "spikes/own-renderer/server/src/tests/todomvc.rs"})
         for _, block in blocks:
-            sites = re.findall(r"panicked at ([^\n]+?):(\d+):\d+:", block)
+            sites = re.findall(r"panicked at ([^\n]+?):(\d+):(\d+):", block)
             if len(sites) != 1:
                 return False, 0, 0
-            path, line = sites[0]
+            path, line, column = sites[0]
             source = pathlib.Path(path)
             if source.is_absolute():
                 try:
@@ -592,6 +592,10 @@ def cargo_result(suite, code, out):
                 return False, 0, 0
             lines = (ROOT / source).read_text().splitlines()
             if not 1 <= int(line) <= len(lines) or not re.match(r"\s*assert(?:_eq|_ne)?!", lines[int(line) - 1]):
+                return False, 0, 0
+            source_line = lines[int(line) - 1]
+            macro_column = len(source_line) - len(source_line.lstrip()) + 1
+            if int(column) != macro_column:
                 return False, 0, 0
     INVENTORIES.setdefault(suite, names)
     return True, result.passed, result.failed
