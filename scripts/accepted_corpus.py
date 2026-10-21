@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """**The accepted corpus, against the one list of the build's refusals** (ADR-0361; the coordinator's ruling of
-2026-10-20, verify 39442025240). Check-is-build makes `pw check` the complete check, what builds, and it refuses four
-accepted programs (PW6601). examples/accepted/build-refusals.json lists each, with its exact message and why; this
+2026-10-20, verify 39442025240). Check-is-build makes `pw check` the complete check, what builds, and it refuses the
+precisely listed unsupported accepted programs (PW6601). examples/accepted/build-refusals.json lists each, with its exact message and why; this
 check runs `pw check` on the accepted corpus as one program and passes only where every program not listed reports no
 error and each listed one is refused with exactly its code and message. It prints the list's size.
 
-Recipes that ran `pw check` on examples/accepted/*.pw and required it clean run this instead (five of them failed
-that verify on the raw check's "4 error(s)").
+Recipes that ran `pw check` on examples/accepted/*.pw and required it clean run this instead.
+The list is an executable-support census; semantic conformance remains a separate gate.
 
     python3 scripts/accepted_corpus.py
 """

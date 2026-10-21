@@ -189,7 +189,7 @@ fn accepted_corpus_has_exactly_its_known_backend_refusals() {
     );
     let files_ref = &files;
     // D1's accepted cross-source reference is a warning, separate from the
-    // executable backend's four errors. Pin its native structured identity.
+    // executable backend's listed errors. Pin its native structured identity.
     let expected_warning = "`Comments.author` refers to `Members` in `MemberData`, and `Comments` is in `CommentData`: no database holds the reference, so the referred row may be missing";
     let warnings: Vec<_> = report
         .diagnostics
@@ -338,8 +338,9 @@ fn accepted_corpus_has_exactly_its_known_backend_refusals() {
             );
             assert!(
                 text.contains(&format!(
-                    "pw check: {} file(s), 4 error(s), 1 warning(s)",
-                    program.len()
+                    "pw check: {} file(s), {} error(s), 1 warning(s)",
+                    program.len(),
+                    listed.len()
                 )),
                 "{text}"
             );
@@ -347,14 +348,19 @@ fn accepted_corpus_has_exactly_its_known_backend_refusals() {
             assert_eq!(codes(&text), BTreeSet::from(["PW6601".to_string()]));
             assert!(!text.contains("[PW0365]"), "{text}");
         }
-        assert_eq!(text.matches("[PW6601]").count(), 4, "{command}: {text}");
+        assert_eq!(
+            text.matches("[PW6601]").count(),
+            listed.len(),
+            "{command}: {text}"
+        );
         for (_, _, message) in &expected {
             assert!(text.contains(message), "{command}: {text}");
         }
         assert!(!out.exists());
     }
     println!(
-        "accepted corpus: semantic language remains accepted; complete check/build agree on exactly four backend gaps"
+        "accepted corpus: semantic language remains accepted; complete check/build agree on exactly {} listed backend refusals",
+        listed.len()
     );
 }
 

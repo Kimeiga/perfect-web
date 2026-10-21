@@ -10,6 +10,14 @@
       "why": "not supported yet: an element that mounts a resource (`<map resource={..}>`)"
     },
     {
+      "file": "A-010-origin-only-secret-operation.pw",
+      "code": "PW6601",
+      "stage": "backend_component",
+      "responsible": "command capture_payment",
+      "message": "`payments.capture.capture_payment`: did not lower: the backend does not lower a body-level statement yet: the backend lowers calls, names, literals, blocks, bindings, field reads, matches over `Option` and `Result`, arithmetic, comparisons, `if`, interpolated strings and records",
+      "why": "Existing backend gap, exposed after the A-008 WIT collision was fixed: the body-level `use key: Secret<Payments>` statement does not lower."
+    },
+    {
       "file": "A-013-build-time-deterministic-page.pw",
       "code": "PW6601",
       "stage": "backend_page",
@@ -18,12 +26,52 @@
       "why": "not supported yet: a page value computed at build time from a workspace file (`build.input.read`)"
     },
     {
+      "file": "A-014-content-addressed-resumable-handler.pw",
+      "code": "PW6601",
+      "stage": "backend_placeholder",
+      "responsible": "view AddToCartButton",
+      "message": "`store.add_button.AddToCartButton~ui` depends on `cart.commands.add_to_cart`, whose body is a placeholder (`todo`)",
+      "why": "Existing unimplemented dependency, exposed after the A-008 WIT collision was fixed: the handler calls the corpus fixture command cart.commands.add_to_cart, whose body is todo."
+    },
+    {
       "file": "A-018-resize-observation-updates-derived-state.pw",
       "code": "PW6601",
       "stage": "backend_template",
       "responsible": "style:grid-template-columns",
       "message": "a template part the renderer cannot render: store.responsive_menu.ResponsiveMenu~ui: `style:grid-template-columns`: `style:grid-template-columns` is a directive, and only `on:` directives are compiled",
       "why": "not supported yet: `style:` directives (only `on:` directives are compiled)"
+    },
+    {
+      "file": "A-025-page-states-its-title.pw",
+      "code": "PW6601",
+      "stage": "backend_placeholder",
+      "responsible": "page StoreOverview",
+      "message": "`store.overview.StoreOverview~ui` depends on `Resources.Store`, whose body is a placeholder (`todo`)",
+      "why": "Existing unimplemented dependency, exposed after the A-008 WIT collision was fixed: the page reads the corpus fixture query Resources.Store, whose body is todo."
+    },
+    {
+      "file": "A-026-ids-and-what-names-them.pw",
+      "code": "PW6601",
+      "stage": "backend_placeholder",
+      "responsible": "page CartPage",
+      "message": "`store.cart_page.CartPage~ui` depends on `Resources.Cart`, whose body is a placeholder (`todo`)",
+      "why": "Existing unimplemented dependency, exposed after the A-008 WIT collision was fixed: the page reads the corpus fixture query Resources.Cart, whose body is todo."
+    },
+    {
+      "file": "A-027-page-states-its-description.pw",
+      "code": "PW6601",
+      "stage": "backend_placeholder",
+      "responsible": "page StoreSummary",
+      "message": "`store.store_summary.StoreSummary~ui` depends on `Resources.Store`, whose body is a placeholder (`todo`)",
+      "why": "Existing unimplemented dependency, exposed after the A-008 WIT collision was fixed: the page reads the corpus fixture query Resources.Store, whose body is todo."
+    },
+    {
+      "file": "A-034-a-users-query-read-on-a-users-page.pw",
+      "code": "PW6601",
+      "stage": "backend_placeholder",
+      "responsible": "page SavedPage",
+      "message": "`saved.page.SavedPage~ui` depends on `Saved.SavedFor`, whose body is a placeholder (`todo`)",
+      "why": "Existing unimplemented dependency, exposed after the A-008 WIT collision was fixed: the page reads the corpus fixture query Saved.SavedFor, whose body is todo."
     }
   ]
 }

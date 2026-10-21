@@ -1,0 +1,469 @@
+Causal accepted-corpus probe, 2026-10-20.
+
+Historical checkout: git worktree add --detach /home/haki/code/pw-wt/train12-corpus-before 115895de
+Current isolated checkout: git worktree add -b track/train12-corpus /home/haki/code/pw-wt/train12-corpus d8369604
+Historical checkout git status --porcelain was empty after both probes.
+All 42 historical accepted .pw fixtures are byte-identical in current source; none was edited.
+Historical full inputs=90; historical omit-A008 inputs=89; current full inputs=93.
+Current inputs add examples/lib/FunctionReceiver.pw, accepted/A-039-generic-results-preserve-pure-member-types.pw,
+and accepted/A-054-a-value-the-device-keeps.pw; platform browser.pw and events.pw also have existing train changes.
+
+For each historical probe, from that checkout:
+    import importlib.util, subprocess
+    spec = importlib.util.spec_from_file_location('accepted', 'scripts/accepted_corpus.py')
+    accepted = importlib.util.module_from_spec(spec); spec.loader.exec_module(accepted)
+    files = accepted.program()
+    # Second probe only:
+    files = [p for p in files if not p.name.startswith('A-008-')]
+    run = subprocess.run(['cargo', 'run', '--quiet', '--locked', '-p', 'pw-cli', '--',
+                          'check', *map(str, files), '--plain'], capture_output=True, text=True)
+    print(run.returncode); print(run.stdout + run.stderr)
+Current full probe uses the current accepted.program() list without filtering, and target/debug/pw built by cargo.
+Assertions over raw diagnostics: historical full=4; historical minus-A008=9; current full=9.
+Historical minus-A008 diagnostic tuples (file,code,message) equal current full exactly after removing
+only the intentional namespace identity suffix ~ui from current messages.
+
+An extra cross-version-input probe runs current target/debug/pw with historical accepted.program()'s full90paths.
+It stops at PW0408 in A021: historical browser.pw predates ADR0351's PaintContext declaration.
+That probe cannot reach backend validation; its complete output is retained below. It does not establish
+backend parity across mismatched compiler/platform versions. The historical full/omit-A008 pair above uses
+one compiler and unchanged source contents, so independently proves these six old gaps were masked.
+
+HISTORICAL RAW
+master115 full original corpus
+native exit: 1
+('A-007-map-widget-resource-with-cleanup.pw', 'PW6601', 'a template part the renderer cannot render: store.map_widget.StoreLocation: `<map resource={..}>`: an element that mounts a resource is not compiled')
+('A-008-streamed-public-recommendations.pw', 'PW6601', 'the generated WIT does not parse: duplicate item named `store-recommendations-recommendations-api`')
+('A-013-build-time-deterministic-page.pw', 'PW6601', "`marketing.terms.Terms`'s values: part 0 computes a value that performs `build.input.read<WorkspaceFile>`, and a host computes only a value that performs nothing")
+('A-018-resize-observation-updates-derived-state.pw', 'PW6601', 'a template part the renderer cannot render: store.responsive_menu.ResponsiveMenu: `style:grid-template-columns`: `style:grid-template-columns` is a directive, and only `on:` directives are compiled')
+error: [PW6601] a template part the renderer cannot render: store.map_widget.StoreLocation: `<map resource={..}>`: an element that mounts a resource is not compiled
+  --> A-007-map-widget-resource-with-cleanup.pw:30:1
+   |
+30 | / view StoreLocation(center: LatLng) !{} {
+31 | |     <section aria-label="Store location">
+32 | |         <map-container resource={StoreMap} center={center} />
+33 | |     </section>
+34 | | }
+   | |_^ a template part the renderer cannot render: store.map_widget.StoreLocation: `<map resource={..}>`: an element that mounts a resource is not compiled
+   |
+   = note: The executable backend refused this program. Accepting it during check would promise an artifact the compiler cannot execute. Check and build use the same lowering, encoding, audit and page plans.
+   = help: use a supported construct described by the refusal, or supply the body the program depends on
+error: [PW6601] the generated WIT does not parse: duplicate item named `store-recommendations-recommendations-api`
+  --> A-008-streamed-public-recommendations.pw:18:1
+   |
+18 | / public query Recommendations(id: StoreId)
+19 | |     -> Result<List<Recommendation>, RecommendationError>
+20 | |     freshness      10.minutes
+21 | |     consistency    eventual
+...  |
+28 | |     Recommender.for_store(id)
+29 | | }
+   | |_^ the generated WIT does not parse: duplicate item named `store-recommendations-recommendations-api`
+   |
+   = note: The executable backend refused this program. Accepting it during check would promise an artifact the compiler cannot execute. Check and build use the same lowering, encoding, audit and page plans.
+   = help: use a supported construct described by the refusal, or supply the body the program depends on
+error: [PW6601] `marketing.terms.Terms`'s values: part 0 computes a value that performs `build.input.read<WorkspaceFile>`, and a host computes only a value that performs nothing
+  --> A-013-build-time-deterministic-page.pw:24:1
+   |
+24 | / page Terms() !{ build.input.read<WorkspaceFile> } {
+25 | |     placement build
+26 | |     privacy   Public
+27 | |     cache     shared
+...  |
+38 | | }
+   | |_^ `marketing.terms.Terms`'s values: part 0 computes a value that performs `build.input.read<WorkspaceFile>`, and a host computes only a value that performs nothing
+   |
+   = note: The executable backend refused this program. Accepting it during check would promise an artifact the compiler cannot execute. Check and build use the same lowering, encoding, audit and page plans.
+   = help: use a supported construct described by the refusal, or supply the body the program depends on
+error: [PW6601] a template part the renderer cannot render: store.responsive_menu.ResponsiveMenu: `style:grid-template-columns`: `style:grid-template-columns` is a directive, and only `on:` directives are compiled
+  --> A-018-resize-observation-updates-derived-state.pw:25:31
+   |
+25 |         <ul aria-label="Menu" style:grid-template-columns={repeat(columns)}>
+   |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^ a template part the renderer cannot render: store.responsive_menu.ResponsiveMenu: `style:grid-template-columns`: `style:grid-template-columns` is a directive, and only `on:` directives are compiled
+   |
+   = note: The executable backend refused this program. Accepting it during check would promise an artifact the compiler cannot execute. Check and build use the same lowering, encoding, audit and page plans.
+   = help: use a supported construct described by the refusal, or supply the body the program depends on
+warning: [PW0365] `Comments.author` refers to `Members` in `MemberData`, and `Comments` is in `CommentData`: no database holds the reference, so the referred row may be missing
+  --> A-052-a-reference-across-sources-that-may-name-no-row.pw:24:5
+   |
+24 |     refers author to Members
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^ `Comments.author` refers to `Members` in `MemberData`, and `Comments` is in `CommentData`: no database holds the reference, so the referred row may be missing
+   |
+  ::: A-051-a-reference-within-one-source.pw:17:7
+   |
+17 | table Members
+   |       ------- `Members` is held by `MemberData`
+   |
+   = note: Within one database a reference is a foreign key, which the database holds: a row is not written referring to one that is not there, and a row referred to is not deleted. Two databases hold nothing of each other, so the row a reference across them names may be missing, deleted by the other database's writes, and `get` answers it as `None`. This is true whether the field holding the key is optional or required.
+   = help: handle `None` from `Members`'s `get`, or hold `Comments` and `Members` in one source
+pw check: 90 file(s), 4 error(s), 1 warning(s)
+
+master115 original source list omitting A008 only
+native exit: 1
+('A-007-map-widget-resource-with-cleanup.pw', 'PW6601', 'a template part the renderer cannot render: store.map_widget.StoreLocation: `<map resource={..}>`: an element that mounts a resource is not compiled')
+('A-010-origin-only-secret-operation.pw', 'PW6601', '`payments.capture.capture_payment`: did not lower: the backend does not lower a body-level statement yet: the backend lowers calls, names, literals, blocks, bindings, field reads, matches over `Option` and `Result`, arithmetic, comparisons, `if`, interpolated strings and records')
+('A-013-build-time-deterministic-page.pw', 'PW6601', "`marketing.terms.Terms`'s values: part 0 computes a value that performs `build.input.read<WorkspaceFile>`, and a host computes only a value that performs nothing")
+('A-014-content-addressed-resumable-handler.pw', 'PW6601', '`store.add_button.AddToCartButton` depends on `cart.commands.add_to_cart`, whose body is a placeholder (`todo`)')
+('A-018-resize-observation-updates-derived-state.pw', 'PW6601', 'a template part the renderer cannot render: store.responsive_menu.ResponsiveMenu: `style:grid-template-columns`: `style:grid-template-columns` is a directive, and only `on:` directives are compiled')
+('A-025-page-states-its-title.pw', 'PW6601', '`store.overview.StoreOverview` depends on `Resources.Store`, whose body is a placeholder (`todo`)')
+('A-026-ids-and-what-names-them.pw', 'PW6601', '`store.cart_page.CartPage` depends on `Resources.Cart`, whose body is a placeholder (`todo`)')
+('A-027-page-states-its-description.pw', 'PW6601', '`store.store_summary.StoreSummary` depends on `Resources.Store`, whose body is a placeholder (`todo`)')
+('A-034-a-users-query-read-on-a-users-page.pw', 'PW6601', '`saved.page.SavedPage` depends on `Saved.SavedFor`, whose body is a placeholder (`todo`)')
+error: [PW6601] a template part the renderer cannot render: store.map_widget.StoreLocation: `<map resource={..}>`: an element that mounts a resource is not compiled
+  --> A-007-map-widget-resource-with-cleanup.pw:30:1
+   |
+30 | / view StoreLocation(center: LatLng) !{} {
+31 | |     <section aria-label="Store location">
+32 | |         <map-container resource={StoreMap} center={center} />
+33 | |     </section>
+34 | | }
+   | |_^ a template part the renderer cannot render: store.map_widget.StoreLocation: `<map resource={..}>`: an element that mounts a resource is not compiled
+   |
+   = note: The executable backend refused this program. Accepting it during check would promise an artifact the compiler cannot execute. Check and build use the same lowering, encoding, audit and page plans.
+   = help: use a supported construct described by the refusal, or supply the body the program depends on
+error: [PW6601] `payments.capture.capture_payment`: did not lower: the backend does not lower a body-level statement yet: the backend lowers calls, names, literals, blocks, bindings, field reads, matches over `Option` and `Result`, arithmetic, comparisons, `if`, interpolated strings and records
+  --> A-010-origin-only-secret-operation.pw:20:1
+   |
+20 | / command capture_payment(order: OrderId, amount: Money<USD>)
+21 | |     -> Result<PaymentReceipt, PaymentError>
+22 | |     requires      SignedIn, OwnsOrder(order)
+23 | |     placement     origin
+...  |
+31 | |     Payments.capture(key, order, amount)
+32 | | }
+   | |_^ `payments.capture.capture_payment`: did not lower: the backend does not lower a body-level statement yet: the backend lowers calls, names, literals, blocks, bindings, field reads, matches over `Option` and `Result`, arithmetic, comparisons, `if`, interpolated strings and records
+   |
+   = note: The executable backend refused this program. Accepting it during check would promise an artifact the compiler cannot execute. Check and build use the same lowering, encoding, audit and page plans.
+   = help: use a supported construct described by the refusal, or supply the body the program depends on
+error: [PW6601] `marketing.terms.Terms`'s values: part 0 computes a value that performs `build.input.read<WorkspaceFile>`, and a host computes only a value that performs nothing
+  --> A-013-build-time-deterministic-page.pw:24:1
+   |
+24 | / page Terms() !{ build.input.read<WorkspaceFile> } {
+25 | |     placement build
+26 | |     privacy   Public
+27 | |     cache     shared
+...  |
+38 | | }
+   | |_^ `marketing.terms.Terms`'s values: part 0 computes a value that performs `build.input.read<WorkspaceFile>`, and a host computes only a value that performs nothing
+   |
+   = note: The executable backend refused this program. Accepting it during check would promise an artifact the compiler cannot execute. Check and build use the same lowering, encoding, audit and page plans.
+   = help: use a supported construct described by the refusal, or supply the body the program depends on
+error: [PW6601] `store.add_button.AddToCartButton` depends on `cart.commands.add_to_cart`, whose body is a placeholder (`todo`)
+  --> A-014-content-addressed-resumable-handler.pw:26:1
+   |
+26 | / view AddToCartButton(item: MenuItem, available: Bool) !{} {
+...  |
+36 | |     </button>{/if}
+37 | | }
+   | |_^ `store.add_button.AddToCartButton` depends on `cart.commands.add_to_cart`, whose body is a placeholder (`todo`)
+   |
+   = note: The executable backend refused this program. Accepting it during check would promise an artifact the compiler cannot execute. Check and build use the same lowering, encoding, audit and page plans.
+   = help: use a supported construct described by the refusal, or supply the body the program depends on
+error: [PW6601] a template part the renderer cannot render: store.responsive_menu.ResponsiveMenu: `style:grid-template-columns`: `style:grid-template-columns` is a directive, and only `on:` directives are compiled
+  --> A-018-resize-observation-updates-derived-state.pw:25:31
+   |
+25 |         <ul aria-label="Menu" style:grid-template-columns={repeat(columns)}>
+   |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^ a template part the renderer cannot render: store.responsive_menu.ResponsiveMenu: `style:grid-template-columns`: `style:grid-template-columns` is a directive, and only `on:` directives are compiled
+   |
+   = note: The executable backend refused this program. Accepting it during check would promise an artifact the compiler cannot execute. Check and build use the same lowering, encoding, audit and page plans.
+   = help: use a supported construct described by the refusal, or supply the body the program depends on
+error: [PW6601] `store.overview.StoreOverview` depends on `Resources.Store`, whose body is a placeholder (`todo`)
+  --> A-025-page-states-its-title.pw:18:1
+   |
+18 | / page StoreOverview(id: StoreId) {
+19 | |     route "/stores/{id}/overview"
+20 | |
+21 | |     let store = query Store(id)
+...  |
+29 | | }
+   | |_^ `store.overview.StoreOverview` depends on `Resources.Store`, whose body is a placeholder (`todo`)
+   |
+   = note: The executable backend refused this program. Accepting it during check would promise an artifact the compiler cannot execute. Check and build use the same lowering, encoding, audit and page plans.
+   = help: use a supported construct described by the refusal, or supply the body the program depends on
+error: [PW6601] `store.cart_page.CartPage` depends on `Resources.Cart`, whose body is a placeholder (`todo`)
+  --> A-026-ids-and-what-names-them.pw:19:1
+   |
+19 | / page CartPage() {
+20 | |     route "/cart"
+21 | |
+22 | |     let cart = query Cart(current_session())
+...  |
+43 | | }
+   | |_^ `store.cart_page.CartPage` depends on `Resources.Cart`, whose body is a placeholder (`todo`)
+   |
+   = note: The executable backend refused this program. Accepting it during check would promise an artifact the compiler cannot execute. Check and build use the same lowering, encoding, audit and page plans.
+   = help: use a supported construct described by the refusal, or supply the body the program depends on
+error: [PW6601] `store.store_summary.StoreSummary` depends on `Resources.Store`, whose body is a placeholder (`todo`)
+  --> A-027-page-states-its-description.pw:17:1
+   |
+17 | / page StoreSummary(id: StoreId) {
+18 | |     route "/stores/{id}/summary"
+19 | |
+20 | |     let store = query Store(id)
+...  |
+30 | | }
+   | |_^ `store.store_summary.StoreSummary` depends on `Resources.Store`, whose body is a placeholder (`todo`)
+   |
+   = note: The executable backend refused this program. Accepting it during check would promise an artifact the compiler cannot execute. Check and build use the same lowering, encoding, audit and page plans.
+   = help: use a supported construct described by the refusal, or supply the body the program depends on
+error: [PW6601] `saved.page.SavedPage` depends on `Saved.SavedFor`, whose body is a placeholder (`todo`)
+  --> A-034-a-users-query-read-on-a-users-page.pw:17:1
+   |
+17 | / user page SavedPage() {
+18 | |     route "/saved"
+19 | |     cache private
+...  |
+33 | | }
+   | |_^ `saved.page.SavedPage` depends on `Saved.SavedFor`, whose body is a placeholder (`todo`)
+   |
+   = note: The executable backend refused this program. Accepting it during check would promise an artifact the compiler cannot execute. Check and build use the same lowering, encoding, audit and page plans.
+   = help: use a supported construct described by the refusal, or supply the body the program depends on
+warning: [PW0365] `Comments.author` refers to `Members` in `MemberData`, and `Comments` is in `CommentData`: no database holds the reference, so the referred row may be missing
+  --> A-052-a-reference-across-sources-that-may-name-no-row.pw:24:5
+   |
+24 |     refers author to Members
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^ `Comments.author` refers to `Members` in `MemberData`, and `Comments` is in `CommentData`: no database holds the reference, so the referred row may be missing
+   |
+  ::: A-051-a-reference-within-one-source.pw:17:7
+   |
+17 | table Members
+   |       ------- `Members` is held by `MemberData`
+   |
+   = note: Within one database a reference is a foreign key, which the database holds: a row is not written referring to one that is not there, and a row referred to is not deleted. Two databases hold nothing of each other, so the row a reference across them names may be missing, deleted by the other database's writes, and `get` answers it as `None`. This is true whether the field holding the key is optional or required.
+   = help: handle `None` from `Members`'s `get`, or hold `Comments` and `Members` in one source
+pw check: 89 file(s), 9 error(s), 1 warning(s)
+
+
+
+CURRENT RAW
+d8369604 full original corpus
+native exit: 1
+[('A-007-map-widget-resource-with-cleanup.pw', 'PW6601', 'a template part the renderer cannot render: store.map_widget.StoreLocation~ui: `<map resource={..}>`: an element that mounts a resource is not compiled'), ('A-010-origin-only-secret-operation.pw', 'PW6601', '`payments.capture.capture_payment`: did not lower: the backend does not lower a body-level statement yet: the backend lowers calls, names, literals, blocks, bindings, field reads, matches over `Option` and `Result`, arithmetic, comparisons, `if`, interpolated strings and records'), ('A-013-build-time-deterministic-page.pw', 'PW6601', "`marketing.terms.Terms~ui`'s values: part 0 computes a value that performs `build.input.read<WorkspaceFile>`, and a host computes only a value that performs nothing"), ('A-014-content-addressed-resumable-handler.pw', 'PW6601', '`store.add_button.AddToCartButton~ui` depends on `cart.commands.add_to_cart`, whose body is a placeholder (`todo`)'), ('A-018-resize-observation-updates-derived-state.pw', 'PW6601', 'a template part the renderer cannot render: store.responsive_menu.ResponsiveMenu~ui: `style:grid-template-columns`: `style:grid-template-columns` is a directive, and only `on:` directives are compiled'), ('A-025-page-states-its-title.pw', 'PW6601', '`store.overview.StoreOverview~ui` depends on `Resources.Store`, whose body is a placeholder (`todo`)'), ('A-026-ids-and-what-names-them.pw', 'PW6601', '`store.cart_page.CartPage~ui` depends on `Resources.Cart`, whose body is a placeholder (`todo`)'), ('A-027-page-states-its-description.pw', 'PW6601', '`store.store_summary.StoreSummary~ui` depends on `Resources.Store`, whose body is a placeholder (`todo`)'), ('A-034-a-users-query-read-on-a-users-page.pw', 'PW6601', '`saved.page.SavedPage~ui` depends on `Saved.SavedFor`, whose body is a placeholder (`todo`)')]
+error: [PW6601] a template part the renderer cannot render: store.map_widget.StoreLocation~ui: `<map resource={..}>`: an element that mounts a resource is not compiled
+  --> A-007-map-widget-resource-with-cleanup.pw:30:1
+   |
+30 | / view StoreLocation(center: LatLng) !{} {
+31 | |     <section aria-label="Store location">
+32 | |         <map-container resource={StoreMap} center={center} />
+33 | |     </section>
+34 | | }
+   | |_^ a template part the renderer cannot render: store.map_widget.StoreLocation~ui: `<map resource={..}>`: an element that mounts a resource is not compiled
+   |
+   = note: The executable backend refused this program. Accepting it during check would promise an artifact the compiler cannot execute. Check and build use the same lowering, encoding, audit and page plans.
+   = help: use a supported construct described by the refusal, or supply the body the program depends on
+error: [PW6601] `payments.capture.capture_payment`: did not lower: the backend does not lower a body-level statement yet: the backend lowers calls, names, literals, blocks, bindings, field reads, matches over `Option` and `Result`, arithmetic, comparisons, `if`, interpolated strings and records
+  --> A-010-origin-only-secret-operation.pw:20:1
+   |
+20 | / command capture_payment(order: OrderId, amount: Money<USD>)
+21 | |     -> Result<PaymentReceipt, PaymentError>
+22 | |     requires      SignedIn, OwnsOrder(order)
+23 | |     placement     origin
+...  |
+31 | |     Payments.capture(key, order, amount)
+32 | | }
+   | |_^ `payments.capture.capture_payment`: did not lower: the backend does not lower a body-level statement yet: the backend lowers calls, names, literals, blocks, bindings, field reads, matches over `Option` and `Result`, arithmetic, comparisons, `if`, interpolated strings and records
+   |
+   = note: The executable backend refused this program. Accepting it during check would promise an artifact the compiler cannot execute. Check and build use the same lowering, encoding, audit and page plans.
+   = help: use a supported construct described by the refusal, or supply the body the program depends on
+error: [PW6601] `marketing.terms.Terms~ui`'s values: part 0 computes a value that performs `build.input.read<WorkspaceFile>`, and a host computes only a value that performs nothing
+  --> A-013-build-time-deterministic-page.pw:24:1
+   |
+24 | / page Terms() !{ build.input.read<WorkspaceFile> } {
+25 | |     placement build
+26 | |     privacy   Public
+27 | |     cache     shared
+...  |
+38 | | }
+   | |_^ `marketing.terms.Terms~ui`'s values: part 0 computes a value that performs `build.input.read<WorkspaceFile>`, and a host computes only a value that performs nothing
+   |
+   = note: The executable backend refused this program. Accepting it during check would promise an artifact the compiler cannot execute. Check and build use the same lowering, encoding, audit and page plans.
+   = help: use a supported construct described by the refusal, or supply the body the program depends on
+error: [PW6601] `store.add_button.AddToCartButton~ui` depends on `cart.commands.add_to_cart`, whose body is a placeholder (`todo`)
+  --> A-014-content-addressed-resumable-handler.pw:26:1
+   |
+26 | / view AddToCartButton(item: MenuItem, available: Bool) !{} {
+...  |
+36 | |     </button>{/if}
+37 | | }
+   | |_^ `store.add_button.AddToCartButton~ui` depends on `cart.commands.add_to_cart`, whose body is a placeholder (`todo`)
+   |
+   = note: The executable backend refused this program. Accepting it during check would promise an artifact the compiler cannot execute. Check and build use the same lowering, encoding, audit and page plans.
+   = help: use a supported construct described by the refusal, or supply the body the program depends on
+error: [PW6601] a template part the renderer cannot render: store.responsive_menu.ResponsiveMenu~ui: `style:grid-template-columns`: `style:grid-template-columns` is a directive, and only `on:` directives are compiled
+  --> A-018-resize-observation-updates-derived-state.pw:25:31
+   |
+25 |         <ul aria-label="Menu" style:grid-template-columns={repeat(columns)}>
+   |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^ a template part the renderer cannot render: store.responsive_menu.ResponsiveMenu~ui: `style:grid-template-columns`: `style:grid-template-columns` is a directive, and only `on:` directives are compiled
+   |
+   = note: The executable backend refused this program. Accepting it during check would promise an artifact the compiler cannot execute. Check and build use the same lowering, encoding, audit and page plans.
+   = help: use a supported construct described by the refusal, or supply the body the program depends on
+error: [PW6601] `store.overview.StoreOverview~ui` depends on `Resources.Store`, whose body is a placeholder (`todo`)
+  --> A-025-page-states-its-title.pw:18:1
+   |
+18 | / page StoreOverview(id: StoreId) {
+19 | |     route "/stores/{id}/overview"
+20 | |
+21 | |     let store = query Store(id)
+...  |
+29 | | }
+   | |_^ `store.overview.StoreOverview~ui` depends on `Resources.Store`, whose body is a placeholder (`todo`)
+   |
+   = note: The executable backend refused this program. Accepting it during check would promise an artifact the compiler cannot execute. Check and build use the same lowering, encoding, audit and page plans.
+   = help: use a supported construct described by the refusal, or supply the body the program depends on
+error: [PW6601] `store.cart_page.CartPage~ui` depends on `Resources.Cart`, whose body is a placeholder (`todo`)
+  --> A-026-ids-and-what-names-them.pw:19:1
+   |
+19 | / page CartPage() {
+20 | |     route "/cart"
+21 | |
+22 | |     let cart = query Cart(current_session())
+...  |
+43 | | }
+   | |_^ `store.cart_page.CartPage~ui` depends on `Resources.Cart`, whose body is a placeholder (`todo`)
+   |
+   = note: The executable backend refused this program. Accepting it during check would promise an artifact the compiler cannot execute. Check and build use the same lowering, encoding, audit and page plans.
+   = help: use a supported construct described by the refusal, or supply the body the program depends on
+error: [PW6601] `store.store_summary.StoreSummary~ui` depends on `Resources.Store`, whose body is a placeholder (`todo`)
+  --> A-027-page-states-its-description.pw:17:1
+   |
+17 | / page StoreSummary(id: StoreId) {
+18 | |     route "/stores/{id}/summary"
+19 | |
+20 | |     let store = query Store(id)
+...  |
+30 | | }
+   | |_^ `store.store_summary.StoreSummary~ui` depends on `Resources.Store`, whose body is a placeholder (`todo`)
+   |
+   = note: The executable backend refused this program. Accepting it during check would promise an artifact the compiler cannot execute. Check and build use the same lowering, encoding, audit and page plans.
+   = help: use a supported construct described by the refusal, or supply the body the program depends on
+error: [PW6601] `saved.page.SavedPage~ui` depends on `Saved.SavedFor`, whose body is a placeholder (`todo`)
+  --> A-034-a-users-query-read-on-a-users-page.pw:17:1
+   |
+17 | / user page SavedPage() {
+18 | |     route "/saved"
+19 | |     cache private
+...  |
+33 | | }
+   | |_^ `saved.page.SavedPage~ui` depends on `Saved.SavedFor`, whose body is a placeholder (`todo`)
+   |
+   = note: The executable backend refused this program. Accepting it during check would promise an artifact the compiler cannot execute. Check and build use the same lowering, encoding, audit and page plans.
+   = help: use a supported construct described by the refusal, or supply the body the program depends on
+warning: [PW0365] `Comments.author` refers to `Members` in `MemberData`, and `Comments` is in `CommentData`: no database holds the reference, so the referred row may be missing
+  --> A-052-a-reference-across-sources-that-may-name-no-row.pw:24:5
+   |
+24 |     refers author to Members
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^ `Comments.author` refers to `Members` in `MemberData`, and `Comments` is in `CommentData`: no database holds the reference, so the referred row may be missing
+   |
+  ::: A-051-a-reference-within-one-source.pw:17:7
+   |
+17 | table Members
+   |       ------- `Members` is held by `MemberData`
+   |
+   = note: Within one database a reference is a foreign key, which the database holds: a row is not written referring to one that is not there, and a row referred to is not deleted. Two databases hold nothing of each other, so the row a reference across them names may be missing, deleted by the other database's writes, and `get` answers it as `None`. This is true whether the field holding the key is optional or required.
+   = help: handle `None` from `Members`'s `get`, or hold `Comments` and `Members` in one source
+pw check: 93 file(s), 9 error(s), 1 warning(s)
+
+
+CROSS-VERSION INPUT PROBE
+Current d836 compiler on unedited historical115895de full90inputs
+native exit: 1
+[('A-021-custom-paint-with-declared-inputs.pw', 'PW0408', 'the type of `ctx` is not known here, so what `.rect` reads cannot be checked')]
+error: [PW0408] the type of `ctx` is not known here, so what `.rect` reads cannot be checked
+  --> A-021-custom-paint-with-declared-inputs.pw:32:13
+   |
+32 |             ctx.rect(Float.from_int(i) * step, height * (1.0 - v), step - 1.0, height * v)
+   |             ---^^^^^
+   |             |
+   |             the type of `ctx` is not known here, so what `.rect` reads cannot be checked
+   |             no declaration gives this value a type, and no call solves one
+   |
+   = note: A member read is a call (ADR-0048), found by its receiver's type: which `rect` this is, the effects it performs and the label of what it gives are each read through that type, and `RatingSpark` cannot be checked against a read no analysis can see.
+   = help: write `ctx`'s type where it is bound, as `(x: Item) => ..` does for a lambda's parameter
+warning: [PW0365] `Comments.author` refers to `Members` in `MemberData`, and `Comments` is in `CommentData`: no database holds the reference, so the referred row may be missing
+  --> A-052-a-reference-across-sources-that-may-name-no-row.pw:24:5
+   |
+24 |     refers author to Members
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^ `Comments.author` refers to `Members` in `MemberData`, and `Comments` is in `CommentData`: no database holds the reference, so the referred row may be missing
+   |
+  ::: A-051-a-reference-within-one-source.pw:17:7
+   |
+17 | table Members
+   |       ------- `Members` is held by `MemberData`
+   |
+   = note: Within one database a reference is a foreign key, which the database holds: a row is not written referring to one that is not there, and a row referred to is not deleted. Two databases hold nothing of each other, so the row a reference across them names may be missing, deleted by the other database's writes, and `get` answers it as `None`. This is true whether the field holding the key is optional or required.
+   = help: handle `None` from `Members`'s `get`, or hold `Comments` and `Members` in one source
+pw check: 90 file(s), 1 error(s), 1 warning(s)
+
+
+CURRENT EXACT CLI GATE: cargo test --locked -p pw-cli --test check_build_corpus accepted_corpus_has_exactly_its_known_backend_refusals -- --exact --nocapture
+   Compiling pw-cli v0.0.0 (/home/haki/code/pw-wt/train12-corpus/compiler/pw-cli)
+    Finished `test` profile [unoptimized] target(s) in 0.63s
+     Running tests/check_build_corpus.rs (target/debug/deps/check_build_corpus-ec5fcb9158b0d481)
+
+running 1 test
+accepted corpus: semantic language remains accepted; complete check/build agree on exactly 9 listed backend refusals
+test accepted_corpus_has_exactly_its_known_backend_refusals ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 1.32s
+
+
+
+A008 REAL QUERY/VIEW: cargo test --locked -p pw-core --test component_names accepted_a008_builds_its_real_query_and_view -- --exact --nocapture
+   Compiling bitflags v2.13.1
+   Compiling shlex v2.0.1
+   Compiling find-msvc-tools v0.1.9
+   Compiling cfg-if v1.0.4
+   Compiling arrayvec v0.7.8
+   Compiling libc v0.2.189
+   Compiling cpufeatures v0.3.0
+   Compiling arrayref v0.3.9
+   Compiling constant_time_eq v0.4.2
+   Compiling getrandom v0.4.3
+   Compiling rustix v1.1.4
+   Compiling cc v1.4.0
+   Compiling wasmparser v0.257.1
+   Compiling linux-raw-sys v0.12.1
+   Compiling fastrand v2.5.0
+   Compiling once_cell v1.21.4
+   Compiling blake3 v1.8.6
+   Compiling pw-resource v0.0.0 (/home/haki/code/pw-wt/train12-corpus/runtime/pw-resource)
+   Compiling tempfile v3.27.0
+   Compiling pw-document v0.0.0 (/home/haki/code/pw-wt/train12-corpus/runtime/pw-document)
+   Compiling pw-render v0.0.0 (/home/haki/code/pw-wt/train12-corpus/runtime/pw-render)
+   Compiling wasm-encoder v0.257.1
+   Compiling wit-parser v0.257.1
+   Compiling wasm-metadata v0.257.1
+   Compiling wit-component v0.257.1
+   Compiling pw-core v0.0.0 (/home/haki/code/pw-wt/train12-corpus/compiler/pw-core)
+    Finished `test` profile [unoptimized] target(s) in 16.57s
+     Running tests/component_names.rs (target/debug/deps/component_names-f7f5d3fea0ea1ead)
+
+running 1 test
+test accepted_a008_builds_its_real_query_and_view ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.19s
+
+
+
+CURRENT CORPUS SCRIPT: python3 scripts/accepted_corpus.py
+accepted corpus: 44 programs, 35 with no error, 9 refused exactly as listed (examples/accepted/build-refusals.json: 9 entries)
+
+
+EXACT-LIST COMPARISON REGRESSIONS: python3 -m unittest discover -s scripts/tests -p test_accepted_corpus.py
+...
+----------------------------------------------------------------------
+Ran 3 tests in 0.000s
+
+OK
+
+
+SEMANTIC CONFORMANCE: cargo test --locked -p pw-core --test checking_source no_accepted_corpus_file_reports_a_body_level_error -- --exact --nocapture
+   Compiling pw-core v0.0.0 (/home/haki/code/pw-wt/train12-corpus/compiler/pw-core)
+    Finished `test` profile [unoptimized] target(s) in 0.61s
+     Running tests/checking_source.rs (target/debug/deps/checking_source-9166b1a7d916f70f)
+
+running 1 test
+test no_accepted_corpus_file_reports_a_body_level_error ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 19 filtered out; finished in 0.26s
+

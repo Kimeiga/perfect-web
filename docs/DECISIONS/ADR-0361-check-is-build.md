@@ -1144,3 +1144,60 @@ exactly its message, and it prints the list's size
 (`scripts/tests/test_accepted_corpus.py` holds the comparison, with the
 controls of an unlisted error, a missing refusal and a message changed by
 one character).
+
+
+## Corpus census after the WIT collision repair (2026-10-20)
+
+ADR-0373 repairs A-008's same-named query/view identity collision. The earlier
+four-refusal census was incomplete: the whole generated WIT package failed to
+parse, so `build::analyze_prepared` correctly skipped WIT-dependent component
+encoding. That also hid unsupported components and dependencies on placeholders
+elsewhere in the combined semantic corpus. It did not make those fixtures
+executable. Independent template/page refusals were still reported.
+
+The integrator required historical proof before correcting this contract. In a
+clean detached checkout of `115895de`, the original full corpus reports four
+refusals. The same historical compiler and unchanged source files, omitting only
+A-008 from the probe's argument list, report nine. The integrated `d8369604`
+compiler with its full corpus reports the same nine, with only the intentional
+`~ui` identity suffix differing. All forty-two historical accepted `.pw` fixtures
+are byte-identical in the integrated source. Commands, full raw outputs and the
+exact diagnostic-tuple comparison are recorded in
+[`corpus-after-wit.txt`](../evidence/tooling/corpus-after-wit.txt).
+
+The current program has ninety-three inputs versus the historical ninety: two
+new accepted fixtures, one new library fixture, and existing train updates to
+`browser.pw`/`events.pw`. An extra current-compiler/historical-platform probe
+cannot reach the backend: A-021 reports PW0408 because that old `browser.pw`
+lacks ADR-0351's declared `PaintContext`. That result is retained in the raw
+record; cross-version platform compatibility is not claimed. The historical
+full/omit-A008 comparison itself uses one compiler and unchanged source content.
+
+The six newly visible limitations are existing gaps, not executable regressions
+introduced by generic/effect inference or the namespace repair:
+
+- A-010: the body-level `use key: Secret<Payments>` statement does not lower.
+- A-014: its resumable handler depends on fixture command
+  `cart.commands.add_to_cart`, whose body is `todo`.
+- A-025 and A-027: their pages depend on fixture query `Resources.Store`, whose
+  body is `todo`.
+- A-026: its page depends on fixture query `Resources.Cart`, whose body is `todo`.
+- A-034: its page depends on fixture query `Saved.SavedFor`, whose body is `todo`.
+
+Under the integrator's explicit corpus-contract ruling, the single reviewed
+`examples/accepted/build-refusals.json` census now records all nine exact
+file/code/stage/responsible-span/message entries and each limitation's reason.
+No backend refusal is suppressed, placeholder body invented, frozen fixture
+edited, or executable acceptance weakened. The semantic corpus remains its
+separate language-conformance gate. The complete CLI test derives only its
+summary count from this exact list, while still matching every individual
+structured refusal, warning, native check/build exit and absence of artifacts.
+Unlisted, missing or changed refusals still fail the existing comparison tests.
+
+A-008 itself is no longer in the refusal list. The unchanged fixture passes
+`component_names::accepted_a008_builds_its_real_query_and_view`: its real query
+component is compiled and audited and its separate view is built through the
+rendering path. The integrated exact accepted-corpus CLI gate and script pass
+with nine listed refusals; the three exact-list comparison regressions pass.
+These are support-census corrections, not claims that the remaining backend
+features or fixture service implementations have been completed.

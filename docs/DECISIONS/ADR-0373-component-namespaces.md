@@ -65,3 +65,15 @@ WIT's contract-declaration map now admits Term/Ui namespaces only, the namespace
 of its component and callable declarations. Other namespaces keep their existing
 WIT naming; they cannot replace a contract's declaration. The regression requires
 both source orders to retain the query's signature and audited executable body.
+
+
+### Accepted corpus integration consequence (2026-10-20)
+
+Repairing A-008's generated-WIT collision exposes six pre-existing backend or
+fixture-placeholder refusals that the old package failure masked. Historical
+`115895de` full-corpus four-refusal output becomes nine when only A-008 is omitted
+from the probe's arguments; integrated `d8369604` full-corpus output has those
+same nine. The unchanged A-008 now builds its actual query and view separately.
+[ADR-0361's corpus census amendment](ADR-0361-check-is-build.md#corpus-census-after-the-wit-collision-repair-2026-10-20)
+records the integrator's explicit correction, all six limitations and raw proof.
+Complete validation remains fail closed and frozen `.pw` sources remain unchanged.
