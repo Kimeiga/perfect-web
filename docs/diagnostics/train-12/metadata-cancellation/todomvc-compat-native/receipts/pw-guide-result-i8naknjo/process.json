@@ -1,0 +1,21 @@
+{
+  "command": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/haki/code/pw-wt/final-evidence-metadata/scripts/unittest_producer.py",
+    "--report",
+    "/tmp/pw-todomvc-compat-controls-elfo978m/pw-guide-result-i8naknjo/result.json",
+    "--expected",
+    "/tmp/pw-todomvc-compat-controls-elfo978m/pw-guide-result-i8naknjo/expected.json",
+    "test_todomvc_cypress_compat"
+  ],
+  "cwd": "/home/haki/code/pw-wt/final-evidence-metadata",
+  "deployment_env_absent": true,
+  "fresh_bytecode_prefix": "/tmp/pw-todomvc-compat-controls-elfo978m/pw-guide-result-i8naknjo/fresh-bytecode",
+  "pid": 808520,
+  "actual_status": 0,
+  "validated_status": 0,
+  "timed_out": false,
+  "cancelled": false,
+  "child_reaped": true
+}

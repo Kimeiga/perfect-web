@@ -1,0 +1,31 @@
+todomvc-cypress-compat-v1: create; original 7 upstream blobs unchanged; exact 2-patch execution copy; manifest sha256 f14a99ba4714c91ee7f39397a58bfb1c9f8fc0b4881a1e60f72c3bb7809801c0
+{
+  "cypress_binary": "15.21.1",
+  "cypress_package": "wrong",
+  "identity": "todomvc-cypress-compat-v1",
+  "output_sha256": {
+    "LICENSE-todomvc.md": "32238c5c6759b589ea768661b6eb0fcb42449b74d57cdf09928743f2e1eb748d",
+    "cypress.config.js": "e1e01ccb3aa9901bd2c47577c79fb7b039928ebadd6b4071dabbbd49627e245c",
+    "cypress/e2e/spec.cy.js": "c353401d93731945f77c3f8341fcded3bb5479b2d36944349133a72ac09cd88c",
+    "cypress/fixtures/example.json": "6c88ef752eb4a0e9dc7d1a9ea16624eda9084fea2cc967a89d5a9304aa32be9d",
+    "cypress/support/commands.js": "4aa73053c8323b9bf93fdbf706147968d2f43627e6d4366e8c86cddbd580d843",
+    "cypress/support/e2e.js": "c183589133eaf583809727f3f9f52aff93db86e200a71ae045de2a381f87b9c1",
+    "package.json": "f867221162a60c2d75a35a203226d4d42dc0c8cde143a8abee67760cad145c2b",
+    "tests/knownIssues.js": "dc628ff3e0198c4559e501a566cb6c344bf75a7e0dc7cae11e1e50de90feca90"
+  },
+  "patches": [
+    "spy-reset-history",
+    "fresh-created-todo-query"
+  ],
+  "patchset_sha256": "25d26eb59c020b9ea261f65861f0b7dad4cb698fce1ade1d3f4b9276f03ed3ee",
+  "upstream_blobs": {
+    "LICENSE-todomvc.md": "9275d4371020294b6a107e454a0d1819f8b71c31",
+    "cypress.config.js": "9557466f8850fd01fe05406acbc69d2e713fccd1",
+    "cypress/e2e/spec.cy.js": "478bcfb17f407d56b4db19c4bffadcd0aa1e0972",
+    "cypress/fixtures/example.json": "da87594a2465392b86ba23faaa7ac1d971c32091",
+    "cypress/support/commands.js": "029abdbaf932cd1dded89e79c7943aa2fcab9c36",
+    "cypress/support/e2e.js": "8edffddd850ceaa49a30c8b4542df5f02d16676a",
+    "tests/knownIssues.js": "808649f49a9cde966e2fb8185eac394a0f975217"
+  },
+  "upstream_revision": "ff43b02e59dfa604386bb382034b2cd07c2bcd8a"
+}

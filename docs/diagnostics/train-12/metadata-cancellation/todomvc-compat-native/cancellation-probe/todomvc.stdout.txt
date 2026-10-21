@@ -1,0 +1,4 @@
+stub native receipt
+baseline: 11 passed, 0 failed
+CANCEL_RECEIPT {"exit": 143, "source_restored": true, "handler_restored": true}
+memory bound: no process was stopped

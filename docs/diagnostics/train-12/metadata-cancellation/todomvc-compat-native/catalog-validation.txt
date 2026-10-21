@@ -1,0 +1,9 @@
+PASS: 8 of 8 canonical verdicts uniquely match the descriptions plus qualified witness metadata using evidence_counts.VERDICT and evidence_counts.names.
+1. changed original blobs are accepted: KILLED by test_todomvc_cypress_compat.Compatibility.test_each_original_drift_or_missing_file_refuses_before_creation (2 assertion methods fail)
+2. installed package and binary pins are ignored: KILLED by test_todomvc_cypress_compat.Compatibility.test_package_and_binary_versions_must_be_exact (2 assertion methods fail)
+3. declared package pin is ignored: KILLED by test_todomvc_cypress_compat.Compatibility.test_declared_pin_drift_is_refused (1 assertion methods fail)
+4. patch identity can change without a new version: KILLED by test_todomvc_cypress_compat.Compatibility.test_patch_identity_cannot_silently_change_under_v1 (1 assertion methods fail)
+5. existing destination paths are no longer refused: KILLED by test_todomvc_cypress_compat.Compatibility.test_recheck_catches_source_drift_and_never_overwrites (1 assertion methods fail)
+6. patched-output digest guard is bypassed: KILLED by test_todomvc_cypress_compat.Compatibility.test_output_identity_cannot_silently_change_under_v1 (1 assertion methods fail)
+7. extra staged specs are accepted: KILLED by test_todomvc_cypress_compat.Compatibility.test_staged_added_missing_and_symlink_files_are_refused (1 assertion methods fail)
+8. staged content and manifest drift are accepted: KILLED by test_todomvc_cypress_compat.Compatibility.test_staged_file_and_manifest_drift_are_refused (1 assertion methods fail)

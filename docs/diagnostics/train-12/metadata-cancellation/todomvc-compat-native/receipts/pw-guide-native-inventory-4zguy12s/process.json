@@ -1,0 +1,19 @@
+{
+  "command": [
+    "/usr/bin/python3",
+    "-B",
+    "-c",
+    "import json,sys,unittest\nloader=unittest.TestLoader()\nsuite=loader.discover(sys.argv[1],pattern=sys.argv[2])\ndef walk(node):\n for item in node:\n  if isinstance(item,unittest.TestSuite):yield from walk(item)\n  else:yield item.id()\nids=sorted(walk(suite))\nif loader.errors:raise RuntimeError('native discovery failed: '+repr(loader.errors))\nprint(json.dumps(ids))\n",
+    "/home/haki/code/pw-wt/final-evidence-metadata/scripts/tests",
+    "test_todomvc_cypress_compat.py"
+  ],
+  "cwd": "/home/haki/code/pw-wt/final-evidence-metadata",
+  "deployment_env_absent": true,
+  "fresh_bytecode_prefix": "/tmp/pw-todomvc-compat-controls-elfo978m/pw-guide-native-inventory-4zguy12s/fresh-bytecode",
+  "pid": 808518,
+  "actual_status": 0,
+  "validated_status": 0,
+  "timed_out": false,
+  "cancelled": false,
+  "child_reaped": true
+}

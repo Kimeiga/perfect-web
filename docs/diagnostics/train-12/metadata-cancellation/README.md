@@ -19,3 +19,37 @@ cache and was removed after the run; the shared cache was not modified.
 
 The first refusal remains historical evidence. It is retained alongside the
 successful run rather than overwritten.
+
+## TodoMVC compatibility controls
+
+`todomvc-compat-native/raw-run.txt` retains the 11-test native baseline and
+all eight compatibility-guard mutations. `receipts/` preserves the native
+inventory, frozen expected IDs, process statuses, stdout/stderr, structured
+result reports, and validation receipts for the baseline and each control.
+This is the native compatibility-guard campaign; it does not claim a Cypress
+application/browser run. `catalog-validation.txt` checks the exact eight
+verdicts with the unchanged `evidence_counts.VERDICT` parser and `names`
+matcher, pairing each mutation description with its qualified witness from
+the parallel `WITNESSES` list. All eight rows match uniquely; no parser rule
+was changed.
+
+The raw TodoMVC run is SHA256
+`ed412aefff032760b815104252e625197aab7524dc05b57ec82267b9477d058f`.
+
+## Isolated cancellation probe
+
+Reproduce both bounded child probes with:
+
+```sh
+python3 -m unittest -v scripts.tests.test_mutation_cancel_restores_source
+```
+
+That test copies each source into a temporary directory, invokes the actual
+runner `main()` in a child process, stubs native producer work, and delivers
+SIGTERM after observing the changed copy. The parent checks exit 143 and exact
+source restoration; the child receipt checks prior-handler restoration. The
+parent reaps each child before its temporary directory is removed. The captured
+child stdout and process-status records are in `todomvc-compat-native/cancellation-probe/`.
+These probes test mutation cleanup and process ownership for the isolated
+child only; they do not exercise descendant process groups or real native
+producer shutdown.
