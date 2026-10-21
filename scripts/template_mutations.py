@@ -21,6 +21,7 @@ import os
 import re
 import signal
 import subprocess
+import producer_process
 import sys
 
 import cargo_test_results
@@ -211,19 +212,9 @@ def run_tests():
         flags = ["--", "--format=pretty"]
         if index == 2:
             flags.extend(arg for name in KIOKUN_OTHER_RUNS for arg in ("--skip", name))
-        child = subprocess.Popen([*cmd, *flags], cwd=ROOT,
-                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                 text=True, start_new_session=True)
-        try:
-            out, _ = child.communicate(timeout=600)
-        except BaseException:
-            try:
-                os.killpg(child.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            child.communicate()
-            raise
-        valid, p, f = result_of(index, child.returncode, out)
+        result = producer_process.run([*cmd, *flags], cwd=ROOT, timeout=600)
+        out = result.stdout
+        valid, p, f = result_of(index, result.returncode, out)
         if not valid or f:
             print(out, flush=True)
         built &= valid

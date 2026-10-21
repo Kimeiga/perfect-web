@@ -20,6 +20,7 @@ import os
 import re
 import signal
 import subprocess
+import producer_process
 import sys
 
 import cargo_test_results
@@ -119,18 +120,9 @@ def run_tests():
     """Only complete native results and test-body assertions earn credit."""
     built, passed, failed = True, 0, 0
     for cmd in TESTS:
-        child = subprocess.Popen(cmd, cwd=ROOT, stdout=subprocess.PIPE,
-                                 stderr=subprocess.STDOUT, text=True, start_new_session=True)
-        try:
-            output, _ = child.communicate(timeout=300)
-        except BaseException:
-            try:
-                os.killpg(child.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            child.communicate()
-            raise
-        valid, p, f = result_of(child.returncode, output)
+        result = producer_process.run(cmd, cwd=ROOT, timeout=300)
+        output = result.stdout
+        valid, p, f = result_of(result.returncode, output)
         if not valid or f:
             print(output, flush=True)
         built &= valid

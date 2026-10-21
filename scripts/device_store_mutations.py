@@ -42,6 +42,7 @@ import pathlib
 import re
 import signal
 import subprocess
+import producer_process
 import sys
 import secrets
 import tempfile
@@ -529,27 +530,11 @@ BOUND = 1500
 
 def bounded(cmd, **kw):
     """(output, returncode), or (output, None) when it ran past the bound."""
-    p = subprocess.Popen(cmd, start_new_session=True, stdout=subprocess.PIPE,
-                         stderr=subprocess.STDOUT, text=True, **kw)
     try:
-        out, _ = p.communicate(timeout=BOUND)
-        return out, p.returncode
-    except subprocess.TimeoutExpired:
-        try:
-            os.killpg(p.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-        out, _ = p.communicate()
-        return out, None
-    except BaseException:
-        # Cancellation must reap our process group before the caller restores
-        # a mutant's source. Otherwise the old child can still read that source.
-        try:
-            os.killpg(p.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-        p.communicate()
-        raise
+        result = producer_process.run(cmd, timeout=BOUND, **kw)
+        return result.stdout, result.returncode
+    except subprocess.TimeoutExpired as expired:
+        return expired.output, None
 
 
 # Frozen from each unmutated complete run, then compared for every control.

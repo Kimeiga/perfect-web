@@ -5,6 +5,7 @@ import pathlib
 import re
 import signal
 import subprocess
+import producer_process
 import sys
 from cargo_test_results import parse
 
@@ -38,17 +39,13 @@ INVENTORY = None
 
 
 def run():
-    process = subprocess.Popen(['cargo', 'test', '--quiet', '--locked', '-p', 'pw-core',
-        '--test', 'qualified_device', '--', '--format=pretty'], cwd=ROOT,
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True)
     try:
-        out, _ = process.communicate(timeout=BOUND)
-    except subprocess.TimeoutExpired:
-        os.killpg(process.pid, signal.SIGKILL)
-        out, _ = process.communicate()
-        print(out, flush=True)
+        result = producer_process.run(['cargo', 'test', '--quiet', '--locked', '-p', 'pw-core',
+            '--test', 'qualified_device', '--', '--format=pretty'], cwd=ROOT, timeout=BOUND)
+    except subprocess.TimeoutExpired as expired:
+        print(expired.output, flush=True)
         return False, 0
-    return validate(process.returncode, out)
+    return validate(result.returncode, result.stdout)
 
 
 def validate(code, out):

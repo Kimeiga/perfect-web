@@ -49,8 +49,8 @@ MUTANTS = [
     ('skipped cargo tests accepted', 'DeviceProducers.test_cargo_inventory_must_be_complete_and_frozen', DEVICE,
      '    if (re.search(r"; [1-9]\\d* (?:ignored|measured)", out)\n',
      '    if (False\n'),
-    ('cancellation leaves owned child running', 'DeviceProducers.test_cancellation_reaps_child_before_source_restoration', DEVICE,
-     "    except BaseException:\n        # Cancellation must reap our process group before the caller restores\n        # a mutant's source. Otherwise the old child can still read that source.\n        try:\n            os.killpg(p.pid, signal.SIGKILL)\n        except ProcessLookupError:\n            pass\n        p.communicate()\n        raise\n", '    except BaseException:\n        raise\n'),
+    ('cancellation leaves owned child running', 'DeviceProducers.test_cancellation_reaps_child_before_source_restoration', ROOT / "scripts/producer_process.py",
+     '            if child is not None and not complete:\n', '            if False:\n'),
     ('an assertion operand panic earns a kill', 'DeviceProducers.test_cargo_refuses_assertion_operand_panics', DEVICE,
      '            if int(column) != macro_column:\n', '            if False:\n'),
  ]
