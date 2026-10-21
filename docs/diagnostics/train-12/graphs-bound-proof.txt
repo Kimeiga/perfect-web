@@ -427,3 +427,158 @@ the host refuses a browser's graph: KILLED (6 of 25 tests fail)
 the host reads a node's slots as any field: KILLED (6 of 25 tests fail)
 19 of 19 mutants killed
 memory bound: a process was stopped in 1 of 19 mutants' runs, each perhaps killed by the bound alone: the renderer takes a node twice
+
+===== FOLLOW-UP: mutual-recursive type canonical refusal witness =====
+Source parent: 1f02a3c500632deef2e6e0bcf2547204d9889eaf
+8d1348382ca854fd5e61f0b204f79fe9b4e86d194815c6cf6e837941841159d0 compiler/pw-core/tests/graphs_on_the_wire.rs
+Native relevant suite only, original operator14 unchanged. Old abort is invalid; repaired result is complete6 with5pass/1assertion failure. Full19 hosted remains due.
+
+===== /tmp/graphs-mutual-targeted-proof.py =====
+from pathlib import Path
+import sys,os
+sys.path.insert(0,'scripts')
+import graphs_on_the_wire_mutations as campaign,mutation_source,producer_process,mutation_bound
+watch=mutation_bound.start()
+root=Path.cwd();cmd=campaign.CARGO['core'];env={**os.environ,'CARGO_TARGET_DIR':'/home/haki/code/pw-wt/device-witnesses/target'}
+def phase(label):
+ print('\n== '+label,flush=True)
+ result=producer_process.run(cmd,cwd=root,env=env,timeout=180)
+ print('native status:',result.returncode,flush=True);print(result.stdout,flush=True)
+ parsed=campaign.cargo_result('core',result.returncode,result.stdout)
+ print('shared complete6 assertion result:',parsed,flush=True)
+ print('memory stopped:',bool(watch.stopped),flush=True)
+ return parsed
+assert phase('unmutated compiler graph baseline')==(True,6,0)
+what,path,anchor,replacement=campaign.MUTANTS[14]
+assert what=='two types that hold each other are put on the wire'
+original=path.read_text();assert original.count(anchor)==1
+with mutation_source.changed(path,original,original.replace(anchor,replacement,1)):
+ print('unchanged model:',what,flush=True)
+ valid, passed, failed = phase('mutual-recursive type refusal removed')
+ assert valid and failed == 1 and passed == 5
+assert phase('restored compiler graph baseline')==(True,6,0)
+
+===== /tmp/graphs-mutual-targeted-before.txt =====
+
+== unmutated compiler graph baseline
+native status: 0
+
+running 6 tests
+test the_build_writes_a_first_value_as_its_nodes ... ok
+test a_handler_sends_a_command_a_value_as_its_nodes ... ok
+test each_node_holds_the_next_run_in_the_order_its_fields_are_declared ... ok
+test a_graph_that_is_not_a_tree_traps_in_the_handler ... ok
+test what_a_host_writes_of_one_and_two_types_that_hold_each_other_are_refused ... ok
+test a_handler_reads_a_signal_from_its_nodes_and_writes_one_as_its_nodes ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+
+shared complete6 assertion result: (True, 6, 0)
+memory stopped: False
+unchanged model: two types that hold each other are put on the wire
+
+== mutual-recursive type refusal removed
+native status: 101
+
+running 6 tests
+test the_build_writes_a_first_value_as_its_nodes ... ok
+test a_handler_sends_a_command_a_value_as_its_nodes ... ok
+test each_node_holds_the_next_run_in_the_order_its_fields_are_declared ... ok
+test a_graph_that_is_not_a_tree_traps_in_the_handler ... ok
+
+thread 'what_a_host_writes_of_one_and_two_types_that_hold_each_other_are_refused' (483226) has overflowed its stack
+fatal runtime error: stack overflow, aborting
+error: test failed, to rerun pass `-p pw-core --test graphs_on_the_wire`
+
+Caused by:
+  process didn't exit successfully: `/home/haki/code/pw-wt/device-witnesses/target/debug/deps/graphs_on_the_wire-0337ba7f29f4cd8b --format=pretty --quiet` (signal: 6, SIGABRT: process abort signal)
+
+shared complete6 assertion result: (False, 0, 0)
+memory stopped: False
+
+== restored compiler graph baseline
+native status: 0
+
+running 6 tests
+test the_build_writes_a_first_value_as_its_nodes ... ok
+test a_handler_sends_a_command_a_value_as_its_nodes ... ok
+test each_node_holds_the_next_run_in_the_order_its_fields_are_declared ... ok
+test a_graph_that_is_not_a_tree_traps_in_the_handler ... ok
+test what_a_host_writes_of_one_and_two_types_that_hold_each_other_are_refused ... ok
+test a_handler_reads_a_signal_from_its_nodes_and_writes_one_as_its_nodes ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+
+
+shared complete6 assertion result: (True, 6, 0)
+memory stopped: False
+memory bound: no process was stopped
+
+===== /tmp/graphs-mutual-targeted-after.txt =====
+
+== unmutated compiler graph baseline
+native status: 0
+
+running 6 tests
+test the_build_writes_a_first_value_as_its_nodes ... ok
+test a_handler_sends_a_command_a_value_as_its_nodes ... ok
+test each_node_holds_the_next_run_in_the_order_its_fields_are_declared ... ok
+test a_graph_that_is_not_a_tree_traps_in_the_handler ... ok
+test what_a_host_writes_of_one_and_two_types_that_hold_each_other_are_refused ... ok
+test a_handler_reads_a_signal_from_its_nodes_and_writes_one_as_its_nodes ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+
+
+shared complete6 assertion result: (True, 6, 0)
+memory stopped: False
+unchanged model: two types that hold each other are put on the wire
+
+== mutual-recursive type refusal removed
+native status: 101
+
+running 6 tests
+test the_build_writes_a_first_value_as_its_nodes ... ok
+test a_handler_sends_a_command_a_value_as_its_nodes ... ok
+test a_graph_that_is_not_a_tree_traps_in_the_handler ... ok
+test each_node_holds_the_next_run_in_the_order_its_fields_are_declared ... ok
+test what_a_host_writes_of_one_and_two_types_that_hold_each_other_are_refused ... FAILED
+test a_handler_reads_a_signal_from_its_nodes_and_writes_one_as_its_nodes ... ok
+
+failures:
+
+---- what_a_host_writes_of_one_and_two_types_that_hold_each_other_are_refused stdout ----
+
+thread 'what_a_host_writes_of_one_and_two_types_that_hold_each_other_are_refused' (486141) panicked at compiler/pw-core/tests/graphs_on_the_wire.rs:318:5:
+the canonical first-value boundary refuses mutual types
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    what_a_host_writes_of_one_and_two_types_that_hold_each_other_are_refused
+
+test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
+
+error: test failed, to rerun pass `-p pw-core --test graphs_on_the_wire`
+
+shared complete6 assertion result: (True, 5, 1)
+memory stopped: False
+
+== restored compiler graph baseline
+native status: 0
+
+running 6 tests
+test the_build_writes_a_first_value_as_its_nodes ... ok
+test a_handler_sends_a_command_a_value_as_its_nodes ... ok
+test each_node_holds_the_next_run_in_the_order_its_fields_are_declared ... ok
+test a_graph_that_is_not_a_tree_traps_in_the_handler ... ok
+test what_a_host_writes_of_one_and_two_types_that_hold_each_other_are_refused ... ok
+test a_handler_reads_a_signal_from_its_nodes_and_writes_one_as_its_nodes ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+
+
+shared complete6 assertion result: (True, 6, 0)
+memory stopped: False
+memory bound: no process was stopped

@@ -309,6 +309,19 @@ fn what_a_host_writes_of_one_and_two_types_that_hold_each_other_are_refused() {
         page P() {\n    cache private\n\n    signal a: A = A { n: 1, bs: [] }\n\n    view {\n        \
         <main><button type=\"button\" on:press|refusable={() => a = A { n: a.n + 1, bs: [] }}>Go</button></main>\n    \
         }\n}\n";
+    // The finite first value reaches the same canonical mutual-type refusal
+    // before a missing guard could recursively emit an unbounded decoder.
+    let initial = pw_core::backend::signals::compile(&units(mutual));
+    assert!(initial.is_ok(), "the mutual-type fixture checks");
+    let initial = initial.unwrap();
+    assert_eq!(initial.len(), 1, "the fixture has exactly one signal page");
+    assert!(
+        initial[0]
+            .signals
+            .as_ref()
+            .is_err_and(|why| why.contains("two types that hold each other")),
+        "the canonical first-value boundary refuses mutual types"
+    );
     let refused: Vec<String> = handlers(mutual)
         .into_iter()
         .filter_map(Result::err)

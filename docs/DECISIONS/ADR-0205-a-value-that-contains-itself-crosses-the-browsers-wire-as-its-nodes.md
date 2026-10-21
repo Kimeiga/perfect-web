@@ -185,3 +185,23 @@ hosted source; historical shortened counts are not newly credited.
 [The diagnostic record](../diagnostics/train-12/graphs-bound-proof.txt)
 retains native output and the original stop without presenting either as
 current accepted E14 evidence.
+
+
+### The mutual-type control's finite refusal witness
+
+A bounded follow-up of the unchanged mutual-recursive-type operator confirmed
+another old shortened result: removing `held_back` made handler decoder emission
+recurse until the compiler test process aborted. The strict producer correctly
+refused this incomplete run; it did not earn a kill.
+
+The existing mutual-type fixture already has a finite first value
+`A { n: 1, bs: [] }`. Its signal compilation reaches the same canonical
+`wire_json` / `held_back` boundary while walking only that finite data. The
+existing refusal test now first asserts that this boundary refuses the mutual
+types, then retains its original handler refusal checks. Removing the same
+guard produces a direct assertion failure before unsafe decoder emission.
+No production behavior, original fault operator, deep workload or stack-property
+classification changes. The complete relevant six-test suite passed baseline,
+produced exactly five passes and one native assertion failure under the fault,
+and passed again after restoration. This focused proof is retained in the same
+diagnostic record. Full nineteen-model hosted verification remains due.
