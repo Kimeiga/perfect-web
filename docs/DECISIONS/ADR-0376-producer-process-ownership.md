@@ -103,7 +103,7 @@ A focused boundary regression and control assert exactly that behavior. This
 owner does not replace native pipe I/O or provide process-tree containment.
 
 The guide ownership witness class is explicitly Linux-native: it requires
-`/proc/self/stat` and the waitid/WNOWAIT observation APIs. Ordinary discovery
+`/proc/self/stat`, waitid/WNOWAIT observation and pidfd signalling APIs. Ordinary discovery
 reports skips on unsupported hosts instead of treating a missing `/proc` tree
 as evidence that a grandchild stopped. The strict guide campaign refuses a
 skipped baseline and cannot claim mutation kills there. Linux tests simulate
@@ -128,3 +128,34 @@ killed all nine controls with native assertion receipts and no memory stop.
 preserves those results. The original bulk run remains failed; the newly
 changed campaign requires fresh hosted evidence before final integration is
 declared verified.
+
+### Native fixture readiness and guide witness metadata (2026-10-21)
+
+Run 39538607183 refused the unmutated guide campaign because the 300ms timeout
+expired before its fixture published both child PIDs. The recursive fixture
+had the same startup race before its 500ms timeout. Fixture setup now waits
+for an atomic readiness receipt inside the injected Popen constructor. The
+production owner starts its unchanged execution deadline only after that
+constructor returns. Deterministic delayed starts reproduce both old failures
+and pass with the readiness gate; ignored-TERM behavior and the launch-window
+cancellation injection remain intact.
+
+Readiness has its own five-second bound. A constructor that fails before
+returning still owns its child: native TERM/grace/KILL cleanup retains the
+leader with WNOWAIT, then communicates and reaps it before rethrowing the
+startup error. This safety harness does not call the production cleanup
+functions being mutated. Early atomic PID/start-time receipts cover failures
+before normal fixture readiness; emergency cleanup opens a pidfd and verifies
+that identity before signalling. Startup failure stays invalid even when the
+ready marker appears during cleanup. Native witnesses require source
+restoration and stopped owned work, without crediting that setup failure as a
+semantic assertion or weakening the original 15-method/13-control inventory.
+
+The guide's thirteen control records also now contain full unittest witness
+IDs, passed directly to the producer. Twelve bare long method names had been
+misread as descriptions by the unchanged canonical count reader. A separate
+regression retains all thirteen actual historical verdicts and requires their
+exact catalog owner. Both repairs require fresh whole-campaign evidence; the
+failed hosted baseline is retained as a failure. Raw fixture diagnostics are
+in [guide readiness](../diagnostics/train-12/guide-readiness.txt), and the
+independent metadata causality is in [guide witness metadata](../diagnostics/train-12/guide-witness-metadata.txt).

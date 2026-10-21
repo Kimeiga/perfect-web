@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import signal
+import select
 import subprocess
 import sys
 import tempfile
@@ -25,39 +26,116 @@ def running(pid):
         return False
 
 
+def stop_owned(record):
+    """Emergency fixture cleanup never signals a reused numeric PID."""
+    try:
+        fd = os.pidfd_open(record['pid'])
+    except ProcessLookupError:
+        return
+    try:
+        try:
+            start = Path(f"/proc/{record['pid']}/stat").read_text().split(') ', 1)[1].split()[19]
+        except (FileNotFoundError, ProcessLookupError):
+            return
+        if start == record['start']:
+            try: signal.pidfd_send_signal(fd, signal.SIGKILL)
+            except ProcessLookupError: pass
+            stopped = select.poll()
+            stopped.register(fd, select.POLLIN)
+            if not stopped.poll(5000):
+                raise RuntimeError('owned fixture did not terminate after emergency cleanup')
+    finally:
+        os.close(fd)
+
+
+def pid_writer(path):
+    """Native fixture code publishes a complete identity before readiness."""
+    temporary = path.with_suffix('.tmp')
+    return (f"Path({str(temporary)!r}).write_text(json.dumps({{'pid':os.getpid(),"
+            "'start':Path('/proc/self/stat').read_text().split(') ',1)[1].split()[19]})); "
+            f"Path({str(temporary)!r}).replace({str(path)!r})")
+
+
+# This is fixture setup, before the production owner's execution deadline.
+# A failed constructor still owns its native process until it kills/reaps it.
+READY_LAUNCH = r"""
+class ReadyNative(subprocess.Popen):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        try:
+            temporary = FIXTURE_LAUNCHED.with_suffix('.tmp')
+            temporary.write_text(json.dumps({'pid':self.pid, 'start':Path(f'/proc/{self.pid}/stat').read_text().split(') ',1)[1].split()[19]}))
+            temporary.replace(FIXTURE_LAUNCHED)
+            end = time.monotonic() + FIXTURE_STARTUP_BOUND
+            while not FIXTURE_READY.exists() and time.monotonic() < end:
+                time.sleep(.01)
+            if not FIXTURE_READY.exists():
+                raise RuntimeError('fixture startup did not become ready')
+        except BaseException as startup_error:
+            # This constructor still owns the unreaped child; the helper
+            # under mutation has not received it. Cleanup is native here.
+            owns_leader = True
+            try:
+                try:
+                    try: os.killpg(self.pid, signal.SIGTERM)
+                    except ProcessLookupError: pass
+                    end = time.monotonic() + 2
+                    while time.monotonic() < end:
+                        try:
+                            done = os.waitid(os.P_PID,self.pid,os.WEXITED|os.WNOHANG|os.WNOWAIT)
+                        except ChildProcessError:
+                            owns_leader = False
+                            raise
+                        if done is not None: break
+                        time.sleep(.01)
+                finally:
+                    if owns_leader:
+                        try: os.killpg(self.pid, signal.SIGKILL)
+                        except ProcessLookupError: pass
+                    super().communicate()
+            except BaseException as cleanup_error:
+                raise startup_error from cleanup_error
+            raise
+"""
+
+
 @unittest.skipUnless(
     sys.platform.startswith('linux') and Path('/proc/self/stat').is_file()
-    and all(hasattr(os, name) for name in ('waitid', 'P_PID', 'WEXITED', 'WNOHANG', 'WNOWAIT')),
-    'Linux /proc and waitid native process-group witnesses')
+    and all(hasattr(os, name) for name in ('waitid', 'P_PID', 'WEXITED', 'WNOHANG', 'WNOWAIT', 'pidfd_open'))
+    and hasattr(signal, 'pidfd_send_signal'),
+    'Linux /proc, waitid and pidfd native process-group witnesses')
 class GuideOwnership(unittest.TestCase):
-    def probe(self, phase, ignores_term=False):
+    def probe(self, phase, ignores_term=False, startup_delay=0, startup_bound=5, startup_fails=False):
         with tempfile.TemporaryDirectory() as directory:
             tmp = Path(directory)
             source, pidfile, receipt = (tmp / name for name in ('source', 'pids', 'restored'))
             source.write_text('original')
             evidence = tmp / 'evidence'; evidence.mkdir()
-            grandchild = "import signal,time; from pathlib import Path; " + ("signal.signal(signal.SIGTERM,signal.SIG_IGN); " if ignores_term else "") + "Path(" + repr(str(tmp/'grandchild-ready')) + ").touch(); time.sleep(60)"
+            grandchild = "import signal,time; from pathlib import Path; " + ("signal.signal(signal.SIGTERM,signal.SIG_IGN); " if ignores_term else "") + "time.sleep(" + repr(startup_delay) + "); Path(" + repr(str(tmp/'grandchild-ready')) + ").touch(); time.sleep(60)"
             child = "\n".join([
                 'import json,os,subprocess,sys,time', 'from pathlib import Path',
                 "grandchild=subprocess.Popen([sys.executable,'-c',"+repr(grandchild)+"])",
+                "Path("+repr(str(tmp/'spawned.tmp'))+").write_text(json.dumps([{'pid':pid,'start':Path(f'/proc/{pid}/stat').read_text().split(') ',1)[1].split()[19]} for pid in [os.getpid(),grandchild.pid]]))",
+                "Path("+repr(str(tmp/'spawned.tmp'))+").replace("+repr(str(tmp/'spawned'))+")",
                 "while not Path("+repr(str(tmp/'grandchild-ready'))+").exists(): time.sleep(.005)",
                 "print('owned stdout',flush=True)", "print('owned stderr',file=sys.stderr,flush=True)",
-                'Path(' + repr(str(pidfile)) + ').write_text(json.dumps([os.getpid(),grandchild.pid]))',
+                'Path(' + repr(str(pidfile.with_suffix('.tmp'))) + ').write_text(json.dumps([os.getpid(),grandchild.pid]))',
+                'Path(' + repr(str(pidfile.with_suffix('.tmp'))) + ').replace(' + repr(str(pidfile)) + ')',
                 'time.sleep(60)'])
             program = r"""
 import json,os,signal,subprocess,sys,time
 from pathlib import Path
 sys.path.insert(0,SCRIPTS)
-import guide_python
+import guide_python,producer_process
 source,pidfile,receipt,evidence=map(Path,PATHS)
+FIXTURE_READY=pidfile
+FIXTURE_LAUNCHED=source.parent/"native-pid"
+READINESS_HELPER
 signal.signal(signal.SIGTERM, lambda *_: sys.exit(37))
-native=subprocess.Popen
-class Injected(native):
+class Injected(ReadyNative):
     def __init__(self,*args,**kwargs):
         super().__init__(*args,**kwargs)
         if PHASE=='launch':
-            end=time.monotonic()+5
-            while not pidfile.exists() and time.monotonic()<end: time.sleep(.01)
             os.kill(os.getpid(),signal.SIGTERM)
 subprocess.Popen=Injected
 def running(pid):
@@ -68,26 +146,41 @@ try:
     status,output=guide_python._launch(evidence,[sys.executable,'-c',CHILD],[],.3 if PHASE=='timeout' else 60)
     (evidence/'return.json').write_text(json.dumps({'status':status,'output':output}))
 finally:
-    pids=json.loads(pidfile.read_text())
-    end=time.monotonic()+2
-    while any(running(pid) for pid in pids) and time.monotonic()<end: time.sleep(.01)
-    # Reaping the direct child is stricter than merely observing its death.
-    try: os.kill(pids[0],0); leader_exists=True
-    except ProcessLookupError: leader_exists=False
-    receipt.write_text(json.dumps({'running':[running(pid) for pid in pids],
-                                  'leader_exists':leader_exists}))
-    source.write_text('original')
+    try:
+        if pidfile.exists():
+            pids=json.loads(pidfile.read_text())
+            end=time.monotonic()+2
+            while any(running(pid) for pid in pids) and time.monotonic()<end: time.sleep(.01)
+            # Reaping the direct child is stricter than observing its death.
+            try: os.kill(pids[0],0); leader_exists=True
+            except ProcessLookupError: leader_exists=False
+            receipt.write_text(json.dumps({'running':[running(pid) for pid in pids],
+                                          'leader_exists':leader_exists}))
+    finally:
+        source.write_text('original')
 """
             settings = '\n'.join(f'{name}={value!r}' for name, value in [
                 ('SCRIPTS',str(ROOT/'scripts')), ('PATHS',list(map(str,(source,pidfile,receipt,evidence)))),
-                ('CHILD',child), ('PHASE',phase)])
+                ('CHILD',child), ('PHASE',phase), ('FIXTURE_STARTUP_BOUND',startup_bound)])
+            program=program.replace('READINESS_HELPER',READY_LAUNCH)
             wrapper=subprocess.Popen([sys.executable,'-c',settings+'\n'+program],
                 stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True)
             pids=[]
             try:
-                end=time.monotonic()+5
+                end=time.monotonic()+startup_bound+3
                 while not pidfile.exists() and wrapper.poll() is None and time.monotonic()<end:
                     time.sleep(.01)
+                if startup_fails:
+                    output,_=wrapper.communicate(timeout=8)
+                    self.assertEqual(wrapper.returncode,1,output)
+                    self.assertIn('fixture startup did not become ready',output)
+                    self.assertEqual(source.read_text(),'original',output)
+                    self.assertFalse((evidence/'process.json').exists(),output)
+                    with self.assertRaises(ProcessLookupError):
+                        os.kill(json.loads((tmp/'native-pid').read_text())['pid'],0)
+                    if (tmp/'spawned').exists():
+                        self.assertFalse(any(running(record['pid']) for record in json.loads((tmp/'spawned').read_text())),output)
+                    return
                 self.assertTrue(pidfile.exists(),'owned child/grandchild did not launch')
                 pids=json.loads(pidfile.read_text())
                 if phase=='running': wrapper.send_signal(signal.SIGTERM)
@@ -108,11 +201,13 @@ finally:
                 self.assertEqual((evidence/'stderr.txt').read_text(),'owned stderr\n')
             finally:
                 if wrapper.poll() is None:
-                    wrapper.kill(); wrapper.communicate()
-                if not pids and pidfile.exists(): pids=json.loads(pidfile.read_text())
-                for pid in pids:
-                    try: os.kill(pid,signal.SIGKILL)
-                    except ProcessLookupError: pass
+                    wrapper.terminate()
+                    try: wrapper.communicate(timeout=8)
+                    except subprocess.TimeoutExpired: wrapper.kill(); wrapper.communicate()
+                else: wrapper.communicate()
+                if (tmp/'native-pid').exists(): stop_owned(json.loads((tmp/'native-pid').read_text()))
+                if (tmp/'spawned').exists():
+                    for record in json.loads((tmp/'spawned').read_text()): stop_owned(record)
 
     def test_launch_cancellation_reaps_before_restoration_and_stops_its_group(self):
         self.probe('launch')
@@ -122,6 +217,7 @@ finally:
 
     def test_timeout_stops_same_group_grandchild_and_cannot_validate(self):
         self.probe('timeout')
+        self.probe('timeout',ignores_term=True,startup_delay=.6,startup_bound=.2,startup_fails=True)
 
     def test_native_files_status_and_clean_import_environment_are_preserved(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -143,49 +239,67 @@ finally:
             self.assertFalse(metadata.get('cancelled',False))
 
 
-    def nested(self, timeout, ignores_term, recursive=False):
+    def nested(self, timeout, ignores_term, recursive=False, startup_delay=0, startup_bound=5, startup_fails=False):
         with tempfile.TemporaryDirectory() as directory:
             tmp=Path(directory)
             (tmp/'evidence').mkdir()
             for name in ('inner-source','middle-source','outer-source'): (tmp/name).write_text('original')
-            leaf="\n".join(['import os,signal,time', 'from pathlib import Path',
+            leaf="\n".join(['import json,os,signal,time', 'from pathlib import Path',
                 'signal.signal(signal.SIGTERM,signal.SIG_IGN)' if ignores_term else 'pass',
-                'Path('+repr(str(tmp/'leaf-pid'))+').write_text(str(os.getpid()))', 'time.sleep(60)'])
-            inner="\n".join(['import os,sys', 'from pathlib import Path',
+                pid_writer(tmp/'leaf-started'),
+                'time.sleep('+str(startup_delay)+')',
+                pid_writer(tmp/'leaf-pid'), 'time.sleep(60)'])
+            inner="\n".join(['import json,os,sys', 'from pathlib import Path',
                 'sys.path.insert(0,'+repr(str(ROOT/'scripts'))+')',
                 'import producer_process,mutation_source', 'root=Path('+repr(str(tmp))+')',
-                "(root/'inner-pid').write_text(str(os.getpid()))", 'try:',
+                pid_writer(tmp/'inner-pid'), 'try:',
                 " with mutation_source.changed(root/'inner-source','original','mutant'):",
                 '  producer_process.run([sys.executable,"-c",'+repr(leaf)+'],timeout=60,grace='+str(2 if recursive else 0)+')',
                 'finally:', " (root/'inner-finally').write_text((root/'inner-source').read_text())"])
             if recursive:
                 (tmp/'middle-evidence').mkdir()
-                inner="\n".join(['import os,sys', 'from pathlib import Path',
+                inner="\n".join(['import json,os,sys', 'from pathlib import Path',
                     'sys.path.insert(0,'+repr(str(ROOT/'scripts'))+')',
                     'import guide_python,mutation_source', 'root=Path('+repr(str(tmp))+')',
-                    "(root/'middle-pid').write_text(str(os.getpid()))", 'try:',
+                    pid_writer(tmp/'middle-pid'), 'try:',
                     " with mutation_source.changed(root/'middle-source','original','mutant'):",
                     '  guide_python._launch(root/"middle-evidence",[sys.executable,"-c",'+repr(inner)+'],[],60)',
                     'finally:', " (root/'middle-finally').write_text((root/'middle-source').read_text())"])
-            outer="\n".join(['import os,signal,sys', 'from pathlib import Path',
+            outer="\n".join(['import json,os,signal,subprocess,sys,time', 'from pathlib import Path',
                 'sys.path.insert(0,'+repr(str(ROOT/'scripts'))+')',
-                'import guide_python,mutation_source', 'root=Path('+repr(str(tmp))+')',
+                'import guide_python,mutation_source,producer_process', 'root=Path('+repr(str(tmp))+')',
+                "FIXTURE_READY=root/'leaf-pid'", "FIXTURE_LAUNCHED=root/'native-pid'",
+                'FIXTURE_STARTUP_BOUND='+str(startup_bound), READY_LAUNCH,
+                'subprocess.Popen=ReadyNative',
                 'signal.signal(signal.SIGTERM,lambda *_:sys.exit(37))', 'try:',
                 " with mutation_source.changed(root/'outer-source','original','mutant'):",
                 '  guide_python._launch(root/"evidence",[sys.executable,"-c",'+repr(inner)+'],[],'+str(.5 if timeout else 60)+')',
                 'finally:',
-                " pid=int((root/'leaf-pid').read_text())",
-                ' try: os.kill(pid,0); alive=True',
-                ' except ProcessLookupError: alive=False',
-                " (root/'outer-finally').write_text(str(alive))"])
+                " if (root/'leaf-pid').exists():",
+                "  pid=json.loads((root/'leaf-pid').read_text())['pid']",
+                '  try: os.kill(pid,0); alive=True',
+                '  except ProcessLookupError: alive=False',
+                "  (root/'outer-finally').write_text(str(alive))",
+                " else: (root/'outer-finally').write_text('not ready')"])
             wrapper=subprocess.Popen([sys.executable,'-c',outer],stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True)
             owned=[]
             try:
-                end=time.monotonic()+5
+                end=time.monotonic()+startup_bound+3
                 while not (tmp/'leaf-pid').exists() and wrapper.poll() is None and time.monotonic()<end:
                     time.sleep(.01)
+                if startup_fails:
+                    output,_=wrapper.communicate(timeout=8)
+                    self.assertEqual(wrapper.returncode,1,output)
+                    self.assertIn('fixture startup did not become ready',output)
+                    self.assertFalse((tmp/'evidence/process.json').exists(),output)
+                    for name in ('inner-source','middle-source','outer-source'):
+                        self.assertEqual((tmp/name).read_text(),'original',output)
+                    for name in ('native-pid','inner-pid','middle-pid','leaf-started'):
+                        if (tmp/name).exists():
+                            with self.assertRaises(ProcessLookupError): os.kill(json.loads((tmp/name).read_text())['pid'],0)
+                    return
                 self.assertTrue((tmp/'leaf-pid').exists(),'nested leaf did not launch')
-                owned=[int((tmp/name).read_text()) for name in ('inner-pid','leaf-pid')]
+                owned=[json.loads((tmp/name).read_text())['pid'] for name in ('inner-pid','leaf-pid')]
                 if not timeout: wrapper.send_signal(signal.SIGTERM)
                 output,_=wrapper.communicate(timeout=8)
                 self.assertEqual(wrapper.returncode,0 if timeout else 37,output)
@@ -200,7 +314,7 @@ finally:
                     self.assertEqual((tmp/'middle-source').read_text(),'original',output)
                     self.assertTrue((tmp/'middle-finally').exists(),output)
                     self.assertEqual((tmp/'middle-finally').read_text(),'original',output)
-                    with self.assertRaises(ProcessLookupError): os.kill(int((tmp/'middle-pid').read_text()),0)
+                    with self.assertRaises(ProcessLookupError): os.kill(json.loads((tmp/'middle-pid').read_text())['pid'],0)
                 metadata=json.loads((tmp/'evidence/process.json').read_text())
                 self.assertEqual(metadata['actual_status'],128+signal.SIGTERM)
                 self.assertIsNone(metadata['validated_status'])
@@ -208,16 +322,17 @@ finally:
                 self.assertEqual(metadata['timed_out'],timeout)
                 self.assertEqual(metadata['cancelled'],not timeout)
             finally:
-                if wrapper.poll() is None: wrapper.kill();wrapper.communicate()
-                for name in ('inner-pid','middle-pid','leaf-pid'):
-                    if (tmp/name).exists():
-                        pid=int((tmp/name).read_text())
-                        try: os.kill(pid,signal.SIGKILL)
-                        except ProcessLookupError: pass
+                if wrapper.poll() is None:
+                    wrapper.terminate()
+                    try: wrapper.communicate(timeout=8)
+                    except subprocess.TimeoutExpired: wrapper.kill();wrapper.communicate()
+                else: wrapper.communicate()
+                for name in ('native-pid','inner-pid','middle-pid','leaf-pid','leaf-started'):
+                    if (tmp/name).exists(): stop_owned(json.loads((tmp/name).read_text()))
 
     def test_nested_timeout_restores_both_owners_even_when_leaf_ignores_term(self):
         for ignores_term in (False,True):
-            with self.subTest(ignores_term=ignores_term): self.nested(True,ignores_term)
+            with self.subTest(ignores_term=ignores_term): self.nested(True,ignores_term,startup_delay=.8)
 
     def test_nested_cancellation_restores_both_owners_even_when_leaf_ignores_term(self):
         for ignores_term in (False,True):
@@ -226,10 +341,11 @@ finally:
 
     def test_exited_leader_does_not_spare_a_term_ignoring_grandchild(self):
         for phase in ('timeout','running'):
-            with self.subTest(phase=phase): self.probe(phase,ignores_term=True)
+            with self.subTest(phase=phase): self.probe(phase,ignores_term=True, startup_delay=.6 if phase=='timeout' else 0)
 
     def test_recursive_timeout_has_descending_cleanup_deadlines(self):
-        self.nested(True,True,recursive=True)
+        self.nested(True,True,recursive=True,startup_delay=3)
+        self.nested(True,True,recursive=True,startup_delay=.8,startup_bound=.2,startup_fails=True)
 
     def test_recursive_cancellation_has_descending_cleanup_deadlines(self):
         self.nested(False,True,recursive=True)
