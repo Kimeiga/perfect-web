@@ -3243,3 +3243,7 @@ Effect inference revisits readers only when dependency rows grow (landed with tr
 [ADR-0381](DECISIONS/ADR-0381-a-commands-send-is-answered-within-its-deadline.md):
 A command's send is answered within its deadline, or it is no answer (track `command-deadline`; verified at `bfda9ae5`, not landed).
 - Each send has ten seconds for its whole answer, its body included, and is then sent again as `retry` allows; a send held for the command before it waits its turn, as an early answer does. Every press settles in bounded time; an outcome the page cannot know is still told as "could not be sent".
+
+[ADR-0382](DECISIONS/ADR-0382-a-press-loads-its-modules-within-the-deadline.md):
+The modules a press needs are loaded within the deadline, and a failed load is not kept (track `press-modules`; not landed).
+- A handler's module, the page's speculation module and its renderer load within ADR-0381's deadline; a failed or given-up load is forgotten, the speculation module asked for again under a new specifier as a handler's is; a press whose speculation cannot load is sent unspeculated. The computed values' loader keeps its failure.

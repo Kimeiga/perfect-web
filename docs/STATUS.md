@@ -127,12 +127,15 @@ evidence. No failed result is promoted by this summary.
   sent", a command given up may still run after those behind it, and the
   host's waits have no deadline (ADR-0381,
   [KNOWN_LIMITATIONS](KNOWN_LIMITATIONS.md)).
-- **A press's modules** (found 2026-10-21, reproduced in Chromium): one
-  failed load of a page's speculation module is kept, so every later press
-  that speculates fails the same way until the page is reloaded (the network
-  is not asked again); and a handler's or speculation's module that never
-  loads holds its press and, by ADR-0152, the presses after it. Not
-  repaired; track `press-modules` is to repair it.
+- **On master, a press's modules** (found 2026-10-21, reproduced in
+  Chromium): one failed load of a page's speculation module is kept, so
+  every later press that speculates fails the same way until reload, and a
+  module that never loads holds its press and, by ADR-0152, the presses
+  after it. Repaired on `wip/press-modules`
+  ([ADR-0382](DECISIONS/ADR-0382-a-press-loads-its-modules-within-the-deadline.md),
+  stacked on `wip/command-deadline`): five failing-first tests and six
+  strict controls pass locally in Chromium; its hosted verification is
+  still to run. The computed values' loader keeps its failure.
 - Hosted evidence does not prove the local-only performance, memory, load
   or Kiokun obligations. E14 agent benchmarking still requires the owner's
   model, budget and teaching choices. Neither performance universality nor
@@ -229,9 +232,9 @@ to older frame attribution.
 1. With the owner's approval, land `wip/command-deadline` (verified at
    `bfda9ae5`, evidence `973fbbcc`) once exact-commit CI passes at the
    commit that lands; no other gate is outstanding.
-2. Track `press-modules`: a page's speculation module loaded again after a
-   failed load, and every module a press needs bounded by the deadline, with
-   failing-first tests, strict controls and the reached verification.
+2. Verify track `press-modules` (ADR-0382) on GitHub: exact-commit CI and
+   the recipes the runtime change reaches, in three browser engines; then
+   land it with `command-deadline`, with the owner's approval.
 3. E14-E: the owner's model, budget and teaching choices, from the decision
    brief and the changed-lines repair on `wip/e14-readiness`; run nothing paid
    on an assumed choice. Then device-local durability (ADR-0366's boundary)

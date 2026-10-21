@@ -980,13 +980,16 @@ awaited in order. What remains:
     holds its press and the presses after it (ADR-0152).
   A rejected request that exhausts its retries is reported on the control
   and by the page's live status announcer (ADR-0173's correction).
-- **One failed load of a page's speculation module fails every later press
-  that speculates** (found 2026-10-21, reproduced in Chromium; not
-  repaired). `speculations()` keeps the rejected load, so the network is not
-  asked again and each Add fails with the same error until the page is
-  reloaded; the renderer's and the computed values' loaders keep theirs too.
-  A handler's module is loaded again under a new specifier after a failure,
-  but no module load has a deadline. Track `press-modules` (NEXT).
+- **A press's modules load within the deadline, and a failed load is
+  forgotten** (ADR-0382, which replaced "one failed load of a page's
+  speculation module fails every later press that speculates"). What
+  remains:
+  - the computed values' module (`computedValues()`, a feed page's) still
+    keeps a failed load and has no deadline;
+  - a press whose speculation module cannot load is sent unspeculated: the
+    reader sees its result only when the server's frames come;
+  - a failed or given-up load is told "This did not work. Try again."
+    (ADR-0302's `failed`), whether the module failed or never came.
 - **Each Add carries the whole item** (ADR-0172), its description too,
   though the command reads its id and the transition its name and price. A
   narrower record is the program's to declare.

@@ -22,18 +22,17 @@ In order:
    reached recipes, `e14-pleris-controls`, three browser engines), evidence
    fetched at `973fbbcc`. What remains is exact-commit CI at the commit that
    lands, and the merge.
-2. **Track `press-modules`** (`wip/press-modules`, stacked on the above).
-   Reproduced 2026-10-21 in Chromium: after one failed load of the store's
-   speculation module (`/speculation/store.page.StorePage~ui.mjs`), every
-   later Add fails with the same error and the network is not asked again;
-   `speculations()` keeps the rejected load (`??=`), as `renderModule()` and
-   `computedValues()` keep theirs. A handler's or speculation's module that
-   never loads holds its press and, by ADR-0152, the presses after it.
-   Acceptance: an ADR; failing-first tests for a failed and a held module on
-   the press path; a failed load loaded again at the next press under a new
-   specifier, as `loadHandler` does; a press whose speculation cannot load
-   sent unspeculated, if the ADR so rules; strict controls; the reached
-   verification.
+2. **Verify track `press-modules`** (`wip/press-modules`, ADR-0382, stacked
+   on the above). Reproduced 2026-10-21 in Chromium: after one failed load
+   of the store's speculation module, every later Add failed with the same
+   error and the network was not asked again; a module that never loaded
+   held its press and the presses after it. Repaired: a press's modules load
+   within the deadline, a failed load is forgotten (the speculation module
+   asked for under a new specifier, as a handler's is), and a press whose
+   speculation cannot load is sent unspeculated. Five failing-first tests
+   and six strict controls pass in Chromium. Remaining: exact-commit CI, the
+   reached recipes and three browser engines on GitHub; the computed values'
+   loader (`computedValues()`) still keeps its failure.
 3. **E14-E, decision-ready** (`wip/e14-readiness`). The decision brief
    (`docs/milestones/E14-E-decision-brief.md`) and the changed-lines repair
    (Next.js's footprint was undercounted in T01, T06, T08 and T11) await
