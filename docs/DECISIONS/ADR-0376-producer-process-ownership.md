@@ -101,3 +101,11 @@ its handler identity, invalidates evidence and restores source, but the shared
 owner must not signal a process-group ID whose leader has already been reaped.
 A focused boundary regression and control assert exactly that behavior. This
 owner does not replace native pipe I/O or provide process-tree containment.
+
+The guide ownership witness class is explicitly Linux-native: it requires
+`/proc/self/stat` and the waitid/WNOWAIT observation APIs. Ordinary discovery
+reports skips on unsupported hosts instead of treating a missing `/proc` tree
+as evidence that a grandchild stopped. The strict guide campaign refuses a
+skipped baseline and cannot claim mutation kills there. Linux tests simulate
+the production helper's missing-waitid fallback; they do not establish native
+macOS cancellation behavior.
