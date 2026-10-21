@@ -1,8 +1,8 @@
 ADR-0072 - an element named with a capital letter is a view
 
 produced by: just e10-view-elements
-commit: 320c52a44840a80423609ab476eb847c04de34a6
-ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39442025240 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: f15117dede242fac2bc2d54aa973180e47cad1c6
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39526960864 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == view elements (compiler/pw-core/tests/view_elements.rs)
@@ -19,7 +19,7 @@ baseline: 4 passed, 0 failed
 the rule is not run: KILLED (2 of 4 tests fail)
 an element named with a capital letter is not read: KILLED (2 of 4 tests fail)
 an element named in lowercase is read as a view: KILLED (4 of 4 tests fail)
-a tag's name resolves to nothing: KILLED (4 of 4 tests fail)
+a tag's name resolves to nothing: KILLED (3 of 4 tests fail)
 an imported view is not resolved: KILLED (1 of 4 tests fail)
 a view is not told from another declaration: KILLED (1 of 4 tests fail)
 6 of 6 mutants killed

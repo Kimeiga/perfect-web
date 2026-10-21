@@ -1,28 +1,28 @@
 ADR-0053 - a lambda's parameters take the types its use declares
 
 produced by: just e10-callbacks
-commit: ddaeeb1dfba9630371b7dd5b127c23855d245c74
-ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39131257549 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: f15117dede242fac2bc2d54aa973180e47cad1c6
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39526960864 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the callback tests (compiler/pw-core/tests/callback_parameters.rs)
 
 test a_folds_accumulator_is_its_seeds_type ... ok
 test a_lambda_bound_with_a_written_type_takes_its_parameters_from_it ... ok
-test a_lambda_over_a_bound_list_is_typed_once_the_binding_is ... ok
 test a_name_two_lambdas_bind_is_still_not_guessed ... ok
+test a_lambda_over_a_bound_list_is_typed_once_the_binding_is ... ok
 test a_folds_accumulator_and_element_are_each_checked ... ok
 test a_parameter_known_in_part_is_checked_by_that_part ... ok
 test a_piped_lists_callback_still_takes_its_element ... ok
 test a_programs_own_callback_takes_its_declared_parameter_types ... ok
 test a_returned_lambda_takes_its_parameters_from_the_declared_result ... ok
-test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
 
 == an effect through a callback (compiler/pw-core/tests/causal_evidence.rs)
 
 test a_folds_accumulator_is_not_its_lists_element ... ok
-test no_conclusion_was_reached_by_a_program_wide_name ... ok
 test a_receiver_with_no_such_member_produces_no_chain ... ok
+test no_conclusion_was_reached_by_a_program_wide_name ... ok
 test the_effect_is_caused_by_a_receiver_type_resolution ... ok
 test a_callbacks_later_parameter_is_typed_by_the_callees_declaration ... ok
 test the_effect_travelled_through_the_callback ... ok
@@ -30,18 +30,18 @@ test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 == what must stay clean: errors reported
 
-accepted corpus: 0
+accepted corpus: 44 programs, 35 with no error, 9 refused exactly as listed (examples/accepted/build-refusals.json: 9 entries)
 store: 0
 kiokun: 0
 
 == mutation controls (scripts/callback_mutations.py)
 
 baseline: 57 passed, 0 failed
-any type parameter takes the list's element: KILLED (1 of 57 tests fail)
-a declared parameter type is not read: KILLED (1 of 57 tests fail)
-a list's element binds no type parameter: KILLED (3 of 57 tests fail)
-a piped value is not the first argument: KILLED (2 of 57 tests fail)
-a solved lambda's parameters are forgotten: KILLED (8 of 57 tests fail)
+callback parameters take the sibling parameters types: KILLED (8 of 57 tests fail)
+a declared callback parameter type is not read: KILLED (2 of 57 tests fail)
+solved callback parameter types are discarded: KILLED (14 of 57 tests fail)
+a piped value is not the first argument: KILLED (5 of 57 tests fail)
+a solved lambda's parameters are forgotten: KILLED (14 of 57 tests fail)
 a parameter known only in part is not typed: KILLED (1 of 57 tests fail)
 a lambda bound with a written type is not typed by it: KILLED (1 of 57 tests fail)
 a returned lambda is not typed by the declared result: KILLED (1 of 57 tests fail)

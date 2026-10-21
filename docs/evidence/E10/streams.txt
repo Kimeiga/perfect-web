@@ -1,17 +1,17 @@
 ADR-0075 - a mounted resource does not build; ADR-0148 - a stream builds as a part
 
 produced by: just e10-streams
-commit: 320c52a44840a80423609ab476eb847c04de34a6
-ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39442025240 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: f15117dede242fac2bc2d54aa973180e47cad1c6
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39526960864 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == streams and resources (compiler/pw-core/tests/streams_and_resources.rs)
 
 test a_stream_builds_as_a_part ... ok
-test the_complete_stream_example_reports_its_exact_wit_collision ... ok
 test a_mounted_resource_does_not_build ... ok
+test the_complete_stream_example_builds_distinct_query_and_view_components ... ok
 test a_static_resource_attribute_is_an_attribute ... ok
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.29s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.73s
 
 == mutation controls (scripts/stream_mutations.py)
 

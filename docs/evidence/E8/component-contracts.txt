@@ -91,7 +91,7 @@ store.hours.StoresOpen  abi 70a5dd9e12a7307f
   host      store:data/stores#list  (database.read<Stores>)
   exports   query StoresOpen
 
-store.page.AddressPage  abi 770e51c96051ba77
+store.page.AddressPage~ui  abi 7a1b2fca3415f1ab
   runs at   origin
   needs     session.read
   component pw:app/store.page.Places#Places
@@ -109,7 +109,7 @@ store.page.Cart  abi 37cb9e8b9dc1738c
   host      store:data/user-carts#current  (database.read<Carts>)
   exports   query Cart
 
-store.page.CartPage  abi f00a4fe14eeded6f
+store.page.CartPage~ui  abi 439d4998a967f0e3
   runs at   origin
   needs     session.read
   component pw:app/store.hours.CartHours#CartHours
@@ -156,7 +156,7 @@ store.page.Estimate  abi 94da90c7ccd7e563
   host      store:data/user-estimates#for-store  (database.read<Estimates>)
   exports   query Estimate
 
-store.page.HomePage  abi 2c950586f6696763
+store.page.HomePage~ui  abi cdb05a0704baba79
   runs at   origin
   needs     session.read
   component pw:app/store.hours.StoresOpen#StoresOpen
@@ -188,7 +188,7 @@ store.page.Order  abi 6def0e0e60df40e2
   host      store:data/user-orders#current  (database.read<Orders>)
   exports   query Order
 
-store.page.OrderPage  abi ba1334c5a2f7dee7
+store.page.OrderPage~ui  abi 9318dd4611ddf383
   runs at   origin
   needs     session.read
   component pw:app/store.page.Order#Order
@@ -198,15 +198,15 @@ store.page.OrderPage  abi ba1334c5a2f7dee7
   host      pw:host/principal#read  (session.read)
   exports   page OrderPage
 
-store.page.OrderPage.derived_3  abi 23ce3b89fcf1ed87
+store.page.OrderPage~ui.derived_3  abi 50fcaa56ff2746c3
   runs at   origin
   exports   derived derived$3
 
-store.page.OrderPage.derived_4  abi d0f2f87eff133f23
+store.page.OrderPage~ui.derived_4  abi 35902a69f1fed88f
   runs at   origin
   exports   derived derived$4
 
-store.page.OrderPage.derived_9  abi e58a44b06458557f
+store.page.OrderPage~ui.derived_9  abi 2cb19d3ca0c8c02b
   runs at   origin
   exports   derived derived$9
 
@@ -246,7 +246,7 @@ store.page.Store  abi 4aedcc2febb0861f
   host      store:data/stores#get  (database.read<Stores>)
   exports   query Store
 
-store.page.StoreLayout  abi b337b80a218b9741
+store.page.StoreLayout~ui  abi 475d6ffccc4a3285
   runs at   browser, edge, origin
   needs     session.read
   component pw:app/store.page.Cart#Cart
@@ -259,7 +259,7 @@ store.page.StoreList  abi 7fad5df1af8cdb8f
   host      store:data/stores#list  (database.read<Stores>)
   exports   query StoreList
 
-store.page.StorePage  abi d803b26130c7cf49
+store.page.StorePage~ui  abi cedabeabae50d3d3
   runs at   origin
   needs     session.read
   component pw:app/store.hours.StoreStatus#StoreStatus
@@ -279,7 +279,7 @@ store.page.StorePage  abi d803b26130c7cf49
   host      pw:host/principal#read  (session.read)
   exports   page StorePage
 
-store.page.TimePage  abi 881bdfdcf009c063
+store.page.TimePage~ui  abi 011adc193398272d
   runs at   origin
   needs     session.read
   component pw:app/store.page.TimesOffered#TimesOffered
@@ -587,7 +587,7 @@ store.page.settle_payment  abi 8ac6e1f4e1759bef
   host      store:data/user-orders#settle  (database.write<Orders>)
   exports   command settle_payment
 
-store.rate.RatePage  abi 1404bdc0d0d7164e
+store.rate.RatePage~ui  abi 9d8a90cda0d38664
   runs at   origin
   needs     session.read
   component pw:app/store.rate.rate_order#rate_order
@@ -595,27 +595,27 @@ store.rate.RatePage  abi 1404bdc0d0d7164e
   host      pw:host/principal#read  (session.read)
   exports   page RatePage
 
-store.rate.RatePage.derived_10  abi 2ae23ec8232e911e
+store.rate.RatePage~ui.derived_10  abi 5d15e0ddb0dbbc90
   runs at   origin
   exports   derived derived$10
 
-store.rate.RatePage.derived_12  abi cb9ddb0f6c696f16
+store.rate.RatePage~ui.derived_12  abi 777b73e8776c6e48
   runs at   origin
   exports   derived derived$12
 
-store.rate.RatePage.derived_14  abi f63d360709db7cae
+store.rate.RatePage~ui.derived_14  abi bce7cc0f87231190
   runs at   origin
   exports   derived derived$14
 
-store.rate.RatePage.derived_16  abi ae6bb979e0128dd6
+store.rate.RatePage~ui.derived_16  abi 4d2e378809531838
   runs at   origin
   exports   derived derived$16
 
-store.rate.RatePage.derived_6  abi baa963082a1877fc
+store.rate.RatePage~ui.derived_6  abi ad0d82ba6c96df8e
   runs at   origin
   exports   derived derived$6
 
-store.rate.RatePage.derived_8  abi 06baa34336c3aee4
+store.rate.RatePage~ui.derived_8  abi fcad6d72ac44d3a6
   runs at   origin
   exports   derived derived$8
 
@@ -674,7 +674,7 @@ store.search.Search  abi 8db4a980491b7b06
   host      store:data/search#find-for  (database.read<Stores>)
   exports   query Search
 
-store.search.SearchPage  abi 6f777e8ea6bc2c28
+store.search.SearchPage~ui  abi 72088bbacc31201e
   runs at   origin
   needs     session.read
   component pw:app/store.search.Search#Search

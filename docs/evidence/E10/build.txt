@@ -1,8 +1,8 @@
 E10 gate item 1 - the store builds from source, without Koka or Marko
 
 produced by: just e10-build
-commit: 320c52a44840a80423609ab476eb847c04de34a6
-ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39442025240 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: f15117dede242fac2bc2d54aa973180e47cad1c6
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39526960864 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the control: the ordinary PATH
@@ -65,30 +65,30 @@ pw build: 8 template(s), 34 handler(s), 55 component(s), 69 contract(s) -> OUT
   component  store.hours.CartHours  16628 bytes (13430 core), 5 function(s) audited, imports [store:data/hours#for-cart, pw:host/clock#today, pw:host/clock#at, pw:host/clock#passed]
   component  store.hours.StoreStatus  27007 bytes (22907 core), 5 function(s) audited, imports [store:data/hours#for-store, pw:host/clock#today, pw:host/clock#at, pw:host/clock#passed]
   component  store.hours.StoresOpen  29652 bytes (25175 core), 7 function(s) audited, imports [store:data/stores#list, store:data/hours#for-stores, store:data/ratings#for-stores, pw:host/clock#today, pw:host/clock#at, pw:host/clock#passed]
-  no body    store.page.AddressPage  a Page
+  no body    store.page.AddressPage~ui  a Page
   component  store.page.Cart  4090 bytes (663 core), 2 function(s) audited, imports [store:data/user-carts#current]
-  no body    store.page.CartPage  a Page
+  no body    store.page.CartPage~ui  a Page
   component  store.page.Checkout  71360 bytes (62656 core), 12 function(s) audited, imports [store:data/checkout#parts, store:data/fees#for-stores, store:data/checkout#chosen, store:data/promos#find, pw:host/clock#passed, store:data/hours#for-stores, store:data/user-estimates#for-stores, pw:host/clock#today, pw:host/clock#at, pw:host/clock#date, pw:host/clock#time]
   component  store.page.Estimate  4136 bytes (686 core), 2 function(s) audited, imports [store:data/user-estimates#for-store]
-  no body    store.page.HomePage  a Page
+  no body    store.page.HomePage~ui  a Page
   component  store.page.Menu  4085 bytes (659 core), 2 function(s) audited, imports [store:data/menus#sections]
   component  store.page.MenuLine  3622 bytes (1564 core), 2 function(s) audited, imports [pw:host/reads#store-page-menu-size]
   component  store.page.MenuSize  3380 bytes (857 core), 2 function(s) audited, imports [pw:host/reads#store-page-menu]
   component  store.page.Order  4393 bytes (668 core), 2 function(s) audited, imports [store:data/user-orders#current]
-  no body    store.page.OrderPage  a Page
-  component  store.page.OrderPage.derived_3  4217 bytes (1819 core), 1 function(s) audited, imports []
-  component  store.page.OrderPage.derived_4  3645 bytes (897 core), 1 function(s) audited, imports []
-  component  store.page.OrderPage.derived_9  3384 bytes (878 core), 1 function(s) audited, imports []
+  no body    store.page.OrderPage~ui  a Page
+  component  store.page.OrderPage~ui.derived_3  4241 bytes (1823 core), 1 function(s) audited, imports []
+  component  store.page.OrderPage~ui.derived_4  3669 bytes (901 core), 1 function(s) audited, imports []
+  component  store.page.OrderPage~ui.derived_9  3408 bytes (882 core), 1 function(s) audited, imports []
   component  store.page.OrderTotal  3316 bytes (775 core), 2 function(s) audited, imports [store:data/user-orders#charged]
   component  store.page.Places  2609 bytes (652 core), 2 function(s) audited, imports [store:data/places#list]
   component  store.page.Reach  3236 bytes (667 core), 2 function(s) audited, imports [store:data/coverage#for-store]
   component  store.page.Recommendations  3811 bytes (715 core), 2 function(s) audited, imports [store:data/recommendations#for-store]
   component  store.page.SavedAddresses  3257 bytes (704 core), 2 function(s) audited, imports [store:data/addresses#list]
   component  store.page.Store  3396 bytes (659 core), 2 function(s) audited, imports [store:data/stores#get]
-  no body    store.page.StoreLayout  a Layout
+  no body    store.page.StoreLayout~ui  a Layout
   component  store.page.StoreList  2915 bytes (669 core), 2 function(s) audited, imports [store:data/stores#list]
-  no body    store.page.StorePage  a Page
-  no body    store.page.TimePage  a Page
+  no body    store.page.StorePage~ui  a Page
+  no body    store.page.TimePage~ui  a Page
   component  store.page.TimesOffered  26746 bytes (20747 core), 9 function(s) audited, imports [store:data/hours#for-cart, store:data/checkout#chosen, store:data/user-estimates#for-stores, pw:host/clock#today, pw:host/clock#at, pw:host/clock#passed, pw:host/clock#date, pw:host/clock#time]
   component  store.page.add_address  5691 bytes (888 core), 5 function(s) audited, imports [pw:host/principal#read, pw:host/invalidations#store-page-saved-addresses, pw:host/outbox#addresses-changed, store:data/addresses#add]
   component  store.page.add_to_cart  7623 bytes (1163 core), 7 function(s) audited, imports [pw:host/principal#read, pw:host/invalidations#store-page-cart, pw:host/outbox#user-cart-changed, store:data/menus#is-available, store:data/coverage#reaches, store:data/user-carts#add]
@@ -108,34 +108,34 @@ pw build: 8 template(s), 34 handler(s), 55 component(s), 69 contract(s) -> OUT
   component  store.page.rename_address  5645 bytes (903 core), 5 function(s) audited, imports [pw:host/principal#read, pw:host/invalidations#store-page-saved-addresses, pw:host/outbox#addresses-changed, store:data/addresses#rename]
   component  store.page.send_to_store  6914 bytes (890 core), 5 function(s) audited, imports [pw:host/principal#read, pw:host/invalidations#store-page-order, pw:host/outbox#user-order-changed, store:data/user-orders#send]
   component  store.page.settle_payment  9979 bytes (1503 core), 11 function(s) audited, imports [pw:host/principal#read, pw:host/invalidations#store-page-cart, pw:host/invalidations#store-page-order, pw:host/invalidations#store-page-checkout, pw:host/invalidations#store-page-order-total, pw:host/outbox#user-cart-changed, pw:host/outbox#user-order-changed, pw:host/schedules#store-page-expire-order-cancel, store:data/user-orders#settle, pw:host/schedules#store-page-send-to-store-at]
-  no body    store.rate.RatePage  a Page
-  component  store.rate.RatePage.derived_10  1630 bytes (660 core), 1 function(s) audited, imports []
-  component  store.rate.RatePage.derived_12  1630 bytes (660 core), 1 function(s) audited, imports []
-  component  store.rate.RatePage.derived_14  1630 bytes (660 core), 1 function(s) audited, imports []
-  component  store.rate.RatePage.derived_16  2050 bytes (1077 core), 1 function(s) audited, imports []
-  component  store.rate.RatePage.derived_6  1608 bytes (656 core), 1 function(s) audited, imports []
-  component  store.rate.RatePage.derived_8  1608 bytes (656 core), 1 function(s) audited, imports []
+  no body    store.rate.RatePage~ui  a Page
+  component  store.rate.RatePage~ui.derived_10  1654 bytes (664 core), 1 function(s) audited, imports []
+  component  store.rate.RatePage~ui.derived_12  1654 bytes (664 core), 1 function(s) audited, imports []
+  component  store.rate.RatePage~ui.derived_14  1654 bytes (664 core), 1 function(s) audited, imports []
+  component  store.rate.RatePage~ui.derived_16  2074 bytes (1081 core), 1 function(s) audited, imports []
+  component  store.rate.RatePage~ui.derived_6  1632 bytes (660 core), 1 function(s) audited, imports []
+  component  store.rate.RatePage~ui.derived_8  1632 bytes (660 core), 1 function(s) audited, imports []
   component  store.rate.rate_order  6060 bytes (1023 core), 7 function(s) audited, imports [pw:host/principal#read, pw:host/invalidations#store-reviews-order-ratings, pw:host/invalidations#store-reviews-store-to-rate, pw:host/outbox#user-cart-changed, pw:host/outbox#store-rated, store:data/ratings#rate]
   component  store.reviews.OrderRatings  4411 bytes (1687 core), 2 function(s) audited, imports [store:data/ratings#for-order]
   component  store.reviews.StoreRatings  5061 bytes (2156 core), 3 function(s) audited, imports [store:data/ratings#for-stores, store:data/ratings#reviews]
   component  store.reviews.StoreToRate  5134 bytes (2288 core), 2 function(s) audited, imports [store:data/ratings#for-order]
   component  store.search.Search  35204 bytes (29380 core), 7 function(s) audited, imports [store:data/search#find-for, store:data/hours#for-stores, store:data/ratings#for-stores, pw:host/clock#today, pw:host/clock#at, pw:host/clock#passed]
-  no body    store.search.SearchPage  a Page
-  page       store.page.StorePage  8 binding(s), 9 part(s), 2 stream(s)
-  page       store.page.CartPage  5 binding(s), 5 part(s)
-  page       store.page.TimePage  2 binding(s), 3 part(s)
-  page       store.page.HomePage  3 binding(s), 2 part(s)
-  page       store.page.OrderPage  4 binding(s), 1 part(s)
-  page       store.page.AddressPage  3 binding(s), 1 part(s)
-  page       store.rate.RatePage  2 binding(s), 3 part(s)
-  page       store.search.SearchPage  2 binding(s), 2 part(s)
-  speculate  store.page.StorePage  store.page.add_to_cart, store.page.decrease_in_cart, store.page.increase_in_cart, store.page.remove_from_cart on cart  18474 bytes
-  speculate  store.page.CartPage  store.page.decrease_in_cart, store.page.increase_in_cart, store.page.remove_from_cart on cart  12689 bytes
-  computed   store.rate.RatePage  1200 bytes
-  build      b9d66b1168312be53
+  no body    store.search.SearchPage~ui  a Page
+  page       store.page.StorePage~ui  8 binding(s), 9 part(s), 2 stream(s)
+  page       store.page.CartPage~ui  5 binding(s), 5 part(s)
+  page       store.page.TimePage~ui  2 binding(s), 3 part(s)
+  page       store.page.HomePage~ui  3 binding(s), 2 part(s)
+  page       store.page.OrderPage~ui  4 binding(s), 1 part(s)
+  page       store.page.AddressPage~ui  3 binding(s), 1 part(s)
+  page       store.rate.RatePage~ui  2 binding(s), 3 part(s)
+  page       store.search.SearchPage~ui  2 binding(s), 2 part(s)
+  speculate  store.page.StorePage~ui  store.page.add_to_cart, store.page.decrease_in_cart, store.page.increase_in_cart, store.page.remove_from_cart on cart  18477 bytes
+  speculate  store.page.CartPage~ui  store.page.decrease_in_cart, store.page.increase_in_cart, store.page.remove_from_cart on cart  12692 bytes
+  computed   store.rate.RatePage~ui  1203 bytes
+  build      b3e139de18b86e622
 
 == what was written
-    47064  app.wit
+    47172  app.wit
        18  build-id
      2625  components/UserCarts.line_count.wasm
      2802  components/UserCarts.subtotal.wasm
@@ -152,9 +152,9 @@ pw build: 8 template(s), 34 handler(s), 55 component(s), 69 contract(s) -> OUT
      3622  components/store.page.MenuLine.wasm
      3380  components/store.page.MenuSize.wasm
      4393  components/store.page.Order.wasm
-     4217  components/store.page.OrderPage.derived_3.wasm
-     3645  components/store.page.OrderPage.derived_4.wasm
-     3384  components/store.page.OrderPage.derived_9.wasm
+     4241  components/store.page.OrderPage~ui.derived_3.wasm
+     3669  components/store.page.OrderPage~ui.derived_4.wasm
+     3408  components/store.page.OrderPage~ui.derived_9.wasm
      3316  components/store.page.OrderTotal.wasm
      2609  components/store.page.Places.wasm
      3236  components/store.page.Reach.wasm
@@ -181,20 +181,20 @@ pw build: 8 template(s), 34 handler(s), 55 component(s), 69 contract(s) -> OUT
      5645  components/store.page.rename_address.wasm
      6914  components/store.page.send_to_store.wasm
      9979  components/store.page.settle_payment.wasm
-     1630  components/store.rate.RatePage.derived_10.wasm
-     1630  components/store.rate.RatePage.derived_12.wasm
-     1630  components/store.rate.RatePage.derived_14.wasm
-     2050  components/store.rate.RatePage.derived_16.wasm
-     1608  components/store.rate.RatePage.derived_6.wasm
-     1608  components/store.rate.RatePage.derived_8.wasm
+     1654  components/store.rate.RatePage~ui.derived_10.wasm
+     1654  components/store.rate.RatePage~ui.derived_12.wasm
+     1654  components/store.rate.RatePage~ui.derived_14.wasm
+     2074  components/store.rate.RatePage~ui.derived_16.wasm
+     1632  components/store.rate.RatePage~ui.derived_6.wasm
+     1632  components/store.rate.RatePage~ui.derived_8.wasm
      6060  components/store.rate.rate_order.wasm
      4411  components/store.reviews.OrderRatings.wasm
      5061  components/store.reviews.StoreRatings.wasm
      5134  components/store.reviews.StoreToRate.wasm
     35204  components/store.search.Search.wasm
-     1200  computed/store.rate.RatePage.mjs
-   264655  contracts.json
-    32328  graph.json
+     1203  computed/store.rate.RatePage~ui.mjs
+   264745  contracts.json
+    32430  graph.json
       330  handlers/029fa6a984724f1c.mjs
     21028  handlers/0567c01c8c1d4702.mjs
      1456  handlers/0884d13a19812a03.mjs
@@ -225,21 +225,21 @@ pw build: 8 template(s), 34 handler(s), 55 component(s), 69 contract(s) -> OUT
      2953  handlers/ce4501910ab2a49a.mjs
      1828  handlers/dc95ff389eaac1f1.mjs
      1946  handlers/e54d74c7f76a6a78.mjs
-     2031  pages/store.page.AddressPage.json
-     6417  pages/store.page.CartPage.json
-     1776  pages/store.page.HomePage.json
-     3533  pages/store.page.OrderPage.json
-     7326  pages/store.page.StorePage.json
-     1882  pages/store.page.TimePage.json
-     3238  pages/store.rate.RatePage.json
-     1845  pages/store.search.SearchPage.json
+     2037  pages/store.page.AddressPage~ui.json
+     6423  pages/store.page.CartPage~ui.json
+     1782  pages/store.page.HomePage~ui.json
+     3557  pages/store.page.OrderPage~ui.json
+     7332  pages/store.page.StorePage~ui.json
+     1888  pages/store.page.TimePage~ui.json
+     3262  pages/store.rate.RatePage~ui.json
+     1851  pages/store.search.SearchPage~ui.json
       136  predicates.json
       294  sources.json
-      431  speculations/store.page.CartPage.json
-    12689  speculations/store.page.CartPage.mjs
-      481  speculations/store.page.StorePage.json
-    18474  speculations/store.page.StorePage.mjs
-   106446  templates.json
+      437  speculations/store.page.CartPage~ui.json
+    12692  speculations/store.page.CartPage~ui.mjs
+      487  speculations/store.page.StorePage~ui.json
+    18477  speculations/store.page.StorePage~ui.mjs
+   106497  templates.json
 
 == byte-identical to the separately recorded artifacts
   components/store.page.add_to_cart.wasm = docs/evidence/E10/store.page.add_to_cart.wasm
@@ -281,11 +281,11 @@ pw build: 8 template(s), 34 handler(s), 55 component(s), 69 contract(s) -> OUT
 test a_placeholder_that_something_depends_on_is_a_refusal ... ok
 test a_program_that_does_not_check_builds_nothing ... ok
 test the_store_builds_every_artifact_from_source ... ok
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.94s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.30s
 
 Since ADR-0125 the development server runs the store's queries and
 the cart's count (UserCarts.line_count since track store-accounts) by
-pages/store.page.StorePage.json. NOT CLAIMED: their
+pages/store.page.StorePage~ui.json. NOT CLAIMED: their
 policies (freshness, cache, key, concurrency); E14-Q's second slice. The
 four Resources.* queries are 'todo' in the library, and nothing the store
 builds depends on them.

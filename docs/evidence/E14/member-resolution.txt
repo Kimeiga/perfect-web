@@ -1,24 +1,24 @@
 ADR-0254 - a member names the declaration its module sees
 
 produced by: just e14-member-resolution
-commit: ddaeeb1dfba9630371b7dd5b127c23855d245c74
-ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39131257549 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: f15117dede242fac2bc2d54aa973180e47cad1c6
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39526960864 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the checker (compiler/pw-core/tests/member_resolution.rs)
 
-test a_member_two_imported_modules_declare_is_refused ... ok
 test a_member_of_modules_none_imported_is_refused ... ok
+test a_member_two_imported_modules_declare_is_refused ... ok
 test a_member_declared_beside_its_type_is_seen_without_an_import ... ok
 test an_ambiguous_member_is_no_function_value ... ok
-test a_member_two_modules_declare_is_the_one_imported ... ok
 test a_members_effects_are_the_imported_ones ... ok
+test a_member_two_modules_declare_is_the_one_imported ... ok
 test a_members_type_is_the_imported_ones ... ok
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.42s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.05s
 
 == the member table (compiler/pw-core/src/signatures.rs)
 
-test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 185 filtered out; finished in 0.17s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 186 filtered out; finished in 0.11s
 
 == mutation controls (scripts/member_resolution_mutations.py)
 
@@ -30,7 +30,7 @@ a term beside its type is not seen: KILLED (1 of 7 tests fail)
 no declaration is named where none is seen: KILLED (1 of 7 tests fail)
 an ambiguous member is not refused: KILLED (4 of 7 tests fail)
 the value relations ask as no module: KILLED (4 of 7 tests fail)
-the inference asks as no module: KILLED (1 of 7 tests fail)
+the inference asks as no module: KILLED (2 of 7 tests fail)
 an ambiguous member is a function value: KILLED (1 of 7 tests fail)
 9 of 9 mutants killed
 memory bound: no process was stopped

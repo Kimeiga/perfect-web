@@ -1,18 +1,18 @@
 ADR-0118 - what a declaration reads, it reads through what it calls
 
 produced by: just e10-reads-through-calls
-commit: 5d147285f6e2957e5a5c0a5ac159c7269d1721b7
-ci: https://github.com/Kimeiga/perfect-web/actions/runs/38277655867 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: f15117dede242fac2bc2d54aa973180e47cad1c6
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39526960864 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == reads through calls (compiler/pw-core/tests/reads_through_calls.rs)
 
-test a_session_its_keyword_alone_declares_is_read_through_a_relay ... ok
 test a_contract_is_as_private_as_what_its_component_reads ... ok
+test a_session_its_keyword_alone_declares_is_read_through_a_relay ... ok
 test a_shared_cache_reads_through_a_helper ... ok
 test a_shared_page_reads_through_a_public_query ... ok
 test a_shared_fragment_is_as_private_as_what_its_dependency_reads ... ok
-test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.19s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.23s
 
 == mutation controls (scripts/reads_through_calls_mutations.py)
 
