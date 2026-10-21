@@ -8,28 +8,30 @@ The assembled candidate is unlanded; master remains the verified train-11
 commit recorded in [STATUS](STATUS.md). Finish the combined gates before
 starting another feature batch.
 
-The latest source `d2e14292` retains all 43 TodoMVC controls and 50 browser
-identities. Its filtered-update test now starts with mixed active/completed
-rows and asserts exact visible identities before acting across filter changes.
-It also retains the last completed item becoming an empty Completed list.
-Final-source controls 10 and 11 produce valid complete assertion receipts,
-with passing host4/browser50 baseline and restored suites. The prior 12–20
-sweep is explicitly tied to its earlier source hash.
+The latest source `9031b412` repairs two observed browser-test races. The
+TodoMVC mixed-state toggle-all actions now have explicit row and checkbox
+preconditions and outcomes; the unchanged original fault produces two complete
+semantic assertion failures among the same 50 test IDs, with passing 4-host /
+50-browser baseline and restoration. The device privacy test now waits for
+its rendered note, stored JSON and updated count before reload, while keeping
+all postreload persistence and network privacy assertions.
 
-The [seven-recipe run](https://github.com/studiokimeiga/perfect-web/actions/runs/39549550596)
-at `bd267ad6` correctly refused control 10 after a stale list observation led
-to an action timeout. Preserve that failure. Run the four reached recipes:
-`e10-browser`, `e14-todomvc`, `e14-device-store`, and `e14-second-host`, plus
-the workflow's full browser suites. The whole 43-control result remains due.
+[Verify 39555014640](https://github.com/studiokimeiga/perfect-web/actions/runs/39555014640)
+at `e877236b` remains failed for its TodoMVC witness and Chromium privacy test.
+Its device-storage 62/62 campaign and Firefox/WebKit browser passes are valid
+for that source; they do not replace the latest test source's verification.
+Run the four reached recipes: `e10-browser`, `e14-todomvc`, `e14-device-store`,
+and `e14-second-host`, plus the full browser suites. Retain all 43 TodoMVC
+controls and 50 native test IDs; no setup failure or action error is a kill.
 
-Completed audited imports include 125 eligible files from the original
-155-recipe run, four from the eight-recipe run, and seventeen from the
-successful 21-recipe run; the respective import commits are `bd267ad6`,
-`693e0d7c`, and `eb1b2e35`. After the seven-run completes, import only its
-still-current valid files. Reconcile canonical source, count/header and native
-results across all runs, include any remaining canonical stale obligations,
-and require exact final-commit CI before landing. The dated details below
-preserve the original failures and requirements as recorded then.
+The prior seven-run is complete. Its three valid, still-current files were
+imported at `bc805844`, after independent native/header/count audit. The prior
+125 + 4 + 17 eligible imports remain recorded in STATUS. Finish canonical
+reconciliation after the new results; final track verification must also cover
+legacy `e8-wit`, `e10-component` and `e8-contracts`, which current evidence
+cannot credit. Require exact final-commit CI before a track push, verify the
+track, then recheck remote master before landing. The dated details below
+retain the original failures and requirements as recorded then.
 
 The earlier assembled repair candidate `34f3c2d1` began the first follow-up on `wip/train-12`.
 [Verify39538607183](https://github.com/studiokimeiga/perfect-web/actions/runs/39538607183)

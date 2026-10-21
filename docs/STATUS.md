@@ -3,7 +3,7 @@
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
 Reviewed 2026-10-21 against assembled train-12 source
-`d2e14292` (with final hosted verification still pending).
+`9031b412` (with final hosted verification still pending).
 [The complete prior ledger](STATUS-HISTORY-2026-10.md) remains verbatim,
 including failed runs, corrections and their original scope.
 
@@ -75,33 +75,37 @@ evidence. No failed result is promoted by this summary.
 
 ## failing gate items
 
-- Source `d2e14292` preserves all 43 TodoMVC operators and 50 browser
-  identities. A mixed completed/active fixture now observes exact row titles
-  before acting after a filter transition, and retains the last completed row
-  becoming an empty filtered list. Final-source controls 10 and 11 each yield
-  complete native assertion failures between passing host4/browser50 baseline
-  and restored suites. The earlier controls 12–20 sweep belongs to its recorded
-  earlier source hash, not this final source. See the
-  [native diagnostics](diagnostics/train-12/todomvc-filter-boundaries/).
-- The [seven-recipe follow-up](https://github.com/studiokimeiga/perfect-web/actions/runs/39549550596)
-  at `bd267ad6` correctly refused TodoMVC control 10: a stale list count could
-  match before filtering, and the subsequent action timed out. That failed
-  result remains failed. The repaired source reaches four whole recipes:
-  `e10-browser`, `e14-todomvc`, `e14-device-store`, and `e14-second-host`.
-  Their full current verification, final evidence reconciliation, and exact
-  final-commit CI remain required.
-- Completed artifact audits validate native status, exact commit headers,
-  recipe coverage and counts using the complete immutable recipe sources.
-  Eligible imports now include 125 files from the original 155-recipe run
-  (`bd267ad6`), four from the eight-recipe run (`693e0d7c`), and seventeen
-  from the successful [21-recipe run](https://github.com/studiokimeiga/perfect-web/actions/runs/39543811122)
-  (`eb1b2e35`). Stale and invalid files were excluded. The 21-run and eight-run
-  full browser jobs passed on all three engines. Changed test source still
-  requires the new four-recipe run and current browser suites.
-- Exact witness metadata, canonical compatibility verdicts and isolated
-  SIGTERM restoration probes are integrated: nine Playwright controls, eight
-  compatibility controls and the combined 18 count/restoration tests pass
-  locally. These are scoped results, not final combined verification.
+- Source `9031b412` retains all 43 TodoMVC controls and 50 browser test
+  identities. Mixed-state toggle-all tests now establish row and checkbox
+  states around each click. The exact original fault that completes only when
+  all todos are active yields a complete 48-pass/2-assertion-failure receipt,
+  between passing host4/browser50 baseline and restored suites. Source hashes,
+  complete receipts, and excluded setup attempts are in the
+  [focused diagnostics](diagnostics/train-12/todomvc-toggle-all-state-witness/).
+- The [four-recipe run](https://github.com/studiokimeiga/perfect-web/actions/runs/39555014640)
+  at `e877236b` correctly refused that TodoMVC witness: seven controls were
+  killed before an implicit checkbox state check produced an invalid receipt.
+  Its Chromium browser job also found an immediate-reload race in the device
+  privacy test. That test now waits for the rendered and stored note, then the
+  updated count, before reload; its postreload persistence and privacy
+  assertions remain. The focused case passes on all three engines. Its full
+  Chromium spec reported 15 passes; the wrapper limitation and missing raw
+  exploratory probe output are documented in the
+  [diagnostic](diagnostics/train-12/device-store-marker-race-2026-10-21.md).
+- The same run's device-storage campaign detected 62/62 faults and passed
+  immutable header/count checks; Firefox and WebKit browser jobs passed.
+  These results precede the latest test changes. The repaired source still
+  requires whole `e10-browser`, `e14-todomvc`, `e14-device-store` and
+  `e14-second-host` campaigns, full browser suites, and exact final-commit CI.
+- [CI 39549544042](https://github.com/studiokimeiga/perfect-web/actions/runs/39549544042)
+  passed x64, ARM and license/advisory checks at `bd267ad6`. It is not final
+  candidate CI. Completed, audited evidence imports include 125 files from
+  the original 155-run (`bd267ad6`), four from the eight-run (`693e0d7c`),
+  seventeen from the successful 21-run (`eb1b2e35`), and three from the
+  completed seven-run (`bc805844`). Native-invalid and stale files were
+  excluded. The canonical remaining plan includes the four current campaigns
+  and legacy `e8-wit`, `e10-component`, `e8-contracts` obligations for the
+  final track verification. No earlier failure has been promoted to a pass.
 
 The following entries retain the earlier findings and repair obligations as
 recorded at their cited sources. Their later replacements are reconciled above;
