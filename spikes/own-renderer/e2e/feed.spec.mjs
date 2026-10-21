@@ -32,7 +32,8 @@
 //     (ADR-0238);
 //   - a post shown before the server answers waits: nothing on it links or
 //     acts until the server's row stands in its place (ADR-0275).
-import { expect, test } from "@playwright/test";
+import { test } from "@playwright/test";
+import { expect } from "../assertion-expect.mjs";
 import { FEED_PORTS } from "../host-metadata.mjs";
 
 test.use({
@@ -41,7 +42,9 @@ test.use({
   },
 });
 
-test.describe.configure({ mode: "serial" });
+// Keep this host sequential, but execute every independent case after a failure.
+// Mutation evidence requires the complete inventory, including later cases.
+test.describe.configure({ mode: "default" });
 
 // What the network saw of the page's subscription and reads: when each
 // `/stream` and `/pw-read` was asked, answered and ended, a stream's
@@ -480,7 +483,7 @@ test("Load more shows the next page, and a post after it is shown over it", asyn
   const rows = page.locator("main > ul > li");
   await expect(rows).toHaveCount(20);
   await page.getByRole("button", { name: "Load more" }).click();
-  await expect.poll(() => rows.count()).toBeGreaterThan(20);
+  await expect.poll(async () => (await rows.count()) > 20).toBe(true);
   const longer = await rows.count();
   expect(longer).toBeLessThanOrEqual(40);
   // A post held at the network is shown over the page the browser holds now,

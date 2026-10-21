@@ -68,8 +68,10 @@ fn speculation(
     program: &str,
     page: &str,
 ) -> Option<Result<pw_core::backend::speculation::Speculation, String>> {
-    pw_core::backend::speculation::compile(&units(program))
-        .expect("the program checks")
+    let compiled = pw_core::backend::speculation::compile(&units(program));
+    assert!(compiled.is_ok(), "the program checks: {compiled:?}");
+    compiled
+        .unwrap()
         .into_iter()
         .find(|c| c.page == page)
         .map(|c| match c.module {
@@ -85,9 +87,9 @@ fn each_page_speculates_on_the_arm_whose_target_it_shows() {
     let program = feed(&|s| s.to_string());
     assert_eq!(reported(&program), Vec::<String>::new());
     // The home page shows the timeline: `like`'s first arm.
-    let home = speculation(&program, "feed.app.Home~ui")
-        .expect("the home page's")
-        .unwrap_or_else(|e| panic!("{e}"));
+    let home = speculation(&program, "feed.app.Home~ui");
+    assert!(matches!(&home, Some(Ok(_))), "home speculation: {home:?}");
+    let home = home.unwrap().unwrap();
     assert!(
         home.source
             .contains("\"feed.app.like\": [{ binding: \"feed\","),
@@ -100,9 +102,12 @@ fn each_page_speculates_on_the_arm_whose_target_it_shows() {
         home.source
     );
     // The thread page shows the thread its `id` keys: the second.
-    let thread = speculation(&program, "feed.app.PostPage~ui")
-        .expect("the thread page's")
-        .unwrap_or_else(|e| panic!("{e}"));
+    let thread = speculation(&program, "feed.app.PostPage~ui");
+    assert!(
+        matches!(&thread, Some(Ok(_))),
+        "thread speculation: {thread:?}"
+    );
+    let thread = thread.unwrap().unwrap();
     assert!(
         thread
             .source
@@ -127,13 +132,11 @@ fn an_arm_whose_target_a_page_shows_under_another_key_is_refused() {
             "<button id=\"like\" type=\"button\" on:press={() =>",
         )
     });
-    match speculation(&program, "feed.app.PostPage~ui").expect("the thread page's") {
-        Ok(s) => panic!("speculated {:?}", s.bindings),
-        Err(e) => assert!(
-            e.contains("reads by no binding whose key resolves to the same invocation context"),
-            "{e}"
-        ),
-    }
+    let result = speculation(&program, "feed.app.PostPage~ui");
+    assert!(
+        matches!(&result, Some(Err(e)) if e.contains("reads by no binding whose key resolves to the same invocation context")),
+        "the mismatched entry is refused: {result:?}"
+    );
 }
 
 #[test]
@@ -149,9 +152,28 @@ fn a_page_that_shows_no_target_has_no_speculation() {
         )
     });
     assert_eq!(reported(&program), Vec::<String>::new());
+    // Establish the actual page before asserting that its module is absent.
+    // A lookup by an obsolete or misspelled identity must not prove absence.
+    let compiled_units = units(&program);
+    let hir = &compiled_units.last().expect("the app unit").hir;
+    let pages: Vec<_> = hir
+        .all_decls()
+        .filter(|(_, d)| d.kind == pw_core::hir::DeclKind::Page && d.name == "Likes")
+        .collect();
+    assert_eq!(
+        pages.len(),
+        1,
+        "the fixture declares exactly one Likes page"
+    );
+    let page = pw_core::contract::component_id(hir, pages[0].0);
+    assert_eq!(page, "feed.app.Likes~ui");
+    let compiled = pw_core::backend::speculation::compile(&compiled_units);
+    assert!(compiled.is_ok(), "the program checks: {compiled:?}");
+    let compiled = compiled.unwrap();
     assert!(
-        speculation(&program, "feed.app.Likes").is_none(),
-        "a page that speculates on nothing"
+        compiled.iter().all(|c| c.page != page),
+        "a page that speculates on nothing has no module; emitted pages: {:?}",
+        compiled.iter().map(|c| &c.page).collect::<Vec<_>>()
     );
 }
 
