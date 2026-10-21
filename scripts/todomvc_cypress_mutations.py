@@ -7,8 +7,7 @@ A test that passes with a check removed is not evidence for the check. Each
 mutant undoes one thing:
 - `todomvc_cypress_vendored.py` holds each vendored file to upstream's blob;
 - `todomvc_cypress_result.py` reads Cypress's output and judges each test's
-  outcome (what the spec asks of `localStorage`, what the app's design gives,
-  what a hook that fails makes of the rest, the one test that races the host);
+  observed outcome and the selected mode's explicit requirements;
 - `run.sh` runs the suite, and fails where it cannot (no Xvfb, no binary, no
   build, no host) and where the verdict fails.
 
@@ -21,9 +20,12 @@ sources are restored after every mutant, whatever happens.
 """
 
 import pathlib
-import re
 import signal
-import subprocess
+import tempfile
+
+import guide_python
+import mutation_source
+import producer_process
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -55,8 +57,8 @@ MUTANTS = [
     (
         "a vendored file that is gone is not a problem",
         VENDORED,
-        "        if not file.exists():\n",
-        "        if False:\n",
+        '            found.append(f"{path}: missing")\n',
+        "            pass\n",
     ),
     (
         "a vendored file that differs from upstream's is not a problem",
@@ -295,69 +297,125 @@ MUTANTS = [
     ),
 ]
 
-TESTS = [[sys.executable, "-m", "unittest", "scripts/tests/test_todomvc_cypress.py"]]
+# These additions protect the report and this consumer's proof boundary. The
+# original 42 fault models above are retained.
+MUTANTS += [
+    ("a hook report invents a polling-loop cause", RESULT,
+     '"hook": "a hook failed for this test",',
+     '"hook": "a hook failed for this test because polling loops threw",'),
+    ("an unexecuted test is declared to fail by design", RESULT,
+     '"skip": "not run: Cypress printed no terminal result for this test",',
+     '"skip": "not run: Cypress printed no terminal result for this test; it would fail by design",'),
+    ("memory guard stops count as assertion kills", pathlib.Path(__file__).resolve(),
+     '    if stopped:\n', '    if False:\n'),
+    ("invalid native receipts count as mutation outcomes", pathlib.Path(__file__).resolve(),
+     '    if not result.valid:\n', '    if False:\n'),
+    ("native body errors count as mutation outcomes", pathlib.Path(__file__).resolve(),
+     '    if result.body_errors:\n', '    if False:\n'),
+    ("a completed passing producer counts as a kill", pathlib.Path(__file__).resolve(),
+     '    return "KILLED" if result.assertion_failed else "SURVIVED"\n',
+     '    return "KILLED"\n'),
+]
 
-# How long one command may run. Past the bound it is killed and counts as failing.
-BOUND = 600
+MUTANTS += [
+    ("cancelled campaign restores mutant bytes", pathlib.Path(__file__).resolve(),
+     '        with mutation_source.changed(path, original, original.replace(anchor, replacement, 1)):\n',
+     '        with mutation_source.changed(path, original.replace(anchor, replacement, 1), original.replace(anchor, replacement, 1)):\n'),
+]
+
+MUTANTS += [
+    ("consumer omits the memory guard verdict", pathlib.Path(__file__).resolve(),
+     '        verdict = outcome(result, watch.stopped)\n',
+     '        verdict = outcome(result)\n'),
+    ("syntax faults can reach a mutation witness", pathlib.Path(__file__).resolve(),
+     '            if not preflight(path):\n',
+     '            if False:\n'),
+]
+
+SELECTOR = "test_todomvc_cypress"
+SEARCH = ROOT / "scripts/tests"
+EXPECTED_TESTS = 49
+BOUND = 60
 
 
-def run_tests():
-    """(built, passed, failed) over every test command."""
-    built, passed, failed = True, 0, 0
-    for cmd in TESTS:
+def run_tests(expected, evidence):
+    """One fresh, complete native suite against its unmutated inventory."""
+    receipt = guide_python.run(SELECTOR, expected, SEARCH, evidence, timeout=BOUND)
+    print(receipt.output, flush=True)
+    return receipt.result
+
+
+def outcome(result, stopped=False):
+    """A native body error, skipped/incomplete producer or guard stop earns no kill."""
+    if stopped:
+        return "REFUSED"
+    if not result.valid:
+        return "REFUSED"
+    if result.body_errors:
+        return "REFUSED"
+    return "KILLED" if result.assertion_failed else "SURVIVED"
+
+
+def preflight(path):
+    """Syntax faults in the mutated Python or shell source earn no kill."""
+    if path.suffix == ".py":
         try:
-            r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, timeout=BOUND)
-        except subprocess.TimeoutExpired:
-            failed += 1
-            continue
-        out = r.stdout + r.stderr
-        ran = re.search(r"^Ran (\d+) tests?", out, re.M)
-        if ran is None:
-            built = False
-            continue
-        bad = re.search(r"^FAILED \((.*)\)", out, re.M)
-        n_bad = sum(int(n) for n in re.findall(r"=(\d+)", bad.group(1))) if bad else 0
-        passed += int(ran.group(1)) - n_bad
-        failed += n_bad
-    return built, passed, failed
+            compile(path.read_text(), str(path), "exec")
+        except (SyntaxError, UnicodeError) as error:
+            print(f"source preflight refused: {error}", flush=True)
+            return False
+        return True
+    if path.suffix == ".sh":
+        result = producer_process.run(["bash", "-n", str(path)], cwd=ROOT, timeout=BOUND)
+        if result.returncode:
+            print(result.stdout, flush=True)
+        return result.returncode == 0
+    raise ValueError(f"unsupported mutation source: {path}")
 
 
 def main():
-    import mutation_baseline  # keeps what each command says, for a red baseline
-
-    # Stopped from outside, the sources are still restored: SIGTERM raises
-    # here, and the `finally` below runs.
+    import mutation_baseline
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(1))
-    built, passed, failed = run_tests()
-    print(f"baseline: {passed} passed, {failed} failed", flush=True)
-    if not built or failed or not passed:
-        print("FAIL: the unmutated baseline is not green; no mutant can mean anything")
-        mutation_baseline.explain()
+    watch = mutation_baseline.mutation_bound.start()
+    evidence = pathlib.Path(tempfile.mkdtemp(prefix="pw-todomvc-controls-"))
+    print(f"native receipts: {evidence}", flush=True)
+    expected = guide_python.freeze(SELECTOR, SEARCH, "test_todomvc_cypress.py", EXPECTED_TESTS, evidence)
+    baseline = run_tests(expected, evidence)
+    print(f"baseline: {len(baseline.passed)} passed, {len(baseline.failed)} failed", flush=True)
+    if not baseline.valid or baseline.failed or watch.stopped:
+        print("REFUSED: incomplete, failed or stopped baseline; no mutation evidence")
         return 1
 
-    survivors = 0
+    killed = refused = survivors = 0
     for what, path, anchor, replacement in MUTANTS:
         original = path.read_text()
         if original.count(anchor) != 1:
-            print(f"{what}: ANCHOR NOT FOUND EXACTLY ONCE in {path.name}")
-            survivors += 1
+            print(f"{what}: REFUSED (anchor not unique in {path.name}; no kill)")
+            refused += 1
             continue
-        try:
-            path.write_text(original.replace(anchor, replacement, 1))
-            built, passed, failed = run_tests()
-        finally:
-            path.write_text(original)
-        if not built:
-            verdict = "KILLED (does not run)"
-        elif failed:
-            verdict = f"KILLED ({failed} of {passed + failed} tests fail)"
+        with mutation_source.changed(path, original, original.replace(anchor, replacement, 1)):
+            if not preflight(path):
+                print(f"{what}: REFUSED (source syntax; no kill)", flush=True)
+                refused += 1
+                continue
+            result = run_tests(expected, evidence)
+        verdict = outcome(result, watch.stopped)
+        if verdict == "KILLED":
+            killed += 1
+            detail = f" ({len(result.assertion_failed)} assertion methods fail)"
+        elif verdict == "REFUSED":
+            refused += 1
+            detail = f" (invalid, erroneous or stopped producer; no kill: {result.reason})"
         else:
-            verdict = "SURVIVED"
             survivors += 1
-        print(f"{what}: {verdict}", flush=True)
+            detail = ""
+        print(f"{what}: {verdict}{detail}", flush=True)
+        if watch.stopped:
+            print("REFUSED: memory guard stopped the campaign")
+            return 1
 
-    print(f"{len(MUTANTS) - survivors} of {len(MUTANTS)} mutants killed")
-    return 1 if survivors else 0
+    print(f"{killed} of {len(MUTANTS)} mutants killed; {refused} refused; {survivors} survived")
+    return int(bool(refused or survivors))
 
 
 if __name__ == "__main__":

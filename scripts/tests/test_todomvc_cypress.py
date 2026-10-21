@@ -19,8 +19,11 @@ import pathlib
 import re
 import socket
 import subprocess
+import sys
 import tempfile
 import unittest
+from unittest import mock
+from types import SimpleNamespace
 
 HERE = pathlib.Path(__file__).resolve().parent
 SCRIPTS = HERE.parent
@@ -172,7 +175,7 @@ class Parse(unittest.TestCase):
     def test_the_newer_cypress_prints_the_same_lines(self):
         run = result.parse_run(ACCEPTANCE_NEW)
         self.assertEqual(run["cypress"], "15.21.1")
-        self.assertEqual(run["counts"]["Tests"], 29)
+        self.assertEqual(run["counts"].get("Tests"), 29)
         self.assertEqual(len(run["passed"]), 3)
         self.assertTrue(run["storage_denied"])
         self.assertEqual(result.parse_run(DIAGNOSTIC_NEW)["pending"], ["should persist its data"])
@@ -272,7 +275,7 @@ class JudgeDiagnostic(unittest.TestCase):
         edited = edit(RACY, r"^( +AssertionError: Timed out retrying after 4000ms: expected )'<input#toggle-all.toggle-all>' not to be 'checked'$",
                       "     AssertionError: Timed out retrying after 4000ms: expected something else")
         _, problems = judged("diagnostic", edited, 1)
-        self.assertTrue(has(problems, "another reason than its race"))
+        self.assertTrue(has(problems, "outside the diagnostic's allowed assertion"))
 
     def test_the_racy_test_may_not_be_skipped(self):
         edited = edit(
@@ -281,7 +284,7 @@ class JudgeDiagnostic(unittest.TestCase):
             "      - complete all checkbox should update state when items are completed / cleared",
         )
         _, problems = judged("diagnostic", edited, 0)
-        self.assertTrue(has(problems, "passes or loses its race"))
+        self.assertTrue(has(problems, "requires a pass or its allowed assertion failure"))
 
     def test_a_diagnostic_that_did_not_run_is_not_a_pass(self):
         st, problems = judged("diagnostic", "")
@@ -302,8 +305,8 @@ class Cli(unittest.TestCase):
         self.assertIn("acceptance: 3 of 29 passed; 4 failed (3 tests, 1 hook); 22 not run", text)
         self.assertIn("cypress 15.14.2 on Electron", text)
         self.assertIn("[New Todo] should allow me to add todo items  (spec.cy.js:561)", text)
-        self.assertIn("unmet official requirement: checkItemSaved, checkNumberOfTodosInLocalStorage", text)
-        self.assertIn("not run (a failed hook skipped it); it asks nothing of localStorage: the diagnostic runs it", text)
+        self.assertIn("the official test failed", text)
+        self.assertIn("not run: Cypress printed no terminal result for this test", text)
         self.assertIn("recorded by the browser: Uncaught SecurityError", text)
         self.assertIn("acceptance: FAILED:", text)
 
@@ -312,13 +315,31 @@ class Cli(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("The diagnostic, NOT the acceptance", text)
         self.assertIn("diagnostic: 28 of 29 passed; 1 pending", text)
-        self.assertIn("skipped by the suite itself for this name", text)
+        self.assertIn("Cypress reported this test as pending", text)
 
-    def test_the_report_names_a_race_a_race(self):
+    def test_the_report_preserves_the_observed_diagnostic_failure(self):
         code, text = self.main("diagnostic", str(FIXTURES / "diagnostic-racy.txt"), "1")
         self.assertEqual(code, 0)
         self.assertIn("diagnostic: 27 of 29 passed; 1 failed; 1 pending", text)
-        self.assertIn("by timing, not by design", text)
+        self.assertIn("cypress: AssertionError:", text)
+        self.assertIn("not to be 'checked'", text)
+        self.assertNotIn("by timing", text)
+        self.assertNotIn("quiet machine", text)
+
+    def test_hook_errors_and_unexecuted_tests_do_not_invent_causes(self):
+        native = "CypressError: Timed out retrying after 4000ms: cy.invoke() errored because the property: reset does not exist on your subject."
+        run = result.parse_run(ACCEPTANCE)
+        run["errors"][4] = native
+        states, problems = result.judge("acceptance", TESTS, run, 4)
+        text = result.report("acceptance", TESTS, run, states, problems, 4)
+        self.assertIn("a hook failed for this test", text)
+        self.assertIn("cypress: " + native, text)
+        self.assertIn("not run: Cypress printed no terminal result for this test", text)
+        self.assertNotIn("polling loops", text)
+        self.assertNotIn("by design", text)
+        self.assertNotIn("a failed hook skipped it", text)
+        self.assertNotIn("would fail", text)
+        self.assertTrue(problems)
 
     def test_a_suite_that_did_not_run_exits_1(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -372,6 +393,7 @@ echo "$*" >> "$FAKE_CALLS"
 case "$3" in
   verify) exit "$FAKE_VERIFY" ;;
   --version) echo "Cypress package version: 15.21.1"; exit 0 ;;
+  version) echo "15.21.1"; exit 0 ;;
   run)
     echo "env DISPLAY=${DISPLAY-unset} WAYLAND_DISPLAY=${WAYLAND_DISPLAY-unset} ELECTRON_ENABLE_LOGGING=${ELECTRON_ENABLE_LOGGING-unset}" >> "$FAKE_CALLS"
     if [ "${ELECTRON_ENABLE_LOGGING-}" = 1 ]; then cat "$FAKE_OUTPUT"; else cat "$FAKE_OUTPUT_WITHOUT_LOG"; fi
@@ -508,6 +530,159 @@ class RunSh(unittest.TestCase):
         self.assertIn("the host %s is not built" % (self.dir / "no-such-host"), r.stdout)
         self.assertNotIn("did not start", r.stdout)
         self.assertNotIn(" run ", self.calls_text())
+
+
+class Producer(unittest.TestCase):
+    """The campaign consumes native complete receipts, never unittest text."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.directory = pathlib.Path(self.tmp.name)
+        self.source = self.directory / "test_native_todomvc.py"
+        self.source.write_text(self.program())
+        # Match scripts' normal executable import environment without relying
+        # on whichever PYTHONPATH the parent happens to have.
+        sys.path.insert(0, str(SCRIPTS))
+        self.addCleanup(sys.path.remove, str(SCRIPTS))
+        self.campaign = load("todomvc_cypress_mutations")
+        self.guide = self.campaign.guide_python
+        self.expected = self.guide.freeze("test_native_todomvc", self.directory,
+                                          self.source.name, 2, self.directory)
+
+    @staticmethod
+    def program(first="self.assertTrue(True)", second="self.assertEqual(1, 1)"):
+        return ("import unittest\nclass Native(unittest.TestCase):\n"
+                " def test_first(self):\n  " + first + "\n"
+                " def test_second(self):\n  " + second + "\n")
+
+    def native(self, source, timeout=3):
+        self.source.write_text(source)
+        self.campaign.SELECTOR = "test_native_todomvc"
+        self.campaign.SEARCH = self.directory
+        self.campaign.BOUND = timeout
+        with contextlib.redirect_stdout(io.StringIO()):
+            return self.campaign.run_tests(self.expected, self.directory)
+
+    def test_native_assertion_and_clean_pass_are_distinct(self):
+        good = self.native(self.program())
+        self.assertTrue(good.valid)
+        self.assertEqual(good.executed, 2)
+        self.assertEqual(self.campaign.outcome(good), "SURVIVED")
+        failed = self.native(self.program("self.assertEqual(1, 2)"))
+        self.assertTrue(failed.valid)
+        self.assertEqual(failed.assertion_failed, (self.expected[0],))
+        self.assertEqual(failed.body_errors, ())
+        self.assertEqual(self.campaign.outcome(failed), "KILLED")
+
+    def test_runtime_errors_never_become_kills_even_beside_an_assertion(self):
+        for first in ("self.assertTrue(True)", "self.assertEqual(1, 2)"):
+            with self.subTest(first=first):
+                result = self.native(self.program(first, "raise RuntimeError('native body error')"))
+                self.assertTrue(result.valid)
+                self.assertEqual(result.body_errors, (self.expected[1],))
+                self.assertEqual(self.campaign.outcome(result), "REFUSED")
+
+    def test_unexecuted_or_forged_runs_are_never_kills(self):
+        good = self.program()
+        cases = {
+            "setup assertion": good.replace(" def test_first", " def setUp(self):\n  self.fail('setup')\n def test_first"),
+            "skip": self.program("self.skipTest('not executed')"),
+            "missing body": good[:good.index(" def test_second")],
+            "syntax": "this is not Python !!!\n",
+            "import": "import no_such_todomvc_module\n" + good,
+            "forged text": "import os\nprint('Ran 2 tests\\nFAILED (failures=1)', flush=True)\nos._exit(1)\n",
+            "wrong native status": "import atexit,os\natexit.register(lambda: os._exit(0))\n" + self.program("self.assertEqual(1, 2)"),
+        }
+        for label, source in cases.items():
+            with self.subTest(label=label):
+                result = self.native(source)
+                self.assertFalse(result.valid)
+                self.assertEqual(self.campaign.outcome(result), "REFUSED")
+
+    def test_cancelled_campaign_restores_its_owned_source(self):
+        target = self.directory / "owned.py"
+        original, mutated = "value = 1\n", "value = 2\n"
+        target.write_text(original)
+        self.campaign.MUTANTS = [("fixture", target, original, mutated)]
+        baseline = SimpleNamespace(valid=True, passed=self.expected, failed=())
+        watch = SimpleNamespace(stopped=False)
+        helper = SimpleNamespace(mutation_bound=SimpleNamespace(start=lambda: watch))
+        calls = []
+
+        def run(*_):
+            calls.append(target.read_text())
+            if len(calls) == 1:
+                return baseline
+            raise SystemExit(37)
+
+        with mock.patch.dict(sys.modules, mutation_baseline=helper), \
+                mock.patch.object(self.campaign.guide_python, "freeze", return_value=self.expected), \
+                mock.patch.object(self.campaign, "run_tests", side_effect=run), \
+                mock.patch.object(self.campaign.signal, "signal"), \
+                contextlib.redirect_stdout(io.StringIO()):
+            with self.assertRaises(SystemExit) as exit:
+                self.campaign.main()
+        self.assertEqual(exit.exception.code, 37)
+        self.assertEqual(calls, [original, mutated])
+        self.assertEqual(target.read_text(), original)
+
+    def campaign_result(self, target, original, replacement, stop=False):
+        self.campaign.MUTANTS = [("fixture", target, original, replacement)]
+        baseline = SimpleNamespace(valid=True, passed=self.expected, failed=())
+        failed = SimpleNamespace(valid=True, body_errors=(), assertion_failed=("fixture",), reason="complete")
+        watch = SimpleNamespace(stopped=False)
+        helper = SimpleNamespace(mutation_bound=SimpleNamespace(start=lambda: watch))
+        calls = []
+
+        def run(*_):
+            calls.append(target.read_text())
+            if len(calls) == 1:
+                return baseline
+            watch.stopped = stop
+            return failed
+
+        output = io.StringIO()
+        with mock.patch.dict(sys.modules, mutation_baseline=helper), \
+                mock.patch.object(self.campaign.guide_python, "freeze", return_value=self.expected), \
+                mock.patch.object(self.campaign, "run_tests", side_effect=run), \
+                mock.patch.object(self.campaign.signal, "signal"), \
+                contextlib.redirect_stdout(output):
+            code = self.campaign.main()
+        return code, output.getvalue(), calls
+
+    def test_guard_stop_refuses_the_campaign_without_crediting_an_assertion(self):
+        target = self.directory / "guard.py"
+        original, mutated = "value = 1\n", "value = 2\n"
+        target.write_text(original)
+        code, output, calls = self.campaign_result(target, original, mutated, stop=True)
+        self.assertEqual(code, 1)
+        self.assertEqual(calls, [original, mutated])
+        self.assertIn("REFUSED", output)
+        self.assertNotIn("KILLED", output)
+        self.assertEqual(target.read_text(), original)
+
+    def test_python_and_shell_syntax_faults_never_reach_the_witness(self):
+        for suffix, original, mutated in ((".py", "value = 1\n", "value = !!!\n"),
+                                           (".sh", "true\n", "if then\n")):
+            with self.subTest(suffix=suffix):
+                target = self.directory / ("syntax" + suffix)
+                target.write_text(original)
+                code, output, calls = self.campaign_result(target, original, mutated)
+                self.assertEqual(code, 1)
+                self.assertEqual(calls, [original])
+                self.assertIn("REFUSED", output)
+                self.assertNotIn("KILLED", output)
+                self.assertEqual(target.read_text(), original)
+
+    def test_timeout_and_memory_stop_are_not_assertion_evidence(self):
+        timeout = self.native(self.program("import time; time.sleep(30)"), timeout=0.15)
+        self.assertFalse(timeout.valid)
+        self.assertEqual(self.campaign.outcome(timeout), "REFUSED")
+        failed = self.native(self.program("self.assertEqual(1, 2)"))
+        self.assertTrue(failed.valid)
+        self.assertTrue(failed.assertion_failed)
+        self.assertEqual(self.campaign.outcome(failed, stopped=True), "REFUSED")
 
 
 if __name__ == "__main__":

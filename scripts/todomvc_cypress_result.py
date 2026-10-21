@@ -20,8 +20,8 @@ test remains an unmet requirement even when its cause is understood.
 **The diagnostic** runs the same files under a name the suite's own tables take
 as keeping nothing in `localStorage` (`puremvc`), so each test shows what the
 rest of it says of this app. It is not the acceptance. Every test must pass,
-bar the persistence test, which the suite skips for such a name, and one test
-that races the host (`RACY`).
+bar the persistence test, which the suite skips for such a name, and one
+explicitly recognized assertion failure (`RACY`).
 
 The tests, and which of them ask `localStorage`, are read from the vendored
 spec (`spikes/todomvc-cypress/cypress/e2e/spec.cy.js`, held to upstream's bytes
@@ -55,20 +55,11 @@ CHECKS = {
 # The persistence test skips itself for a name in `noLocalStorageCheck`.
 PERSISTENCE = "should persist its data"
 
-# The one test whose outcome depends on timing, not on the app's design: it
-# presses toggle-all and, at once, unchecks the first row's box. This host
-# checks that box when its answer reaches the page (the stream is read every
-# 25 ms, so tens of milliseconds after the press); when the test's next step
-# comes first, `uncheck` finds the box unchecked and does nothing, and
-# toggle-all stays checked as every row completes. It fails when the host is
-# loaded and passes when it is not (ADR section on the suite's result).
+# The diagnostic's historical allowed assertion text. Matching this text is a
+# diagnostic policy, not proof of the cause of an observed failure.
 RACY = {
     "complete all checkbox should update state when items are completed / cleared": (
         "expected '<input#toggle-all.toggle-all>' not to be 'checked'",
-        "by timing, not by design: the test unchecks the first row's box the moment it has pressed "
-        "toggle-all, and the host checks that box when its answer reaches the page. Where the test is "
-        "first, its uncheck finds the box unchecked and does nothing, and toggle-all stays checked as "
-        "every row completes. It passes on a quiet machine and fails on a loaded one",
     )
 }
 
@@ -151,7 +142,7 @@ def asks_text(test):
 def parse_run(text):
     """What Cypress's spec reporter printed: each test's line, each failure's
     first error line, the table of counts, and whether the browser logged the
-    `SecurityError` of a polling loop reading a cleared `Storage`."""
+    recorded `Storage` SecurityError string."""
     lines = ANSI.sub("", text).replace("\r", "").split("\n")
     run = {
         "cypress": None,
@@ -246,9 +237,9 @@ def judge_diagnostic(tests, st, run, problems):
                 problems.append(f"{name(t)} should be skipped by the suite for this name, and is {state}")
         elif t.title in RACY:
             if state == "fail" and RACY[t.title][0] not in (error or ""):
-                problems.append(f"{name(t)} failed for another reason than its race: {error}")
+                problems.append(f"{name(t)} failed outside the diagnostic's allowed assertion: {error}")
             elif state not in ("pass", "fail"):
-                problems.append(f"{name(t)} is {state}: it passes or loses its race")
+                problems.append(f"{name(t)} is {state}: diagnostic requires a pass or its allowed assertion failure")
         elif state != "pass":
             problems.append(f"{name(t)} is {state}, and every test but two should pass: {error}")
 
@@ -282,25 +273,14 @@ def judge(mode, tests, run, exit_status=None):
 
 
 def why(mode, test, state, error):
-    """The lines under a test that did not pass: the spec rule's outcome and why."""
-    out = []
-    if state == "fail" and mode == "acceptance":
-        out.append(f"unmet official requirement: {asks_text(test)}" if asks(test) else "the official test failed")
-    elif state == "fail" and test.title in RACY:
-        out.append(RACY[test.title][1])
-    elif state == "hook":
-        out.append(
-            "its beforeEach failed: the polling loops of the failed tests before it read a localStorage that "
-            "Cypress had cleared away, which throws in the spec's own window and is charged to this hook; "
-            "Cypress then skips the rest of the suite"
-        )
-    elif state == "skip":
-        if asks(test):
-            out.append(f"not run (a failed hook skipped it); it asks localStorage ({asks_text(test)}): it would fail there, by design")
-        else:
-            out.append("not run (a failed hook skipped it); it asks nothing of localStorage: the diagnostic runs it")
-    elif state == "pending":
-        out.append("skipped by the suite itself for this name (it reloads the page and asks localStorage)")
+    """Observed status and native error only; neither establishes a cause."""
+    descriptions = {
+        "fail": "the official test failed",
+        "hook": "a hook failed for this test",
+        "skip": "not run: Cypress printed no terminal result for this test",
+        "pending": "Cypress reported this test as pending",
+    }
+    out = [descriptions[state]] if state in descriptions else []
     if error and state in ("fail", "hook"):
         out.append(f"cypress: {error}")
     return out
