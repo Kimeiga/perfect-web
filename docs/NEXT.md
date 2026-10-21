@@ -39,12 +39,18 @@ starting another feature batch.
    what it sets". The baseline passed eight tests, but only 13/14 controls
    were detected. Preserve the intended captured-value fault and prove the
    complete campaign; a green baseline is not sufficient.
-6. Rerecord `e14-guide-ownership` on the current source: the post-dispatch
+6. Repair `e14-speculated-arms`: its core/parser/browser baselines passed,
+   but only 7/8 controls were detected. The test of a page without speculation
+   queried its old UI identity and accepted a missing lookup. Assert the
+   compiled canonical page identity before checking that speculation is
+   absent. Preserve all eight fault models, require complete native assertion
+   receipts, and rerun every reached feed test consumer after instrumentation.
+7. Rerecord `e14-guide-ownership` on the current source: the post-dispatch
    Linux/procfs capability guard changes its proof scope. Unsupported hosts
    skip explicitly and cannot satisfy the strict mutation baseline.
-7. Reconcile eligible current evidence under ADR-0281, run exact-commit CI
+8. Reconcile eligible current evidence under ADR-0281, run exact-commit CI
    and all reached follow-ups, then land only the verified combined tree.
-   All four failed recipe results remain failed and none is fetched as a
+   All five failed recipe results remain failed and none is fetched as a
    pass. Separate effect-inference scaling work awaits its own
    exact-commit CI and whole campaigns before integration.
 

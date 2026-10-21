@@ -17,12 +17,14 @@ additional generic effects, canonical device privacy, WIT namespace,
 keyed retry and producer-ownership repairs are still unlanded. Current
 completion claims and exact failed runs are in [STATUS](STATUS.md).
 
-The combined train-12 verification has found four unmet gates so far:
+The combined train-12 verification has found five unmet gates so far:
 TodoMVC's unchanged upstream Cypress execution passes 24/29 because of
 spy-reset and detached-alias incompatibilities with the pinned runner;
 device-store's strict mutation campaign refuses nine invalid producers
 instead of crediting compile errors, setup panics or browser timeouts.
-The source census also missed TodoMVC, and one binding control survived.
+The source census also missed TodoMVC; one binding control and one
+speculation control survived. The latter queried an obsolete UI identity
+and passed on a missing lookup instead of proving the intended absence.
 All three full browser suites passed, but that does not close these gates.
 The proposed TodoMVC compatibility copy must be identified explicitly;
 its execution must never be described as the unchanged upstream suite.

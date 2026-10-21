@@ -1,6 +1,6 @@
-# ADR-XXXX: Binding capture controls exercise diagnostic ownership
+# ADR-0378: Binding capture controls exercise diagnostic ownership
 
-Status: proposed for integration, E14; refines the witness for ADR-0142.
+Status: accepted by the integrator, 2026-10-20; E14; refines the witness for ADR-0142.
 
 The combined `e14-bind` run passed eight baseline tests but killed only 13
 of 14 controls. Removing the bound-handler capture exemption survived because

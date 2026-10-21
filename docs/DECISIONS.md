@@ -3227,3 +3227,7 @@ Mutation producers own their child through launch, cancellation and reaping (tra
 [ADR-0377](DECISIONS/ADR-0377-todomvc-cypress-compatibility-copy.md):
 Execute an identified TodoMVC Cypress compatibility copy (train-12 integration; final combined gates pending).
 - Preserve the seven upstream blobs, verify exactly two compatibility patches and the runner pin, and require all 29 cases with native status zero. The launcher owns and reaps its actual host; failed and ineffective probes remain recorded.
+
+[ADR-0378](DECISIONS/ADR-0378-bind-capture-control.md):
+Binding capture controls exercise diagnostic ownership (train-12 integration; final combined gates pending).
+- A nonserializable invalid target distinguishes the binding exemption from canonical signal filtering, while ordinary handlers retain capture checks. All 14 fault models remain; native builds and timeouts no longer count as mutation kills.
