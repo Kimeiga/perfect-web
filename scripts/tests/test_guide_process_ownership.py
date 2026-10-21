@@ -21,7 +21,7 @@ def running(pid):
     try:
         state = Path(f'/proc/{pid}/stat').read_text().split(') ', 1)[1].split()[0]
         return state not in ('Z', 'X')
-    except FileNotFoundError:
+    except (FileNotFoundError, ProcessLookupError):
         return False
 
 
@@ -58,7 +58,7 @@ class Injected(native):
 subprocess.Popen=Injected
 def running(pid):
     try: return Path(f'/proc/{pid}/stat').read_text().split(') ',1)[1].split()[0] not in ('Z','X')
-    except FileNotFoundError: return False
+    except (FileNotFoundError, ProcessLookupError): return False
 source.write_text('mutant')
 try:
     status,output=guide_python._launch(evidence,[sys.executable,'-c',CHILD],[],.3 if PHASE=='timeout' else 60)
