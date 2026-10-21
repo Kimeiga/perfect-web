@@ -49,7 +49,8 @@ export default class AssertionResultReporter {
   onTestEnd(test, result) {
     if (!this.started.has(test.id) || this.results.has(test.id)
         || test.expectedStatus !== "passed" || !["passed", "failed"].includes(result.status)) this.problem = true;
-    if (result.status === "failed" && !bodyAssertions(result)) this.problem = true;
+    if (result.status === "failed" && (!bodyAssertions(result)
+        || !result.errors.every(error => error.cause?.message === `Error: PW_ASSERTION:${this.nonce}`))) this.problem = true;
     if (result.status === "passed" && result.errors.length) this.problem = true;
     this.results.set(test.id, result.status);
   }

@@ -855,3 +855,60 @@ old producer accepts all four as assertion failures; the new one accepts only
 the two real assertions and refuses panics in the compared operand and message
 operand. A seventeenth regression and twentieth producer control hold this rule.
 Whole campaign validation remains part of the combined remote train.
+
+### Native browser matcher proof (2026-10-20)
+
+A failed Playwright `expect` step is not sufficient assertion evidence. Native
+Chromium probes showed that a closed page and `expect(42).toHaveText(...)` each
+failed inside that category and earned a receipt. Both are producer/API errors,
+not observations contradicting an application's expected behavior.
+The [native probes and local control logs](../evidence/tooling/browser-assertion-probes.txt)
+retain the before/after outcomes and their actual producer output.
+
+The two device/TodoMVC specs now import a small public `expect` wrapper. It
+preserves native comparison, `.not`, custom messages and locator retries. Only
+a thrown error with the native `matcherResult`, the invoked matcher name and
+the corresponding boolean pass result receives a fresh nonce-bound Error cause.
+Any existing cause stays beneath that marker. Playwright's
+[public custom matcher example](https://playwright.dev/docs/test-assertions#add-custom-matchers)
+reads the native `matcherResult`; its public
+[`TestError.cause`](https://playwright.dev/docs/api/class-testerror#test-error-cause)
+is the serialized transport. The pinned 1.58 probe confirms that it does not
+serialize `matcherResult`. The failed step is
+already serialized before an outer wrapper catches the error, so the reporter
+requires the marker on every final error and retains exact message/stack pairing
+with body expect steps. Hooks, runtime errors, timeouts, skips, retries and
+incomplete inventories remain invalid. Unsupported assertion modes fail closed.
+
+The sole existing polling witness uses positive `expect.poll(callback).toBe`.
+Native poll drops `matcherResult` at its deadline and leaves caught failing
+child expect steps. A scoped public `expect.extend` matcher therefore polls
+with the same `Object.is` comparison and returns a native matcher result once.
+Its supported contract is a callback, expected value, optional string message,
+finite positive timeout (default 5000ms) and nonempty finite positive intervals
+(default 100/250/500/1000ms, repeating the last). It does not expose `.not`, soft,
+promise or other polling matchers. A completed mismatch can fail the assertion;
+a callback exception, a callback still pending at its deadline, or a callback
+that completes after that deadline cannot. No application behavior changes.
+
+The native protocol covers 26 cases, including actual Chromium mismatches and
+the two false-kill reproductions, custom messages, negation, preserved causes,
+polling, NaN and signed zero. Its default 23 cases and ordinary unit checks
+need no browser binary. Three browser tests require `PW_BROWSER_PROOF=1` in the
+explicit `e14-browser-assertions` recipe; its actual
+`scripts/playwright_assertion_mutations.py` command selects browser setup.
+That recipe freezes all ten regression methods and proves eight additional
+controls through their named native body assertions. The existing twenty device
+producer controls remain intact. These local checks do not replace final
+combined hosted verification or the full changed-page browser suites.
+
+The control's outer unittest producer uses the shared process owner's bounded
+cooperative cleanup; the direct Playwright child owner uses immediate cleanup.
+The shared inherited budget reserves time for each enclosing owner (ADR-0376).
+Native timeout and SIGTERM probes of this exact nested topology captured the
+runner, worker and detached Chromium processes at a live-page barrier. None of
+the eight captured processes was running before source restoration in either
+case; the probe reaped adopted zombie children before exiting. This is evidence
+for the configured producer, not arbitrary detached subprocesses. Each
+JavaScript mutant also passes native `node --check` before its selected witness;
+invalid syntax is refused and cannot earn an assertion kill.

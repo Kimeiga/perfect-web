@@ -17,7 +17,8 @@
 //   reordered (the block's morph, matched by key);
 // - no request carries what the device keeps;
 // - and the store's own limit, measured in each engine.
-import { expect, test } from "@playwright/test";
+import { test } from "@playwright/test";
+import { expect } from "../assertion-expect.mjs";
 
 const PAGE = "/page/demo.device.DevicePage~ui";
 

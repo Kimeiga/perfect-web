@@ -21,7 +21,8 @@
 //   `{id, title, completed}`, which no server is told.
 // - Routing: `#/`, `#/active`, `#/completed`, filtered by the model, the
 //   `selected` class on the links, and a fragment kept on reload.
-import { expect, test } from "@playwright/test";
+import { test } from "@playwright/test";
+import { expect } from "../assertion-expect.mjs";
 import { TODOMVC_PORTS } from "../host-metadata.mjs";
 
 test.use({

@@ -72,3 +72,15 @@ e14-device-producer:
        python3 scripts/device_producer_mutations.py; \
      } > docs/evidence/E14/device-producer.txt 2>&1
     @tail -n 5 docs/evidence/E14/device-producer.txt
+
+# Real browser/API failures and native matcher proof require the browser setup
+# selected for the actual Playwright control command below.
+e14-browser-assertions:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0366 - native browser assertion provenance"; echo; \
+       echo "produced by: just e14-browser-assertions"; \
+       echo "commit: $(git rev-parse HEAD)"; \
+       python3 scripts/device_browser_protocol.py --browser; \
+       python3 scripts/playwright_assertion_mutations.py; \
+     } > docs/evidence/E14/browser-assertions.txt 2>&1
+    @tail -n 5 docs/evidence/E14/browser-assertions.txt
