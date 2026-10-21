@@ -13,7 +13,11 @@ The assembled repair candidate `34f3c2d1` is published on `wip/train-12`.
 runs 155 of the 156 required recipes; the known-invalid graph campaign remains
 an explicit separate obligation below. Exact-source
 [CI39538597877](https://github.com/studiokimeiga/perfect-web/actions/runs/39538597877)
-is pending. Chromium job119020991409 failed during `setup-just` because GitHub's
+failed on both architectures at Clippy's `collapsible_if` lint in the generic
+representation test; the preceding evidence gates passed. The semantics-preserving
+let-chain repair `4623d304` passes targeted Clippy and its native regression.
+Exact combined CI is still required. Chromium job119020991409 failed during
+`setup-just` because GitHub's
 release API returned HTTP502, before tests ran. Its first exact-job rerun was
 refused while the workflow remained active. Retry when permitted, or record a
 current successful full-browser follow-up; never count that setup failure as
@@ -21,8 +25,9 @@ browser evidence. Other jobs continue.
 
 1. Audit all 239 native recipe results from
    [verify 39526960864](https://github.com/studiokimeiga/perfect-web/actions/runs/39526960864)
-   at `f15117de`, including producer status and memory stops. All three
-   full browser jobs passed. A successful wrapper job does not override a
+   at `f15117de`, including producer status and memory stops. The completed
+   census contains exactly239 recipes:228 valid and11 invalid; summary is the
+   only failed job. All three full browser jobs passed. A successful wrapper job does not override a
    failed native recipe, and an incomplete run is not accepted evidence.
 2. Repair the failed `e14-todomvc` harness. Host tests passed 4/4 and the
    separate Playwright suite passed 150/150; the unchanged official Cypress

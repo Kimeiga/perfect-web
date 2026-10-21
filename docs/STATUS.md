@@ -85,9 +85,11 @@ evidence. No failed result is promoted by this summary.
   completed 73 recipes, with 71 passing and only the case-handling and
   template controls failing. Both control repairs are integrated; their
   full combined rerun remains pending.
-- **The 239-recipe combined verification is still running.**
+- **The 239-recipe combined verification completed with11 invalid recipes.**
   [39526960864](https://github.com/studiokimeiga/perfect-web/actions/runs/39526960864)
-  at `f15117de` passed all three full browser jobs, but native recipes
+  at `f15117de` recorded239/239 unique recipe results, with228 valid native
+  results and11 invalid. All three full browser jobs passed; summary was the
+  sole failed job. Native recipes
   `e14-todomvc`, `e14-device-store`, `e14-check-is-build`, `e14-bind`,
   `e14-speculated-arms`, `e14-representations`, `e14-computed-conditions`,
   `e14-mutation-bound`, `e14-guide` and `e14-browser-host-map` failed. TodoMVC's unchanged Cypress
@@ -121,8 +123,12 @@ evidence. No failed result is promoted by this summary.
   framework-wide performance result.
 - Published repair candidate `34f3c2d1` has
   [155-recipe verification](https://github.com/studiokimeiga/perfect-web/actions/runs/39538607183)
-  and [exact-source CI](https://github.com/studiokimeiga/perfect-web/actions/runs/39538597877)
-  in progress. The graph campaign is a separate required repair. Chromium's
+  in progress. Its [exact-source CI](https://github.com/studiokimeiga/perfect-web/actions/runs/39538597877)
+  failed on x64 and ARM at Clippy's `collapsible_if` lint in the generic
+  representation test; evidence gates passed before lint and the separate
+  license/advisory job passed. The semantics-preserving repair `4623d304`
+  passes targeted Clippy and its native regression, with exact combined CI
+  still required. The graph campaign is a separate required repair. Chromium's
   setup job hit a GitHub release API HTTP502 before running tests; it must be
   rerun when permitted or replaced by current full-browser proof. This is one
   recorded setup failure, not an application-test result.
