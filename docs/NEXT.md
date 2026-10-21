@@ -8,6 +8,17 @@ The assembled candidate is unlanded; master remains the verified train-11
 commit recorded in [STATUS](STATUS.md). Finish the combined gates before
 starting another feature batch.
 
+The assembled repair candidate `34f3c2d1` is published on `wip/train-12`.
+[Verify39538607183](https://github.com/studiokimeiga/perfect-web/actions/runs/39538607183)
+runs 155 of the 156 required recipes; the known-invalid graph campaign remains
+an explicit separate obligation below. Exact-source
+[CI39538597877](https://github.com/studiokimeiga/perfect-web/actions/runs/39538597877)
+is pending. Chromium job119020991409 failed during `setup-just` because GitHub's
+release API returned HTTP502, before tests ran. Its first exact-job rerun was
+refused while the workflow remained active. Retry when permitted, or record a
+current successful full-browser follow-up; never count that setup failure as
+browser evidence. Other jobs continue.
+
 1. Audit all 239 native recipe results from
    [verify 39526960864](https://github.com/studiokimeiga/perfect-web/actions/runs/39526960864)
    at `f15117de`, including producer status and memory stops. All three

@@ -119,6 +119,13 @@ evidence. No failed result is promoted by this summary.
   helper-chain checker improvement is recorded in
   [ADR-0380](DECISIONS/ADR-0380-effect-inference-queue.md); this is not a
   framework-wide performance result.
+- Published repair candidate `34f3c2d1` has
+  [155-recipe verification](https://github.com/studiokimeiga/perfect-web/actions/runs/39538607183)
+  and [exact-source CI](https://github.com/studiokimeiga/perfect-web/actions/runs/39538597877)
+  in progress. The graph campaign is a separate required repair. Chromium's
+  setup job hit a GitHub release API HTTP502 before running tests; it must be
+  rerun when permitted or replaced by current full-browser proof. This is one
+  recorded setup failure, not an application-test result.
 - Exact-source [CI39527396553](https://github.com/studiokimeiga/perfect-web/actions/runs/39527396553)
   at `152a4a41` passed x64, ARM and license/advisory checks. Subsequent
   repairs still require their own exact-source CI; this pass does not
