@@ -58,3 +58,24 @@ strings. Hashing or printing a filename is not running it. Method IDs beside
 a mutation description are metadata; they cannot replace its description.
 Actual second campaigns still require their own complete evidence blocks.
 Dynamic shell execution remains outside this static-reference model.
+
+## Bare module selectors in native producer inventories, 2026-10-20
+
+The train-12 follow-up plan omitted `e14-mutation-bound` after a change to
+`test_ci_scripts.py`. That campaign names `scripts/tests` and the exact bare
+module `test_ci_scripts` in a tuple; it constructs the `.py` discovery pattern
+later for the shared native producer. The existing rule sees only a filename
+with its suffix or a fully qualified module and therefore misses this reader.
+
+Extend the same static directory/name rule to exact bare module selectors,
+including class/method suffixes, while retaining name boundaries. An unrelated
+module with the same prefix or the same basename in another directory remains
+unselected. A regression must require the actual campaign and its recipe, plus
+synthetic bare/class/neighbor consumers. A control removes just the new edge.
+No separate recipe allowlist is introduced: freshness and planning continue
+using the same canonical function. Whole affected verification remains due.
+
+[Native before/after and whole nine-control output](../evidence/tooling/ci-bare-module-reach.txt):
+the real consumer was omitted before the correction; both focused cases and
+all nine strict controls pass afterward, with no producer errors or memory
+stops. Exact hosted follow-up and final combined gates remain pending.

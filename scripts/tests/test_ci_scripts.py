@@ -296,6 +296,19 @@ class Plan(unittest.TestCase):
         unknown = {"scripts/tests/test_nobody_runs_this.py": [(1, 1)]}
         self.assertEqual(plan.touched_scripts(unknown, 0), set())
 
+    def test_bare_python_module_inventories_reach_their_campaigns(self) -> None:
+        changed = {"scripts/tests/test_ci_scripts.py": [(1, 1)]}
+        self.assertIn("mutation_bound_mutations.py", plan.touched_scripts(changed, 0))
+        self.assertIn("e14-mutation-bound", plan.recipes_for(changed, 0, plan.recipes()))
+        bodies = {
+            "bare": 'SEARCH = "scripts/tests"; SELECTORS = ("test_ci_scripts",)',
+            "class": 'SEARCH = "scripts/tests"; SELECTORS = ("test_ci_scripts.Plan",)',
+            "other": 'SEARCH = "scripts/tests"; SELECTORS = ("test_ci_scripts_extra",)',
+            "other-directory": 'SEARCH = "elsewhere/tests"; SELECTORS = ("test_ci_scripts",)',
+        }
+        with mock.patch.object(plan, "bodies", return_value=bodies):
+            self.assertEqual(plan.recipes_for(changed, 0, list(bodies)), ["bare", "class"])
+
     def test_a_changed_browser_spec_reaches_the_scripts_and_recipes_that_run_it(self) -> None:
         # ADR-0281: a spec a script runs is its test, as a Rust test file is;
         # a change to `accessibility.spec.mjs` planned nothing before.

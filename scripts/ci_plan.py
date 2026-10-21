@@ -567,9 +567,11 @@ def names_python_tests(text: str, changed: dict[str, list[tuple[int, int]]]) -> 
         if re.search(rf"(?<![\w.]){re.escape(module)}(?!\w)", text):
             return True
         directory, name = path.rsplit("/", 1)
-        if re.search(rf"(?<![\w./-]){re.escape(directory)}(?![\w./-])", text) and re.search(
-            rf"(?<![\w./-]){re.escape(name)}(?![\w./-])", text
-        ):
+        directory_named = re.search(rf"(?<![\w./-]){re.escape(directory)}(?![\w./-])", text)
+        if directory_named and re.search(rf"(?<![\w./-]){re.escape(name)}(?![\w./-])", text):
+            return True
+        # Native producer inventories may append .py to a bare module later.
+        if directory_named and re.search(rf"(?<![\w.]){re.escape(name[:-3])}(?!\w)", text):
             return True
     return False
 

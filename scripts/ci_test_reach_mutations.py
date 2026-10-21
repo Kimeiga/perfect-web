@@ -37,6 +37,9 @@ MUTANTS = [
      '        or names_python_tests(body.get(name, ""), changed)\n', ""),
     ("library root tests are ignored", PLAN,
      'not in {"main.rs", "lib.rs"}', 'not in {"main.rs"}'),
+    ("bare Python module selectors are ignored", PLAN,
+     '        if directory_named and re.search(rf"(?<![\\w.]){re.escape(name[:-3])}(?!\\w)", text):',
+     '        if False:'),
     ("workspace consumers omit changed root tests", PLAN,
      '    if re.search(r"(?<![\\w-])--workspace(?![\\w-])", text):',
      '    if False:'),
@@ -46,6 +49,7 @@ SELECTORS = [
     "scripts.tests.test_evidence_counts.Counts.test_a_method_id_does_not_replace_the_mutant_description",
     "scripts.tests.test_ci_scripts.Plan.test_root_test_changes_reach_the_package_test_consumers",
     "scripts.tests.test_ci_scripts.Plan.test_python_test_changes_reach_scripts_and_direct_recipes",
+    "scripts.tests.test_ci_scripts.Plan.test_bare_python_module_inventories_reach_their_campaigns",
 ]
 
 

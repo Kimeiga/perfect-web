@@ -1,0 +1,48 @@
+Train-12 local changed-test consumer regression, 2026-10-20.
+Base8b73c998 plus the ADR0372 bare-module follow-up.
+The new real-consumer test is run before/after the planner repair.
+Commands: python3 -m unittest scripts.tests.test_ci_scripts.Plan.test_bare_python_module_inventories_reach_their_campaigns -v
+After also includes Plan.test_python_test_changes_reach_scripts_and_direct_recipes.
+Whole controls: python3 scripts/ci_test_reach_mutations.py
+This is local native proof, not current hosted verification evidence.
+
+== before
+test_bare_python_module_inventories_reach_their_campaigns (scripts.tests.test_ci_scripts.Plan) ... FAIL
+
+======================================================================
+FAIL: test_bare_python_module_inventories_reach_their_campaigns (scripts.tests.test_ci_scripts.Plan)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/train-12/scripts/tests/test_ci_scripts.py", line 301, in test_bare_python_module_inventories_reach_their_campaigns
+    self.assertIn("mutation_bound_mutations.py", plan.touched_scripts(changed, 0))
+AssertionError: 'mutation_bound_mutations.py' not found in {'evidence_integrity_2_mutations.py', 'ci_test_reach_mutations.py', 'evidence_integrity_mutations.py', 'dealt_by_time_mutations.py'}
+
+----------------------------------------------------------------------
+Ran 1 test in 0.212s
+
+FAILED (failures=1)
+memory bound: no process was stopped
+
+== after
+test_bare_python_module_inventories_reach_their_campaigns (scripts.tests.test_ci_scripts.Plan) ... ok
+test_python_test_changes_reach_scripts_and_direct_recipes (scripts.tests.test_ci_scripts.Plan) ... ok
+
+----------------------------------------------------------------------
+Ran 2 tests in 1.650s
+
+OK
+memory bound: no process was stopped
+
+== controls
+baseline: 5 passed, 0 failed
+hash inputs are counted as executed campaigns: KILLED (1 assertion failures)
+a long witness identifier replaces the mutant description: KILLED (1 assertion failures)
+root tests reach no mutation script: KILLED (1 assertion failures)
+Python tests reach no mutation script: KILLED (2 assertion failures)
+root tests reach no direct recipe: KILLED (1 assertion failures)
+Python tests reach no direct recipe: KILLED (2 assertion failures)
+library root tests are ignored: KILLED (1 assertion failures)
+bare Python module selectors are ignored: KILLED (1 assertion failures)
+workspace consumers omit changed root tests: KILLED (1 assertion failures)
+9 of 9 mutants killed
+memory bound: no process was stopped
