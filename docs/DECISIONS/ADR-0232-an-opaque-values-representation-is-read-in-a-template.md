@@ -119,7 +119,7 @@ producer controls were killed by valid assertions, with zero refusals,
 survivors, or memory stops; the final restoration build succeeded. Exact
 commands, source hashes, the historical failed report, and native before/red/
 green output are retained in
-[`representations-proof.txt`](../evidence/tooling/representations-proof.txt).
+[`representations-proof.txt`](../diagnostics/train-12/representations-proof.txt).
 The hosted integration campaign remains a separate required check; this
 local result does not rewrite or relabel the original failed run.
 The integration review caught that nested campaign calls are intentionally

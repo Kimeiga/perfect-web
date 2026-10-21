@@ -54,7 +54,7 @@ starting another feature batch.
    refused one of31 controls because another test read an absent output file
    instead of asserting its presence. The latter stopped before any control
    because one renamed operator was absent from its required-witness map.
-   [Focused native probes](evidence/tooling/train12-catalog-and-bound-witnesses.txt)
+   [Focused native probes](diagnostics/train-12/train12-catalog-and-bound-witnesses.txt)
    demonstrate the repairs; whole31/74 campaigns remain required. Tighten the
    guide producer to require actual assertions and complete inventories, while
    preserving its three explicitly named semantic checker refusals.
