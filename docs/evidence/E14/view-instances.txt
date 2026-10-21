@@ -1,8 +1,8 @@
 ADR-0203 - a view that contains itself is an instance of its own template, made at run time
 
 produced by: just e14-view-instances
-commit: 34f3c2d1de6bfa075a1db82ae5a61fddf4af4e95
-ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39538607183 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: bfda9ae555a5e56b557be3d47cb0b69a861be7e6
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39658074296 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 playwright: Version 1.58.0
 
@@ -18,7 +18,7 @@ test a_templates_schema_closes_over_the_views_its_instances_reach ... ok
 test an_instance_is_rendered_again_whole_by_what_gives_it_its_value ... ok
 test the_renderer_goes_no_deeper_for_each_instance ... ok
 test past_what_a_browser_nests_it_is_refused ... ok
-test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.60s
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
 
 == the renderer (runtime/pw-render/tests/properties.rs) and the browser's (runtime/pw-render-wasm)
 
@@ -36,7 +36,7 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 == the thread page (spikes/own-renderer/e2e/thread.spec.mjs), three engines
 
-  18 passed (23.2s)
+  18 passed (15.5s)
 
 == mutation controls (scripts/view_instances_mutations.py)
 

@@ -1,8 +1,8 @@
 Kiokun unit-test dataset isolation (ADR-0286)
 
 produced by: just e14-kiokun-test-data
-commit: 34f3c2d1de6bfa075a1db82ae5a61fddf4af4e95
-ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39538607183 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: bfda9ae555a5e56b557be3d47cb0b69a861be7e6
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39658074296 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 baseline: 1 passed, 0 failed

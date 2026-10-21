@@ -1,15 +1,15 @@
 ADR-0275 - a row shown before the server answers waits
 
 produced by: just e14-waiting-rows
-commit: 52e773c7e2b6a064e7debeed9a01fce49119a363
-ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39543811122 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: bfda9ae555a5e56b557be3d47cb0b69a861be7e6
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39658074296 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
 
 == the feed in three engines (e2e/feed.spec.mjs)
 
-  66 passed (1.3m)
+  66 passed (1.2m)
 
 == mutation controls (scripts/waiting_rows_mutations.py)
 

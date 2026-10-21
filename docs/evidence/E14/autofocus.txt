@@ -1,15 +1,15 @@
 ADR-0367 - an element a block shows with autofocus takes focus as it appears
 
 produced by: just e14-autofocus
-commit: 34f3c2d1de6bfa075a1db82ae5a61fddf4af4e95
-ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39538607183 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: bfda9ae555a5e56b557be3d47cb0b69a861be7e6
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39658074296 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
 
 == the browser in three engines (e2e/focus.spec.mjs)
 
-  12 passed (20.8s)
+  12 passed (22.1s)
 
 == mutation controls (scripts/autofocus_mutations.py)
 
