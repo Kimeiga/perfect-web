@@ -4714,6 +4714,8 @@ e14-representations:
        cargo test --locked -p pw-core --test template_representations 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the server (spikes/own-renderer/server/src/main.rs)"; echo; \
        cargo test --locked -p pw-dev-server -- an_opaque_values_representation 2>&1 | grep -E '^(test |test result)|panicked at'; \
+       echo; echo "== producer controls (scripts/representations_producer_mutations.py)"; echo; \
+       python3 scripts/representations_producer_mutations.py; \
        echo; echo "== mutation controls (scripts/template_representations_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/template_representations_mutations.py; \
      } > docs/evidence/E14/representations.txt

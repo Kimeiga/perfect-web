@@ -28,6 +28,16 @@ class Producers(unittest.TestCase):
                        f"{source.relative_to(ROOT)}:{number}:{column}:\nassertion failed\n\nfailures:\n    {first}\n")
         return output + f'test result: {"FAILED" if failed else "ok"}. {len(names)-int(failed)} passed; {int(failed)} failed; 0 ignored; 0 measured; 0 filtered out\n'
 
+    def test_recipe_names_each_evidence_owner_once(self):
+        import ci_plan
+        import evidence_counts
+        body = ci_plan.bodies(ROOT)['e14-representations']
+        self.assertEqual(evidence_counts.executed_scripts(body), [
+            'representations_producer_mutations.py', 'template_representations_mutations.py',
+        ])
+        for name in ('representations_producer_mutations.py', 'template_representations_mutations.py'):
+            self.assertEqual(body.count('python3 scripts/' + name + ';'), 1)
+
     def test_complete_results_and_assertions_are_valid(self):
         self.assertEqual(campaign.cargo_result('core', 0, self.output()), (True, 4, 0))
         self.assertEqual(campaign.cargo_result('core', 101, self.output(failed=True)), (True, 3, 1))
@@ -75,7 +85,6 @@ class Producers(unittest.TestCase):
                 return result
             with mock.patch.object(campaign, 'MUTANTS', [('fault', 'cargo', source, 'original', 'mutant')]), \
                  mock.patch.object(campaign, 'SUITES', {'cargo': suite}), \
-                 mock.patch.object(campaign, 'controls', return_value=True), \
                  mock.patch.object(campaign, 'build', return_value=restored), \
                  mock.patch.object(campaign.signal, 'signal'), \
                  mock.patch.object(mutation_baseline.mutation_bound, 'start', return_value=watch), \

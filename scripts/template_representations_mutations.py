@@ -133,17 +133,10 @@ def build():
 SUITES = {"cargo": cargo_tests}
 
 
-def controls():
-    import representations_producer_mutations
-    return representations_producer_mutations.main() == 0
-
-
 def main():
     import mutation_baseline  # keep native output before running any producer
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(1))
     watch = mutation_baseline.mutation_bound.start()
-    if not controls():
-        return 1
     for suite in sorted({m[1] for m in MUTANTS}):
         valid, passed, failed = SUITES[suite]()
         print(f"baseline ({suite}): {passed} passed, {failed} failed", flush=True)

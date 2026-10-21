@@ -105,11 +105,13 @@ producer copy is removed; the original final store/feed/server restoration
 build is retained and its status now checked. Cancellation guarantees source
 restoration, not that generated build outputs have been rebuilt afterward.
 
-Ten focused producer consumer tests and ten independent assertion controls
+Eleven focused producer consumer tests and ten independent assertion controls
 hold this wiring, including an explicit no-`KILLED` check for stopped
 producers as well as a failing campaign status. They reuse the existing
 native Cargo and Python receipt authorities rather than introducing another
-parser. The same recipe runs these controls before the original four.
+parser. The recipe explicitly runs the producer control script once before the original
+four-fault script. The original runner does not call it indirectly. This keeps
+both count blocks owned by the literal commands the evidence gate reads.
 
 Local WSL proof on base `8017e328` plus this amendment's source changes:
 all five native baseline tests passed; all four original faults and all ten
@@ -120,3 +122,12 @@ green output are retained in
 [`representations-proof.txt`](../evidence/tooling/representations-proof.txt).
 The hosted integration campaign remains a separate required check; this
 local result does not rewrite or relabel the original failed run.
+The integration review caught that nested campaign calls are intentionally
+not discovered by `evidence_counts`. The recipe now names both commands,
+and the producer uses the existing count/verdict format and class-qualified
+witness metadata. A focused eleventh consumer test requires each command
+once. An actual generated evidence file combines a fresh native ten-control
+report with the retained unchanged four-fault report: count/owner validation
+passes; omitting either the producer command or its output block fails.
+This command relocation does not change any fault or validation rule and
+was checked without repeating the expensive four semantic fault runs.

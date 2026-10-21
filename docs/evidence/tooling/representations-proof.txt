@@ -411,3 +411,50 @@ mutation anchors: 4341 mutants in 305 scripts, each matching once
 memory bound: no process was stopped
 
 Evidence-count gate: 26 pre-existing stale recipes are planned; 0 failing. case-check: OK (3482 paths). cargo fmt --all --check and git diff --check passed. Original four MUTANTS AST exact against base.
+
+== Recipe-owner integration correction (after b3697fd9)
+The recipe now explicitly executes producer controls once, followed by the original four-fault runner; nested invocation is removed. All fourteen fault models and native validation unchanged. Producer verdict/count formatting and class-qualified witness metadata now conform to existing evidence_counts. Eleven consumer tests include exact recipe-owner regression. Fresh ten producer controls rerun; four semantic fault output reused unchanged for generated-file ownership check (not claimed rerun).
+Final source hashes for this correction:
+29fcea44b0e378ae4ecaeb12841f00863aea6bd5f785a33fde414e6411d19ddc  justfile
+7655e71907c60d7632bfd29c51b923d7620e89cbfcd2291f57085267c76e4f2f  scripts/template_representations_mutations.py
+78c9a72ecdb556dc604baa3b41f1ecf5e4045b059e915f65a6afb206eb64c5ab  scripts/representations_producer_mutations.py
+3f93265da9011f268b1ddb014ee7a76d819289f8855ad64a163cb4961395bd37  scripts/tests/test_representations_producers.py
+
+== Eleven producer consumer tests
+test_bad_native_status_build_or_panic_is_invalid (test_representations_producers.Producers) ... ok
+test_baseline_must_be_complete_and_green (test_representations_producers.Producers) ... ok
+test_cancellation_restores_source_and_identity (test_representations_producers.Producers) ... ok
+test_complete_results_and_assertions_are_valid (test_representations_producers.Producers) ... ok
+test_exact_inventory_is_required (test_representations_producers.Producers) ... ok
+test_failed_restored_build_fails_campaign (test_representations_producers.Producers) ... ok
+test_invalid_or_stopped_results_earn_no_kill (test_representations_producers.Producers) ... ok
+test_partial_command_set_is_invalid (test_representations_producers.Producers) ... ok
+test_recipe_names_each_evidence_owner_once (test_representations_producers.Producers) ... ok
+test_restoration_build_errors_are_refused (test_representations_producers.Producers) ... ok
+test_timeout_keeps_invalid_native_status (test_representations_producers.Producers) ... ok
+
+----------------------------------------------------------------------
+Ran 11 tests in 0.026s
+
+OK
+memory bound: no process was stopped
+
+== Fresh ten native producer controls
+invalid Cargo evidence is accepted: KILLED by test_representations_producers.Producers.test_bad_native_status_build_or_panic_is_invalid (3 of 11 tests fail)
+the Cargo inventory is not required: KILLED by test_representations_producers.Producers.test_exact_inventory_is_required (1 of 11 tests fail)
+an invalid command is omitted from the campaign: KILLED by test_representations_producers.Producers.test_partial_command_set_is_invalid (1 of 11 tests fail)
+a timeout supplies a failure status: KILLED by test_representations_producers.Producers.test_timeout_keeps_invalid_native_status (1 of 11 tests fail)
+a restoration command may fail: KILLED by test_representations_producers.Producers.test_restoration_build_errors_are_refused (1 of 11 tests fail)
+an invalid producer earns a kill: KILLED by test_representations_producers.Producers.test_invalid_or_stopped_results_earn_no_kill (1 of 11 tests fail)
+a stopped producer earns a kill: KILLED by test_representations_producers.Producers.test_invalid_or_stopped_results_earn_no_kill (1 of 11 tests fail)
+an invalid baseline runs controls: KILLED by test_representations_producers.Producers.test_baseline_must_be_complete_and_green (1 of 11 tests fail)
+failed restoration is ignored: KILLED by test_representations_producers.Producers.test_failed_restored_build_fails_campaign (1 of 11 tests fail)
+cancelled mutation source is retained: KILLED by test_representations_producers.Producers.test_cancellation_restores_source_and_identity (3 of 11 tests fail)
+10 of 10 mutants killed; 0 refused; 0 survived
+memory bound: no process was stopped
+
+== Actual generated-file owner gate and negative neighbors
+Omitted literal producer command: {'e14-representations': [('docs/evidence/E14/representations.txt', 11, 'its verdicts name the mutants of none of template_representations_mutations.py')]}
+Actual two-command recipe / fresh native ten + retained unchanged native four: {}
+Missing actual producer block: {'e14-representations': [('docs/evidence/E14/representations.txt', 0, "counts none of representations_producer_mutations.py's mutants, which the recipe runs")]}
+Complete generated report has exactly ten producer and four original verdicts, each owned once.
