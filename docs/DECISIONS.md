@@ -3174,13 +3174,15 @@ TodoMVC in Pleris, held to its own spec and its own tests (track
 - A page binds a signal to its address's fragment (PW6101-PW6106); the
   platform declares a double press and a control's losing focus; an element
   a block shows with `autofocus` takes focus; TodoMVC's official Cypress
-  suite is run unchanged and each test judged by what Cypress printed.
+  sources remain unchanged; execution uses the explicitly identified pinned
+  compatibility copy, and each result is judged by what Cypress printed.
 [ADR-0368](DECISIONS/ADR-0368-todomvc-acceptance-means-passing.md):
 TodoMVC acceptance requires every official test to pass (the integrator's;
 train-12).
 - A judge that called a run of 3 of 29 a success was no acceptance;
-  acceptance is the unchanged official suite passing in full, on the reviewed
-  Cypress 15.21.1 pin (ruling 4 of 2026-10-20).
+  acceptance requires all 29 official cases passing in full on the reviewed
+  Cypress 15.21.1 pin. The October 20 amendment identifies the exact
+  two-patch compatibility execution and preserves every failed old run.
 [ADR-0369](DECISIONS/ADR-0369-hosts-share-one-database.md):
 hosts share one database: each hears every commit from the outbox, and a
 session is the database's (track `second-host`; train-12).

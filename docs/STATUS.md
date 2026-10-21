@@ -3,7 +3,7 @@
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
 Reviewed 2026-10-20 against assembled train-12 source
-`3d74e820` (with final verification still pending).
+`152a4a41` (with final verification still pending).
 [The complete prior ledger](STATUS-HISTORY-2026-10.md) remains verbatim,
 including failed runs, corrections and their original scope.
 
@@ -85,6 +85,15 @@ evidence. No failed result is promoted by this summary.
   completed 73 recipes, with 71 passing and only the case-handling and
   template controls failing. Both control repairs are integrated; their
   full combined rerun remains pending.
+- **The 239-recipe combined verification is still running.**
+  [39526960864](https://github.com/studiokimeiga/perfect-web/actions/runs/39526960864)
+  at `f15117de` passed all three full browser jobs, but native recipes
+  `e14-todomvc` and `e14-device-store` failed. TodoMVC's unchanged Cypress
+  execution passed 24/29 (native status 3); device-store's strict campaign
+  credited 53/62 controls and refused nine invalid producers. Both repairs
+  and their whole affected follow-ups are pending; [NEXT](NEXT.md) records
+  the causes and acceptance obligations. Post-dispatch guide ownership
+  scope changes also require current evidence.
 - **E14 gates 3 and 4 remain open:** agent runs and analysis await model and
   budget decisions. Framework-wide performance superiority and broad
   application correctness are not established.

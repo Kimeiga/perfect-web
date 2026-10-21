@@ -2,6 +2,47 @@
 
 The next executable tasks, in order, with acceptance criteria. Charter §3.4.
 
+## Train-12 verification follow-ups, 2026-10-20
+
+The assembled candidate is unlanded; master remains the verified train-11
+commit recorded in [STATUS](STATUS.md). Finish the combined gates before
+starting another feature batch.
+
+1. Audit all 239 native recipe results from
+   [verify 39526960864](https://github.com/studiokimeiga/perfect-web/actions/runs/39526960864)
+   at `f15117de`, including producer status and memory stops. All three
+   full browser jobs passed. A successful wrapper job does not override a
+   failed native recipe, and an incomplete run is not accepted evidence.
+2. Repair the failed `e14-todomvc` harness. Host tests passed 4/4 and the
+   separate Playwright suite passed 150/150; the unchanged official Cypress
+   files passed 24/29 with native status 3. Cypress 15.21.1's spy has
+   `resetHistory`, not the invoked `reset`, and the custom command's final
+   `then` leaves the persistence alias pointing to a detached element after
+   reload. Preserve the seven pinned upstream blobs, stage an explicitly
+   versioned two-patch compatibility copy, and keep every behavioral and
+   storage assertion. Acceptance still requires all 29 cases, zero skips
+   or failures, and native status zero. A native compatibility diagnostic
+   passes 29/29; the combined recipe and its negative controls remain due.
+3. Repair the failed `e14-device-store` fault-model witnesses. Its native
+   baseline passed 15 core, 15 browser and 50 TodoMVC tests, but only 53 of
+   62 mutation controls produced valid assertion failures; nine were
+   refused and none survived. Compile errors, setup panics and browser
+   timeouts do not prove a bug was caught. Preserve each intended fault,
+   correct the invalid witness, and rerun the whole affected campaign.
+4. Rerecord `e14-guide-ownership` on the current source: the post-dispatch
+   Linux/procfs capability guard changes its proof scope. Unsupported hosts
+   skip explicitly and cannot satisfy the strict mutation baseline.
+5. Reconcile eligible current evidence under ADR-0281, run exact-commit CI
+   and all reached follow-ups, then land only the verified combined tree.
+   The failed TodoMVC and device-store results remain failed; neither is
+   fetched as a pass. Separate effect-inference scaling work awaits its own
+   exact-commit CI and whole campaigns before integration.
+
+The older follow-ups below retain their dated context. A-008's WIT
+collision, generic-result effects and producer-ownership repairs are now
+on the unlanded candidate; their historical open entries are not current
+claims that those repairs are absent.
+
 ## Integration follow-ups, 2026-10-16
 
 - D1's local compiler integration gate is green (ADR-0350), on train-10.

@@ -3,6 +3,32 @@
 Status: accepted by the integrator under the owner's delegation of
 2026-10-02, on the explicit takeover request, 2026-10-15. Milestone: E14.
 
+## Amendment: explicit Cypress compatibility execution, 2026-10-20
+
+The integrator accepts a versioned execution copy under the owner's current
+instruction to continue the work. The seven vendored upstream blobs remain
+byte-for-byte unchanged. Execution on the pinned Cypress 15.21.1 applies
+exactly two identified compatibility edits: invoke the spy's `resetHistory`
+method, and finish `createTodo` with a fresh query after retaining its
+existing logging callback. The latter lets the persistence alias query the
+new document after reload. No application/runtime behavior, test case,
+storage assertion, persistence assertion or known-issue table is changed.
+
+Every report must identify this as **official TodoMVC cases with pinned
+Cypress compatibility patch v1**. It is not unchanged upstream execution.
+The source hashes, runner pin, unique patch anchors, output hashes and
+staged manifest are checked before launch. The runner must own and reap
+its host; another process answering the chosen port is not readiness proof.
+
+Acceptance still requires all 29 cases to execute and pass, no pending,
+failed or skipped cases, and native Cypress status zero. Crashes, timeouts,
+missing results and source drift fail the gate. Historical runs remain
+failed, including the unchanged 24/29 run in verify 39526960864. A passing
+compatibility diagnostic does not replace the complete recipe or its
+negative controls. The server-backed version and old unchanged-suite
+requirements described below are the historical decision; this amendment
+supersedes their execution method and does not retroactively change results.
+
 ## Finding
 
 The TodoMVC track ran the official Cypress files unchanged but its custom

@@ -9,6 +9,32 @@ CI existed. Its complete bytes are retained in
 [the historical limitations file](KNOWN_LIMITATIONS-history-2026-09-15.md).
 Those historical statements must not override current source or test results.
 
+## Current integration qualifications, 2026-10-20
+
+The dated sections below retain historical findings. Train-11 has landed
+check/build validation and browser host selection repairs; train-12's
+additional generic effects, canonical device privacy, WIT namespace,
+keyed retry and producer-ownership repairs are still unlanded. Current
+completion claims and exact failed runs are in [STATUS](STATUS.md).
+
+The combined train-12 verification has found two unmet gates so far:
+TodoMVC's unchanged upstream Cypress execution passes 24/29 because of
+spy-reset and detached-alias incompatibilities with the pinned runner;
+device-store's strict mutation campaign refuses nine invalid producers
+instead of crediting compile errors, setup panics or browser timeouts.
+All three full browser suites passed, but that does not close either gate.
+The proposed TodoMVC compatibility copy must be identified explicitly;
+its execution must never be described as the unchanged upstream suite.
+
+The accepted-program corpus still has nine exact backend refusals.
+Read-only scoping also found that custom tags such as `<map-container/>`
+are parsed as a short tag plus an attribute, and a body-level `use`
+annotation is not validated like a `let` annotation. A build-time markdown
+value needs a tracked build phase; removing the refusal would currently
+expose an empty platform stub. A-018's style refusal likewise cannot be
+closed by merely building an unmounted component template. These are open
+compiler/execution boundaries, not evidence that the examples work.
+
 ## Train-10 integration (2026-10-15 to 2026-10-17)
 
 The each-header and argument-boundary repairs below are integrated on

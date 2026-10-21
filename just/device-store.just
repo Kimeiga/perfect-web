@@ -34,26 +34,24 @@ e14-device-store:
      } > docs/evidence/E14/device-store.txt
     @grep -E "^test result|passed|mutants killed|^---- |panicked at" docs/evidence/E14/device-store.txt
 
-# Track `device-store` (ADR-0366): TodoMVC's own Cypress suite, unchanged,
-# over TodoMVC on the device (spikes/todomvc-cypress/run.sh). Its acceptance
-# asks all 29 to pass, and is NOT met: the run says which pass and which do
-# not. The five that fail fail for any app under the Cypress the suite is run
-# with, which the probes show with no app (spikes/todomvc-cypress-probes/run.sh).
-# This recipe records both. It fails where Cypress cannot run and where a
-# probe does not hold (what the ADR says of the five would be wrong then); the
-# acceptance's verdict is recorded as it is, and `just e14-todomvc` is the
-# acceptance's own recipe.
+# Track `device-store` (ADR-0366): the official TodoMVC cases with pinned
+# Cypress compatibility patch v1 (spikes/todomvc-cypress/run.sh), plus static
+# probes documenting the original runner incompatibilities. All seven
+# upstream sources remain unchanged; execution is an identified staged copy.
+# This diagnostic recipe records the acceptance's native verdict as it is
+# and requires the static probes to hold. Its own success is not application
+# acceptance: `just e14-todomvc` requires all 29 cases to execute and pass.
 e14-device-store-cypress:
     @bash spikes/own-renderer/todomvc.sh > /dev/null
     @cargo build --quiet --locked -p pw-dev-server
     @cd spikes/todomvc-cypress && pnpm exec cypress install > /dev/null
     @mkdir -p docs/evidence/E14
-    @{ echo "ADR-0366 - TodoMVC's own Cypress suite over TodoMVC on the device, and the Cypress it runs in"; echo; \
+    @{ echo "ADR-0366 - official TodoMVC cases with pinned Cypress compatibility patch v1, and static runner probes"; echo; \
        echo "produced by: just e14-device-store-cypress"; \
        echo "commit: $(git rev-parse HEAD)$(git diff --quiet HEAD -- . ':(exclude)docs/evidence' ':(exclude)spikes/own-renderer/store-ir.json' || echo ' + uncommitted changes')"; \
        echo "node: $(node --version)"; \
        echo "cypress: $(cd spikes/todomvc-cypress && pnpm exec cypress --version | tr '\n' ' ')"; echo; \
-       echo "== the acceptance (spikes/todomvc-cypress/run.sh): all 29 must pass, and it is not met where it says FAILED"; echo; \
+       echo "== compatibility acceptance (spikes/todomvc-cypress/run.sh): all 29 must pass; native failures remain NOT MET"; echo; \
        bash spikes/todomvc-cypress/run.sh && echo "acceptance: exit 0" || echo "acceptance: exit $?: NOT MET"; \
        echo; echo "== the probes, with no app (spikes/todomvc-cypress-probes/run.sh)"; echo; \
        bash spikes/todomvc-cypress-probes/run.sh; \

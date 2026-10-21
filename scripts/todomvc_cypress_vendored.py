@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """**The official suite is vendored unchanged** (track `todomvc`, W7).
 
-`spikes/todomvc-cypress` holds TodoMVC's own Cypress suite, as the plan has
-it: run unchanged, against TodoMVC in Pleris. That claim is a hash. Each file
+`spikes/todomvc-cypress` holds TodoMVC's own unchanged Cypress sources.
+Execution uses the explicitly versioned copy in todomvc_cypress_compat.py;
+this file verifies the original sources, not unchanged execution. Each file
 is held to the git blob upstream has at the pinned commit
 (`spikes/todomvc-cypress/UPSTREAM.md`): the SHA-1 of `blob <size>\\0<bytes>`, the
 hash `git hash-object` gives. A file edited, reformatted or re-encoded fails
@@ -11,7 +12,7 @@ here, whoever's change it was.
     python3 scripts/todomvc_cypress_vendored.py        # exit 1 on any drift
 
 The suite's own package pins Cypress too, and that is held here: 15.21.1, the
-last 15.x. (Upstream's lockfile pins 15.14.2, whose dependency tree carries six
+reviewed pin. (Upstream's lockfile pins 15.14.2, whose dependency tree carries six
 advisories, in `uuid`, `qs` and `extract-zip`, that this one's does not.)
 """
 
