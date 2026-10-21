@@ -15,3 +15,10 @@ unchanged. Original and relocated SHA-256 values are identical:
 c2bdbe475cb96fff1e5a3989dd6b592cd65ab88ce373f0806611aff6f8825653  representations-proof.txt
 dbfa01b3c03597690e9dfee105708c9befbd0de4ad81db40db542078a45b3172  train12-catalog-and-bound-witnesses.txt
 ```
+
+The reserved-host mixed diagnostic was subsequently moved with the same
+byte-preservation rule (it was not a failing evidence-guard record):
+
+```text
+842e83d8e29814ae15137e162a9c938f1af5e77df284ee297af24ed3c1880dad  browser-host-map-reserved-proof.txt
+```

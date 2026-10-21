@@ -315,7 +315,7 @@ remains. Production behavior, the strict producer, and all 54 original
 operators are unchanged.
 
 The targeted native proof is in
-`docs/evidence/tooling/browser-host-map-reserved-proof.txt`. The old full
+[the reserved-host diagnostic record](../diagnostics/train-12/browser-host-map-reserved-proof.txt). The old full
 fast suite passed 25 cases with and without the original fault. With the
 new witness, the same fault produces exactly one `ERR_ASSERTION` failure
 in the intended declarations test, with the other 24 cases passing; after
