@@ -8,6 +8,37 @@ The assembled candidate is unlanded; master remains the verified train-11
 commit recorded in [STATUS](STATUS.md). Finish the combined gates before
 starting another feature batch.
 
+The latest assembled source `df2397f8` incorporates reviewed graph, WIT-source
+and TodoMVC follow-ups after the published `52e773c7` browser repair.
+The latter's [21-recipe run](https://github.com/studiokimeiga/perfect-web/actions/runs/39543811122)
+is still active; all three full browser engines passed at that source. Its
+inputs changed again for `e10-browser`, `e14-second-host` and
+`e14-speculated-graphs`, so those require fresh evidence.
+
+The seven-recipe follow-up
+[39542637844](https://github.com/studiokimeiga/perfect-web/actions/runs/39542637844)
+validated the guide fixture and producer ownership metadata, but the graph
+campaign completed 15/19 valid kills and refused four ordinary panic sites.
+Explicit semantic assertions now give complete 25-case results for all four
+faults (5, 5, 6 and 6 failures), between passing 25-case baseline/restored runs.
+The WIT witness now exercises the actual generated-parser collision in both
+declaration orders: its original source-identity fault causes one assertion
+among all 12 relevant cases, with 99 total baseline tests passing.
+
+TodoMVC retains all 43 intended fault models, reanchoring three to the live
+checkbox/focus paths. Its four surviving faults now fail by native assertion
+between passing host4/browser50 baselines and restored runs. The runner uses
+strict native receipts, shared process/source ownership and mandatory restored
+suites; 17 producer controls cover these gates, including actual SIGTERM
+restoration. The Cypress producer retains its previous 54 controls plus one
+reporting control. Raw transcripts and receipts are retained byte-for-byte in
+uploaded traces; real survivor verdicts still fail the unchanged summary guard.
+The local proof is diagnostic only. The required next hosted set is:
+`e10-browser`, `e14-cart-lines`, `e14-check-is-build`, `e14-device-store`,
+`e14-graphs-on-the-wire`, `e14-second-host`, `e14-speculated-graphs` and
+`e14-todomvc`. Whole campaigns, canonical evidence reconciliation and final
+exact-source CI remain mandatory before landing.
+
 The earlier assembled repair candidate `34f3c2d1` began the first follow-up on `wip/train-12`.
 [Verify39538607183](https://github.com/studiokimeiga/perfect-web/actions/runs/39538607183)
 runs 155 of the 156 required recipes; the known-invalid graph campaign remains

@@ -3,7 +3,7 @@
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
 Reviewed 2026-10-21 against assembled train-12 source
-`4db12570` (with combined hosted verification still pending).
+`df2397f8` (with combined hosted verification still pending).
 [The complete prior ledger](STATUS-HISTORY-2026-10.md) remains verbatim,
 including failed runs, corrections and their original scope.
 
@@ -75,6 +75,20 @@ evidence. No failed result is promoted by this summary.
 
 ## failing gate items
 
+- The latest source `df2397f8` incorporates reviewed graph, WIT-source and
+  TodoMVC witness/producer repairs. Graph's four remaining invalid controls
+  now yield complete 25-test assertion results; WIT's escaped source-identity
+  control fails in its unchanged 12-test inventory; TodoMVC's four escaped
+  faults fail between passing host4/browser50 baselines and restored runs.
+  TodoMVC now rejects invalid native producers and requires restoration, held
+  by 17 controls; its 55 Cypress producer controls preserve the prior 54 and
+  protect retained raw diagnostics from being mistaken for verdicts.
+  These focused proofs do not establish whole campaign success. Eight reached
+  campaigns listed in [NEXT](NEXT.md), canonical evidence reconciliation and
+  final exact-source CI remain due. The earlier `52e773c7`
+  [21-recipe run](https://github.com/studiokimeiga/perfect-web/actions/runs/39543811122)
+  continues, with all three full browser engines passing at that source.
+  Later TodoMVC/graph witness changes require new reached results.
 - **Train-12 final gates remain pending.** Narrow controls do not replace
   whole reached campaigns, combined browser suites or exact-head CI.
   The earlier combined [CI 39518614014](https://github.com/studiokimeiga/perfect-web/actions/runs/39518614014)
