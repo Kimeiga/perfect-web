@@ -109,3 +109,22 @@ as evidence that a grandchild stopped. The strict guide campaign refuses a
 skipped baseline and cannot claim mutation kills there. Linux tests simulate
 the production helper's missing-waitid fallback; they do not establish native
 macOS cancellation behavior.
+
+### Qualified control witnesses (2026-10-21)
+
+The original nine process-owner controls now store their full unittest witness
+IDs beside their descriptions and pass those IDs directly to the native
+producer. The descriptions, mutations, frozen ten-test baseline, assertion
+authority and output are unchanged. Bare method names were longer than eight
+descriptions, so the canonical evidence-count reader treated that metadata as
+the description when the completed bulk output was fetched. Its refusal was
+correct for the ambiguous catalog; its parser is unchanged.
+
+A regression retains the nine actual verdict lines from run 39526960864 and
+checks their exact canonical owner and catalog. It fails against the original
+metadata and passes with qualified IDs. The bounded local whole campaign
+killed all nine controls with native assertion receipts and no memory stop.
+[Raw diagnostic proof](../diagnostics/train-12/producer-witness-metadata.txt)
+preserves those results. The original bulk run remains failed; the newly
+changed campaign requires fresh hosted evidence before final integration is
+declared verified.

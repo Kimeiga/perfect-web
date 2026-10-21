@@ -29,7 +29,7 @@ MUTANTS = [
      '                signal.signal(number, handler)\n', '                pass\n'),
 ]
 # Every row exposes the actual changed authority for the planner/anchor checker.
-MUTANTS = [(name, witness, OWNER, anchor, replacement)
+MUTANTS = [(name, 'test_producer_ownership.ProducerOwnership.' + witness, OWNER, anchor, replacement)
            for name, witness, anchor, replacement in MUTANTS]
 
 
@@ -48,12 +48,11 @@ def main():
         return 1
     print(f'baseline: {len(expected)} passed, 0 failed')
     killed = 0
-    for name, method, path, anchor, replacement in MUTANTS:
+    for name, witness, path, anchor, replacement in MUTANTS:
         original = path.read_text()
         if original.count(anchor) != 1:
             print(f'REFUSED: {name}: anchor is not unique')
             return 1
-        witness = selector + '.ProducerOwnership.' + method
         if witness not in expected:
             print(f'REFUSED: {name}: witness not in frozen inventory')
             return 1
