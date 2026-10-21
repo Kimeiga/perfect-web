@@ -1,0 +1,376 @@
+Local native TodoMVC metadata import regression, 2026-10-20.
+Base699def98 plus deferred runtime import.
+Commands:
+python3 -m unittest scripts.tests.test_ci_scripts.Plan.test_a_todomvc_plan_writes_only_the_workflow_output -v
+python3 scripts/ci_test_reach_mutations.py
+python3 scripts/todomvc_compat_mutations.py
+No hosted verification claim. All eight compatibility fault models unchanged.
+
+== BEFORE
+test_a_todomvc_plan_writes_only_the_workflow_output (scripts.tests.test_ci_scripts.Plan) ... FAIL
+
+======================================================================
+FAIL: test_a_todomvc_plan_writes_only_the_workflow_output (scripts.tests.test_ci_scripts.Plan)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/train-12/scripts/tests/test_ci_scripts.py", line 610, in test_a_todomvc_plan_writes_only_the_workflow_output
+    self.assertEqual(len(lines), 1, "planning metadata must not start a mutation runtime: " + done.stdout)
+AssertionError: 2 != 1 : planning metadata must not start a mutation runtime: shards=[{"index": 0, "recipes": ["e14-todomvc"], "browsers": true, "build": true, "database": false}]
+memory bound: no process was stopped
+
+
+----------------------------------------------------------------------
+Ran 1 test in 0.082s
+
+FAILED (failures=1)
+
+== AFTER
+test_a_todomvc_plan_writes_only_the_workflow_output (scripts.tests.test_ci_scripts.Plan) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.106s
+
+OK
+
+== WHOLE PLANNER CONTROLS
+baseline: 6 passed, 0 failed
+hash inputs are counted as executed campaigns: KILLED (1 assertion failures)
+a long witness identifier replaces the mutant description: KILLED (1 assertion failures)
+root tests reach no mutation script: KILLED (1 assertion failures)
+Python tests reach no mutation script: KILLED (2 assertion failures)
+root tests reach no direct recipe: KILLED (1 assertion failures)
+Python tests reach no direct recipe: KILLED (2 assertion failures)
+library root tests are ignored: KILLED (1 assertion failures)
+bare Python module selectors are ignored: KILLED (1 assertion failures)
+reading TodoMVC metadata starts its mutation runtime: KILLED (1 assertion failures)
+workspace consumers omit changed root tests: KILLED (1 assertion failures)
+10 of 10 mutants killed
+memory bound: no process was stopped
+
+== WHOLE COMPATIBILITY CONTROLS
+test_ambiguous_anchor_is_refused (test_todomvc_cypress_compat.Compatibility) ... ok
+test_cli_refuses_before_staging_and_prints_explicit_identity (test_todomvc_cypress_compat.Compatibility) ... ok
+test_declared_pin_drift_is_refused (test_todomvc_cypress_compat.Compatibility) ... ok
+test_each_original_drift_or_missing_file_refuses_before_creation (test_todomvc_cypress_compat.Compatibility) ... ok
+test_exact_two_edits_preserve_all_originals_and_29_test_contracts (test_todomvc_cypress_compat.Compatibility) ... ok
+test_output_identity_cannot_silently_change_under_v1 (test_todomvc_cypress_compat.Compatibility) ... ok
+test_package_and_binary_versions_must_be_exact (test_todomvc_cypress_compat.Compatibility) ... ok
+test_patch_identity_cannot_silently_change_under_v1 (test_todomvc_cypress_compat.Compatibility) ... ok
+test_recheck_catches_source_drift_and_never_overwrites (test_todomvc_cypress_compat.Compatibility) ... ok
+test_staged_added_missing_and_symlink_files_are_refused (test_todomvc_cypress_compat.Compatibility) ... ok
+test_staged_file_and_manifest_drift_are_refused (test_todomvc_cypress_compat.Compatibility) ... ok
+
+----------------------------------------------------------------------
+Ran 11 tests in 0.033s
+
+OK
+
+Python structured receipt: /tmp/pw-todomvc-compat-controls-_atzumvg/pw-guide-result-v49ie0lf
+{"valid": true, "reason": "complete", "passed": ["test_todomvc_cypress_compat.Compatibility.test_ambiguous_anchor_is_refused", "test_todomvc_cypress_compat.Compatibility.test_cli_refuses_before_staging_and_prints_explicit_identity", "test_todomvc_cypress_compat.Compatibility.test_declared_pin_drift_is_refused", "test_todomvc_cypress_compat.Compatibility.test_each_original_drift_or_missing_file_refuses_before_creation", "test_todomvc_cypress_compat.Compatibility.test_exact_two_edits_preserve_all_originals_and_29_test_contracts", "test_todomvc_cypress_compat.Compatibility.test_output_identity_cannot_silently_change_under_v1", "test_todomvc_cypress_compat.Compatibility.test_package_and_binary_versions_must_be_exact", "test_todomvc_cypress_compat.Compatibility.test_patch_identity_cannot_silently_change_under_v1", "test_todomvc_cypress_compat.Compatibility.test_recheck_catches_source_drift_and_never_overwrites", "test_todomvc_cypress_compat.Compatibility.test_staged_added_missing_and_symlink_files_are_refused", "test_todomvc_cypress_compat.Compatibility.test_staged_file_and_manifest_drift_are_refused"], "assertion_failed": [], "body_errors": [], "executed": 11, "report_sha256": "175c84d733e53e880a911050125a383eecdea6203cb261c1400fb8a873f4ae88"}
+
+baseline: 11 passed, 0 failed
+test_ambiguous_anchor_is_refused (test_todomvc_cypress_compat.Compatibility) ... ok
+test_cli_refuses_before_staging_and_prints_explicit_identity (test_todomvc_cypress_compat.Compatibility) ... ok
+test_declared_pin_drift_is_refused (test_todomvc_cypress_compat.Compatibility) ... ok
+test_each_original_drift_or_missing_file_refuses_before_creation (test_todomvc_cypress_compat.Compatibility) ... FAIL
+test_exact_two_edits_preserve_all_originals_and_29_test_contracts (test_todomvc_cypress_compat.Compatibility) ... ok
+test_output_identity_cannot_silently_change_under_v1 (test_todomvc_cypress_compat.Compatibility) ... ok
+test_package_and_binary_versions_must_be_exact (test_todomvc_cypress_compat.Compatibility) ... ok
+test_patch_identity_cannot_silently_change_under_v1 (test_todomvc_cypress_compat.Compatibility) ... ok
+test_recheck_catches_source_drift_and_never_overwrites (test_todomvc_cypress_compat.Compatibility) ... FAIL
+test_staged_added_missing_and_symlink_files_are_refused (test_todomvc_cypress_compat.Compatibility) ... ok
+test_staged_file_and_manifest_drift_are_refused (test_todomvc_cypress_compat.Compatibility) ... ok
+
+======================================================================
+FAIL: test_each_original_drift_or_missing_file_refuses_before_creation (test_todomvc_cypress_compat.Compatibility)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/train-12/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/train-12/scripts/tests/test_todomvc_cypress_compat.py", line 71, in test_each_original_drift_or_missing_file_refuses_before_creation
+    with self.assertRaisesRegex(ValueError, "upstream blob drift"):
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_recheck_catches_source_drift_and_never_overwrites (test_todomvc_cypress_compat.Compatibility)
+----------------------------------------------------------------------
+ValueError: staged content drift: cypress.config.js
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/train-12/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/train-12/scripts/tests/test_todomvc_cypress_compat.py", line 159, in test_recheck_catches_source_drift_and_never_overwrites
+    with self.assertRaisesRegex(ValueError, "upstream blob drift"):
+AssertionError: "upstream blob drift" does not match "staged content drift: cypress.config.js"
+
+----------------------------------------------------------------------
+Ran 11 tests in 0.031s
+
+FAILED (failures=2)
+
+Python structured receipt: /tmp/pw-todomvc-compat-controls-_atzumvg/pw-guide-result-o81k0_ca
+{"valid": true, "reason": "complete", "passed": ["test_todomvc_cypress_compat.Compatibility.test_ambiguous_anchor_is_refused", "test_todomvc_cypress_compat.Compatibility.test_cli_refuses_before_staging_and_prints_explicit_identity", "test_todomvc_cypress_compat.Compatibility.test_declared_pin_drift_is_refused", "test_todomvc_cypress_compat.Compatibility.test_exact_two_edits_preserve_all_originals_and_29_test_contracts", "test_todomvc_cypress_compat.Compatibility.test_output_identity_cannot_silently_change_under_v1", "test_todomvc_cypress_compat.Compatibility.test_package_and_binary_versions_must_be_exact", "test_todomvc_cypress_compat.Compatibility.test_patch_identity_cannot_silently_change_under_v1", "test_todomvc_cypress_compat.Compatibility.test_staged_added_missing_and_symlink_files_are_refused", "test_todomvc_cypress_compat.Compatibility.test_staged_file_and_manifest_drift_are_refused"], "assertion_failed": ["test_todomvc_cypress_compat.Compatibility.test_each_original_drift_or_missing_file_refuses_before_creation", "test_todomvc_cypress_compat.Compatibility.test_recheck_catches_source_drift_and_never_overwrites"], "body_errors": [], "executed": 11, "report_sha256": "1a90a9eed11fa40b22e62d9f4b6aed10ae254672bf49f8e9bf96aecad45e298f"}
+
+changed original blobs are accepted: KILLED by test_todomvc_cypress_compat.Compatibility.test_each_original_drift_or_missing_file_refuses_before_creation
+todomvc-cypress-compat-v1: create; original 7 upstream blobs unchanged; exact 2-patch execution copy; manifest sha256 f14a99ba4714c91ee7f39397a58bfb1c9f8fc0b4881a1e60f72c3bb7809801c0
+{
+  "cypress_binary": "15.21.1",
+  "cypress_package": "wrong",
+  "identity": "todomvc-cypress-compat-v1",
+  "output_sha256": {
+    "LICENSE-todomvc.md": "32238c5c6759b589ea768661b6eb0fcb42449b74d57cdf09928743f2e1eb748d",
+    "cypress.config.js": "e1e01ccb3aa9901bd2c47577c79fb7b039928ebadd6b4071dabbbd49627e245c",
+    "cypress/e2e/spec.cy.js": "c353401d93731945f77c3f8341fcded3bb5479b2d36944349133a72ac09cd88c",
+    "cypress/fixtures/example.json": "6c88ef752eb4a0e9dc7d1a9ea16624eda9084fea2cc967a89d5a9304aa32be9d",
+    "cypress/support/commands.js": "4aa73053c8323b9bf93fdbf706147968d2f43627e6d4366e8c86cddbd580d843",
+    "cypress/support/e2e.js": "c183589133eaf583809727f3f9f52aff93db86e200a71ae045de2a381f87b9c1",
+    "package.json": "f867221162a60c2d75a35a203226d4d42dc0c8cde143a8abee67760cad145c2b",
+    "tests/knownIssues.js": "dc628ff3e0198c4559e501a566cb6c344bf75a7e0dc7cae11e1e50de90feca90"
+  },
+  "patches": [
+    "spy-reset-history",
+    "fresh-created-todo-query"
+  ],
+  "patchset_sha256": "25d26eb59c020b9ea261f65861f0b7dad4cb698fce1ade1d3f4b9276f03ed3ee",
+  "upstream_blobs": {
+    "LICENSE-todomvc.md": "9275d4371020294b6a107e454a0d1819f8b71c31",
+    "cypress.config.js": "9557466f8850fd01fe05406acbc69d2e713fccd1",
+    "cypress/e2e/spec.cy.js": "478bcfb17f407d56b4db19c4bffadcd0aa1e0972",
+    "cypress/fixtures/example.json": "da87594a2465392b86ba23faaa7ac1d971c32091",
+    "cypress/support/commands.js": "029abdbaf932cd1dded89e79c7943aa2fcab9c36",
+    "cypress/support/e2e.js": "8edffddd850ceaa49a30c8b4542df5f02d16676a",
+    "tests/knownIssues.js": "808649f49a9cde966e2fb8185eac394a0f975217"
+  },
+  "upstream_revision": "ff43b02e59dfa604386bb382034b2cd07c2bcd8a"
+}
+test_ambiguous_anchor_is_refused (test_todomvc_cypress_compat.Compatibility) ... ok
+test_cli_refuses_before_staging_and_prints_explicit_identity (test_todomvc_cypress_compat.Compatibility) ... FAIL
+test_declared_pin_drift_is_refused (test_todomvc_cypress_compat.Compatibility) ... ok
+test_each_original_drift_or_missing_file_refuses_before_creation (test_todomvc_cypress_compat.Compatibility) ... ok
+test_exact_two_edits_preserve_all_originals_and_29_test_contracts (test_todomvc_cypress_compat.Compatibility) ... ok
+test_output_identity_cannot_silently_change_under_v1 (test_todomvc_cypress_compat.Compatibility) ... ok
+test_package_and_binary_versions_must_be_exact (test_todomvc_cypress_compat.Compatibility) ... FAIL
+test_patch_identity_cannot_silently_change_under_v1 (test_todomvc_cypress_compat.Compatibility) ... ok
+test_recheck_catches_source_drift_and_never_overwrites (test_todomvc_cypress_compat.Compatibility) ... ok
+test_staged_added_missing_and_symlink_files_are_refused (test_todomvc_cypress_compat.Compatibility) ... ok
+test_staged_file_and_manifest_drift_are_refused (test_todomvc_cypress_compat.Compatibility) ... ok
+
+======================================================================
+FAIL: test_cli_refuses_before_staging_and_prints_explicit_identity (test_todomvc_cypress_compat.Compatibility)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/train-12/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/train-12/scripts/tests/test_todomvc_cypress_compat.py", line 167, in test_cli_refuses_before_staging_and_prints_explicit_identity
+    self.assertEqual(code, 1)
+AssertionError: 0 != 1
+
+======================================================================
+FAIL: test_package_and_binary_versions_must_be_exact (test_todomvc_cypress_compat.Compatibility)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/train-12/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/train-12/scripts/tests/test_todomvc_cypress_compat.py", line 83, in test_package_and_binary_versions_must_be_exact
+    with self.assertRaisesRegex(ValueError, "not pinned"):
+AssertionError: ValueError not raised
+
+----------------------------------------------------------------------
+Ran 11 tests in 0.034s
+
+FAILED (failures=2)
+
+Python structured receipt: /tmp/pw-todomvc-compat-controls-_atzumvg/pw-guide-result-rt8655jr
+{"valid": true, "reason": "complete", "passed": ["test_todomvc_cypress_compat.Compatibility.test_ambiguous_anchor_is_refused", "test_todomvc_cypress_compat.Compatibility.test_declared_pin_drift_is_refused", "test_todomvc_cypress_compat.Compatibility.test_each_original_drift_or_missing_file_refuses_before_creation", "test_todomvc_cypress_compat.Compatibility.test_exact_two_edits_preserve_all_originals_and_29_test_contracts", "test_todomvc_cypress_compat.Compatibility.test_output_identity_cannot_silently_change_under_v1", "test_todomvc_cypress_compat.Compatibility.test_patch_identity_cannot_silently_change_under_v1", "test_todomvc_cypress_compat.Compatibility.test_recheck_catches_source_drift_and_never_overwrites", "test_todomvc_cypress_compat.Compatibility.test_staged_added_missing_and_symlink_files_are_refused", "test_todomvc_cypress_compat.Compatibility.test_staged_file_and_manifest_drift_are_refused"], "assertion_failed": ["test_todomvc_cypress_compat.Compatibility.test_cli_refuses_before_staging_and_prints_explicit_identity", "test_todomvc_cypress_compat.Compatibility.test_package_and_binary_versions_must_be_exact"], "body_errors": [], "executed": 11, "report_sha256": "9de0be0283b4d3045626700f3a3699d660a2b9a8489f61f9b4e27decee9b3a10"}
+
+installed package and binary pins are ignored: KILLED by test_todomvc_cypress_compat.Compatibility.test_package_and_binary_versions_must_be_exact
+test_ambiguous_anchor_is_refused (test_todomvc_cypress_compat.Compatibility) ... ok
+test_cli_refuses_before_staging_and_prints_explicit_identity (test_todomvc_cypress_compat.Compatibility) ... ok
+test_declared_pin_drift_is_refused (test_todomvc_cypress_compat.Compatibility) ... FAIL
+test_each_original_drift_or_missing_file_refuses_before_creation (test_todomvc_cypress_compat.Compatibility) ... ok
+test_exact_two_edits_preserve_all_originals_and_29_test_contracts (test_todomvc_cypress_compat.Compatibility) ... ok
+test_output_identity_cannot_silently_change_under_v1 (test_todomvc_cypress_compat.Compatibility) ... ok
+test_package_and_binary_versions_must_be_exact (test_todomvc_cypress_compat.Compatibility) ... ok
+test_patch_identity_cannot_silently_change_under_v1 (test_todomvc_cypress_compat.Compatibility) ... ok
+test_recheck_catches_source_drift_and_never_overwrites (test_todomvc_cypress_compat.Compatibility) ... ok
+test_staged_added_missing_and_symlink_files_are_refused (test_todomvc_cypress_compat.Compatibility) ... ok
+test_staged_file_and_manifest_drift_are_refused (test_todomvc_cypress_compat.Compatibility) ... ok
+
+======================================================================
+FAIL: test_declared_pin_drift_is_refused (test_todomvc_cypress_compat.Compatibility)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/train-12/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/train-12/scripts/tests/test_todomvc_cypress_compat.py", line 92, in test_declared_pin_drift_is_refused
+    with self.assertRaisesRegex(ValueError, "declared Cypress"):
+AssertionError: ValueError not raised
+
+----------------------------------------------------------------------
+Ran 11 tests in 0.035s
+
+FAILED (failures=1)
+
+Python structured receipt: /tmp/pw-todomvc-compat-controls-_atzumvg/pw-guide-result-tp5njmfb
+{"valid": true, "reason": "complete", "passed": ["test_todomvc_cypress_compat.Compatibility.test_ambiguous_anchor_is_refused", "test_todomvc_cypress_compat.Compatibility.test_cli_refuses_before_staging_and_prints_explicit_identity", "test_todomvc_cypress_compat.Compatibility.test_each_original_drift_or_missing_file_refuses_before_creation", "test_todomvc_cypress_compat.Compatibility.test_exact_two_edits_preserve_all_originals_and_29_test_contracts", "test_todomvc_cypress_compat.Compatibility.test_output_identity_cannot_silently_change_under_v1", "test_todomvc_cypress_compat.Compatibility.test_package_and_binary_versions_must_be_exact", "test_todomvc_cypress_compat.Compatibility.test_patch_identity_cannot_silently_change_under_v1", "test_todomvc_cypress_compat.Compatibility.test_recheck_catches_source_drift_and_never_overwrites", "test_todomvc_cypress_compat.Compatibility.test_staged_added_missing_and_symlink_files_are_refused", "test_todomvc_cypress_compat.Compatibility.test_staged_file_and_manifest_drift_are_refused"], "assertion_failed": ["test_todomvc_cypress_compat.Compatibility.test_declared_pin_drift_is_refused"], "body_errors": [], "executed": 11, "report_sha256": "b7e579445ed7a0e0c989728bc7818bb05dc31884f16bfdb73d6bbea97a21acf1"}
+
+declared package pin is ignored: KILLED by test_todomvc_cypress_compat.Compatibility.test_declared_pin_drift_is_refused
+test_ambiguous_anchor_is_refused (test_todomvc_cypress_compat.Compatibility) ... ok
+test_cli_refuses_before_staging_and_prints_explicit_identity (test_todomvc_cypress_compat.Compatibility) ... ok
+test_declared_pin_drift_is_refused (test_todomvc_cypress_compat.Compatibility) ... ok
+test_each_original_drift_or_missing_file_refuses_before_creation (test_todomvc_cypress_compat.Compatibility) ... ok
+test_exact_two_edits_preserve_all_originals_and_29_test_contracts (test_todomvc_cypress_compat.Compatibility) ... ok
+test_output_identity_cannot_silently_change_under_v1 (test_todomvc_cypress_compat.Compatibility) ... ok
+test_package_and_binary_versions_must_be_exact (test_todomvc_cypress_compat.Compatibility) ... ok
+test_patch_identity_cannot_silently_change_under_v1 (test_todomvc_cypress_compat.Compatibility) ... FAIL
+test_recheck_catches_source_drift_and_never_overwrites (test_todomvc_cypress_compat.Compatibility) ... ok
+test_staged_added_missing_and_symlink_files_are_refused (test_todomvc_cypress_compat.Compatibility) ... ok
+test_staged_file_and_manifest_drift_are_refused (test_todomvc_cypress_compat.Compatibility) ... ok
+
+======================================================================
+FAIL: test_patch_identity_cannot_silently_change_under_v1 (test_todomvc_cypress_compat.Compatibility)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/train-12/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/train-12/scripts/tests/test_todomvc_cypress_compat.py", line 100, in test_patch_identity_cannot_silently_change_under_v1
+    with self.assertRaisesRegex(ValueError, "patch identity drift"):
+AssertionError: ValueError not raised
+
+----------------------------------------------------------------------
+Ran 11 tests in 0.036s
+
+FAILED (failures=1)
+
+Python structured receipt: /tmp/pw-todomvc-compat-controls-_atzumvg/pw-guide-result-t06brb2m
+{"valid": true, "reason": "complete", "passed": ["test_todomvc_cypress_compat.Compatibility.test_ambiguous_anchor_is_refused", "test_todomvc_cypress_compat.Compatibility.test_cli_refuses_before_staging_and_prints_explicit_identity", "test_todomvc_cypress_compat.Compatibility.test_declared_pin_drift_is_refused", "test_todomvc_cypress_compat.Compatibility.test_each_original_drift_or_missing_file_refuses_before_creation", "test_todomvc_cypress_compat.Compatibility.test_exact_two_edits_preserve_all_originals_and_29_test_contracts", "test_todomvc_cypress_compat.Compatibility.test_output_identity_cannot_silently_change_under_v1", "test_todomvc_cypress_compat.Compatibility.test_package_and_binary_versions_must_be_exact", "test_todomvc_cypress_compat.Compatibility.test_recheck_catches_source_drift_and_never_overwrites", "test_todomvc_cypress_compat.Compatibility.test_staged_added_missing_and_symlink_files_are_refused", "test_todomvc_cypress_compat.Compatibility.test_staged_file_and_manifest_drift_are_refused"], "assertion_failed": ["test_todomvc_cypress_compat.Compatibility.test_patch_identity_cannot_silently_change_under_v1"], "body_errors": [], "executed": 11, "report_sha256": "1da4cc70449557833fd0f4ad111c6f2556b5b7f92bd1587656a2ecd76a7a8a27"}
+
+patch identity can change without a new version: KILLED by test_todomvc_cypress_compat.Compatibility.test_patch_identity_cannot_silently_change_under_v1
+test_ambiguous_anchor_is_refused (test_todomvc_cypress_compat.Compatibility) ... ok
+test_cli_refuses_before_staging_and_prints_explicit_identity (test_todomvc_cypress_compat.Compatibility) ... ok
+test_declared_pin_drift_is_refused (test_todomvc_cypress_compat.Compatibility) ... ok
+test_each_original_drift_or_missing_file_refuses_before_creation (test_todomvc_cypress_compat.Compatibility) ... ok
+test_exact_two_edits_preserve_all_originals_and_29_test_contracts (test_todomvc_cypress_compat.Compatibility) ... ok
+test_output_identity_cannot_silently_change_under_v1 (test_todomvc_cypress_compat.Compatibility) ... ok
+test_package_and_binary_versions_must_be_exact (test_todomvc_cypress_compat.Compatibility) ... ok
+test_patch_identity_cannot_silently_change_under_v1 (test_todomvc_cypress_compat.Compatibility) ... ok
+test_recheck_catches_source_drift_and_never_overwrites (test_todomvc_cypress_compat.Compatibility) ... FAIL
+test_staged_added_missing_and_symlink_files_are_refused (test_todomvc_cypress_compat.Compatibility) ... ok
+test_staged_file_and_manifest_drift_are_refused (test_todomvc_cypress_compat.Compatibility) ... ok
+
+======================================================================
+FAIL: test_recheck_catches_source_drift_and_never_overwrites (test_todomvc_cypress_compat.Compatibility)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/train-12/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/train-12/scripts/tests/test_todomvc_cypress_compat.py", line 153, in test_recheck_catches_source_drift_and_never_overwrites
+    with self.assertRaises(FileExistsError):
+AssertionError: FileExistsError not raised
+
+----------------------------------------------------------------------
+Ran 11 tests in 0.033s
+
+FAILED (failures=1)
+
+Python structured receipt: /tmp/pw-todomvc-compat-controls-_atzumvg/pw-guide-result-q1hrldnt
+{"valid": true, "reason": "complete", "passed": ["test_todomvc_cypress_compat.Compatibility.test_ambiguous_anchor_is_refused", "test_todomvc_cypress_compat.Compatibility.test_cli_refuses_before_staging_and_prints_explicit_identity", "test_todomvc_cypress_compat.Compatibility.test_declared_pin_drift_is_refused", "test_todomvc_cypress_compat.Compatibility.test_each_original_drift_or_missing_file_refuses_before_creation", "test_todomvc_cypress_compat.Compatibility.test_exact_two_edits_preserve_all_originals_and_29_test_contracts", "test_todomvc_cypress_compat.Compatibility.test_output_identity_cannot_silently_change_under_v1", "test_todomvc_cypress_compat.Compatibility.test_package_and_binary_versions_must_be_exact", "test_todomvc_cypress_compat.Compatibility.test_patch_identity_cannot_silently_change_under_v1", "test_todomvc_cypress_compat.Compatibility.test_staged_added_missing_and_symlink_files_are_refused", "test_todomvc_cypress_compat.Compatibility.test_staged_file_and_manifest_drift_are_refused"], "assertion_failed": ["test_todomvc_cypress_compat.Compatibility.test_recheck_catches_source_drift_and_never_overwrites"], "body_errors": [], "executed": 11, "report_sha256": "585c2daacf7322457226f4f2f06a1c1727ad9811157bc5ee347caee8c7e17db5"}
+
+existing destination paths are no longer refused: KILLED by test_todomvc_cypress_compat.Compatibility.test_recheck_catches_source_drift_and_never_overwrites
+test_ambiguous_anchor_is_refused (test_todomvc_cypress_compat.Compatibility) ... ok
+test_cli_refuses_before_staging_and_prints_explicit_identity (test_todomvc_cypress_compat.Compatibility) ... ok
+test_declared_pin_drift_is_refused (test_todomvc_cypress_compat.Compatibility) ... ok
+test_each_original_drift_or_missing_file_refuses_before_creation (test_todomvc_cypress_compat.Compatibility) ... ok
+test_exact_two_edits_preserve_all_originals_and_29_test_contracts (test_todomvc_cypress_compat.Compatibility) ... ok
+test_output_identity_cannot_silently_change_under_v1 (test_todomvc_cypress_compat.Compatibility) ... FAIL
+test_package_and_binary_versions_must_be_exact (test_todomvc_cypress_compat.Compatibility) ... ok
+test_patch_identity_cannot_silently_change_under_v1 (test_todomvc_cypress_compat.Compatibility) ... ok
+test_recheck_catches_source_drift_and_never_overwrites (test_todomvc_cypress_compat.Compatibility) ... ok
+test_staged_added_missing_and_symlink_files_are_refused (test_todomvc_cypress_compat.Compatibility) ... ok
+test_staged_file_and_manifest_drift_are_refused (test_todomvc_cypress_compat.Compatibility) ... ok
+
+======================================================================
+FAIL: test_output_identity_cannot_silently_change_under_v1 (test_todomvc_cypress_compat.Compatibility)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/train-12/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/train-12/scripts/tests/test_todomvc_cypress_compat.py", line 114, in test_output_identity_cannot_silently_change_under_v1
+    with self.assertRaisesRegex(ValueError, "output identity drift"):
+AssertionError: ValueError not raised
+
+----------------------------------------------------------------------
+Ran 11 tests in 0.033s
+
+FAILED (failures=1)
+
+Python structured receipt: /tmp/pw-todomvc-compat-controls-_atzumvg/pw-guide-result-lmnb1vbc
+{"valid": true, "reason": "complete", "passed": ["test_todomvc_cypress_compat.Compatibility.test_ambiguous_anchor_is_refused", "test_todomvc_cypress_compat.Compatibility.test_cli_refuses_before_staging_and_prints_explicit_identity", "test_todomvc_cypress_compat.Compatibility.test_declared_pin_drift_is_refused", "test_todomvc_cypress_compat.Compatibility.test_each_original_drift_or_missing_file_refuses_before_creation", "test_todomvc_cypress_compat.Compatibility.test_exact_two_edits_preserve_all_originals_and_29_test_contracts", "test_todomvc_cypress_compat.Compatibility.test_package_and_binary_versions_must_be_exact", "test_todomvc_cypress_compat.Compatibility.test_patch_identity_cannot_silently_change_under_v1", "test_todomvc_cypress_compat.Compatibility.test_recheck_catches_source_drift_and_never_overwrites", "test_todomvc_cypress_compat.Compatibility.test_staged_added_missing_and_symlink_files_are_refused", "test_todomvc_cypress_compat.Compatibility.test_staged_file_and_manifest_drift_are_refused"], "assertion_failed": ["test_todomvc_cypress_compat.Compatibility.test_output_identity_cannot_silently_change_under_v1"], "body_errors": [], "executed": 11, "report_sha256": "f47fc59dfd06c0cb4454d3ed3a4bfc678f4cf3ef0bebaf88d0cbf4d4923dc6b1"}
+
+patched-output digest guard is bypassed: KILLED by test_todomvc_cypress_compat.Compatibility.test_output_identity_cannot_silently_change_under_v1
+test_ambiguous_anchor_is_refused (test_todomvc_cypress_compat.Compatibility) ... ok
+test_cli_refuses_before_staging_and_prints_explicit_identity (test_todomvc_cypress_compat.Compatibility) ... ok
+test_declared_pin_drift_is_refused (test_todomvc_cypress_compat.Compatibility) ... ok
+test_each_original_drift_or_missing_file_refuses_before_creation (test_todomvc_cypress_compat.Compatibility) ... ok
+test_exact_two_edits_preserve_all_originals_and_29_test_contracts (test_todomvc_cypress_compat.Compatibility) ... ok
+test_output_identity_cannot_silently_change_under_v1 (test_todomvc_cypress_compat.Compatibility) ... ok
+test_package_and_binary_versions_must_be_exact (test_todomvc_cypress_compat.Compatibility) ... ok
+test_patch_identity_cannot_silently_change_under_v1 (test_todomvc_cypress_compat.Compatibility) ... ok
+test_recheck_catches_source_drift_and_never_overwrites (test_todomvc_cypress_compat.Compatibility) ... ok
+test_staged_added_missing_and_symlink_files_are_refused (test_todomvc_cypress_compat.Compatibility) ... FAIL
+test_staged_file_and_manifest_drift_are_refused (test_todomvc_cypress_compat.Compatibility) ... ok
+
+======================================================================
+FAIL: test_staged_added_missing_and_symlink_files_are_refused (test_todomvc_cypress_compat.Compatibility)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/train-12/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/train-12/scripts/tests/test_todomvc_cypress_compat.py", line 133, in test_staged_added_missing_and_symlink_files_are_refused
+    with self.assertRaisesRegex(ValueError, "inventory drift"):
+AssertionError: ValueError not raised
+
+----------------------------------------------------------------------
+Ran 11 tests in 0.033s
+
+FAILED (failures=1)
+
+Python structured receipt: /tmp/pw-todomvc-compat-controls-_atzumvg/pw-guide-result-0u8ljgub
+{"valid": true, "reason": "complete", "passed": ["test_todomvc_cypress_compat.Compatibility.test_ambiguous_anchor_is_refused", "test_todomvc_cypress_compat.Compatibility.test_cli_refuses_before_staging_and_prints_explicit_identity", "test_todomvc_cypress_compat.Compatibility.test_declared_pin_drift_is_refused", "test_todomvc_cypress_compat.Compatibility.test_each_original_drift_or_missing_file_refuses_before_creation", "test_todomvc_cypress_compat.Compatibility.test_exact_two_edits_preserve_all_originals_and_29_test_contracts", "test_todomvc_cypress_compat.Compatibility.test_output_identity_cannot_silently_change_under_v1", "test_todomvc_cypress_compat.Compatibility.test_package_and_binary_versions_must_be_exact", "test_todomvc_cypress_compat.Compatibility.test_patch_identity_cannot_silently_change_under_v1", "test_todomvc_cypress_compat.Compatibility.test_recheck_catches_source_drift_and_never_overwrites", "test_todomvc_cypress_compat.Compatibility.test_staged_file_and_manifest_drift_are_refused"], "assertion_failed": ["test_todomvc_cypress_compat.Compatibility.test_staged_added_missing_and_symlink_files_are_refused"], "body_errors": [], "executed": 11, "report_sha256": "cec252b44b2ef427791fd74225341eec11e587becfc3e88e92bedf89cf410a57"}
+
+extra staged specs are accepted: KILLED by test_todomvc_cypress_compat.Compatibility.test_staged_added_missing_and_symlink_files_are_refused
+test_ambiguous_anchor_is_refused (test_todomvc_cypress_compat.Compatibility) ... ok
+test_cli_refuses_before_staging_and_prints_explicit_identity (test_todomvc_cypress_compat.Compatibility) ... ok
+test_declared_pin_drift_is_refused (test_todomvc_cypress_compat.Compatibility) ... ok
+test_each_original_drift_or_missing_file_refuses_before_creation (test_todomvc_cypress_compat.Compatibility) ... ok
+test_exact_two_edits_preserve_all_originals_and_29_test_contracts (test_todomvc_cypress_compat.Compatibility) ... ok
+test_output_identity_cannot_silently_change_under_v1 (test_todomvc_cypress_compat.Compatibility) ... ok
+test_package_and_binary_versions_must_be_exact (test_todomvc_cypress_compat.Compatibility) ... ok
+test_patch_identity_cannot_silently_change_under_v1 (test_todomvc_cypress_compat.Compatibility) ... ok
+test_recheck_catches_source_drift_and_never_overwrites (test_todomvc_cypress_compat.Compatibility) ... ok
+test_staged_added_missing_and_symlink_files_are_refused (test_todomvc_cypress_compat.Compatibility) ... ok
+test_staged_file_and_manifest_drift_are_refused (test_todomvc_cypress_compat.Compatibility) ... FAIL
+
+======================================================================
+FAIL: test_staged_file_and_manifest_drift_are_refused (test_todomvc_cypress_compat.Compatibility)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/train-12/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/train-12/scripts/tests/test_todomvc_cypress_compat.py", line 124, in test_staged_file_and_manifest_drift_are_refused
+    with self.assertRaisesRegex(ValueError, "staged content drift"):
+AssertionError: ValueError not raised
+
+----------------------------------------------------------------------
+Ran 11 tests in 0.029s
+
+FAILED (failures=1)
+
+Python structured receipt: /tmp/pw-todomvc-compat-controls-_atzumvg/pw-guide-result-osbl08k4
+{"valid": true, "reason": "complete", "passed": ["test_todomvc_cypress_compat.Compatibility.test_ambiguous_anchor_is_refused", "test_todomvc_cypress_compat.Compatibility.test_cli_refuses_before_staging_and_prints_explicit_identity", "test_todomvc_cypress_compat.Compatibility.test_declared_pin_drift_is_refused", "test_todomvc_cypress_compat.Compatibility.test_each_original_drift_or_missing_file_refuses_before_creation", "test_todomvc_cypress_compat.Compatibility.test_exact_two_edits_preserve_all_originals_and_29_test_contracts", "test_todomvc_cypress_compat.Compatibility.test_output_identity_cannot_silently_change_under_v1", "test_todomvc_cypress_compat.Compatibility.test_package_and_binary_versions_must_be_exact", "test_todomvc_cypress_compat.Compatibility.test_patch_identity_cannot_silently_change_under_v1", "test_todomvc_cypress_compat.Compatibility.test_recheck_catches_source_drift_and_never_overwrites", "test_todomvc_cypress_compat.Compatibility.test_staged_added_missing_and_symlink_files_are_refused"], "assertion_failed": ["test_todomvc_cypress_compat.Compatibility.test_staged_file_and_manifest_drift_are_refused"], "body_errors": [], "executed": 11, "report_sha256": "8857c91b4d4373ac1e73ef53787ca6dc1b8af72c6ab22bfc65902aa723fc14f9"}
+
+staged content and manifest drift are accepted: KILLED by test_todomvc_cypress_compat.Compatibility.test_staged_file_and_manifest_drift_are_refused
+8 of 8 mutants killed
+memory bound: no process was stopped

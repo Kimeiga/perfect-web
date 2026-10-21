@@ -600,6 +600,18 @@ class Plan(unittest.TestCase):
         self.assertEqual([n for n in known if n not in plan.bodies()], [])
         self.assertIn("e2e/performance.spec.mjs", plan.bodies()["e10-close-bench"])
 
+    def test_a_todomvc_plan_writes_only_the_workflow_output(self) -> None:
+        done = subprocess.run(
+            [sys.executable, str(SCRIPTS / "ci_plan.py"), "--shards", "1", "e14-todomvc"],
+            capture_output=True, text=True, timeout=30,
+        )
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        lines = done.stdout.splitlines()
+        self.assertEqual(len(lines), 1, "planning metadata must not start a mutation runtime: " + done.stdout)
+        self.assertTrue(lines[0].startswith("shards="), done.stdout)
+        shards = json.loads(lines[0].split("=", 1)[1])
+        self.assertEqual([recipe for shard in shards for recipe in shard["recipes"]], ["e14-todomvc"])
+
     def test_a_recipe_run_against_a_database_is_a_shard_of_its_own(self) -> None:
         out = subprocess.run(
             [sys.executable, str(SCRIPTS / "ci_plan.py"), "--shards", "2", "e14-feed-postgres", "e14-feed"],

@@ -69,3 +69,23 @@ Whole existing producer controls and exact combined CI remain pending. The integ
 earlier scratch 29/29 and the failed first probe are diagnostic history only.
 Historical failed unchanged runs remain failed. This adapter establishes
 neither an unchanged-suite pass nor broader TodoMVC correctness.
+
+## Metadata import stays inert
+
+The follow-up planner exposed an import-time bug before dispatch: importing
+`todomvc_compat_mutations` to count its eight controls also imported
+`mutation_baseline`. That started a watcher and appended a memory-bound line
+at process exit. The native TodoMVC plan therefore wrote two stdout lines,
+while the workflow redirects this stream into `GITHUB_OUTPUT`, whose entries
+must be output parameters ([GitHub workflow commands](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-output-parameter)).
+
+Import the runtime only inside `main`, as its own module contract requires.
+The actual campaign still starts the same guard and keeps all eight controls.
+A fresh native planner regression requires exactly its one `shards=` JSON
+parameter, and a control restores the erroneous eager import. Existing
+planner tests selected older recipes and did not exercise this new metadata.
+
+[Native red/green and complete control output](../evidence/tooling/todomvc-metadata-import.txt):
+the new planner regression passes, all ten changed-test/planner controls and
+the unchanged eight compatibility controls pass. The real campaign still
+reports its memory guard; metadata planning no longer starts that runtime.

@@ -40,6 +40,8 @@ MUTANTS = [
     ("bare Python module selectors are ignored", PLAN,
      '        if directory_named and re.search(rf"(?<![\\w.]){re.escape(name[:-3])}(?!\\w)", text):',
      '        if False:'),
+    ("reading TodoMVC metadata starts its mutation runtime", ROOT / "scripts/todomvc_compat_mutations.py",
+     "import guide_python\n", "import guide_python\nimport mutation_baseline\n"),
     ("workspace consumers omit changed root tests", PLAN,
      '    if re.search(r"(?<![\\w-])--workspace(?![\\w-])", text):',
      '    if False:'),
@@ -50,6 +52,7 @@ SELECTORS = [
     "scripts.tests.test_ci_scripts.Plan.test_root_test_changes_reach_the_package_test_consumers",
     "scripts.tests.test_ci_scripts.Plan.test_python_test_changes_reach_scripts_and_direct_recipes",
     "scripts.tests.test_ci_scripts.Plan.test_bare_python_module_inventories_reach_their_campaigns",
+    "scripts.tests.test_ci_scripts.Plan.test_a_todomvc_plan_writes_only_the_workflow_output",
 ]
 
 

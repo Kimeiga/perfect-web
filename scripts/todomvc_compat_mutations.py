@@ -6,7 +6,6 @@ import sys
 import tempfile
 
 import guide_python
-import mutation_baseline
 import mutation_source
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -46,6 +45,7 @@ WITNESSES = [
 
 
 def main():
+    import mutation_baseline  # metadata imports must not start mutation execution
     watch = mutation_baseline.mutation_bound.start()
     evidence = Path(tempfile.mkdtemp(prefix="pw-todomvc-compat-controls-"))
     expected = guide_python.freeze(SELECTOR, TESTS, SELECTOR + ".py", 11, evidence)
