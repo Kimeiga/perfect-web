@@ -1,0 +1,117 @@
+Train-12 read-only follow-up probes, 2026-10-20
+Not acceptance evidence; no frozen accepted fixture was changed.
+Use-annotation source: effect-scaling 0d616d041c1de85f4c7dec805845be90cc1da15e.
+Native rustc 1.97.1 (8bab26f4f).
+pw_core rlib SHA256: 0de699e36cc4f1c0a315c27d2efdea1c990a63e826adaef58522b09a2fcdb23e
+Custom-tag source: same checkout during effect work; exact transient HEAD was not stamped.
+pw_syntax rlib SHA256: e3ea336c31a736637d9fd30eec1ae0ed38290d0cbd717b8ca5b9cdad3faad70f
+The parser/lower/values/lexical source files are identical at152a4a41 and0d616d04.
+Each .rs probe was compiled with:
+  rustc --edition=2024 -L dependency=target/debug/deps --extern pw_syntax=<recorded rlib> <probe.rs>
+  rustc --edition=2024 -L dependency=target/debug/deps --extern pw_core=<recorded rlib> <probe.rs>
+A018 exploratory builds used root152a4a41 in scratch copies only; raw statuses below.
+
+
+=== train12-custom-tag-probe.rs ===
+fn main() {
+    for source in ["module t\nview V() !{} { <map-container /> }", "module t\nview V() !{} { <my-widget>hello</my-widget> }"] {
+        let parsed = pw_syntax::parse_tree(source);
+        println!("SOURCE: {source}\nERRORS: {:?}", parsed.errors);
+        let root = parsed.green;
+        for open in root.descendants().filter(|n| n.kind() == pw_syntax::SyntaxKind::OpenTag) {
+            println!("OPEN: {open}");
+            for child in open.children() { println!("CHILD {:?}: {}", child.kind(), child.text()); }
+        }
+    }
+}
+
+
+=== train12-custom-tag-probe.txt ===
+SOURCE: module t
+view V() !{} { <map-container /> }
+ERRORS: []
+OPEN: <map-container />
+CHILD Name: map
+CHILD Attr: container
+SOURCE: module t
+view V() !{} { <my-widget>hello</my-widget> }
+ERRORS: []
+OPEN: <my-widget>
+CHILD Name: my
+CHILD Attr: widget
+
+
+=== train12-use-annotation-probe.rs ===
+fn main() {
+    for binding in ["use key: Int", "use key: MissingType", "let key: Int", "let key: MissingType"] {
+        let source = format!("module t\nfn f() -> String !{{}} {{\n    {binding} = \"text\"\n    key\n}}\n");
+        println!("=== {binding} = string ===");
+        let files = vec![("t.pw".into(), source)];
+        let diagnostics = pw_core::check::check_sources(&files);
+        let mut count=0;
+        for (file, ds) in diagnostics { for d in ds { count+=1; println!("{file}: {} {}", d.code, d.message); } }
+        println!("diagnostics: {count}");
+    }
+}
+
+
+=== train12-use-annotation-probe.txt ===
+=== use key: Int = string ===
+diagnostics: 0
+=== use key: MissingType = string ===
+diagnostics: 0
+=== let key: Int = string ===
+t.pw: PW0607 `key` is declared `Int` and initialised with `String`
+t.pw: PW0606 `t.f` declares its result `String` and this produces `Int`
+diagnostics: 2
+=== let key: MissingType = string ===
+t.pw: PW0026 this binding's annotation names `MissingType`: `MissingType` is not a type visible here
+diagnostics: 1
+
+
+=== t12-gap-a018-probe.txt ===
+original native exit 1
+
+pw: the program does not check, so nothing is compiled: /tmp/pw-a018-scope-iiycv25n/original.pw: [PW6601] a template part the renderer cannot render: store.responsive_menu.ResponsiveMenu~ui: `style:grid-template-columns`: `style:grid-template-columns` is a directive, and only `on:` directives are compiled
+
+omit-only-style-directive native exit 0
+pw build: 1 template(s), 0 handler(s), 0 component(s), 6 contract(s) -> /tmp/pw-a018-scope-iiycv25n/omit-only-style-directive-out
+  todo       Resources.Cart  a placeholder body; nothing built depends on it
+  todo       Resources.Menu  a placeholder body; nothing built depends on it
+  todo       Resources.Order  a placeholder body; nothing built depends on it
+  todo       Resources.Store  a placeholder body; nothing built depends on it
+  todo       Saved.SavedFor  a placeholder body; nothing built depends on it
+  no body    store.responsive_menu.ResponsiveMenu~ui  a Component
+  build      bdc68f0894d78b1d9
+
+
+same-value-as-ordinary-attribute native exit 0
+pw build: 1 template(s), 0 handler(s), 0 component(s), 6 contract(s) -> /tmp/pw-a018-boundary-3vf0iw01/same-value-as-ordinary-attribute-out
+  todo       Resources.Cart  a placeholder body; nothing built depends on it
+  todo       Resources.Menu  a placeholder body; nothing built depends on it
+  todo       Resources.Order  a placeholder body; nothing built depends on it
+  todo       Resources.Store  a placeholder body; nothing built depends on it
+  todo       Saved.SavedFor  a placeholder body; nothing built depends on it
+  no body    store.responsive_menu.ResponsiveMenu~ui  a Component
+  build      b85e2857bd8f36f81
+
+
+render-derived-columns native exit 0
+pw build: 1 template(s), 0 handler(s), 0 component(s), 6 contract(s) -> /tmp/pw-a018-boundary-3vf0iw01/render-derived-columns-out
+  todo       Resources.Cart  a placeholder body; nothing built depends on it
+  todo       Resources.Menu  a placeholder body; nothing built depends on it
+  todo       Resources.Order  a placeholder body; nothing built depends on it
+  todo       Resources.Store  a placeholder body; nothing built depends on it
+  todo       Saved.SavedFor  a placeholder body; nothing built depends on it
+  no body    store.responsive_menu.ResponsiveMenu~ui  a Component
+  build      bb188d63ab0f5d260
+
+
+mounted-ordinary-attribute native exit 1
+
+pw: the program does not check, so nothing is compiled: /tmp/pw-a018-mounted-bbyeh1ls/mounted-ordinary-attribute.pw: [PW5020] `<ResponsiveMenu>` uses `ResponsiveMenu` inside another view, and only a view is used as an element; /tmp/pw-a018-mounted-bbyeh1ls/mounted-ordinary-attribute.pw: [PW0609] `items` is `List<_>`, which has no text form
+
+mounted-derived-columns native exit 1
+
+pw: the program does not check, so nothing is compiled: /tmp/pw-a018-mounted-bbyeh1ls/mounted-derived-columns.pw: [PW5020] `<ResponsiveMenu>` uses `ResponsiveMenu` inside another view, and only a view is used as an element; /tmp/pw-a018-mounted-bbyeh1ls/mounted-derived-columns.pw: [PW0609] `items` is `List<_>`, which has no text form
+

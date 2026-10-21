@@ -33,7 +33,9 @@ annotation is not validated like a `let` annotation. A build-time markdown
 value needs a tracked build phase; removing the refusal would currently
 expose an empty platform stub. A-018's style refusal likewise cannot be
 closed by merely building an unmounted component template. These are open
-compiler/execution boundaries, not evidence that the examples work.
+compiler/execution boundaries, not evidence that the examples work. The
+[scoping probes](evidence/tooling/train12-backend-gap-probes.txt) retain
+their source, native results and revision qualifications.
 
 ## Train-10 integration (2026-10-15 to 2026-10-17)
 
