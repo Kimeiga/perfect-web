@@ -332,9 +332,21 @@ MUTANTS += [
      '            if False:\n'),
 ]
 
+MUTANTS += [
+    ("launcher tracks a shell instead of its native host", RUN,
+     '(cd "$SPIKE" && exec env PORT="$PORT"',
+     '(cd "$SPIKE" && env PORT="$PORT"'),
+    ("existing listeners may supply this run's readiness", RUN,
+     '    held.bind(("127.0.0.1", int(sys.argv[1])))\n',
+     '    pass\n'),
+    ("Cypress executes without the identified compatibility project", RUN,
+     '--reporter spec --project "$EXECUTION/project" > "$OUT" 2>&1\n',
+     '--reporter spec > "$OUT" 2>&1\n'),
+]
+
 SELECTOR = "test_todomvc_cypress"
 SEARCH = ROOT / "scripts/tests"
-EXPECTED_TESTS = 49
+EXPECTED_TESTS = 51
 BOUND = 60
 
 

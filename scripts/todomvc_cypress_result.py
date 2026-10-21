@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """**What TodoMVC's own Cypress suite says of TodoMVC in Pleris** (track `todomvc`, W7).
 
-`spikes/todomvc-cypress/run.sh` runs the suite, unchanged, against the app and
-gives Cypress's output to this script, which writes the evidence
+`spikes/todomvc-cypress/run.sh` runs the identified compatibility copy of the
+pinned upstream suite against the app and gives Cypress's output to this script, which writes the evidence
 `just e14-todomvc` records and judges it:
 
     python3 scripts/todomvc_cypress_result.py <acceptance|diagnostic> <output> [exit status]

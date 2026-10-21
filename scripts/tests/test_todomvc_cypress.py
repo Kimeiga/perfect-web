@@ -1,9 +1,9 @@
-"""TodoMVC's own Cypress suite: unchanged (`todomvc_cypress_vendored.py`),
-judged by what it prints (`todomvc_cypress_result.py`), and run by `run.sh`.
+"""TodoMVC's pinned original Cypress sources and identified compatibility copy,
+judged by what it prints (`todomvc_cypress_result.py`) and run by `run.sh`.
 
-Track `todomvc` runs the official spec unchanged as its acceptance. That is a
-claim about bytes (the vendored files are upstream's) and a claim about a run
-(acceptance requires all official tests passing). These
+Track `todomvc` keeps the upstream source bytes unchanged and runs an explicit
+two-patch compatibility copy. Acceptance requires all 29 official tests passing
+with native exit zero; the separate diagnostic cannot satisfy that gate. These
 tests hold the checks to both: the fixtures are real outputs of Cypress 15.14.2 and
 15.21.1 against this app (`fixtures/todomvc-cypress/`), each rule of the judgement is
 broken in a copy of one of them, and `run.sh` is run whole with a stand-in
@@ -12,12 +12,16 @@ fail and not to be skipped.
 """
 
 import contextlib
+import ctypes
+import http.server
 import importlib.util
 import io
 import os
 import pathlib
 import re
 import socket
+import signal
+import threading
 import subprocess
 import sys
 import tempfile
@@ -404,6 +408,7 @@ exit 99
 
 # A host: whatever answers on the port it is given.
 FAKE_HOST = """#!/bin/sh
+printf '%s\\n' "$$" > "$FAKE_HOST_PID"
 exec python3 -m http.server "$PORT" --bind 127.0.0.1
 """
 
@@ -418,6 +423,13 @@ class RunSh(unittest.TestCase):
         self.bin.mkdir()
         (self.dir / "dist" / "build").mkdir(parents=True)
         self.calls = self.dir / "calls.txt"
+        self.host_pid = self.dir / "host.pid"
+        self.subreaper = None
+        if sys.platform.startswith("linux"):
+            libc = ctypes.CDLL(None, use_errno=True)
+            previous = ctypes.c_int()
+            if libc.prctl(37, ctypes.byref(previous), 0, 0, 0) == 0 and libc.prctl(36, 1, 0, 0, 0) == 0:
+                self.subreaper = (libc, previous.value)
         self.write(self.bin / "pnpm", FAKE_PNPM)
         self.write(self.dir / "host", FAKE_HOST)
         with socket.socket() as s:
@@ -425,7 +437,26 @@ class RunSh(unittest.TestCase):
             self.port = s.getsockname()[1]
 
     def tearDown(self):
-        self.tmp.cleanup()
+        # A broken launcher must not leak the fixture while proving its leak.
+        # Linux adoption lets this test reap an orphan left by the shell-PID
+        # mutant. It is restored to the caller's setting after each fixture.
+        try:
+            if self.host_pid.exists():
+                pid = int(self.host_pid.read_text())
+                if self.subreaper is not None:
+                    try:
+                        # An unreaped adopted child keeps its PID reserved;
+                        # never signal a receipt PID that is no longer ours.
+                        waited, _ = os.waitpid(pid, os.WNOHANG)
+                        if waited == 0:
+                            os.kill(pid, signal.SIGTERM)
+                            os.waitpid(pid, 0)
+                    except (ChildProcessError, ProcessLookupError):
+                        pass
+        finally:
+            if self.subreaper is not None:
+                self.subreaper[0].prctl(36, self.subreaper[1], 0, 0, 0)
+            self.tmp.cleanup()
 
     @staticmethod
     def write(path, text):
@@ -447,6 +478,7 @@ class RunSh(unittest.TestCase):
                 "DISPLAY": ":99",
                 "WAYLAND_DISPLAY": "wayland-0",
                 "FAKE_CALLS": str(self.calls),
+                "FAKE_HOST_PID": str(self.host_pid),
                 "FAKE_VERIFY": str(verify),
                 "FAKE_STATUS": str(status),
                 "FAKE_OUTPUT": str(self.dir / "output.txt"),
@@ -471,6 +503,61 @@ class RunSh(unittest.TestCase):
         self.assertIn("run --env framework=page/todomvc.app.Todos~ui --config baseUrl=http://127.0.0.1:%d --reporter spec" % self.port, calls)
         # The display of the machine is left out, and the browser's console is on.
         self.assertIn("env DISPLAY=unset WAYLAND_DISPLAY=unset ELECTRON_ENABLE_LOGGING=1", calls)
+        self.assertIn("exec cypress version --component package", calls)
+        self.assertIn("exec cypress version --component binary", calls)
+        self.assertIn("todomvc-cypress-compat-v1: create; original 7 upstream blobs unchanged; exact 2-patch execution copy", r.stdout)
+        hashes = re.findall(r"manifest sha256 ([0-9a-f]{64})", r.stdout)
+        self.assertEqual(len(hashes), 2)
+        self.assertEqual(hashes[0], hashes[1], "execution copy must be reverified immediately before launch")
+        project = re.search(r"--reporter spec --project ([^\n]+)", calls)
+        self.assertIsNotNone(project, "Cypress must execute the identified copy")
+        path = pathlib.Path(project.group(1))
+        self.assertEqual(path.name, "project")
+        self.assertEqual(path.parent.parent, RUN_SH.parent)
+        self.assertTrue(path.parent.name.startswith(".execution-v1."))
+        self.assertFalse(path.parent.exists(), "owned execution copy must be removed on exit")
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "native Linux host adoption/reaping proof")
+    def test_the_owned_host_is_reaped_before_the_launcher_returns(self):
+        self.assertIsNotNone(self.subreaper, "native child adoption is required for safe negative control cleanup")
+        r = self.run_sh(output=complete_output(), status=0)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertTrue(self.host_pid.exists())
+        pid = int(self.host_pid.read_text())
+        try:
+            os.kill(pid, 0)
+            exists = True
+        except ProcessLookupError:
+            exists = False
+        self.assertFalse(exists, f"owned host {pid} was not reaped")
+
+    def test_an_existing_listener_cannot_supply_readiness(self):
+        requests = []
+
+        class Existing(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                requests.append(self.path)
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b"another host")
+
+            def log_message(self, *_):
+                pass
+
+        server = http.server.HTTPServer(("127.0.0.1", self.port), Existing)
+        worker = threading.Thread(target=server.serve_forever, daemon=True)
+        worker.start()
+        try:
+            r = self.run_sh(output=complete_output(), status=0)
+        finally:
+            server.shutdown()
+            server.server_close()
+            worker.join(timeout=5)
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("the host port is already occupied", r.stdout)
+        self.assertEqual(requests, [])
+        self.assertNotIn(" run ", self.calls_text())
+        self.assertFalse(self.host_pid.exists())
 
     def test_a_complete_official_output_makes_the_recipe_succeed(self):
         r = self.run_sh(output=complete_output(), status=0)
