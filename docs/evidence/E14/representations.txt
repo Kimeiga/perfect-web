@@ -1,28 +1,235 @@
 ADR-0232 - an opaque value's representation is read in a template
 
 produced by: just e14-representations
-commit: 320c52a44840a80423609ab476eb847c04de34a6
-ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39442025240 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: c714d1c35cee98ec923946aac6c873624c971b7f
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39542637844 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the build (compiler/pw-core/tests/template_representations.rs)
 
 test a_records_field_named_value_is_a_field ... ok
+test a_generic_match_binding_reads_its_opaque_representation ... ok
 test a_speculated_value_read_through_a_view_reads_its_representation ... ok
 test a_representation_is_read_by_the_opaque_values_path ... ok
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.59s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.80s
 
 == the server (spikes/own-renderer/server/src/main.rs)
 
 test tests::an_opaque_values_representation_is_rendered ... ok
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 670 filtered out; finished in 2.46s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 711 filtered out; finished in 2.38s
+
+== producer controls (scripts/representations_producer_mutations.py)
+
+invalid Cargo evidence is accepted: KILLED by test_representations_producers.Producers.test_bad_native_status_build_or_panic_is_invalid (3 of 11 tests fail)
+the Cargo inventory is not required: KILLED by test_representations_producers.Producers.test_exact_inventory_is_required (1 of 11 tests fail)
+an invalid command is omitted from the campaign: KILLED by test_representations_producers.Producers.test_partial_command_set_is_invalid (1 of 11 tests fail)
+a timeout supplies a failure status: KILLED by test_representations_producers.Producers.test_timeout_keeps_invalid_native_status (1 of 11 tests fail)
+a restoration command may fail: KILLED by test_representations_producers.Producers.test_restoration_build_errors_are_refused (1 of 11 tests fail)
+an invalid producer earns a kill: KILLED by test_representations_producers.Producers.test_invalid_or_stopped_results_earn_no_kill (1 of 11 tests fail)
+a stopped producer earns a kill: KILLED by test_representations_producers.Producers.test_invalid_or_stopped_results_earn_no_kill (1 of 11 tests fail)
+an invalid baseline runs controls: KILLED by test_representations_producers.Producers.test_baseline_must_be_complete_and_green (1 of 11 tests fail)
+failed restoration is ignored: KILLED by test_representations_producers.Producers.test_failed_restored_build_fails_campaign (1 of 11 tests fail)
+cancelled mutation source is retained: KILLED by test_representations_producers.Producers.test_cancellation_restores_source_and_identity (3 of 11 tests fail)
+10 of 10 mutants killed; 0 refused; 0 survived
+memory bound: no process was stopped
 
 == mutation controls (scripts/template_representations_mutations.py)
 
-baseline (cargo): 4 passed, 0 failed
-a representation is read as a field [cargo]: KILLED (4 of 4 tests fail)
-a record's field named `value` is a representation [cargo]: KILLED (1 of 4 tests fail)
-a base the checker's types leave untyped is typed no further [cargo]: KILLED (3 of 4 tests fail)
-the speculation module reads a representation as a field [cargo]: KILLED (3 of 4 tests fail)
-4 of 4 mutants killed
+
+running 4 tests
+test a_records_field_named_value_is_a_field ... ok
+test a_generic_match_binding_reads_its_opaque_representation ... ok
+test a_speculated_value_read_through_a_view_reads_its_representation ... ok
+test a_representation_is_read_by_the_opaque_values_path ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.78s
+
+
+
+running 1 test
+test tests::an_opaque_values_representation_is_rendered ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 711 filtered out; finished in 2.46s
+
+
+baseline (cargo): 5 passed, 0 failed
+
+running 4 tests
+test a_records_field_named_value_is_a_field ... FAILED
+test a_speculated_value_read_through_a_view_reads_its_representation ... FAILED
+test a_generic_match_binding_reads_its_opaque_representation ... FAILED
+test a_representation_is_read_by_the_opaque_values_path ... FAILED
+
+failures:
+
+---- a_records_field_named_value_is_a_field stdout ----
+
+thread 'a_records_field_named_value_is_a_field' (5821) panicked at compiler/pw-core/tests/template_representations.rs:189:5:
+the representation program builds: Err("`t.P~ui`'s values: `.value` is neither a field nor a member")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- a_speculated_value_read_through_a_view_reads_its_representation stdout ----
+
+thread 'a_speculated_value_read_through_a_view_reads_its_representation' (5823) panicked at compiler/pw-core/tests/template_representations.rs:279:5:
+the representation program builds: Err("`t.P~ui`'s values: `.value` is neither a field nor a member")
+
+---- a_generic_match_binding_reads_its_opaque_representation stdout ----
+
+thread 'a_generic_match_binding_reads_its_opaque_representation' (5820) panicked at compiler/pw-core/tests/template_representations.rs:343:5:
+assertion `left == right` failed
+  left: [Some("item.value")]
+ right: [Some("item")]
+
+---- a_representation_is_read_by_the_opaque_values_path stdout ----
+
+thread 'a_representation_is_read_by_the_opaque_values_path' (5822) panicked at compiler/pw-core/tests/template_representations.rs:123:5:
+the representation program builds: Err("`feed.app.PostPage~ui`'s values: `.value` is neither a field nor a member")
+
+
+failures:
+    a_generic_match_binding_reads_its_opaque_representation
+    a_records_field_named_value_is_a_field
+    a_representation_is_read_by_the_opaque_values_path
+    a_speculated_value_read_through_a_view_reads_its_representation
+
+test result: FAILED. 0 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.82s
+
+error: test failed, to rerun pass `-p pw-core --test template_representations`
+
+
+running 1 test
+test tests::an_opaque_values_representation_is_rendered ... FAILED
+
+failures:
+
+---- tests::an_opaque_values_representation_is_rendered stdout ----
+
+thread 'tests::an_opaque_values_representation_is_rendered' (6368) panicked at spikes/own-renderer/server/src/main.rs:14740:9:
+["`feed.app.PostPage~ui`'s values: `.value` is neither a field nor a member"]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    tests::an_opaque_values_representation_is_rendered
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 711 filtered out; finished in 1.06s
+
+error: test failed, to rerun pass `-p pw-dev-server --bin pw-dev-server`
+
+a representation is read as a field [cargo]: KILLED (5 of 5 tests fail)
+
+running 4 tests
+test a_records_field_named_value_is_a_field ... FAILED
+test a_generic_match_binding_reads_its_opaque_representation ... ok
+test a_speculated_value_read_through_a_view_reads_its_representation ... ok
+test a_representation_is_read_by_the_opaque_values_path ... ok
+
+failures:
+
+---- a_records_field_named_value_is_a_field stdout ----
+
+thread 'a_records_field_named_value_is_a_field' (6772) panicked at compiler/pw-core/tests/template_representations.rs:194:5:
+["</p>\n            <p id=\"nested\">", "</p>\n            <p id=\"whole\">", "</p>\n        </main>", "<main>\n            <p id=\"field\">", "P", "pair", "pair.outer", "t.P~ui"]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    a_records_field_named_value_is_a_field
+
+test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.80s
+
+error: test failed, to rerun pass `-p pw-core --test template_representations`
+
+
+running 1 test
+test tests::an_opaque_values_representation_is_rendered ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 711 filtered out; finished in 2.45s
+
+
+a record's field named `value` is a representation [cargo]: KILLED (1 of 5 tests fail)
+
+running 4 tests
+test a_records_field_named_value_is_a_field ... ok
+test a_generic_match_binding_reads_its_opaque_representation ... FAILED
+test a_speculated_value_read_through_a_view_reads_its_representation ... ok
+test a_representation_is_read_by_the_opaque_values_path ... ok
+
+failures:
+
+---- a_generic_match_binding_reads_its_opaque_representation stdout ----
+
+thread 'a_generic_match_binding_reads_its_opaque_representation' (7727) panicked at compiler/pw-core/tests/template_representations.rs:343:5:
+assertion `left == right` failed
+  left: [Some("item.value")]
+ right: [Some("item")]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    a_generic_match_binding_reads_its_opaque_representation
+
+test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.80s
+
+error: test failed, to rerun pass `-p pw-core --test template_representations`
+
+
+running 1 test
+test tests::an_opaque_values_representation_is_rendered ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 711 filtered out; finished in 2.41s
+
+
+a base the checker's types leave untyped is typed no further [cargo]: KILLED (1 of 5 tests fail)
+
+running 4 tests
+test a_records_field_named_value_is_a_field ... ok
+test a_generic_match_binding_reads_its_opaque_representation ... ok
+test a_speculated_value_read_through_a_view_reads_its_representation ... FAILED
+test a_representation_is_read_by_the_opaque_values_path ... FAILED
+
+failures:
+
+---- a_speculated_value_read_through_a_view_reads_its_representation stdout ----
+
+thread 'a_speculated_value_read_through_a_view_reads_its_representation' (8706) panicked at compiler/pw-core/tests/template_representations.rs:279:5:
+the representation program builds: Err("`t.P~ui`'s speculations: `a speculated value given to a view in part` does not encode: part 0 of `t.P~ui` reads `t.n` through a view given a field of `t`, and a view's part is recomputed from a binding given whole")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- a_representation_is_read_by_the_opaque_values_path stdout ----
+
+thread 'a_representation_is_read_by_the_opaque_values_path' (8705) panicked at compiler/pw-core/tests/template_representations.rs:123:5:
+the representation program builds: Err("`feed.app.PostPage~ui`'s speculations: `a speculated value given to a view in part` does not encode: part 2 of `feed.app.PostPage~ui` reads `thread.id` through a view given a field of `thread`, and a view's part is recomputed from a binding given whole")
+
+
+failures:
+    a_representation_is_read_by_the_opaque_values_path
+    a_speculated_value_read_through_a_view_reads_its_representation
+
+test result: FAILED. 2 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.78s
+
+error: test failed, to rerun pass `-p pw-core --test template_representations`
+
+
+running 1 test
+test tests::an_opaque_values_representation_is_rendered ... FAILED
+
+failures:
+
+---- tests::an_opaque_values_representation_is_rendered stdout ----
+
+thread 'tests::an_opaque_values_representation_is_rendered' (9251) panicked at spikes/own-renderer/server/src/main.rs:14740:9:
+["`feed.app.PostPage~ui`'s speculations: `a speculated value given to a view in part` does not encode: part 2 of `feed.app.PostPage~ui` reads `thread.id` through a view given a field of `thread`, and a view's part is recomputed from a binding given whole"]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    tests::an_opaque_values_representation_is_rendered
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 711 filtered out; finished in 1.11s
+
+error: test failed, to rerun pass `-p pw-dev-server --bin pw-dev-server`
+
+the speculation module reads a representation as a field [cargo]: KILLED (3 of 5 tests fail)
+4 of 4 mutants killed; 0 refused; 0 survived
 memory bound: no process was stopped

@@ -1,7 +1,7 @@
 ADR-0376 - producer process ownership
 produced by: just e14-producer-ownership
-commit: f15117dede242fac2bc2d54aa973180e47cad1c6
-ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39526960864 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: c714d1c35cee98ec923946aac6c873624c971b7f
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39542637844 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 test_child_default_and_ignored_signals_keep_native_semantics (test_producer_ownership.ProducerOwnership.test_child_default_and_ignored_signals_keep_native_semantics) ... ok
 test_child_does_not_inherit_a_blocked_cancellation_signal (test_producer_ownership.ProducerOwnership.test_child_does_not_inherit_a_blocked_cancellation_signal) ... ok
 test_default_cancellation_raises_through_source_restoration (test_producer_ownership.ProducerOwnership.test_default_cancellation_raises_through_source_restoration) ... ok
@@ -14,7 +14,7 @@ test_running_cancellation_reaps_before_all_four_restore (test_producer_ownership
 test_timeout_reaps_and_preserves_native_partial_output (test_producer_ownership.ProducerOwnership.test_timeout_reaps_and_preserves_native_partial_output) ... ok
 
 ----------------------------------------------------------------------
-Ran 10 tests in 1.371s
+Ran 10 tests in 1.314s
 
 OK
 test_child_default_and_ignored_signals_keep_native_semantics (test_producer_ownership.ProducerOwnership.test_child_default_and_ignored_signals_keep_native_semantics) ... ok
@@ -29,11 +29,11 @@ test_running_cancellation_reaps_before_all_four_restore (test_producer_ownership
 test_timeout_reaps_and_preserves_native_partial_output (test_producer_ownership.ProducerOwnership.test_timeout_reaps_and_preserves_native_partial_output) ... ok
 
 ----------------------------------------------------------------------
-Ran 10 tests in 3.689s
+Ran 10 tests in 3.619s
 
 OK
 
-Python structured receipt: /tmp/pw-producer-ownership-m4w1bf_9/pw-guide-result-47s2aywm
+Python structured receipt: /tmp/pw-producer-ownership-7becuh69/pw-guide-result-nl2vu99h
 {"valid": true, "reason": "complete", "passed": ["test_producer_ownership.ProducerOwnership.test_child_default_and_ignored_signals_keep_native_semantics", "test_producer_ownership.ProducerOwnership.test_child_does_not_inherit_a_blocked_cancellation_signal", "test_producer_ownership.ProducerOwnership.test_default_cancellation_raises_through_source_restoration", "test_producer_ownership.ProducerOwnership.test_ignored_parent_cancellation_stays_ignored", "test_producer_ownership.ProducerOwnership.test_launch_cancellation_reaps_before_all_four_restore", "test_producer_ownership.ProducerOwnership.test_launch_error_restores_original_handlers", "test_producer_ownership.ProducerOwnership.test_native_output_and_nonzero_status_are_unchanged", "test_producer_ownership.ProducerOwnership.test_repeated_cancellation_during_cleanup_cannot_skip_restoration", "test_producer_ownership.ProducerOwnership.test_running_cancellation_reaps_before_all_four_restore", "test_producer_ownership.ProducerOwnership.test_timeout_reaps_and_preserves_native_partial_output"], "assertion_failed": [], "body_errors": [], "executed": 10, "report_sha256": "82f7f88c959e0c2a5af6909e50acc725e3266f219ae3a556fac60b9ebc162aef"}
 
 baseline: 10 passed, 0 failed
@@ -116,11 +116,11 @@ AssertionError: {'alive_at_restore': True, 'source': 'original', 'reaped': False
  : 
 
 ----------------------------------------------------------------------
-Ran 1 test in 0.691s
+Ran 1 test in 0.682s
 
 FAILED (failures=4)
 
-Python structured receipt: /tmp/pw-producer-ownership-m4w1bf_9/pw-guide-result-llpra4nz
+Python structured receipt: /tmp/pw-producer-ownership-7becuh69/pw-guide-result-x3lb7yyr
 {"valid": true, "reason": "complete", "passed": [], "assertion_failed": ["test_producer_ownership.ProducerOwnership.test_launch_cancellation_reaps_before_all_four_restore"], "body_errors": [], "executed": 1, "report_sha256": "9da11c6d0a485c6a9fa75330a64ac0df84866275a11b0c3b0ecfe49e3fa0585c"}
 
 launch cancellation is delivered before ownership: KILLED by test_producer_ownership.ProducerOwnership.test_launch_cancellation_reaps_before_all_four_restore (1 assertion methods fail)
@@ -203,11 +203,11 @@ AssertionError: {'alive_at_restore': True, 'source': 'original', 'reaped': False
  : 
 
 ----------------------------------------------------------------------
-Ran 1 test in 1.092s
+Ran 1 test in 1.076s
 
 FAILED (failures=4)
 
-Python structured receipt: /tmp/pw-producer-ownership-m4w1bf_9/pw-guide-result-jbdpgqeg
+Python structured receipt: /tmp/pw-producer-ownership-7becuh69/pw-guide-result-ggqk0au8
 {"valid": true, "reason": "complete", "passed": [], "assertion_failed": ["test_producer_ownership.ProducerOwnership.test_running_cancellation_reaps_before_all_four_restore"], "body_errors": [], "executed": 1, "report_sha256": "5d0c77c6fdd6b2e81e0c4de008492eba34d3778a70f4fd31c73cefbc4f3902b9"}
 
 cancellation omits owned cleanup: KILLED by test_producer_ownership.ProducerOwnership.test_running_cancellation_reaps_before_all_four_restore (1 assertion methods fail)
@@ -290,11 +290,11 @@ AssertionError: {'alive_at_restore': True, 'source': 'original', 'reaped': False
  : 
 
 ----------------------------------------------------------------------
-Ran 1 test in 0.686s
+Ran 1 test in 0.677s
 
 FAILED (failures=4)
 
-Python structured receipt: /tmp/pw-producer-ownership-m4w1bf_9/pw-guide-result-2du0aips
+Python structured receipt: /tmp/pw-producer-ownership-7becuh69/pw-guide-result-kkaay7ro
 {"valid": true, "reason": "complete", "passed": [], "assertion_failed": ["test_producer_ownership.ProducerOwnership.test_launch_cancellation_reaps_before_all_four_restore"], "body_errors": [], "executed": 1, "report_sha256": "9da11c6d0a485c6a9fa75330a64ac0df84866275a11b0c3b0ecfe49e3fa0585c"}
 
 cleanup does not finish native reaping: KILLED by test_producer_ownership.ProducerOwnership.test_launch_cancellation_reaps_before_all_four_restore (1 assertion methods fail)
@@ -377,11 +377,11 @@ AssertionError: {'alive_at_restore': True, 'source': 'original', 'reaped': False
  : 
 
 ----------------------------------------------------------------------
-Ran 1 test in 0.691s
+Ran 1 test in 0.672s
 
 FAILED (failures=4)
 
-Python structured receipt: /tmp/pw-producer-ownership-m4w1bf_9/pw-guide-result-nt8ht0l0
+Python structured receipt: /tmp/pw-producer-ownership-7becuh69/pw-guide-result-zyhukx5o
 {"valid": true, "reason": "complete", "passed": [], "assertion_failed": ["test_producer_ownership.ProducerOwnership.test_repeated_cancellation_during_cleanup_cannot_skip_restoration"], "body_errors": [], "executed": 1, "report_sha256": "adad3e1265eab0e5af00ac0989bca1ea7c1757c0f662e8146b87d6faa5ca9e9f"}
 
 cleanup cancellation escapes before reaping: KILLED by test_producer_ownership.ProducerOwnership.test_repeated_cancellation_during_cleanup_cannot_skip_restoration (1 assertion methods fail)
@@ -440,11 +440,11 @@ Traceback (most recent call last):
 AssertionError: -15 != 143 : 
 
 ----------------------------------------------------------------------
-Ran 1 test in 0.685s
+Ran 1 test in 0.692s
 
 FAILED (failures=4)
 
-Python structured receipt: /tmp/pw-producer-ownership-m4w1bf_9/pw-guide-result-a01gc4be
+Python structured receipt: /tmp/pw-producer-ownership-7becuh69/pw-guide-result-sldc4xa3
 {"valid": true, "reason": "complete", "passed": [], "assertion_failed": ["test_producer_ownership.ProducerOwnership.test_default_cancellation_raises_through_source_restoration"], "body_errors": [], "executed": 1, "report_sha256": "d4cc6d7dbd6b7ec2be5c4926f61d6b0c2904aaee31df654da0757ede941136c7"}
 
 default cancellation kills the parent without restoring source: KILLED by test_producer_ownership.ProducerOwnership.test_default_cancellation_raises_through_source_restoration (1 assertion methods fail)
@@ -472,11 +472,11 @@ Traceback (most recent call last):
 AssertionError: an ignored signal cancelled the parent: 143
 
 ----------------------------------------------------------------------
-Ran 1 test in 0.069s
+Ran 1 test in 0.066s
 
 FAILED (failures=1)
 
-Python structured receipt: /tmp/pw-producer-ownership-m4w1bf_9/pw-guide-result-_msceq9n
+Python structured receipt: /tmp/pw-producer-ownership-7becuh69/pw-guide-result-gia97l60
 {"valid": true, "reason": "complete", "passed": [], "assertion_failed": ["test_producer_ownership.ProducerOwnership.test_ignored_parent_cancellation_stays_ignored"], "body_errors": [], "executed": 1, "report_sha256": "1cfa651b6414df34e76d2293dbfe4343e01852ba99921dc28a4bae2cd32d53ab"}
 
 ignored cancellation is captured: KILLED by test_producer_ownership.ProducerOwnership.test_ignored_parent_cancellation_stays_ignored (1 assertion methods fail)
@@ -494,11 +494,11 @@ Traceback (most recent call last):
 AssertionError: 0 != 17
 
 ----------------------------------------------------------------------
-Ran 1 test in 0.054s
+Ran 1 test in 0.053s
 
 FAILED (failures=1)
 
-Python structured receipt: /tmp/pw-producer-ownership-m4w1bf_9/pw-guide-result-gbl8yonu
+Python structured receipt: /tmp/pw-producer-ownership-7becuh69/pw-guide-result-c5zlds8w
 {"valid": true, "reason": "complete", "passed": [], "assertion_failed": ["test_producer_ownership.ProducerOwnership.test_native_output_and_nonzero_status_are_unchanged"], "body_errors": [], "executed": 1, "report_sha256": "88735b0ce39c8eb23619d8ec61ccadcc7c20a67163848e6ab9fc342a3030a6aa"}
 
 native failed status is changed to success: KILLED by test_producer_ownership.ProducerOwnership.test_native_output_and_nonzero_status_are_unchanged (1 assertion methods fail)
@@ -520,7 +520,7 @@ Ran 1 test in 0.204s
 
 FAILED (failures=1)
 
-Python structured receipt: /tmp/pw-producer-ownership-m4w1bf_9/pw-guide-result-c4x2ij7m
+Python structured receipt: /tmp/pw-producer-ownership-7becuh69/pw-guide-result-4iftqa3q
 {"valid": true, "reason": "complete", "passed": [], "assertion_failed": ["test_producer_ownership.ProducerOwnership.test_timeout_reaps_and_preserves_native_partial_output"], "body_errors": [], "executed": 1, "report_sha256": "56ef14d1c4f7c0d108d9f15ae13361f3b4ed8c9f47f9701f0350dd164e554d9a"}
 
 timeout is reported as native completion: KILLED by test_producer_ownership.ProducerOwnership.test_timeout_reaps_and_preserves_native_partial_output (1 assertion methods fail)
@@ -535,9 +535,9 @@ Traceback (most recent call last):
                         ^^^^^^^^^^^^^^^^^^^^^^^^^
   File "/home/runner/work/perfect-web/perfect-web/scripts/tests/test_producer_ownership.py", line 188, in test_launch_error_restores_original_handlers
     self.assertEqual({number: signal.getsignal(number) for number in before}, before)
-AssertionError: {<Sig[13 chars]2>: <function run.<locals>.defer at 0x7fcf0cbe[73 chars]740>} != {<Sig[13 chars]2>: <built-in function default_int_handler>, <[39 chars]: 0>}
-- {<Signals.SIGINT: 2>: <function run.<locals>.defer at 0x7fcf0cbeb740>,
--  <Signals.SIGTERM: 15>: <function run.<locals>.defer at 0x7fcf0cbeb740>}
+AssertionError: {<Sig[13 chars]2>: <function run.<locals>.defer at 0x7f38e2de[73 chars]740>} != {<Sig[13 chars]2>: <built-in function default_int_handler>, <[39 chars]: 0>}
+- {<Signals.SIGINT: 2>: <function run.<locals>.defer at 0x7f38e2de7740>,
+-  <Signals.SIGTERM: 15>: <function run.<locals>.defer at 0x7f38e2de7740>}
 + {<Signals.SIGINT: 2>: <built-in function default_int_handler>,
 +  <Signals.SIGTERM: 15>: <Handlers.SIG_DFL: 0>}
 
@@ -546,7 +546,7 @@ Ran 1 test in 0.001s
 
 FAILED (failures=1)
 
-Python structured receipt: /tmp/pw-producer-ownership-m4w1bf_9/pw-guide-result-9pz8zxrx
+Python structured receipt: /tmp/pw-producer-ownership-7becuh69/pw-guide-result-5y2pki7l
 {"valid": true, "reason": "complete", "passed": [], "assertion_failed": ["test_producer_ownership.ProducerOwnership.test_launch_error_restores_original_handlers"], "body_errors": [], "executed": 1, "report_sha256": "f4ce66fe9d2feb8fa3f81cbc95a855367c04d2ab4b6d94fd895e869bf163cda9"}
 
 original handlers are not restored: KILLED by test_producer_ownership.ProducerOwnership.test_launch_error_restores_original_handlers (1 assertion methods fail)
