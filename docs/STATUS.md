@@ -115,7 +115,7 @@ evidence. No failed result is promoted by this summary.
   still requires combined hosted verification.
 - The isolated effect queue at `fb0bea66` passed
   [CI39532444813](https://github.com/studiokimeiga/perfect-web/actions/runs/39532444813)
-  on x64/ARM and both eight-campaign verification batches. Its bounded deep
+  on x64/ARM and both verification batches, covering eight campaigns. Its bounded deep
   helper-chain checker improvement is recorded in
   [ADR-0380](DECISIONS/ADR-0380-effect-inference-queue.md); this is not a
   framework-wide performance result.
