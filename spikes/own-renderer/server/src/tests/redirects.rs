@@ -134,7 +134,7 @@ fn word_plan(s: &Server) -> &serde_json::Value {
     let mut pages = s
         .plans
         .iter()
-        .filter(|(page, _)| page.ends_with(".WordPage"));
+        .filter(|(page, _)| page.ends_with(".WordPage~ui"));
     let (_, plan) = pages.next().expect("the word page's plan");
     assert!(pages.next().is_none(), "one word page");
     plan

@@ -16179,7 +16179,7 @@ public query Store(",
         assert_eq!(text_in(&page, "<p id=\"twice\">"), "6");
         assert_eq!(text_in(&page, "<p id=\"opened\">"), "open");
         assert!(
-            page.contains("\"computed\":\"/computed/feed.app.Count.mjs\""),
+            page.contains("\"computed\":\"/computed/feed.app.Count~ui.mjs\""),
             "{page}"
         );
     }
