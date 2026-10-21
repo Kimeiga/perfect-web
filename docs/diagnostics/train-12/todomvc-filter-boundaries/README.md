@@ -2,8 +2,8 @@
 
 These files record two strict native campaigns run from worktree commit
 `aabed65c19599c548a4530a357bd0361e15bc0c2`, with only
-`spikes/own-renderer/e2e/todomvc.spec.mjs` modified. The test source SHA-256
-was `0397aca273bdf2a49e95a90a063428def7af403d08b5ff1e25795ba6b695ea93`.
+`spikes/own-renderer/e2e/todomvc.spec.mjs` modified. The initial test source SHA-256
+was `0397aca273bdf2a49e95a90a063428def7af403d08b5ff1e25795ba6b695ea93`; it applies to the 12–20 sweep and the initial 10–11 run only.
 The mutation operator definitions and receipt validators were unchanged.
 
 `focused-operators-10-11.txt` records baseline, operators 10 and 11, and
@@ -39,3 +39,8 @@ They are kept separate from the successful strict campaign summaries.
 This is a bounded witness for operators 10–20, not a run of the complete 43
 operator set or the full verification recipe. No time-budget stop was counted
 as a kill.
+
+The initial 10–11 run was superseded after restoring the empty Completed-filter
+transition. The final-source 10–11 proof is in
+`final-source-operators-10-11/`; its source hash and receipts are recorded
+there. The 12–20 sweep was not repeated and remains scoped to the initial hash.

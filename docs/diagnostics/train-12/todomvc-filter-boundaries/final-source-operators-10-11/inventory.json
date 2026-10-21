@@ -1,0 +1,21 @@
+{
+  "repo": "/home/haki/code/pw-wt/todomvc-toggle-all-visible-precondition",
+  "commit": "43d769833e400b3bd8bbf58166c448f3b2c0a3b3",
+  "full_original_mutant_count": 43,
+  "selected_original_zero_based_indexes": [
+    10,
+    11
+  ],
+  "selected_original_names": [
+    "the active filter shows the completed",
+    "the completed filter shows the active"
+  ],
+  "browser_expected_count": 50,
+  "server_expected_names": [
+    "tests::todomvc::no_host_holds_a_todo",
+    "tests::todomvc::the_document_says_what_the_device_keeps",
+    "tests::todomvc::the_host_renders_the_default_and_hides_what_the_device_decides",
+    "tests::todomvc::the_page_has_the_templates_markup"
+  ],
+  "test_id": "e2e/todomvc.spec.mjs::an item updated while filtered is updated accordingly"
+}

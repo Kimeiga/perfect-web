@@ -823,22 +823,28 @@ Then what the build and the suite found:
 
 The unchanged original mutation operators 10 and 11, followed by a bounded
 strict sweep of operators 12–20, were run against the same 50 native browser
-tests. The boundary-dependent edit test now starts with one completed row and
+tests. The filtered-update test now starts with one completed row and
 checks exact visible row titles after each filter transition before taking an
 action through a row locator. This makes the Active and Completed boundaries
 observable before an action can target a stale list.
 
-The focused run had 50/50 browser tests pass on baseline and restoration, and
-4/4 host tests pass on both. Operator 10 (`the active filter shows the
-completed`) and operator 11 (`the completed filter shows the active`) were
-each killed by native assertion failures; neither was refused. The diagnostic
+The initial focused run had 50/50 browser tests pass on baseline and
+restoration, and 4/4 host tests pass on both. Operators 10 (`the active
+filter shows the completed`) and 11 (`the completed filter shows the active`)
+were each killed by native assertion failures; neither was refused. After the
+empty Completed-filter transition was restored, the final-source 10–11 rerun
+again passed baseline/restoration 50/50 browser and 4/4 host tests and killed
+both operators by native assertions, with no refusals. The diagnostic
 sweep's baseline and restoration also passed 50/50 browser and 4/4 host tests;
 all nine unchanged original operators 12–20 were killed by native assertions,
 with none refused or surviving. Both bounded campaigns used the existing
 strict receipt validators and retained their native JSON receipts. This is a
 focused witness, not a rerun of all 43 operators or the broader recipe.
 
-Raw summaries, harnesses, selection inventory, and native receipts are in
-`docs/diagnostics/train-12/todomvc-filter-boundaries/`. The source test's SHA-256
-for these runs was `0397aca273bdf2a49e95a90a063428def7af403d08b5ff1e25795ba6b695ea93`;
-the operator inventory and strict receipt producers were unchanged.
+The original 12–20 sweep used source SHA-256
+`0397aca273bdf2a49e95a90a063428def7af403d08b5ff1e25795ba6b695ea93`. The
+final 10–11 source SHA-256 is
+`260d8f30037942c17d8d936087ced87603044a11da38e18eac7291f1b83b95c2`. Its
+raw summary, harness, and receipts are recorded separately under
+`docs/diagnostics/train-12/todomvc-filter-boundaries/final-source-operators-10-11/`.
+The selection and strict receipt producers were unchanged.

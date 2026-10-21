@@ -681,6 +681,9 @@ test("an item updated while filtered is updated accordingly", async ({ page }) =
   await expect(items(page)).toHaveText([ONE, TWO]);
   await items(page).nth(0).locator(".toggle").click();
   await expect(items(page)).toHaveText([TWO]);
+  // Removing the last completed row still exercises the empty-filter boundary.
+  await items(page).nth(0).locator(".toggle").click();
+  await expect(items(page)).toHaveCount(0);
   await link(page, "All").click();
   await expect(items(page)).toHaveText([ONE, TWO, THREE]);
 });
