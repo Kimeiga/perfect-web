@@ -462,3 +462,144 @@ FAILED (failures=1)
 an unfinished callback becomes an observed mismatch: KILLED by scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_pending_poll_callback_is_not_a_mismatch (1 assertion methods fail)
 9 of 9 mutants killed
 memory bound: no process was stopped
+
+=== Full native protocol after repair: python3 scripts/device_browser_protocol.py --browser ===
+green: native exit 0, valid=True, expected=True
+assertion: native exit 1, valid=True, expected=True
+
+Running 1 test using 1 worker
+
+[1A[2K[1/1] ../../../../../../../tmp/pw-browser-protocol-mq85mobu/fixture.spec.mjs:61:8 › witness
+[1A[2K  1) ../../../../../../../tmp/pw-browser-protocol-mq85mobu/fixture.spec.mjs:61:8 › witness ─────────
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBe[2m([22m[32mexpected[39m[2m) // Object.is equality[22m
+
+    Expected: [32m2[39m
+    Received: [31m1[39m
+
+       at ../../home/haki/code/pw-wt/train-12/spikes/own-renderer/assertion-expect.mjs:31
+
+      29 |       return (...args) => {
+      30 |         try {
+    > 31 |           const result = Reflect.apply(matcher, object, args);
+         |                                  ^
+      32 |           return result && typeof result.then === "function"
+      33 |             ? result.catch(error => proven(error, name, isNot)) : result;
+      34 |         } catch (error) { return proven(error, name, isNot); }
+        at Proxy.toBe (/home/haki/code/pw-wt/train-12/spikes/own-renderer/assertion-expect.mjs:31:34)
+        at witness (/tmp/pw-browser-protocol-mq85mobu/fixture.spec.mjs:10:39)
+    [cause]: Error: PW_ASSERTION:066270ebd3d2a17c4d36ac8a0e9a8e3262ea925200ef92597798384e3afdeac7
+        at proven (/home/haki/code/pw-wt/train-12/spikes/own-renderer/assertion-expect.mjs:13:19)
+        at Proxy.toBe (/home/haki/code/pw-wt/train-12/spikes/own-renderer/assertion-expect.mjs:34:34)
+        at witness (/tmp/pw-browser-protocol-mq85mobu/fixture.spec.mjs:10:39)
+
+
+[1A[2K  1 failed
+    ../../../../../../../tmp/pw-browser-protocol-mq85mobu/fixture.spec.mjs:61:8 › witness ──────────
+
+customMessage: native exit 1, valid=True, expected=True
+not: native exit 1, valid=True, expected=True
+locator: native exit 1, valid=True, expected=True
+pollGreen: native exit 0, valid=True, expected=True
+poll: native exit 1, valid=True, expected=True
+
+Running 1 test using 1 worker
+
+[1A[2K[1/1] ../../../../../../../tmp/pw-browser-protocol-h5n5t9ft/fixture.spec.mjs:61:8 › witness
+[1A[2K  1) ../../../../../../../tmp/pw-browser-protocol-h5n5t9ft/fixture.spec.mjs:61:8 › witness ─────────
+
+    Error: Expected: [32m"stale"[39m
+    Received: [31m"fresh"[39m
+
+       at ../../home/haki/code/pw-wt/train-12/spikes/own-renderer/assertion-expect.mjs:31
+
+      29 |       return (...args) => {
+      30 |         try {
+    > 31 |           const result = Reflect.apply(matcher, object, args);
+         |                                  ^
+      32 |           return result && typeof result.then === "function"
+      33 |             ? result.catch(error => proven(error, name, isNot)) : result;
+      34 |         } catch (error) { return proven(error, name, isNot); }
+        at Proxy.toBePolled (/home/haki/code/pw-wt/train-12/spikes/own-renderer/assertion-expect.mjs:31:34)
+        at Object.toBe (/home/haki/code/pw-wt/train-12/spikes/own-renderer/assertion-expect.mjs:96:81)
+        at witness (/tmp/pw-browser-protocol-h5n5t9ft/fixture.spec.mjs:14:66)
+    [cause]: Error: PW_ASSERTION:b1fef573b9cccd0cda6769660998793bd6de6f2a80c3aaaece5c1d437b994b25
+        at proven (/home/haki/code/pw-wt/train-12/spikes/own-renderer/assertion-expect.mjs:13:19)
+        at /home/haki/code/pw-wt/train-12/spikes/own-renderer/assertion-expect.mjs:33:37
+        at witness (/tmp/pw-browser-protocol-h5n5t9ft/fixture.spec.mjs:14:24)
+
+
+[1A[2K  1 failed
+    ../../../../../../../tmp/pw-browser-protocol-h5n5t9ft/fixture.spec.mjs:61:8 › witness ──────────
+
+pollNaN: native exit 0, valid=True, expected=True
+pollSignedZero: native exit 1, valid=True, expected=True
+pollEarlyTimer: native exit 1, valid=True, expected=True
+cause: native exit 1, valid=True, expected=True
+closed: native exit 1, valid=False, expected=False
+
+Running 1 test using 1 worker
+
+[1A[2K[1/1] ../../../../../../../tmp/pw-browser-protocol-5s_t1n6u/fixture.spec.mjs:56:3 › witness
+[1A[2K  1) ../../../../../../../tmp/pw-browser-protocol-5s_t1n6u/fixture.spec.mjs:56:3 › witness ─────────
+
+    Error: expect.toHaveText: Target page, context or browser has been closed
+
+       at ../../home/haki/code/pw-wt/train-12/spikes/own-renderer/assertion-expect.mjs:31
+
+      29 |       return (...args) => {
+      30 |         try {
+    > 31 |           const result = Reflect.apply(matcher, object, args);
+         |                                  ^
+      32 |           return result && typeof result.then === "function"
+      33 |             ? result.catch(error => proven(error, name, isNot)) : result;
+      34 |         } catch (error) { return proven(error, name, isNot); }
+        at Proxy.toHaveText (/home/haki/code/pw-wt/train-12/spikes/own-renderer/assertion-expect.mjs:31:34)
+        at /tmp/pw-browser-protocol-5s_t1n6u/fixture.spec.mjs:59:70
+
+
+[1A[2K  1 failed
+    ../../../../../../../tmp/pw-browser-protocol-5s_t1n6u/fixture.spec.mjs:56:3 › witness ──────────
+
+invalidMatcher: native exit 1, valid=False, expected=False
+
+Running 1 test using 1 worker
+
+[1A[2K[1/1] ../../../../../../../tmp/pw-browser-protocol-5hatlue0/fixture.spec.mjs:56:3 › witness
+[1A[2K  1) ../../../../../../../tmp/pw-browser-protocol-5hatlue0/fixture.spec.mjs:56:3 › witness ─────────
+
+    Error: toHaveText can be only used with Locator object
+
+       at ../../home/haki/code/pw-wt/train-12/spikes/own-renderer/assertion-expect.mjs:31
+
+      29 |       return (...args) => {
+      30 |         try {
+    > 31 |           const result = Reflect.apply(matcher, object, args);
+         |                                  ^
+      32 |           return result && typeof result.then === "function"
+      33 |             ? result.catch(error => proven(error, name, isNot)) : result;
+      34 |         } catch (error) { return proven(error, name, isNot); }
+        at Proxy.toHaveText (/home/haki/code/pw-wt/train-12/spikes/own-renderer/assertion-expect.mjs:31:34)
+        at /tmp/pw-browser-protocol-5hatlue0/fixture.spec.mjs:59:70
+
+    Error Context: test-results/fixture-witness/error-context.md
+
+
+[1A[2K  1 failed
+    ../../../../../../../tmp/pw-browser-protocol-5hatlue0/fixture.spec.mjs:56:3 › witness ──────────
+
+pollCallback: native exit 1, valid=False, expected=False
+pollAssertCallback: native exit 1, valid=False, expected=False
+pollPending: native exit 1, valid=False, expected=False
+pollOptions: native exit 1, valid=False, expected=False
+pollUnsupported: native exit 1, valid=False, expected=False
+before: native exit 1, valid=False, expected=False
+after: native exit 1, valid=False, expected=False
+runtime: native exit 1, valid=False, expected=False
+timeout: native exit 1, valid=False, expected=False
+setupTimeout: native exit 1, valid=False, expected=False
+skipped: native exit 0, valid=False, expected=False
+retry: native exit 0, valid=False, expected=False
+soft: native exit 1, valid=False, expected=False
+unwrapped: native exit 1, valid=False, expected=False
+27 of 27 native Playwright producer cases agree

@@ -956,3 +956,18 @@ tests completed in every run. The two polling cases use the separately
 reviewed final-interval fix. The 17 strict device-producer regressions remain
 green. Mutated sources and generated demo assets were restored; these targeted
 runs do not replace the full hosted 62-operator campaign.
+### Train-12: a final polling interval cannot start a new callback
+
+A sleep clamped to the overall polling deadline can wake slightly early.
+The previous loop then started another callback with less than a millisecond
+left, making ordinary completed mismatches end in an invalid callback timeout.
+The loop now marks its final interval before sleeping and ends afterward.
+An actually started callback that throws, remains pending or finishes late is
+still refused; no timeout becomes assertion evidence.
+
+A deterministic native timer witness fails on the former loop and passes on
+the repaired one. The complete current protocol passes 27 cases, and the
+11-method native regression inventory kills all nine instrument controls.
+The [raw before/after proof](../evidence/tooling/browser-poll-final-interval.txt)
+retains commands, source hashes and native output. These local checks do not
+replace the complete hosted browser assertion and device campaigns.
