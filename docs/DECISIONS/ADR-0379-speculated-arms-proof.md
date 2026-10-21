@@ -1,4 +1,4 @@
-# ADR-XXXX: speculation absence names an existing page and controls require native assertions
+# ADR-0379: speculation absence names an existing page and controls require native assertions
 
 Status: integrator-approved repair, 2026-10-21. Milestone: E14.
 

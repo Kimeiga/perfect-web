@@ -3231,3 +3231,7 @@ Execute an identified TodoMVC Cypress compatibility copy (train-12 integration; 
 [ADR-0378](DECISIONS/ADR-0378-bind-capture-control.md):
 Binding capture controls exercise diagnostic ownership (train-12 integration; final combined gates pending).
 - A nonserializable invalid target distinguishes the binding exemption from canonical signal filtering, while ordinary handlers retain capture checks. All 14 fault models remain; native builds and timeouts no longer count as mutation kills.
+
+[ADR-0379](DECISIONS/ADR-0379-speculated-arms-proof.md):
+Speculation absence names an existing page, and controls require native assertions (train-12 integration; final combined gates pending).
+- Derive the canonical page identity before asserting absence; keep all eight fault models and require complete Cargo/browser receipts. Feed cases remain sequential and continue after failures.
