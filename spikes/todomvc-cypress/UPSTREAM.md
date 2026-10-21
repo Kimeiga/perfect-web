@@ -1,7 +1,9 @@
 # What is vendored here, and from where
 
-TodoMVC's official behavioural tests, **unchanged**, so that TodoMVC in Pleris
-(`examples/todomvc`) is held to the tests every TodoMVC is held to.
+TodoMVC's official behavioural test sources are **vendored unchanged**.
+Execution uses the explicitly identified **todomvc-cypress-compat-v1** copy
+described below, holding TodoMVC in Pleris (`examples/todomvc`) to all 29
+test bodies and their original storage assertions.
 
 - **Source**: <https://github.com/tastejs/todomvc>, `master` at
   `ff43b02e59dfa604386bb382034b2cd07c2bcd8a` ("Revise README for 2.0.0",
@@ -35,10 +37,10 @@ the repository's `examples/`), its other frameworks' folders, and
 # How it is run
 
 `run.sh` serves TodoMVC in Pleris (`spikes/own-renderer/dist-todomvc`) on a
-host of its own and runs the suite against it:
+host of its own and runs the compatibility copy against it:
 
 ```
-cypress run --env framework=page/todomvc.app.Todos~ui --config baseUrl=http://127.0.0.1:<port>
+cypress run --env framework=page/todomvc.app.Todos~ui --config baseUrl=http://127.0.0.1:<port> --project <verified-v1-copy>
 ```
 
 The suite visits `baseUrl + '/' + framework`; the name is the page's own path
@@ -47,14 +49,51 @@ address. (The root, `.`, was tried first: Cypress asks for `/.`, which no host
 here serves as `/`.) The name is in none of the suite's tables
 (`noLocalStorageCheck` and the rest), so every check the suite makes of an app
 it knows nothing about is made of this one: including `localStorage`. TodoMVC now declares device storage under
-`todos-pleris`; the combined train-12 verification must demonstrate that the
-unchanged suite passes. That is **the acceptance**.
+`todos-pleris`; the combined train-12 verification must demonstrate that all
+29 tests in the identified compatibility copy pass. That is **the acceptance**.
 
 `DIAGNOSTIC=1 run.sh` runs the same files a second time, **not as the
 acceptance**, under a name the suite's own tables take as keeping nothing in
 `localStorage` (`--env framework=puremvc`, reaching the page through an address
 fragment the page ignores). It shows what the rest of each test says of this
 app.
+
+## Compatibility execution copy v1
+
+The original seven files above are never patched. Before launch,
+`scripts/todomvc_cypress_compat.py` checks their upstream Git blob hashes,
+the source package pin, and the installed Cypress package **and binary**
+versions, both exactly 15.21.1. It generates a unique disposable project
+with precisely two changes:
+
+1. The spec's one `.invoke('reset')` becomes `.invoke('resetHistory')`.
+   This clears the spy's recorded calls while retaining the real storage
+   operation. The obsolete spy method does not exist in the pinned tool.
+2. `createTodo` keeps its logging `.then(...)` and appends
+   `return cy.get(todoListSelector, { log: false }).contains('li', todo.trim(), { log: false })`.
+   Its alias can re-query the current DOM after reload; no stale DOM element
+   from before reload is treated as the persisted todo.
+
+All test bodies, storage predicates, test titles, skip tables, fixtures and
+configuration otherwise remain byte-identical. There is no application
+detection or private Cypress API. This is an adapted execution, **not an
+unchanged-suite pass**. The previous failed original executions remain failed.
+
+The generator requires unique anchors, a fixed patchset SHA-256 and fixed
+patched-output SHA-256 values. It emits `compatibility-manifest.json` with
+the upstream revision and blobs, package/binary versions, patch identity and
+every staged file's SHA-256. `run.sh` prints that manifest and its hash,
+revalidates source, manifest and complete staged inventory immediately before
+launch, then removes the owned temporary project after the host exits. A
+changed source, version, patch, file or manifest refuses the run. New upstream
+sources or a different adaptation require a new reviewed compatibility identity.
+
+The public [Cypress version CLI](https://docs.cypress.io/app/references/command-line),
+[query alias behavior](https://docs.cypress.io/app/core-concepts/variables-and-aliases)
+and [Sinon spy resetHistory](https://sinonjs.org/concepts/spies/api/reset-history) explain
+the tool contracts; native tests against the pinned Cypress establish the
+specific behavior. `scripts/tests/test_todomvc_cypress_compat.py` and
+`scripts/todomvc_compat_mutations.py` hold the generation/refusal contract.
 
 `run.sh` does not skip. It exits 1 where Cypress cannot run (no Xvfb, no
 binary, no build of the app, no host) and where a run printed no results, and

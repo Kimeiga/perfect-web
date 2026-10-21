@@ -89,15 +89,15 @@ e14-autofocus:
 # spikes/own-renderer/todomvc.sh and served on a host per engine
 # (e2e/todomvc.spec.mjs), and the mutation controls
 # (scripts/todomvc_mutations.py), each program mutant checked to be a
-# well-typed program. And TodoMVC's own Cypress suite, vendored unchanged
-# (spikes/todomvc-cypress), run against the app twice: as the suite ships (the
-# acceptance: all 29 must pass; `just e14-device-store-cypress` shows why five
-# cannot under this Cypress, for any app) and, labelled as not the
+# well-typed program. TodoMVC's seven Cypress originals remain vendored
+# unchanged; an explicit compatibility v1 execution copy adapts two tool
+# mismatches (spikes/todomvc-cypress/UPSTREAM.md). Run it against the app twice:
+# acceptance (all 29 must pass) and, labelled as not the
 # acceptance, under a name its own tables take as keeping nothing in
 # localStorage. Each run is judged by scripts/todomvc_cypress_result.py from
 # what Cypress printed. THIS RECIPE FAILS where Cypress cannot run (no Xvfb, no
-# binary, no results) and where an outcome is not the one the app's design
-# gives: it never records a skip as a pass. It fetches Cypress's binary into
+# binary, no results) or any acceptance test fails or skips. The diagnostic
+# explains observations only. It fetches Cypress's binary into
 # Cypress's own cache (`cypress install` does nothing where it is there). The
 # Cypress suite is not part of `just ci`.
 e14-todomvc:
@@ -118,9 +118,11 @@ e14-todomvc:
        cargo test --locked -p pw-dev-server -- tests::todomvc:: 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the browser in three engines (e2e/todomvc.spec.mjs)"; echo; \
        bash scripts/run_suite.sh -- pnpm exec playwright test e2e/todomvc.spec.mjs --reporter=line; \
-       echo; echo "== TodoMVC's own Cypress suite, unchanged: the acceptance (spikes/todomvc-cypress/run.sh)"; echo; \
+       echo; echo "== compatibility v1 identity and drift controls (original seven upstream blobs remain unchanged)"; echo; \
+       python3 scripts/todomvc_compat_mutations.py; \
+       echo; echo "== TodoMVC Cypress compatibility v1: the 29-test acceptance (spikes/todomvc-cypress/run.sh)"; echo; \
        bash spikes/todomvc-cypress/run.sh; \
-       echo; echo "== TodoMVC's own Cypress suite, unchanged: the diagnostic, not the acceptance (DIAGNOSTIC=1)"; echo; \
+       echo; echo "== TodoMVC Cypress compatibility v1: the diagnostic, not the acceptance (DIAGNOSTIC=1)"; echo; \
        DIAGNOSTIC=1 bash spikes/todomvc-cypress/run.sh; \
        echo; echo "== mutation controls: the Cypress acceptance's checks (scripts/todomvc_cypress_mutations.py)"; echo; \
        python3 scripts/todomvc_cypress_mutations.py; \
