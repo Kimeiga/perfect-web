@@ -1201,3 +1201,36 @@ rendering path. The integrated exact accepted-corpus CLI gate and script pass
 with nine listed refusals; the three exact-list comparison regressions pass.
 These are support-census corrections, not claims that the remaining backend
 features or fixture service implementations have been completed.
+
+## Keep parsed WIT source ownership covered after A-008 builds (2026-10-21)
+
+Verify39538607183 at34f3c2d1 completed the repaired626-file program census and
+99-test baseline, but killed only50 of51 check-is-build controls. The unchanged
+control that removes `PreparationError::declaration`'s world lookup survived.
+Its earlier coverage had depended on A-008's generated duplicate item: the
+historical refusal list asserted both that parser error and its responsible
+`query Recommendations` span. ADR-0373 correctly removed that bug and its
+expected refusal. The focused WIT test covered a generator-detected Foo/foo
+collision, which returns before the upstream parser and cannot hold the
+parsed-error source mapping.
+
+The existing test now also checks a distinct, semantically valid Foo/FooApi
+pair. WIT worlds and export interfaces share an item namespace: FooApi's
+world conflicts with Foo's generated export interface. The existing upstream
+parser refuses the emitted package. Both declaration orders must produce
+exactly one PW6601/backend_wit diagnostic in the responsible file, with the
+exact FooApi declaration span; an independent file stays clean. Renaming only
+FooApi to Bar must make the complete program build in both orders. This is an
+explicit existing ABI-name refusal witness, not a new language restriction or
+a reintroduction of A-008's repaired query/view identity collision.
+
+No production code, producer authority, command inventory or fault operator
+changes. The original twelve focused test names (and aggregate99-test
+inventory) remain. With the unchanged source-identity mutation, the complete
+focused inventory returns native101 with exactly one assertion failure: the
+parser diagnostic wrongly moves to the independent file at span0..1. The
+shared Cargo assertion validator confirms the native status, complete names
+and exact assertion site; restored source returns native0 with all twelve
+passing. The whole51-control campaign must be recorded after integration.
+[Preserved native diagnostics](../diagnostics/train-12/wit-source-proof.txt)
+include the hosted survivor and local baseline/control/restored results.

@@ -91,6 +91,62 @@ fn a_wit_failure_preserves_independent_page_refusals_and_its_own_file() {
         .expect("WIT failure at its responsible file");
     assert!(inputs[1].src[collision.primary_span.clone()].contains("query foo"));
     assert!(report.into_build().is_err());
+
+    // A world and an export interface share WIT's item namespace. This
+    // reaches the upstream parser after the generator's own collision check,
+    // unlike Foo/foo above. A-008 used to exercise this path incidentally.
+    for declarations in [
+        "query Foo() -> Int { 1 }\nquery FooApi() -> Int { 2 }\n",
+        "query FooApi() -> Int { 2 }\nquery Foo() -> Int { 1 }\n",
+    ] {
+        let source = format!("module collision\n{declarations}");
+        let sources = vec![
+            (
+                "other.pw".into(),
+                "module other\nquery One() -> Int { 1 }\n".into(),
+            ),
+            ("parsed.pw".into(), source.clone()),
+        ];
+        let semantic = check_sources(&sources);
+        assert!(
+            semantic.iter().all(|(_, errors)| errors.is_empty()),
+            "{semantic:?}"
+        );
+        let report = pw_core::program::validate_sources(&sources);
+        assert!(
+            report.diagnostics[0].1.is_empty(),
+            "{:?}",
+            report.diagnostics
+        );
+        assert_eq!(report.diagnostics[1].1.len(), 1, "{:?}", report.diagnostics);
+        let failure = &report.diagnostics[1].1[0];
+        assert_eq!((failure.code, failure.reason), ("PW6601", "backend_wit"));
+        assert!(
+            failure.message.contains("the generated WIT does not parse"),
+            "{failure:?}"
+        );
+        assert!(failure.message.contains("collision-foo-api"), "{failure:?}");
+        assert_eq!(
+            &source[failure.primary_span.clone()],
+            "query FooApi() -> Int { 2 }"
+        );
+        assert!(report.into_build().is_err());
+
+        let neighbor = vec![
+            sources[0].clone(),
+            ("parsed.pw".into(), source.replace("FooApi", "Bar")),
+        ];
+        let supported = pw_core::program::validate_sources(&neighbor);
+        assert!(
+            supported
+                .diagnostics
+                .iter()
+                .all(|(_, errors)| errors.is_empty()),
+            "{:?}",
+            supported.diagnostics
+        );
+        assert!(supported.into_build().is_ok());
+    }
 }
 
 #[test]
