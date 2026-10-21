@@ -25,14 +25,15 @@ In order:
 2. **Verify track `press-modules`** (`wip/press-modules`, ADR-0382, stacked
    on the above). Reproduced 2026-10-21 in Chromium: after one failed load
    of the store's speculation module, every later Add failed with the same
-   error and the network was not asked again; a module that never loaded
-   held its press and the presses after it. Repaired: a press's modules load
-   within the deadline, a failed load is forgotten (the speculation module
-   asked for under a new specifier, as a handler's is), and a press whose
-   speculation cannot load is sent unspeculated. Five failing-first tests
-   and six strict controls pass in Chromium. Remaining: exact-commit CI, the
-   reached recipes and three browser engines on GitHub; the computed values'
-   loader (`computedValues()`) still keeps its failure.
+   error and the network was not asked again; the renderer's and the
+   computed values' loaders kept their failures the same way; and a module
+   that never loaded held its press and the presses after it. Repaired: a
+   page's on-demand modules load within the deadline, a failed load is
+   forgotten and asked for again under a new specifier, as a handler's is,
+   and a press whose speculation cannot load is sent unspeculated. Seven
+   failing-first tests and nine strict controls pass in Chromium.
+   Remaining: exact-commit CI, the reached recipes and three browser
+   engines on GitHub.
 3. **E14-E, decision-ready** (`wip/e14-readiness`). The decision brief
    (`docs/milestones/E14-E-decision-brief.md`) and the changed-lines repair
    (Next.js's footprint was undercounted in T01, T06, T08 and T11) await

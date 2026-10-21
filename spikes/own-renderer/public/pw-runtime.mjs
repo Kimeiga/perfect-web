@@ -1825,12 +1825,27 @@ let computedModule = null;
  * compiler wrote, its functions the same ones the host computed the page's
  * first values with. Loaded when one of those signals first changes. */
 function computedValues() {
-  computedModule ??= import(parts.computed).then((module) => {
-    log.push(`loaded ${parts.computed}`);
-    return module;
-  });
+  if (computedModule) return computedModule;
+  // Within the deadline, and not kept failed (ADR-0382): the next change
+  // asks again, under another specifier, as a speculation's load does.
+  const url = computedAttempts === 0 ? parts.computed : `${parts.computed}?attempt=${computedAttempts}`;
+  computedModule = within(import(url), "the computed values").then(
+    (module) => {
+      log.push(`loaded ${parts.computed}`);
+      return module;
+    },
+    (error) => {
+      computedModule = null;
+      computedAttempts += 1;
+      log.push(`computed values not loaded: ${error.message ?? error}`);
+      throw error;
+    },
+  );
   return computedModule;
 }
+
+/** How many loads of the page's computed values have failed (ADR-0382). */
+let computedAttempts = 0;
 
 /** Where each signal's latest change came from: the element and the event
  * whose handler set it (ADR-0142). */

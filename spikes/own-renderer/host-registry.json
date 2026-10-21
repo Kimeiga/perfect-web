@@ -366,6 +366,11 @@
         "base"
       ]
     },
+    "computed-modules.spec.mjs": {
+      "roles": [
+        "feed"
+      ]
+    },
     "compiled-handler.spec.mjs": {
       "roles": [
         "base"

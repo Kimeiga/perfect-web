@@ -127,15 +127,16 @@ evidence. No failed result is promoted by this summary.
   sent", a command given up may still run after those behind it, and the
   host's waits have no deadline (ADR-0381,
   [KNOWN_LIMITATIONS](KNOWN_LIMITATIONS.md)).
-- **On master, a press's modules** (found 2026-10-21, reproduced in
-  Chromium): one failed load of a page's speculation module is kept, so
-  every later press that speculates fails the same way until reload, and a
-  module that never loads holds its press and, by ADR-0152, the presses
-  after it. Repaired on `wip/press-modules`
-  ([ADR-0382](DECISIONS/ADR-0382-a-press-loads-its-modules-within-the-deadline.md),
-  stacked on `wip/command-deadline`): five failing-first tests and six
+- **On master, a page's on-demand modules** (found 2026-10-21, reproduced
+  in Chromium): one failed load of a page's speculation module, renderer or
+  computed values is kept, so every later press that speculates, or change
+  that computes, fails the same way until reload; and a module that never
+  loads holds its press and, by ADR-0152, the presses after it. Repaired on
+  `wip/press-modules`
+  ([ADR-0382](DECISIONS/ADR-0382-a-page-loads-its-modules-within-the-deadline.md),
+  stacked on `wip/command-deadline`): seven failing-first tests and nine
   strict controls pass locally in Chromium; its hosted verification is
-  still to run. The computed values' loader keeps its failure.
+  still to run.
 - Hosted evidence does not prove the local-only performance, memory, load
   or Kiokun obligations. E14 agent benchmarking still requires the owner's
   model, budget and teaching choices. Neither performance universality nor

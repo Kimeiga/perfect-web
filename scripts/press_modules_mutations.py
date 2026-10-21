@@ -6,9 +6,11 @@ Each mutant undoes one piece: a handler's module, or the page's speculation
 module, waited for without a deadline; a failed speculation load kept, or
 asked for again under the same specifier, which the browser keeps failed; a
 failed renderer load kept; a press whose speculation cannot load failed
-rather than sent unspeculated.
+rather than sent unspeculated; a page's computed values waited for without
+a deadline, kept failed, or asked for again under the same specifier.
 
-`e2e/press-modules.spec.mjs`, in Chromium, must fail for each. Only complete
+`e2e/press-modules.spec.mjs` and `e2e/computed-modules.spec.mjs`, in
+Chromium, must fail for each. Only complete
 native results earn a kill: a build that fails, a producer that times out, a
 receipt that is missing or forged, or an inventory that differs from the
 baseline's is REFUSED, never a kill.
@@ -69,6 +71,24 @@ MUTANTS = [
         "",
     ),
     (
+        "the computed values are waited for without a deadline",
+        RUNTIME,
+        '  computedModule = within(import(url), "the computed values").then(\n',
+        "  computedModule = import(url).then(\n",
+    ),
+    (
+        "a failed computed values load is kept",
+        RUNTIME,
+        "      computedModule = null;\n",
+        "",
+    ),
+    (
+        "a failed computed values load is asked for again under the same specifier",
+        RUNTIME,
+        "      computedAttempts += 1;\n",
+        "",
+    ),
+    (
         "a press whose speculation cannot load fails",
         RUNTIME,
         "            const ids = await speculate(component, args, interaction).catch((error) => {\n"
@@ -79,7 +99,7 @@ MUTANTS = [
     ),
 ]
 
-SPEC = ["e2e/press-modules.spec.mjs"]
+SPEC = ["e2e/press-modules.spec.mjs", "e2e/computed-modules.spec.mjs"]
 BOUND = 1200
 INVENTORIES = {}
 
@@ -97,6 +117,7 @@ def build():
     """Build the actual source; refusal cannot earn a mutation kill."""
     for command, env in (
         (["bash", "spikes/own-renderer/run.sh"], {"BUILD_ONLY": "1"}),
+        (["bash", "spikes/own-renderer/feed.sh"], {}),
         (["cargo", "build", "--quiet", "--locked", "-p", "pw-dev-server"], {}),
     ):
         out, code = bounded(command, cwd=ROOT, env={**os.environ, **env})
