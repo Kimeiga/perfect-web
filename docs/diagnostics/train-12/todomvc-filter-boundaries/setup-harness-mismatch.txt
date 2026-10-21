@@ -1,0 +1,12 @@
+commit=aabed65c19599c548a4530a357bd0361e15bc0c2
+runtime_blob=8506e8e41c2bfb723102ba61aad985e7c2c933a1
+app_blob=3dba6a6c5432d306e3cd2096ce17c2bfebc385b9
+spec_blob=908e0743aa8f98afe5488be12df5f389df887efa
+port=18541
+deadline_seconds=540
+full original controls=43; executed unchanged original controls=10,11 only
+Traceback (most recent call last):
+  File "/tmp/todomvc-route-boundary-20261021/run-focused.py", line 19, in <module>
+    assert [x[0] for x in selected] == [
+AssertionError
+focused_campaign_exit=1

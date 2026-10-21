@@ -1,0 +1,24 @@
+commit=aabed65c19599c548a4530a357bd0361e15bc0c2
+runtime_blob=8506e8e41c2bfb723102ba61aad985e7c2c933a1
+app_blob=3dba6a6c5432d306e3cd2096ce17c2bfebc385b9
+spec_blob=908e0743aa8f98afe5488be12df5f389df887efa
+port=18541
+deadline_seconds=540
+full original controls=43; selected original zero-based model indexes=10,11
+Traceback (most recent call last):
+  File "/tmp/todomvc-route-boundary-20261021/run-focused.py", line 33, in <module>
+    (out / 'inventory.json').write_text(json.dumps({
+  File "/usr/lib/python3.10/json/__init__.py", line 238, in dumps
+    **kw).encode(obj)
+  File "/usr/lib/python3.10/json/encoder.py", line 201, in encode
+    chunks = list(chunks)
+  File "/usr/lib/python3.10/json/encoder.py", line 431, in _iterencode
+    yield from _iterencode_dict(o, _current_indent_level)
+  File "/usr/lib/python3.10/json/encoder.py", line 405, in _iterencode_dict
+    yield from chunks
+  File "/usr/lib/python3.10/json/encoder.py", line 438, in _iterencode
+    o = _default(o)
+  File "/usr/lib/python3.10/json/encoder.py", line 179, in default
+    raise TypeError(f'Object of type {o.__class__.__name__} '
+TypeError: Object of type set is not JSON serializable
+focused_campaign_exit=1

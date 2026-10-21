@@ -662,21 +662,27 @@ test("the counter counts every todo whatever the filter shows", async ({ page })
 test("an item updated while filtered is updated accordingly", async ({ page }) => {
   await open(page);
   await add(page, ONE, TWO, THREE);
+  await items(page).nth(1).locator(".toggle").check();
+  await expect(items(page).nth(1)).toHaveClass(/completed/);
   await link(page, "Active").click();
-  await expect(items(page)).toHaveCount(3);
+  // The fixture makes the boundary observable: only ONE and THREE are active.
+  // Assert identities before using a row locator, so a filter fault cannot
+  // make that action target a stale All-list row.
+  await expect(items(page)).toHaveText([ONE, THREE]);
   // Checked, it is no longer active: it goes. Pressed, not `check()`ed:
   // the browser renders the list again as it is pressed (track
   // `device-store`), so the box leaves with its todo, and none is left to be
   // seen checked; what the list holds says what the press did.
-  await items(page).nth(1).locator(".toggle").click();
-  await expect(items(page)).toHaveText([ONE, THREE]);
-  // And in completed, un-checked, it goes the other way.
-  await link(page, "Completed").click();
-  await expect(items(page)).toHaveText([TWO]);
   await items(page).nth(0).locator(".toggle").click();
-  await expect(items(page)).toHaveCount(0);
+  await expect(items(page)).toHaveText([THREE]);
+  // The completed boundary now contains TWO and the just-completed ONE.
+  // Assert exact rows before unchecking one of them.
+  await link(page, "Completed").click();
+  await expect(items(page)).toHaveText([ONE, TWO]);
+  await items(page).nth(0).locator(".toggle").click();
+  await expect(items(page)).toHaveText([TWO]);
   await link(page, "All").click();
-  await expect(items(page)).toHaveCount(3);
+  await expect(items(page)).toHaveText([ONE, TWO, THREE]);
 });
 
 test("a todo added under a filter that shows it appears, and under one that does not, does not", async ({

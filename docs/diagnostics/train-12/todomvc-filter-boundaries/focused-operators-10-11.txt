@@ -1,0 +1,106 @@
+baseline (server): 4 passed, 0 failed
+baseline (browser): 50 passed, 0 failed
+  1) [chromium] › e2e/todomvc.spec.mjs:688:1 › a todo added under a filter that shows it appears, and under one that does not, does not 
+    Error: expect(locator).toHaveCount(expected) failed
+    Expected: 2
+    Received: 0
+      - Expect "toHaveCount" with timeout 5000ms
+      - waiting for locator('.todo-list li')
+          - unexpected value "0"
+    [cause]: Error: PW_ASSERTION:1a3019233cf3e57e116e4778f7dfca7b05abff6409d74203a6621e7fdac240ed
+  2) [chromium] › e2e/todomvc.spec.mjs:632:1 › #/active shows the active todos, #/completed the completed, and each link is selected 
+    Error: expect(locator).toHaveText(expected) failed
+    - Expected  - 2
+    -   "buy some cheese",
+    -   "book a doctors appointment",
+      - Expect "toHaveText" with timeout 5000ms
+      - waiting for locator('.todo-list li')
+    [cause]: Error: PW_ASSERTION:1a3019233cf3e57e116e4778f7dfca7b05abff6409d74203a6621e7fdac240ed
+  3) [chromium] › e2e/todomvc.spec.mjs:662:1 › an item updated while filtered is updated accordingly 
+    Error: expect(locator).toHaveText(expected) failed
+    - Expected  - 2
+    -   "buy some cheese",
+    -   "book a doctors appointment",
+      - Expect "toHaveText" with timeout 5000ms
+      - waiting for locator('.todo-list li')
+    [cause]: Error: PW_ASSERTION:1a3019233cf3e57e116e4778f7dfca7b05abff6409d74203a6621e7fdac240ed
+  4) [chromium] › e2e/todomvc.spec.mjs:710:1 › the back button respects the routes ─────────────────
+    Error: expect(locator).toHaveCount(expected) failed
+    Expected: 2
+    Received: 1
+      - Expect "toHaveCount" with timeout 5000ms
+      - waiting for locator('.todo-list li')
+          - unexpected value "3"
+          - unexpected value "1"
+    [cause]: Error: PW_ASSERTION:1a3019233cf3e57e116e4778f7dfca7b05abff6409d74203a6621e7fdac240ed
+  5) [chromium] › e2e/todomvc.spec.mjs:730:1 › a page opened at a route shows it, and the route is kept on reload 
+    Error: expect(locator).toHaveText(expected) failed
+    - Expected  - 1
+    -   "feed the cat",
+      - Expect "toHaveText" with timeout 5000ms
+      - waiting for locator('.todo-list li')
+    [cause]: Error: PW_ASSERTION:1a3019233cf3e57e116e4778f7dfca7b05abff6409d74203a6621e7fdac240ed
+  5 failed
+  45 passed (8.4s)
+  run_suite: kept 6 of 6 entries of its output (8.0 KiB) in kept-traces/local/20261021T060540Z-1226203/run-1
+  run_suite: exit 1
+
+the active filter shows the completed [program]: KILLED by the browser's tests (5 of 50 tests fail)
+  1) [chromium] › e2e/todomvc.spec.mjs:652:1 › the counter counts every todo whatever the filter shows 
+    Error: expect(locator).toHaveCount(expected) failed
+    Expected: 1
+    Received: 2
+      - Expect "toHaveCount" with timeout 5000ms
+      - waiting for locator('.todo-list li')
+          - unexpected value "3"
+          - unexpected value "2"
+    [cause]: Error: PW_ASSERTION:38e674a225b70f4dee8cc1ed10e886d8338e4d30a9a16fedcd00787c2390ae3c
+  2) [chromium] › e2e/todomvc.spec.mjs:688:1 › a todo added under a filter that shows it appears, and under one that does not, does not 
+    Error: expect(locator).toHaveCount(expected) failed
+    Expected: 0
+    Received: 2
+      - Expect "toHaveCount" with timeout 5000ms
+      - waiting for locator('.todo-list li')
+          - unexpected value "2"
+    [cause]: Error: PW_ASSERTION:38e674a225b70f4dee8cc1ed10e886d8338e4d30a9a16fedcd00787c2390ae3c
+  3) [chromium] › e2e/todomvc.spec.mjs:632:1 › #/active shows the active todos, #/completed the completed, and each link is selected 
+    Error: expect(locator).toHaveText(expected) failed
+    - Expected  -  1
+    -   "feed the cat",
+      - Expect "toHaveText" with timeout 5000ms
+      - waiting for locator('.todo-list li')
+    [cause]: Error: PW_ASSERTION:38e674a225b70f4dee8cc1ed10e886d8338e4d30a9a16fedcd00787c2390ae3c
+  4) [chromium] › e2e/todomvc.spec.mjs:730:1 › a page opened at a route shows it, and the route is kept on reload 
+    Error: expect(locator).toHaveText(expected) failed
+    - Expected  - 1
+    -   "buy some cheese",
+      - Expect "toHaveText" with timeout 5000ms
+      - waiting for locator('.todo-list li')
+    [cause]: Error: PW_ASSERTION:38e674a225b70f4dee8cc1ed10e886d8338e4d30a9a16fedcd00787c2390ae3c
+  5) [chromium] › e2e/todomvc.spec.mjs:662:1 › an item updated while filtered is updated accordingly 
+    Error: expect(locator).toHaveText(expected) failed
+    - Expected  - 2
+    -   "buy some cheese",
+    -   "feed the cat",
+      - Expect "toHaveText" with timeout 5000ms
+      - waiting for locator('.todo-list li')
+    [cause]: Error: PW_ASSERTION:38e674a225b70f4dee8cc1ed10e886d8338e4d30a9a16fedcd00787c2390ae3c
+  6) [chromium] › e2e/todomvc.spec.mjs:710:1 › the back button respects the routes ─────────────────
+    Error: expect(locator).toHaveCount(expected) failed
+    Expected: 1
+    Received: 2
+      - Expect "toHaveCount" with timeout 5000ms
+      - waiting for locator('.todo-list li')
+          - unexpected value "2"
+    [cause]: Error: PW_ASSERTION:38e674a225b70f4dee8cc1ed10e886d8338e4d30a9a16fedcd00787c2390ae3c
+  6 failed
+  44 passed (8.2s)
+  run_suite: kept 7 of 7 entries of its output (10.5 KiB) in kept-traces/local/20261021T060551Z-1230276/run-1
+  run_suite: exit 1
+
+the completed filter shows the active [program]: KILLED by the browser's tests (6 of 50 tests fail)
+restored (server): 4 passed, 0 failed
+restored (browser): 50 passed, 0 failed
+2 of 2 mutants killed; 0 refused; 0 survived
+memory bound: no process was stopped
+focused_campaign_exit=

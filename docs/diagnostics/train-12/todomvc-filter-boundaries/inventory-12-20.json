@@ -1,0 +1,35 @@
+{
+  "repo": "/home/haki/code/pw-wt/todomvc-toggle-all-visible-precondition",
+  "commit": "aabed65c19599c548a4530a357bd0361e15bc0c2",
+  "full_original_mutant_count": 43,
+  "selected_original_zero_based_indexes": [
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20
+  ],
+  "selected_original_names": [
+    "the default filter shows nothing",
+    "the model does not filter",
+    "the clear button counts what is left",
+    "no row is the one being edited",
+    "an edited todo that is completed is not shown completed",
+    "an edited todo has no editing class",
+    "a completed todo has no completed class",
+    "a toggle sets what the todo already is",
+    "an edit trimmed to nothing is kept, not destroyed"
+  ],
+  "browser_expected_count": 50,
+  "server_expected_names": [
+    "tests::todomvc::no_host_holds_a_todo",
+    "tests::todomvc::the_document_says_what_the_device_keeps",
+    "tests::todomvc::the_host_renders_the_default_and_hides_what_the_device_decides",
+    "tests::todomvc::the_page_has_the_templates_markup"
+  ],
+  "test_id": "bounded original indexes 12-20"
+}
