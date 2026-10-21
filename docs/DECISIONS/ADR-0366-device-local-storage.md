@@ -912,3 +912,47 @@ case; the probe reaped adopted zombie children before exiting. This is evidence
 for the configured producer, not arbitrary detached subprocesses. Each
 JavaScript mutant also passes native `node --check` before its selected witness;
 invalid syntax is refused and cannot earn an assertion kill.
+
+### Train-12: mutation witnesses assert the device contract before inspecting it
+
+The first strict hosted campaign at `f15117de` (verify `39526960864`) ran
+its unmutated core/browser/TodoMVC baselines, then reported 53 of 62 kills,
+nine refused producers and no survivors. The nine refusals stay failed
+historical evidence. A Rust match made non-exhaustive, an `expect`/panic
+before a comparison, a browser parser error, a matcher receiving the wrong
+input type, and an unfinished wait are not mutation kills.
+
+The Map/Set operator now returns no storage-form refusal from its existing
+exhaustive arm. It preserves the intended omitted rejection while compiling.
+The positive core and host witnesses explicitly assert an executable page
+plan, a successful build of the valid TodoMVC fixture, and the named migration
+module before extracting them. Filesystem, process and other setup errors
+remain ordinary errors; this is not a blanket conversion of setup failures.
+
+Browser witnesses assert that required storage entries are strings and valid
+JSON before comparing decoded values. Missing entries and malformed persisted
+data now fail their actual storage contract instead of throwing from JSON.parse
+or misusing a string matcher. Existing absence checks use the equivalent
+`toBe(undefined)` native comparator, which carries authenticated matcher
+metadata in the pinned tool. All expected persisted values remain unchanged.
+The test that holds back rendering asserts completion of the device read with
+a bounded poll, and releases its own route in `finally` even on failure.
+A separate shared polling fix owns the final-interval deadline boundary; this
+change does not relax callback timeout or assertion provenance requirements.
+
+All 62 original fault models remain. Complete native inventory, native exit
+agreement, assertion provenance, mixed-error refusal, bound-stop refusal and
+source restoration are unchanged. Local targeted checks cover the repaired
+witnesses; the complete campaign and all three browser engines still require
+the combined hosted verification before acceptance.
+
+Local native checks after these repairs retain green baselines of 15 core,
+5 host and 15 Chromium tests. Each of the nine previously refused operators
+now produces a complete authenticated assertion failure against its frozen
+inventory: both core operators, both host operators, and the five browser
+operators. The browser failing counts are respectively 8 (read at start),
+7 (write), 2 (other tab), 1 (old key), and 1 (unreadable backup), with all 15
+tests completed in every run. The two polling cases use the separately
+reviewed final-interval fix. The 17 strict device-producer regressions remain
+green. Mutated sources and generated demo assets were restored; these targeted
+runs do not replace the full hosted 62-operator campaign.

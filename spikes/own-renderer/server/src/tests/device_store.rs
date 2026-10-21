@@ -76,9 +76,12 @@ fn a_page_whose_one_computing_is_a_step_between_versions_is_served_its_steps() {
     let manifest: serde_json::Value = serde_json::from_str(&page[start..end]).expect("JSON");
     assert_eq!(manifest["device"][0]["version"], 2, "{manifest:#}");
     // The module the browser runs the step from is named, and served.
-    let module = manifest["computed"]
-        .as_str()
-        .unwrap_or_else(|| panic!("no module named: {manifest:#}"));
+    let module = manifest["computed"].as_str();
+    assert!(
+        module.is_some(),
+        "the migration module is named: {manifest:#}"
+    );
+    let module = module.expect("the module name was asserted");
     let served = answer(&s, module);
     assert!(served.starts_with("HTTP/1.1 200"), "{served}");
     assert!(served.contains("export const migrations"), "{served}");

@@ -38,6 +38,22 @@ const stored = (page) =>
     ),
   );
 
+/** A required stored value is text before any content inspection. */
+function keptText(values, key) {
+  const value = values[key];
+  expect(typeof value, `${key} is stored as text`).toBe("string");
+  return value;
+}
+
+/** JSON validity is part of the persisted-data contract, not a parser panic. */
+function keptJson(values, key) {
+  const text = keptText(values, key);
+  let value, valid = true;
+  try { value = JSON.parse(text); } catch { valid = false; }
+  expect(valid, `${key} contains valid JSON`).toBe(true);
+  return value;
+}
+
 /** What the runtime says of each value it keeps. */
 const state = (page) => page.evaluate(() => window.__pw.device?.state ?? {});
 
@@ -121,14 +137,17 @@ test("what the device decides stays hidden until it is rendered at the device's 
     await held;
     await route.continue();
   });
-  await page.goto(PAGE);
-  await page.waitForFunction(() =>
-    (window.__pw?.log ?? []).some((l) => l === "device: demo-notes read"),
-  );
-  // Read, not yet rendered: the default is not shown in its place.
-  await expect(page.locator("#count")).toBeHidden();
-  await expect(page.locator("#draft")).toBeVisible();
-  release();
+  try {
+    await page.goto(PAGE);
+    await expect.poll(() => page.evaluate(() =>
+      (window.__pw?.log ?? []).some((l) => l === "device: demo-notes read"),
+    )).toBe(true);
+    // Read, not yet rendered: the default is not shown in its place.
+    await expect(page.locator("#count")).toBeHidden();
+    await expect(page.locator("#draft")).toBeVisible();
+  } finally {
+    release();
+  }
   await expect(page.locator("#count")).toBeVisible();
   await expect(page.locator("#count")).toHaveText("2 notes");
 });
@@ -152,7 +171,7 @@ test("a value kept survives a reload, under its name and version", async ({ page
   await expect(page.locator("#count")).toHaveText("2 notes");
   await expect(page.locator("#presses")).toHaveText("2");
   const kept = await stored(page);
-  expect(JSON.parse(kept["demo-notes@2"])).toEqual([
+  expect(keptJson(kept, "demo-notes@2")).toEqual([
     { id: "0-buy some cheese", text: "buy some cheese", pinned: false },
     { id: "1-feed the cat", text: "feed the cat", pinned: false },
   ]);
@@ -201,8 +220,8 @@ test("version 1's notes are taken to version 2, and the old key goes", async ({ 
   expect((await state(page)).notes).toBe("migrated");
   await expect(page.locator("#notes li")).toHaveText(["old", "older"]);
   const kept = await stored(page);
-  expect(kept["demo-notes"]).toBeUndefined();
-  expect(JSON.parse(kept["demo-notes@2"])).toEqual([
+  expect(kept["demo-notes"]).toBe(undefined);
+  expect(keptJson(kept, "demo-notes@2")).toEqual([
     { id: "old", text: "old", pinned: false },
     { id: "older", text: "older", pinned: false },
   ]);
@@ -222,7 +241,7 @@ test("a page that finds a newer version writes nothing more, and says so", async
   await note(page, "not kept");
   await expect(page.locator("#count")).toHaveText("1 note");
   const kept = await stored(page);
-  expect(kept["demo-notes@2"]).toBeUndefined();
+  expect(kept["demo-notes@2"]).toBe(undefined);
   await expect(page.locator(".pw-refusal")).toHaveText(
     "This page is out of date. Reload to keep your changes.",
   );
@@ -237,14 +256,14 @@ test("a newer version kept by another tab stops this one writing", async ({ cont
   await ready(page);
   await note(page, "kept");
   await expect(page.locator("#count")).toHaveText("1 note");
-  expect((await stored(page))["demo-notes@2"]).toContain("kept");
+  expect(keptText(await stored(page), "demo-notes@2")).toContain("kept");
   const other = await context.newPage();
   await other.goto(PAGE);
   await other.evaluate(() => localStorage.setItem("demo-notes@3", "[]"));
   await expect.poll(async () => (await state(page)).notes).toBe("stale");
   await note(page, "not kept");
   await expect(page.locator("#count")).toHaveText("2 notes");
-  expect((await stored(page))["demo-notes@2"]).not.toContain("not kept");
+  expect(keptText(await stored(page), "demo-notes@2")).not.toContain("not kept");
 });
 
 test("an unreadable value is refused, never used, and kept aside before it is replaced", async ({
@@ -265,12 +284,12 @@ test("an unreadable value is refused, never used, and kept aside before it is re
   expect(said.join("\n")).toContain("the value[0].text is no String");
   // Nothing is written until the reader writes, and then the unread text is
   // kept aside first.
-  expect((await stored(page))["demo-notes@2!unreadable"]).toBeUndefined();
+  expect((await stored(page))["demo-notes@2!unreadable"]).toBe(undefined);
   await note(page, "a new start");
   await expect(page.locator("#count")).toHaveText("1 note");
   const kept = await stored(page);
-  expect(JSON.parse(kept["demo-notes@2!unreadable"])).toEqual([{ id: "a", text: 7, pinned: false }]);
-  expect(JSON.parse(kept["demo-notes@2"])).toEqual([
+  expect(keptJson(kept, "demo-notes@2!unreadable")).toEqual([{ id: "a", text: 7, pinned: false }]);
+  expect(keptJson(kept, "demo-notes@2")).toEqual([
     { id: "0-a new start", text: "a new start", pinned: false },
   ]);
 });
@@ -296,7 +315,7 @@ test("a write the store refuses is said where it was made, and what was kept sta
   // Control: the other value is kept as ever.
   await note(page, "kept");
   await expect(page.locator("#count")).toHaveText("1 note");
-  expect((await stored(page))["demo-notes@2"]).toContain("kept");
+  expect(keptText(await stored(page), "demo-notes@2")).toContain("kept");
 });
 
 test("a value computed from the device's value and the page's is computed again when either changes", async ({

@@ -209,8 +209,8 @@ MUTANTS = [
         "a map is kept",
         "core",
         CHECKER,
-        "            Builtin::Map | Builtin::Set => Some(format!(\n",
-        "            Builtin::Map | Builtin::Set if false => Some(format!(\n",
+        '            Builtin::Map | Builtin::Set => Some(format!(\n                "a `{}` is not kept by the first version",\n                ty.display_name()\n            )),\n',
+        "            Builtin::Map | Builtin::Set => None,\n",
     ),
     (
         "an opaque type with a where is kept",

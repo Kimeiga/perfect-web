@@ -33,7 +33,13 @@ fn served_todomvc() -> Served {
             });
         }
     }
-    let build = pw_core::build::build(&units).expect("TodoMVC builds");
+    let build = pw_core::build::build(&units);
+    assert!(
+        build.is_ok(),
+        "the valid TodoMVC program builds: {:?}",
+        build.as_ref().err()
+    );
+    let build = build.expect("the executable build was asserted");
     assert!(build.refusals().is_empty(), "{:?}", build.refusals());
     let out = dir.path().join("build");
     build.write(&out).expect("the build is written");

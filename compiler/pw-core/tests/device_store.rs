@@ -128,8 +128,12 @@ fn a_value_the_device_keeps_checks_and_its_page_holds_it() {
         .pages
         .iter()
         .find(|p| p.page == "t.P~ui")
-        .and_then(|p| p.plan.as_ref().ok())
-        .expect("a plan");
+        .and_then(|p| p.plan.as_ref().ok());
+    assert!(
+        plan.is_some(),
+        "a valid device page retains its executable plan"
+    );
+    let plan = plan.expect("the executable plan was asserted");
     let held = serde_json::to_value(&plan.device).expect("JSON");
     assert_eq!(
         held,
@@ -542,8 +546,12 @@ fn the_browser_computes_from_several_values_and_a_list_in_its_block() {
         .pages
         .iter()
         .find(|p| p.page == "t.P~ui")
-        .and_then(|p| p.plan.as_ref().ok())
-        .expect("a plan");
+        .and_then(|p| p.plan.as_ref().ok());
+    assert!(
+        plan.is_some(),
+        "a valid device page retains its executable plan"
+    );
+    let plan = plan.expect("the executable plan was asserted");
     let live = serde_json::to_value(&plan.live).expect("JSON");
     let entries = live.as_array().expect("a list");
     // The text from two values: each given, in order.
