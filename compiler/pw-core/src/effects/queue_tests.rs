@@ -19,7 +19,8 @@ fn inspect(source: &str) -> (BTreeMap<String, Snapshot>, usize) {
     let workspace = Workspace::build(&refs);
     let sigs = Signatures::build(&workspace, &refs);
     let mut inference = Inference::new(&sigs, &workspace);
-    inference.run(&refs);
+    let mut body_visits = 0;
+    inference.run_observing(&refs, || body_visits += 1);
     let name = |def: DefId| {
         hirs[def.unit]
             .decl(crate::hir::DeclId(def.decl))
@@ -87,7 +88,7 @@ fn inspect(source: &str) -> (BTreeMap<String, Snapshot>, usize) {
         };
         snapshots.insert(decl.name.clone(), snapshot);
     }
-    (snapshots, inference.body_visits)
+    (snapshots, body_visits)
 }
 
 fn program(mut declarations: Vec<String>, reverse: bool) -> String {

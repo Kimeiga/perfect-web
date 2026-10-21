@@ -44,6 +44,17 @@ must fail their named assertions. Existing convergence tests additionally check
 valid program diagnostics and exact query capabilities, including value cycles
 and non-invoked members.
 
+Visit counting uses a private generic callback on the same inference path. The
+public `run` passes a zero-capture no-op; tests pass a local counting closure.
+There is no stored counter, dynamic dispatch or public instrumentation API.
+The first candidate's exact CI (39528431883) correctly refused mid-source
+`cfg(test)` fields and blocks: the diagnostic census permits that boundary only
+before test modules. The census is unchanged. Its twelve tests, the five queue
+witnesses and six convergence tests independently pass with the callback repair.
+The [repair measurement record](../evidence/tooling/effect-queue-instrumentation.txt)
+retains that failure and repeats the same alternating benchmark and native
+controls against the repaired source.
+
 The existing eight-sweep and first-sweep controls now cap queue waves: each wave
 processes the pending set present at its start. They still truncate actual deep
 propagation. The value-only and rooted-member/value controls retain their faults
@@ -63,16 +74,17 @@ the full checker measurements rebuild the normal checker pipeline.
 
 | Workload | Old medians (ms) | Queue medians (ms) |
 | --- | ---: | ---: |
-| 250 caller-first helpers, inference | 573.38 / 556.91 | 9.81 / 9.56 |
-| 250 caller-first helpers, full checker | 754.89 / 755.65 | 193.54 / 192.90 |
-| 250 callee-first helpers, full checker | 201.78 / 198.09 | 200.26 / 190.46 |
-| Reference feed, full checker | 226.32 / 220.86 | 220.71 / 221.61 |
+| 250 caller-first helpers, inference | 554.74 / 558.87 | 9.53 / 9.59 |
+| 250 caller-first helpers, full checker | 750.36 / 737.82 | 199.66 / 198.04 |
+| 250 callee-first helpers, full checker | 196.10 / 198.93 | 187.99 / 199.87 |
+| Reference feed, full checker | 227.23 / 225.49 | 217.22 / 226.97 |
 
 All 23 canonical snapshots are identical across all four runs, covering rows,
 performed effects, source text/reasons and charged calls. Valid-program and exact
 capability assertions also pass. Callable identities use qualified paths;
 unchanged non-callable declarations retain their IDs, so repeated clause names
-cannot overwrite snapshots. This bounded debug measurement establishes the deep
+cannot overwrite snapshots. The table uses the callback repair's repeated run;
+the earlier record remains historical evidence. This bounded debug measurement establishes the deep
 chain improvement; it does not imply a whole-framework speedup or replace exact
 hosted verification. The new recipe is `just e14-effect-queue`; existing reached
 recipes include `e14-effect-convergence`, `e10-effects-through-values` and
