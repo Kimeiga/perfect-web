@@ -5,6 +5,7 @@ import importlib.util
 import io
 import json
 import pathlib
+import re
 import sys
 import tempfile
 import types
@@ -22,9 +23,34 @@ def load_guide():
 
 
 def cargo_output(failed=False, name="intended_private_witness"):
+    tests = f'test {name} ... {"FAILED" if failed else "ok"}\n'
     if failed:
-        return f"test {name} ... FAILED\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out\n"
-    return "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n"
+        lines = (ROOT / "compiler/pw-cli/tests/guide.rs").read_text().splitlines()
+        line = next(i for i, text in enumerate(lines, 1) if text.lstrip().startswith("assert!("))
+        column = len(lines[line-1]) - len(lines[line-1].lstrip()) + 1
+        tests += (f"\nfailures:\n\n---- {name} stdout ----\nthread '{name}' panicked at "
+                  f"compiler/pw-cli/tests/guide.rs:{line}:{column}:\nassertion failed\n\nfailures:\n    {name}\n")
+    return tests + f'test result: {"FAILED" if failed else "ok"}. {0 if failed else 1} passed; {1 if failed else 0} failed; 0 ignored; 0 measured; 0 filtered out\n'
+
+
+def browser_receipts(env, failed=False):
+    inventory = [f"private-{i}" for i in range(4)]
+    titles = ["intended private witness", "second", "third", "fourth"]
+    receipt = dict(schema=1, complete=True, nonce=env["PW_ASSERTION_NONCE"], inventory=inventory,
+                   tests=[[identity, "failed" if failed and i == 0 else "passed"] for i, identity in enumerate(inventory)])
+    metadata = {"suites": [{"title": "guestbook.spec.mjs", "specs": [
+        {"id": identity, "title": title, "tests": [{"projectName": "chromium"}]}
+        for identity, title in zip(inventory, titles)]}]}
+    pathlib.Path(env["PW_ASSERTION_REPORT"]).write_text(json.dumps(receipt))
+    pathlib.Path(env["PLAYWRIGHT_JSON_OUTPUT_NAME"]).write_text(json.dumps(metadata))
+    return {identity: "guestbook.spec.mjs › " + title for identity, title in zip(inventory, titles)}
+
+
+def compiler_output(codes=("PW5048",)):
+    files = sum(len(list((ROOT / directory).glob("*.pw"))) for directory in
+                ("packages/pw-std", "packages/pw-platform-web", "examples/guestbook"))
+    return "\n".join([*(f"error: [{code}] private named diagnostic" for code in codes),
+                       f"pw check: {files} file(s), {len(codes)} error(s), 0 warning(s)"])
 
 
 def python_output(failed=False, name="intended_private_witness"):
@@ -72,12 +98,23 @@ class GuideProducers(unittest.TestCase):
             text = ""
         outcome = module.guide_python.unittest_protocol.validate_result(python[0], text, expected)
         produced = module.guide_python.PythonRun(outcome, output, pathlib.Path("private-fixture-evidence"), python[0])
-        with mock.patch.object(module, "run", return_value=cargo), mock.patch.object(module, "python_tests", return_value=produced):
+        with mock.patch.object(module, "CARGO_NAMES", {"intended_private_witness"}), mock.patch.object(module, "run", return_value=cargo), mock.patch.object(module, "python_tests", return_value=produced):
             return module.guide_tests()
 
-    def browser_result(self, status, output):
+    def browser_result(self, status, output, alter=None, frozen=True):
         module = load_guide()
-        with mock.patch.object(module, "run", side_effect=[(0, "built\n"), (status, output)]) as run:
+        def produce(command, **kw):
+            if command == module.APP_BUILD:
+                return 0, "built\n"
+            env = kw["env"]
+            if output in (browser_output(), browser_output(True)):
+                titles = browser_receipts(env, output == browser_output(True))
+                if frozen:
+                    module._BROWSER_TITLES = titles
+                if alter:
+                    alter(env, module)
+            return status, output
+        with mock.patch.object(module, "run", side_effect=produce) as run:
             result = module.browser_tests()
         return result, run.call_args_list, module
 
@@ -104,8 +141,7 @@ class GuideProducers(unittest.TestCase):
     def test_cargo_all_binary_summaries_must_agree(self):
         mixed = cargo_output() + cargo_output(True)
         ran, failed, names, _ = self.guide_result(cargo=(101, mixed))
-        self.assertEqual((ran, failed), (9, 1))
-        self.assertIn("intended_private_witness", names)
+        self.assertIsNone(ran, "one selected binary must report exactly one full inventory")
         self.assertIsNone(self.guide_result(cargo=(0, mixed))[0])
 
     def test_cargo_refuses_build_or_stop_diagnostics_after_partial_results(self):
@@ -113,20 +149,14 @@ class GuideProducers(unittest.TestCase):
             with self.subTest(extra=extra):
                 self.assertIsNone(self.guide_result(cargo=(101, cargo_output(True) + extra))[0])
 
-    def test_cargo_quiet_failure_names_remain_intended_witnesses(self):
+    def test_cargo_quiet_failure_without_inventory_is_refused(self):
         output = "---- intended_private_witness stdout ----\n" + cargo_output(True).split("\n", 1)[1]
         ran, failed, names, _ = self.guide_result(cargo=(101, output))
-        self.assertEqual((ran, failed), (8, 1))
-        self.assertIn("intended_private_witness", names)
+        self.assertIsNone(ran, "failure prose alone does not establish executed inventory")
 
-    def test_cargo_counts_an_empty_binary_beside_nonempty_ones_as_the_shared_parser_does(self):
-        # Train-11: the shared parser is master's (ADR-0352's completion: a
-        # command's aggregate must be nonempty, and a binary a filter leaves
-        # empty beside others is a result, as every filtered `cargo test`
-        # prints one), not the v1 this branch adopted, which refused it.
-        empty = "test result: ok. 0 passed; 0 failed; 0 ignored;\n"
-        self.assertIsNotNone(self.guide_result(cargo=(0, cargo_output() + empty))[0])
-        # The control: empty binaries alone are no result.
+    def test_cargo_additional_empty_binary_is_refused(self):
+        empty = "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n"
+        self.assertIsNone(self.guide_result(cargo=(0, cargo_output() + empty))[0])
         self.assertIsNone(self.guide_result(cargo=(0, empty + empty))[0])
 
     def test_python_refuses_invalid_failure_status(self):
@@ -175,8 +205,8 @@ class GuideProducers(unittest.TestCase):
 
     def test_browser_accepts_actual_assertion_failure(self):
         result, _, _ = self.browser_result(1, browser_output(True))
-        self.assertEqual(result[:3], (True, 1, 1))
-        self.assertIn("intended private witness", result[3])
+        self.assertEqual(result[:3], (True, 4, 1))
+        self.assertIn("guestbook.spec.mjs › intended private witness", result[3])
 
     def test_browser_accepts_green_producer(self):
         result, _, _ = self.browser_result(0, browser_output())
@@ -188,6 +218,120 @@ class GuideProducers(unittest.TestCase):
         expected = ["bash", str(ROOT / "scripts/run_suite.sh"), "-C", ".", "--", *module.SPEC]
         self.assertEqual(calls[1].args[0], expected)
         self.assertEqual(calls[1].kwargs["cwd"], ROOT / "spikes/own-renderer")
+        env = calls[1].kwargs["env"]
+        self.assertEqual(env["PLAYWRIGHT_JSON_OUTPUT_FILE"], env["PLAYWRIGHT_JSON_OUTPUT_NAME"])
+
+    def test_cargo_requires_exact_inventory_and_assertion_site(self):
+        for output in (cargo_output().replace("intended_private_witness", "foreign"),
+                       cargo_output(True).replace("panicked at compiler/", "panicked at foreign/"),
+                       re.sub(r":(\d+):\nassertion failed", ":999:\noperand panic", cargo_output(True)),
+                       cargo_output().replace("0 ignored", "1 ignored")):
+            status = 101 if "FAILED" in output else 0
+            self.assertIsNone(self.guide_result(cargo=(status, output))[0])
+
+    def test_original_rust_inventory_is_frozen_exactly(self):
+        module = load_guide()
+        source = module.TEST.read_text()
+        actual = set(re.findall(r"#\[test\]\s*fn (\w+)\(", source))
+        self.assertEqual(len(actual), 15)
+        self.assertEqual(module.CARGO_NAMES, actual)
+
+    def test_browser_refuses_partial_stale_and_duplicate_receipts(self):
+        def alter(env, module, kind):
+            path = pathlib.Path(env["PW_ASSERTION_REPORT"])
+            report = json.loads(path.read_text())
+            if kind == "partial": report["tests"].pop()
+            if kind == "stale": report["nonce"] = "older invocation"
+            if kind == "duplicate": report["inventory"][1] = report["inventory"][0]
+            if kind == "runtime": report["complete"] = False
+            path.write_text(json.dumps(report))
+        for kind in ("partial", "stale", "duplicate", "runtime"):
+            self.assertFalse(self.browser_result(1, browser_output(True), lambda e, m: alter(e, m, kind))[0][0])
+
+    def test_browser_refuses_missing_and_disagreeing_metadata(self):
+        def alter(env, module, kind):
+            path = pathlib.Path(env["PLAYWRIGHT_JSON_OUTPUT_NAME"])
+            if kind == "missing":
+                path.unlink()
+                return
+            metadata = json.loads(path.read_text())
+            specs = metadata["suites"][0]["specs"]
+            if kind == "partial": specs.pop()
+            if kind == "extra": specs.append({**specs[0], "id": "foreign"})
+            if kind == "duplicate": specs.append(dict(specs[0]))
+            if kind == "foreign": specs[1]["id"] = "foreign"
+            if kind == "title": specs[0]["title"] = "different intended witness"
+            if kind == "project": specs[0]["tests"][0]["projectName"] = "firefox"
+            if kind == "invalid": metadata = None
+            path.write_text(json.dumps(metadata))
+        for kind in ("missing", "partial", "extra", "duplicate", "foreign", "title", "project", "invalid"):
+            with self.subTest(kind=kind):
+                self.assertFalse(self.browser_result(1, browser_output(True), lambda e, m: alter(e, m, kind))[0][0])
+                if kind != "title":
+                    self.assertFalse(self.browser_result(0, browser_output(), lambda e, m: alter(e, m, kind), frozen=False)[0][0])
+
+    def test_browser_freezes_mapping_only_from_green_complete_baseline(self):
+        self.assertFalse(self.browser_result(1, browser_output(True), frozen=False)[0][0])
+        result, calls, module = self.browser_result(0, browser_output(), frozen=False)
+        self.assertTrue(result[0])
+        self.assertEqual(len(module._BROWSER_TITLES), 4)
+        self.assertIn("--retries=0", calls[1].args[0])
+        self.assertIn("--reporter=line,json,./assertion-result-reporter.mjs", calls[1].args[0])
+
+    def test_browser_json_and_prose_do_not_authorize_outcomes(self):
+        def alter(env, module):
+            path = pathlib.Path(env["PLAYWRIGHT_JSON_OUTPUT_NAME"])
+            metadata = json.loads(path.read_text())
+            metadata["stats"] = {"unexpected": 999}
+            for spec in metadata["suites"][0]["specs"]:
+                spec["ok"] = False
+                spec["tests"][0]["status"] = "unexpected"
+            path.write_text(json.dumps(metadata))
+        self.assertEqual(self.browser_result(0, browser_output(), alter)[0][:3], (True, 4, 0))
+        self.assertFalse(self.browser_result(1, "999 failed with intended private witness")[0][0])
+
+    def test_checked_refusal_requires_complete_error_inventory(self):
+        module = load_guide()
+        native = compiler_output()
+        self.assertEqual(module.compiler_codes(1, native), {"PW5048"})
+        for status, output in ((True, native), (1, native + "\nerror: unrelated runtime failure"),
+                               (1, native.replace("1 error(s)", "2 error(s)")),
+                               (1, native.replace("0 warning(s)", "1 warning(s)")),
+                               (1, native.replace("error: [PW5048]", "error: untyped")),
+                               (1, native + "\npw check: 1 file(s), 1 error(s), 0 warning(s)"),
+                               (1, "error[E0001]: build failed\n" + native),
+                               (1, "internal compiler error: compiler defect\n" + native),
+                               (1, "bash: line 2: unexpected failure\n" + native),
+                               (1, "unrecognized output\n" + native),
+                               (1, "  unexpected indented failure\n" + native),
+                               (1, "   | stray gutter before diagnostic\n" + native)):
+            self.assertEqual(module.compiler_codes(status, output), set())
+
+    def test_checked_plain_diagnostic_continuations_are_supported(self):
+        module = load_guide()
+        lines = compiler_output().splitlines()
+        diagnostic = "\n".join([lines[0], "  --> pages.pw:30:13", "   |",
+            "10 | | source snippet", "...  |", "   | |__^ diagnostic", "   = note: explanation",
+            "   = help: repair", lines[-1]])
+        self.assertEqual(module.compiler_codes(1, diagnostic), {"PW5048"})
+
+    def test_main_cancellation_restores_source_and_preserves_exit(self):
+        module = load_guide()
+        with tempfile.TemporaryDirectory() as folder:
+            path = pathlib.Path(folder) / "source"
+            path.write_text("original")
+            watch = types.SimpleNamespace(stopped=[])
+            baseline = types.SimpleNamespace(mutation_bound=types.SimpleNamespace(start=lambda: watch))
+            with mock.patch.dict(sys.modules, {"mutation_baseline": baseline}), \
+                 mock.patch.object(module, "MUTANTS", [("own", "guide", path, "original", "mutated")]), \
+                 mock.patch.object(module, "MUST", {"own": {"test_own"}}), \
+                 mock.patch.object(module, "CHECKED", {}), \
+                 mock.patch.object(module, "freeze_python", return_value=["test_own"]), \
+                 mock.patch.object(module, "guide_tests", side_effect=[module.GuideResult(1, 0, set(), ""), SystemExit(37)]):
+                with self.assertRaises(SystemExit) as caught:
+                    module.main()
+            self.assertEqual(caught.exception.code, 37)
+            self.assertEqual(path.read_text(), "original")
 
     def run_main(self, phase, status=0, mode="invalid", codes=("PW5048",), named=False):
         module = load_guide()
@@ -203,7 +347,7 @@ class GuideProducers(unittest.TestCase):
             source.write_bytes(original)
             build_calls = 0
             cargo_calls = 0
-            def produce(command, **_):
+            def produce(command, **kw):
                 nonlocal build_calls, cargo_calls
                 mutated = source.read_bytes() != original
                 if command == module.CARGO_TEST:
@@ -224,9 +368,10 @@ class GuideProducers(unittest.TestCase):
                     if mode == "cleanup_failure" and build_calls == 3:
                         return 67, "private cleanup build failure\n"
                     if mutated and phase == "build":
-                        return status, "\n".join(f"error: [{code}] private named diagnostic" for code in codes)
+                        return status, compiler_output(codes)
                     return 0, "built\n"
                 if command[-len(module.SPEC):] == module.SPEC:
+                    browser_receipts(kw["env"], mutated and phase == "browser" and mode != "green")
                     if mutated and phase == "browser":
                         return (0, browser_output()) if mode == "green" else (status, browser_output(True))
                     return 0, browser_output()
@@ -244,6 +389,7 @@ class GuideProducers(unittest.TestCase):
                     result = protocol.Result(True, "mocked validated green bodies", tuple(expected_python), (), (), 7)
                 return module.guide_python.PythonRun(result, "mocked structured Python domain outcome", pathlib.Path(directory), status)
             with contextlib.ExitStack() as stack:
+                stack.enter_context(mock.patch.object(module, "CARGO_NAMES", {"intended_private_witness"}))
                 stack.enter_context(mock.patch.object(module, "MUTANTS", [(what, held, source, "original", "mutated")]))
                 stack.enter_context(mock.patch.object(module, "MUST", {what: set() if named else {witness}}))
                 stack.enter_context(mock.patch.object(module, "CHECKED", {what: {"PW5048"}} if named else {}))
@@ -387,6 +533,7 @@ class Native(unittest.TestCase):
             what = "native intended mutation"
             with contextlib.ExitStack() as stack:
                 for name, value in {
+                    "CARGO_NAMES": {"intended_private_witness"},
                     "MUTANTS": [(what, "guide", source, 'MODE = "green"', f'MODE = "{mode}"')],
                     "MUST": {what: {"test_required"}}, "CHECKED": {},
                     "PYTHON_SELECTOR": "private_native", "PYTHON_SEARCH_DIR": directory,
@@ -436,12 +583,11 @@ class Native(unittest.TestCase):
         self.assertEqual(produced.result.body_errors, ())
         self.assertTrue(entered)
 
-    def test_native_body_error_preserves_the_distinct_named_error_policy(self):
+    def test_native_body_error_earns_no_assertion_kill(self):
         code, output, produced, entered = self.run_native_main("body_error")
-        self.assertEqual(code, 0)
-        self.assertIn("KILLED by test_required", output)
-        self.assertIn("Python body error", output)
-        self.assertNotIn("Python body assertion", output)
+        self.assertNotEqual(code, 0)
+        self.assertIn("REFUSED", output)
+        self.assertNotIn("KILLED", output)
         self.assertEqual(produced.result.body_errors, ("private_native.Native.test_required",))
         self.assertEqual(produced.result.assertion_failed, ())
         self.assertTrue(entered)

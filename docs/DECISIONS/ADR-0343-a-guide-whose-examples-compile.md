@@ -348,3 +348,14 @@ require its help. Historical findings above describe the original branch.
 ADR-0349 also requires current registered corpus codes in the generated
 reference and propagates tutorial browser failures through the shared
 suite runner. Full assembled guide controls remain pending.
+
+## Train-12 producer completion (2026-10-21)
+
+ADR-0362's assertion-only completion retains all 74 guide controls and the
+three exact semantic compiler refusals. Rust and Python kills require native
+intended body assertions; the guestbook's four Chromium cases require the shared
+nonce receipt and a stable same-invocation title map. The tutorial spec uses
+ordered independent execution with no retries, so a failed case does not skip
+the remaining cases. Full three-engine tutorial coverage remains in the guide
+recipe. Historical prose/count-based producer and retry descriptions above are
+superseded by this contract; they are not claims about current evidence.

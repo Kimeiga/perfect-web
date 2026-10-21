@@ -10,7 +10,8 @@
 //     remove and no one else's;
 //   - another reader's open page is told of the entry, and of its removal,
 //     without a reload.
-import { expect, test } from "@playwright/test";
+import { test } from "@playwright/test";
+import { expect } from "../assertion-expect.mjs";
 import { GUESTBOOK_PORTS } from "../host-metadata.mjs";
 
 test.use({
@@ -19,7 +20,7 @@ test.use({
   },
 });
 
-test.describe.configure({ mode: "serial" });
+test.describe.configure({ mode: "default" });
 
 /** The guestbook, its handlers attached. */
 async function home(page) {
@@ -39,6 +40,7 @@ const PASSWORD = "correct horse battery";
 /** Signed up at the development provider, from the guestbook, and back. */
 async function signUp(page, who, name) {
   await home(page);
+  await expect(page.getByRole("button", { name: "Sign up" })).toBeVisible();
   await page.getByRole("button", { name: "Sign up" }).click();
   await expect(page.getByRole("note")).toContainText("not for production");
   await page.getByLabel("Handle").fill(who);
@@ -121,6 +123,7 @@ test("another reader's open page is told of an entry, and of its removal", async
   // Told, with no reload: the command's event drops the reader's entries.
   await expect(entry(other, words)).toHaveCount(1);
   await expect(entry(other, words).getByRole("button", { name: "Remove" })).toHaveCount(0);
+  await expect(entry(page, words).getByRole("button", { name: "Remove" })).toHaveCount(1);
   await entry(page, words).getByRole("button", { name: "Remove" }).click();
   await expect(entry(page, words)).toHaveCount(0);
   await expect(entry(other, words)).toHaveCount(0);

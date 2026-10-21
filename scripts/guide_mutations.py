@@ -31,11 +31,14 @@ a survivor. The unmutated baseline must be green first.
 Run from the repository root; `just e14-guide` records the output. The
 source is restored after every mutant, whatever happens. A browser mutant
 builds the app (`spikes/own-renderer/guestbook.sh`) and runs the spec in
-Chromium, once more for each test that fails (`--retries=1`), on the PORT the
+Chromium with no retries and a complete assertion receipt, on the PORT the
 environment gives (the base default 3141 where it gives none).
 """
 
 import os
+import json
+import secrets
+import signal
 import pathlib
 import re
 import subprocess
@@ -46,7 +49,10 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 if str(ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(ROOT / "scripts"))
 import guide_python
-import cargo_test_results
+import cargo_assertion_results
+import browser_test_results
+import mutation_source
+import producer_process
 TEST = ROOT / "compiler/pw-cli/tests/guide.rs"
 GENERATOR = ROOT / "scripts/guide_diagnostics.py"
 GUIDE = ROOT / "docs/guide"
@@ -501,8 +507,8 @@ MUTANTS = [
         "trailing space is no difference",
         "guide",
         TEST,
-        "        .find(|(name, text)| **text != on_disk[*name])",
-        "        .find(|(name, text)| text.trim_end() != on_disk[*name].trim_end())",
+        "**text != *other",
+        "text.trim_end() != other.trim_end()",
     ),
     (
         "a row's invariant is not compared with the registry's",
@@ -719,7 +725,13 @@ MUST = {
     "the entries are not told of a signed entry": set(),
 }
 
-CARGO_TEST = ["cargo", "test", "--locked", "-p", "pw-cli", "--test", "guide"]
+CARGO_TEST = ["cargo", "test", "--locked", "-p", "pw-cli", "--test", "guide", "--", "--format=pretty"]
+CARGO_NAMES = {GUIDE_TEST, VERDICT, FENCES, UNCLOSED, INFO, PIECES, SHOWN,
+               BUILD_SHOWN, SURVEY, DIRECTORY, DIRECTORY_HELD, DIFFERS,
+               REFERENCE_TEST, REFERENCE_HELD,
+               "a_refused_examples_codes_are_read_from_its_output"}
+BOUND = 1200
+_BROWSER_TITLES = None
 PYTHON_TEST = [
     "python3",
     "-m",
@@ -738,19 +750,17 @@ SPEC = [
     "test",
     "e2e/guestbook.spec.mjs",
     "--project=chromium",
-    "--retries=1",
-    "--reporter=line",
+    "--retries=0",
+    "--reporter=line,json,./assertion-result-reporter.mjs",
 ]
 
 
-def run(cmd, cwd=ROOT):
-    r = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
-    return r.returncode, re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", r.stdout + r.stderr)
-
-
-def _test_status(code, passed, failed, failure_status):
-    """Counts describe tests only after a consistent, nonempty producer exit."""
-    return passed + failed > 0 and code == (failure_status if failed else 0)
+def run(cmd, cwd=ROOT, env=None):
+    try:
+        result = producer_process.run(cmd, cwd=cwd, env=env, timeout=BOUND)
+        return result.returncode, re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", result.stdout)
+    except subprocess.TimeoutExpired as expired:
+        return None, expired.output or "producer timed out"
 
 
 def _stopped(watch):
@@ -803,9 +813,9 @@ def guide_tests():
     """Cargo tests plus one canonical, provenance-validated Python result."""
     code, out = run(CARGO_TEST)
     outputs = [out]
-    cargo = cargo_test_results.parse(code, out)
+    cargo = cargo_assertion_results.validate(code, out, root=ROOT, sources=[TEST], expected=CARGO_NAMES)
     if not cargo.valid:
-        outputs.append("Cargo result refused: " + cargo.reason)
+        outputs.append("Cargo result refused: " + (cargo.reason or "incomplete inventory or non-assertion failure"))
         return GuideResult(None, 0, set(), "\n".join(outputs))
     ran = cargo.passed + cargo.failed
     failed = cargo.failed
@@ -813,49 +823,128 @@ def guide_tests():
     python = python_tests()
     outputs.append(python.output)
     outcome = python.result
-    if not outcome.valid:
+    if not outcome.valid or outcome.body_errors:
         return GuideResult(None, 0, set(), "\n".join(outputs), cargo_failed, outcome)
     # Full expected IDs and actual body provenance were validated by the shared
     # authority before any bare MUST name is considered here.
-    names = cargo_failed | {identity.rsplit(".", 1)[-1] for identity in outcome.failed}
-    return GuideResult(ran + outcome.executed, failed + len(outcome.failed), names,
+    names = cargo_failed | {identity.rsplit(".", 1)[-1] for identity in outcome.assertion_failed}
+    return GuideResult(ran + outcome.executed, failed + len(outcome.assertion_failed), names,
                        "\n".join(outputs), cargo_failed, outcome)
 
 
 def failure_categories(result, intended):
     categories = []
     if result.cargo_failed & intended:
-        categories.append("Rust test failure")
+        categories.append("Rust body assertion")
     python = result.python_result
     if python is not None:
         if {name.rsplit(".", 1)[-1] for name in python.assertion_failed} & intended:
             categories.append("Python body assertion")
-        if {name.rsplit(".", 1)[-1] for name in python.body_errors} & intended:
-            categories.append("Python body error")
     return ", ".join(categories)
+
+
+def browser_titles(metadata, inventory):
+    """Only identity/title metadata from the same invocation's built-in JSON.
+
+    Status and assertion provenance come exclusively from the nonce receipt.
+    The pinned JSON reporter assigns each spec the same TestCase.id used by
+    our reporter. Chromium-only selection requires exactly one project test.
+    """
+    titles = {}
+    def visit(suites, parents=()):
+        if not isinstance(suites, list):
+            raise ValueError("browser metadata suites are missing")
+        for suite in suites:
+            if not isinstance(suite, dict) or not isinstance(suite.get("title"), str) or not suite["title"]:
+                raise ValueError("browser metadata suite title is missing")
+            path = (*parents, suite["title"])
+            specs = suite.get("specs", [])
+            if not isinstance(specs, list):
+                raise ValueError("browser metadata specs are missing")
+            for spec in specs:
+                if not isinstance(spec, dict):
+                    raise ValueError("browser metadata spec is invalid")
+                identity, title, tests = spec.get("id"), spec.get("title"), spec.get("tests")
+                if (not isinstance(identity, str) or not identity or identity in titles
+                        or not isinstance(title, str) or not title
+                        or not isinstance(tests, list) or len(tests) != 1
+                        or not isinstance(tests[0], dict) or tests[0].get("projectName") != "chromium"):
+                    raise ValueError("browser metadata identity/title/project is invalid or duplicate")
+                titles[identity] = " › ".join((*path, title))
+            visit(suite.get("suites", []), path)
+    if not isinstance(metadata, dict):
+        raise ValueError("browser metadata is missing")
+    visit(metadata.get("suites"))
+    if set(titles) != set(inventory) or len(titles) != 4:
+        raise ValueError("browser metadata differs from complete four-test receipt")
+    return titles
+
+
+def compiler_codes(code, output):
+    """A complete plain `pw check` refusal, before guestbook.sh can build."""
+    if type(code) is not int or code != 1:
+        return set()
+    lines = output.splitlines()
+    if not lines:
+        return set()
+    summary = re.fullmatch(r"pw check: (\d+) file\(s\), (\d+) error\(s\), 0 warning\(s\)", lines[-1])
+    files = sum(len(list((ROOT / directory).glob("*.pw"))) for directory in
+                ("packages/pw-std", "packages/pw-platform-web", "examples/guestbook"))
+    errors = [line for line in lines if line.startswith("error:")]
+    codes = [re.fullmatch(r"error: \[(PW\d{4})\] .+", line) for line in errors]
+    started = unrecognized = False
+    for line in lines[:-1]:
+        if line.startswith("error:"):
+            started = True
+        elif line and (not started or re.fullmatch(
+                r"(?:\s*(?:\d+|\.\.\.)?\s*\|.*|  --> .+:\d+:\d+|   = (?:note|help):.*)", line) is None):
+            unrecognized = True
+    if (summary is None or int(summary[1]) != files or int(summary[2]) != len(errors)
+            or not errors or not all(codes) or unrecognized
+            or sum(line.startswith("pw check:") for line in lines) != 1
+            or any(re.match(r"(?:warning:|error\[|thread |fatal:|Traceback|panicked)", line) for line in lines)):
+        return set()
+    return {match[1] for match in codes}
 
 
 def browser_tests():
     """(valid, ran, failed, failed titles, output), or typed compiler refusal."""
+    global _BROWSER_TITLES
     code, out = run(APP_BUILD)
     if code != 0:
-        codes = set(re.findall(r"(?m)^error: \[(PW\d{4})\]", out))
-        if code == 1 and codes:
+        codes = compiler_codes(code, out)
+        if codes:
             return CompilerRefusal(codes, out)
         return False, 0, 0, set(), out
+    directory = pathlib.Path(tempfile.mkdtemp(prefix="pw-guide-browser-"))
+    receipt, metadata = directory / "assertions.json", directory / "metadata.json"
+    nonce = secrets.token_hex(32)
     code, out = run(
         ["bash", str(ROOT / "scripts/run_suite.sh"), "-C", ".", "--", *SPEC],
         cwd=ROOT / "spikes/own-renderer",
+        env={**os.environ, "PW_ASSERTION_REPORT": str(receipt), "PW_ASSERTION_NONCE": nonce,
+             "PLAYWRIGHT_JSON_OUTPUT_NAME": str(metadata), "PLAYWRIGHT_JSON_OUTPUT_FILE": str(metadata)},
     )
-    passed = re.search(r"(\d+) passed", out)
-    failed = re.search(r"(\d+) failed", out)
-    passed = int(passed.group(1)) if passed else 0
-    failed = int(failed.group(1)) if failed else 0
-    titles = set(re.findall(r"^\s+\d+\) \[chromium\] › \S+ › (.+?)(?: ─+)?$", out, re.M))
-    # The canonical helper owns real producer exit/no-test authority. These
-    # counts name witnesses only when the returned status is consistent.
-    valid = _test_status(code, passed, failed, 1)
-    return valid, passed + failed, failed, titles, out
+    (directory / "output.txt").write_text(out)
+    try:
+        report = json.loads(receipt.read_text())
+    except (OSError, ValueError):
+        report = None
+    result = browser_test_results.parse(code, report, nonce, _BROWSER_TITLES)
+    if not result.valid:
+        return False, 0, 0, set(), out + "\nBrowser receipt refused: " + result.reason
+    try:
+        titles = browser_titles(json.loads(metadata.read_text()), result.inventory)
+        if _BROWSER_TITLES is not None and titles != _BROWSER_TITLES:
+            raise ValueError("browser title mapping changed after baseline")
+        if _BROWSER_TITLES is None:
+            if result.failed:
+                raise ValueError("browser title mapping requires a green baseline")
+            _BROWSER_TITLES = titles
+    except (OSError, ValueError) as error:
+        return False, 0, 0, set(), out + "\nBrowser metadata refused: " + str(error)
+    failed_titles = {titles[identity] for identity, status in report["tests"] if status == "failed"}
+    return True, result.passed + result.failed, result.failed, failed_titles, out
 
 
 def judge(what, held, names, failed):
@@ -871,8 +960,10 @@ def judge(what, held, names, failed):
 def main():
     import mutation_baseline  # keeps what each command says, for a red baseline
     watch = mutation_baseline.mutation_bound.start()
-    global _PYTHON_EXPECTED
+    global _PYTHON_EXPECTED, _BROWSER_TITLES
     _PYTHON_EXPECTED = None
+    _BROWSER_TITLES = None
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(1))
 
     seen = set()
     for what, *_ in MUTANTS:
@@ -912,8 +1003,7 @@ def main():
             print(f"{what}: ANCHOR NOT FOUND EXACTLY ONCE in {path.name}")
             refused += 1
             continue
-        try:
-            path.write_text(original.replace(anchor, replacement, 1))
+        with mutation_source.changed(path, original, original.replace(anchor, replacement, 1)):
             if held == "guide":
                 result = guide_tests()
                 ran, failed, names, out = result
@@ -959,11 +1049,12 @@ def main():
                 else:
                     verdict = f"SURVIVED (no intended witness failed: {sorted(names)})"
                     survivors += 1
-        finally:
-            path.write_text(original)
         print(f"{what}: {verdict}", flush=True)
         if verdict.startswith("REFUSED"):
             print(out[-3000:], flush=True)
+        if _stopped(watch):
+            print("REFUSED: memory guard stopped the campaign")
+            return 1
 
     if browser:
         # Leave the app built from the sources as they are.

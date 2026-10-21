@@ -684,6 +684,11 @@ fn a_pages_program_is_the_directory_it_names() {
             continue;
         };
         named += 1;
+        assert_eq!(
+            dir,
+            dir.trim(),
+            "a declared directory is trimmed before I/O"
+        );
         let mut on_disk = BTreeMap::new();
         for e in std::fs::read_dir(repo().join(&dir)).unwrap_or_else(|e| panic!("{dir}: {e}")) {
             let p = e.expect("entry").path();
@@ -692,9 +697,8 @@ fn a_pages_program_is_the_directory_it_names() {
                 on_disk.insert(name, std::fs::read_to_string(&p).expect("read"));
             }
         }
-        if let Some(why) = program_problem(&page, &md, &on_disk) {
-            panic!("{why}");
-        }
+        let problem = program_problem(&page, &md, &on_disk);
+        assert!(problem.is_none(), "{problem:?}");
     }
     assert!(named >= 1, "the tutorial names the app it builds");
 }
@@ -713,7 +717,7 @@ fn differs(
     }
     assembled
         .iter()
-        .find(|(name, text)| **text != on_disk[*name])
+        .find(|(name, text)| on_disk.get(*name).is_some_and(|other| **text != *other))
         .map(|(name, _)| format!("`{name}` differs: the tutorial and the app differ"))
 }
 

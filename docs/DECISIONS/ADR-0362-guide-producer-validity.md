@@ -279,3 +279,62 @@ plans and records.
   order), merged from `6abc09f3` (`track/guide-producer-validity`).
   `ADR-XXXX` reads `ADR-0362` in nothing else (the placeholder was this
   file's name and title only), as in this file's name and title.
+
+## Train-12 assertion-only completion (2026-10-21)
+
+A native Python `OSError` in the intended test body was accepted by the old
+consumer as a named kill. The new red witness requires refusal, preserving the
+native structured receipt's distinction between body assertions and body errors.
+All 74 guide fault models and their intended witnesses remain; the three
+`CHECKED` semantic refusals remain explicit compiler contracts.
+
+The guide now uses `cargo_assertion_results` for the one selected Rust binary:
+all 15 names, one complete native summary, consistent exit, no ignored/measured
+cases, and each failed test's source line and column at a direct assertion.
+Unwrap, setup, runtime and compilation failures earn no kill. Python keeps its
+seven frozen full IDs and shared `guide_python` provenance, but any body error
+invalidates the producer. Only intended body assertions are credited.
+
+The guestbook runs all four Chromium cases once, using the shared assertion
+wrapper and nonce-bound complete receipt. Native status, completeness and
+assertion classification come only from `browser_test_results`. The same native
+invocation also writes the built-in JSON reporter to a fresh owned path. Its
+unique spec IDs must exactly match the authenticated receipt; each has one
+Chromium project and a nonempty title. The full ID-to-title map is frozen by the
+green baseline and must remain identical for every mutant. JSON outcomes and
+terminal prose have no authority. Missing, duplicate, extra, changed or invalid
+metadata refuses the result. `MUST` still requires the intended title to fail.
+
+This adapter uses the pinned Playwright 1.58 reporter's `spec.id`, `spec.title`,
+nested suite titles and `tests[].projectName`; an actual four-case native run
+verified that its IDs equal the shared reporter's `TestCase.id`. The official
+[JSON reporter documentation](https://playwright.dev/docs/test-reporters#json-reporter)
+describes the file environment variables and multiple reporters. Both output
+file variables are overridden with the same fresh path, so an inherited output
+setting cannot redirect this invocation's metadata.
+
+The guestbook retains declaration order with `mode: "default"`, and uses no
+retries. Each test has its own page/context and setup; there is no shared
+`beforeAll` state. A failed case therefore does not skip independent later cases.
+Its ordinary expect matchers are supported by the shared wrapper without
+changing their assertions or time bounds.
+
+A named compiler refusal requires native exit 1, the exact guestbook/standard
+package file count, one terminal plain `pw check` summary, a positive error count
+matching every typed error header, zero warnings and no extra build/runtime
+errors. The complete error-code set must equal the model's exact `CHECKED` set.
+Syntax errors or additional diagnostics cannot earn this semantic credit.
+Only the native plain renderer's location, source-gutter, note and help lines
+may continue an opened diagnostic; unknown or orphaned output refuses.
+
+Native launch, timeout and cancellation use `producer_process`; edited sources
+use `mutation_source`. The ADR-0376 completion boundary and cooperative-process
+scope remain unchanged. A memory stop invalidates the current producer and ends
+the campaign. The separate instrument campaign retains its original eight
+fault models, adds strict boundary controls and syntax-checks planted Python
+before running its complete frozen consumer inventory. Runtime errors, skips,
+partial inventories, invalid exits and unrelated assertions earn no kill.
+
+Historical counts and broader body-error acceptance above describe previous
+versions, not this assertion-only contract. Native checks of the final source
+and the full current hosted guide campaign must be recorded before landing.
