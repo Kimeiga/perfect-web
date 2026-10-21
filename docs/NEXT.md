@@ -58,12 +58,18 @@ starting another feature batch.
    demonstrate the repairs; whole31/74 campaigns remain required. Tighten the
    guide producer to require actual assertions and complete inventories, while
    preserving its three explicitly named semantic checker refusals.
-9. Rerecord `e14-guide-ownership` on the current source: the post-dispatch
+9. Repair the surviving `e14-browser-host-map` reserved-host control. Its
+   25 fast, 17 CLI and 111 browser baseline cases passed, but the fast suite
+   detected only 53/54 controls overall. The intended rejection test still
+   passed when reserved host names were allowed. Preserve the host contract
+   and all fault models; demonstrate the actual assertion failure and rerun
+   the complete campaign.
+10. Rerecord `e14-guide-ownership` on the current source: the post-dispatch
    Linux/procfs capability guard changes its proof scope. Unsupported hosts
    skip explicitly and cannot satisfy the strict mutation baseline.
-10. Reconcile eligible current evidence under ADR-0281, run exact-commit CI
+11. Reconcile eligible current evidence under ADR-0281, run exact-commit CI
    and all reached follow-ups, then land only the verified combined tree.
-   All nine failed recipe results remain failed and none is fetched as a
+   All ten failed recipe results remain failed and none is fetched as a
    pass. Separate effect-inference scaling work awaits its own
    exact-commit CI and whole campaigns before integration.
 

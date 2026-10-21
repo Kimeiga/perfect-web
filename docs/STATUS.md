@@ -88,15 +88,17 @@ evidence. No failed result is promoted by this summary.
 - **The 239-recipe combined verification is still running.**
   [39526960864](https://github.com/studiokimeiga/perfect-web/actions/runs/39526960864)
   at `f15117de` passed all three full browser jobs, but native recipes
-  `e14-todomvc`, `e14-device-store`, `e14-check-is-build`, `e14-bind`
+  `e14-todomvc`, `e14-device-store`, `e14-check-is-build`, `e14-bind`,
   `e14-speculated-arms`, `e14-representations`, `e14-computed-conditions`,
-  `e14-mutation-bound` and `e14-guide` failed. TodoMVC's unchanged Cypress
+  `e14-mutation-bound`, `e14-guide` and `e14-browser-host-map` failed. TodoMVC's unchanged Cypress
   execution passed 24/29 (native status 3); device-store's strict campaign
   credited 53/62 controls and refused nine invalid producers. The source
   census missed TodoMVC; one of 14 binding controls and one of eight
   speculation controls survived. Representations detected3/4 and computed
   conditions9/12; the memory-bound campaign refused one invalid witness,
-  and the guide campaign stopped on a stale control-map entry. Repairs
+  and the guide campaign stopped on a stale control-map entry. The browser
+  host map detected53/54 controls; its reserved-host rejection witness
+  missed the injected fault. Repairs
   and their whole affected follow-ups are pending; [NEXT](NEXT.md) records
   the causes and acceptance obligations. Post-dispatch guide ownership
   scope changes also require current evidence.
