@@ -157,3 +157,29 @@ neighbors and producer checks are retained as diagnostic evidence. The whole
 twelve-control campaign, including both runtime faults in all three engines,
 must pass on the final hosted candidate before its result replaces the failed
 historical record.
+
+## A valid draft must enable submission (2026-10-21)
+
+The hosted run `39538607183` at `34f3c2d1` reported 42 failures and 24 passes
+for the fault that omits `computedNow()` from the renderer's values. Those
+failures included action and request timeouts, and the complete receipt was
+missing. A valid draft left Post disabled, and
+several tests attempted the click without first asserting the draft's computed
+submission state. The strict producer correctly refused that result; the
+historical eleven kills and one refusal are not a passing twelve-control run.
+
+Every existing Post click now first asserts that the valid draft enables the
+button. The keepalive case makes that assertion before starting its request
+waiter, so a failed precondition does not leave an unrelated pending request.
+These assertions exercise the same computed enabled-state contract already
+checked by the draft-length case. Existing clicks and all downstream behavior
+assertions remain, including the 280-code-point boundary and optimistic rows.
+All 22 test titles in all three engines and all twelve semantic operators remain
+unchanged. No timeout, parser or receipt exception is added.
+
+The focused native baseline and restored baseline each passed 66 of 66 tests.
+The unchanged original fault produced 24 passes and 42 test-body assertion
+failures, fourteen per engine, with a complete frozen receipt and native exit 1.
+These runs are recorded in [the browser witness diagnostic](../diagnostics/train-12/computed-browser-post-precondition.txt).
+The entire twelve-control campaign and the feed spec's reached consumers still
+require the final hosted candidate's verification.

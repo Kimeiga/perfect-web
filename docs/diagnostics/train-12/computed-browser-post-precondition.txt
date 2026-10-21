@@ -1,0 +1,609 @@
+Computed-condition Post precondition witness; diagnostic only, not current E14 acceptance.
+Base source 1c2f11f683b2c16d49502fd50a5901dc99ca9728 plus ten test-body assertions.
+Original source/runtime/operator and all downstream assertions preserved.
+Full raw files retained in C:/Users/haki/code/perfect-web-handoff/tracks/evidence/computed-browser-witness/.
+Command: python3 /tmp/train12-computed-browser-proof.py; PORT=17441.
+Native commands use the existing feed spec, assertion reporter and shared browser_test_results parser.
+All sources are built for each phase. No copied suite or timeout exception.
+Whole twelve-control campaign and the 20 reached recipes remain hosted verification requirements.
+
+22 original test titles preserved; three engines; exact frozen inventory of 66.
+All 12 operators and runtime source byte-identical after restoration.
+Native mutant failure headers: {"chromium": 14, "firefox": 14, "webkit": 14}
+No action/request timeout markers in mutant output.
+
+Controller output (verbatim):
+BEGIN baseline
+baseline {"native_status": 0, "valid": true, "reason": "", "passed": 66, "failed": 0}
+BEGIN mutant
+mutant {"native_status": 1, "valid": true, "reason": "", "passed": 24, "failed": 42}
+BEGIN restored
+restored {"native_status": 0, "valid": true, "reason": "", "passed": 66, "failed": 0}
+PASS: unchanged operator, full frozen 66 inventory, assertion-only mutant and restored green
+
+Historical invalid native output excerpt (verbatim):
+  1) [chromium] › e2e/feed.spec.mjs:192:1 › a post reaches the author's timeline and every other reader's 
+    Error: locator.click: Test ended.
+      - waiting for getByRole('button', { name: 'Post' })
+        - locator resolved to <button disabled data-pw="5" type="submit">Post</button>
+      - attempting click action
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+           - element is not enabled
+         - retrying click action
+           - waiting 500ms
+  2) [firefox] › e2e/feed.spec.mjs:192:1 › a post reaches the author's timeline and every other reader's 
+    Error: locator.click: Test ended.
+    [pid=35143][out]   Message: EmptyDatabaseError: "main/nimbus-desktop-experiments" has not been synced yet
+    [pid=35143][err] JavaScript error: http://127.0.0.1:3202/pw-runtime.mjs, line 1334: Error: block 19 did not render: MissingValue { path: "#feed.app.Home~ui~19" }
+    [pid=35143][err] JavaScript error: resource:///modules/backup/BackupService.sys.mjs, line 3721: NotAllowedError: PathUtils.join: PathUtils does not support empty paths
+      - waiting for getByRole('button', { name: 'Post' })
+        - locator resolved to <button disabled data-pw="5" type="submit">Post</button>
+      - attempting click action
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+           - element is not enabled
+         - retrying click action
+           - waiting 500ms
+  3) [chromium] › e2e/feed.spec.mjs:233:1 › what is left of a draft is computed as it is typed ─────
+    Error: expect(locator).toBeEnabled() failed
+    Expected: enabled
+    Received: disabled
+      - Expect "toBeEnabled" with timeout 5000ms
+      - waiting for getByRole('button', { name: 'Post' })
+          - unexpected value "disabled"
+    [cause]: Error: PW_ASSERTION:d5dade0b22d576a7d15ee96441db6c5922c810725d0087e12f343564ee8bcfc6
+  4) [firefox] › e2e/feed.spec.mjs:233:1 › what is left of a draft is computed as it is typed ──────
+    Error: expect(locator).toBeEnabled() failed
+    Expected: enabled
+    Received: disabled
+      - Expect "toBeEnabled" with timeout 5000ms
+      - waiting for getByRole('button', { name: 'Post' })
+          - unexpected value "disabled"
+    [cause]: Error: PW_ASSERTION:d5dade0b22d576a7d15ee96441db6c5922c810725d0087e12f343564ee8bcfc6
+  5) [chromium] › e2e/feed.spec.mjs:262:1 › a condition is computed: a draft too long, and a thread with no reply 
+    Error: expect(locator).toHaveText(expected) failed
+    Expected: "Too long to post."
+    Error: element(s) not found
+      - Expect "toHaveText" with timeout 5000ms
+      - waiting for getByRole('alert')
+    [cause]: Error: PW_ASSERTION:d5dade0b22d576a7d15ee96441db6c5922c810725d0087e12f343564ee8bcfc6
+  6) [firefox] › e2e/feed.spec.mjs:262:1 › a condition is computed: a draft too long, and a thread with no reply 
+    Error: expect(locator).toHaveText(expected) failed
+    Expected: "Too long to post."
+    Error: element(s) not found
+      - Expect "toHaveText" with timeout 5000ms
+      - waiting for getByRole('alert')
+    [cause]: Error: PW_ASSERTION:d5dade0b22d576a7d15ee96441db6c5922c810725d0087e12f343564ee8bcfc6
+  7) [chromium] › e2e/feed.spec.mjs:312:1 › a post shows before the server answers, and is the server's after 
+    Error: locator.click: Test timeout of 30000ms exceeded.
+      - waiting for getByRole('button', { name: 'Post' })
+        - locator resolved to <button disabled data-pw="5" type="submit">Post</button>
+      - attempting click action
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+           - element is not enabled
+         - retrying click action
+           - waiting 500ms
+  8) [firefox] › e2e/feed.spec.mjs:312:1 › a post shows before the server answers, and is the server's after 
+    Error: locator.click: Test timeout of 30000ms exceeded.
+      - waiting for getByRole('button', { name: 'Post' })
+        - locator resolved to <button disabled data-pw="5" type="submit">Post</button>
+      - attempting click action
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+           - element is not enabled
+         - retrying click action
+           - waiting 500ms
+  9) [chromium] › e2e/feed.spec.mjs:337:1 › a post shown before the server answers waits, and acts once it is the server's 
+    Error: locator.click: Test timeout of 30000ms exceeded.
+      - waiting for getByRole('button', { name: 'Post' })
+        - locator resolved to <button disabled data-pw="5" type="submit">Post</button>
+      - attempting click action
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+           - element is not enabled
+         - retrying click action
+           - waiting 500ms
+  10) [firefox] › e2e/feed.spec.mjs:337:1 › a post shown before the server answers waits, and acts once it is the server's 
+    Error: locator.click: Test timeout of 30000ms exceeded.
+      - waiting for getByRole('button', { name: 'Post' })
+        - locator resolved to <button disabled data-pw="5" type="submit">Post</button>
+      - attempting click action
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+           - element is not enabled
+         - retrying click action
+           - waiting 500ms
+  11) [chromium] › e2e/feed.spec.mjs:413:1 › a post whose request fails is taken back ──────────────
+    Error: locator.click: Test timeout of 30000ms exceeded.
+      - waiting for getByRole('button', { name: 'Post' })
+        - locator resolved to <button disabled data-pw="5" type="submit">Post</button>
+      - attempting click action
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+           - element is not enabled
+         - retrying click action
+           - waiting 500ms
+  12) [firefox] › e2e/feed.spec.mjs:413:1 › a post whose request fails is taken back ───────────────
+    Error: locator.click: Test timeout of 30000ms exceeded.
+      - waiting for getByRole('button', { name: 'Post' })
+        - locator resolved to <button disabled data-pw="5" type="submit">Post</button>
+      - attempting click action
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+           - element is not enabled
+         - retrying click action
+           - waiting 500ms
+  13) [chromium] › e2e/feed.spec.mjs:433:1 › a post longer than 280 characters is not sent, and 280 emoji are 
+    Error: locator.click: Test timeout of 30000ms exceeded.
+      - waiting for getByRole('button', { name: 'Post' })
+        - locator resolved to <button disabled data-pw="5" type="submit">Post</button>
+      - attempting click action
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+           - element is not enabled
+         - retrying click action
+           - waiting 500ms
+  14) [firefox] › e2e/feed.spec.mjs:433:1 › a post longer than 280 characters is not sent, and 280 emoji are 
+    Error: locator.click: Test timeout of 30000ms exceeded.
+      - waiting for getByRole('button', { name: 'Post' })
+        - locator resolved to <button disabled data-pw="5" type="submit">Post</button>
+      - attempting click action
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+           - element is not enabled
+         - retrying click action
+           - waiting 500ms
+  15) [chromium] › e2e/feed.spec.mjs:467:1 › Load more shows the next page, and a post after it is shown over it 
+    Error: locator.click: Test timeout of 30000ms exceeded.
+      - waiting for getByRole('button', { name: 'Post' })
+        - locator resolved to <button disabled data-pw="5" type="submit">Post</button>
+      - attempting click action
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+           - element is not enabled
+         - retrying click action
+           - waiting 500ms
+  16) [firefox] › e2e/feed.spec.mjs:467:1 › Load more shows the next page, and a post after it is shown over it 
+    Error: locator.click: Test timeout of 30000ms exceeded.
+      - waiting for getByRole('button', { name: 'Post' })
+        - locator resolved to <button disabled data-pw="5" type="submit">Post</button>
+      - attempting click action
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+           - element is not enabled
+         - retrying click action
+           - waiting 500ms
+  17) [chromium] › e2e/feed.spec.mjs:509:1 › a reply reaches its thread and every reader of it, and no timeline 
+    Error: locator.click: Test ended.
+      - waiting for getByRole('button', { name: 'Post' })
+        - locator resolved to <button disabled data-pw="5" type="submit">Post</button>
+      - attempting click action
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+           - element is not enabled
+         - retrying click action
+           - waiting 500ms
+  18) [firefox] › e2e/feed.spec.mjs:509:1 › a reply reaches its thread and every reader of it, and no timeline 
+    Error: locator.click: Test ended.
+    [pid=38905][out]   Message: EmptyDatabaseError: "main/nimbus-desktop-experiments" has not been synced yet
+    [pid=38905][err] JavaScript error: http://127.0.0.1:3202/pw-runtime.mjs, line 1334: Error: block 19 did not render: MissingValue { path: "#feed.app.Home~ui~19" }
+    [pid=38905][err] JavaScript error: resource:///modules/backup/BackupService.sys.mjs, line 3721: NotAllowedError: PathUtils.join: PathUtils does not support empty paths
+      - waiting for getByRole('button', { name: 'Post' })
+        - locator resolved to <button disabled data-pw="5" type="submit">Post</button>
+      - attempting click action
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+           - element is not enabled
+         - retrying click action
+           - waiting 500ms
+  19) [chromium] › e2e/feed.spec.mjs:571:1 › a reply shows before the server answers, and is the server's after 
+    Error: locator.click: Test timeout of 30000ms exceeded.
+      - waiting for getByRole('button', { name: 'Post' })
+        - locator resolved to <button disabled data-pw="5" type="submit">Post</button>
+      - attempting click action
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+           - element is not enabled
+         - retrying click action
+           - waiting 500ms
+  20) [firefox] › e2e/feed.spec.mjs:571:1 › a reply shows before the server answers, and is the server's after 
+    Error: locator.click: Test timeout of 30000ms exceeded.
+      - waiting for getByRole('button', { name: 'Post' })
+        - locator resolved to <button disabled data-pw="5" type="submit">Post</button>
+      - attempting click action
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+           - element is not enabled
+         - retrying click action
+           - waiting 500ms
+  21) [chromium] › e2e/feed.spec.mjs:599:1 › a reply whose request fails is taken back ─────────────
+    Error: locator.click: Test timeout of 30000ms exceeded.
+      - waiting for getByRole('button', { name: 'Post' })
+        - locator resolved to <button disabled data-pw="5" type="submit">Post</button>
+      - attempting click action
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+           - element is not enabled
+         - retrying click action
+           - waiting 500ms
+        - waiting for element to be visible, enabled and stable
+  22) [firefox] › e2e/feed.spec.mjs:599:1 › a reply whose request fails is taken back ──────────────
+    Error: locator.click: Test timeout of 30000ms exceeded.
+      - waiting for getByRole('button', { name: 'Post' })
+        - locator resolved to <button disabled data-pw="5" type="submit">Post</button>
+      - attempting click action
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+           - element is not enabled
+         - retrying click action
+           - waiting 500ms
+  23) [chromium] › e2e/feed.spec.mjs:622:1 › a like on the thread page shows before the server answers 
+    Error: locator.click: Test timeout of 30000ms exceeded.
+      - waiting for getByRole('button', { name: 'Post' })
+        - locator resolved to <button disabled data-pw="5" type="submit">Post</button>
+      - attempting click action
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+           - element is not enabled
+         - retrying click action
+           - waiting 500ms
+  24) [firefox] › e2e/feed.spec.mjs:622:1 › a like on the thread page shows before the server answers 
+    Error: locator.click: Test timeout of 30000ms exceeded.
+      - waiting for getByRole('button', { name: 'Post' })
+        - locator resolved to <button disabled data-pw="5" type="submit">Post</button>
+      - attempting click action
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+           - element is not enabled
+         - retrying click action
+           - waiting 500ms
+  25) [chromium] › e2e/feed.spec.mjs:742:1 › your own page says it is yours ────────────────────────
+    Error: locator.click: Test timeout of 30000ms exceeded.
+      - waiting for getByRole('button', { name: 'Post' })
+        - locator resolved to <button disabled data-pw="5" type="submit">Post</button>
+      - attempting click action
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+           - element is not enabled
+         - retrying click action
+           - waiting 500ms
+  26) [firefox] › e2e/feed.spec.mjs:742:1 › your own page says it is yours ─────────────────────────
+    Error: locator.click: Test timeout of 30000ms exceeded.
+      - waiting for getByRole('button', { name: 'Post' })
+        - locator resolved to <button disabled data-pw="5" type="submit">Post</button>
+      - attempting click action
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+           - element is not enabled
+         - retrying click action
+           - waiting 500ms
+  27) [chromium] › e2e/feed.spec.mjs:763:1 › a post's request is kept alive, counted by its bytes ──
+    Error: page.waitForRequest: Test timeout of 30000ms exceeded.
+    Error: locator.click: Test timeout of 30000ms exceeded.
+      - waiting for getByRole('button', { name: 'Post' })
+        - locator resolved to <button disabled data-pw="5" type="submit">Post</button>
+      - attempting click action
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+           - element is not enabled
+         - retrying click action
+           - waiting 500ms
+  28) [firefox] › e2e/feed.spec.mjs:763:1 › a post's request is kept alive, counted by its bytes ───
+    Error: page.waitForRequest: Test timeout of 30000ms exceeded.
+    Error: locator.click: Test timeout of 30000ms exceeded.
+      - waiting for getByRole('button', { name: 'Post' })
+        - locator resolved to <button disabled data-pw="5" type="submit">Post</button>
+      - attempting click action
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+           - element is not enabled
+         - retrying click action
+           - waiting 500ms
+  29) [webkit] › e2e/feed.spec.mjs:192:1 › a post reaches the author's timeline and every other reader's 
+    Error: locator.click: Test ended.
+      - waiting for getByRole('button', { name: 'Post' })
+        - locator resolved to <button disabled data-pw="5" type="submit">Post</button>
+      - attempting click action
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+           - element is not enabled
+         - retrying click action
+           - waiting 500ms
+        - waiting for element to be visible, enabled and stable
+  30) [webkit] › e2e/feed.spec.mjs:233:1 › what is left of a draft is computed as it is typed ──────
+    Error: expect(locator).toBeEnabled() failed
+    Expected: enabled
+    Received: disabled
+      - Expect "toBeEnabled" with timeout 5000ms
+      - waiting for getByRole('button', { name: 'Post' })
+          - unexpected value "disabled"
+    [cause]: Error: PW_ASSERTION:d5dade0b22d576a7d15ee96441db6c5922c810725d0087e12f343564ee8bcfc6
+  31) [webkit] › e2e/feed.spec.mjs:262:1 › a condition is computed: a draft too long, and a thread with no reply 
+    Error: expect(locator).toHaveText(expected) failed
+    Expected: "Too long to post."
+    Error: element(s) not found
+      - Expect "toHaveText" with timeout 5000ms
+      - waiting for getByRole('alert')
+    [cause]: Error: PW_ASSERTION:d5dade0b22d576a7d15ee96441db6c5922c810725d0087e12f343564ee8bcfc6
+  32) [webkit] › e2e/feed.spec.mjs:312:1 › a post shows before the server answers, and is the server's after 
+    Error: locator.click: Test timeout of 30000ms exceeded.
+      - waiting for getByRole('button', { name: 'Post' })
+        - locator resolved to <button disabled data-pw="5" type="submit">Post</button>
+      - attempting click action
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+           - element is not enabled
+         - retrying click action
+           - waiting 500ms
+  33) [webkit] › e2e/feed.spec.mjs:337:1 › a post shown before the server answers waits, and acts once it is the server's 
+    Error: locator.click: Test timeout of 30000ms exceeded.
+      - waiting for getByRole('button', { name: 'Post' })
+        - locator resolved to <button disabled data-pw="5" type="submit">Post</button>
+      - attempting click action
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+           - element is not enabled
+         - retrying click action
+           - waiting 500ms
+  34) [webkit] › e2e/feed.spec.mjs:413:1 › a post whose request fails is taken back ────────────────
+    Error: locator.click: Test timeout of 30000ms exceeded.
+      - waiting for getByRole('button', { name: 'Post' })
+        - locator resolved to <button disabled data-pw="5" type="submit">Post</button>
+      - attempting click action
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+           - element is not enabled
+         - retrying click action
+           - waiting 500ms
+  35) [webkit] › e2e/feed.spec.mjs:433:1 › a post longer than 280 characters is not sent, and 280 emoji are 
+    Error: locator.click: Test timeout of 30000ms exceeded.
+      - waiting for getByRole('button', { name: 'Post' })
+        - locator resolved to <button disabled data-pw="5" type="submit">Post</button>
+      - attempting click action
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+           - element is not enabled
+         - retrying click action
+           - waiting 500ms
+  36) [webkit] › e2e/feed.spec.mjs:467:1 › Load more shows the next page, and a post after it is shown over it 
+    Error: locator.click: Test timeout of 30000ms exceeded.
+      - waiting for getByRole('button', { name: 'Post' })
+        - locator resolved to <button disabled data-pw="5" type="submit">Post</button>
+      - attempting click action
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+           - element is not enabled
+         - retrying click action
+           - waiting 500ms
+  37) [webkit] › e2e/feed.spec.mjs:509:1 › a reply reaches its thread and every reader of it, and no timeline 
+    Error: locator.click: Test ended.
+      - waiting for getByRole('button', { name: 'Post' })
+        - locator resolved to <button disabled data-pw="5" type="submit">Post</button>
+      - attempting click action
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+           - element is not enabled
+         - retrying click action
+           - waiting 500ms
+  38) [webkit] › e2e/feed.spec.mjs:571:1 › a reply shows before the server answers, and is the server's after 
+    Error: locator.click: Test timeout of 30000ms exceeded.
+      - waiting for getByRole('button', { name: 'Post' })
+        - locator resolved to <button disabled data-pw="5" type="submit">Post</button>
+      - attempting click action
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+           - element is not enabled
+         - retrying click action
+           - waiting 500ms
+  39) [webkit] › e2e/feed.spec.mjs:599:1 › a reply whose request fails is taken back ───────────────
+    Error: locator.click: Test timeout of 30000ms exceeded.
+      - waiting for getByRole('button', { name: 'Post' })
+        - locator resolved to <button disabled data-pw="5" type="submit">Post</button>
+      - attempting click action
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+           - element is not enabled
+         - retrying click action
+           - waiting 500ms
+  40) [webkit] › e2e/feed.spec.mjs:622:1 › a like on the thread page shows before the server answers 
+    Error: locator.click: Test timeout of 30000ms exceeded.
+      - waiting for getByRole('button', { name: 'Post' })
+        - locator resolved to <button disabled data-pw="5" type="submit">Post</button>
+      - attempting click action
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+           - element is not enabled
+         - retrying click action
+           - waiting 500ms
+  41) [webkit] › e2e/feed.spec.mjs:742:1 › your own page says it is yours ──────────────────────────
+    Error: locator.click: Test timeout of 30000ms exceeded.
+      - waiting for getByRole('button', { name: 'Post' })
+        - locator resolved to <button disabled data-pw="5" type="submit">Post</button>
+      - attempting click action
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+           - element is not enabled
+         - retrying click action
+           - waiting 500ms
+  42) [webkit] › e2e/feed.spec.mjs:763:1 › a post's request is kept alive, counted by its bytes ────
+    Error: locator.click: Test timeout of 30000ms exceeded.
+      - waiting for getByRole('button', { name: 'Post' })
+        - locator resolved to <button disabled data-pw="5" type="submit">Post</button>
+      - attempting click action
+          - element is not enabled
+        - retrying click action
+        - waiting 20ms
+          - element is not enabled
+        - retrying click action
+          - waiting 100ms
+           - element is not enabled
+         - retrying click action
+           - waiting 500ms
+    Error: page.waitForRequest: Test timeout of 30000ms exceeded.
+  42 failed
+  24 passed (13.5m)
+  run_suite: kept 15 of 43 entries of its output (32.0 MiB) in kept-traces/e14-computed-conditions/20261021T034036Z-35032/run-1; 28 (90.0 MiB) were over the 32.0 MiB a kept-traces holds (see NOT-KEPT.txt)
+  run_suite: exit 1
+
+REFUSED browser producer: missing complete browser receipt
+the browser renders a block without what it computes [browser]: REFUSED (invalid or stopped producer; no kill)
+
+Full raw SHA256 inventory:
+9e72fce0bcb6efb58afd314e995ba5852dc04d02090c52c2e42806a08d7ce639  /mnt/c/Users/haki/code/perfect-web-handoff/tracks/evidence/wit-unique/verify-39538607183/evidence-17/evidence/docs/evidence/E14/computed-conditions.txt
+3d811b53c7645e81f05b714d7e7bd2fc42485e4047b9036d1ccf814201774f9f  /tmp/train12-computed-browser-proof/baseline/assertions.json
+a6b24fa84716607f47646590acb6b7ded24f0eeef452d60c217fe626db4cc172  /tmp/train12-computed-browser-proof/baseline/output.txt
+1958e8996f51177c268471bc4e1e2fc7cea390ad121b96606318b57ef821ac64  /tmp/train12-computed-browser-proof/mutant/assertions.json
+ee11a2ebda2ee52b7bbfda13d3b9fb1521e26f3457097e9b41d39e6c677d786a  /tmp/train12-computed-browser-proof/mutant/output.txt
+72dc7255d0d740d084fd1d4c094d1793362cc23abd03d6a5c9b0b0d312b89f59  /tmp/train12-computed-browser-proof/restored/assertions.json
+927ed57ea3a5ab17c84d9587ac8ee4a25dc6a223982fce91fd936e5ed11d23b3  /tmp/train12-computed-browser-proof/restored/output.txt
+
+baseline complete native receipt (verbatim):
+{"schema":1,"complete":true,"nonce":"e3b131ae53a2cbbc04c1701d2c8e849703226ca503fc062954695df3444cf4d9","tests":[["ecb225d951287b8e15c1-01dfffb92e1597fcf15c","passed"],["ecb225d951287b8e15c1-034d82e9aa9786b08320","passed"],["ecb225d951287b8e15c1-041dbd7451ac8a9c957f","passed"],["ecb225d951287b8e15c1-04b958af1fecfb3bfde3","passed"],["ecb225d951287b8e15c1-055bf75539b5a4b17d16","passed"],["ecb225d951287b8e15c1-069cb3cb7b627407db53","passed"],["ecb225d951287b8e15c1-06b370c10cc4dea9e70a","passed"],["ecb225d951287b8e15c1-0a4ac61b3a19f7fdd2e1","passed"],["ecb225d951287b8e15c1-0f33f058e84b4bea9bf6","passed"],["ecb225d951287b8e15c1-0f95ba07f482eb56cafc","passed"],["ecb225d951287b8e15c1-115edb07c9b6c498cb53","passed"],["ecb225d951287b8e15c1-12ba68fa4868b56e2de2","passed"],["ecb225d951287b8e15c1-12cc4945b7b3e7c7b751","passed"],["ecb225d951287b8e15c1-16aae6a51fe92304aee1","passed"],["ecb225d951287b8e15c1-24c792c92ea47332bfe5","passed"],["ecb225d951287b8e15c1-3168f769b6a64daf33d5","passed"],["ecb225d951287b8e15c1-3ae23cf7092609f083fe","passed"],["ecb225d951287b8e15c1-3c6f6d7a95f5abf8a1d0","passed"],["ecb225d951287b8e15c1-3fd5b10cde47f3747e1a","passed"],["ecb225d951287b8e15c1-44e168720c3ab4d5d551","passed"],["ecb225d951287b8e15c1-459b4d781d47d16c7a2a","passed"],["ecb225d951287b8e15c1-4ceb460e51d9dc67c654","passed"],["ecb225d951287b8e15c1-4e1d6f9510c3e1d92932","passed"],["ecb225d951287b8e15c1-5142ace001d7483bf8c5","passed"],["ecb225d951287b8e15c1-51afbf11e9d4b7c93112","passed"],["ecb225d951287b8e15c1-57b3a315918ded968732","passed"],["ecb225d951287b8e15c1-57e731be0a826ac5d18c","passed"],["ecb225d951287b8e15c1-5b46a0a285274e10b58a","passed"],["ecb225d951287b8e15c1-5cd53da3dd2a6e2756e9","passed"],["ecb225d951287b8e15c1-5e4655694634348a4908","passed"],["ecb225d951287b8e15c1-5f9d1ae61dcf9b69b669","passed"],["ecb225d951287b8e15c1-6405c43a8cce9c08e433","passed"],["ecb225d951287b8e15c1-65d943b10f5ed389ce14","passed"],["ecb225d951287b8e15c1-6a9fe6f94f1b31e21eda","passed"],["ecb225d951287b8e15c1-6aa5ef9e31b5a39c60da","passed"],["ecb225d951287b8e15c1-73b7909b2111e4651780","passed"],["ecb225d951287b8e15c1-7b9327847800609641ab","passed"],["ecb225d951287b8e15c1-7caf5e2f109df0d93568","passed"],["ecb225d951287b8e15c1-81183e1d1aa62318f33e","passed"],["ecb225d951287b8e15c1-85313e3a0de50b52560c","passed"],["ecb225d951287b8e15c1-8e5aee32052c295f01e4","passed"],["ecb225d951287b8e15c1-8ff519216c469e843e7e","passed"],["ecb225d951287b8e15c1-99a5c5926aa40cddcb7d","passed"],["ecb225d951287b8e15c1-9b6a9913aa79623edcb7","passed"],["ecb225d951287b8e15c1-9f6945bc7a052b5e04b4","passed"],["ecb225d951287b8e15c1-a0173dd3ea9299043a5d","passed"],["ecb225d951287b8e15c1-a1d34e5fc1547abdb6d2","passed"],["ecb225d951287b8e15c1-a630344e1feb43284f5c","passed"],["ecb225d951287b8e15c1-ad0b18a693d1a55c6a57","passed"],["ecb225d951287b8e15c1-bad3bd04184c4963aac9","passed"],["ecb225d951287b8e15c1-c7fa59b95f92570efb83","passed"],["ecb225d951287b8e15c1-cdf6b2e7e8864b7ebbfa","passed"],["ecb225d951287b8e15c1-cfacdcdf7e7b5664a298","passed"],["ecb225d951287b8e15c1-d01dd2e197df60e1bf94","passed"],["ecb225d951287b8e15c1-d079f166a8ddd458cd04","passed"],["ecb225d951287b8e15c1-d1db7e9ac2bf0d5361f0","passed"],["ecb225d951287b8e15c1-d435b324d3b8827e05e3","passed"],["ecb225d951287b8e15c1-d8ee829c50c9751f80b4","passed"],["ecb225d951287b8e15c1-da53754518b8e7ef1b58","passed"],["ecb225d951287b8e15c1-dd250582a07ec88e47ca","passed"],["ecb225d951287b8e15c1-dd8d5d4d7d9bf5379bf6","passed"],["ecb225d951287b8e15c1-ed6a66189e8f5262ea0a","passed"],["ecb225d951287b8e15c1-edff112e62859b5358e9","passed"],["ecb225d951287b8e15c1-f59ce4c875e0694d07ac","passed"],["ecb225d951287b8e15c1-f9bc579ccc5b73f804eb","passed"],["ecb225d951287b8e15c1-ff692995c2c63f9fcde3","passed"]],"inventory":["ecb225d951287b8e15c1-01dfffb92e1597fcf15c","ecb225d951287b8e15c1-034d82e9aa9786b08320","ecb225d951287b8e15c1-041dbd7451ac8a9c957f","ecb225d951287b8e15c1-04b958af1fecfb3bfde3","ecb225d951287b8e15c1-055bf75539b5a4b17d16","ecb225d951287b8e15c1-069cb3cb7b627407db53","ecb225d951287b8e15c1-06b370c10cc4dea9e70a","ecb225d951287b8e15c1-0a4ac61b3a19f7fdd2e1","ecb225d951287b8e15c1-0f33f058e84b4bea9bf6","ecb225d951287b8e15c1-0f95ba07f482eb56cafc","ecb225d951287b8e15c1-115edb07c9b6c498cb53","ecb225d951287b8e15c1-12ba68fa4868b56e2de2","ecb225d951287b8e15c1-12cc4945b7b3e7c7b751","ecb225d951287b8e15c1-16aae6a51fe92304aee1","ecb225d951287b8e15c1-24c792c92ea47332bfe5","ecb225d951287b8e15c1-3168f769b6a64daf33d5","ecb225d951287b8e15c1-3ae23cf7092609f083fe","ecb225d951287b8e15c1-3c6f6d7a95f5abf8a1d0","ecb225d951287b8e15c1-3fd5b10cde47f3747e1a","ecb225d951287b8e15c1-44e168720c3ab4d5d551","ecb225d951287b8e15c1-459b4d781d47d16c7a2a","ecb225d951287b8e15c1-4ceb460e51d9dc67c654","ecb225d951287b8e15c1-4e1d6f9510c3e1d92932","ecb225d951287b8e15c1-5142ace001d7483bf8c5","ecb225d951287b8e15c1-51afbf11e9d4b7c93112","ecb225d951287b8e15c1-57b3a315918ded968732","ecb225d951287b8e15c1-57e731be0a826ac5d18c","ecb225d951287b8e15c1-5b46a0a285274e10b58a","ecb225d951287b8e15c1-5cd53da3dd2a6e2756e9","ecb225d951287b8e15c1-5e4655694634348a4908","ecb225d951287b8e15c1-5f9d1ae61dcf9b69b669","ecb225d951287b8e15c1-6405c43a8cce9c08e433","ecb225d951287b8e15c1-65d943b10f5ed389ce14","ecb225d951287b8e15c1-6a9fe6f94f1b31e21eda","ecb225d951287b8e15c1-6aa5ef9e31b5a39c60da","ecb225d951287b8e15c1-73b7909b2111e4651780","ecb225d951287b8e15c1-7b9327847800609641ab","ecb225d951287b8e15c1-7caf5e2f109df0d93568","ecb225d951287b8e15c1-81183e1d1aa62318f33e","ecb225d951287b8e15c1-85313e3a0de50b52560c","ecb225d951287b8e15c1-8e5aee32052c295f01e4","ecb225d951287b8e15c1-8ff519216c469e843e7e","ecb225d951287b8e15c1-99a5c5926aa40cddcb7d","ecb225d951287b8e15c1-9b6a9913aa79623edcb7","ecb225d951287b8e15c1-9f6945bc7a052b5e04b4","ecb225d951287b8e15c1-a0173dd3ea9299043a5d","ecb225d951287b8e15c1-a1d34e5fc1547abdb6d2","ecb225d951287b8e15c1-a630344e1feb43284f5c","ecb225d951287b8e15c1-ad0b18a693d1a55c6a57","ecb225d951287b8e15c1-bad3bd04184c4963aac9","ecb225d951287b8e15c1-c7fa59b95f92570efb83","ecb225d951287b8e15c1-cdf6b2e7e8864b7ebbfa","ecb225d951287b8e15c1-cfacdcdf7e7b5664a298","ecb225d951287b8e15c1-d01dd2e197df60e1bf94","ecb225d951287b8e15c1-d079f166a8ddd458cd04","ecb225d951287b8e15c1-d1db7e9ac2bf0d5361f0","ecb225d951287b8e15c1-d435b324d3b8827e05e3","ecb225d951287b8e15c1-d8ee829c50c9751f80b4","ecb225d951287b8e15c1-da53754518b8e7ef1b58","ecb225d951287b8e15c1-dd250582a07ec88e47ca","ecb225d951287b8e15c1-dd8d5d4d7d9bf5379bf6","ecb225d951287b8e15c1-ed6a66189e8f5262ea0a","ecb225d951287b8e15c1-edff112e62859b5358e9","ecb225d951287b8e15c1-f59ce4c875e0694d07ac","ecb225d951287b8e15c1-f9bc579ccc5b73f804eb","ecb225d951287b8e15c1-ff692995c2c63f9fcde3"]}
+
+mutant complete native receipt (verbatim):
+{"schema":1,"complete":true,"nonce":"bc99dda89fc3d0faa1b64f414d210380cce2f5da5302de4232fed104e756c905","tests":[["ecb225d951287b8e15c1-01dfffb92e1597fcf15c","passed"],["ecb225d951287b8e15c1-034d82e9aa9786b08320","failed"],["ecb225d951287b8e15c1-041dbd7451ac8a9c957f","failed"],["ecb225d951287b8e15c1-04b958af1fecfb3bfde3","failed"],["ecb225d951287b8e15c1-055bf75539b5a4b17d16","failed"],["ecb225d951287b8e15c1-069cb3cb7b627407db53","passed"],["ecb225d951287b8e15c1-06b370c10cc4dea9e70a","failed"],["ecb225d951287b8e15c1-0a4ac61b3a19f7fdd2e1","passed"],["ecb225d951287b8e15c1-0f33f058e84b4bea9bf6","failed"],["ecb225d951287b8e15c1-0f95ba07f482eb56cafc","passed"],["ecb225d951287b8e15c1-115edb07c9b6c498cb53","failed"],["ecb225d951287b8e15c1-12ba68fa4868b56e2de2","failed"],["ecb225d951287b8e15c1-12cc4945b7b3e7c7b751","failed"],["ecb225d951287b8e15c1-16aae6a51fe92304aee1","failed"],["ecb225d951287b8e15c1-24c792c92ea47332bfe5","failed"],["ecb225d951287b8e15c1-3168f769b6a64daf33d5","passed"],["ecb225d951287b8e15c1-3ae23cf7092609f083fe","failed"],["ecb225d951287b8e15c1-3c6f6d7a95f5abf8a1d0","failed"],["ecb225d951287b8e15c1-3fd5b10cde47f3747e1a","passed"],["ecb225d951287b8e15c1-44e168720c3ab4d5d551","failed"],["ecb225d951287b8e15c1-459b4d781d47d16c7a2a","passed"],["ecb225d951287b8e15c1-4ceb460e51d9dc67c654","failed"],["ecb225d951287b8e15c1-4e1d6f9510c3e1d92932","failed"],["ecb225d951287b8e15c1-5142ace001d7483bf8c5","failed"],["ecb225d951287b8e15c1-51afbf11e9d4b7c93112","failed"],["ecb225d951287b8e15c1-57b3a315918ded968732","failed"],["ecb225d951287b8e15c1-57e731be0a826ac5d18c","failed"],["ecb225d951287b8e15c1-5b46a0a285274e10b58a","passed"],["ecb225d951287b8e15c1-5cd53da3dd2a6e2756e9","failed"],["ecb225d951287b8e15c1-5e4655694634348a4908","passed"],["ecb225d951287b8e15c1-5f9d1ae61dcf9b69b669","passed"],["ecb225d951287b8e15c1-6405c43a8cce9c08e433","passed"],["ecb225d951287b8e15c1-65d943b10f5ed389ce14","failed"],["ecb225d951287b8e15c1-6a9fe6f94f1b31e21eda","failed"],["ecb225d951287b8e15c1-6aa5ef9e31b5a39c60da","failed"],["ecb225d951287b8e15c1-73b7909b2111e4651780","passed"],["ecb225d951287b8e15c1-7b9327847800609641ab","failed"],["ecb225d951287b8e15c1-7caf5e2f109df0d93568","failed"],["ecb225d951287b8e15c1-81183e1d1aa62318f33e","passed"],["ecb225d951287b8e15c1-85313e3a0de50b52560c","passed"],["ecb225d951287b8e15c1-8e5aee32052c295f01e4","passed"],["ecb225d951287b8e15c1-8ff519216c469e843e7e","passed"],["ecb225d951287b8e15c1-99a5c5926aa40cddcb7d","passed"],["ecb225d951287b8e15c1-9b6a9913aa79623edcb7","failed"],["ecb225d951287b8e15c1-9f6945bc7a052b5e04b4","failed"],["ecb225d951287b8e15c1-a0173dd3ea9299043a5d","failed"],["ecb225d951287b8e15c1-a1d34e5fc1547abdb6d2","failed"],["ecb225d951287b8e15c1-a630344e1feb43284f5c","failed"],["ecb225d951287b8e15c1-ad0b18a693d1a55c6a57","failed"],["ecb225d951287b8e15c1-bad3bd04184c4963aac9","passed"],["ecb225d951287b8e15c1-c7fa59b95f92570efb83","failed"],["ecb225d951287b8e15c1-cdf6b2e7e8864b7ebbfa","passed"],["ecb225d951287b8e15c1-cfacdcdf7e7b5664a298","failed"],["ecb225d951287b8e15c1-d01dd2e197df60e1bf94","passed"],["ecb225d951287b8e15c1-d079f166a8ddd458cd04","failed"],["ecb225d951287b8e15c1-d1db7e9ac2bf0d5361f0","failed"],["ecb225d951287b8e15c1-d435b324d3b8827e05e3","failed"],["ecb225d951287b8e15c1-d8ee829c50c9751f80b4","failed"],["ecb225d951287b8e15c1-da53754518b8e7ef1b58","failed"],["ecb225d951287b8e15c1-dd250582a07ec88e47ca","failed"],["ecb225d951287b8e15c1-dd8d5d4d7d9bf5379bf6","passed"],["ecb225d951287b8e15c1-ed6a66189e8f5262ea0a","passed"],["ecb225d951287b8e15c1-edff112e62859b5358e9","failed"],["ecb225d951287b8e15c1-f59ce4c875e0694d07ac","passed"],["ecb225d951287b8e15c1-f9bc579ccc5b73f804eb","passed"],["ecb225d951287b8e15c1-ff692995c2c63f9fcde3","failed"]],"inventory":["ecb225d951287b8e15c1-01dfffb92e1597fcf15c","ecb225d951287b8e15c1-034d82e9aa9786b08320","ecb225d951287b8e15c1-041dbd7451ac8a9c957f","ecb225d951287b8e15c1-04b958af1fecfb3bfde3","ecb225d951287b8e15c1-055bf75539b5a4b17d16","ecb225d951287b8e15c1-069cb3cb7b627407db53","ecb225d951287b8e15c1-06b370c10cc4dea9e70a","ecb225d951287b8e15c1-0a4ac61b3a19f7fdd2e1","ecb225d951287b8e15c1-0f33f058e84b4bea9bf6","ecb225d951287b8e15c1-0f95ba07f482eb56cafc","ecb225d951287b8e15c1-115edb07c9b6c498cb53","ecb225d951287b8e15c1-12ba68fa4868b56e2de2","ecb225d951287b8e15c1-12cc4945b7b3e7c7b751","ecb225d951287b8e15c1-16aae6a51fe92304aee1","ecb225d951287b8e15c1-24c792c92ea47332bfe5","ecb225d951287b8e15c1-3168f769b6a64daf33d5","ecb225d951287b8e15c1-3ae23cf7092609f083fe","ecb225d951287b8e15c1-3c6f6d7a95f5abf8a1d0","ecb225d951287b8e15c1-3fd5b10cde47f3747e1a","ecb225d951287b8e15c1-44e168720c3ab4d5d551","ecb225d951287b8e15c1-459b4d781d47d16c7a2a","ecb225d951287b8e15c1-4ceb460e51d9dc67c654","ecb225d951287b8e15c1-4e1d6f9510c3e1d92932","ecb225d951287b8e15c1-5142ace001d7483bf8c5","ecb225d951287b8e15c1-51afbf11e9d4b7c93112","ecb225d951287b8e15c1-57b3a315918ded968732","ecb225d951287b8e15c1-57e731be0a826ac5d18c","ecb225d951287b8e15c1-5b46a0a285274e10b58a","ecb225d951287b8e15c1-5cd53da3dd2a6e2756e9","ecb225d951287b8e15c1-5e4655694634348a4908","ecb225d951287b8e15c1-5f9d1ae61dcf9b69b669","ecb225d951287b8e15c1-6405c43a8cce9c08e433","ecb225d951287b8e15c1-65d943b10f5ed389ce14","ecb225d951287b8e15c1-6a9fe6f94f1b31e21eda","ecb225d951287b8e15c1-6aa5ef9e31b5a39c60da","ecb225d951287b8e15c1-73b7909b2111e4651780","ecb225d951287b8e15c1-7b9327847800609641ab","ecb225d951287b8e15c1-7caf5e2f109df0d93568","ecb225d951287b8e15c1-81183e1d1aa62318f33e","ecb225d951287b8e15c1-85313e3a0de50b52560c","ecb225d951287b8e15c1-8e5aee32052c295f01e4","ecb225d951287b8e15c1-8ff519216c469e843e7e","ecb225d951287b8e15c1-99a5c5926aa40cddcb7d","ecb225d951287b8e15c1-9b6a9913aa79623edcb7","ecb225d951287b8e15c1-9f6945bc7a052b5e04b4","ecb225d951287b8e15c1-a0173dd3ea9299043a5d","ecb225d951287b8e15c1-a1d34e5fc1547abdb6d2","ecb225d951287b8e15c1-a630344e1feb43284f5c","ecb225d951287b8e15c1-ad0b18a693d1a55c6a57","ecb225d951287b8e15c1-bad3bd04184c4963aac9","ecb225d951287b8e15c1-c7fa59b95f92570efb83","ecb225d951287b8e15c1-cdf6b2e7e8864b7ebbfa","ecb225d951287b8e15c1-cfacdcdf7e7b5664a298","ecb225d951287b8e15c1-d01dd2e197df60e1bf94","ecb225d951287b8e15c1-d079f166a8ddd458cd04","ecb225d951287b8e15c1-d1db7e9ac2bf0d5361f0","ecb225d951287b8e15c1-d435b324d3b8827e05e3","ecb225d951287b8e15c1-d8ee829c50c9751f80b4","ecb225d951287b8e15c1-da53754518b8e7ef1b58","ecb225d951287b8e15c1-dd250582a07ec88e47ca","ecb225d951287b8e15c1-dd8d5d4d7d9bf5379bf6","ecb225d951287b8e15c1-ed6a66189e8f5262ea0a","ecb225d951287b8e15c1-edff112e62859b5358e9","ecb225d951287b8e15c1-f59ce4c875e0694d07ac","ecb225d951287b8e15c1-f9bc579ccc5b73f804eb","ecb225d951287b8e15c1-ff692995c2c63f9fcde3"]}
+
+restored complete native receipt (verbatim):
+{"schema":1,"complete":true,"nonce":"e1b05ded7e1a435b23c8920e5a94a46f37274bb479f8e7731d1f31da4297528d","tests":[["ecb225d951287b8e15c1-01dfffb92e1597fcf15c","passed"],["ecb225d951287b8e15c1-034d82e9aa9786b08320","passed"],["ecb225d951287b8e15c1-041dbd7451ac8a9c957f","passed"],["ecb225d951287b8e15c1-04b958af1fecfb3bfde3","passed"],["ecb225d951287b8e15c1-055bf75539b5a4b17d16","passed"],["ecb225d951287b8e15c1-069cb3cb7b627407db53","passed"],["ecb225d951287b8e15c1-06b370c10cc4dea9e70a","passed"],["ecb225d951287b8e15c1-0a4ac61b3a19f7fdd2e1","passed"],["ecb225d951287b8e15c1-0f33f058e84b4bea9bf6","passed"],["ecb225d951287b8e15c1-0f95ba07f482eb56cafc","passed"],["ecb225d951287b8e15c1-115edb07c9b6c498cb53","passed"],["ecb225d951287b8e15c1-12ba68fa4868b56e2de2","passed"],["ecb225d951287b8e15c1-12cc4945b7b3e7c7b751","passed"],["ecb225d951287b8e15c1-16aae6a51fe92304aee1","passed"],["ecb225d951287b8e15c1-24c792c92ea47332bfe5","passed"],["ecb225d951287b8e15c1-3168f769b6a64daf33d5","passed"],["ecb225d951287b8e15c1-3ae23cf7092609f083fe","passed"],["ecb225d951287b8e15c1-3c6f6d7a95f5abf8a1d0","passed"],["ecb225d951287b8e15c1-3fd5b10cde47f3747e1a","passed"],["ecb225d951287b8e15c1-44e168720c3ab4d5d551","passed"],["ecb225d951287b8e15c1-459b4d781d47d16c7a2a","passed"],["ecb225d951287b8e15c1-4ceb460e51d9dc67c654","passed"],["ecb225d951287b8e15c1-4e1d6f9510c3e1d92932","passed"],["ecb225d951287b8e15c1-5142ace001d7483bf8c5","passed"],["ecb225d951287b8e15c1-51afbf11e9d4b7c93112","passed"],["ecb225d951287b8e15c1-57b3a315918ded968732","passed"],["ecb225d951287b8e15c1-57e731be0a826ac5d18c","passed"],["ecb225d951287b8e15c1-5b46a0a285274e10b58a","passed"],["ecb225d951287b8e15c1-5cd53da3dd2a6e2756e9","passed"],["ecb225d951287b8e15c1-5e4655694634348a4908","passed"],["ecb225d951287b8e15c1-5f9d1ae61dcf9b69b669","passed"],["ecb225d951287b8e15c1-6405c43a8cce9c08e433","passed"],["ecb225d951287b8e15c1-65d943b10f5ed389ce14","passed"],["ecb225d951287b8e15c1-6a9fe6f94f1b31e21eda","passed"],["ecb225d951287b8e15c1-6aa5ef9e31b5a39c60da","passed"],["ecb225d951287b8e15c1-73b7909b2111e4651780","passed"],["ecb225d951287b8e15c1-7b9327847800609641ab","passed"],["ecb225d951287b8e15c1-7caf5e2f109df0d93568","passed"],["ecb225d951287b8e15c1-81183e1d1aa62318f33e","passed"],["ecb225d951287b8e15c1-85313e3a0de50b52560c","passed"],["ecb225d951287b8e15c1-8e5aee32052c295f01e4","passed"],["ecb225d951287b8e15c1-8ff519216c469e843e7e","passed"],["ecb225d951287b8e15c1-99a5c5926aa40cddcb7d","passed"],["ecb225d951287b8e15c1-9b6a9913aa79623edcb7","passed"],["ecb225d951287b8e15c1-9f6945bc7a052b5e04b4","passed"],["ecb225d951287b8e15c1-a0173dd3ea9299043a5d","passed"],["ecb225d951287b8e15c1-a1d34e5fc1547abdb6d2","passed"],["ecb225d951287b8e15c1-a630344e1feb43284f5c","passed"],["ecb225d951287b8e15c1-ad0b18a693d1a55c6a57","passed"],["ecb225d951287b8e15c1-bad3bd04184c4963aac9","passed"],["ecb225d951287b8e15c1-c7fa59b95f92570efb83","passed"],["ecb225d951287b8e15c1-cdf6b2e7e8864b7ebbfa","passed"],["ecb225d951287b8e15c1-cfacdcdf7e7b5664a298","passed"],["ecb225d951287b8e15c1-d01dd2e197df60e1bf94","passed"],["ecb225d951287b8e15c1-d079f166a8ddd458cd04","passed"],["ecb225d951287b8e15c1-d1db7e9ac2bf0d5361f0","passed"],["ecb225d951287b8e15c1-d435b324d3b8827e05e3","passed"],["ecb225d951287b8e15c1-d8ee829c50c9751f80b4","passed"],["ecb225d951287b8e15c1-da53754518b8e7ef1b58","passed"],["ecb225d951287b8e15c1-dd250582a07ec88e47ca","passed"],["ecb225d951287b8e15c1-dd8d5d4d7d9bf5379bf6","passed"],["ecb225d951287b8e15c1-ed6a66189e8f5262ea0a","passed"],["ecb225d951287b8e15c1-edff112e62859b5358e9","passed"],["ecb225d951287b8e15c1-f59ce4c875e0694d07ac","passed"],["ecb225d951287b8e15c1-f9bc579ccc5b73f804eb","passed"],["ecb225d951287b8e15c1-ff692995c2c63f9fcde3","passed"]],"inventory":["ecb225d951287b8e15c1-01dfffb92e1597fcf15c","ecb225d951287b8e15c1-034d82e9aa9786b08320","ecb225d951287b8e15c1-041dbd7451ac8a9c957f","ecb225d951287b8e15c1-04b958af1fecfb3bfde3","ecb225d951287b8e15c1-055bf75539b5a4b17d16","ecb225d951287b8e15c1-069cb3cb7b627407db53","ecb225d951287b8e15c1-06b370c10cc4dea9e70a","ecb225d951287b8e15c1-0a4ac61b3a19f7fdd2e1","ecb225d951287b8e15c1-0f33f058e84b4bea9bf6","ecb225d951287b8e15c1-0f95ba07f482eb56cafc","ecb225d951287b8e15c1-115edb07c9b6c498cb53","ecb225d951287b8e15c1-12ba68fa4868b56e2de2","ecb225d951287b8e15c1-12cc4945b7b3e7c7b751","ecb225d951287b8e15c1-16aae6a51fe92304aee1","ecb225d951287b8e15c1-24c792c92ea47332bfe5","ecb225d951287b8e15c1-3168f769b6a64daf33d5","ecb225d951287b8e15c1-3ae23cf7092609f083fe","ecb225d951287b8e15c1-3c6f6d7a95f5abf8a1d0","ecb225d951287b8e15c1-3fd5b10cde47f3747e1a","ecb225d951287b8e15c1-44e168720c3ab4d5d551","ecb225d951287b8e15c1-459b4d781d47d16c7a2a","ecb225d951287b8e15c1-4ceb460e51d9dc67c654","ecb225d951287b8e15c1-4e1d6f9510c3e1d92932","ecb225d951287b8e15c1-5142ace001d7483bf8c5","ecb225d951287b8e15c1-51afbf11e9d4b7c93112","ecb225d951287b8e15c1-57b3a315918ded968732","ecb225d951287b8e15c1-57e731be0a826ac5d18c","ecb225d951287b8e15c1-5b46a0a285274e10b58a","ecb225d951287b8e15c1-5cd53da3dd2a6e2756e9","ecb225d951287b8e15c1-5e4655694634348a4908","ecb225d951287b8e15c1-5f9d1ae61dcf9b69b669","ecb225d951287b8e15c1-6405c43a8cce9c08e433","ecb225d951287b8e15c1-65d943b10f5ed389ce14","ecb225d951287b8e15c1-6a9fe6f94f1b31e21eda","ecb225d951287b8e15c1-6aa5ef9e31b5a39c60da","ecb225d951287b8e15c1-73b7909b2111e4651780","ecb225d951287b8e15c1-7b9327847800609641ab","ecb225d951287b8e15c1-7caf5e2f109df0d93568","ecb225d951287b8e15c1-81183e1d1aa62318f33e","ecb225d951287b8e15c1-85313e3a0de50b52560c","ecb225d951287b8e15c1-8e5aee32052c295f01e4","ecb225d951287b8e15c1-8ff519216c469e843e7e","ecb225d951287b8e15c1-99a5c5926aa40cddcb7d","ecb225d951287b8e15c1-9b6a9913aa79623edcb7","ecb225d951287b8e15c1-9f6945bc7a052b5e04b4","ecb225d951287b8e15c1-a0173dd3ea9299043a5d","ecb225d951287b8e15c1-a1d34e5fc1547abdb6d2","ecb225d951287b8e15c1-a630344e1feb43284f5c","ecb225d951287b8e15c1-ad0b18a693d1a55c6a57","ecb225d951287b8e15c1-bad3bd04184c4963aac9","ecb225d951287b8e15c1-c7fa59b95f92570efb83","ecb225d951287b8e15c1-cdf6b2e7e8864b7ebbfa","ecb225d951287b8e15c1-cfacdcdf7e7b5664a298","ecb225d951287b8e15c1-d01dd2e197df60e1bf94","ecb225d951287b8e15c1-d079f166a8ddd458cd04","ecb225d951287b8e15c1-d1db7e9ac2bf0d5361f0","ecb225d951287b8e15c1-d435b324d3b8827e05e3","ecb225d951287b8e15c1-d8ee829c50c9751f80b4","ecb225d951287b8e15c1-da53754518b8e7ef1b58","ecb225d951287b8e15c1-dd250582a07ec88e47ca","ecb225d951287b8e15c1-dd8d5d4d7d9bf5379bf6","ecb225d951287b8e15c1-ed6a66189e8f5262ea0a","ecb225d951287b8e15c1-edff112e62859b5358e9","ecb225d951287b8e15c1-f59ce4c875e0694d07ac","ecb225d951287b8e15c1-f9bc579ccc5b73f804eb","ecb225d951287b8e15c1-ff692995c2c63f9fcde3"]}

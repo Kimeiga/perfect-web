@@ -198,6 +198,7 @@ test("a post reaches the author's timeline and every other reader's", async ({
   const text = `Posted in ${testInfo.project.name} at ${Date.now()}`;
   const draft = author.getByLabel("What's happening?");
   await draft.fill(text);
+  await expect(author.getByRole("button", { name: "Post" })).toBeEnabled();
   await author.getByRole("button", { name: "Post" }).click();
   await expect(post(author, text)).toHaveCount(1);
   await expect(draft).toHaveValue("");
@@ -322,6 +323,7 @@ test("a post shows before the server answers, and is the server's after", async 
   });
   const text = `Shown at once in ${testInfo.project.name}, ${Date.now()}`;
   await page.getByLabel("What's happening?").fill(text);
+  await expect(page.getByRole("button", { name: "Post" })).toBeEnabled();
   await page.getByRole("button", { name: "Post" }).click();
   await expect(post(page, text)).toHaveCount(1);
   await expect(post(page, text).locator(".author")).toHaveText("You");
@@ -349,6 +351,7 @@ test("a post shown before the server answers waits, and acts once it is the serv
   });
   const text = `Waiting in ${testInfo.project.name}, ${Date.now()}`;
   await page.getByLabel("What's happening?").fill(text);
+  await expect(page.getByRole("button", { name: "Post" })).toBeEnabled();
   await page.getByRole("button", { name: "Post" }).click();
   const row = post(page, text);
   await expect(row.locator(".author")).toHaveText("You");
@@ -421,6 +424,7 @@ test("a post whose request fails is taken back", async ({ page }, testInfo) => {
   });
   const text = `Never sent from ${testInfo.project.name}, ${Date.now()}`;
   await page.getByLabel("What's happening?").fill(text);
+  await expect(page.getByRole("button", { name: "Post" })).toBeEnabled();
   await page.getByRole("button", { name: "Post" }).click();
   await expect(post(page, text)).toHaveCount(1);
   release();
@@ -458,6 +462,7 @@ test("a post longer than 280 characters is not sent, and 280 emoji are", async (
   const emoji = "\u{1F600}".repeat(280);
   await draft.fill(emoji);
   await expect(page.locator("#left")).toHaveText("0 left");
+  await expect(button).toBeEnabled();
   await button.click();
   await expect(post(page, emoji)).toHaveCount(1);
   await expect(post(page, emoji).locator(".author")).toHaveText(/^Guest /);
@@ -498,6 +503,7 @@ test("Load more shows the next page, and a post after it is shown over it", asyn
   // the other's post as its own.
   const text = `After more in ${testInfo.project.name}, ${Date.now()} ${testInfo.repeatEachIndex}`;
   await page.getByLabel("What's happening?").fill(text);
+  await expect(page.getByRole("button", { name: "Post" })).toBeEnabled();
   await page.getByRole("button", { name: "Post" }).click();
   await expect(rows.first()).toContainText(text);
   await expect(rows).toHaveCount(longer + 1);
@@ -517,6 +523,7 @@ test("a reply reaches its thread and every reader of it, and no timeline", async
   await home(author);
   const text = `A thread in ${testInfo.project.name} at ${Date.now()}`;
   await author.getByLabel("What's happening?").fill(text);
+  await expect(author.getByRole("button", { name: "Post" })).toBeEnabled();
   await author.getByRole("button", { name: "Post" }).click();
   // The server's row, whose link is the post's address, not the pending
   // row's.
@@ -557,6 +564,7 @@ async function newThread(page, testInfo, what) {
   await home(page);
   const text = `${what} in ${testInfo.project.name} at ${Date.now()}`;
   await page.getByLabel("What's happening?").fill(text);
+  await expect(page.getByRole("button", { name: "Post" })).toBeEnabled();
   await page.getByRole("button", { name: "Post" }).click();
   const link = post(page, text).locator(".author");
   await expect(link).toHaveAttribute("href", /^\/post\/p\d+$/);
@@ -744,6 +752,7 @@ test("your own page says it is yours", async ({ page }, testInfo) => {
   await home(page);
   const text = `Mine in ${testInfo.project.name} at ${Date.now()}`;
   await page.getByLabel("What's happening?").fill(text);
+  await expect(page.getByRole("button", { name: "Post" })).toBeEnabled();
   await page.getByRole("button", { name: "Post" }).click();
   const row = post(page, text);
   // The server's row, by the session's guest, not the one shown before it
@@ -772,6 +781,7 @@ test("a post's request is kept alive, counted by its bytes", async ({ page }, te
   });
   const text = `\u{1F600} kept alive in ${testInfo.project.name} at ${Date.now()}`;
   await page.getByLabel("What's happening?").fill(text);
+  await expect(page.getByRole("button", { name: "Post" })).toBeEnabled();
   const request = page.waitForRequest("**/command/feed.app.post");
   await page.getByRole("button", { name: "Post" }).click();
   const body = (await request).postData();
