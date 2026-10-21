@@ -3,7 +3,7 @@
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
 Reviewed 2026-10-20 against assembled train-12 source
-`fddb367c22130afbfb8835abe2c822a1d510db47`.
+`12da8a21` (with final verification still pending).
 [The complete prior ledger](STATUS-HISTORY-2026-10.md) remains verbatim,
 including failed runs, corrections and their original scope.
 
@@ -81,9 +81,14 @@ evidence. No failed result is promoted by this summary.
   budget decisions. Framework-wide performance superiority and broad
   application correctness are not established.
 - The assembled tree's [backend refusal inventory](../examples/accepted/build-refusals.json)
-  retains A-007 (resource mounting), A-013 (build-time page values) and A-018
-  (`style:` directives). A-008's namespace repair remains unlanded; it has
-  not changed the landed master's status.
+  records nine exact refusals: resource mounting (A-007), body-level secret
+  binding (A-010), build-time page values (A-013), style directives (A-018),
+  and placeholder dependencies (A-014/A-025/A-026/A-027/A-034). Repairing
+  A-008's WIT collision exposed six existing gaps; the historical compiler
+  reproduces the same nine when only A-008 is omitted. The
+  [causal probe](evidence/tooling/corpus-after-wit.txt) preserves both runs.
+  All 42 historical accepted programs remain unchanged. A-008 now builds
+  on this candidate; the combined repairs remain unlanded.
 - The scheduled-order Chromium timeout, WebKitGTK navigation/cancellation
   investigation, E7 long-frame instrument and E10 carry-over work retain
   their scope in [NEXT](NEXT.md), [KNOWN_LIMITATIONS](KNOWN_LIMITATIONS.md)
