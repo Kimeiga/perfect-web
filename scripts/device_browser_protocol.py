@@ -13,7 +13,7 @@ from browser_test_results import parse
 import producer_process
 
 VALID = {'green': 0, 'assertion': 1, 'customMessage': 1, 'not': 1, 'locator': 1,
-         'pollGreen': 0, 'poll': 1, 'pollNaN': 0, 'pollSignedZero': 1, 'cause': 1}
+         'pollGreen': 0, 'poll': 1, 'pollNaN': 0, 'pollSignedZero': 1, 'pollEarlyTimer': 1, 'cause': 1}
 INVALID = ('closed', 'invalidMatcher', 'pollCallback', 'pollAssertCallback', 'pollPending',
            'pollOptions', 'pollUnsupported', 'before', 'after', 'runtime', 'timeout',
            'setupTimeout', 'skipped', 'retry', 'soft', 'unwrapped')
@@ -52,6 +52,22 @@ async function witness() {
   if (mode === 'poll') await expect.poll(() => 'fresh', polling).toBe('stale');
   if (mode === 'pollNaN') await expect.poll(() => NaN, polling).toBe(NaN);
   if (mode === 'pollSignedZero') await expect.poll(() => -0, polling).toBe(0);
+  if (mode === 'pollEarlyTimer') {
+    // Force timer rounding below the final clamped delay while retaining
+    // the real monotonic clock.
+    // A second callback is deliberately pending and cannot be assertion proof.
+    const originalTimer = globalThis.setTimeout;
+    let calls = 0;
+    globalThis.setTimeout = (callback, delay, ...args) =>
+      originalTimer(callback, delay > 0 && delay <= 100 ? 1 : delay, ...args);
+    try {
+      await expect.poll(() => ++calls === 1 ? 'fresh' : new Promise(() => {}),
+        {timeout: 90, intervals: [100]}).toBe('stale');
+    } finally {
+      globalThis.setTimeout = originalTimer;
+      if (calls !== 1) throw new Error('a final clamped sleep restarted the callback');
+    }
+  }
   if (mode === 'pollCallback') await expect.poll(() => { throw new Error('callback failure'); }, polling).toBe(undefined);
   if (mode === 'pollAssertCallback') await expect.poll(() => { expect(1).toBe(2); }, polling).toBe(1);
   if (mode === 'pollPending') await expect.poll(() => new Promise(() => {}), polling).toBe(1);

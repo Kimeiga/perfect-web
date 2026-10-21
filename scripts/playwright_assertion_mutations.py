@@ -36,6 +36,8 @@ MUTANTS = [
     ('callback exceptions become observed mismatches', 'test_poll_callback_errors_are_not_assertion_results', EXPECT,
      '            throw new Error("poll callback failed", { cause });',
      '            return undefined;'),
+    ('a final clamped interval restarts the poll callback', 'test_final_poll_interval_never_restarts_an_early_callback', EXPECT,
+     '      if (finalInterval) break;', '      // restart after a clamped sleep'),
     ('an unfinished callback becomes an observed mismatch', 'test_pending_poll_callback_is_not_a_mismatch', EXPECT,
      '''          new Promise((_, reject) => {
             timer = setTimeout(() => reject(new Error("poll callback did not complete before its deadline")), remaining);
@@ -50,7 +52,7 @@ MUTANTS = [
       } finally { clearTimeout(timer); }'''),
 ]
 SELECTOR = 'scripts.tests.test_browser_assertion_proof'
-COUNT = 10
+COUNT = 11
 
 
 def run(selectors, expected, evidence):
@@ -76,7 +78,7 @@ def main():
     watch = mutation_baseline.mutation_bound.start()
     evidence = Path(tempfile.mkdtemp(prefix='pw-browser-proof-controls-'))
     # The ordinary test command deliberately skips browser cases. This explicit
-    # browser campaign freezes and executes all ten, never accepts skip credit.
+    # browser campaign freezes and executes all eleven, never accepts skip credit.
     os.environ['PW_BROWSER_PROOF'] = '1'
     expected = unittest_producer.load([SELECTOR])[2]
     if len(expected) != COUNT:

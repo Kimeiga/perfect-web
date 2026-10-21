@@ -38,6 +38,9 @@ class BrowserAssertions(unittest.TestCase):
         for mode, failed in (('poll', 1), ('pollGreen', 0), ('pollNaN', 0), ('pollSignedZero', 1)):
             self.case(mode, True, failed)
 
+    def test_final_poll_interval_never_restarts_an_early_callback(self):
+        self.case('pollEarlyTimer', True, 1)
+
     def test_poll_callback_errors_are_not_assertion_results(self):
         for mode in ('pollCallback', 'pollAssertCallback'):
             self.case(mode, False)

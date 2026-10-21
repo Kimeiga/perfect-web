@@ -66,8 +66,14 @@ const pollingExpect = playwrightExpect.extend({
       if (performance.now() >= deadline) throw new Error("poll callback completed after its deadline");
       observed = true;
       if (Object.is(actual, expected)) break;
-      const delay = Math.min(intervals[Math.min(attempt++, intervals.length - 1)], deadline - performance.now());
+      const interval = intervals[Math.min(attempt++, intervals.length - 1)];
+      const left = deadline - performance.now();
+      const finalInterval = interval >= left;
+      const delay = Math.min(interval, left);
       if (delay > 0) await new Promise(resolve => setTimeout(resolve, delay));
+      // The final sleep was clamped to the deadline. Timer rounding must not
+      // start another callback with a fractional remaining deadline.
+      if (finalInterval) break;
     }
     if (!observed) throw new Error("poll observed no completed callback");
     return { name: "toBePolled", pass: Object.is(actual, expected), actual, expected,

@@ -1,0 +1,464 @@
+Final polling interval native proof, 2026-10-20
+Source parent 7e315cde plus the file hashes below.
+A timer waking early after the deadline-clamped final interval must not
+launch another callback with a fractional time budget. The final interval
+ends the observation loop. Actually started callback errors, pending work
+and late completion remain invalid producer outcomes.
+The new native witness failed before the repair; 11 native tests and all
+9 whole strict mutation controls pass afterward. Hosted full recipe due.
+a64970b9bc7b98b3d64eceec706298b2cfc046c9f23c5fdc0a2c720c573adb90  spikes/own-renderer/assertion-expect.mjs
+425e53c6560dd6bf7fd65adc9c55231ca50f28846d26afd312df327c6fe2fd1f  scripts/device_browser_protocol.py
+d617ae80b8f66b2a8d34a9760cd71747e9a22ca6c9b1f7939382fdd08ffa933d  scripts/tests/test_browser_assertion_proof.py
+f913c66f7d66e27d33c4e8713897728d1ca399aed21b616b62a318de728e39d6  scripts/playwright_assertion_mutations.py
+
+=== t12-poll-early-before.txt ===
+test_final_poll_interval_never_restarts_an_early_callback (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... FAIL
+
+======================================================================
+FAIL: test_final_poll_interval_never_restarts_an_early_callback (scripts.tests.test_browser_assertion_proof.BrowserAssertions)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/train-12/scripts/tests/test_browser_assertion_proof.py", line 42, in test_final_poll_interval_never_restarts_an_early_callback
+    self.case('pollEarlyTimer', True, 1)
+  File "/home/haki/code/pw-wt/train-12/scripts/tests/test_browser_assertion_proof.py", line 19, in case
+    self.assertEqual((result.valid, result.failed), (valid, failed), output)
+AssertionError: Tuples differ: (False, 0) != (True, 1)
+
+First differing element 0:
+False
+True
+
+- (False, 0)
++ (True, 1) : 
+Running 1 test using 1 worker
+
+[1A[2K[1/1] ../../../../../../../tmp/pw-browser-protocol-bst2arv5/fixture.spec.mjs:61:8 › witness
+[1A[2K  1) ../../../../../../../tmp/pw-browser-protocol-bst2arv5/fixture.spec.mjs:61:8 › witness ─────────
+
+    Error: a final clamped sleep restarted the callback
+
+      28 |     } finally {
+      29 |       globalThis.setTimeout = originalTimer;
+    > 30 |       if (calls !== 1) throw new Error('a final clamped sleep restarted the callback');
+         |                              ^
+      31 |     }
+      32 |   }
+      33 |   if (mode === 'pollCallback') await expect.poll(() => { throw new Error('callback failure'); }, polling).toBe(undefined);
+        at witness (/tmp/pw-browser-protocol-bst2arv5/fixture.spec.mjs:30:30)
+
+
+[1A[2K  1 failed
+    ../../../../../../../tmp/pw-browser-protocol-bst2arv5/fixture.spec.mjs:61:8 › witness ──────────
+
+
+----------------------------------------------------------------------
+Ran 1 test in 1.196s
+
+FAILED (failures=1)
+
+=== t12-poll-native-tests.txt ===
+test_closed_browser_is_not_a_comparison (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... ok
+test_final_poll_interval_never_restarts_an_early_callback (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... ok
+test_invalid_matcher_api_is_not_a_comparison (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... ok
+test_missing_native_proof_is_refused (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... ok
+test_native_cause_is_preserved_under_proof (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... ok
+test_native_comparisons_messages_and_negation_produce_proof (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... ok
+test_native_locator_mismatch_produces_proof (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... ok
+test_pending_poll_callback_is_not_a_mismatch (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... ok
+test_poll_callback_errors_are_not_assertion_results (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... ok
+test_poll_preserves_object_is_and_completed_mismatches (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... ok
+test_stale_native_proof_is_refused (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... ok
+
+----------------------------------------------------------------------
+Ran 11 tests in 18.478s
+
+OK
+
+=== t12-poll-controls.txt ===
+structured instrument receipts: /tmp/pw-browser-proof-controls-hnj_v644
+test_closed_browser_is_not_a_comparison (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... ok
+test_final_poll_interval_never_restarts_an_early_callback (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... ok
+test_invalid_matcher_api_is_not_a_comparison (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... ok
+test_missing_native_proof_is_refused (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... ok
+test_native_cause_is_preserved_under_proof (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... ok
+test_native_comparisons_messages_and_negation_produce_proof (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... ok
+test_native_locator_mismatch_produces_proof (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... ok
+test_pending_poll_callback_is_not_a_mismatch (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... ok
+test_poll_callback_errors_are_not_assertion_results (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... ok
+test_poll_preserves_object_is_and_completed_mismatches (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... ok
+test_stale_native_proof_is_refused (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... ok
+
+----------------------------------------------------------------------
+Ran 11 tests in 18.468s
+
+OK
+
+baseline: 11 passed, 0 failed
+test_missing_native_proof_is_refused (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... FAIL
+
+======================================================================
+FAIL: test_missing_native_proof_is_refused (scripts.tests.test_browser_assertion_proof.BrowserAssertions)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/train-12/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/train-12/scripts/tests/test_browser_assertion_proof.py", line 64, in test_missing_native_proof_is_refused
+    self.assertIsNone(self.fixture('unproven'))
+AssertionError: {'schema': 1, 'complete': True, 'nonce': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'tests': [['one', 'failed']], 'inventory': ['one']} is not None
+
+----------------------------------------------------------------------
+Ran 1 test in 0.015s
+
+FAILED (failures=1)
+
+expect steps earn kills without native proof: KILLED by scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_missing_native_proof_is_refused (1 assertion methods fail)
+test_stale_native_proof_is_refused (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... FAIL
+
+======================================================================
+FAIL: test_stale_native_proof_is_refused (scripts.tests.test_browser_assertion_proof.BrowserAssertions)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/train-12/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/train-12/scripts/tests/test_browser_assertion_proof.py", line 68, in test_stale_native_proof_is_refused
+    self.assertIsNone(self.fixture('staleProof'))
+AssertionError: {'schema': 1, 'complete': True, 'nonce': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'tests': [['one', 'failed']], 'inventory': ['one']} is not None
+
+----------------------------------------------------------------------
+Ran 1 test in 0.016s
+
+FAILED (failures=1)
+
+old native proof earns a kill: KILLED by scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_stale_native_proof_is_refused (1 assertion methods fail)
+test_closed_browser_is_not_a_comparison (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... FAIL
+
+======================================================================
+FAIL: test_closed_browser_is_not_a_comparison (scripts.tests.test_browser_assertion_proof.BrowserAssertions)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/train-12/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/train-12/scripts/tests/test_browser_assertion_proof.py", line 31, in test_closed_browser_is_not_a_comparison
+    self.case('closed', False)
+  File "/home/haki/code/pw-wt/train-12/scripts/tests/test_browser_assertion_proof.py", line 19, in case
+    self.assertEqual((result.valid, result.failed), (valid, failed), output)
+AssertionError: Tuples differ: (True, 1) != (False, 0)
+
+First differing element 0:
+True
+False
+
+- (True, 1)
++ (False, 0) : 
+Running 1 test using 1 worker
+
+[1A[2K[1/1] ../../../../../../../tmp/pw-browser-protocol-62d0kwoi/fixture.spec.mjs:56:3 › witness
+[1A[2K  1) ../../../../../../../tmp/pw-browser-protocol-62d0kwoi/fixture.spec.mjs:56:3 › witness ─────────
+
+    Error: expect.toHaveText: Target page, context or browser has been closed
+
+       at ../../home/haki/code/pw-wt/train-12/spikes/own-renderer/assertion-expect.mjs:30
+
+      28 |       return (...args) => {
+      29 |         try {
+    > 30 |           const result = Reflect.apply(matcher, object, args);
+         |                                  ^
+      31 |           return result && typeof result.then === "function"
+      32 |             ? result.catch(error => proven(error, name, isNot)) : result;
+      33 |         } catch (error) { return proven(error, name, isNot); }
+        at Proxy.toHaveText (/home/haki/code/pw-wt/train-12/spikes/own-renderer/assertion-expect.mjs:30:34)
+        at /tmp/pw-browser-protocol-62d0kwoi/fixture.spec.mjs:59:70
+    [cause]: Error: PW_ASSERTION:2a9b751a48fd4e95ea59de7abfde989ae79172db8fda474f69344d9cd0602b79
+        at proven (/home/haki/code/pw-wt/train-12/spikes/own-renderer/assertion-expect.mjs:12:19)
+        at /home/haki/code/pw-wt/train-12/spikes/own-renderer/assertion-expect.mjs:32:37
+        at /tmp/pw-browser-protocol-62d0kwoi/fixture.spec.mjs:59:5
+
+
+[1A[2K  1 failed
+    ../../../../../../../tmp/pw-browser-protocol-62d0kwoi/fixture.spec.mjs:56:3 › witness ──────────
+
+
+----------------------------------------------------------------------
+Ran 1 test in 1.356s
+
+FAILED (failures=1)
+
+browser/API errors are branded as matcher failures: KILLED by scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_closed_browser_is_not_a_comparison (1 assertion methods fail)
+test_native_comparisons_messages_and_negation_produce_proof (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... FAIL
+
+======================================================================
+FAIL: test_native_comparisons_messages_and_negation_produce_proof (scripts.tests.test_browser_assertion_proof.BrowserAssertions)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/train-12/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/train-12/scripts/tests/test_browser_assertion_proof.py", line 23, in test_native_comparisons_messages_and_negation_produce_proof
+    self.case(mode, True, 1)
+  File "/home/haki/code/pw-wt/train-12/scripts/tests/test_browser_assertion_proof.py", line 19, in case
+    self.assertEqual((result.valid, result.failed), (valid, failed), output)
+AssertionError: Tuples differ: (False, 0) != (True, 1)
+
+First differing element 0:
+False
+True
+
+- (False, 0)
++ (True, 1) : 
+Running 1 test using 1 worker
+
+[1A[2K[1/1] ../../../../../../../tmp/pw-browser-protocol-lnr4jg2q/fixture.spec.mjs:61:8 › witness
+[1A[2K  1) ../../../../../../../tmp/pw-browser-protocol-lnr4jg2q/fixture.spec.mjs:61:8 › witness ─────────
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mnot[2m.[22mtoBe[2m([22m[32mexpected[39m[2m) // Object.is equality[22m
+
+    Expected: not [32m1[39m
+
+       at ../../home/haki/code/pw-wt/train-12/spikes/own-renderer/assertion-expect.mjs:31
+
+      29 |       return (...args) => {
+      30 |         try {
+    > 31 |           const result = Reflect.apply(matcher, object, args);
+         |                                  ^
+      32 |           return result && typeof result.then === "function"
+      33 |             ? result.catch(error => proven(error, name, isNot)) : result;
+      34 |         } catch (error) { return proven(error, name, isNot); }
+        at Proxy.toBe (/home/haki/code/pw-wt/train-12/spikes/own-renderer/assertion-expect.mjs:31:34)
+        at witness (/tmp/pw-browser-protocol-lnr4jg2q/fixture.spec.mjs:12:37)
+
+
+[1A[2K  1 failed
+    ../../../../../../../tmp/pw-browser-protocol-lnr4jg2q/fixture.spec.mjs:61:8 › witness ──────────
+
+
+----------------------------------------------------------------------
+Ran 1 test in 3.567s
+
+FAILED (failures=1)
+
+negated comparisons lose native proof: KILLED by scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_native_comparisons_messages_and_negation_produce_proof (1 assertion methods fail)
+test_native_cause_is_preserved_under_proof (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... FAIL
+
+======================================================================
+FAIL: test_native_cause_is_preserved_under_proof (scripts.tests.test_browser_assertion_proof.BrowserAssertions)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/train-12/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/train-12/scripts/tests/test_browser_assertion_proof.py", line 52, in test_native_cause_is_preserved_under_proof
+    self.case('cause', True, 1)
+  File "/home/haki/code/pw-wt/train-12/scripts/tests/test_browser_assertion_proof.py", line 19, in case
+    self.assertEqual((result.valid, result.failed), (valid, failed), output)
+AssertionError: Tuples differ: (False, 0) != (True, 1)
+
+First differing element 0:
+False
+True
+
+- (False, 0)
++ (True, 1) : 
+Running 1 test using 1 worker
+
+[1A[2K[1/1] ../../../../../../../tmp/pw-browser-protocol-4on_ak4b/fixture.spec.mjs:61:8 › witness
+[1A[2K  1) ../../../../../../../tmp/pw-browser-protocol-4on_ak4b/fixture.spec.mjs:61:8 › witness ─────────
+
+    Error: native cause was lost
+
+      41 |     try { expect(1).toBe(2); }
+      42 |     catch (error) {
+    > 43 |       if (error.cause?.cause !== original) throw new Error('native cause was lost');
+         |                                                  ^
+      44 |       throw error;
+      45 |     } finally { delete Error.prototype.cause; }
+      46 |   }
+        at witness (/tmp/pw-browser-protocol-4on_ak4b/fixture.spec.mjs:43:50)
+
+
+[1A[2K  1 failed
+    ../../../../../../../tmp/pw-browser-protocol-4on_ak4b/fixture.spec.mjs:61:8 › witness ──────────
+
+
+----------------------------------------------------------------------
+Ran 1 test in 1.198s
+
+FAILED (failures=1)
+
+native error causes are discarded: KILLED by scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_native_cause_is_preserved_under_proof (1 assertion methods fail)
+test_poll_preserves_object_is_and_completed_mismatches (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... FAIL
+
+======================================================================
+FAIL: test_poll_preserves_object_is_and_completed_mismatches (scripts.tests.test_browser_assertion_proof.BrowserAssertions)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/train-12/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/train-12/scripts/tests/test_browser_assertion_proof.py", line 39, in test_poll_preserves_object_is_and_completed_mismatches
+    self.case(mode, True, failed)
+  File "/home/haki/code/pw-wt/train-12/scripts/tests/test_browser_assertion_proof.py", line 18, in case
+    self.assertEqual(code, 0 if mode in ('green', 'pollGreen', 'pollNaN') else 1, output)
+AssertionError: 1 != 0 : 
+Running 1 test using 1 worker
+
+[1A[2K[1/1] ../../../../../../../tmp/pw-browser-protocol-nmyrv6t0/fixture.spec.mjs:61:8 › witness
+[1A[2K  1) ../../../../../../../tmp/pw-browser-protocol-nmyrv6t0/fixture.spec.mjs:61:8 › witness ─────────
+
+    Error: Expected: [32mNaN[39m
+    Received: [31mNaN[39m
+
+       at ../../home/haki/code/pw-wt/train-12/spikes/own-renderer/assertion-expect.mjs:31
+
+      29 |       return (...args) => {
+      30 |         try {
+    > 31 |           const result = Reflect.apply(matcher, object, args);
+         |                                  ^
+      32 |           return result && typeof result.then === "function"
+      33 |             ? result.catch(error => proven(error, name, isNot)) : result;
+      34 |         } catch (error) { return proven(error, name, isNot); }
+        at Proxy.toBePolled (/home/haki/code/pw-wt/train-12/spikes/own-renderer/assertion-expect.mjs:31:34)
+        at Object.toBe (/home/haki/code/pw-wt/train-12/spikes/own-renderer/assertion-expect.mjs:96:81)
+        at witness (/tmp/pw-browser-protocol-nmyrv6t0/fixture.spec.mjs:15:65)
+    [cause]: Error: PW_ASSERTION:8929dc66cdb40df073c88c06b564141cabf10159d01af7002506400f746a0ff1
+        at proven (/home/haki/code/pw-wt/train-12/spikes/own-renderer/assertion-expect.mjs:13:19)
+        at /home/haki/code/pw-wt/train-12/spikes/own-renderer/assertion-expect.mjs:33:37
+        at witness (/tmp/pw-browser-protocol-nmyrv6t0/fixture.spec.mjs:15:27)
+
+
+[1A[2K  1 failed
+    ../../../../../../../tmp/pw-browser-protocol-nmyrv6t0/fixture.spec.mjs:61:8 › witness ──────────
+
+
+----------------------------------------------------------------------
+Ran 1 test in 3.712s
+
+FAILED (failures=1)
+
+poll equality uses ordinary numeric equality: KILLED by scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_poll_preserves_object_is_and_completed_mismatches (1 assertion methods fail)
+test_poll_callback_errors_are_not_assertion_results (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... FAIL
+
+======================================================================
+FAIL: test_poll_callback_errors_are_not_assertion_results (scripts.tests.test_browser_assertion_proof.BrowserAssertions)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/train-12/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/train-12/scripts/tests/test_browser_assertion_proof.py", line 46, in test_poll_callback_errors_are_not_assertion_results
+    self.case(mode, False)
+  File "/home/haki/code/pw-wt/train-12/scripts/tests/test_browser_assertion_proof.py", line 18, in case
+    self.assertEqual(code, 0 if mode in ('green', 'pollGreen', 'pollNaN') else 1, output)
+AssertionError: 0 != 1 : 
+Running 1 test using 1 worker
+
+[1A[2K[1/1] ../../../../../../../tmp/pw-browser-protocol-7f0usy7q/fixture.spec.mjs:61:8 › witness
+[1A[2K  1 passed (606ms)
+
+
+----------------------------------------------------------------------
+Ran 1 test in 1.195s
+
+FAILED (failures=1)
+
+callback exceptions become observed mismatches: KILLED by scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_poll_callback_errors_are_not_assertion_results (1 assertion methods fail)
+test_final_poll_interval_never_restarts_an_early_callback (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... FAIL
+
+======================================================================
+FAIL: test_final_poll_interval_never_restarts_an_early_callback (scripts.tests.test_browser_assertion_proof.BrowserAssertions)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/train-12/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/train-12/scripts/tests/test_browser_assertion_proof.py", line 42, in test_final_poll_interval_never_restarts_an_early_callback
+    self.case('pollEarlyTimer', True, 1)
+  File "/home/haki/code/pw-wt/train-12/scripts/tests/test_browser_assertion_proof.py", line 19, in case
+    self.assertEqual((result.valid, result.failed), (valid, failed), output)
+AssertionError: Tuples differ: (False, 0) != (True, 1)
+
+First differing element 0:
+False
+True
+
+- (False, 0)
++ (True, 1) : 
+Running 1 test using 1 worker
+
+[1A[2K[1/1] ../../../../../../../tmp/pw-browser-protocol-ftx4x82z/fixture.spec.mjs:61:8 › witness
+[1A[2K  1) ../../../../../../../tmp/pw-browser-protocol-ftx4x82z/fixture.spec.mjs:61:8 › witness ─────────
+
+    Error: a final clamped sleep restarted the callback
+
+      28 |     } finally {
+      29 |       globalThis.setTimeout = originalTimer;
+    > 30 |       if (calls !== 1) throw new Error('a final clamped sleep restarted the callback');
+         |                              ^
+      31 |     }
+      32 |   }
+      33 |   if (mode === 'pollCallback') await expect.poll(() => { throw new Error('callback failure'); }, polling).toBe(undefined);
+        at witness (/tmp/pw-browser-protocol-ftx4x82z/fixture.spec.mjs:30:30)
+
+
+[1A[2K  1 failed
+    ../../../../../../../tmp/pw-browser-protocol-ftx4x82z/fixture.spec.mjs:61:8 › witness ──────────
+
+
+----------------------------------------------------------------------
+Ran 1 test in 1.186s
+
+FAILED (failures=1)
+
+a final clamped interval restarts the poll callback: KILLED by scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_final_poll_interval_never_restarts_an_early_callback (1 assertion methods fail)
+test_pending_poll_callback_is_not_a_mismatch (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... FAIL
+
+======================================================================
+FAIL: test_pending_poll_callback_is_not_a_mismatch (scripts.tests.test_browser_assertion_proof.BrowserAssertions)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/train-12/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/train-12/scripts/tests/test_browser_assertion_proof.py", line 49, in test_pending_poll_callback_is_not_a_mismatch
+    self.case('pollPending', False)
+  File "/home/haki/code/pw-wt/train-12/scripts/tests/test_browser_assertion_proof.py", line 19, in case
+    self.assertEqual((result.valid, result.failed), (valid, failed), output)
+AssertionError: Tuples differ: (True, 1) != (False, 0)
+
+First differing element 0:
+True
+False
+
+- (True, 1)
++ (False, 0) : 
+Running 1 test using 1 worker
+
+[1A[2K[1/1] ../../../../../../../tmp/pw-browser-protocol-hku3wjll/fixture.spec.mjs:61:8 › witness
+[1A[2K  1) ../../../../../../../tmp/pw-browser-protocol-hku3wjll/fixture.spec.mjs:61:8 › witness ─────────
+
+    Error: Expected: [32m1[39m
+    Received: [31mundefined[39m
+
+       at ../../home/haki/code/pw-wt/train-12/spikes/own-renderer/assertion-expect.mjs:31
+
+      29 |       return (...args) => {
+      30 |         try {
+    > 31 |           const result = Reflect.apply(matcher, object, args);
+         |                                  ^
+      32 |           return result && typeof result.then === "function"
+      33 |             ? result.catch(error => proven(error, name, isNot)) : result;
+      34 |         } catch (error) { return proven(error, name, isNot); }
+        at Proxy.toBePolled (/home/haki/code/pw-wt/train-12/spikes/own-renderer/assertion-expect.mjs:31:34)
+        at Object.toBe (/home/haki/code/pw-wt/train-12/spikes/own-renderer/assertion-expect.mjs:95:81)
+        at witness (/tmp/pw-browser-protocol-hku3wjll/fixture.spec.mjs:35:87)
+    [cause]: Error: PW_ASSERTION:e779a1c7006b34af3ec1f988a81a9bd5395d80dbfbb596d63c97533a1a94c2c8
+        at proven (/home/haki/code/pw-wt/train-12/spikes/own-renderer/assertion-expect.mjs:13:19)
+        at /home/haki/code/pw-wt/train-12/spikes/own-renderer/assertion-expect.mjs:33:37
+        at witness (/tmp/pw-browser-protocol-hku3wjll/fixture.spec.mjs:35:31)
+
+
+[1A[2K  1 failed
+    ../../../../../../../tmp/pw-browser-protocol-hku3wjll/fixture.spec.mjs:61:8 › witness ──────────
+
+
+----------------------------------------------------------------------
+Ran 1 test in 1.286s
+
+FAILED (failures=1)
+
+an unfinished callback becomes an observed mismatch: KILLED by scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_pending_poll_callback_is_not_a_mismatch (1 assertion methods fail)
+9 of 9 mutants killed
+memory bound: no process was stopped
