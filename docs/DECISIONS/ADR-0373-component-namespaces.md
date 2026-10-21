@@ -77,3 +77,14 @@ same nine. The unchanged A-008 now builds its actual query and view separately.
 [ADR-0361's corpus census amendment](ADR-0361-check-is-build.md#corpus-census-after-the-wit-collision-repair-2026-10-20)
 records the integrator's explicit correction, all six limitations and raw proof.
 Complete validation remains fail closed and frozen `.pw` sources remain unchanged.
+
+
+## Landing (2026-10-21)
+
+Landed on `master` with train-12 at `e7664d2eb01aa8c6e91df594bd7270a84a8bf8de`
+after exact-commit CI ([39584219053](https://github.com/studiokimeiga/perfect-web/actions/runs/39584219053))
+and automatic track verification ([39575516650](https://github.com/studiokimeiga/perfect-web/actions/runs/39575516650)).
+Dated statements above that call landing or combined gates pending describe
+the candidate before it landed and are kept as written. The
+[acceptance record](../diagnostics/train-12/acceptance-record-2026-10-21.md)
+states what the landing's evidence does and does not prove.

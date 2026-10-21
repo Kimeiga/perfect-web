@@ -53,3 +53,14 @@ The existing documented braces advisory remains a separate limitation.
 The train's GitHub CI and verification must pass before landing. This
 patch does not establish production readiness or remove the historical
 Marko dependency; its retirement remains a separate obligation.
+
+
+## Landing (2026-10-21)
+
+Landed on `master` with train-12 at `e7664d2eb01aa8c6e91df594bd7270a84a8bf8de`
+after exact-commit CI ([39584219053](https://github.com/studiokimeiga/perfect-web/actions/runs/39584219053))
+and automatic track verification ([39575516650](https://github.com/studiokimeiga/perfect-web/actions/runs/39575516650)).
+Dated statements above that call landing or combined gates pending describe
+the candidate before it landed and are kept as written. The
+[acceptance record](../diagnostics/train-12/acceptance-record-2026-10-21.md)
+states what the landing's evidence does and does not prove.

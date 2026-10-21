@@ -34,3 +34,14 @@ assertion, and restored source passes. The four native producer regressions
 pass. Raw evidence is recorded with this change. Full 14-control hosted
 verification and exact-commit CI remain pending; no whole-campaign pass is
 claimed from the single repaired control.
+
+
+## Landing (2026-10-21)
+
+Landed on `master` with train-12 at `e7664d2eb01aa8c6e91df594bd7270a84a8bf8de`
+after exact-commit CI ([39584219053](https://github.com/studiokimeiga/perfect-web/actions/runs/39584219053))
+and automatic track verification ([39575516650](https://github.com/studiokimeiga/perfect-web/actions/runs/39575516650)).
+Dated statements above that call landing or combined gates pending describe
+the candidate before it landed and are kept as written. The
+[acceptance record](../diagnostics/train-12/acceptance-record-2026-10-21.md)
+states what the landing's evidence does and does not prove.

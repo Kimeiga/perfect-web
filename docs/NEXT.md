@@ -2,7 +2,47 @@
 
 The next executable tasks, in order, with acceptance criteria. Charter §3.4.
 
+## Current, 2026-10-21: after train-12's landing
+
+Train-12 landed on master at `e7664d2e` on 2026-10-21. Its record commit
+passed exact-commit CI ([39567756677](https://github.com/studiokimeiga/perfect-web/actions/runs/39567756677),
+[39575516309](https://github.com/studiokimeiga/perfect-web/actions/runs/39575516309)
+and, on master, [39584219053](https://github.com/studiokimeiga/perfect-web/actions/runs/39584219053))
+and automatic track verification
+([39575516650](https://github.com/studiokimeiga/perfect-web/actions/runs/39575516650):
+`e10-browser`, the legacy `e8-wit`, `e10-component` and `e8-contracts`, and
+the full Chromium, Firefox and WebKit jobs). The
+[acceptance record](diagnostics/train-12/acceptance-record-2026-10-21.md)
+states its proof limits. The promotion steps of the next section are done.
+
+In order:
+
+1. **Track `command-deadline`** (`wip/command-deadline`, in progress). A
+   command request that never settles leaves its press pending
+   ([KNOWN_LIMITATIONS](KNOWN_LIMITATIONS.md), ADR-0173's "not claimed"),
+   and through the page's order (ADR-0152, ADR-0305, ADR-0280) later presses
+   and navigations wait on it. Acceptance: an ADR that decides the semantics
+   before any timeout is chosen; failing-first browser tests for a send never
+   answered, an answer whose body never completes and a press behind one;
+   the repair; positive, negative and neighbour behaviour in Chromium,
+   Firefox and WebKit; whole affected mutation scripts; exact-commit CI and
+   the planned verification.
+2. **E14-E, decision-ready.** The benchmark's models, budget and teaching
+   method are the owner's choices, made before any paid run. Prepare the
+   zero-cost parts: a bounded study design, the configurations to choose
+   between, and the controls the harness runs offline.
+3. **Device-local durability** (ADR-0366): specify a durable-acknowledgement
+   boundary, or state a scope-limited guarantee, before changing the
+   runtime; test it against real navigation and reload races with the
+   privacy invariants held.
+
+The local-only performance/load/memory and Kiokun checks remain separate
+unproved work; keep their scope and the known backend/runtime limitations
+explicit.
+
 ## Train-12 acceptance and promotion, 2026-10-21
+
+Done (see above). The plan below is kept as it stood before the landing.
 
 Source `ec15e5b1858b608d5a4c8aa39e00a0683c678505` passed
 [CI 39558466827](https://github.com/studiokimeiga/perfect-web/actions/runs/39558466827)

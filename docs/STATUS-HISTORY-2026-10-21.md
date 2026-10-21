@@ -1,0 +1,320 @@
+# STATUS snapshot at train-12's landing, 2026-10-21
+
+Historical snapshot of STATUS.md at e7664d2eb01aa8c6e91df594bd7270a84a8bf8de,
+the commit train-12 landed on master with. The original document follows
+verbatim, including its promotion gate (since met), failed runs and
+superseded instructions. Read [STATUS.md](STATUS.md) for the current summary
+and operational rules. Relative links retain their original directory.
+
+---
+
+# STATUS
+
+<!-- Charter §3.4 requires exactly these sections. Keep them. -->
+
+Reviewed 2026-10-21 against assembled train-12 source
+`ec15e5b1858b608d5a4c8aa39e00a0683c678505` and its completed hosted runs.
+[The complete prior ledger](STATUS-HISTORY-2026-10.md) remains verbatim,
+including failed runs, corrections and their original scope.
+
+## current milestone
+
+**E14, the AI benchmark**, ahead of E11-E13 under the owner's 2026-10-02
+ruling ([ADR-0119](DECISIONS/ADR-0119-e10-closes-and-the-ai-benchmark-comes-next.md),
+[E14 plan](milestones/E14.md)). The offline harness and reference tasks exist.
+Agent runs still require the owner's choices of models, budget and how
+Pleris is taught to an agent. Compiler and browser tests establish no agent
+benchmark. Numbering remains engineering E0-E15, public proofs P0-P9 and
+risk experiments RQ-* ([charter](../PROJECT_CHARTER.md)).
+
+**Train-12** assembles generic-result/effect repairs, device-local data and
+TodoMVC, cross-host database checks, verification/producer repairs, security
+pins, component namespaces, keyed-read retry and effect convergence. Its
+combined source passed the hosted gates below. Promotion to master requires
+CI and automatic track verification at the final record commit; a source
+pass alone does not establish that promotion.
+
+## last passing commit
+
+**Latest verified source:** `ec15e5b1858b608d5a4c8aa39e00a0683c678505`.
+[CI 39558466827](https://github.com/studiokimeiga/perfect-web/actions/runs/39558466827)
+passed x64, ARM and license/advisory checks.
+[Verify 39558474966](https://github.com/studiokimeiga/perfect-web/actions/runs/39558474966)
+passed all four reached recipes and the full Chromium, Firefox and WebKit
+browser jobs. Earlier eligible recipe records are reconciled in the
+[train-12 acceptance record](diagnostics/train-12/acceptance-record-2026-10-21.md).
+
+**Previously landed and verified predecessor:**
+`115895de63d336352cd9051a828257abb92afedb` (train-11, 2026-10-20).
+[CI 39489264202](https://github.com/studiokimeiga/perfect-web/actions/runs/39489264202)
+and [verify 39489264142](https://github.com/studiokimeiga/perfect-web/actions/runs/39489264142)
+passed at that exact commit. Its failure census also passed.
+
+Train-11's initial source verification
+[39442025240](https://github.com/studiokimeiga/perfect-web/actions/runs/39442025240)
+at `320c52a4` failed six recipes. The follow-up
+[39478386992](https://github.com/studiokimeiga/perfect-web/actions/runs/39478386992)
+at `2b8a8b81` passed those six; final master's exact-commit CI and verify
+then passed as linked above. The initial failed run remains failed. Those
+train-11 records establish no pass for train-12. Older snapshots and failed or
+cancelled runs remain in the
+[last-passing ledger](STATUS-HISTORY-2026-10.md#last-passing-commit).
+
+## completed gate items
+
+At train-12 source `ec15e5b1`, the latest complete campaign detects all
+43 TodoMVC, 62 device-storage and 50 second-host faults, plus TodoMVC's
+8 compatibility, 55 Cypress producer and 17 strict producer controls.
+Its repeated full-browser recipe passes three whole runs, each with
+1,258 passed and 20 explicitly skipped tests. The skips are not passes.
+All four records were imported with the canonical fetcher after workflow
+completion; the evidence-count gate reports zero disagreements and failures.
+The earlier failed runs remain failed. The Cypress acceptance uses the
+pinned compatibility copy, not unchanged upstream execution.
+
+On landed train-11:
+
+- Renders share identical calls within a snapshot
+  ([ADR-0354](DECISIONS/ADR-0354-a-render-reads-each-call-once.md)); committed
+  components are checked against the build
+  ([ADR-0355](DECISIONS/ADR-0355-the-committed-components-are-the-builds.md)).
+- Browser tests start selected hosts
+  ([ADR-0356](DECISIONS/ADR-0356-browser-host-map.md)); mutation slots isolate
+  inputs ([ADR-0357](DECISIONS/ADR-0357-mutants-run-in-parallel-slots.md));
+  Kiokun cache publication preserves the reader's version
+  ([ADR-0358](DECISIONS/ADR-0358-kiokun-cache.md)).
+- CI retains failing traces and red baselines, bounds checker latency and
+  avoids repeating a verified nightly head
+  ([ADR-0359](DECISIONS/ADR-0359-ci-reliability-traces-latency-incremental-builds-and-the-nightly.md)).
+  Coverage-guided fuzzing measures or fails
+  ([ADR-0360](DECISIONS/ADR-0360-the-coverage-guided-fuzzer-measures-or-fails.md)).
+- Check and build share validation
+  ([ADR-0361](DECISIONS/ADR-0361-check-is-build.md)); guide mutation kills
+  require valid producer outcomes
+  ([ADR-0362](DECISIONS/ADR-0362-guide-producer-validity.md)); Wasmtime 48.0.7
+  addresses its recorded advisories
+  ([ADR-0363](DECISIONS/ADR-0363-wasmtime-48-0-7.md)).
+
+Earlier task controls and commands remain in the [E14 plan](milestones/E14.md)
+and [completed-gates ledger](STATUS-HISTORY-2026-10.md#completed-gate-items).
+Changed inputs can stale a historical pass;
+[ADR-0281](DECISIONS/ADR-0281-a-merge-is-held-to-ci-s-verification-run.md) governs current
+evidence. No failed result is promoted by this summary.
+
+## failing gate items
+
+- The final record commit must pass exact-commit CI and automatic track
+  verification before promotion. The canonical final plan retains legacy
+  `e8-wit`, `e10-component` and `e8-contracts`; the first two have no committed
+  evidence text, and the third has no versioned header. The planner is not
+  relaxed to credit them. Track verification is their acceptance gate.
+- Hosted evidence does not prove the local-only performance, memory, load
+  or Kiokun obligations. E14 agent benchmarking still requires the owner's
+  model, budget and teaching choices. Neither performance universality nor
+  production readiness follows from these checks.
+- Device storage becomes durable when the queued handler applies the
+  assignment. Navigation before it runs can discard pending input; the
+  privacy-test repair establishes storage before reload and does not change
+  that runtime boundary. See [known limitations](KNOWN_LIMITATIONS.md).
+
+The following entries retain the earlier findings and repair obligations as
+recorded at their cited sources. Their later replacements are reconciled above;
+none of the original failed runs becomes a pass.
+
+- Earlier source `df2397f8` incorporated reviewed graph, WIT-source and
+  TodoMVC witness/producer repairs. Graph's four remaining invalid controls
+  now yield complete 25-test assertion results; WIT's escaped source-identity
+  control fails in its unchanged 12-test inventory; TodoMVC's four escaped
+  faults fail between passing host4/browser50 baselines and restored runs.
+  TodoMVC now rejects invalid native producers and requires restoration, held
+  by 17 controls; its 55 Cypress producer controls preserve the prior 54 and
+  protect retained raw diagnostics from being mistaken for verdicts.
+  These focused proofs do not establish whole campaign success. Eight reached
+  campaigns listed in [NEXT](NEXT.md), canonical evidence reconciliation and
+  final exact-source CI remain due. The earlier `52e773c7`
+  [21-recipe run](https://github.com/studiokimeiga/perfect-web/actions/runs/39543811122)
+  continues, with all three full browser engines passing at that source.
+  Later TodoMVC/graph witness changes require new reached results.
+- **Train-12 final gates remain pending.** Narrow controls do not replace
+  whole reached campaigns, combined browser suites or exact-head CI.
+  The earlier combined [CI 39518614014](https://github.com/studiokimeiga/perfect-web/actions/runs/39518614014)
+  at `d8369604` failed five tests on both architectures: the exact corpus
+  refusal inventory and four lookups using pre-namespace UI identities.
+  Focused checks of their repairs pass locally; the failed run remains failed.
+  The [generic campaign 39513687603](https://github.com/studiokimeiga/perfect-web/actions/runs/39513687603)
+  completed 73 recipes, with 71 passing and only the case-handling and
+  template controls failing. Both control repairs are integrated; their
+  full combined rerun remains pending.
+- **The 239-recipe combined verification completed with 11 invalid recipes.**
+  [39526960864](https://github.com/studiokimeiga/perfect-web/actions/runs/39526960864)
+  at `f15117de` recorded239/239 unique recipe results, with 228 valid native
+  results and11 invalid. All three full browser jobs passed; summary was the
+  sole failed job. Native recipes
+  `e14-todomvc`, `e14-device-store`, `e14-check-is-build`, `e14-bind`,
+  `e14-speculated-arms`, `e14-representations`, `e14-computed-conditions`,
+  `e14-mutation-bound`, `e14-guide` and `e14-browser-host-map` failed. TodoMVC's unchanged Cypress
+  execution passed 24/29 (native status 3); device-store's strict campaign
+  credited 53/62 controls and refused nine invalid producers. The source
+  census missed TodoMVC; one of 14 binding controls and one of eight
+  speculation controls survived. Representations detected3/4 and computed
+  conditions9/12; the memory-bound campaign refused one invalid witness,
+  and the guide campaign stopped on a stale control-map entry. The browser
+  host map detected53/54 controls; its reserved-host rejection witness
+  missed the injected fault. Repairs
+  and their whole affected follow-ups are pending; [NEXT](NEXT.md) records
+  the causes and acceptance obligations. Post-dispatch guide ownership
+  scope changes also require current evidence.
+- The graph-on-the-wire campaign returned native status zero, but its written
+  evidence records a memory guard stopping the renderer mutation above 3.9 GiB.
+  That campaign is invalid. The canonical summary/fetch guard reads the evidence
+  files and rejects it; an earlier status/log-only audit missed that stop.
+  Its repaired witnesses retain all 19 operators and 25 native identities;
+  targeted renderer and mutual-type faults now give completed native assertion
+  failures. The whole campaign and its reached cart-line consumer remain due.
+- The assembled repair gate at `1549c4bb` completed 1,015 tests in 240.385s
+  with five explicit skips, and formatting, path-case and all 4,374 mutation
+  anchors passed. The guard still rejects failed historical records as accepted
+  evidence; mixed transcripts are retained byte-identically in
+  [diagnostics](diagnostics/README.md). Subsequent effect-queue integration
+  still requires combined hosted verification.
+- The isolated effect queue at `fb0bea66` passed
+  [CI39532444813](https://github.com/studiokimeiga/perfect-web/actions/runs/39532444813)
+  on x64/ARM and both verification batches, covering eight campaigns. Its bounded deep
+  helper-chain checker improvement is recorded in
+  [ADR-0380](DECISIONS/ADR-0380-effect-inference-queue.md); this is not a
+  framework-wide performance result.
+- Published repair candidate `34f3c2d1` has
+  [155-recipe verification](https://github.com/studiokimeiga/perfect-web/actions/runs/39538607183)
+  completed as summarized above. Its [exact-source CI](https://github.com/studiokimeiga/perfect-web/actions/runs/39538597877)
+  failed on x64 and ARM at Clippy's `collapsible_if` lint in the generic
+  representation test; evidence gates passed before lint and the separate
+  license/advisory job passed. The semantics-preserving repair `4623d304`
+  passes targeted Clippy and its native regression, with exact combined CI
+  still required. The graph campaign is a separate required repair. Chromium's
+  setup job hit a GitHub release API HTTP502 before running tests; it must be
+  rerun when permitted or replaced by current full-browser proof. This is one
+  recorded setup failure, not an application-test result. Firefox and WebKit
+  full suites passed. The same run's `e14-guide-ownership` recipe failed its
+  15-test baseline before controls: a short native timeout elapsed before
+  child/grandchild fixture readiness. The repaired fixture preserves the
+  execution deadlines, bounds readiness, and cleans up failed startup using
+  verified process identities. All 15 native tests and 13 controls pass locally
+  with independent review; current hosted evidence is still required.
+  Its `e14-bind` campaign also refused one of 14 controls because five tests
+  used `expect("builds")` instead of an assertion on their valid fixture.
+  The repaired unchanged lowering fault completes all nine tests as assertions,
+  followed by restored nine passing; the complete hosted campaign remains required.
+  `e14-computed-conditions` detected 11/12 controls and refused a browser
+  fault whose disabled-button clicks timed out. The downstream
+  `e14-evidence-integrity` recipe correctly rejected the short computed result
+  written earlier in its shard. Both need follow-up; this is not evidence of
+  a separate integrity-guard defect. Ten valid-draft enabled-state assertions
+  now produce complete native browser receipts: 66 baseline passes, 42 valid
+  assertion failures plus 24 passes under the unchanged fault, then 66 restored
+  passes. All 20 reached consumers and the explicit integrity rerun remain due.
+  The same run also reports `e14-check-is-build` at 50/51 controls after a
+  complete 626/626 source census and 99-test baseline: generated WIT source
+  identity has a surviving fault. `e14-todomvc` reports 39/43 application
+  controls, with four checked-state/autofocus survivors, despite passing
+  server/browser baselines and its separate 54/54 Cypress producer controls.
+  Its legacy campaign must also stop crediting setup, build or timeout failures.
+  Both repairs and current full campaigns remain required.
+- Canonical fetch of the completed239-recipe run imported 82 eligible files
+  after skipping 155 changed recipes and excluding all 11 invalid outcomes.
+  A post-fetch count gate exposed ambiguous bare witness metadata in
+  `e14-producer-ownership`; its nine native control outcomes remain valid.
+  Qualified metadata and an exact-output regression fix the ownership labels
+  without changing the evidence parser. The gate now has 26 stale or planned
+  disagreements and zero unexplained failures; the changed campaign still
+  requires current hosted evidence.
+- Exact-source [CI39527396553](https://github.com/studiokimeiga/perfect-web/actions/runs/39527396553)
+  at `152a4a41` passed x64, ARM and license/advisory checks. Subsequent
+  repairs still require their own exact-source CI; this pass does not
+  establish the current unlanded combined tree.
+- **E14 gates 3 and 4 remain open:** agent runs and analysis await model and
+  budget decisions. Framework-wide performance superiority and broad
+  application correctness are not established.
+- The assembled tree's [backend refusal inventory](../examples/accepted/build-refusals.json)
+  records nine exact refusals: resource mounting (A-007), body-level secret
+  binding (A-010), build-time page values (A-013), style directives (A-018),
+  and placeholder dependencies (A-014/A-025/A-026/A-027/A-034). Repairing
+  A-008's WIT collision exposed six existing gaps; the historical compiler
+  reproduces the same nine when only A-008 is omitted. The
+  [causal probe](evidence/tooling/corpus-after-wit.txt) preserves both runs.
+  All 42 historical accepted programs remain unchanged. A-008 now builds
+  on this candidate; the combined repairs remain unlanded.
+- The scheduled-order Chromium timeout, WebKitGTK navigation/cancellation
+  investigation, E7 long-frame instrument and E10 carry-over work retain
+  their scope in [NEXT](NEXT.md), [KNOWN_LIMITATIONS](KNOWN_LIMITATIONS.md)
+  and the [historical failing gates](STATUS-HISTORY-2026-10.md#failing-gate-items).
+  Temporal authorization, live-version compatibility, unknown outcomes,
+  composed budgets and browser-owned editing remain proposals where
+  generated-runtime enforcement is not demonstrated.
+
+## exact commands to reproduce
+
+Quick inspection and focused regressions on this assembled source:
+
+```sh
+just doctor
+cargo fmt --all -- --check
+python3 scripts/mutation_anchors.py
+bash scripts/case-check.sh
+cargo test --locked -p pw-core --test query_values --test let_discard --test effect_convergence
+cargo test --locked -p pw-dev-server --bin pw-dev-server -- --exact tests::a_flight_another_reader_waits_for_is_not_stopped tests::a_longer_read_is_not_applied_over_a_commit_it_did_not_see
+python3 scripts/ci_plan.py --changed origin/master HEAD
+```
+
+The full gate is `just ci`; the changed recipe plan and browser suites run
+on GitHub under [PARALLEL](PARALLEL.md)'s branch and port rules. Run reached
+mutation scripts whole, then check restoration with the anchor command.
+`just evidence-gates` validates machinery using injected producers; it does
+not establish real compiler, runtime or browser behavior. Fetching and
+freshness follow [ADR-0281](DECISIONS/ADR-0281-a-merge-is-held-to-ci-s-verification-run.md).
+`just doctor` is read-only; `just bootstrap` installs pinned dependencies
+under existing authorization, not a grant from this document.
+
+## known environmental issues
+
+Development uses Windows/WSL2 and GitHub hosted Linux x64/ARM. Quick local
+checks stay under roughly ten minutes; heavy campaigns, full browser suites
+and busy-host CI run on GitHub under the owner's 2026-10-20 grant. Workers
+use assigned ports and their own targets. Pass
+`--repo studiokimeiga/perfect-web` to `gh` for the connected repository.
+
+The PC's WSL `gh` credential failed during this integration; authenticated
+Windows `gh.exe` works. Shared load affects timing; build caches can exhaust
+disk space. Follow [PARALLEL](PARALLEL.md)'s bounded diagnostic rerun and
+owned cleanup rules; never loosen a bound to obtain a pass. No new
+platform-wide outage is asserted here.
+
+October 2 Firefox stalls and September macOS disk/cache incidents are
+[dated observations](STATUS-HISTORY-2026-10.md#known-environmental-issues),
+not current WSL or hosted-runner claims. Partial output, a missing producer
+exit or an existing evidence file is never a successful result.
+
+## last benchmark summary
+
+The E10 close benchmark retained here is 2026-10-02 at
+`bff437c6ae641529461ca56410b1f0337e06557a`, Apple M2 Pro arm64:
+[raw evidence](evidence/E10/close-bench.txt), `just e10-close-bench 8`.
+Store components were 3,037-4,221 bytes. The host's `add_to_cart` median
+was 18.767 microseconds versus 20.620 for the Rust guest and 0.302 natively.
+Three of eight Chromium runs reported an interaction long frame. These
+are old measured inputs, not train-12 performance or framework comparisons.
+
+[Benchmark requirements](BENCHMARKS.md) retain revision, machine, warm/cold
+state, samples, distributions and raw commands. Narrow checker timings do
+not replace an application benchmark. ADR-0027's correction still applies
+to older frame attribution.
+
+## next three concrete tasks
+
+1. Finish train-12's exact-commit CI and full affected verification; inspect
+   failed or stopped producers, repair defects, reconcile current evidence
+   under ADR-0281, and land only the verified combined tree.
+2. Resolve remaining [NEXT](NEXT.md) integration follow-ups using recorded
+   reproductions for the scheduled-order timeout, WebKit traffic and
+   adapter/estimator gaps; retain unresolved limits.
+3. Prepare E14-E's runs and analysis for the owner's model, budget and
+   teaching-method choices; run no benchmark on an assumed choice.

@@ -21,6 +21,18 @@ Checked against train-10 (`track/train-10`, 2026-10-17): `master` at
 `32757966` (train-9, landed) and the train's merges, ADR-0001 to ADR-0353
 (ADR-0351, generic effects, is train-11's).
 
+**Not yet re-checked after two landings** (note of 2026-10-21). Train-11
+landed on 2026-10-20 (`115895de`) and train-12 on 2026-10-21 (`e7664d2e`,
+ADR-0351 and ADR-0365 to ADR-0380). The rows below still read as of
+train-10, and the [In flight](#in-flight) table is a record of that hour,
+not of today's branches. Two examples of how it is now stale: TodoMVC's
+official Cypress suite passes all 29 cases on the pinned compatibility copy
+with 43 of 43 application fault controls detected, and two hosts share one
+database under 50 of 50 controls
+([train-12 acceptance](../diagnostics/train-12/acceptance-record-2026-10-21.md)).
+Neither is production readiness. A row-by-row reconciliation is pending; until
+it is done, [STATUS](../STATUS.md) and the ADRs are the current record.
+
 ## Built
 
 | Capability | ADRs | Limits |

@@ -3193,49 +3193,49 @@ session is the database's (track `second-host`; train-12).
   answered `another-host`.
 
 [ADR-0351](DECISIONS/ADR-0351-generic-effects.md):
-Generic calls preserve solved result types and performed effects (train-12 integration; final combined gates pending).
+Generic calls preserve solved result types and performed effects (landed with train-12 at `e7664d2e`, 2026-10-21).
 - Type checking, member resolution, affine checking and lowering share the solved generic facts; unknown member receivers are refused rather than treated as pure.
 
 [ADR-0370](DECISIONS/ADR-0370-vite-security-update.md):
-Vite uses the patched editor launcher on every dependency path (train-12 integration; final combined gates pending).
+Vite uses the patched editor launcher on every dependency path (landed with train-12 at `e7664d2e`, 2026-10-21).
 - Pin Vite 8.3.3 and launch-editor 2.14.2 across direct and Marko dependency paths, with the existing reviewed audit allowance unchanged.
 
 [ADR-0371](DECISIONS/ADR-0371-node-audit-fails-closed.md):
-Dependency audits require a complete, internally consistent producer result (train-12 integration; final combined gates pending).
+Dependency audits require a complete, internally consistent producer result (landed with train-12 at `e7664d2e`, 2026-10-21).
 - Reject empty, malformed, duplicate-key or inconsistent audit reports and producer failures; the pinned package manager's exit status must agree with its advisory report.
 
 [ADR-0372](DECISIONS/ADR-0372-ci-test-reach.md):
-Changed test witnesses reach their verification recipes (train-12 integration; final combined gates pending).
+Changed test witnesses reach their verification recipes (landed with train-12 at `e7664d2e`, 2026-10-21).
 - Root Rust tests reach package-wide commands, Python unittest selectors retain their tests, and evidence counts only scripts actually executed by a recipe.
 
 [ADR-0373](DECISIONS/ADR-0373-component-namespaces.md):
-Component identities preserve declaration namespaces (train-12 integration; final combined gates pending).
+Component identities preserve declaration namespaces (landed with train-12 at `e7664d2e`, 2026-10-21).
 - UI identities use the reserved ~ui suffix across contracts, artifacts, renderer paths and semantic diffs; noncomponent declarations cannot replace executable bodies.
 
 [ADR-0374](DECISIONS/ADR-0374-keyed-retry.md):
-Only a current keyed read retries after newer frames (train-12 integration; final combined gates pending).
+Only a current keyed read retries after newer frames (landed with train-12 at `e7664d2e`, 2026-10-21).
 - A superseded keyed read ends before frame revalidation can start an unnecessary flight; current reads retain their protection against stale results.
 
 [ADR-0375](DECISIONS/ADR-0375-effect-convergence.md):
-Inferred effects reach a fixed point before checks and contracts (train-12 integration; final combined gates pending).
+Inferred effects reach a fixed point before checks and contracts (landed with train-12 at `e7664d2e`, 2026-10-21).
 - Remove the silent eight-sweep limit; deep and cyclic helper chains preserve their effects regardless of declaration order. Bounded scale measurements record the additional work.
 
 [ADR-0376](DECISIONS/ADR-0376-producer-process-ownership.md):
-Mutation producers own their child through launch, cancellation and reaping (train-12 integration; final combined gates pending).
+Mutation producers own their child through launch, cancellation and reaping (landed with train-12 at `e7664d2e`, 2026-10-21).
 - Defer cancellation while acquiring and cleaning the child; reap its owned process group before source restoration. Native launch-window, running, repeated-signal and timeout controls hold the lifecycle.
 
 [ADR-0377](DECISIONS/ADR-0377-todomvc-cypress-compatibility-copy.md):
-Execute an identified TodoMVC Cypress compatibility copy (train-12 integration; final combined gates pending).
+Execute an identified TodoMVC Cypress compatibility copy (landed with train-12 at `e7664d2e`, 2026-10-21).
 - Preserve the seven upstream blobs, verify exactly two compatibility patches and the runner pin, and require all 29 cases with native status zero. The launcher owns and reaps its actual host; failed and ineffective probes remain recorded.
 
 [ADR-0378](DECISIONS/ADR-0378-bind-capture-control.md):
-Binding capture controls exercise diagnostic ownership (train-12 integration; final combined gates pending).
+Binding capture controls exercise diagnostic ownership (landed with train-12 at `e7664d2e`, 2026-10-21).
 - A nonserializable invalid target distinguishes the binding exemption from canonical signal filtering, while ordinary handlers retain capture checks. All 14 fault models remain; native builds and timeouts no longer count as mutation kills.
 
 [ADR-0379](DECISIONS/ADR-0379-speculated-arms-proof.md):
-Speculation absence names an existing page, and controls require native assertions (train-12 integration; final combined gates pending).
+Speculation absence names an existing page, and controls require native assertions (landed with train-12 at `e7664d2e`, 2026-10-21).
 - Derive the canonical page identity before asserting absence; keep all eight fault models and require complete Cargo/browser receipts. Feed cases remain sequential and continue after failures.
 
 [ADR-0380](DECISIONS/ADR-0380-effect-inference-queue.md):
-Effect inference revisits readers only when dependency rows grow (train-12 integration; final combined gates pending).
+Effect inference revisits readers only when dependency rows grow (landed with train-12 at `e7664d2e`, 2026-10-21).
 - Preserve canonical effect rows, performed metadata and convergence while replacing repeated whole-program sweeps with a deduplicated reader queue. Bounded alternating measurements establish the deep-chain improvement, not an application-wide speedup.

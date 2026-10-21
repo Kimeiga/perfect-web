@@ -120,8 +120,10 @@ Cancel only a run proven to belong to the assigned branch and commit;
 never cancel `master` or `track/train-*` runs. Check run ID, branch and SHA,
 not the newest run by position. Delete only the assigned scratch branch
 when its work completes. [ADR-0365](DECISIONS/ADR-0365-tests-wait-on-events.md)
-records train-12's stronger event/cleanup work; that integration is still
-unlanded, so this link establishes no final validation.
+records train-12's stronger event/cleanup work. It landed with train-12 at
+`e7664d2e` on 2026-10-21; the
+[acceptance record](diagnostics/train-12/acceptance-record-2026-10-21.md)
+states what that landing proves and what it does not.
 
 ## Questions for the integrator
 
