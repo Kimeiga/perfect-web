@@ -144,6 +144,11 @@ evidence. No failed result is promoted by this summary.
   used `expect("builds")` instead of an assertion on their valid fixture.
   The repaired unchanged lowering fault completes all nine tests as assertions,
   followed by restored nine passing; the complete hosted campaign remains required.
+  `e14-computed-conditions` detected 11/12 controls and refused a browser
+  fault whose disabled-button clicks timed out. The downstream
+  `e14-evidence-integrity` recipe correctly rejected the short computed result
+  written earlier in its shard. Both need follow-up; this is not evidence of
+  a separate integrity-guard defect.
 - Canonical fetch of the completed239-recipe run imported 82 eligible files
   after skipping 155 changed recipes and excluding all 11 invalid outcomes.
   A post-fetch count gate exposed ambiguous bare witness metadata in

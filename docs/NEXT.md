@@ -33,6 +33,12 @@ five render-again tests panicked at an expected-build extraction. An explicit
 valid-build assertion now gives a complete nine-test assertion failure under the
 unchanged lowering fault; the restored nine pass. The whole campaign and its
 reached consumers remain due.
+The same run's `e14-computed-conditions` detected 11 of 12 controls and refused
+the browser fault that omits a block's computed values: disabled-button clicks
+timed out rather than producing valid assertion receipts. Preserve the fault
+and complete 66-test inventory, repair its semantic witness, and rerun the whole
+campaign. `e14-evidence-integrity` then correctly rejected that short result in
+the same shard; it needs a fresh run after the computed campaign is repaired.
 
 The graph repair now retains all 19 operators and 25 native identities with strict
 completed-assertion validation. Targeted renderer faults and the mutual-type
