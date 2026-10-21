@@ -9,25 +9,30 @@ CI existed. Its complete bytes are retained in
 [the historical limitations file](KNOWN_LIMITATIONS-history-2026-09-15.md).
 Those historical statements must not override current source or test results.
 
-## Current integration qualifications, 2026-10-20
+## Current integration qualifications, 2026-10-21
 
-The dated sections below retain historical findings. Train-11 has landed
-check/build validation and browser host selection repairs; train-12's
-additional generic effects, canonical device privacy, WIT namespace,
-keyed retry and producer-ownership repairs are still unlanded. Current
-completion claims and exact failed runs are in [STATUS](STATUS.md).
+The dated sections below retain historical findings. The train-12 source
+`ec15e5b1` passed combined x64/ARM CI, the reached hosted campaigns and all
+three browser engines. [STATUS](STATUS.md) and the
+[acceptance record](diagnostics/train-12/acceptance-record-2026-10-21.md)
+name the source and exact runs. Final record promotion still requires CI
+and automatic track verification at that commit.
 
-The combined train-12 verification has found five unmet gates so far:
-TodoMVC's unchanged upstream Cypress execution passes 24/29 because of
-spy-reset and detached-alias incompatibilities with the pinned runner;
-device-store's strict mutation campaign refuses nine invalid producers
-instead of crediting compile errors, setup panics or browser timeouts.
-The source census also missed TodoMVC; one binding control and one
-speculation control survived. The latter queried an obsolete UI identity
-and passed on a missing lookup instead of proving the intended absence.
-All three full browser suites passed, but that does not close these gates.
-The proposed TodoMVC compatibility copy must be identified explicitly;
-its execution must never be described as the unchanged upstream suite.
+The original TodoMVC compatibility, invalid device witnesses, missing source
+census entry, binding and speculation controls have current passing
+replacements. Their original failures remain in the ledger. TodoMVC's
+Cypress acceptance uses a pinned compatibility copy that repairs the runner
+API and detached alias; it must never be called unchanged upstream execution.
+
+**Pending device input is not yet durable.** A device-signal assignment is
+written synchronously to localStorage when its queued handler applies the
+assignment (ADR-0366, decisions 1-3). Navigation or reload before that handler
+runs can discard the pending interaction. This version does not guarantee
+durability of unhandled input. Persistence tests must observe the stored
+value before reload. The
+[privacy-test synchronization repair](diagnostics/train-12/device-store-marker-race-2026-10-21.md)
+changes the test's observation boundary, not production persistence behavior;
+it is not evidence of a privacy leak.
 
 The accepted-program corpus still has nine exact backend refusals.
 Read-only scoping also found that custom tags such as `<map-container/>`

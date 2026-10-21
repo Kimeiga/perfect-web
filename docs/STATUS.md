@@ -3,7 +3,7 @@
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
 Reviewed 2026-10-21 against assembled train-12 source
-`9031b412` (with final hosted verification still pending).
+`ec15e5b1858b608d5a4c8aa39e00a0683c678505` and its completed hosted runs.
 [The complete prior ledger](STATUS-HISTORY-2026-10.md) remains verbatim,
 including failed runs, corrections and their original scope.
 
@@ -17,16 +17,24 @@ Pleris is taught to an agent. Compiler and browser tests establish no agent
 benchmark. Numbering remains engineering E0-E15, public proofs P0-P9 and
 risk experiments RQ-* ([charter](../PROJECT_CHARTER.md)).
 
-**Unlanded train-12** assembles generic-result/effect repairs, device-local
-data and TodoMVC, cross-host database checks, verification/producer repairs,
-security pins, component namespaces, keyed-read retry and effect convergence.
-Individual track evidence does not establish the combined tree. Final
-exact-commit CI, full affected verification, evidence reconciliation and
-landing are pending.
+**Train-12** assembles generic-result/effect repairs, device-local data and
+TodoMVC, cross-host database checks, verification/producer repairs, security
+pins, component namespaces, keyed-read retry and effect convergence. Its
+combined source passed the hosted gates below. Promotion to master requires
+CI and automatic track verification at the final record commit; a source
+pass alone does not establish that promotion.
 
 ## last passing commit
 
-**Landed and verified master:**
+**Latest verified source:** `ec15e5b1858b608d5a4c8aa39e00a0683c678505`.
+[CI 39558466827](https://github.com/studiokimeiga/perfect-web/actions/runs/39558466827)
+passed x64, ARM and license/advisory checks.
+[Verify 39558474966](https://github.com/studiokimeiga/perfect-web/actions/runs/39558474966)
+passed all four reached recipes and the full Chromium, Firefox and WebKit
+browser jobs. Earlier eligible recipe records are reconciled in the
+[train-12 acceptance record](diagnostics/train-12/acceptance-record-2026-10-21.md).
+
+**Previously landed and verified predecessor:**
 `115895de63d336352cd9051a828257abb92afedb` (train-11, 2026-10-20).
 [CI 39489264202](https://github.com/studiokimeiga/perfect-web/actions/runs/39489264202)
 and [verify 39489264142](https://github.com/studiokimeiga/perfect-web/actions/runs/39489264142)
@@ -37,12 +45,22 @@ Train-11's initial source verification
 at `320c52a4` failed six recipes. The follow-up
 [39478386992](https://github.com/studiokimeiga/perfect-web/actions/runs/39478386992)
 at `2b8a8b81` passed those six; final master's exact-commit CI and verify
-then passed as linked above. The initial failed run remains failed. These
-records establish no pass for train-12. Older snapshots and failed or
+then passed as linked above. The initial failed run remains failed. Those
+train-11 records establish no pass for train-12. Older snapshots and failed or
 cancelled runs remain in the
 [last-passing ledger](STATUS-HISTORY-2026-10.md#last-passing-commit).
 
 ## completed gate items
+
+At train-12 source `ec15e5b1`, the latest complete campaign detects all
+43 TodoMVC, 62 device-storage and 50 second-host faults, plus TodoMVC's
+8 compatibility, 55 Cypress producer and 17 strict producer controls.
+Its repeated full-browser recipe passes three whole runs, each with
+1,258 passed and 20 explicitly skipped tests. The skips are not passes.
+All four records were imported with the canonical fetcher after workflow
+completion; the evidence-count gate reports zero disagreements and failures.
+The earlier failed runs remain failed. The Cypress acceptance uses the
+pinned compatibility copy, not unchanged upstream execution.
 
 On landed train-11:
 
@@ -75,37 +93,19 @@ evidence. No failed result is promoted by this summary.
 
 ## failing gate items
 
-- Source `9031b412` retains all 43 TodoMVC controls and 50 browser test
-  identities. Mixed-state toggle-all tests now establish row and checkbox
-  states around each click. The exact original fault that completes only when
-  all todos are active yields a complete 48-pass/2-assertion-failure receipt,
-  between passing host4/browser50 baseline and restored suites. Source hashes,
-  complete receipts, and excluded setup attempts are in the
-  [focused diagnostics](diagnostics/train-12/todomvc-toggle-all-state-witness/).
-- The [four-recipe run](https://github.com/studiokimeiga/perfect-web/actions/runs/39555014640)
-  at `e877236b` correctly refused that TodoMVC witness: seven controls were
-  killed before an implicit checkbox state check produced an invalid receipt.
-  Its Chromium browser job also found an immediate-reload race in the device
-  privacy test. That test now waits for the rendered and stored note, then the
-  updated count, before reload; its postreload persistence and privacy
-  assertions remain. The focused case passes on all three engines. Its full
-  Chromium spec reported 15 passes; the wrapper limitation and missing raw
-  exploratory probe output are documented in the
-  [diagnostic](diagnostics/train-12/device-store-marker-race-2026-10-21.md).
-- The same run's device-storage campaign detected 62/62 faults and passed
-  immutable header/count checks; Firefox and WebKit browser jobs passed.
-  These results precede the latest test changes. The repaired source still
-  requires whole `e10-browser`, `e14-todomvc`, `e14-device-store` and
-  `e14-second-host` campaigns, full browser suites, and exact final-commit CI.
-- [CI 39549544042](https://github.com/studiokimeiga/perfect-web/actions/runs/39549544042)
-  passed x64, ARM and license/advisory checks at `bd267ad6`. It is not final
-  candidate CI. Completed, audited evidence imports include 125 files from
-  the original 155-run (`bd267ad6`), four from the eight-run (`693e0d7c`),
-  seventeen from the successful 21-run (`eb1b2e35`), and three from the
-  completed seven-run (`bc805844`). Native-invalid and stale files were
-  excluded. The canonical remaining plan includes the four current campaigns
-  and legacy `e8-wit`, `e10-component`, `e8-contracts` obligations for the
-  final track verification. No earlier failure has been promoted to a pass.
+- The final record commit must pass exact-commit CI and automatic track
+  verification before promotion. The canonical final plan retains legacy
+  `e8-wit`, `e10-component` and `e8-contracts`; the first two have no committed
+  evidence text, and the third has no versioned header. The planner is not
+  relaxed to credit them. Track verification is their acceptance gate.
+- Hosted evidence does not prove the local-only performance, memory, load
+  or Kiokun obligations. E14 agent benchmarking still requires the owner's
+  model, budget and teaching choices. Neither performance universality nor
+  production readiness follows from these checks.
+- Device storage becomes durable when the queued handler applies the
+  assignment. Navigation before it runs can discard pending input; the
+  privacy-test repair establishes storage before reload and does not change
+  that runtime boundary. See [known limitations](KNOWN_LIMITATIONS.md).
 
 The following entries retain the earlier findings and repair obligations as
 recorded at their cited sources. Their later replacements are reconciled above;

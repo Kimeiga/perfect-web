@@ -2,36 +2,38 @@
 
 The next executable tasks, in order, with acceptance criteria. Charter §3.4.
 
-## Train-12 verification follow-ups, 2026-10-20
+## Train-12 acceptance and promotion, 2026-10-21
 
-The assembled candidate is unlanded; master remains the verified train-11
-commit recorded in [STATUS](STATUS.md). Finish the combined gates before
-starting another feature batch.
+Source `ec15e5b1858b608d5a4c8aa39e00a0683c678505` passed
+[CI 39558466827](https://github.com/studiokimeiga/perfect-web/actions/runs/39558466827)
+on x64 and ARM, and all of
+[verify 39558474966](https://github.com/studiokimeiga/perfect-web/actions/runs/39558474966).
+The four reached recipes are recorded: TodoMVC 43/43, device storage 62/62,
+second host 50/50, and three full-browser runs of 1,258 passed / 20 skipped.
+The separate full Chromium, Firefox and WebKit jobs also passed. All native
+inventories and strict producer checks remain intact. Earlier failed runs,
+setup failures and invalid witnesses remain historical failures.
 
-The latest source `9031b412` repairs two observed browser-test races. The
-TodoMVC mixed-state toggle-all actions now have explicit row and checkbox
-preconditions and outcomes; the unchanged original fault produces two complete
-semantic assertion failures among the same 50 test IDs, with passing 4-host /
-50-browser baseline and restoration. The device privacy test now waits for
-its rendered note, stored JSON and updated count before reload, while keeping
-all postreload persistence and network privacy assertions.
+The [acceptance record](diagnostics/train-12/acceptance-record-2026-10-21.md)
+reconciles the completed evidence cohorts and documents the proof limits.
+Promotion is held to these checks in order:
 
-[Verify 39555014640](https://github.com/studiokimeiga/perfect-web/actions/runs/39555014640)
-at `e877236b` remains failed for its TodoMVC witness and Chromium privacy test.
-Its device-storage 62/62 campaign and Firefox/WebKit browser passes are valid
-for that source; they do not replace the latest test source's verification.
-Run the four reached recipes: `e10-browser`, `e14-todomvc`, `e14-device-store`,
-and `e14-second-host`, plus the full browser suites. Retain all 43 TodoMVC
-controls and 50 native test IDs; no setup failure or action error is a kill.
+1. The final documentation/evidence commit passes exact-commit CI.
+2. Its automatic track verification passes, including the canonical legacy
+   `e8-wit`, `e10-component`, `e8-contracts` obligations and full browsers.
+3. The integrator rechecks master and promotes the verified tip without
+   rewriting published history. The handoff records the final SHA and runs.
 
-The prior seven-run is complete. Its three valid, still-current files were
-imported at `bc805844`, after independent native/header/count audit. The prior
-125 + 4 + 17 eligible imports remain recorded in STATUS. Finish canonical
-reconciliation after the new results; final track verification must also cover
-legacy `e8-wit`, `e10-component` and `e8-contracts`, which current evidence
-cannot credit. Require exact final-commit CI before a track push, verify the
-track, then recheck remote master before landing. The dated details below
-retain the original failures and requirements as recorded then.
+After promotion, choose the E14 benchmark models, budget and agent teaching
+method with the owner before spending on benchmark runs. The local-only
+performance/load/memory and Kiokun checks remain separate unproved work;
+keep their scope and the known backend/runtime limitations explicit.
+
+## Historical train-12 findings
+
+The dated details below preserve the failures and obligations as originally
+recorded. Their eligible replacements are reconciled above and in STATUS;
+they are not a second list of outstanding reruns.
 
 The earlier assembled repair candidate `34f3c2d1` began the first follow-up on `wip/train-12`.
 [Verify39538607183](https://github.com/studiokimeiga/perfect-web/actions/runs/39538607183)
