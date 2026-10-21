@@ -59,3 +59,16 @@ e14-device-store-cypress:
        bash spikes/todomvc-cypress-probes/run.sh; \
      } > docs/evidence/E14/device-store-cypress.txt
     @grep -E "^acceptance|^probes|^(spy|alias):" docs/evidence/E14/device-store-cypress.txt
+
+# Strict native test producers for the device campaign, including the pinned
+# Playwright lifecycle without launching an application or browser.
+e14-device-producer:
+    @mkdir -p docs/evidence/E14
+    @{ echo "ADR-0366 - complete assertion-only device mutation producers"; echo; \
+       echo "produced by: just e14-device-producer"; \
+       echo "commit: $(git rev-parse HEAD)"; \
+       python3 -m unittest discover -s scripts/tests -p test_device_producer_results.py -v; \
+       python3 scripts/device_browser_protocol.py; \
+       python3 scripts/device_producer_mutations.py; \
+     } > docs/evidence/E14/device-producer.txt 2>&1
+    @tail -n 5 docs/evidence/E14/device-producer.txt

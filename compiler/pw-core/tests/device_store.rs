@@ -88,7 +88,9 @@ fn built(src: &str) -> pw_core::build::Build {
             src,
         });
     }
-    pw_core::build::build(&units).expect("it builds")
+    let result = pw_core::build::build(&units);
+    assert!(result.is_ok(), "it builds: {:?}", result.as_ref().err());
+    result.unwrap()
 }
 
 /// A module declaring `kept`, a page `P` holding `signals` and showing
@@ -736,4 +738,26 @@ fn a_value_a_host_holds_is_still_refused_where_decision_7_lifts_the_refusals() {
         clean(&src);
         assert_eq!(refusals(&src), "", "{markup}");
     }
+}
+
+// The generic solver and Device checker must agree on this same row.
+#[test]
+fn generic_reverse_keeps_a_device_rows_type_and_privacy() {
+    let rows = "{#each List.reverse(notes) as n (n.id)}<li>{n.text}</li>{/each}";
+    clean(&program(KEPT, "", rows, ""));
+    let send = "{#each List.reverse(notes) as n (n.id)}<button type=\"button\" on:press={() => match send(n.text) { Ok(_) => draft = \"\", Err(_) => draft = \"\", }}>Send</button>{/each}";
+    let private = program(KEPT, "signal draft: String = \"\"", send, SEND);
+    refused(&private, "PW6801", "sent");
+    let boundary = boundaries(&private);
+    assert!(!boundary.is_empty(), "{private}");
+    assert!(
+        boundary.iter().all(|b| b.contains("device")),
+        "{boundary:?}"
+    );
+    clean(&program(
+        "",
+        "signal notes: List<Note> = []\nsignal draft: String = \"\"",
+        send,
+        SEND,
+    ));
 }

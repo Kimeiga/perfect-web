@@ -36,18 +36,23 @@ Run from the repository root; `just e14-device-store` records the output.
 The source is restored after every mutant, whatever happens.
 """
 
+import json
 import os
 import pathlib
 import re
 import signal
 import subprocess
 import sys
+import secrets
+import tempfile
+
+import browser_test_results
+import cargo_test_results
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CHECKER = ROOT / "compiler/pw-core/src/device_store.rs"
 SIGNATURES = ROOT / "compiler/pw-core/src/signatures.rs"
 SIGNALS = ROOT / "compiler/pw-core/src/signals.rs"
-INFER = ROOT / "compiler/pw-core/src/infer.rs"
 TEMPLATE = ROOT / "compiler/pw-core/src/template_ir.rs"
 PLAN = ROOT / "compiler/pw-core/src/page_values.rs"
 RESUME = ROOT / "compiler/pw-core/src/resume.rs"
@@ -228,11 +233,11 @@ MUTANTS = [
         "                if decl.kind == DeclKind::Signal && decl.body.is_some() && false {\n",
     ),
     (
-        "a row of a list the device keeps has no type",
+        "a device-kept list loses its declared type for every reader",
         "core",
-        INFER,
-        "                        .is_none_or(of_a_module_signal) =>\n",
-        "                        .is_none() =>\n",
+        SIGNATURES,
+        "        self.signal_types.get(&def)\n",
+        "        self.signal_types.get(&def).filter(|t| !self.device.contains(&def) || !t.resolved().is_some_and(|t| t.as_builtin() == Some(crate::resolved::Builtin::List)))\n",
     ),
     # --- the plan and the build ---------------------------------------------
     (
@@ -505,11 +510,11 @@ MUTANTS = [
 
 CARGO = {
     "core": [
-        "cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "device_store",
+        "cargo", "test", "--quiet", "--locked", "-p", "pw-core", "--test", "device_store", "--", "--format=pretty",
     ],
     "host": [
         "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--",
-        "tests::todomvc::", "tests::device_store::",
+        "tests::todomvc::", "tests::device_store::", "--format=pretty",
     ],
 }
 SPECS = {
@@ -518,7 +523,7 @@ SPECS = {
 }
 
 # How long one command may run. Past the bound it is killed with everything
-# it started, and the run counts as failing.
+# it started. A bound stop is invalid evidence, never an assertion kill.
 BOUND = 1500
 
 
@@ -530,51 +535,115 @@ def bounded(cmd, **kw):
         out, _ = p.communicate(timeout=BOUND)
         return out, p.returncode
     except subprocess.TimeoutExpired:
-        os.killpg(p.pid, signal.SIGKILL)
+        try:
+            os.killpg(p.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
         out, _ = p.communicate()
         return out, None
+    except BaseException:
+        # Cancellation must reap our process group before the caller restores
+        # a mutant's source. Otherwise the old child can still read that source.
+        try:
+            os.killpg(p.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        p.communicate()
+        raise
+
+
+# Frozen from each unmutated complete run, then compared for every control.
+INVENTORIES = {}
+
+
+def cargo_result(suite, code, out):
+    result = cargo_test_results.parse(code, out)
+    if not result.valid:
+        return False, 0, 0
+    if (re.search(r"; [1-9]\d* (?:ignored|measured)", out)
+            or re.search(r"^test \S+ \.\.\. (?!ok$|FAILED$).+", out, re.M)):
+        return False, 0, 0
+    tests = re.findall(r"^test (\S+) \.\.\. (ok|FAILED)$", out, re.M)
+    names = tuple(sorted(name for name, _ in tests))
+    if (len(tests) != result.passed + result.failed or len(set(names)) != len(names)
+            or (suite in INVENTORIES and names != INVENTORIES[suite])):
+        return False, 0, 0
+    # A Rust panic is not automatically an assertion. Authenticate every failed
+    # test's panic site against the selected test source, not production code or
+    # expect/unwrap/setup failures. The shared parser remains native authority.
+    blocks = re.findall(r"^---- (\S+) stdout ----\n(.*?)(?=^---- |^failures:|^test result:|\Z)", out, re.M | re.S)
+    if result.failed:
+        if len(blocks) != result.failed or {name for name, _ in blocks} != set(result.failure_names):
+            return False, 0, 0
+        allowed = ({"compiler/pw-core/tests/device_store.rs"} if suite == "core" else
+                   {"spikes/own-renderer/server/src/tests/device_store.rs", "spikes/own-renderer/server/src/tests/todomvc.rs"})
+        for _, block in blocks:
+            sites = re.findall(r"panicked at ([^\n]+?):(\d+):\d+:", block)
+            if len(sites) != 1:
+                return False, 0, 0
+            path, line = sites[0]
+            source = pathlib.Path(path)
+            if source.is_absolute():
+                try:
+                    source = source.relative_to(ROOT)
+                except ValueError:
+                    return False, 0, 0
+            if source.as_posix() not in allowed:
+                return False, 0, 0
+            lines = (ROOT / source).read_text().splitlines()
+            if not 1 <= int(line) <= len(lines) or not re.match(r"\s*assert(?:_eq|_ne)?!", lines[int(line) - 1]):
+                return False, 0, 0
+    INVENTORIES.setdefault(suite, names)
+    return True, result.passed, result.failed
 
 
 def cargo_tests(suite):
-    """(built, passed, failed) over the suite's tests."""
     out, code = bounded(CARGO[suite], cwd=ROOT)
-    if code is None:
-        return True, 0, 1
-    found = re.findall(r"test result: \w+\. (\d+) passed; (\d+) failed", out)
-    if not found:
-        return False, 0, 0
-    return True, sum(int(p) for p, _ in found), sum(int(f) for _, f in found)
+    result = cargo_result(suite, code, out)
+    if not result[0] or result[2]:
+        print(out, flush=True)
+    return result
 
 
 def built():
-    """Whether the pages, TodoMVC's and the server build: what each browser
-    run serves, built again from the source as it is now."""
+    """A failed or stopped build refuses the producer; it earns no kill."""
     for cmd, env in (
         (["bash", "spikes/own-renderer/run.sh"], {"BUILD_ONLY": "1"}),
         (["bash", "spikes/own-renderer/todomvc.sh"], {}),
         (["cargo", "build", "--quiet", "--locked", "-p", "pw-dev-server", "-p", "kiokun-server"], {}),
     ):
-        done = subprocess.run(cmd, cwd=ROOT, env={**os.environ, **env},
-                              capture_output=True, text=True)
-        if done.returncode != 0:
+        out, code = bounded(cmd, cwd=ROOT, env={**os.environ, **env})
+        if code != 0:
+            print(out, flush=True)
             return False
     return True
 
 
 def browser_tests(suite):
-    """(built, passed, failed) of the suite's spec in Chromium, after a build."""
     if not built():
         return False, 0, 0
-    out, code = bounded(
-        ["pnpm", "exec", "playwright", "test", *SPECS[suite], "--reporter=line"],
-        cwd=ROOT / "spikes/own-renderer",
-    )
-    if code is None:
-        return True, 0, 1
-    out = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", out)
-    passed = sum(int(n) for n in re.findall(r"(\d+) passed", out))
-    failed = sum(int(n) for n in re.findall(r"(\d+) failed", out))
-    return passed + failed > 0, passed, failed
+    with tempfile.TemporaryDirectory(prefix="pw-device-result-") as directory:
+        receipt = pathlib.Path(directory) / "result.json"
+        nonce = secrets.token_hex(32)
+        out, code = bounded(
+            ["bash", str(ROOT / "scripts/run_suite.sh"), "-C", ".", "--",
+             "pnpm", "exec", "playwright", "test", *SPECS[suite], "--retries=0",
+             "--reporter=line,./assertion-result-reporter.mjs"],
+            cwd=ROOT / "spikes/own-renderer",
+            env={**os.environ, "PW_ASSERTION_REPORT": str(receipt), "PW_ASSERTION_NONCE": nonce},
+        )
+        try:
+            report = json.loads(receipt.read_text())
+        except (OSError, ValueError):
+            report = None
+        result = browser_test_results.parse(code, report, nonce, INVENTORIES.get(suite))
+        if not result.valid or result.failed:
+            print(out, flush=True)
+        if not result.valid:
+            print(f"REFUSED browser producer: {result.reason}", flush=True)
+            return False, 0, 0
+        INVENTORIES.setdefault(suite, result.inventory)
+        return True, result.passed, result.failed
 
 
 SUITES = {
@@ -590,39 +659,45 @@ def main():
     # Stopped from outside, the source is still restored: SIGTERM raises
     # here, and the `finally` below runs.
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(1))
+    watch = mutation_baseline.mutation_bound.start()
+    INVENTORIES.clear()
     for suite, run in SUITES.items():
         ok, passed, failed = run(suite)
         print(f"baseline ({suite}): {passed} passed, {failed} failed", flush=True)
-        if not ok or failed or not passed:
+        if not ok or failed or not passed or watch.stopped:
             print("FAIL: the unmutated baseline is not green; no mutant can mean anything")
             mutation_baseline.explain()
             return 1
 
-    survivors = 0
+    survivors = refused = killed = 0
     for what, suite, path, anchor, replacement in MUTANTS:
         original = path.read_text()
         if original.count(anchor) != 1:
             print(f"{what}: ANCHOR NOT FOUND EXACTLY ONCE in {path.name}")
-            survivors += 1
+            refused += 1
             continue
         try:
             path.write_text(original.replace(anchor, replacement, 1))
             ok, passed, failed = SUITES[suite](suite)
         finally:
             path.write_text(original)
-        if not ok:
-            verdict = "KILLED (does not build)"
+        if not ok or watch.stopped:
+            verdict = "REFUSED (invalid or stopped producer; no kill)"
+            refused += 1
         elif failed:
             verdict = f"KILLED ({failed} of {passed + failed} tests fail)"
+            killed += 1
         else:
             verdict = "SURVIVED"
             survivors += 1
         print(f"{what} [{suite}]: {verdict}", flush=True)
     # The pages and the server are built again from the restored source.
-    built()
+    if not built() or watch.stopped:
+        print("REFUSED: restored source did not build")
+        refused += 1
 
-    print(f"{len(MUTANTS) - survivors} of {len(MUTANTS)} mutants killed")
-    return 1 if survivors else 0
+    print(f"{killed} of {len(MUTANTS)} mutants killed; {refused} refused; {survivors} survived")
+    return int(bool(survivors or refused))
 
 
 if __name__ == "__main__":

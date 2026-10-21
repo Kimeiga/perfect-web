@@ -746,3 +746,65 @@ The answers to the questions above, from the integrator's message of about
   merged from `5d4280b0` (`track/device-store`). `ADR-XXXX` reads `ADR-0366`
   in the track's code, recipes, tests, corpus and evidence (65 mentions in
   36 files), as in this file's name and title.
+
+
+## Generic integration and trustworthy controls (2026-10-20)
+
+The generic solver made the old device-list row control equivalent: removing
+`of_a_module_signal` from the fallback in `infer.rs` left the focused row test
+green. Its baseline and mutant each executed one passing test. The replacement
+removes only Device List declarations from `Signatures::signal_type`, the shared
+resolved identity authority read both by inference and the generic value typer.
+It leaves non-device lists and scalar device signals alone. On the integrated
+source it produces seven real assertion failures out of fifteen compiler tests,
+including `generic_reverse_keeps_a_device_rows_type_and_privacy`.
+
+That regression renders `List.reverse(notes)` rows and accesses their nominal
+record fields, then proves a row value is refused at a server command by PW6801.
+The same command over a page-local list checks clean. This joins the generic
+solver's row type and the Device privacy boundary in one program; neither an
+unknown-name error nor a type error satisfies the negative case. The pre-existing
+Device-label mutation also exercises this integrated privacy assertion.
+
+The integration exposed a separate evidence defect: this campaign counted failed
+builds and command timeouts as kills. These are now refused producers. Cargo's
+native exit and libtest summaries use the existing `cargo_test_results` parser.
+The caller additionally freezes the complete executed test inventory, refuses
+ignored/measured tests and authenticates every failed test's panic site as an
+assert macro in the selected test source. Production panics, setup/unwrap/expect
+panics, compilation errors, stopped processes and incomplete results earn no
+kill. A test helper's asserted build result remains a genuine test assertion;
+its previous `expect` is now an explicit `assert!`. This source attribution is
+for the owned Rust tests, not a sandbox for hostile output.
+
+For browser tests, line output alone cannot establish whether a failure happened
+in a body assertion, hook, setup or timeout. The integrator approved a structured
+producer. `assertion-result-reporter.mjs` uses the pinned Playwright 1.58.0 public
+Reporter, TestResult and TestStep interfaces, verified against the installed
+`playwright/types/testReporter.d.ts` and the tagged primary source:
+
+- [Reporter types at v1.58.0](https://github.com/microsoft/playwright/blob/v1.58.0/packages/playwright/types/testReporter.d.ts)
+- [JSON reporter at v1.58.0](https://github.com/microsoft/playwright/blob/v1.58.0/packages/playwright/src/reporters/json.ts)
+
+The built-in JSON reporter omits expect/hook step detail, so it cannot prove this
+contract. The small reporter follows `host-plan-reporter.mjs`'s existing lifecycle:
+fail closed on invalid callbacks, publish atomically only at `onExit`, refuse an
+existing receipt. Each parent command provides a fresh random nonce and fresh
+path. `browser_test_results` validates that receipt, exact native exit agreement
+and the frozen baseline inventory. The reporter requires one begin/end for each
+selected test, no retries, skipped/timedOut/interrupted results, expected failures
+or global errors. Every failed result error must match a failed expect step in
+the test body, with no hook ancestor. The normal line reporter and canonical
+`run_suite.sh` still retain ordinary red assertion output and traces.
+
+`device_browser_protocol.py` executes nine real pinned Playwright cases without
+launching a browser: green and body assertion are valid; beforeEach/afterEach
+assertions, runtime errors, test and setup timeouts, skipping and retry recovery are
+invalid. The focused Python suite checks the transport, reporter lifecycle,
+Cargo producer, campaign verdict and final restored build. Cancellation kills
+and reaps the owned process group before restoring source; a real child-process
+regression holds this order. Its nineteen named
+mutation controls use the existing canonical `guide_python` assertion receipts.
+`just e14-device-producer` records these checks; whole device/TodoMVC campaigns
+remain required on the combined remote train. No full-campaign result is claimed
+by the local probes in `docs/evidence/tooling/device-integration-probes.txt`.
