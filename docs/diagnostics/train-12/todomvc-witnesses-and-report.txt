@@ -1,0 +1,187 @@
+TodoMVC witness and report repair, 2026-10-21
+Base c714d1c3; working source hashes below.
+This is historical/targeted diagnostic proof, not a current whole E14 campaign.
+Whole semantic43 and Cypress producer55 are pending hosted reruns.
+
+Original failed verify39538607183 exact34f3 (complete raw retained at handoff):
+/mnt/c/Users/haki/code/perfect-web-handoff/tracks/evidence/wit-unique/verify-39538607183/evidence-1/evidence/docs/evidence/E14/todomvc.txt
+sha256 615c0d97a506823879ec8066d7fbd5ac96fce31d80cdb606aa083ee51e54a31d
+6796: AssertionError: 'SURVIVED' != 'REFUSED'
+6809: AssertionError: 'SURVIVED' != 'REFUSED'
+6822: AssertionError: 'SURVIVED' != 'REFUSED'
+6835: AssertionError: 'SURVIVED' != 'REFUSED'
+6848: AssertionError: 'SURVIVED' != 'REFUSED'
+6861: AssertionError: 'SURVIVED' != 'REFUSED'
+6874: AssertionError: 'SURVIVED' != 'REFUSED'
+6887: AssertionError: 'SURVIVED' != 'REFUSED'
+6963: AssertionError: 'SURVIVED' != 'REFUSED'
+7630: 54 of 54 mutants killed; 0 refused; 0 survived
+7645: the toggle-all is checked with no todos [program]: SURVIVED
+7677: a patch that removes `checked` leaves the box as a person left it [runtime]: SURVIVED
+7678: a patch that sets `checked` leaves the box as a person left it [runtime]: SURVIVED
+7679: an edit field inside the row a patch inserts is not given focus [runtime]: SURVIVED
+7680: 39 of 43 mutants killed
+spikes/own-renderer/e2e/todomvc.spec.mjs sha256 7a059c69b873052402c794f07b8db8bb4a2d9d74ee790b93183f79a241055e6a
+spikes/own-renderer/server/src/tests/todomvc.rs sha256 ad3dc03a31b942977e4207389227ab3245b35c373772ec8ff8fb56338042a254
+scripts/todomvc_cypress_mutations.py sha256 11e57a0d5351032659f91f32bf1ed85569af0ff0fb2cf3c921d2e3b02ec6f0a2
+scripts/tests/test_todomvc_cypress.py sha256 cb1a6f930023b8797397447a2a82468a694a226401bba3c5ddb95668539445b2
+
+=== /tmp/train12-todomvc-proof.py ===
+import json, os, pathlib, secrets, signal, sys, time
+ROOT=pathlib.Path('/home/haki/code/pw-wt/todomvc-survivors')
+sys.path.insert(0,str(ROOT/'scripts'))
+import todomvc_mutations as campaign
+import browser_test_results, cargo_assertion_results, mutation_source, producer_process
+os.environ['PORT']='18441'
+os.environ['CARGO_TARGET_DIR']=str(ROOT/'target')
+signal.signal(signal.SIGTERM,lambda *_:sys.exit(1))
+proof=pathlib.Path('/tmp/train12-todomvc-proof-final');proof.mkdir(exist_ok=True)
+expected=None
+server_expected=None
+start=time.monotonic()
+def native(command,label,env=None,cwd=ROOT):
+ result=producer_process.run(command,timeout=300,cwd=cwd,env=env or os.environ.copy())
+ (proof/(label+'.txt')).write_text(result.stdout)
+ return result
+
+def host(label,fail=False):
+ global server_expected
+ r=native([x for x in campaign.SERVER_TESTS if x != "--quiet"]+["--test-threads=1"],label)
+ parsed=cargo_assertion_results.validate(r.returncode,r.stdout,root=ROOT,sources=[ROOT/'spikes/own-renderer/server/src/tests/todomvc.rs'],expected=server_expected)
+ print(label,json.dumps({'native_status':r.returncode,'parsed':parsed._asdict()}),flush=True)
+ assert parsed.valid and parsed.passed+parsed.failed==4
+ if server_expected is None:server_expected=cargo_assertion_results.names(r.stdout)
+ assert parsed.failed>0 if fail else parsed.failed==0
+
+def browser(label,fail=False):
+ global expected
+ for name,command,env in [('pages',['bash','spikes/own-renderer/run.sh'],{**os.environ,'BUILD_ONLY':'1'}),('todo',['bash','spikes/own-renderer/todomvc.sh'],None),('host',['cargo','build','--quiet','--locked','-p','pw-dev-server','-p','kiokun-server'],None)]:
+  r=native(command,label+'-build-'+name,env)
+  assert r.returncode==0,(name,r.stdout[-3000:])
+ target=proof/label;target.mkdir(exist_ok=False)
+ report=target/'assertions.json';nonce=secrets.token_hex(32)
+ command=['pnpm','exec','playwright','test','e2e/todomvc.spec.mjs','--project=chromium','--retries=0','--reporter=line,./assertion-result-reporter.mjs']
+ r=producer_process.run(command,timeout=300,cwd=ROOT/'spikes/own-renderer',env={**os.environ,'PW_ASSERTION_REPORT':str(report),'PW_ASSERTION_NONCE':nonce})
+ (target/'output.txt').write_text(r.stdout)
+ native_report=json.loads(report.read_text()) if report.exists() else None
+ parsed=browser_test_results.parse(r.returncode,native_report,nonce,expected)
+ print(label,json.dumps({'native_status':r.returncode,'valid':parsed.valid,'reason':parsed.reason,'passed':parsed.passed,'failed':parsed.failed,'elapsed':time.monotonic()-start}),flush=True)
+ assert parsed.valid,parsed.reason
+ assert parsed.passed+parsed.failed==50
+ if expected is None:expected=parsed.inventory
+ assert parsed.failed>0 if fail else parsed.failed==0
+
+host('baseline-server')
+browser('baseline-browser')
+name,suite,path,anchor,replacement=campaign.MUTANTS[8]
+assert name=='the toggle-all is checked with no todos'
+original=path.read_text();assert original.count(anchor)==1
+with mutation_source.changed(path,original,original.replace(anchor,replacement,1)):
+ r=native(['cargo','run','--quiet','--locked','-p','pw-cli','--','check','--plain',*map(str,sorted((ROOT/'packages/pw-std').glob('*.pw'))),*map(str,sorted((ROOT/'packages/pw-platform-web').glob('*.pw'))),*map(str,sorted((ROOT/'examples/todomvc').glob('*.pw')))],'empty-toggle-check')
+ assert r.returncode==0
+ host('empty-toggle-mutant',True)
+path=campaign.RUNTIME_FILE
+original=path.read_text()
+anchor='      if (typeof el[live.attribute] === "boolean") el[live.attribute] = on;\n'
+models=[('unchecked-property',anchor,'      if (typeof el[live.attribute] === "boolean" && (live.attribute !== "checked" || on)) el[live.attribute] = on;\n'),('checked-property',anchor,'      if (typeof el[live.attribute] === "boolean" && (live.attribute !== "checked" || !on)) el[live.attribute] = on;\n'),('inserted-focus','    const el = autofocusIn(records.flatMap((r) => [...r.addedNodes]));\n','    const el = null;\n')]
+try:
+ for label,anchor,replacement in models:
+  assert original.count(anchor)==1
+  with mutation_source.changed(path,original,original.replace(anchor,replacement,1)):
+   browser(label,True)
+finally:
+ assert path.read_text()==original
+ host('restored-server')
+ browser('restored-browser')
+print('PASS: exact4/50 inventories, original empty model and3 canonical runtime reanchors; elapsed',time.monotonic()-start,flush=True)
+
+=== /tmp/train12-todomvc-proof-final.log ===
+baseline-server {"native_status": 0, "parsed": {"valid": true, "passed": 4, "failed": 0, "failure_names": [], "reason": ""}}
+baseline-browser {"native_status": 0, "valid": true, "reason": "", "passed": 50, "failed": 0, "elapsed": 11.582179547054693}
+empty-toggle-mutant {"native_status": 101, "parsed": {"valid": true, "passed": 3, "failed": 1, "failure_names": ["tests::todomvc::the_host_renders_the_default_and_hides_what_the_device_decides"], "reason": ""}}
+unchecked-property {"native_status": 1, "valid": true, "reason": "", "passed": 48, "failed": 2, "elapsed": 27.213255107053556}
+checked-property {"native_status": 1, "valid": true, "reason": "", "passed": 49, "failed": 1, "elapsed": 38.78590763604734}
+inserted-focus {"native_status": 1, "valid": true, "reason": "", "passed": 47, "failed": 3, "elapsed": 51.13706546602771}
+restored-server {"native_status": 0, "parsed": {"valid": true, "passed": 4, "failed": 0, "failure_names": [], "reason": ""}}
+restored-browser {"native_status": 0, "valid": true, "reason": "", "passed": 50, "failed": 0, "elapsed": 62.50838232599199}
+PASS: exact4/50 inventories, original empty model and3 canonical runtime reanchors; elapsed 62.50840875203721
+
+=== /tmp/t12-cypress-report-before.log ===
+test_native_assertion_and_clean_pass_are_distinct (test_todomvc_cypress.Producer) ... FAIL
+
+======================================================================
+FAIL: test_native_assertion_and_clean_pass_are_distinct (test_todomvc_cypress.Producer)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/todomvc-survivors/scripts/tests/test_todomvc_cypress.py", line 675, in test_native_assertion_and_clean_pass_are_distinct
+    self.assertNotIn("SURVIVED", self.output)
+AssertionError: 'SURVIVED' unexpectedly found in 'test_first (test_native_todomvc.Native) ... FAIL\ntest_second (test_native_todomvc.Native) ... ok\n\n======================================================================\nFAIL: test_first (test_native_todomvc.Native)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File "/home/haki/code/pw-wt/todomvc-survivors/scripts/unittest_producer.py", line 302, in body\n    return self.checked(original(*args, **kwargs), identity + \' body\')\n  File "/tmp/tmp6zoczu4g/test_native_todomvc.py", line 4, in test_first\n    self.assertEqual(\'SURVIVED\', \'REFUSED\')\nAssertionError: \'SURVIVED\' != \'REFUSED\'\n- SURVIVED\n+ REFUSED\n\n\n----------------------------------------------------------------------\nRan 2 tests in 0.000s\n\nFAILED (failures=1)\n\nPython structured receipt: /tmp/tmp6zoczu4g/pw-guide-result-_ieasuxs\n{"valid": true, "reason": "complete", "passed": ["test_native_todomvc.Native.test_second"], "assertion_failed": ["test_native_todomvc.Native.test_first"], "body_errors": [], "executed": 2, "report_sha256": "e71e0404f328366cbf268e33ede3a24c59fdf52c8543f3fe63af2b03df0fd98b"}\n\n'
+
+----------------------------------------------------------------------
+Ran 1 test in 0.667s
+
+FAILED (failures=1)
+
+=== /tmp/t12-cypress-report-after.log ===
+test_native_assertion_and_clean_pass_are_distinct (test_todomvc_cypress.Producer) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.773s
+
+OK
+
+=== /tmp/t12-cypress-format-control.py ===
+import pathlib,sys,json,os
+root=pathlib.Path('/home/haki/code/pw-wt/todomvc-survivors');sys.path.insert(0,str(root/'scripts'))
+import todomvc_cypress_mutations as campaign,mutation_source
+from unittest import mock
+proof=pathlib.Path('/tmp/t12-cypress-format-proof');proof.mkdir(exist_ok=True)
+expected=campaign.guide_python.freeze(campaign.SELECTOR,campaign.SEARCH,'test_todomvc_cypress.py',51,proof)
+print('original54 retained; focused newformatcontrol, native51 inventory',flush=True)
+name,path,anchor,replacement=campaign.MUTANTS[-1]
+original=path.read_text();assert original.count(anchor)==1
+with mutation_source.changed(path,original,original.replace(anchor,replacement,1)):
+ result=campaign.run_tests(expected,proof)
+ assert result.valid and not result.body_errors,result
+ assert set(result.assertion_failed)=={'test_todomvc_cypress.Producer.test_native_assertion_and_clean_pass_are_distinct','test_todomvc_cypress.Producer.test_unexecuted_or_forged_runs_are_never_kills'},result
+ print(name+': KILLED (2 of51tests fail)',flush=True)
+assert path.read_text()==original
+result=campaign.run_tests(expected,proof)
+assert result.valid and len(result.passed)==51 and not result.failed,result
+print('restored51 green',flush=True)
+
+=== /tmp/t12-cypress-format-control-final.log ===
+original54 retained; focused newformatcontrol, native51 inventory
+native producer: {"assertion_failed": ["test_todomvc_cypress.Producer.test_native_assertion_and_clean_pass_are_distinct", "test_todomvc_cypress.Producer.test_unexecuted_or_forged_runs_are_never_kills"], "body_errors": [], "executed": 51, "expected": ["test_todomvc_cypress.Cli.test_a_mode_that_is_neither_is_a_usage_error", "test_todomvc_cypress.Cli.test_a_suite_that_did_not_run_exits_1", "test_todomvc_cypress.Cli.test_a_synthetic_complete_output_is_an_accepted_positive_control", "test_todomvc_cypress.Cli.test_an_outcome_the_design_does_not_give_exits_1", "test_todomvc_cypress.Cli.test_hook_errors_and_unexecuted_tests_do_not_invent_causes", "test_todomvc_cypress.Cli.test_the_report_of_the_diagnostic_says_it_is_not_the_acceptance", "test_todomvc_cypress.Cli.test_the_report_preserves_the_observed_diagnostic_failure", "test_todomvc_cypress.Cli.test_the_report_says_what_each_test_came_to_and_why", "test_todomvc_cypress.JudgeAcceptance.test_a_complete_run_passes_including_storage_tests", "test_todomvc_cypress.JudgeAcceptance.test_a_suite_that_did_not_run_is_not_a_pass", "test_todomvc_cypress.JudgeAcceptance.test_a_test_the_spec_does_not_have_is_named", "test_todomvc_cypress.JudgeAcceptance.test_every_recorded_incomplete_run_is_refused", "test_todomvc_cypress.JudgeAcceptance.test_the_exit_status_must_be_the_failing_count", "test_todomvc_cypress.JudgeAcceptance.test_the_table_must_count_the_specs_tests", "test_todomvc_cypress.JudgeAcceptance.test_the_table_must_say_what_the_lines_say", "test_todomvc_cypress.JudgeDiagnostic.test_a_diagnostic_that_did_not_run_is_not_a_pass", "test_todomvc_cypress.JudgeDiagnostic.test_every_other_test_must_pass", "test_todomvc_cypress.JudgeDiagnostic.test_the_diagnostics_the_app_gives_are_judged_right", "test_todomvc_cypress.JudgeDiagnostic.test_the_persistence_test_must_be_skipped_by_the_suite", "test_todomvc_cypress.JudgeDiagnostic.test_the_racy_test_may_lose_only_its_race", "test_todomvc_cypress.JudgeDiagnostic.test_the_racy_test_may_not_be_skipped", "test_todomvc_cypress.Parse.test_colour_codes_are_no_part_of_a_line", "test_todomvc_cypress.Parse.test_nothing_is_read_where_nothing_ran", "test_todomvc_cypress.Parse.test_the_acceptance_is_read", "test_todomvc_cypress.Parse.test_the_diagnostic_is_read", "test_todomvc_cypress.Parse.test_the_newer_cypress_prints_the_same_lines", "test_todomvc_cypress.Producer.test_cancelled_campaign_restores_its_owned_source", "test_todomvc_cypress.Producer.test_guard_stop_refuses_the_campaign_without_crediting_an_assertion", "test_todomvc_cypress.Producer.test_native_assertion_and_clean_pass_are_distinct", "test_todomvc_cypress.Producer.test_python_and_shell_syntax_faults_never_reach_the_witness", "test_todomvc_cypress.Producer.test_runtime_errors_never_become_kills_even_beside_an_assertion", "test_todomvc_cypress.Producer.test_timeout_and_memory_stop_are_not_assertion_evidence", "test_todomvc_cypress.Producer.test_unexecuted_or_forged_runs_are_never_kills", "test_todomvc_cypress.RunSh.test_a_build_that_is_missing_fails", "test_todomvc_cypress.RunSh.test_a_complete_official_output_makes_the_recipe_succeed", "test_todomvc_cypress.RunSh.test_a_host_that_is_missing_fails", "test_todomvc_cypress.RunSh.test_a_missing_binary_fails_and_runs_nothing", "test_todomvc_cypress.RunSh.test_a_missing_xvfb_fails_and_runs_nothing", "test_todomvc_cypress.RunSh.test_a_run_that_printed_no_results_fails", "test_todomvc_cypress.RunSh.test_an_existing_listener_cannot_supply_readiness", "test_todomvc_cypress.RunSh.test_an_exit_status_that_is_not_the_failing_count_fails", "test_todomvc_cypress.RunSh.test_an_outcome_the_design_does_not_give_fails", "test_todomvc_cypress.RunSh.test_the_acceptance_is_run_as_the_suite_ships_and_judged", "test_todomvc_cypress.RunSh.test_the_diagnostic_is_run_under_another_name_and_says_so", "test_todomvc_cypress.RunSh.test_the_owned_host_is_reaped_before_the_launcher_returns", "test_todomvc_cypress.Spec.test_a_test_asks_through_its_own_body_and_its_contexts_hook", "test_todomvc_cypress.Spec.test_six_tests_ask_nothing_of_localstorage", "test_todomvc_cypress.Spec.test_the_spec_has_29_tests_in_order", "test_todomvc_cypress.Vendored.test_a_blob_is_gits", "test_todomvc_cypress.Vendored.test_a_file_changed_by_a_byte_is_not", "test_todomvc_cypress.Vendored.test_the_suite_in_the_tree_is_upstreams"], "native_status": 1, "passed": ["test_todomvc_cypress.Cli.test_a_mode_that_is_neither_is_a_usage_error", "test_todomvc_cypress.Cli.test_a_suite_that_did_not_run_exits_1", "test_todomvc_cypress.Cli.test_a_synthetic_complete_output_is_an_accepted_positive_control", "test_todomvc_cypress.Cli.test_an_outcome_the_design_does_not_give_exits_1", "test_todomvc_cypress.Cli.test_hook_errors_and_unexecuted_tests_do_not_invent_causes", "test_todomvc_cypress.Cli.test_the_report_of_the_diagnostic_says_it_is_not_the_acceptance", "test_todomvc_cypress.Cli.test_the_report_preserves_the_observed_diagnostic_failure", "test_todomvc_cypress.Cli.test_the_report_says_what_each_test_came_to_and_why", "test_todomvc_cypress.JudgeAcceptance.test_a_complete_run_passes_including_storage_tests", "test_todomvc_cypress.JudgeAcceptance.test_a_suite_that_did_not_run_is_not_a_pass", "test_todomvc_cypress.JudgeAcceptance.test_a_test_the_spec_does_not_have_is_named", "test_todomvc_cypress.JudgeAcceptance.test_every_recorded_incomplete_run_is_refused", "test_todomvc_cypress.JudgeAcceptance.test_the_exit_status_must_be_the_failing_count", "test_todomvc_cypress.JudgeAcceptance.test_the_table_must_count_the_specs_tests", "test_todomvc_cypress.JudgeAcceptance.test_the_table_must_say_what_the_lines_say", "test_todomvc_cypress.JudgeDiagnostic.test_a_diagnostic_that_did_not_run_is_not_a_pass", "test_todomvc_cypress.JudgeDiagnostic.test_every_other_test_must_pass", "test_todomvc_cypress.JudgeDiagnostic.test_the_diagnostics_the_app_gives_are_judged_right", "test_todomvc_cypress.JudgeDiagnostic.test_the_persistence_test_must_be_skipped_by_the_suite", "test_todomvc_cypress.JudgeDiagnostic.test_the_racy_test_may_lose_only_its_race", "test_todomvc_cypress.JudgeDiagnostic.test_the_racy_test_may_not_be_skipped", "test_todomvc_cypress.Parse.test_colour_codes_are_no_part_of_a_line", "test_todomvc_cypress.Parse.test_nothing_is_read_where_nothing_ran", "test_todomvc_cypress.Parse.test_the_acceptance_is_read", "test_todomvc_cypress.Parse.test_the_diagnostic_is_read", "test_todomvc_cypress.Parse.test_the_newer_cypress_prints_the_same_lines", "test_todomvc_cypress.Producer.test_cancelled_campaign_restores_its_owned_source", "test_todomvc_cypress.Producer.test_guard_stop_refuses_the_campaign_without_crediting_an_assertion", "test_todomvc_cypress.Producer.test_python_and_shell_syntax_faults_never_reach_the_witness", "test_todomvc_cypress.Producer.test_runtime_errors_never_become_kills_even_beside_an_assertion", "test_todomvc_cypress.Producer.test_timeout_and_memory_stop_are_not_assertion_evidence", "test_todomvc_cypress.RunSh.test_a_build_that_is_missing_fails", "test_todomvc_cypress.RunSh.test_a_complete_official_output_makes_the_recipe_succeed", "test_todomvc_cypress.RunSh.test_a_host_that_is_missing_fails", "test_todomvc_cypress.RunSh.test_a_missing_binary_fails_and_runs_nothing", "test_todomvc_cypress.RunSh.test_a_missing_xvfb_fails_and_runs_nothing", "test_todomvc_cypress.RunSh.test_a_run_that_printed_no_results_fails", "test_todomvc_cypress.RunSh.test_an_existing_listener_cannot_supply_readiness", "test_todomvc_cypress.RunSh.test_an_exit_status_that_is_not_the_failing_count_fails", "test_todomvc_cypress.RunSh.test_an_outcome_the_design_does_not_give_fails", "test_todomvc_cypress.RunSh.test_the_acceptance_is_run_as_the_suite_ships_and_judged", "test_todomvc_cypress.RunSh.test_the_diagnostic_is_run_under_another_name_and_says_so", "test_todomvc_cypress.RunSh.test_the_owned_host_is_reaped_before_the_launcher_returns", "test_todomvc_cypress.Spec.test_a_test_asks_through_its_own_body_and_its_contexts_hook", "test_todomvc_cypress.Spec.test_six_tests_ask_nothing_of_localstorage", "test_todomvc_cypress.Spec.test_the_spec_has_29_tests_in_order", "test_todomvc_cypress.Vendored.test_a_blob_is_gits", "test_todomvc_cypress.Vendored.test_a_file_changed_by_a_byte_is_not", "test_todomvc_cypress.Vendored.test_the_suite_in_the_tree_is_upstreams"], "retained": "/home/haki/code/pw-wt/todomvc-survivors/spikes/own-renderer/kept-traces/local/todomvc-producers/pw-guide-result-ihkb4q03", "sha256": {"expected.json": "66abfa5a91b8c4f6ea5e33dbf6433745bcc4d6894bd35783779ed7eceb11369b", "process.json": "1b92992405cbb8601fd883053cc462a1e6116710ddaf40a41823c8aa7f88351c", "result.json": "fbbd9f21e8b89fa2d3e06756714cea93e719bb9fe688722519ad8e53ec6aa1dc", "stderr.txt": "39ed57007563392fe82a9020a6ed156ca6e208f647a0f6e2ec9156f3168c9168", "stdout.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "transcript.txt": "0d816f85a73a61f8b60543549a7fc41e115af2a636c6bca5fda33b954ec4419b", "validated.json": "a330f4ac32a65184af4d80cc0d063823052df5babe7c9dd040bfb72c43d491ae"}, "source": "/tmp/t12-cypress-format-proof/pw-guide-result-ihkb4q03", "valid": true, "validated_status": 1}
+raw assertion operands are emitted as campaign verdicts: KILLED (2 of51tests fail)
+native producer: {"assertion_failed": [], "body_errors": [], "executed": 51, "expected": ["test_todomvc_cypress.Cli.test_a_mode_that_is_neither_is_a_usage_error", "test_todomvc_cypress.Cli.test_a_suite_that_did_not_run_exits_1", "test_todomvc_cypress.Cli.test_a_synthetic_complete_output_is_an_accepted_positive_control", "test_todomvc_cypress.Cli.test_an_outcome_the_design_does_not_give_exits_1", "test_todomvc_cypress.Cli.test_hook_errors_and_unexecuted_tests_do_not_invent_causes", "test_todomvc_cypress.Cli.test_the_report_of_the_diagnostic_says_it_is_not_the_acceptance", "test_todomvc_cypress.Cli.test_the_report_preserves_the_observed_diagnostic_failure", "test_todomvc_cypress.Cli.test_the_report_says_what_each_test_came_to_and_why", "test_todomvc_cypress.JudgeAcceptance.test_a_complete_run_passes_including_storage_tests", "test_todomvc_cypress.JudgeAcceptance.test_a_suite_that_did_not_run_is_not_a_pass", "test_todomvc_cypress.JudgeAcceptance.test_a_test_the_spec_does_not_have_is_named", "test_todomvc_cypress.JudgeAcceptance.test_every_recorded_incomplete_run_is_refused", "test_todomvc_cypress.JudgeAcceptance.test_the_exit_status_must_be_the_failing_count", "test_todomvc_cypress.JudgeAcceptance.test_the_table_must_count_the_specs_tests", "test_todomvc_cypress.JudgeAcceptance.test_the_table_must_say_what_the_lines_say", "test_todomvc_cypress.JudgeDiagnostic.test_a_diagnostic_that_did_not_run_is_not_a_pass", "test_todomvc_cypress.JudgeDiagnostic.test_every_other_test_must_pass", "test_todomvc_cypress.JudgeDiagnostic.test_the_diagnostics_the_app_gives_are_judged_right", "test_todomvc_cypress.JudgeDiagnostic.test_the_persistence_test_must_be_skipped_by_the_suite", "test_todomvc_cypress.JudgeDiagnostic.test_the_racy_test_may_lose_only_its_race", "test_todomvc_cypress.JudgeDiagnostic.test_the_racy_test_may_not_be_skipped", "test_todomvc_cypress.Parse.test_colour_codes_are_no_part_of_a_line", "test_todomvc_cypress.Parse.test_nothing_is_read_where_nothing_ran", "test_todomvc_cypress.Parse.test_the_acceptance_is_read", "test_todomvc_cypress.Parse.test_the_diagnostic_is_read", "test_todomvc_cypress.Parse.test_the_newer_cypress_prints_the_same_lines", "test_todomvc_cypress.Producer.test_cancelled_campaign_restores_its_owned_source", "test_todomvc_cypress.Producer.test_guard_stop_refuses_the_campaign_without_crediting_an_assertion", "test_todomvc_cypress.Producer.test_native_assertion_and_clean_pass_are_distinct", "test_todomvc_cypress.Producer.test_python_and_shell_syntax_faults_never_reach_the_witness", "test_todomvc_cypress.Producer.test_runtime_errors_never_become_kills_even_beside_an_assertion", "test_todomvc_cypress.Producer.test_timeout_and_memory_stop_are_not_assertion_evidence", "test_todomvc_cypress.Producer.test_unexecuted_or_forged_runs_are_never_kills", "test_todomvc_cypress.RunSh.test_a_build_that_is_missing_fails", "test_todomvc_cypress.RunSh.test_a_complete_official_output_makes_the_recipe_succeed", "test_todomvc_cypress.RunSh.test_a_host_that_is_missing_fails", "test_todomvc_cypress.RunSh.test_a_missing_binary_fails_and_runs_nothing", "test_todomvc_cypress.RunSh.test_a_missing_xvfb_fails_and_runs_nothing", "test_todomvc_cypress.RunSh.test_a_run_that_printed_no_results_fails", "test_todomvc_cypress.RunSh.test_an_existing_listener_cannot_supply_readiness", "test_todomvc_cypress.RunSh.test_an_exit_status_that_is_not_the_failing_count_fails", "test_todomvc_cypress.RunSh.test_an_outcome_the_design_does_not_give_fails", "test_todomvc_cypress.RunSh.test_the_acceptance_is_run_as_the_suite_ships_and_judged", "test_todomvc_cypress.RunSh.test_the_diagnostic_is_run_under_another_name_and_says_so", "test_todomvc_cypress.RunSh.test_the_owned_host_is_reaped_before_the_launcher_returns", "test_todomvc_cypress.Spec.test_a_test_asks_through_its_own_body_and_its_contexts_hook", "test_todomvc_cypress.Spec.test_six_tests_ask_nothing_of_localstorage", "test_todomvc_cypress.Spec.test_the_spec_has_29_tests_in_order", "test_todomvc_cypress.Vendored.test_a_blob_is_gits", "test_todomvc_cypress.Vendored.test_a_file_changed_by_a_byte_is_not", "test_todomvc_cypress.Vendored.test_the_suite_in_the_tree_is_upstreams"], "native_status": 0, "passed": ["test_todomvc_cypress.Cli.test_a_mode_that_is_neither_is_a_usage_error", "test_todomvc_cypress.Cli.test_a_suite_that_did_not_run_exits_1", "test_todomvc_cypress.Cli.test_a_synthetic_complete_output_is_an_accepted_positive_control", "test_todomvc_cypress.Cli.test_an_outcome_the_design_does_not_give_exits_1", "test_todomvc_cypress.Cli.test_hook_errors_and_unexecuted_tests_do_not_invent_causes", "test_todomvc_cypress.Cli.test_the_report_of_the_diagnostic_says_it_is_not_the_acceptance", "test_todomvc_cypress.Cli.test_the_report_preserves_the_observed_diagnostic_failure", "test_todomvc_cypress.Cli.test_the_report_says_what_each_test_came_to_and_why", "test_todomvc_cypress.JudgeAcceptance.test_a_complete_run_passes_including_storage_tests", "test_todomvc_cypress.JudgeAcceptance.test_a_suite_that_did_not_run_is_not_a_pass", "test_todomvc_cypress.JudgeAcceptance.test_a_test_the_spec_does_not_have_is_named", "test_todomvc_cypress.JudgeAcceptance.test_every_recorded_incomplete_run_is_refused", "test_todomvc_cypress.JudgeAcceptance.test_the_exit_status_must_be_the_failing_count", "test_todomvc_cypress.JudgeAcceptance.test_the_table_must_count_the_specs_tests", "test_todomvc_cypress.JudgeAcceptance.test_the_table_must_say_what_the_lines_say", "test_todomvc_cypress.JudgeDiagnostic.test_a_diagnostic_that_did_not_run_is_not_a_pass", "test_todomvc_cypress.JudgeDiagnostic.test_every_other_test_must_pass", "test_todomvc_cypress.JudgeDiagnostic.test_the_diagnostics_the_app_gives_are_judged_right", "test_todomvc_cypress.JudgeDiagnostic.test_the_persistence_test_must_be_skipped_by_the_suite", "test_todomvc_cypress.JudgeDiagnostic.test_the_racy_test_may_lose_only_its_race", "test_todomvc_cypress.JudgeDiagnostic.test_the_racy_test_may_not_be_skipped", "test_todomvc_cypress.Parse.test_colour_codes_are_no_part_of_a_line", "test_todomvc_cypress.Parse.test_nothing_is_read_where_nothing_ran", "test_todomvc_cypress.Parse.test_the_acceptance_is_read", "test_todomvc_cypress.Parse.test_the_diagnostic_is_read", "test_todomvc_cypress.Parse.test_the_newer_cypress_prints_the_same_lines", "test_todomvc_cypress.Producer.test_cancelled_campaign_restores_its_owned_source", "test_todomvc_cypress.Producer.test_guard_stop_refuses_the_campaign_without_crediting_an_assertion", "test_todomvc_cypress.Producer.test_native_assertion_and_clean_pass_are_distinct", "test_todomvc_cypress.Producer.test_python_and_shell_syntax_faults_never_reach_the_witness", "test_todomvc_cypress.Producer.test_runtime_errors_never_become_kills_even_beside_an_assertion", "test_todomvc_cypress.Producer.test_timeout_and_memory_stop_are_not_assertion_evidence", "test_todomvc_cypress.Producer.test_unexecuted_or_forged_runs_are_never_kills", "test_todomvc_cypress.RunSh.test_a_build_that_is_missing_fails", "test_todomvc_cypress.RunSh.test_a_complete_official_output_makes_the_recipe_succeed", "test_todomvc_cypress.RunSh.test_a_host_that_is_missing_fails", "test_todomvc_cypress.RunSh.test_a_missing_binary_fails_and_runs_nothing", "test_todomvc_cypress.RunSh.test_a_missing_xvfb_fails_and_runs_nothing", "test_todomvc_cypress.RunSh.test_a_run_that_printed_no_results_fails", "test_todomvc_cypress.RunSh.test_an_existing_listener_cannot_supply_readiness", "test_todomvc_cypress.RunSh.test_an_exit_status_that_is_not_the_failing_count_fails", "test_todomvc_cypress.RunSh.test_an_outcome_the_design_does_not_give_fails", "test_todomvc_cypress.RunSh.test_the_acceptance_is_run_as_the_suite_ships_and_judged", "test_todomvc_cypress.RunSh.test_the_diagnostic_is_run_under_another_name_and_says_so", "test_todomvc_cypress.RunSh.test_the_owned_host_is_reaped_before_the_launcher_returns", "test_todomvc_cypress.Spec.test_a_test_asks_through_its_own_body_and_its_contexts_hook", "test_todomvc_cypress.Spec.test_six_tests_ask_nothing_of_localstorage", "test_todomvc_cypress.Spec.test_the_spec_has_29_tests_in_order", "test_todomvc_cypress.Vendored.test_a_blob_is_gits", "test_todomvc_cypress.Vendored.test_a_file_changed_by_a_byte_is_not", "test_todomvc_cypress.Vendored.test_the_suite_in_the_tree_is_upstreams"], "retained": "/home/haki/code/pw-wt/todomvc-survivors/spikes/own-renderer/kept-traces/local/todomvc-producers/pw-guide-result-4heujvbe", "sha256": {"expected.json": "66abfa5a91b8c4f6ea5e33dbf6433745bcc4d6894bd35783779ed7eceb11369b", "process.json": "464a1245c5a3510852d795f0bec33449b448c265f49e6af45f93c0ec2c69e8c5", "result.json": "ae8f2975b7d43f88504fac2e5dfa598b7979dd02c4baa3bde743ee7d392aca74", "stderr.txt": "0350da483a993940d793e18004ba0e0391a2c05540ad54b9f8c73bdc4e83942f", "stdout.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "transcript.txt": "ee2d7ba56905f22a5c25b0b94bf0ce2229f228823592fdb1d1ce71bea110ff94", "validated.json": "eebd09ad1ca9d6cf4cc262c5260de5e76f2fc81f3a545f367cc712563ea4a129"}, "source": "/tmp/t12-cypress-format-proof/pw-guide-result-4heujvbe", "valid": true, "validated_status": 0}
+restored51 green
+
+=== Independent source/proof review ===
+WIT reviewed final witnesses, exact native4/50 receipts, raw retention/native authority, format control and restored51; no unresolved finding.
+
+=== /tmp/todomvc-strict-checker-native.txt ===
+native status: 0
+pw check: 23 file(s), no diagnostics
+
+native status: 1
+error: [PW6805] `todos` is kept on the device, and does not say whose it is
+  --> app.pw:50:8
+   |
+50 | signal todos: List<Todo> = []
+   |        ^^^^^
+   |        |
+   |        `todos` is kept on the device, and does not say whose it is
+   |        `todos` is declared here, a signal the device keeps
+   |
+   = note: A module's signal with a value is one the device keeps (ADR-0366): its clauses say where it rests and under what name, whose it is, and what two tabs' writes do, so that none of the three is a default nobody chose. The first version keeps a value on the device alone, the device's own, the whole value written last being every tab's.
+   = help: say it is the device's own, and never leaves it: `privacy Device`
+pw check: 23 file(s), 1 error(s), 0 warning(s)
+
+native status: 0
+pw check: 23 file(s), no diagnostics
+
+PASS: actual clean -> exact named PW6805 -> restored clean
+
+=== /tmp/t12-todomvc-anchors.txt ===
+mutation anchors: 4396 mutants in 309 scripts, each matching once

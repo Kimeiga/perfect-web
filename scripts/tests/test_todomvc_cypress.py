@@ -16,6 +16,8 @@ import ctypes
 import http.server
 import importlib.util
 import io
+import json
+import hashlib
 import os
 import pathlib
 import re
@@ -633,6 +635,7 @@ class Producer(unittest.TestCase):
         sys.path.insert(0, str(SCRIPTS))
         self.addCleanup(sys.path.remove, str(SCRIPTS))
         self.campaign = load("todomvc_cypress_mutations")
+        self.campaign.RETENTION_ROOT = self.directory / "kept-traces"
         self.guide = self.campaign.guide_python
         self.expected = self.guide.freeze("test_native_todomvc", self.directory,
                                           self.source.name, 2, self.directory)
@@ -648,8 +651,11 @@ class Producer(unittest.TestCase):
         self.campaign.SELECTOR = "test_native_todomvc"
         self.campaign.SEARCH = self.directory
         self.campaign.BOUND = timeout
-        with contextlib.redirect_stdout(io.StringIO()):
-            return self.campaign.run_tests(self.expected, self.directory)
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            result = self.campaign.run_tests(self.expected, self.directory)
+        self.output = output.getvalue()
+        return result
 
     def test_native_assertion_and_clean_pass_are_distinct(self):
         good = self.native(self.program())
@@ -661,6 +667,43 @@ class Producer(unittest.TestCase):
         self.assertEqual(failed.assertion_failed, (self.expected[0],))
         self.assertEqual(failed.body_errors, ())
         self.assertEqual(self.campaign.outcome(failed), "KILLED")
+
+        # An assertion's operand is raw diagnostic data, not a campaign verdict.
+        failed = self.native(self.program("self.assertEqual('SURVIVED', 'REFUSED')"))
+        self.assertTrue(failed.valid)
+        self.assertEqual(self.campaign.outcome(failed), "KILLED")
+        self.assertNotIn("SURVIVED", self.output)
+        metadata = json.loads(self.output.removeprefix("native producer: "))
+        self.assertEqual(metadata["expected"], list(self.expected))
+        self.assertEqual(metadata["native_status"], 1)
+        self.assertEqual(metadata["assertion_failed"], [self.expected[0]])
+        kept = pathlib.Path(metadata["retained"])
+        self.assertIn("SURVIVED", (kept / "stderr.txt").read_text())
+        original = pathlib.Path(metadata["source"])
+        for name, digest in metadata["sha256"].items():
+            self.assertEqual((original / name).read_bytes(), (kept / name).read_bytes())
+            self.assertEqual(hashlib.sha256((kept / name).read_bytes()).hexdigest(), digest)
+        self.assertTrue({"stdout.txt", "stderr.txt", "process.json", "expected.json",
+                         "result.json", "validated.json", "transcript.txt"} <= metadata["sha256"].keys())
+
+        summary = load("ci_summary")
+        artifact = self.directory / "artifact"
+        written = "docs/evidence/E14/todomvc.txt"
+        evidence = artifact / "evidence" / written
+        evidence.parent.mkdir(parents=True)
+        (artifact / "results.json").write_text(json.dumps([
+            {"recipe": "e14-todomvc", "status": 0, "seconds": 0, "wrote": [written]}]))
+        for verdict, expected_status in (("KILLED", 0), ("SURVIVED", 1)):
+            evidence.write_text(self.output + "fixture: " + verdict + "\n")
+            with mock.patch.object(sys, "argv", ["ci_summary.py", str(artifact), "--shards", "1"]), \
+                    mock.patch.dict(os.environ, {}, clear=True), contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(summary.main(), expected_status)
+
+        # Missing retained bytes cannot silently turn a run into eligible evidence.
+        with mock.patch.object(self.campaign.keep_traces, "keep",
+                               return_value=SimpleNamespace(skipped=[("stderr.txt", 1)])):
+            with self.assertRaises(RuntimeError):
+                self.native(self.program())
 
     def test_runtime_errors_never_become_kills_even_beside_an_assertion(self):
         for first in ("self.assertTrue(True)", "self.assertEqual(1, 2)"):
@@ -686,6 +729,13 @@ class Producer(unittest.TestCase):
                 result = self.native(source)
                 self.assertFalse(result.valid)
                 self.assertEqual(self.campaign.outcome(result), "REFUSED")
+                self.assertEqual(len(self.output.splitlines()), 1, "only one structured result belongs in campaign evidence")
+                metadata = json.loads(self.output.removeprefix("native producer: "))
+                self.assertFalse(metadata["valid"])
+                kept = pathlib.Path(metadata["retained"])
+                self.assertTrue((kept / "process.json").is_file())
+                self.assertEqual((kept / "stderr.txt").read_bytes(),
+                                 (pathlib.Path(metadata["source"]) / "stderr.txt").read_bytes())
 
     def test_cancelled_campaign_restores_its_owned_source(self):
         target = self.directory / "owned.py"

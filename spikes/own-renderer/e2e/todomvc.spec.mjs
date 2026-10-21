@@ -66,6 +66,7 @@ test("with no todos, main and footer are hidden, though they are there", async (
   await expect(page.locator(".main")).toBeHidden();
   await expect(page.locator(".footer")).toBeHidden();
   await expect(items(page)).toHaveCount(0);
+  await expect(page.locator(".toggle-all")).not.toBeChecked();
   // The control: the header is not hidden.
   await expect(page.locator("h1")).toHaveText("todos");
   await expect(field(page)).toBeVisible();
@@ -81,6 +82,7 @@ test("with a todo, main and footer are shown; with none again, hidden again", as
   await items(page).first().hover();
   await items(page).first().locator(".destroy").click();
   await expect(items(page)).toHaveCount(0);
+  await expect(page.locator(".toggle-all")).not.toBeChecked();
   await expect(page.locator(".main")).toBeHidden();
   await expect(page.locator(".footer")).toBeHidden();
 });
@@ -219,6 +221,7 @@ test("the toggle-all, pressed, is not checked for a todo added once the complete
   await expect(page.locator(".toggle-all")).toBeChecked();
   await page.locator(".clear-completed").click();
   await expect(items(page)).toHaveCount(0);
+  await expect(page.locator(".toggle-all")).not.toBeChecked();
   await add(page, TWO);
   await expect(items(page).nth(0)).not.toHaveClass(/completed/);
   await expect(page.locator(".toggle-all")).not.toBeChecked();

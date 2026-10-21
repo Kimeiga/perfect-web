@@ -19,11 +19,15 @@ Run from the repository root; `just e14-todomvc` records the output. The
 sources are restored after every mutant, whatever happens.
 """
 
+import hashlib
+import json
+import os
 import pathlib
 import signal
 import tempfile
 
 import guide_python
+import keep_traces
 import mutation_source
 import producer_process
 import sys
@@ -344,16 +348,49 @@ MUTANTS += [
      '--reporter spec > "$OUT" 2>&1\n'),
 ]
 
+MUTANTS += [
+    ("raw assertion operands are emitted as campaign verdicts", pathlib.Path(__file__).resolve(),
+     '    return receipt.result\n',
+     '    print(receipt.output, flush=True)\n    return receipt.result\n'),
+]
+
 SELECTOR = "test_todomvc_cypress"
 SEARCH = ROOT / "scripts/tests"
 EXPECTED_TESTS = 51
 BOUND = 60
+RETENTION_ROOT = ROOT / "spikes/own-renderer/kept-traces"
 
 
 def run_tests(expected, evidence):
     """One fresh, complete native suite against its unmutated inventory."""
     receipt = guide_python.run(SELECTOR, expected, SEARCH, evidence, timeout=BOUND)
-    print(receipt.output, flush=True)
+    # Assertion operands can contain campaign verdict words. Preserve those
+    # native bytes in the uploaded artifact; only structured outcomes belong
+    # in the evidence stream consumed as this campaign's verdicts.
+    (receipt.directory / "transcript.txt").write_text(receipt.output)
+    target = keep_traces.destination(RETENTION_ROOT, os.environ.get("PW_RECIPE"),
+                                     "todomvc-producers", receipt.directory.name)
+    kept = keep_traces.keep(receipt.directory, target, RETENTION_ROOT)
+    if kept.skipped:
+        raise RuntimeError("native producer receipt retention was incomplete")
+    hashes = {}
+    for source in sorted(receipt.directory.rglob("*")):
+        if not source.is_file():
+            continue
+        relative = source.relative_to(receipt.directory)
+        raw = source.read_bytes()
+        if (target / relative).read_bytes() != raw:
+            raise RuntimeError("retained native producer bytes differ")
+        hashes[str(relative)] = hashlib.sha256(raw).hexdigest()
+    process = json.loads((receipt.directory / "process.json").read_text())
+    print("native producer: " + json.dumps({
+        "expected": list(expected), "native_status": process["actual_status"],
+        "validated_status": receipt.status, "valid": receipt.result.valid,
+        "executed": receipt.result.executed, "passed": receipt.result.passed,
+        "assertion_failed": receipt.result.assertion_failed,
+        "body_errors": receipt.result.body_errors,
+        "source": str(receipt.directory), "retained": str(target), "sha256": hashes,
+    }, sort_keys=True), flush=True)
     return receipt.result
 
 

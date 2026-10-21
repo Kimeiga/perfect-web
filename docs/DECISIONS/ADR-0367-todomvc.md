@@ -6,6 +6,47 @@ the integrator's rulings (below). Milestone: E14, track `todomvc` (W7), its
 first milestone. Builds on the integrator's rulings in docs/PARALLEL.md,
 "2026-10-09, W7's plan: TodoMVC", and of 2026-10-14 on the fragment (below).
 
+## Amendment: live TodoMVC witnesses and strict mutation evidence, 2026-10-21
+
+Verify 39538607183 at `34f3` exposed four survivors among the 43 semantic
+controls. The empty-list test did not observe the toggle-all state. Two
+checkbox controls changed the old host patch path, while this device-backed
+application now uses `setAttributePart`. The focus control removed only a
+nested descendant lookup, while the current morph inserts the edit field
+itself. The failed run remains failed.
+
+The original empty-toggle operator is unchanged. Existing tests now assert
+that the toggle-all is unchecked at the host default and at three browser
+transitions: initial empty, removing the last todo, and clearing all completed
+todos. The two runtime controls omit only the false or true `checked`
+property assignment at the live boolean-attribute authority, preserving other
+boolean attributes. The insertion control omits the observer's added-node
+focus lookup. Existing dirty-checkbox and focused-edit tests observe these
+faults directly. All 43 model names and the four host/50 Chromium test IDs
+remain; the application and runtime production behavior are unchanged.
+
+The semantic campaign delegates process ownership, source restoration and
+native Cargo/browser validation to the shared producers. Server runs require
+all four exact IDs and native assertion-site provenance. Chromium freezes all
+50 IDs on a green baseline and requires a fresh nonce, native exit agreement,
+complete body-assertion results and no skips, hooks or timeouts. Program
+mutants must pass native `pw check`; only exact, complete PW6805 output may
+kill the explicitly named privacy control. Build failures, unrelated compiler
+or runtime errors, stops and incomplete results refuse and stop further
+controls. Both restored native suites must pass. Its separate producer suite
+has 15 tests held by 17 assertion controls, including real child SIGTERM
+restoration and final restored-suite gating.
+
+The targeted final native proof ran in 62.5 seconds: host 4/4 and Chromium
+50/50 baseline; the unchanged empty-list operator caused one of four host
+assertions to fail; the three live runtime operators caused 2, 1 and 3 body
+assertions among the same 50 Chromium IDs; restored host 4/4 and browser
+50/50 passed. The strict checker also observed clean 23 files/native 0,
+exact PW6805/native 1 under the original privacy fault, then restored native
+0. These targeted results do not substitute for the whole 43-control hosted
+campaign. Commands, original failed-run identity and native receipts are
+recorded in [the diagnostic proof](../diagnostics/train-12/todomvc-witnesses-and-report.txt).
+
 ## Amendment: explicit Cypress compatibility execution, 2026-10-20
 
 The integrator accepts a versioned execution copy under the owner's current

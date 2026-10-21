@@ -116,6 +116,8 @@ fn the_host_renders_the_default_and_hides_what_the_device_decides() {
         assert!(tag.contains(" hidden"), "{tag}");
         assert!(tag.contains(" data-pw-device"), "{tag}");
     }
+    let toggle_all = tag_of(&html, "class=\"toggle-all\"");
+    assert!(!toggle_all.contains(" checked"), "{toggle_all}");
     // The count, at the default: in an element the device decides.
     assert!(
         html.contains("<strong data-pw-device><!--pw:s"),

@@ -3,6 +3,41 @@
 Status: accepted by the integrator under the owner's delegation of
 2026-10-02, on the explicit takeover request, 2026-10-15. Milestone: E14.
 
+## Amendment: producer transcripts and campaign verdicts, 2026-10-21
+
+The Cypress producer controls intentionally test words such as `SURVIVED`.
+Their native assertion transcripts therefore contain those words even when
+the control was killed by a valid assertion. Verify 39538607183 recorded all
+54 producer controls killed but the generic evidence guard correctly refused
+the resulting ambiguous evidence stream. No summary or fetch guard is relaxed.
+
+The campaign now retains each native run's stdout, stderr, invocation,
+expected inventory, structured receipt and validation record under the
+already-uploaded `spikes/own-renderer/kept-traces` tree, including invalid
+runs. It also retains the combined diagnostic transcript. Copies must match
+byte-for-byte and fit the existing shared artifact budget; missing or skipped
+retention refuses the campaign. The evidence stream prints the complete
+inventory, native and validated status, structured outcomes, actual retained
+path and SHA-256 per file. Its own `KILLED`, `SURVIVED` and `REFUSED` verdicts
+remain plain and retain their existing authority.
+
+This is an explicit bounded exception to the older retention comments that
+exclude intentional mutation output: these small native producer receipts
+are required diagnostic evidence, rather than browser traces. The existing
+32 MiB shared retention budget and uploader are unchanged. Raw assertion
+operands are not themselves campaign verdicts and are never rewritten.
+
+All prior 54 controls remain. A 55th reintroduces raw transcript printing:
+the full 51-test native producer then reports exactly two body assertion
+failures, no body errors or incomplete results; restored 51/51 passes. The
+regression verifies copied raw bytes and hashes, proves an incidental
+assertion operand does not flag canonical `ci_summary`, and proves a real
+plain `SURVIVED` verdict still does. It also covers invalid-run retention
+and refusal when retention is incomplete. Whole 55-control and full official
+29-case acceptance reruns remain hosted obligations. Historical and focused
+proof are [retained separately](../diagnostics/train-12/todomvc-witnesses-and-report.txt)
+from current E14 evidence.
+
 ## Amendment: explicit Cypress compatibility execution, 2026-10-20
 
 The integrator accepts a versioned execution copy under the owner's current
