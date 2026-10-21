@@ -356,7 +356,12 @@ test("no request carries what the device keeps", async ({ page }) => {
   await ready(page);
   const marker = `marker-${Date.now()}`;
   await note(page, marker);
+  await expect(page.locator("#notes li")).toHaveText([marker]);
+  expect(keptJson(await stored(page), "demo-notes@2")).toEqual([
+    { id: "0-" + marker, text: marker, pinned: false },
+  ]);
   await page.locator("#press").click();
+  await expect(page.locator("#presses")).toHaveText("1");
   await page.reload();
   await page.waitForFunction(() => document.documentElement.dataset.pwReady === "1");
   await expect(page.locator("#notes li")).toHaveText([marker]);
