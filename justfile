@@ -61,6 +61,7 @@ import 'just/node-audit.just'
 import 'just/keyed-retry.just'
 import 'just/effect-convergence.just'
 import 'just/command-deadline.just'
+import 'just/press-modules.just'
 
 default:
     @just --list

@@ -524,6 +524,11 @@
         "mutable:performance"
       ]
     },
+    "press-modules.spec.mjs": {
+      "roles": [
+        "base"
+      ]
+    },
     "protocol-boundary.spec.mjs": {
       "roles": [
         "base"

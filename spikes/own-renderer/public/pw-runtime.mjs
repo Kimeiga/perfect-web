@@ -552,7 +552,7 @@ function loadHandler(identity) {
   // makes the failed attempt distinguishable from the next one.
   const attempt = attempts.get(identity) ?? 0;
   const url = attempt === 0 ? `/handler/${identity}.mjs` : `/handler/${identity}.mjs?attempt=${attempt}`;
-  const pending = import(url).then((module) => {
+  const pending = within(import(url), `the handler ${identity}`).then((module) => {
     loaded.set(identity, module);
     log.push(`loaded ${identity}`);
     return module;
@@ -560,6 +560,22 @@ function loadHandler(identity) {
   loaded.set(identity, pending);
   window.__pw.fetched = (window.__pw.fetched ?? 0) + 1;
   return pending;
+}
+
+/**
+ * **A module a press needs, loaded within the deadline** (ADR-0382): its
+ * handler's, the page's speculation module, the renderer that renders its
+ * regions. A load given up fails as a failed load does, and is no longer
+ * waited for, so the press after it, which waits for its turn (ADR-0152),
+ * is not held by a module that never comes. The import itself cannot be
+ * stopped: it is not waited for, and whatever it brings late is not used.
+ */
+function within(loading, what) {
+  let timer;
+  const late = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${what}: none within ${sendDeadline} ms`)), sendDeadline);
+  });
+  return Promise.race([loading, late]).finally(() => clearTimeout(timer));
 }
 
 /**
@@ -770,19 +786,38 @@ let speculationModule = null;
 
 /** The page's speculation module, loaded with the first press that needs it,
  * and the renderer with it where a speculation renders a region (ADR-0172):
- * a region is rendered between a batch's frames, so both are ready first. */
+ * a region is rendered between a batch's frames, so both are ready first.
+ *
+ * **Within the deadline, and not kept failed** (ADR-0382): until 2026-10-21 a
+ * failed load was kept, and every later press that speculates failed with it
+ * until the page was reloaded. A load that fails, or is given up, is
+ * forgotten, and the next asks under another specifier, as a handler's does
+ * (`loadHandler`), so that no failure the browser keeps answers it. */
 function speculations() {
   if (!parts.speculation) return Promise.resolve(null);
-  speculationModule ??= Promise.all([
-    import(parts.speculation),
-    parts.regions ? renderModule() : null,
-  ]).then(([module, renderer]) => {
-    if (renderer) wasm = renderer;
-    speculationLoaded = module;
-    return module;
-  });
+  if (speculationModule) return speculationModule;
+  const url =
+    speculationAttempts === 0 ? parts.speculation : `${parts.speculation}?attempt=${speculationAttempts}`;
+  speculationModule = within(
+    Promise.all([import(url), parts.regions ? renderModule() : null]),
+    "the speculation module",
+  ).then(
+    ([module, renderer]) => {
+      if (renderer) wasm = renderer;
+      speculationLoaded = module;
+      return module;
+    },
+    (error) => {
+      speculationModule = null;
+      speculationAttempts += 1;
+      throw error;
+    },
+  );
   return speculationModule;
 }
+
+/** How many loads of the page's speculation module have failed (ADR-0382). */
+let speculationAttempts = 0;
 
 function current(module, binding) {
   const state = speculated.get(binding);
@@ -888,8 +923,11 @@ function entryValue(frame) {
  * holds when none is (ADR-0172): its list was shown as held before the
  * batch, and the batch's patches made it what the page holds now. */
 async function reapplySpeculations() {
-  if (!speculationModule) return;
-  const module = await speculationModule;
+  // The module as loaded, never a load under way: before it has loaded no
+  // press has speculated, and a load that fails must not fail the batch
+  // (ADR-0382).
+  const module = speculationLoaded;
+  if (!module) return;
   for (const [binding, state] of speculated) {
     const regions = namesOf(module, binding).some((name) => module.regions?.[name]?.length);
     if (state.pending.length > 0 || regions) render(module, binding);
@@ -1313,9 +1351,16 @@ let renderer = null;
 
 /** The renderer, loaded with the first block a signal renders again. */
 function renderModule() {
+  // Not kept failed (ADR-0382): the next need asks the network again.
   renderer ??= fetch("/pw-render.wasm")
     .then((r) => WebAssembly.instantiateStreaming(r, {}))
-    .then(({ instance }) => instance.exports);
+    .then(
+      ({ instance }) => instance.exports,
+      (error) => {
+        renderer = null;
+        throw error;
+      },
+    );
   return renderer;
 }
 
@@ -2803,7 +2848,13 @@ function bindEvent(template, part) {
           // speculation is resolved by the answer, whatever it is.
           command: async (component, args, how = {}) => {
             const interaction = `${press}-${calls++}`;
-            const ids = await speculate(component, args, interaction);
+            // **Sent unspeculated where its speculation cannot load**
+            // (ADR-0382): a speculation only shows the press before its
+            // answer, and the page shows the server's value when it comes.
+            const ids = await speculate(component, args, interaction).catch((error) => {
+              log.push(`${component} sent unspeculated: ${error.message ?? error}`);
+              return [];
+            });
             let answer;
             try {
               answer = await command(component, args, interaction, how.retry);
