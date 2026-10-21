@@ -1,0 +1,540 @@
+ADR-0366 - native browser assertion provenance
+
+produced by: just e14-browser-assertions
+commit: bd267ad604f0ccbae86012c2124dc17977ed65b5
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39549550596 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+green: native exit 0, valid=True, expected=True
+assertion: native exit 1, valid=True, expected=True
+
+Running 1 test using 1 worker
+
+[1A[2K[1/1] ../../../../../../../tmp/pw-browser-protocol-_9ndi3fn/fixture.spec.mjs:61:8 › witness
+[1A[2K  1) ../../../../../../../tmp/pw-browser-protocol-_9ndi3fn/fixture.spec.mjs:61:8 › witness ─────────
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBe[2m([22m[32mexpected[39m[2m) // Object.is equality[22m
+
+    Expected: [32m2[39m
+    Received: [31m1[39m
+
+       at ../../home/runner/work/perfect-web/perfect-web/spikes/own-renderer/assertion-expect.mjs:31
+
+      29 |       return (...args) => {
+      30 |         try {
+    > 31 |           const result = Reflect.apply(matcher, object, args);
+         |                                  ^
+      32 |           return result && typeof result.then === "function"
+      33 |             ? result.catch(error => proven(error, name, isNot)) : result;
+      34 |         } catch (error) { return proven(error, name, isNot); }
+        at Proxy.toBe (/home/runner/work/perfect-web/perfect-web/spikes/own-renderer/assertion-expect.mjs:31:34)
+        at witness (/tmp/pw-browser-protocol-_9ndi3fn/fixture.spec.mjs:10:39)
+    [cause]: Error: PW_ASSERTION:a222ee90ed3417cfedb4b3a359f9cf21dfeb2815f855dc97d7d2a468d58d958b
+        at proven (/home/runner/work/perfect-web/perfect-web/spikes/own-renderer/assertion-expect.mjs:13:19)
+        at Proxy.toBe (/home/runner/work/perfect-web/perfect-web/spikes/own-renderer/assertion-expect.mjs:34:34)
+        at witness (/tmp/pw-browser-protocol-_9ndi3fn/fixture.spec.mjs:10:39)
+
+
+[1A[2K  1 failed
+    ../../../../../../../tmp/pw-browser-protocol-_9ndi3fn/fixture.spec.mjs:61:8 › witness ──────────
+
+customMessage: native exit 1, valid=True, expected=True
+not: native exit 1, valid=True, expected=True
+locator: native exit 1, valid=True, expected=True
+pollGreen: native exit 0, valid=True, expected=True
+poll: native exit 1, valid=True, expected=True
+
+Running 1 test using 1 worker
+
+[1A[2K[1/1] ../../../../../../../tmp/pw-browser-protocol-4srteldl/fixture.spec.mjs:61:8 › witness
+[1A[2K  1) ../../../../../../../tmp/pw-browser-protocol-4srteldl/fixture.spec.mjs:61:8 › witness ─────────
+
+    Error: Expected: [32m"stale"[39m
+    Received: [31m"fresh"[39m
+
+       at ../../home/runner/work/perfect-web/perfect-web/spikes/own-renderer/assertion-expect.mjs:31
+
+      29 |       return (...args) => {
+      30 |         try {
+    > 31 |           const result = Reflect.apply(matcher, object, args);
+         |                                  ^
+      32 |           return result && typeof result.then === "function"
+      33 |             ? result.catch(error => proven(error, name, isNot)) : result;
+      34 |         } catch (error) { return proven(error, name, isNot); }
+        at Proxy.toBePolled (/home/runner/work/perfect-web/perfect-web/spikes/own-renderer/assertion-expect.mjs:31:34)
+        at Object.toBe (/home/runner/work/perfect-web/perfect-web/spikes/own-renderer/assertion-expect.mjs:96:81)
+        at witness (/tmp/pw-browser-protocol-4srteldl/fixture.spec.mjs:14:66)
+    [cause]: Error: PW_ASSERTION:f7ad93916f707c9f4fd55f2d2d975cf5cc2da150fb93d3f09857788d1312cb19
+        at proven (/home/runner/work/perfect-web/perfect-web/spikes/own-renderer/assertion-expect.mjs:13:19)
+        at /home/runner/work/perfect-web/perfect-web/spikes/own-renderer/assertion-expect.mjs:33:37
+        at witness (/tmp/pw-browser-protocol-4srteldl/fixture.spec.mjs:14:24)
+
+
+[1A[2K  1 failed
+    ../../../../../../../tmp/pw-browser-protocol-4srteldl/fixture.spec.mjs:61:8 › witness ──────────
+
+pollNaN: native exit 0, valid=True, expected=True
+pollSignedZero: native exit 1, valid=True, expected=True
+pollEarlyTimer: native exit 1, valid=True, expected=True
+cause: native exit 1, valid=True, expected=True
+closed: native exit 1, valid=False, expected=False
+
+Running 1 test using 1 worker
+
+[1A[2K[1/1] ../../../../../../../tmp/pw-browser-protocol-fgc6hh_g/fixture.spec.mjs:56:3 › witness
+[1A[2K  1) ../../../../../../../tmp/pw-browser-protocol-fgc6hh_g/fixture.spec.mjs:56:3 › witness ─────────
+
+    Error: expect.toHaveText: Target page, context or browser has been closed
+
+       at ../../home/runner/work/perfect-web/perfect-web/spikes/own-renderer/assertion-expect.mjs:31
+
+      29 |       return (...args) => {
+      30 |         try {
+    > 31 |           const result = Reflect.apply(matcher, object, args);
+         |                                  ^
+      32 |           return result && typeof result.then === "function"
+      33 |             ? result.catch(error => proven(error, name, isNot)) : result;
+      34 |         } catch (error) { return proven(error, name, isNot); }
+        at Proxy.toHaveText (/home/runner/work/perfect-web/perfect-web/spikes/own-renderer/assertion-expect.mjs:31:34)
+        at /tmp/pw-browser-protocol-fgc6hh_g/fixture.spec.mjs:59:70
+
+
+[1A[2K  1 failed
+    ../../../../../../../tmp/pw-browser-protocol-fgc6hh_g/fixture.spec.mjs:56:3 › witness ──────────
+
+invalidMatcher: native exit 1, valid=False, expected=False
+
+Running 1 test using 1 worker
+
+[1A[2K[1/1] ../../../../../../../tmp/pw-browser-protocol-l7dn6ozs/fixture.spec.mjs:56:3 › witness
+[1A[2K  1) ../../../../../../../tmp/pw-browser-protocol-l7dn6ozs/fixture.spec.mjs:56:3 › witness ─────────
+
+    Error: toHaveText can be only used with Locator object
+
+       at ../../home/runner/work/perfect-web/perfect-web/spikes/own-renderer/assertion-expect.mjs:31
+
+      29 |       return (...args) => {
+      30 |         try {
+    > 31 |           const result = Reflect.apply(matcher, object, args);
+         |                                  ^
+      32 |           return result && typeof result.then === "function"
+      33 |             ? result.catch(error => proven(error, name, isNot)) : result;
+      34 |         } catch (error) { return proven(error, name, isNot); }
+        at Proxy.toHaveText (/home/runner/work/perfect-web/perfect-web/spikes/own-renderer/assertion-expect.mjs:31:34)
+        at /tmp/pw-browser-protocol-l7dn6ozs/fixture.spec.mjs:59:70
+
+    Error Context: test-results/fixture-witness/error-context.md
+
+
+[1A[2K  1 failed
+    ../../../../../../../tmp/pw-browser-protocol-l7dn6ozs/fixture.spec.mjs:56:3 › witness ──────────
+
+pollCallback: native exit 1, valid=False, expected=False
+pollAssertCallback: native exit 1, valid=False, expected=False
+pollPending: native exit 1, valid=False, expected=False
+pollOptions: native exit 1, valid=False, expected=False
+pollUnsupported: native exit 1, valid=False, expected=False
+before: native exit 1, valid=False, expected=False
+after: native exit 1, valid=False, expected=False
+runtime: native exit 1, valid=False, expected=False
+timeout: native exit 1, valid=False, expected=False
+setupTimeout: native exit 1, valid=False, expected=False
+skipped: native exit 0, valid=False, expected=False
+retry: native exit 0, valid=False, expected=False
+soft: native exit 1, valid=False, expected=False
+unwrapped: native exit 1, valid=False, expected=False
+27 of 27 native Playwright producer cases agree
+structured instrument receipts: /tmp/pw-browser-proof-controls-5eziuqz3
+test_closed_browser_is_not_a_comparison (scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_closed_browser_is_not_a_comparison) ... ok
+test_final_poll_interval_never_restarts_an_early_callback (scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_final_poll_interval_never_restarts_an_early_callback) ... ok
+test_invalid_matcher_api_is_not_a_comparison (scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_invalid_matcher_api_is_not_a_comparison) ... ok
+test_missing_native_proof_is_refused (scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_missing_native_proof_is_refused) ... ok
+test_native_cause_is_preserved_under_proof (scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_native_cause_is_preserved_under_proof) ... ok
+test_native_comparisons_messages_and_negation_produce_proof (scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_native_comparisons_messages_and_negation_produce_proof) ... ok
+test_native_locator_mismatch_produces_proof (scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_native_locator_mismatch_produces_proof) ... ok
+test_pending_poll_callback_is_not_a_mismatch (scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_pending_poll_callback_is_not_a_mismatch) ... ok
+test_poll_callback_errors_are_not_assertion_results (scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_poll_callback_errors_are_not_assertion_results) ... ok
+test_poll_preserves_object_is_and_completed_mismatches (scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_poll_preserves_object_is_and_completed_mismatches) ... ok
+test_stale_native_proof_is_refused (scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_stale_native_proof_is_refused) ... ok
+
+----------------------------------------------------------------------
+Ran 11 tests in 24.381s
+
+OK
+
+baseline: 11 passed, 0 failed
+test_missing_native_proof_is_refused (scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_missing_native_proof_is_refused) ... FAIL
+
+======================================================================
+FAIL: test_missing_native_proof_is_refused (scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_missing_native_proof_is_refused)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/runner/work/perfect-web/perfect-web/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/perfect-web/perfect-web/scripts/tests/test_browser_assertion_proof.py", line 64, in test_missing_native_proof_is_refused
+    self.assertIsNone(self.fixture('unproven'))
+AssertionError: {'schema': 1, 'complete': True, 'nonce': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'tests': [['one', 'failed']], 'inventory': ['one']} is not None
+
+----------------------------------------------------------------------
+Ran 1 test in 0.041s
+
+FAILED (failures=1)
+
+expect steps earn kills without native proof: KILLED by scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_missing_native_proof_is_refused (1 assertion methods fail)
+test_stale_native_proof_is_refused (scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_stale_native_proof_is_refused) ... FAIL
+
+======================================================================
+FAIL: test_stale_native_proof_is_refused (scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_stale_native_proof_is_refused)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/runner/work/perfect-web/perfect-web/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/perfect-web/perfect-web/scripts/tests/test_browser_assertion_proof.py", line 68, in test_stale_native_proof_is_refused
+    self.assertIsNone(self.fixture('staleProof'))
+AssertionError: {'schema': 1, 'complete': True, 'nonce': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'tests': [['one', 'failed']], 'inventory': ['one']} is not None
+
+----------------------------------------------------------------------
+Ran 1 test in 0.022s
+
+FAILED (failures=1)
+
+old native proof earns a kill: KILLED by scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_stale_native_proof_is_refused (1 assertion methods fail)
+test_closed_browser_is_not_a_comparison (scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_closed_browser_is_not_a_comparison) ... FAIL
+
+======================================================================
+FAIL: test_closed_browser_is_not_a_comparison (scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_closed_browser_is_not_a_comparison)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/runner/work/perfect-web/perfect-web/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/perfect-web/perfect-web/scripts/tests/test_browser_assertion_proof.py", line 31, in test_closed_browser_is_not_a_comparison
+    self.case('closed', False)
+  File "/home/runner/work/perfect-web/perfect-web/scripts/tests/test_browser_assertion_proof.py", line 19, in case
+    self.assertEqual((result.valid, result.failed), (valid, failed), output)
+AssertionError: Tuples differ: (True, 1) != (False, 0)
+
+First differing element 0:
+True
+False
+
+- (True, 1)
++ (False, 0) : 
+Running 1 test using 1 worker
+
+[1A[2K[1/1] ../../../../../../../tmp/pw-browser-protocol-y5lw9mrd/fixture.spec.mjs:56:3 › witness
+[1A[2K  1) ../../../../../../../tmp/pw-browser-protocol-y5lw9mrd/fixture.spec.mjs:56:3 › witness ─────────
+
+    Error: expect.toHaveText: Target page, context or browser has been closed
+
+       at ../../home/runner/work/perfect-web/perfect-web/spikes/own-renderer/assertion-expect.mjs:30
+
+      28 |       return (...args) => {
+      29 |         try {
+    > 30 |           const result = Reflect.apply(matcher, object, args);
+         |                                  ^
+      31 |           return result && typeof result.then === "function"
+      32 |             ? result.catch(error => proven(error, name, isNot)) : result;
+      33 |         } catch (error) { return proven(error, name, isNot); }
+        at Proxy.toHaveText (/home/runner/work/perfect-web/perfect-web/spikes/own-renderer/assertion-expect.mjs:30:34)
+        at /tmp/pw-browser-protocol-y5lw9mrd/fixture.spec.mjs:59:70
+    [cause]: Error: PW_ASSERTION:428a8632681903863453fae436344b1709476cd654ef3b419bcc07baa1dd3931
+        at proven (/home/runner/work/perfect-web/perfect-web/spikes/own-renderer/assertion-expect.mjs:12:19)
+        at /home/runner/work/perfect-web/perfect-web/spikes/own-renderer/assertion-expect.mjs:32:37
+        at /tmp/pw-browser-protocol-y5lw9mrd/fixture.spec.mjs:59:5
+
+
+[1A[2K  1 failed
+    ../../../../../../../tmp/pw-browser-protocol-y5lw9mrd/fixture.spec.mjs:56:3 › witness ──────────
+
+
+----------------------------------------------------------------------
+Ran 1 test in 1.753s
+
+FAILED (failures=1)
+
+browser/API errors are branded as matcher failures: KILLED by scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_closed_browser_is_not_a_comparison (1 assertion methods fail)
+test_native_comparisons_messages_and_negation_produce_proof (scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_native_comparisons_messages_and_negation_produce_proof) ... FAIL
+
+======================================================================
+FAIL: test_native_comparisons_messages_and_negation_produce_proof (scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_native_comparisons_messages_and_negation_produce_proof)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/runner/work/perfect-web/perfect-web/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/perfect-web/perfect-web/scripts/tests/test_browser_assertion_proof.py", line 23, in test_native_comparisons_messages_and_negation_produce_proof
+    self.case(mode, True, 1)
+  File "/home/runner/work/perfect-web/perfect-web/scripts/tests/test_browser_assertion_proof.py", line 19, in case
+    self.assertEqual((result.valid, result.failed), (valid, failed), output)
+AssertionError: Tuples differ: (False, 0) != (True, 1)
+
+First differing element 0:
+False
+True
+
+- (False, 0)
++ (True, 1) : 
+Running 1 test using 1 worker
+
+[1A[2K[1/1] ../../../../../../../tmp/pw-browser-protocol-dmz6la9r/fixture.spec.mjs:61:8 › witness
+[1A[2K  1) ../../../../../../../tmp/pw-browser-protocol-dmz6la9r/fixture.spec.mjs:61:8 › witness ─────────
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mnot[2m.[22mtoBe[2m([22m[32mexpected[39m[2m) // Object.is equality[22m
+
+    Expected: not [32m1[39m
+
+       at ../../home/runner/work/perfect-web/perfect-web/spikes/own-renderer/assertion-expect.mjs:31
+
+      29 |       return (...args) => {
+      30 |         try {
+    > 31 |           const result = Reflect.apply(matcher, object, args);
+         |                                  ^
+      32 |           return result && typeof result.then === "function"
+      33 |             ? result.catch(error => proven(error, name, isNot)) : result;
+      34 |         } catch (error) { return proven(error, name, isNot); }
+        at Proxy.toBe (/home/runner/work/perfect-web/perfect-web/spikes/own-renderer/assertion-expect.mjs:31:34)
+        at witness (/tmp/pw-browser-protocol-dmz6la9r/fixture.spec.mjs:12:37)
+
+
+[1A[2K  1 failed
+    ../../../../../../../tmp/pw-browser-protocol-dmz6la9r/fixture.spec.mjs:61:8 › witness ──────────
+
+
+----------------------------------------------------------------------
+Ran 1 test in 4.709s
+
+FAILED (failures=1)
+
+negated comparisons lose native proof: KILLED by scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_native_comparisons_messages_and_negation_produce_proof (1 assertion methods fail)
+test_native_cause_is_preserved_under_proof (scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_native_cause_is_preserved_under_proof) ... FAIL
+
+======================================================================
+FAIL: test_native_cause_is_preserved_under_proof (scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_native_cause_is_preserved_under_proof)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/runner/work/perfect-web/perfect-web/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/perfect-web/perfect-web/scripts/tests/test_browser_assertion_proof.py", line 52, in test_native_cause_is_preserved_under_proof
+    self.case('cause', True, 1)
+  File "/home/runner/work/perfect-web/perfect-web/scripts/tests/test_browser_assertion_proof.py", line 19, in case
+    self.assertEqual((result.valid, result.failed), (valid, failed), output)
+AssertionError: Tuples differ: (False, 0) != (True, 1)
+
+First differing element 0:
+False
+True
+
+- (False, 0)
++ (True, 1) : 
+Running 1 test using 1 worker
+
+[1A[2K[1/1] ../../../../../../../tmp/pw-browser-protocol-a1o5svr8/fixture.spec.mjs:61:8 › witness
+[1A[2K  1) ../../../../../../../tmp/pw-browser-protocol-a1o5svr8/fixture.spec.mjs:61:8 › witness ─────────
+
+    Error: native cause was lost
+
+      41 |     try { expect(1).toBe(2); }
+      42 |     catch (error) {
+    > 43 |       if (error.cause?.cause !== original) throw new Error('native cause was lost');
+         |                                                  ^
+      44 |       throw error;
+      45 |     } finally { delete Error.prototype.cause; }
+      46 |   }
+        at witness (/tmp/pw-browser-protocol-a1o5svr8/fixture.spec.mjs:43:50)
+
+
+[1A[2K  1 failed
+    ../../../../../../../tmp/pw-browser-protocol-a1o5svr8/fixture.spec.mjs:61:8 › witness ──────────
+
+
+----------------------------------------------------------------------
+Ran 1 test in 1.565s
+
+FAILED (failures=1)
+
+native error causes are discarded: KILLED by scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_native_cause_is_preserved_under_proof (1 assertion methods fail)
+test_poll_preserves_object_is_and_completed_mismatches (scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_poll_preserves_object_is_and_completed_mismatches) ... FAIL
+
+======================================================================
+FAIL: test_poll_preserves_object_is_and_completed_mismatches (scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_poll_preserves_object_is_and_completed_mismatches)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/runner/work/perfect-web/perfect-web/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/perfect-web/perfect-web/scripts/tests/test_browser_assertion_proof.py", line 39, in test_poll_preserves_object_is_and_completed_mismatches
+    self.case(mode, True, failed)
+  File "/home/runner/work/perfect-web/perfect-web/scripts/tests/test_browser_assertion_proof.py", line 18, in case
+    self.assertEqual(code, 0 if mode in ('green', 'pollGreen', 'pollNaN') else 1, output)
+AssertionError: 1 != 0 : 
+Running 1 test using 1 worker
+
+[1A[2K[1/1] ../../../../../../../tmp/pw-browser-protocol-y77eoddq/fixture.spec.mjs:61:8 › witness
+[1A[2K  1) ../../../../../../../tmp/pw-browser-protocol-y77eoddq/fixture.spec.mjs:61:8 › witness ─────────
+
+    Error: Expected: [32mNaN[39m
+    Received: [31mNaN[39m
+
+       at ../../home/runner/work/perfect-web/perfect-web/spikes/own-renderer/assertion-expect.mjs:31
+
+      29 |       return (...args) => {
+      30 |         try {
+    > 31 |           const result = Reflect.apply(matcher, object, args);
+         |                                  ^
+      32 |           return result && typeof result.then === "function"
+      33 |             ? result.catch(error => proven(error, name, isNot)) : result;
+      34 |         } catch (error) { return proven(error, name, isNot); }
+        at Proxy.toBePolled (/home/runner/work/perfect-web/perfect-web/spikes/own-renderer/assertion-expect.mjs:31:34)
+        at Object.toBe (/home/runner/work/perfect-web/perfect-web/spikes/own-renderer/assertion-expect.mjs:96:81)
+        at witness (/tmp/pw-browser-protocol-y77eoddq/fixture.spec.mjs:15:65)
+    [cause]: Error: PW_ASSERTION:8beb6c25cbccc966b11cb828d980a33fac882c9025c81a2d18459cd37b49ab68
+        at proven (/home/runner/work/perfect-web/perfect-web/spikes/own-renderer/assertion-expect.mjs:13:19)
+        at /home/runner/work/perfect-web/perfect-web/spikes/own-renderer/assertion-expect.mjs:33:37
+        at witness (/tmp/pw-browser-protocol-y77eoddq/fixture.spec.mjs:15:27)
+
+
+[1A[2K  1 failed
+    ../../../../../../../tmp/pw-browser-protocol-y77eoddq/fixture.spec.mjs:61:8 › witness ──────────
+
+
+----------------------------------------------------------------------
+Ran 1 test in 4.720s
+
+FAILED (failures=1)
+
+poll equality uses ordinary numeric equality: KILLED by scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_poll_preserves_object_is_and_completed_mismatches (1 assertion methods fail)
+test_poll_callback_errors_are_not_assertion_results (scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_poll_callback_errors_are_not_assertion_results) ... FAIL
+
+======================================================================
+FAIL: test_poll_callback_errors_are_not_assertion_results (scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_poll_callback_errors_are_not_assertion_results)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/runner/work/perfect-web/perfect-web/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/perfect-web/perfect-web/scripts/tests/test_browser_assertion_proof.py", line 46, in test_poll_callback_errors_are_not_assertion_results
+    self.case(mode, False)
+  File "/home/runner/work/perfect-web/perfect-web/scripts/tests/test_browser_assertion_proof.py", line 18, in case
+    self.assertEqual(code, 0 if mode in ('green', 'pollGreen', 'pollNaN') else 1, output)
+AssertionError: 0 != 1 : 
+Running 1 test using 1 worker
+
+[1A[2K[1/1] ../../../../../../../tmp/pw-browser-protocol-qsp9sbro/fixture.spec.mjs:61:8 › witness
+[1A[2K  1 passed (805ms)
+
+
+----------------------------------------------------------------------
+Ran 1 test in 1.559s
+
+FAILED (failures=1)
+
+callback exceptions become observed mismatches: KILLED by scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_poll_callback_errors_are_not_assertion_results (1 assertion methods fail)
+test_final_poll_interval_never_restarts_an_early_callback (scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_final_poll_interval_never_restarts_an_early_callback) ... FAIL
+
+======================================================================
+FAIL: test_final_poll_interval_never_restarts_an_early_callback (scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_final_poll_interval_never_restarts_an_early_callback)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/runner/work/perfect-web/perfect-web/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/perfect-web/perfect-web/scripts/tests/test_browser_assertion_proof.py", line 42, in test_final_poll_interval_never_restarts_an_early_callback
+    self.case('pollEarlyTimer', True, 1)
+  File "/home/runner/work/perfect-web/perfect-web/scripts/tests/test_browser_assertion_proof.py", line 19, in case
+    self.assertEqual((result.valid, result.failed), (valid, failed), output)
+AssertionError: Tuples differ: (False, 0) != (True, 1)
+
+First differing element 0:
+False
+True
+
+- (False, 0)
++ (True, 1) : 
+Running 1 test using 1 worker
+
+[1A[2K[1/1] ../../../../../../../tmp/pw-browser-protocol-xq84l0u3/fixture.spec.mjs:61:8 › witness
+[1A[2K  1) ../../../../../../../tmp/pw-browser-protocol-xq84l0u3/fixture.spec.mjs:61:8 › witness ─────────
+
+    Error: a final clamped sleep restarted the callback
+
+      28 |     } finally {
+      29 |       globalThis.setTimeout = originalTimer;
+    > 30 |       if (calls !== 1) throw new Error('a final clamped sleep restarted the callback');
+         |                              ^
+      31 |     }
+      32 |   }
+      33 |   if (mode === 'pollCallback') await expect.poll(() => { throw new Error('callback failure'); }, polling).toBe(undefined);
+        at witness (/tmp/pw-browser-protocol-xq84l0u3/fixture.spec.mjs:30:30)
+
+
+[1A[2K  1 failed
+    ../../../../../../../tmp/pw-browser-protocol-xq84l0u3/fixture.spec.mjs:61:8 › witness ──────────
+
+
+----------------------------------------------------------------------
+Ran 1 test in 1.538s
+
+FAILED (failures=1)
+
+a final clamped interval restarts the poll callback: KILLED by scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_final_poll_interval_never_restarts_an_early_callback (1 assertion methods fail)
+test_pending_poll_callback_is_not_a_mismatch (scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_pending_poll_callback_is_not_a_mismatch) ... FAIL
+
+======================================================================
+FAIL: test_pending_poll_callback_is_not_a_mismatch (scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_pending_poll_callback_is_not_a_mismatch)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/runner/work/perfect-web/perfect-web/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/perfect-web/perfect-web/scripts/tests/test_browser_assertion_proof.py", line 49, in test_pending_poll_callback_is_not_a_mismatch
+    self.case('pollPending', False)
+  File "/home/runner/work/perfect-web/perfect-web/scripts/tests/test_browser_assertion_proof.py", line 19, in case
+    self.assertEqual((result.valid, result.failed), (valid, failed), output)
+AssertionError: Tuples differ: (True, 1) != (False, 0)
+
+First differing element 0:
+True
+False
+
+- (True, 1)
++ (False, 0) : 
+Running 1 test using 1 worker
+
+[1A[2K[1/1] ../../../../../../../tmp/pw-browser-protocol-cv3sytku/fixture.spec.mjs:61:8 › witness
+[1A[2K  1) ../../../../../../../tmp/pw-browser-protocol-cv3sytku/fixture.spec.mjs:61:8 › witness ─────────
+
+    Error: Expected: [32m1[39m
+    Received: [31mundefined[39m
+
+       at ../../home/runner/work/perfect-web/perfect-web/spikes/own-renderer/assertion-expect.mjs:31
+
+      29 |       return (...args) => {
+      30 |         try {
+    > 31 |           const result = Reflect.apply(matcher, object, args);
+         |                                  ^
+      32 |           return result && typeof result.then === "function"
+      33 |             ? result.catch(error => proven(error, name, isNot)) : result;
+      34 |         } catch (error) { return proven(error, name, isNot); }
+        at Proxy.toBePolled (/home/runner/work/perfect-web/perfect-web/spikes/own-renderer/assertion-expect.mjs:31:34)
+        at Object.toBe (/home/runner/work/perfect-web/perfect-web/spikes/own-renderer/assertion-expect.mjs:95:81)
+        at witness (/tmp/pw-browser-protocol-cv3sytku/fixture.spec.mjs:35:87)
+    [cause]: Error: PW_ASSERTION:8de43fc61b5701576731046ba9278e72ababedbb930b3a45a350c61ec0880d92
+        at proven (/home/runner/work/perfect-web/perfect-web/spikes/own-renderer/assertion-expect.mjs:13:19)
+        at /home/runner/work/perfect-web/perfect-web/spikes/own-renderer/assertion-expect.mjs:33:37
+        at witness (/tmp/pw-browser-protocol-cv3sytku/fixture.spec.mjs:35:31)
+
+
+[1A[2K  1 failed
+    ../../../../../../../tmp/pw-browser-protocol-cv3sytku/fixture.spec.mjs:61:8 › witness ──────────
+
+
+----------------------------------------------------------------------
+Ran 1 test in 1.658s
+
+FAILED (failures=1)
+
+an unfinished callback becomes an observed mismatch: KILLED by scripts.tests.test_browser_assertion_proof.BrowserAssertions.test_pending_poll_callback_is_not_a_mismatch (1 assertion methods fail)
+9 of 9 mutants killed
+memory bound: no process was stopped
