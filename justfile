@@ -2912,6 +2912,8 @@ e14-computed-conditions:
        cargo test --locked -p pw-dev-server -- a_condition_ 2>&1 | grep -E '^(test |test result)|panicked at'; \
        echo; echo "== the feed in three engines (e2e/feed.spec.mjs)"; echo; \
        bash scripts/run_suite.sh -- pnpm exec playwright test e2e/feed.spec.mjs --reporter=line; \
+       echo; echo "== native producer controls (scripts/computed_conditions_producer_mutations.py)"; echo; \
+       python3 scripts/computed_conditions_producer_mutations.py; \
        echo; echo "== mutation controls (scripts/computed_conditions_mutations.py)"; echo; \
        CARGO_INCREMENTAL=0 python3 scripts/computed_conditions_mutations.py; \
      } > docs/evidence/E14/computed-conditions.txt

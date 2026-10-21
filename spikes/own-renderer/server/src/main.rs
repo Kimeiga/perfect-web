@@ -16100,9 +16100,23 @@ public query Store(",
     #[test]
     fn what_a_page_computes_from_a_signal_is_rendered_at_its_first_value() {
         let home = |s: &Server| {
-            s.serve_document_settled("a", "feed.app.Home~ui", &Params::new(), &[])
-                .expect("served")
-                .0
+            let computed = s.with_computed_signals(
+                Env::new(),
+                s.plan_of("feed.app.Home~ui"),
+                s.template_of("feed.app.Home~ui"),
+            );
+            assert!(
+                computed.is_ok(),
+                "each live subject has a computed first value: {:?}",
+                computed.as_ref().err()
+            );
+            let result = s.serve_document_settled("a", "feed.app.Home~ui", &Params::new(), &[]);
+            assert!(
+                result.is_ok(),
+                "initial computed values render: {:?}",
+                result.as_ref().err()
+            );
+            result.unwrap().0
         };
         let s = served_feed();
         let html = home(&s);
@@ -16249,9 +16263,13 @@ public query Store(",
         });
         let thread = |id: &str| Params::from([("id".to_string(), id.to_string())]);
         let page = |id: &str| {
-            s.serve_document_settled("a", "feed.app.PostPage~ui", &thread(id), &[])
-                .expect("served")
-                .0
+            let result = s.serve_document_settled("a", "feed.app.PostPage~ui", &thread(id), &[]);
+            assert!(
+                result.is_ok(),
+                "initial computed subject renders: {:?}",
+                result.as_ref().err()
+            );
+            result.unwrap().0
         };
         assert!(page("p3").contains("<p id=\"quiet\">No replies yet.</p>"));
         let html = page("p1");
@@ -16279,9 +16297,23 @@ public query Store(",
     #[test]
     fn a_condition_the_browser_computes_is_rendered_at_its_first_value() {
         let home = |s: &Server| {
-            s.serve_document_settled("a", "feed.app.Home~ui", &Params::new(), &[])
-                .expect("served")
-                .0
+            let computed = s.with_computed_signals(
+                Env::new(),
+                s.plan_of("feed.app.Home~ui"),
+                s.template_of("feed.app.Home~ui"),
+            );
+            assert!(
+                computed.is_ok(),
+                "the browser-computed subject has a first value: {:?}",
+                computed.as_ref().err()
+            );
+            let result = s.serve_document_settled("a", "feed.app.Home~ui", &Params::new(), &[]);
+            assert!(
+                result.is_ok(),
+                "initial browser-computed subject renders: {:?}",
+                result.as_ref().err()
+            );
+            result.unwrap().0
         };
         assert!(!home(&served_feed()).contains("id=\"over\""));
         let s = served_feed_with(|app| {

@@ -64,6 +64,16 @@ fn build(files: &[(String, String)]) -> Result<pw_core::build::Build, String> {
     }
 }
 
+fn built(files: &[(String, String)]) -> pw_core::build::Build {
+    let result = build(files);
+    assert!(
+        result.is_ok(),
+        "supported computed signal: {:?}",
+        result.as_ref().err()
+    );
+    result.unwrap()
+}
+
 fn feed() -> Vec<(String, String)> {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let src = std::fs::read_to_string(root.join("examples/feed/app.pw")).expect("the feed");
@@ -117,7 +127,13 @@ fn standalone_and_prepared_signal_modules_are_byte_identical() {
         })
         .collect();
     let standalone = pw_core::backend::computed::compile(&units).expect("standalone backend");
-    let prepared = pw_core::program::build(&units).expect("complete executable program");
+    let prepared = pw_core::program::build(&units);
+    assert!(
+        prepared.is_ok(),
+        "complete executable program: {:?}",
+        prepared.as_ref().err()
+    );
+    let prepared = prepared.unwrap();
     let modules = |compiled: Vec<pw_core::backend::computed::Compiled>| {
         compiled
             .into_iter()
@@ -136,7 +152,7 @@ fn standalone_and_prepared_signal_modules_are_byte_identical() {
 fn a_value_computed_from_a_signal_is_the_browsers_and_its_first_the_hosts() {
     let files = feed();
     assert_eq!(reported(&files), Vec::<String>::new());
-    let b = build(&files).unwrap_or_else(|e| panic!("{e}"));
+    let b = built(&files);
     let plan = plan_of(&b, "feed.app.Home~ui");
     // What is left, and the post button: each a part the browser sets from
     // the draft, by the component that computes it.
@@ -311,10 +327,10 @@ fn what_the_browser_does_not_compute_yet_is_refused_by_name() {
     ] {
         let files = page(markup);
         assert_eq!(reported(&files), Vec::<String>::new(), "{markup}");
-        match build(&files) {
-            Ok(_) => panic!("{markup} built"),
-            Err(e) => assert!(e.contains(why), "{markup}: {e}"),
-        }
+        let result = build(&files);
+        assert!(result.is_err(), "{markup} built");
+        let e = result.err().unwrap();
+        assert!(e.contains(why), "{markup}: {e}");
     }
     // Control: at the top of the page, it builds; and inside a block a signal
     // decides, which the browser renders again, computing it first (track

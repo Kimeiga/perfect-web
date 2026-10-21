@@ -110,3 +110,50 @@ Milestone: E14.
   - one in a view that contains itself;
   - a subject from a speculated value.
 - **0071-a**, which this lets land: next.
+
+## Current boundary and assertion evidence (2026-10-21)
+
+ADR-0366 supersedes the original blanket refusal of browser-computed values
+inside blocks: a block the browser renders may compute from its held signals.
+A block a host renders still cannot hold such a value, since the browser does
+not render that frame again. The tests retain both the invalid host-frame case
+and valid nested values under literal-signal and computed-signal conditions.
+
+The historical train-12 run at `f15117de` killed 9 of 12 controls. Its three
+survivors removed code that no longer enforced the named fault after ADR-0366:
+
+- Removing the fallback insertion of subject signals changed no subscription:
+  `block_reads` already supplies them. The control now removes those subject
+  inputs from the final computed block's live subscriptions.
+- The old nested-signal refusal is bypassed by the supported nested browser
+  path. The control now bypasses the current refusal of a browser-computed value
+  inside a host-rendered frame, preserving supported nested browser values.
+- Removing `browser.contains(value)` left the canonical `signal(value)` test,
+  which already includes computed values. The control now excludes computed
+  subjects from conditional live reach while retaining literal signal subjects.
+
+All twelve semantic fault models remain; these three follow their current
+behavioral boundaries. No production behavior is changed to make a control fail.
+Build, plan-presence and initial-render expectations are explicit assertions;
+unrelated setup or runtime panics remain invalid producer results.
+The host tests assert the existing first-value computation's `Result` before
+full rendering, so omitting a conditional subject is an assertion failure
+without crediting the renderer's later panic or changing its implementation.
+
+The producer now runs the original four compiler targets separately plus the
+three selected host tests, completing all 23 named tests even when one target
+fails. It uses the shared native Cargo exit, inventory and assertion-source
+authority, and the browser's nonce-bound matcher receipt with a frozen complete
+inventory. A build error, timeout, skip, retry, hook error or incomplete inventory
+earns no mutation kill. Process ownership and source restoration use the shared
+helpers. The feed's public assertion wrapper and default test mode come from the
+speculated-arms proof repair; this track does not implement a second conversion.
+The recipe names the nine-control producer campaign explicitly before the
+twelve-control semantic campaign, so both result inventories have a declared
+owner in the evidence record.
+
+The original equivalent survivors, re-anchored assertion failures, valid
+neighbors and producer checks are retained as diagnostic evidence. The whole
+twelve-control campaign, including both runtime faults in all three engines,
+must pass on the final hosted candidate before its result replaces the failed
+historical record.

@@ -63,6 +63,21 @@ fn build(files: &[(String, String)]) -> Result<pw_core::build::Build, String> {
     }
 }
 
+fn built(files: &[(String, String)]) -> pw_core::build::Build {
+    let result = build(files);
+    assert!(
+        result.is_ok(),
+        "supported computed condition: {:?}",
+        result.as_ref().err()
+    );
+    result.unwrap()
+}
+
+fn present<T>(value: Option<T>, why: &str) -> T {
+    assert!(value.is_some(), "{why}");
+    value.unwrap()
+}
+
 fn feed(change: &dyn Fn(&str) -> String) -> Vec<(String, String)> {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let src = std::fs::read_to_string(root.join("examples/feed/app.pw")).expect("the feed");
@@ -92,28 +107,27 @@ fn page(markup: &str) -> Vec<(String, String)> {
 }
 
 fn plan_of<'b>(b: &'b pw_core::build::Build, page: &str) -> &'b pw_core::page_values::PageValues {
-    b.pages
-        .iter()
-        .find(|p| p.page == page)
-        .unwrap_or_else(|| panic!("no page {page}"))
-        .plan
-        .as_ref()
-        .unwrap_or_else(|e| panic!("{page}: {e}"))
+    let found = b.pages.iter().find(|p| p.page == page);
+    let result = &present(found, page).plan;
+    assert!(result.is_ok(), "{page}: {:?}", result.as_ref().err());
+    result.as_ref().unwrap()
 }
 
 #[test]
 fn a_computed_condition_is_a_hosts_from_a_query_and_the_browsers_from_a_signal() {
     let files = feed(&|s| s.to_string());
     assert_eq!(reported(&files), Vec::<String>::new());
-    let b = build(&files).unwrap_or_else(|e| panic!("{e}"));
+    let b = built(&files);
     // The thread page's: a block a host renders, and again, its subject
     // computed into what it is rendered with.
     let thread = plan_of(&b, "feed.app.PostPage~ui");
-    let subject = thread
-        .derived
-        .iter()
-        .find(|d| d.path.starts_with("#feed.app.PostPage~ui~"))
-        .expect("the condition, the host's");
+    let subject = present(
+        thread
+            .derived
+            .iter()
+            .find(|d| d.path.starts_with("#feed.app.PostPage~ui~")),
+        "the condition, the host's",
+    );
     assert!(thread.blocks.contains(&subject.part), "{:?}", thread.blocks);
     assert_eq!(subject.binding, "thread");
     assert!(
@@ -124,11 +138,12 @@ fn a_computed_condition_is_a_hosts_from_a_query_and_the_browsers_from_a_signal()
     // The home page's: a block the browser renders again as the draft
     // changes, by its component, and the module's function.
     let home = plan_of(&b, "feed.app.Home~ui");
-    let block = home
-        .live
-        .iter()
-        .find(|l| l.kind == "conditional" && !l.derived.is_empty())
-        .expect("the condition, the browser's");
+    let block = present(
+        home.live
+            .iter()
+            .find(|l| l.kind == "conditional" && !l.derived.is_empty()),
+        "the condition, the browser's",
+    );
     assert_eq!(
         (block.signal.as_str(), block.path.as_str()),
         ("draft", "draft")
@@ -138,12 +153,13 @@ fn a_computed_condition_is_a_hosts_from_a_query_and_the_browsers_from_a_signal()
         "{:?}",
         block.reads
     );
-    let module = b
-        .computed
-        .iter()
-        .find(|c| c.page == "feed.app.Home~ui")
-        .and_then(|c| c.module.as_ref().ok())
-        .expect("the home page's module");
+    let module = present(
+        b.computed
+            .iter()
+            .find(|c| c.page == "feed.app.Home~ui")
+            .and_then(|c| c.module.as_ref().ok()),
+        "the home page's module",
+    );
     assert!(
         module.contains(&format!("  \"{}\": (j) =>", block.part)),
         "{module}"
@@ -158,7 +174,7 @@ fn an_else_if_a_match_and_a_value_in_a_hosts_block_are_computed_too() {
          {#if post.pinned}<p>{shown(post.likes > 1)}</p>{/if}",
     );
     assert_eq!(reported(&files), Vec::<String>::new());
-    let b = build(&files).unwrap_or_else(|e| panic!("{e}"));
+    let b = built(&files);
     let plan = plan_of(&b, "t.P~ui");
     // The `{:else if}`'s, the `{#match}`'s and the value in the third block:
     // each the host's, in what the page is rendered with.
@@ -212,10 +228,10 @@ fn what_a_condition_does_not_compute_yet_is_refused_by_name() {
         ),
     ] {
         assert_eq!(reported(&files), Vec::<String>::new(), "{why}");
-        match build(&files) {
-            Ok(_) => panic!("built: {why}"),
-            Err(e) => assert!(e.contains(why), "{e}"),
-        }
+        let result = build(&files);
+        assert!(result.is_err(), "built: {why}");
+        let e = result.err().unwrap();
+        assert!(e.contains(why), "{e}");
     }
     // Controls: a block the browser decides by a computed subject, holding
     // no view's signals; and one a query decides, holding a value the host
@@ -223,7 +239,11 @@ fn what_a_condition_does_not_compute_yet_is_refused_by_name() {
     for markup in [
         "{#if count > 2}<p>many</p>{:else}<p>few</p>{/if}",
         "{#if post.likes > 1}<p>{shown(post.pinned)}</p>{/if}",
+        // ADR-0366: a browser-rendered block may compute from held signals,
+        // whether its subject is a signal or a computed condition.
+        "{#if open}<p>{shown(open)}</p>{/if}",
+        "{#if count > 2}<p>{shown(open)}</p>{/if}",
     ] {
-        build(&page(markup)).unwrap_or_else(|e| panic!("{markup}: {e}"));
+        built(&page(markup));
     }
 }
