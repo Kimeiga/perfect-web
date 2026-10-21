@@ -222,8 +222,7 @@ and merge to master; its numbered ADR records the decision and remaining limits.
 *Standard, used narrowly here.* Not a policy statement but a checked property: a value's [label](#label) never reaches a place less private than itself (cache, page, log, browser, event). A query says whose data it shows: `public`, `session` or `user`. [SEMANTICS §8], [guide: privacy labels].
 
 ### producer ownership
-
-A verification runner keeps responsibility for the test process it starts until completion or cancellation cleanup. Launching, stopping and reaping the owned process group happens before restored source can be read by another run. The native lifecycle tests and its limits are in [ADR-0376].
+*Project term.* A verification runner keeps responsibility for the test process it starts until completion or cancellation cleanup. On cancellation it stops the owned process group and reaps its leader before the caller restores source. The native lifecycle tests and the cooperative nesting limits are in [ADR-0376].
 
 ### PW codes
 *Project term.* Diagnostic codes `PWnnnn`, each registered once in `codes.rs` with its invariant and owner. `PW00xx` is syntax, `PW01xx` and up semantic invariants, `PW50xx` placement, capability and unsafe boundaries. A parallel track's codes live only in its own block, held by a test: `PW55` identity, `PW56` uploads, `PW57` notifications, `PW58` messages, `PW59` store on PostgreSQL, `PW60` kiokun, `PW62` store accounts, `PW63` store search, `PW64` payments, `PW65` schedules. The header of `codes.rs` lists only some. [codes.rs], [guide: diagnostics].
