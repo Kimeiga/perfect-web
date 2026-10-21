@@ -1,8 +1,8 @@
 ADR-0356 - the browser host map: a run starts only the hosts its selected tests need
 
 produced by: just e14-browser-host-map
-commit: 320c52a44840a80423609ab476eb847c04de34a6
-ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39442025240 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 52e773c7e2b6a064e7debeed9a01fce49119a363
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39543811122 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 node: v22.21.1
 playwright: Version 1.58.0
 
@@ -29,8 +29,12 @@ ok 18 - native collection framing preserves every opaque argument before and aft
 ok 19 - collection receipts require exact issuer selection config completion and role identities
 ok 20 - public collection reporter publishes only one successful complete callback sequence
 ok 21 - spec metadata imports cannot recurse through the Playwright config
-# tests 21
-# pass 21
+ok 22 - a host's command passes each word to its host as it is
+ok 23 - a host's launcher keeps its host while its input is open and ends it when the input ends
+ok 24 - a host's launcher ends with its host's status, whatever its input
+ok 25 - a host's owner killed outright leaves its host listening nowhere
+# tests 25
+# pass 25
 # fail 0
 
 == the plan against the real Playwright CLI, on private fixtures (host-plan.native.test.mjs)
@@ -51,8 +55,9 @@ ok 13 - native pinned IPC disconnect invokes its controlled runner close then re
 ok 14 - native selected host startup and body failures complete upstream teardown
 ok 15 - native mutable engine isolation and Chromium performance select only their declared listeners
 ok 16 - the suite's own configuration lists a selection through its plan, and starts no host
-# tests 16
-# pass 16
+ok 17 - native a runner killed outright leaves none of its hosts listening
+# tests 17
+# pass 17
 # fail 0
 
 == a spec on the shared host, one on a mutating suite's, one on the feed's, in three engines
@@ -61,55 +66,61 @@ ok 16 - the suite's own configuration lists a selection through its plan, and st
 
 == mutation controls (scripts/browser_host_map_mutations.py)
 
-baseline fast: 21 passed, 0 failed
-baseline native: 16 passed, 0 failed
-the stride export is the old 200 again [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
-a slot's ports are 200 apart again [fast]: KILLED (by an assertion of its test; 2 of 21 tests fail)
-the last slot is out of the TCP bound [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
-a fractional or infinite port passes [fast]: KILLED (by an assertion of its test; 2 of 21 tests fail)
-an offset may leave its slot [fast]: KILLED (by an assertion of its test; 2 of 21 tests fail)
-two hosts may share an offset [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
-a provider need not be a dependency [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
-a test's hosts leave out their providers [fast]: KILLED (by an assertion of its test; 2 of 21 tests fail)
-a spec of one host may annotate another [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
-an annotated test may name no host or two [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
-a test may name a reserved host [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
-the feed's spec is registered on base, not the feed's host [fast]: KILLED (by an assertion of its test; 3 of 21 tests fail)
-the signals spec is registered with a host it does not reach [fast]: KILLED (by an assertion of its test; 8 of 21 tests fail)
-a describe's override is read as the file's [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
-a spec on the default host reaches nothing [fast]: KILLED (by an assertion of its test; 2 of 21 tests fail)
-a mutating suite's host is read as base [fast]: KILLED (by an assertion of its test; 2 of 21 tests fail)
-a loopback port written as a number passes [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
-a baseURL's host is any engine's [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
-a build with no sources.json is served [fast]: KILLED (by an assertion of its test; 3 of 21 tests fail)
-a build of another runtime is served [fast]: KILLED (by an assertion of its test; 3 of 21 tests fail)
-a recorded source may be gone [fast]: KILLED (by an assertion of its test; 2 of 21 tests fail)
-a changed source passes [fast]: KILLED (by an assertion of its test; 2 of 21 tests fail)
-keyed's exemption covers the repository [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
-an optional build's specs run though it cannot be served [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
-a spec left out is left out silently [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
-a stale optional build says nothing of why [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
-dist's specs are left out quietly too [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
-the collection's --list goes after the separator [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
-a partial receipt is taken as complete [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
-a stale receipt is taken [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
-another child's receipt is taken [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
-another configuration's receipt is taken [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
-a receipt need not prove forbidOnly [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
-a test may be planned twice [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
-a receipt's roles may differ from the registry's [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
-a selected role's host is declared in every engine [fast]: KILLED (by an assertion of its test; 3 of 21 tests fail)
-an unservable dist starts its hosts [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
-an optional host starts though its build cannot be served [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
-a test that skips nothing loses its host quietly [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
-a host reads the caller's database [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
-a host reads a deployment's kiokun data [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
-a signed-in host signs no one in [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
-the uploads' hosts share one blob storage [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
-a host's provider listens on the host's own port [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
-the performance run admits other hosts [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
-an independent run reuses an inherited receipt [native]: KILLED (by an assertion of its test; 1 of 16 tests fail)
-the reporter publishes before Playwright's end [fast]: KILLED (by an assertion of its test; 1 of 21 tests fail)
-the configuration allows a focused test [native]: KILLED (by an assertion of its test; 1 of 16 tests fail)
-48 of 48 mutants killed
+baseline fast: 25 passed, 0 failed
+baseline native: 17 passed, 0 failed
+the stride export is the old 200 again [fast]: KILLED (by an assertion of its test; 1 of 25 tests fail)
+a slot's ports are 200 apart again [fast]: KILLED (by an assertion of its test; 2 of 25 tests fail)
+the last slot is out of the TCP bound [fast]: KILLED (by an assertion of its test; 1 of 25 tests fail)
+a fractional or infinite port passes [fast]: KILLED (by an assertion of its test; 2 of 25 tests fail)
+an offset may leave its slot [fast]: KILLED (by an assertion of its test; 2 of 25 tests fail)
+two hosts may share an offset [fast]: KILLED (by an assertion of its test; 1 of 25 tests fail)
+a provider need not be a dependency [fast]: KILLED (by an assertion of its test; 1 of 25 tests fail)
+a test's hosts leave out their providers [fast]: KILLED (by an assertion of its test; 2 of 25 tests fail)
+a spec of one host may annotate another [fast]: KILLED (by an assertion of its test; 1 of 25 tests fail)
+an annotated test may name no host or two [fast]: KILLED (by an assertion of its test; 1 of 25 tests fail)
+a test may name a reserved host [fast]: KILLED (by an assertion of its test; 1 of 25 tests fail)
+the feed's spec is registered on base, not the feed's host [fast]: KILLED (by an assertion of its test; 3 of 25 tests fail)
+the signals spec is registered with a host it does not reach [fast]: KILLED (by an assertion of its test; 8 of 25 tests fail)
+a describe's override is read as the file's [fast]: KILLED (by an assertion of its test; 1 of 25 tests fail)
+a spec on the default host reaches nothing [fast]: KILLED (by an assertion of its test; 2 of 25 tests fail)
+a mutating suite's host is read as base [fast]: KILLED (by an assertion of its test; 2 of 25 tests fail)
+a loopback port written as a number passes [fast]: KILLED (by an assertion of its test; 1 of 25 tests fail)
+a baseURL's host is any engine's [fast]: KILLED (by an assertion of its test; 1 of 25 tests fail)
+a build with no sources.json is served [fast]: KILLED (by an assertion of its test; 3 of 25 tests fail)
+a build of another runtime is served [fast]: KILLED (by an assertion of its test; 3 of 25 tests fail)
+a recorded source may be gone [fast]: KILLED (by an assertion of its test; 2 of 25 tests fail)
+a changed source passes [fast]: KILLED (by an assertion of its test; 2 of 25 tests fail)
+keyed's exemption covers the repository [fast]: KILLED (by an assertion of its test; 1 of 25 tests fail)
+an optional build's specs run though it cannot be served [fast]: KILLED (by an assertion of its test; 1 of 25 tests fail)
+a spec left out is left out silently [fast]: KILLED (by an assertion of its test; 1 of 25 tests fail)
+a stale optional build says nothing of why [fast]: KILLED (by an assertion of its test; 1 of 25 tests fail)
+dist's specs are left out quietly too [fast]: KILLED (by an assertion of its test; 1 of 25 tests fail)
+the collection's --list goes after the separator [fast]: KILLED (by an assertion of its test; 1 of 25 tests fail)
+a partial receipt is taken as complete [fast]: KILLED (by an assertion of its test; 1 of 25 tests fail)
+a stale receipt is taken [fast]: KILLED (by an assertion of its test; 1 of 25 tests fail)
+another child's receipt is taken [fast]: KILLED (by an assertion of its test; 1 of 25 tests fail)
+another configuration's receipt is taken [fast]: KILLED (by an assertion of its test; 1 of 25 tests fail)
+a receipt need not prove forbidOnly [fast]: KILLED (by an assertion of its test; 1 of 25 tests fail)
+a test may be planned twice [fast]: KILLED (by an assertion of its test; 1 of 25 tests fail)
+a receipt's roles may differ from the registry's [fast]: KILLED (by an assertion of its test; 1 of 25 tests fail)
+a selected role's host is declared in every engine [fast]: KILLED (by an assertion of its test; 3 of 25 tests fail)
+an unservable dist starts its hosts [fast]: KILLED (by an assertion of its test; 1 of 25 tests fail)
+an optional host starts though its build cannot be served [fast]: KILLED (by an assertion of its test; 1 of 25 tests fail)
+a test that skips nothing loses its host quietly [fast]: KILLED (by an assertion of its test; 1 of 25 tests fail)
+a host reads the caller's database [fast]: KILLED (by an assertion of its test; 1 of 25 tests fail)
+a host reads a deployment's kiokun data [fast]: KILLED (by an assertion of its test; 1 of 25 tests fail)
+a signed-in host signs no one in [fast]: KILLED (by an assertion of its test; 1 of 25 tests fail)
+the uploads' hosts share one blob storage [fast]: KILLED (by an assertion of its test; 1 of 25 tests fail)
+a host's provider listens on the host's own port [fast]: KILLED (by an assertion of its test; 1 of 25 tests fail)
+the performance run admits other hosts [fast]: KILLED (by an assertion of its test; 1 of 25 tests fail)
+an independent run reuses an inherited receipt [native]: KILLED (by an assertion of its test; 1 of 17 tests fail)
+the reporter publishes before Playwright's end [fast]: KILLED (by an assertion of its test; 1 of 25 tests fail)
+the configuration allows a focused test [native]: KILLED (by an assertion of its test; 1 of 17 tests fail)
+a selection starts a host by its command alone, not by the launcher [fast]: KILLED (by an assertion of its test; 1 of 25 tests fail)
+a host's command is not run by the launcher, as before the track [native]: KILLED (by an assertion of its test; 1 of 17 tests fail)
+a word of a host's command is not quoted [fast]: KILLED (by an assertion of its test; 5 of 25 tests fail)
+the launcher does not end its host when its input ends [fast]: KILLED (by an assertion of its test; 2 of 25 tests fail)
+the launcher ends its host as it starts [fast]: KILLED (by an assertion of its test; 4 of 25 tests fail)
+the launcher answers with another status than its host's [fast]: KILLED (by an assertion of its test; 1 of 25 tests fail)
+54 of 54 mutants killed
 memory bound: no process was stopped
