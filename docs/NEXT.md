@@ -21,7 +21,20 @@ Exact combined CI is still required. Chromium job119020991409 failed during
 release API returned HTTP502, before tests ran. Its first exact-job rerun was
 refused while the workflow remained active. Retry when permitted, or record a
 current successful full-browser follow-up; never count that setup failure as
-browser evidence. Other jobs continue.
+browser evidence. Other jobs continue. The same run's `e14-guide-ownership`
+recipe failed its 15-test baseline before any controls: the timeout fixture's
+child/grandchild readiness file was absent when its 0.3-second deadline elapsed.
+A bounded readiness handshake must precede that timeout while preserving native
+process cancellation and descendant cleanup; the whole campaign remains due.
+
+The graph repair now retains all19 operators and25 native identities with strict
+completed-assertion validation. Targeted renderer faults and the mutual-type
+refusal produce complete assertions instead of a memory stop or native abort.
+Its full campaign and `e14-cart-lines` are required on the repaired source.
+The producer-ownership campaign's native9-control record is valid, but its
+bare witness names confused evidence-count ownership. Qualified metadata and
+an exact-output regression repair that reporting contract without changing
+any operator or parser; its hosted campaign also must be rerecorded.
 
 1. Audit all 239 native recipe results from
    [verify 39526960864](https://github.com/studiokimeiga/perfect-web/actions/runs/39526960864)

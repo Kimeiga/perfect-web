@@ -3,7 +3,7 @@
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
 Reviewed 2026-10-21 against assembled train-12 source
-`2f6dd58b` (with combined hosted verification still pending).
+`ce7c1135` (with combined hosted verification still pending).
 [The complete prior ledger](STATUS-HISTORY-2026-10.md) remains verbatim,
 including failed runs, corrections and their original scope.
 
@@ -108,7 +108,9 @@ evidence. No failed result is promoted by this summary.
   evidence records a memory guard stopping the renderer mutation above 3.9 GiB.
   That campaign is invalid. The canonical summary/fetch guard reads the evidence
   files and rejects it; an earlier status/log-only audit missed that stop.
-  Its witness and complete rerun are now a separate follow-up.
+  Its repaired witnesses retain all19 operators and25 native identities;
+  targeted renderer and mutual-type faults now give completed native assertion
+  failures. The whole campaign and its reached cart-line consumer remain due.
 - The assembled repair gate at `1549c4bb` completed 1,015 tests in 240.385s
   with five explicit skips, and formatting, path-case and all 4,374 mutation
   anchors passed. The guard still rejects failed historical records as accepted
@@ -131,7 +133,19 @@ evidence. No failed result is promoted by this summary.
   still required. The graph campaign is a separate required repair. Chromium's
   setup job hit a GitHub release API HTTP502 before running tests; it must be
   rerun when permitted or replaced by current full-browser proof. This is one
-  recorded setup failure, not an application-test result.
+  recorded setup failure, not an application-test result. Firefox and WebKit
+  full suites passed. The same run's `e14-guide-ownership` recipe failed its
+  15-test baseline before controls: a short native timeout elapsed before
+  child/grandchild fixture readiness. A bounded readiness handshake repair and
+  the complete campaign are required; no ownership control is credited.
+- Canonical fetch of the completed239-recipe run imported82 eligible files
+  after skipping155 changed recipes and excluding all11 invalid outcomes.
+  A post-fetch count gate exposed ambiguous bare witness metadata in
+  `e14-producer-ownership`; its9 native control outcomes remain valid.
+  Qualified metadata and an exact-output regression fix the ownership labels
+  without changing the evidence parser. The gate now has26 stale/planned
+  disagreements and zero unexplained failures; the changed campaign still
+  requires current hosted evidence.
 - Exact-source [CI39527396553](https://github.com/studiokimeiga/perfect-web/actions/runs/39527396553)
   at `152a4a41` passed x64, ARM and license/advisory checks. Subsequent
   repairs still require their own exact-source CI; this pass does not
