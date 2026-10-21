@@ -1,0 +1,47 @@
+test_poll_preserves_object_is_and_completed_mismatches (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... FAIL
+
+======================================================================
+FAIL: test_poll_preserves_object_is_and_completed_mismatches (scripts.tests.test_browser_assertion_proof.BrowserAssertions)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/tests/test_browser_assertion_proof.py", line 39, in test_poll_preserves_object_is_and_completed_mismatches
+    self.case(mode, True, failed)
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/tests/test_browser_assertion_proof.py", line 18, in case
+    self.assertEqual(code, 0 if mode in ('green', 'pollGreen', 'pollNaN') else 1, output)
+AssertionError: 1 != 0 : 
+Running 1 test using 1 worker
+
+[1A[2K[1/1] ../../../../../../../tmp/pw-browser-protocol-x9sqqxv5/fixture.spec.mjs:61:8 › witness
+[1A[2K  1) ../../../../../../../tmp/pw-browser-protocol-x9sqqxv5/fixture.spec.mjs:61:8 › witness ─────────
+
+    Error: Expected: [32mNaN[39m
+    Received: [31mNaN[39m
+
+       at ../../home/haki/code/pw-wt/final-evidence-metadata/spikes/own-renderer/assertion-expect.mjs:31
+
+      29 |       return (...args) => {
+      30 |         try {
+    > 31 |           const result = Reflect.apply(matcher, object, args);
+         |                                  ^
+      32 |           return result && typeof result.then === "function"
+      33 |             ? result.catch(error => proven(error, name, isNot)) : result;
+      34 |         } catch (error) { return proven(error, name, isNot); }
+        at Proxy.toBePolled (/home/haki/code/pw-wt/final-evidence-metadata/spikes/own-renderer/assertion-expect.mjs:31:34)
+        at Object.toBe (/home/haki/code/pw-wt/final-evidence-metadata/spikes/own-renderer/assertion-expect.mjs:96:81)
+        at witness (/tmp/pw-browser-protocol-x9sqqxv5/fixture.spec.mjs:15:65)
+    [cause]: Error: PW_ASSERTION:b503638512b4e1e6922fe0f4fb867cf2686859fcd757af5d2384477093dda650
+        at proven (/home/haki/code/pw-wt/final-evidence-metadata/spikes/own-renderer/assertion-expect.mjs:13:19)
+        at /home/haki/code/pw-wt/final-evidence-metadata/spikes/own-renderer/assertion-expect.mjs:33:37
+        at witness (/tmp/pw-browser-protocol-x9sqqxv5/fixture.spec.mjs:15:27)
+
+
+[1A[2K  1 failed
+    ../../../../../../../tmp/pw-browser-protocol-x9sqqxv5/fixture.spec.mjs:61:8 › witness ──────────
+
+
+----------------------------------------------------------------------
+Ran 1 test in 5.398s
+
+FAILED (failures=1)

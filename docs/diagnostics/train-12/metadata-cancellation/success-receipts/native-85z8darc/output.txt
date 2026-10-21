@@ -1,0 +1,45 @@
+test_native_cause_is_preserved_under_proof (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... FAIL
+
+======================================================================
+FAIL: test_native_cause_is_preserved_under_proof (scripts.tests.test_browser_assertion_proof.BrowserAssertions)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/tests/test_browser_assertion_proof.py", line 52, in test_native_cause_is_preserved_under_proof
+    self.case('cause', True, 1)
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/tests/test_browser_assertion_proof.py", line 19, in case
+    self.assertEqual((result.valid, result.failed), (valid, failed), output)
+AssertionError: Tuples differ: (False, 0) != (True, 1)
+
+First differing element 0:
+False
+True
+
+- (False, 0)
++ (True, 1) : 
+Running 1 test using 1 worker
+
+[1A[2K[1/1] ../../../../../../../tmp/pw-browser-protocol-t2gfmge_/fixture.spec.mjs:61:8 › witness
+[1A[2K  1) ../../../../../../../tmp/pw-browser-protocol-t2gfmge_/fixture.spec.mjs:61:8 › witness ─────────
+
+    Error: native cause was lost
+
+      41 |     try { expect(1).toBe(2); }
+      42 |     catch (error) {
+    > 43 |       if (error.cause?.cause !== original) throw new Error('native cause was lost');
+         |                                                  ^
+      44 |       throw error;
+      45 |     } finally { delete Error.prototype.cause; }
+      46 |   }
+        at witness (/tmp/pw-browser-protocol-t2gfmge_/fixture.spec.mjs:43:50)
+
+
+[1A[2K  1 failed
+    ../../../../../../../tmp/pw-browser-protocol-t2gfmge_/fixture.spec.mjs:61:8 › witness ──────────
+
+
+----------------------------------------------------------------------
+Ran 1 test in 1.194s
+
+FAILED (failures=1)

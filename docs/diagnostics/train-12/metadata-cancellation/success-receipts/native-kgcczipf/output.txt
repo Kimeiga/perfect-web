@@ -1,0 +1,50 @@
+test_native_comparisons_messages_and_negation_produce_proof (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... FAIL
+
+======================================================================
+FAIL: test_native_comparisons_messages_and_negation_produce_proof (scripts.tests.test_browser_assertion_proof.BrowserAssertions)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/tests/test_browser_assertion_proof.py", line 23, in test_native_comparisons_messages_and_negation_produce_proof
+    self.case(mode, True, 1)
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/tests/test_browser_assertion_proof.py", line 19, in case
+    self.assertEqual((result.valid, result.failed), (valid, failed), output)
+AssertionError: Tuples differ: (False, 0) != (True, 1)
+
+First differing element 0:
+False
+True
+
+- (False, 0)
++ (True, 1) : 
+Running 1 test using 1 worker
+
+[1A[2K[1/1] ../../../../../../../tmp/pw-browser-protocol-usuq9jsb/fixture.spec.mjs:61:8 › witness
+[1A[2K  1) ../../../../../../../tmp/pw-browser-protocol-usuq9jsb/fixture.spec.mjs:61:8 › witness ─────────
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mnot[2m.[22mtoBe[2m([22m[32mexpected[39m[2m) // Object.is equality[22m
+
+    Expected: not [32m1[39m
+
+       at ../../home/haki/code/pw-wt/final-evidence-metadata/spikes/own-renderer/assertion-expect.mjs:31
+
+      29 |       return (...args) => {
+      30 |         try {
+    > 31 |           const result = Reflect.apply(matcher, object, args);
+         |                                  ^
+      32 |           return result && typeof result.then === "function"
+      33 |             ? result.catch(error => proven(error, name, isNot)) : result;
+      34 |         } catch (error) { return proven(error, name, isNot); }
+        at Proxy.toBe (/home/haki/code/pw-wt/final-evidence-metadata/spikes/own-renderer/assertion-expect.mjs:31:34)
+        at witness (/tmp/pw-browser-protocol-usuq9jsb/fixture.spec.mjs:12:37)
+
+
+[1A[2K  1 failed
+    ../../../../../../../tmp/pw-browser-protocol-usuq9jsb/fixture.spec.mjs:61:8 › witness ──────────
+
+
+----------------------------------------------------------------------
+Ran 1 test in 3.711s
+
+FAILED (failures=1)

@@ -1,0 +1,16 @@
+test_missing_native_proof_is_refused (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... FAIL
+
+======================================================================
+FAIL: test_missing_native_proof_is_refused (scripts.tests.test_browser_assertion_proof.BrowserAssertions)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/tests/test_browser_assertion_proof.py", line 64, in test_missing_native_proof_is_refused
+    self.assertIsNone(self.fixture('unproven'))
+AssertionError: {'schema': 1, 'complete': True, 'nonce': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'tests': [['one', 'failed']], 'inventory': ['one']} is not None
+
+----------------------------------------------------------------------
+Ran 1 test in 0.016s
+
+FAILED (failures=1)

@@ -1,0 +1,54 @@
+test_pending_poll_callback_is_not_a_mismatch (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... FAIL
+
+======================================================================
+FAIL: test_pending_poll_callback_is_not_a_mismatch (scripts.tests.test_browser_assertion_proof.BrowserAssertions)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/tests/test_browser_assertion_proof.py", line 49, in test_pending_poll_callback_is_not_a_mismatch
+    self.case('pollPending', False)
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/tests/test_browser_assertion_proof.py", line 19, in case
+    self.assertEqual((result.valid, result.failed), (valid, failed), output)
+AssertionError: Tuples differ: (True, 1) != (False, 0)
+
+First differing element 0:
+True
+False
+
+- (True, 1)
++ (False, 0) : 
+Running 1 test using 1 worker
+
+[1A[2K[1/1] ../../../../../../../tmp/pw-browser-protocol-clhd4dde/fixture.spec.mjs:61:8 › witness
+[1A[2K  1) ../../../../../../../tmp/pw-browser-protocol-clhd4dde/fixture.spec.mjs:61:8 › witness ─────────
+
+    Error: Expected: [32m1[39m
+    Received: [31mundefined[39m
+
+       at ../../home/haki/code/pw-wt/final-evidence-metadata/spikes/own-renderer/assertion-expect.mjs:31
+
+      29 |       return (...args) => {
+      30 |         try {
+    > 31 |           const result = Reflect.apply(matcher, object, args);
+         |                                  ^
+      32 |           return result && typeof result.then === "function"
+      33 |             ? result.catch(error => proven(error, name, isNot)) : result;
+      34 |         } catch (error) { return proven(error, name, isNot); }
+        at Proxy.toBePolled (/home/haki/code/pw-wt/final-evidence-metadata/spikes/own-renderer/assertion-expect.mjs:31:34)
+        at Object.toBe (/home/haki/code/pw-wt/final-evidence-metadata/spikes/own-renderer/assertion-expect.mjs:95:81)
+        at witness (/tmp/pw-browser-protocol-clhd4dde/fixture.spec.mjs:35:87)
+    [cause]: Error: PW_ASSERTION:6d13b23999097eb15428e406c5fe6da7f7713b2152da00e5bc1b95a056e7910e
+        at proven (/home/haki/code/pw-wt/final-evidence-metadata/spikes/own-renderer/assertion-expect.mjs:13:19)
+        at /home/haki/code/pw-wt/final-evidence-metadata/spikes/own-renderer/assertion-expect.mjs:33:37
+        at witness (/tmp/pw-browser-protocol-clhd4dde/fixture.spec.mjs:35:31)
+
+
+[1A[2K  1 failed
+    ../../../../../../../tmp/pw-browser-protocol-clhd4dde/fixture.spec.mjs:61:8 › witness ──────────
+
+
+----------------------------------------------------------------------
+Ran 1 test in 1.312s
+
+FAILED (failures=1)

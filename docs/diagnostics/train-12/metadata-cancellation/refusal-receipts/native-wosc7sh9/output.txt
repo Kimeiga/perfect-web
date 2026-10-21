@@ -1,0 +1,358 @@
+test_closed_browser_is_not_a_comparison (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... ERROR
+test_final_poll_interval_never_restarts_an_early_callback (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... ERROR
+test_invalid_matcher_api_is_not_a_comparison (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... ERROR
+test_missing_native_proof_is_refused (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... ok
+test_native_cause_is_preserved_under_proof (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... ERROR
+test_native_comparisons_messages_and_negation_produce_proof (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... ERROR
+test_native_locator_mismatch_produces_proof (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... ERROR
+test_pending_poll_callback_is_not_a_mismatch (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... ERROR
+test_poll_callback_errors_are_not_assertion_results (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... ERROR
+test_poll_preserves_object_is_and_completed_mismatches (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... ERROR
+test_stale_native_proof_is_refused (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... ok
+
+======================================================================
+ERROR: test_closed_browser_is_not_a_comparison (scripts.tests.test_browser_assertion_proof.BrowserAssertions)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/tests/test_browser_assertion_proof.py", line 31, in test_closed_browser_is_not_a_comparison
+    self.case('closed', False)
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/tests/test_browser_assertion_proof.py", line 17, in case
+    code, result, output = protocol.run_case(mode)
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/device_browser_protocol.py", line 34, in run_case
+    raise RuntimeError(resolved.stdout)
+RuntimeError: node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module '@playwright/test/package.json'
+Require stack:
+- /home/haki/code/pw-wt/final-evidence-metadata/spikes/own-renderer/[eval]
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at Function.resolve (node:internal/modules/helpers:157:19)
+    at [eval]:1:9
+    at runScriptInThisContext (node:internal/vm:209:10)
+    at node:internal/process/execution:446:12
+    at [eval]-wrapper:6:24
+    at runScriptInContext (node:internal/process/execution:444:60)
+    at evalFunction (node:internal/process/execution:279:30)
+    at evalTypeScript (node:internal/process/execution:291:3)
+    at node:internal/main/eval_string:74:3 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/haki/code/pw-wt/final-evidence-metadata/spikes/own-renderer/[eval]'
+  ]
+}
+
+Node.js v22.21.1
+
+
+======================================================================
+ERROR: test_final_poll_interval_never_restarts_an_early_callback (scripts.tests.test_browser_assertion_proof.BrowserAssertions)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/tests/test_browser_assertion_proof.py", line 42, in test_final_poll_interval_never_restarts_an_early_callback
+    self.case('pollEarlyTimer', True, 1)
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/tests/test_browser_assertion_proof.py", line 17, in case
+    code, result, output = protocol.run_case(mode)
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/device_browser_protocol.py", line 34, in run_case
+    raise RuntimeError(resolved.stdout)
+RuntimeError: node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module '@playwright/test/package.json'
+Require stack:
+- /home/haki/code/pw-wt/final-evidence-metadata/spikes/own-renderer/[eval]
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at Function.resolve (node:internal/modules/helpers:157:19)
+    at [eval]:1:9
+    at runScriptInThisContext (node:internal/vm:209:10)
+    at node:internal/process/execution:446:12
+    at [eval]-wrapper:6:24
+    at runScriptInContext (node:internal/process/execution:444:60)
+    at evalFunction (node:internal/process/execution:279:30)
+    at evalTypeScript (node:internal/process/execution:291:3)
+    at node:internal/main/eval_string:74:3 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/haki/code/pw-wt/final-evidence-metadata/spikes/own-renderer/[eval]'
+  ]
+}
+
+Node.js v22.21.1
+
+
+======================================================================
+ERROR: test_invalid_matcher_api_is_not_a_comparison (scripts.tests.test_browser_assertion_proof.BrowserAssertions)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/tests/test_browser_assertion_proof.py", line 35, in test_invalid_matcher_api_is_not_a_comparison
+    self.case('invalidMatcher', False)
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/tests/test_browser_assertion_proof.py", line 17, in case
+    code, result, output = protocol.run_case(mode)
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/device_browser_protocol.py", line 34, in run_case
+    raise RuntimeError(resolved.stdout)
+RuntimeError: node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module '@playwright/test/package.json'
+Require stack:
+- /home/haki/code/pw-wt/final-evidence-metadata/spikes/own-renderer/[eval]
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at Function.resolve (node:internal/modules/helpers:157:19)
+    at [eval]:1:9
+    at runScriptInThisContext (node:internal/vm:209:10)
+    at node:internal/process/execution:446:12
+    at [eval]-wrapper:6:24
+    at runScriptInContext (node:internal/process/execution:444:60)
+    at evalFunction (node:internal/process/execution:279:30)
+    at evalTypeScript (node:internal/process/execution:291:3)
+    at node:internal/main/eval_string:74:3 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/haki/code/pw-wt/final-evidence-metadata/spikes/own-renderer/[eval]'
+  ]
+}
+
+Node.js v22.21.1
+
+
+======================================================================
+ERROR: test_native_cause_is_preserved_under_proof (scripts.tests.test_browser_assertion_proof.BrowserAssertions)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/tests/test_browser_assertion_proof.py", line 52, in test_native_cause_is_preserved_under_proof
+    self.case('cause', True, 1)
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/tests/test_browser_assertion_proof.py", line 17, in case
+    code, result, output = protocol.run_case(mode)
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/device_browser_protocol.py", line 34, in run_case
+    raise RuntimeError(resolved.stdout)
+RuntimeError: node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module '@playwright/test/package.json'
+Require stack:
+- /home/haki/code/pw-wt/final-evidence-metadata/spikes/own-renderer/[eval]
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at Function.resolve (node:internal/modules/helpers:157:19)
+    at [eval]:1:9
+    at runScriptInThisContext (node:internal/vm:209:10)
+    at node:internal/process/execution:446:12
+    at [eval]-wrapper:6:24
+    at runScriptInContext (node:internal/process/execution:444:60)
+    at evalFunction (node:internal/process/execution:279:30)
+    at evalTypeScript (node:internal/process/execution:291:3)
+    at node:internal/main/eval_string:74:3 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/haki/code/pw-wt/final-evidence-metadata/spikes/own-renderer/[eval]'
+  ]
+}
+
+Node.js v22.21.1
+
+
+======================================================================
+ERROR: test_native_comparisons_messages_and_negation_produce_proof (scripts.tests.test_browser_assertion_proof.BrowserAssertions)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/tests/test_browser_assertion_proof.py", line 23, in test_native_comparisons_messages_and_negation_produce_proof
+    self.case(mode, True, 1)
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/tests/test_browser_assertion_proof.py", line 17, in case
+    code, result, output = protocol.run_case(mode)
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/device_browser_protocol.py", line 34, in run_case
+    raise RuntimeError(resolved.stdout)
+RuntimeError: node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module '@playwright/test/package.json'
+Require stack:
+- /home/haki/code/pw-wt/final-evidence-metadata/spikes/own-renderer/[eval]
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at Function.resolve (node:internal/modules/helpers:157:19)
+    at [eval]:1:9
+    at runScriptInThisContext (node:internal/vm:209:10)
+    at node:internal/process/execution:446:12
+    at [eval]-wrapper:6:24
+    at runScriptInContext (node:internal/process/execution:444:60)
+    at evalFunction (node:internal/process/execution:279:30)
+    at evalTypeScript (node:internal/process/execution:291:3)
+    at node:internal/main/eval_string:74:3 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/haki/code/pw-wt/final-evidence-metadata/spikes/own-renderer/[eval]'
+  ]
+}
+
+Node.js v22.21.1
+
+
+======================================================================
+ERROR: test_native_locator_mismatch_produces_proof (scripts.tests.test_browser_assertion_proof.BrowserAssertions)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/tests/test_browser_assertion_proof.py", line 27, in test_native_locator_mismatch_produces_proof
+    self.case('locator', True, 1)
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/tests/test_browser_assertion_proof.py", line 17, in case
+    code, result, output = protocol.run_case(mode)
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/device_browser_protocol.py", line 34, in run_case
+    raise RuntimeError(resolved.stdout)
+RuntimeError: node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module '@playwright/test/package.json'
+Require stack:
+- /home/haki/code/pw-wt/final-evidence-metadata/spikes/own-renderer/[eval]
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at Function.resolve (node:internal/modules/helpers:157:19)
+    at [eval]:1:9
+    at runScriptInThisContext (node:internal/vm:209:10)
+    at node:internal/process/execution:446:12
+    at [eval]-wrapper:6:24
+    at runScriptInContext (node:internal/process/execution:444:60)
+    at evalFunction (node:internal/process/execution:279:30)
+    at evalTypeScript (node:internal/process/execution:291:3)
+    at node:internal/main/eval_string:74:3 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/haki/code/pw-wt/final-evidence-metadata/spikes/own-renderer/[eval]'
+  ]
+}
+
+Node.js v22.21.1
+
+
+======================================================================
+ERROR: test_pending_poll_callback_is_not_a_mismatch (scripts.tests.test_browser_assertion_proof.BrowserAssertions)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/tests/test_browser_assertion_proof.py", line 49, in test_pending_poll_callback_is_not_a_mismatch
+    self.case('pollPending', False)
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/tests/test_browser_assertion_proof.py", line 17, in case
+    code, result, output = protocol.run_case(mode)
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/device_browser_protocol.py", line 34, in run_case
+    raise RuntimeError(resolved.stdout)
+RuntimeError: node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module '@playwright/test/package.json'
+Require stack:
+- /home/haki/code/pw-wt/final-evidence-metadata/spikes/own-renderer/[eval]
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at Function.resolve (node:internal/modules/helpers:157:19)
+    at [eval]:1:9
+    at runScriptInThisContext (node:internal/vm:209:10)
+    at node:internal/process/execution:446:12
+    at [eval]-wrapper:6:24
+    at runScriptInContext (node:internal/process/execution:444:60)
+    at evalFunction (node:internal/process/execution:279:30)
+    at evalTypeScript (node:internal/process/execution:291:3)
+    at node:internal/main/eval_string:74:3 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/haki/code/pw-wt/final-evidence-metadata/spikes/own-renderer/[eval]'
+  ]
+}
+
+Node.js v22.21.1
+
+
+======================================================================
+ERROR: test_poll_callback_errors_are_not_assertion_results (scripts.tests.test_browser_assertion_proof.BrowserAssertions)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/tests/test_browser_assertion_proof.py", line 46, in test_poll_callback_errors_are_not_assertion_results
+    self.case(mode, False)
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/tests/test_browser_assertion_proof.py", line 17, in case
+    code, result, output = protocol.run_case(mode)
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/device_browser_protocol.py", line 34, in run_case
+    raise RuntimeError(resolved.stdout)
+RuntimeError: node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module '@playwright/test/package.json'
+Require stack:
+- /home/haki/code/pw-wt/final-evidence-metadata/spikes/own-renderer/[eval]
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at Function.resolve (node:internal/modules/helpers:157:19)
+    at [eval]:1:9
+    at runScriptInThisContext (node:internal/vm:209:10)
+    at node:internal/process/execution:446:12
+    at [eval]-wrapper:6:24
+    at runScriptInContext (node:internal/process/execution:444:60)
+    at evalFunction (node:internal/process/execution:279:30)
+    at evalTypeScript (node:internal/process/execution:291:3)
+    at node:internal/main/eval_string:74:3 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/haki/code/pw-wt/final-evidence-metadata/spikes/own-renderer/[eval]'
+  ]
+}
+
+Node.js v22.21.1
+
+
+======================================================================
+ERROR: test_poll_preserves_object_is_and_completed_mismatches (scripts.tests.test_browser_assertion_proof.BrowserAssertions)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/tests/test_browser_assertion_proof.py", line 39, in test_poll_preserves_object_is_and_completed_mismatches
+    self.case(mode, True, failed)
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/tests/test_browser_assertion_proof.py", line 17, in case
+    code, result, output = protocol.run_case(mode)
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/device_browser_protocol.py", line 34, in run_case
+    raise RuntimeError(resolved.stdout)
+RuntimeError: node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module '@playwright/test/package.json'
+Require stack:
+- /home/haki/code/pw-wt/final-evidence-metadata/spikes/own-renderer/[eval]
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at Function.resolve (node:internal/modules/helpers:157:19)
+    at [eval]:1:9
+    at runScriptInThisContext (node:internal/vm:209:10)
+    at node:internal/process/execution:446:12
+    at [eval]-wrapper:6:24
+    at runScriptInContext (node:internal/process/execution:444:60)
+    at evalFunction (node:internal/process/execution:279:30)
+    at evalTypeScript (node:internal/process/execution:291:3)
+    at node:internal/main/eval_string:74:3 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/haki/code/pw-wt/final-evidence-metadata/spikes/own-renderer/[eval]'
+  ]
+}
+
+Node.js v22.21.1
+
+
+----------------------------------------------------------------------
+Ran 11 tests in 0.204s
+
+FAILED (errors=9)

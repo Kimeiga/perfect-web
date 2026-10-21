@@ -1,0 +1,52 @@
+test_closed_browser_is_not_a_comparison (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... FAIL
+
+======================================================================
+FAIL: test_closed_browser_is_not_a_comparison (scripts.tests.test_browser_assertion_proof.BrowserAssertions)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/tests/test_browser_assertion_proof.py", line 31, in test_closed_browser_is_not_a_comparison
+    self.case('closed', False)
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/tests/test_browser_assertion_proof.py", line 19, in case
+    self.assertEqual((result.valid, result.failed), (valid, failed), output)
+AssertionError: Tuples differ: (True, 1) != (False, 0)
+
+First differing element 0:
+True
+False
+
+- (True, 1)
++ (False, 0) : 
+Running 1 test using 1 worker
+
+[1A[2K[1/1] ../../../../../../../tmp/pw-browser-protocol-9f_ow66r/fixture.spec.mjs:56:3 › witness
+[1A[2K  1) ../../../../../../../tmp/pw-browser-protocol-9f_ow66r/fixture.spec.mjs:56:3 › witness ─────────
+
+    Error: expect.toHaveText: Target page, context or browser has been closed
+
+       at ../../home/haki/code/pw-wt/final-evidence-metadata/spikes/own-renderer/assertion-expect.mjs:30
+
+      28 |       return (...args) => {
+      29 |         try {
+    > 30 |           const result = Reflect.apply(matcher, object, args);
+         |                                  ^
+      31 |           return result && typeof result.then === "function"
+      32 |             ? result.catch(error => proven(error, name, isNot)) : result;
+      33 |         } catch (error) { return proven(error, name, isNot); }
+        at Proxy.toHaveText (/home/haki/code/pw-wt/final-evidence-metadata/spikes/own-renderer/assertion-expect.mjs:30:34)
+        at /tmp/pw-browser-protocol-9f_ow66r/fixture.spec.mjs:59:70
+    [cause]: Error: PW_ASSERTION:0c984463f59f66b6de06bb023d5fb99893c4204eb189939ff358b9a762c1bbb9
+        at proven (/home/haki/code/pw-wt/final-evidence-metadata/spikes/own-renderer/assertion-expect.mjs:12:19)
+        at /home/haki/code/pw-wt/final-evidence-metadata/spikes/own-renderer/assertion-expect.mjs:32:37
+        at /tmp/pw-browser-protocol-9f_ow66r/fixture.spec.mjs:59:5
+
+
+[1A[2K  1 failed
+    ../../../../../../../tmp/pw-browser-protocol-9f_ow66r/fixture.spec.mjs:56:3 › witness ──────────
+
+
+----------------------------------------------------------------------
+Ran 1 test in 1.269s
+
+FAILED (failures=1)

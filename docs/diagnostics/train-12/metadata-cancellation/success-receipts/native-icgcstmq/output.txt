@@ -1,0 +1,45 @@
+test_final_poll_interval_never_restarts_an_early_callback (scripts.tests.test_browser_assertion_proof.BrowserAssertions) ... FAIL
+
+======================================================================
+FAIL: test_final_poll_interval_never_restarts_an_early_callback (scripts.tests.test_browser_assertion_proof.BrowserAssertions)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/unittest_producer.py", line 302, in body
+    return self.checked(original(*args, **kwargs), identity + ' body')
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/tests/test_browser_assertion_proof.py", line 42, in test_final_poll_interval_never_restarts_an_early_callback
+    self.case('pollEarlyTimer', True, 1)
+  File "/home/haki/code/pw-wt/final-evidence-metadata/scripts/tests/test_browser_assertion_proof.py", line 19, in case
+    self.assertEqual((result.valid, result.failed), (valid, failed), output)
+AssertionError: Tuples differ: (False, 0) != (True, 1)
+
+First differing element 0:
+False
+True
+
+- (False, 0)
++ (True, 1) : 
+Running 1 test using 1 worker
+
+[1A[2K[1/1] ../../../../../../../tmp/pw-browser-protocol-sjo5jdcw/fixture.spec.mjs:61:8 › witness
+[1A[2K  1) ../../../../../../../tmp/pw-browser-protocol-sjo5jdcw/fixture.spec.mjs:61:8 › witness ─────────
+
+    Error: a final clamped sleep restarted the callback
+
+      28 |     } finally {
+      29 |       globalThis.setTimeout = originalTimer;
+    > 30 |       if (calls !== 1) throw new Error('a final clamped sleep restarted the callback');
+         |                              ^
+      31 |     }
+      32 |   }
+      33 |   if (mode === 'pollCallback') await expect.poll(() => { throw new Error('callback failure'); }, polling).toBe(undefined);
+        at witness (/tmp/pw-browser-protocol-sjo5jdcw/fixture.spec.mjs:30:30)
+
+
+[1A[2K  1 failed
+    ../../../../../../../tmp/pw-browser-protocol-sjo5jdcw/fixture.spec.mjs:61:8 › witness ──────────
+
+
+----------------------------------------------------------------------
+Ran 1 test in 1.225s
+
+FAILED (failures=1)
