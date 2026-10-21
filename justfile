@@ -4836,6 +4836,7 @@ e14-speculated-arms:
        echo; echo "== the feed in three engines (e2e/feed.spec.mjs)"; echo; \
        bash scripts/run_suite.sh -- pnpm exec playwright test e2e/feed.spec.mjs --reporter=line; \
        echo; echo "== mutation controls (scripts/speculated_arms_mutations.py)"; echo; \
+       python3 scripts/speculated_arms_producer_mutations.py; \
        CARGO_INCREMENTAL=0 python3 scripts/speculated_arms_mutations.py; \
      } > docs/evidence/E14/speculated-arms.txt
     @grep -E "^test result|passed|mutants killed|^---- |panicked at" docs/evidence/E14/speculated-arms.txt

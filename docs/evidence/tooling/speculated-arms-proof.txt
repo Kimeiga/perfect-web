@@ -508,3 +508,146 @@ memory bound: no process was stopped
 
 === /tmp/speculated-arms-case-final.log sha256 3105ac13082b33f605fbb9994012d9167063eba219faea3b0977f25e408f0a05 ===
 case-check: OK (3482 paths)
+
+
+== Recipe-owner integration correction
+Diagnostic local checks after 59bb7aad76da0e1d7102fb5c15855d2b65bd6e7b plus these changes.
+No semantic operator, credit authority or evidence parser changed. Both campaigns are literal recipe commands, executed once each; nested invocation removed. Producer summaries/verdicts use existing grammar and qualified intended-test identifiers are metadata. Thirteen consumer tests include actual recipe-owner reach. The earlier semantic8 output is retained, not rerun for this wiring change. Full hosted recipe remains pending.
+
+Source SHA256 at check:
+53fbaf2da332bb2d0b315b36c0d48ee01bb10a77384c1e00dbf32a1d4660a9ae  justfile
+56c3c9fb838e1a87248a50870ed87fdca7e84b2387b89890664e03547bcba7e5  scripts/speculated_arms_mutations.py
+5536a73c87423f281829b9d34e38112863d2fdf95fb8f8b51300dfce995b819c  scripts/speculated_arms_producer_mutations.py
+073f4235890bba52640e21f2546023ac4503a0b231a6296b46a384e0331528fc  scripts/tests/test_speculated_arms_producers.py
+
+== Thirteen producer consumer tests
+test_browser_requires_complete_frozen_inventory (test_speculated_arms_producers.Producers) ... 999 failed
+REFUSED browser producer: browser inventory changed
+999 failed
+REFUSED browser producer: incomplete browser results
+999 failed
+REFUSED browser producer: missing complete browser receipt
+999 failed
+REFUSED browser producer: incomplete browser results
+ok
+test_browser_uses_fresh_native_receipt_not_prose (test_speculated_arms_producers.Producers) ... 999 failed
+999 failed
+REFUSED browser producer: missing complete browser receipt
+999 failed
+REFUSED browser producer: stale browser receipt
+999 failed
+REFUSED browser producer: browser exit contradicts receipt
+ok
+test_build_error_or_timeout_is_invalid (test_speculated_arms_producers.Producers) ... bad build
+bad build
+bad build
+ok
+test_cancelled_campaign_restores_source (test_speculated_arms_producers.Producers) ... ok
+test_cargo_accepts_actual_assertion_and_complete_green (test_speculated_arms_producers.Producers) ... ok
+test_cargo_refuses_runtime_and_assertion_operand_panics (test_speculated_arms_producers.Producers) ... ok
+test_cargo_refuses_status_build_and_timeout (test_speculated_arms_producers.Producers) ... ok
+test_cargo_requires_every_named_result (test_speculated_arms_producers.Producers) ... ok
+test_feed_runs_all_cases_with_supported_assertions (test_speculated_arms_producers.Producers) ... ok
+test_invalid_or_stopped_producers_earn_no_kill (test_speculated_arms_producers.Producers) ... ok
+test_recipe_names_each_evidence_owner_once (test_speculated_arms_producers.Producers) ... ok
+test_restored_build_must_succeed (test_speculated_arms_producers.Producers) ... ok
+test_timeout_retains_invalid_status_and_shared_owner (test_speculated_arms_producers.Producers) ... ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 0.026s
+
+OK
+memory bound: no process was stopped
+
+== Fresh twelve native producer controls
+invalid cargo results credited: KILLED by test_speculated_arms_producers.Producers.test_cargo_refuses_status_build_and_timeout (3 of 13 tests fail)
+cargo inventory is not frozen: KILLED by test_speculated_arms_producers.Producers.test_cargo_requires_every_named_result (1 of 13 tests fail)
+build failure is accepted: KILLED by test_speculated_arms_producers.Producers.test_build_error_or_timeout_is_invalid (1 of 13 tests fail)
+browser inventory is not frozen: KILLED by test_speculated_arms_producers.Producers.test_browser_requires_complete_frozen_inventory (1 of 13 tests fail)
+invalid browser receipt is credited: KILLED by test_speculated_arms_producers.Producers.test_browser_uses_fresh_native_receipt_not_prose (2 of 13 tests fail)
+invalid producer earns a kill: KILLED by test_speculated_arms_producers.Producers.test_invalid_or_stopped_producers_earn_no_kill (1 of 13 tests fail)
+restored build failure is ignored: KILLED by test_speculated_arms_producers.Producers.test_restored_build_must_succeed (1 of 13 tests fail)
+cancellation restores mutant source: KILLED by test_speculated_arms_producers.Producers.test_cancelled_campaign_restores_source (3 of 13 tests fail)
+timeout is a failed test: KILLED by test_speculated_arms_producers.Producers.test_timeout_retains_invalid_status_and_shared_owner (1 of 13 tests fail)
+serial failure skips later feed cases: KILLED by test_speculated_arms_producers.Producers.test_feed_runs_all_cases_with_supported_assertions (1 of 13 tests fail)
+feed assertions carry no native proof: KILLED by test_speculated_arms_producers.Producers.test_feed_runs_all_cases_with_supported_assertions (1 of 13 tests fail)
+poll uses unsupported proof matcher: KILLED by test_speculated_arms_producers.Producers.test_feed_runs_all_cases_with_supported_assertions (1 of 13 tests fail)
+12 of 12 mutants killed; 0 refused; 0 survived
+memory bound: no process was stopped
+
+== Actual report ownership and negative neighbors
+Structural check only: fresh producer controls plus retained unchanged native semantic stream; not a combined campaign rerun.
+retained raw SHA256: bd12f8d146abd2843ae24c04eff555faae71a2e35bef29fb03432db040b869fa
+literal script owners: ['speculated_arms_mutations.py', 'speculated_arms_producer_mutations.py']
+actual two-command recipe: {}
+omitted literal producer command: {'e14-speculated-arms': [('docs/evidence/E14/speculated-arms.txt', 13, 'its verdicts name the mutants of none of speculated_arms_mutations.py')]}
+missing producer result block: {'e14-speculated-arms': [('docs/evidence/E14/speculated-arms.txt', 0, "counts none of speculated_arms_producer_mutations.py's mutants, which the recipe runs")]}
+PASS: each native12+8 block owned once; omitted owner and missing block both refused.
+
+== Baseline-diagnostic invariant correction
+The existing baseline invariants caught the noncanonical failure message before explain() and required runtime-import comment. Restored the established baseline wording and comment, leaving credit and trace behavior unchanged; no invariant exceptions added.
+Before (message):
+....F.....................
+======================================================================
+FAIL: test_each_call_follows_a_red_baseline_or_one_of_those_named (test_mutation_baseline.EveryCallOfExplain)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/train-12/scripts/tests/test_mutation_baseline.py", line 517, in test_each_call_follows_a_red_baseline_or_one_of_those_named
+    self.assertEqual(found, self.OTHERS)
+AssertionError: Items in the first set but not the second:
+('speculated_arms_mutations.py', 'print("REFUSED: baseline is invalid, failed or stopped")')
+
+----------------------------------------------------------------------
+Ran 26 tests in 4.662s
+
+FAILED (failures=1)
+memory bound: no process was stopped
+
+Before (import convention):
+......F...................
+======================================================================
+FAIL: test_every_script_keeps_what_its_commands_say_from_its_start (test_mutation_baseline.EveryScript)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/haki/code/pw-wt/train-12/scripts/tests/test_mutation_baseline.py", line 548, in test_every_script_keeps_what_its_commands_say_from_its_start
+    self.assertEqual(unheard, [])
+AssertionError: Lists differ: ['speculated_arms_mutations.py'] != []
+
+First list contains 1 additional elements.
+First extra element 0:
+'speculated_arms_mutations.py'
+
+- ['speculated_arms_mutations.py']
++ []
+
+----------------------------------------------------------------------
+Ran 26 tests in 4.669s
+
+FAILED (failures=1)
+memory bound: no process was stopped
+
+After:
+..........................
+----------------------------------------------------------------------
+Ran 26 tests in 4.669s
+
+OK
+memory bound: no process was stopped
+
+Fresh producer controls after convention correction:
+invalid cargo results credited: KILLED by test_speculated_arms_producers.Producers.test_cargo_refuses_status_build_and_timeout (3 of 13 tests fail)
+cargo inventory is not frozen: KILLED by test_speculated_arms_producers.Producers.test_cargo_requires_every_named_result (1 of 13 tests fail)
+build failure is accepted: KILLED by test_speculated_arms_producers.Producers.test_build_error_or_timeout_is_invalid (1 of 13 tests fail)
+browser inventory is not frozen: KILLED by test_speculated_arms_producers.Producers.test_browser_requires_complete_frozen_inventory (1 of 13 tests fail)
+invalid browser receipt is credited: KILLED by test_speculated_arms_producers.Producers.test_browser_uses_fresh_native_receipt_not_prose (2 of 13 tests fail)
+invalid producer earns a kill: KILLED by test_speculated_arms_producers.Producers.test_invalid_or_stopped_producers_earn_no_kill (1 of 13 tests fail)
+restored build failure is ignored: KILLED by test_speculated_arms_producers.Producers.test_restored_build_must_succeed (1 of 13 tests fail)
+cancellation restores mutant source: KILLED by test_speculated_arms_producers.Producers.test_cancelled_campaign_restores_source (3 of 13 tests fail)
+timeout is a failed test: KILLED by test_speculated_arms_producers.Producers.test_timeout_retains_invalid_status_and_shared_owner (1 of 13 tests fail)
+serial failure skips later feed cases: KILLED by test_speculated_arms_producers.Producers.test_feed_runs_all_cases_with_supported_assertions (1 of 13 tests fail)
+feed assertions carry no native proof: KILLED by test_speculated_arms_producers.Producers.test_feed_runs_all_cases_with_supported_assertions (1 of 13 tests fail)
+poll uses unsupported proof matcher: KILLED by test_speculated_arms_producers.Producers.test_feed_runs_all_cases_with_supported_assertions (1 of 13 tests fail)
+12 of 12 mutants killed; 0 refused; 0 survived
+memory bound: no process was stopped
+
+Final semantic runner SHA256: b800d3b09904a9049ee4448d6df3e1b50cebdde7391ccc45f87a3e36fc861373

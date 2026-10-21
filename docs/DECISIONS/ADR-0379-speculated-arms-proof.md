@@ -69,3 +69,15 @@ regressions, not a guarantee against all compiler or application bugs.
 Raw local commands, input hashes, the original fault's red output and the whole
 campaign output are retained in [the diagnostic tooling record](../evidence/tooling/speculated-arms-proof.txt).
 It explicitly predates the source commit and does not replace hosted evidence.
+
+## Recipe ownership correction
+
+The recipe executes the twelve producer controls explicitly, once, before the
+unchanged eight semantic controls. The semantic runner no longer invokes a
+nested campaign. This makes both evidence owners visible to the canonical
+recipe parser. Producer verdicts and counts follow the existing evidence
+format, and class-qualified witness identifiers remain metadata. The parser
+and its authority are unchanged. A thirteenth producer regression checks the
+actual recipe's two literal invocations. Fresh twelve-control output combined
+with the retained eight-control stream checks report ownership; this structural
+check is not a new run of the semantic campaign or hosted evidence.

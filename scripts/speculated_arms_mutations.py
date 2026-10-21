@@ -200,23 +200,16 @@ def browser_tests():
 SUITES = {"cargo": cargo_tests, "browser": browser_tests}
 
 
-def controls():
-    import speculated_arms_producer_mutations
-    return speculated_arms_producer_mutations.main() == 0
-
-
 def main():
-    import mutation_baseline
+    import mutation_baseline  # retain native baseline output before starting producers
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(1))
     watch = mutation_baseline.mutation_bound.start()
-    if not controls():
-        return 1
     INVENTORIES.clear()
     for suite in sorted({m[1] for m in MUTANTS}):
         valid, passed, failed = SUITES[suite]()
         print(f"baseline ({suite}): {passed} passed, {failed} failed", flush=True)
         if not valid or failed or not passed or watch.stopped:
-            print("REFUSED: baseline is invalid, failed or stopped")
+            print("FAIL: the unmutated baseline is not green; no mutant can mean anything")
             mutation_baseline.explain()
             return 1
 
