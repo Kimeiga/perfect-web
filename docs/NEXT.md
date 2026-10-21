@@ -24,19 +24,21 @@ current successful full-browser follow-up; never count that setup failure as
 browser evidence. Other jobs continue. The same run's `e14-guide-ownership`
 recipe failed its 15-test baseline before any controls: the timeout fixture's
 child/grandchild readiness file was absent when its 0.3-second deadline elapsed.
-A bounded readiness handshake must precede that timeout while preserving native
-process cancellation and descendant cleanup; the whole campaign remains due.
-The same run's `e14-bind` completed its baseline but refused one of14 controls:
+The repaired fixture gates execution deadlines on bounded native readiness
+and cleans up failed startup using verified process identities. All 15 native
+tests and 13 controls pass locally with independent review; its hosted whole
+campaign remains due.
+The same run's `e14-bind` completed its baseline but refused one of 14 controls:
 five render-again tests panicked at an expected-build extraction. An explicit
-valid-build assertion now gives a complete9-test assertion failure under the
-unchanged lowering fault; the restored9 pass. The whole campaign and its
+valid-build assertion now gives a complete nine-test assertion failure under the
+unchanged lowering fault; the restored nine pass. The whole campaign and its
 reached consumers remain due.
 
-The graph repair now retains all19 operators and25 native identities with strict
+The graph repair now retains all 19 operators and 25 native identities with strict
 completed-assertion validation. Targeted renderer faults and the mutual-type
 refusal produce complete assertions instead of a memory stop or native abort.
 Its full campaign and `e14-cart-lines` are required on the repaired source.
-The producer-ownership campaign's native9-control record is valid, but its
+The producer-ownership campaign's native nine-control record is valid, but its
 bare witness names confused evidence-count ownership. Qualified metadata and
 an exact-output regression repair that reporting contract without changing
 any operator or parser; its hosted campaign also must be rerecorded.
@@ -44,7 +46,7 @@ any operator or parser; its hosted campaign also must be rerecorded.
 1. Audit all 239 native recipe results from
    [verify 39526960864](https://github.com/studiokimeiga/perfect-web/actions/runs/39526960864)
    at `f15117de`, including producer status and memory stops. The completed
-   census contains exactly239 recipes:228 valid and11 invalid; summary is the
+   census contains exactly 239 recipes:228 valid and11 invalid; summary is the
    only failed job. All three full browser jobs passed. A successful wrapper job does not override a
    failed native recipe, and an incomplete run is not accepted evidence.
 2. Repair the failed `e14-todomvc` harness. Host tests passed 4/4 and the
@@ -101,7 +103,7 @@ any operator or parser; its hosted campaign also must be rerecorded.
 10. Repair the invalid `e14-graphs-on-the-wire` campaign: native status zero
    concealed a memory guard stop for "the renderer takes a node twice". The
    canonical summary/fetch guard rejects the written evidence. Preserve the
-   fault model, require a real completed assertion failure, and rerun all19
+   fault model, require a real completed assertion failure, and rerun all 19
    controls; a memory stop is never mutation credit.
 11. Rerecord `e14-guide-ownership` on the current source: the post-dispatch
    Linux/procfs capability guard changes its proof scope. Unsupported hosts

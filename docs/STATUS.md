@@ -3,7 +3,7 @@
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
 Reviewed 2026-10-21 against assembled train-12 source
-`ce7c1135` (with combined hosted verification still pending).
+`af0d64c3` (with combined hosted verification still pending).
 [The complete prior ledger](STATUS-HISTORY-2026-10.md) remains verbatim,
 including failed runs, corrections and their original scope.
 
@@ -85,9 +85,9 @@ evidence. No failed result is promoted by this summary.
   completed 73 recipes, with 71 passing and only the case-handling and
   template controls failing. Both control repairs are integrated; their
   full combined rerun remains pending.
-- **The 239-recipe combined verification completed with11 invalid recipes.**
+- **The 239-recipe combined verification completed with 11 invalid recipes.**
   [39526960864](https://github.com/studiokimeiga/perfect-web/actions/runs/39526960864)
-  at `f15117de` recorded239/239 unique recipe results, with228 valid native
+  at `f15117de` recorded239/239 unique recipe results, with 228 valid native
   results and11 invalid. All three full browser jobs passed; summary was the
   sole failed job. Native recipes
   `e14-todomvc`, `e14-device-store`, `e14-check-is-build`, `e14-bind`,
@@ -108,7 +108,7 @@ evidence. No failed result is promoted by this summary.
   evidence records a memory guard stopping the renderer mutation above 3.9 GiB.
   That campaign is invalid. The canonical summary/fetch guard reads the evidence
   files and rejects it; an earlier status/log-only audit missed that stop.
-  Its repaired witnesses retain all19 operators and25 native identities;
+  Its repaired witnesses retain all 19 operators and 25 native identities;
   targeted renderer and mutual-type faults now give completed native assertion
   failures. The whole campaign and its reached cart-line consumer remain due.
 - The assembled repair gate at `1549c4bb` completed 1,015 tests in 240.385s
@@ -136,18 +136,20 @@ evidence. No failed result is promoted by this summary.
   recorded setup failure, not an application-test result. Firefox and WebKit
   full suites passed. The same run's `e14-guide-ownership` recipe failed its
   15-test baseline before controls: a short native timeout elapsed before
-  child/grandchild fixture readiness. A bounded readiness handshake repair and
-  the complete campaign are required; no ownership control is credited.
-  Its `e14-bind` campaign also refused one of14 controls because five tests
+  child/grandchild fixture readiness. The repaired fixture preserves the
+  execution deadlines, bounds readiness, and cleans up failed startup using
+  verified process identities. All 15 native tests and 13 controls pass locally
+  with independent review; current hosted evidence is still required.
+  Its `e14-bind` campaign also refused one of 14 controls because five tests
   used `expect("builds")` instead of an assertion on their valid fixture.
-  The repaired unchanged lowering fault completes all9 tests as assertions,
-  followed by restored9green; the complete hosted campaign remains required.
-- Canonical fetch of the completed239-recipe run imported82 eligible files
-  after skipping155 changed recipes and excluding all11 invalid outcomes.
+  The repaired unchanged lowering fault completes all nine tests as assertions,
+  followed by restored nine passing; the complete hosted campaign remains required.
+- Canonical fetch of the completed239-recipe run imported 82 eligible files
+  after skipping 155 changed recipes and excluding all 11 invalid outcomes.
   A post-fetch count gate exposed ambiguous bare witness metadata in
-  `e14-producer-ownership`; its9 native control outcomes remain valid.
+  `e14-producer-ownership`; its nine native control outcomes remain valid.
   Qualified metadata and an exact-output regression fix the ownership labels
-  without changing the evidence parser. The gate now has26 stale/planned
+  without changing the evidence parser. The gate now has 26 stale or planned
   disagreements and zero unexplained failures; the changed campaign still
   requires current hosted evidence.
 - Exact-source [CI39527396553](https://github.com/studiokimeiga/perfect-web/actions/runs/39527396553)
