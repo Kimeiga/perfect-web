@@ -3,7 +3,7 @@
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
 Reviewed 2026-10-20 against assembled train-12 source
-`12da8a21` (with final verification still pending).
+`3d74e820` (with final verification still pending).
 [The complete prior ledger](STATUS-HISTORY-2026-10.md) remains verbatim,
 including failed runs, corrections and their original scope.
 
@@ -77,6 +77,14 @@ evidence. No failed result is promoted by this summary.
 
 - **Train-12 final gates remain pending.** Narrow controls do not replace
   whole reached campaigns, combined browser suites or exact-head CI.
+  The earlier combined [CI 39518614014](https://github.com/studiokimeiga/perfect-web/actions/runs/39518614014)
+  at `d8369604` failed five tests on both architectures: the exact corpus
+  refusal inventory and four lookups using pre-namespace UI identities.
+  Focused checks of their repairs pass locally; the failed run remains failed.
+  The [generic campaign 39513687603](https://github.com/studiokimeiga/perfect-web/actions/runs/39513687603)
+  completed 73 recipes, with 71 passing and only the case-handling and
+  template controls failing. Both control repairs are integrated; their
+  full combined rerun remains pending.
 - **E14 gates 3 and 4 remain open:** agent runs and analysis await model and
   budget decisions. Framework-wide performance superiority and broad
   application correctness are not established.
