@@ -153,7 +153,7 @@ and merge to master; its numbered ADR records the decision and remaining limits.
 *Project term.* A read of one entry of a keyed query or resource, one key per host call. Below the [seam](#seam-the) that is one call; a keyed read made once per element of a loop is refused at check time (PW0405), and the repair is the [set read](#set-read). Older ADRs also use "keyed read" for the browser's per-document read (`doc=`). [ADR-0337], [ADR-0340], [ADR-0161].
 
 ### killed
-*Standard (mutation testing).* A [mutant](#mutant) the tests caught: verdict `KILLED`. A kill by a failed *build* shows nothing about the tests, so `mutant-programs` checks that a mutant of a `.pw` source is still a well-typed program unless the script names the rule that refuses it. [mutant_programs.py], [ADR-0292].
+*Standard (mutation testing).* A [mutant](#mutant) caught by an actual assertion in a complete valid test run: verdict `KILLED`. Compilation failures, timeouts, memory-guard stops and broken producers earn no kill. A failed *build* shows nothing about the tests, so `mutant-programs` checks that a mutant of a `.pw` source is still a well-typed program unless the script names the rule that refuses it. [mutant_programs.py], [ADR-0292].
 
 ### KNOWN_LIMITATIONS
 *Project term.* ≈ known-issues list. `docs/KNOWN_LIMITATIONS.md`: what does not work, stated honestly (charter §3.3, "never hide uncertainty"). One of the [four status documents](#four-status-documents). [KNOWN_LIMITATIONS.md].
@@ -301,7 +301,7 @@ A verification runner keeps responsibility for the test process it starts until 
 *Standard (merge train / merge queue), used narrowly here.* Tracks ready at once are merged, one merge commit each, onto a branch `track/train-<n>` cut from `master`; `just ci` runs there once and [verify](#verify) plans every recipe the train reaches, once. A track whose recipe fails leaves the train, which is rebuilt without it. A green train [lands](#landing). [ADR-0281].
 
 ### verify
-*Project term.* The GitHub workflow `verify.yml`: a plan, the recipe [shards](#shard), the browser suite in each engine (Chromium, Firefox, WebKit), and a summary that fails on a failed recipe, a survivor or a shard that reported nothing. It runs on pushes to `master` and `track/**`, nightly and by [dispatch](#dispatch). "A verify" is also one such run, cited by ID. [verify.yml], [ADR-0245].
+*Project term.* The GitHub workflow `verify.yml`: a plan, the recipe [shards](#shard), the browser suite in each engine (Chromium, Firefox, WebKit), and a summary that fails on a failed recipe, a survivor, a memory-guard failure or a shard that reported nothing. It runs on pushes to `master` and `track/**`, nightly and by [dispatch](#dispatch). "A verify" is also one such run, cited by ID. [verify.yml], [ADR-0245].
 
 ### view
 *Project term.* ≈ UI component. A reusable piece of markup with typed props and an empty effect row; an element named with a capital letter is a view (`<Money value={...} />`). [ADR-0072], [guide: markup].
