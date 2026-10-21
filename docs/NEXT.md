@@ -45,12 +45,25 @@ starting another feature batch.
    compiled canonical page identity before checking that speculation is
    absent. Preserve all eight fault models, require complete native assertion
    receipts, and rerun every reached feed test consumer after instrumentation.
-7. Rerecord `e14-guide-ownership` on the current source: the post-dispatch
+7. Repair the remaining failed controls: `e14-representations` detected
+   3/4, and `e14-computed-conditions` detected 9/12. Their old witnesses or
+   operators no longer reach the canonical type/computed-value paths. Preserve
+   each intended fault, establish actual assertion failures and valid neighbors,
+   and rerun the complete campaigns with strict producer validation.
+8. Replace `e14-mutation-bound` and `e14-guide` evidence. The former correctly
+   refused one of31 controls because another test read an absent output file
+   instead of asserting its presence. The latter stopped before any control
+   because one renamed operator was absent from its required-witness map.
+   [Focused native probes](evidence/tooling/train12-catalog-and-bound-witnesses.txt)
+   demonstrate the repairs; whole31/74 campaigns remain required. Tighten the
+   guide producer to require actual assertions and complete inventories, while
+   preserving its three explicitly named semantic checker refusals.
+9. Rerecord `e14-guide-ownership` on the current source: the post-dispatch
    Linux/procfs capability guard changes its proof scope. Unsupported hosts
    skip explicitly and cannot satisfy the strict mutation baseline.
-8. Reconcile eligible current evidence under ADR-0281, run exact-commit CI
+10. Reconcile eligible current evidence under ADR-0281, run exact-commit CI
    and all reached follow-ups, then land only the verified combined tree.
-   All five failed recipe results remain failed and none is fetched as a
+   All nine failed recipe results remain failed and none is fetched as a
    pass. Separate effect-inference scaling work awaits its own
    exact-commit CI and whole campaigns before integration.
 

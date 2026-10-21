@@ -650,7 +650,7 @@ MUST = {
     "a page's files no longer check together": {GUIDE_TEST},
     "the tutorial and the app differ by a byte": {DIRECTORY},
     "the tutorial builds a file the app does not have": {DIRECTORY},
-    'the closed two-signal gap claims the wrong refusal': {GUIDE_TEST},
+    'the closed two-signal gap is claimed to be refused still': {GUIDE_TEST},
     "a build gap is closed: the build accepts it": {GUIDE_TEST},
     "a check gap is closed: the check refuses it": {GUIDE_TEST},
     'the closed title gap claims check still accepts it': {GUIDE_TEST},

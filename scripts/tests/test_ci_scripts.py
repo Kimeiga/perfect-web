@@ -1635,7 +1635,10 @@ class BoundEvidence(unittest.TestCase):
                     self.assertEqual(fetch.main(), 0)
                 self.assertEqual(old.read_text(), "prior evidence must remain")
                 self.assertFalse((destination / row["wrote"][1]).exists())
-                self.assertEqual((destination / good["wrote"][0]).read_text(), self.CLEAN)
+                accepted = destination / good["wrote"][0]
+                self.assertTrue(accepted.is_file(), "the valid no-stop neighbor must be copied")
+                self.assertEqual(accepted.read_text(), self.CLEAN)
+                self.assertTrue(seconds.is_file(), "valid completed timing must be recorded")
                 self.assertEqual(json.loads(seconds.read_text()), {"e14-good": 23})
 
 if __name__ == "__main__":

@@ -89,14 +89,21 @@ evidence. No failed result is promoted by this summary.
   [39526960864](https://github.com/studiokimeiga/perfect-web/actions/runs/39526960864)
   at `f15117de` passed all three full browser jobs, but native recipes
   `e14-todomvc`, `e14-device-store`, `e14-check-is-build`, `e14-bind`
-  and `e14-speculated-arms` failed. TodoMVC's unchanged Cypress
+  `e14-speculated-arms`, `e14-representations`, `e14-computed-conditions`,
+  `e14-mutation-bound` and `e14-guide` failed. TodoMVC's unchanged Cypress
   execution passed 24/29 (native status 3); device-store's strict campaign
   credited 53/62 controls and refused nine invalid producers. The source
   census missed TodoMVC; one of 14 binding controls and one of eight
-  speculation controls survived. Repairs
+  speculation controls survived. Representations detected3/4 and computed
+  conditions9/12; the memory-bound campaign refused one invalid witness,
+  and the guide campaign stopped on a stale control-map entry. Repairs
   and their whole affected follow-ups are pending; [NEXT](NEXT.md) records
   the causes and acceptance obligations. Post-dispatch guide ownership
   scope changes also require current evidence.
+- Exact-source [CI39527396553](https://github.com/studiokimeiga/perfect-web/actions/runs/39527396553)
+  at `152a4a41` passed x64, ARM and license/advisory checks. Subsequent
+  repairs still require their own exact-source CI; this pass does not
+  establish the current unlanded combined tree.
 - **E14 gates 3 and 4 remain open:** agent runs and analysis await model and
   budget decisions. Framework-wide performance superiority and broad
   application correctness are not established.
