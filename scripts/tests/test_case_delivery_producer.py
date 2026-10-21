@@ -46,6 +46,9 @@ class CaseDeliveryProducer(unittest.TestCase):
 
     def test_setup_panic_is_refused(self):
         self.assertFalse(campaign.result_of(101, self.output(True, line=1))[0])
+        # An unwrap inside the assertion's operand shares its source line,
+        # but its native panic points at the operand rather than the macro.
+        self.assertFalse(campaign.result_of(101, self.output(True).replace(':5:', ':27:'))[0])
 
     def test_invalid_mutant_earns_no_kill_and_source_is_restored(self):
         import mutation_baseline

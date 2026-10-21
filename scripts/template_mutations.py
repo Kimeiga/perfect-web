@@ -3,8 +3,9 @@
 attributes in templates.
 
 A test that passes with the mechanism removed is not evidence for it. Each
-mutant undoes one piece of ADR-0042, and at least one test must then fail or
-not build. The first is the defect ADR-0042 found: the lowering that dropped
+mutant undoes one piece of ADR-0042, and at least one test assertion must
+then fail. Build errors and incomplete runs earn no kill. The first defect
+ADR-0042 found was the lowering that dropped
 `{:else}`, so both branches of an `if` rendered together.
 
 `evidence_is_current` is left out of the tests run here: it would kill every
@@ -16,9 +17,14 @@ sources are restored after every mutant, whatever happens.
 """
 
 import pathlib
+import os
 import re
+import signal
 import subprocess
 import sys
+
+import cargo_test_results
+import mutation_source
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 LOWER = ROOT / "compiler/pw-core/src/lower.rs"
@@ -104,8 +110,12 @@ MUTANTS = [
     (
         "an arm's binding has no type",
         INFER,
-        "                types.bindings.insert(Binder::Arm(n, 0), p);",
-        "                let _ = p;",
+        # ADR-0351's solved fallback types the arm when its declaration-only
+        # binding is absent. Remove the answer at the shared consumer boundary
+        # so this still models an untyped arm, not a redundant insertion.
+        "    pub fn of(&self, body: &Body, id: ExprId) -> Option<ResolvedType> {\n",
+        "    pub fn of(&self, body: &Body, id: ExprId) -> Option<ResolvedType> {\n"
+        "        if matches!(self.lexical.binder(id), Some(Binder::Arm(_, _))) { return None; }\n",
     ),
     (
         "a match renders its first arm whatever the case",
@@ -141,54 +151,121 @@ TESTS = [
     ["cargo", "test", "--quiet", "--locked", "-p", "kiokun-server"],
 ]
 
+INVENTORIES = {}
+SOURCES = (
+    {"compiler/pw-core/tests/template_blocks.rs"},
+    {"runtime/pw-render/tests/branches.rs"},
+    {"spikes/kiokun/server/src/main.rs", "spikes/kiokun/server/src/data.rs"},
+)
+# These four tests were already ignored in this campaign: three require an
+# external whole-shard checkout, and one is the separate release benchmark.
+# Explicitly exclude them from this selected run so every selected test must
+# finish. The same 10 active kiokun tests still execute for every control.
+KIOKUN_OTHER_RUNS = (
+    "tests::every_entry_in_the_whole_shard_looks_up_and_renders",
+    "tests::memory_and_work_per_call",
+    "tests::the_compiled_search_is_kiokuns_ranking_on_the_whole_shard",
+    "tests::the_compiled_shard_rule_places_every_word_kiokun_has",
+)
+
+
+def result_of(index, code, output):
+    result = cargo_test_results.parse(code, output)
+    tests = re.findall(r"^test (\S+) \.\.\. (ok|FAILED)$", output, re.M)
+    names = tuple(sorted(name for name, _ in tests))
+    if (not result.valid or len(tests) != result.passed + result.failed
+            or len(set(names)) != len(names)
+            or re.search(r"; [1-9]\d* (?:ignored|measured)", output)
+            or (index in INVENTORIES and INVENTORIES[index] != names)):
+        return False, 0, 0
+    if result.failed:
+        blocks = re.findall(r"^---- (\S+) stdout ----\n(.*?)(?=^---- |^failures:|^test result:|\Z)", output, re.M | re.S)
+        failed = {name for name, status in tests if status == "FAILED"}
+        if (len(blocks) != result.failed or {name for name, _ in blocks} != failed
+                or set(result.failure_names) != failed):
+            return False, 0, 0
+        for _, block in blocks:
+            sites = re.findall(r"panicked at ([^\n]+?):(\d+):(\d+):", block)
+            if len(sites) != 1:
+                return False, 0, 0
+            path, line, column = sites[0]
+            try:
+                source = (ROOT / path).resolve().relative_to(ROOT)
+            except ValueError:
+                return False, 0, 0
+            if source.as_posix() not in SOURCES[index]:
+                return False, 0, 0
+            lines = (ROOT / source).read_text().splitlines()
+            if (not 1 <= int(line) <= len(lines)
+                    or not (start := re.match(r"(\s*)assert(?:_eq|_ne)?!", lines[int(line) - 1]))
+                    or int(column) != len(start.group(1)) + 1):
+                return False, 0, 0
+    INVENTORIES.setdefault(index, names)
+    return True, result.passed, result.failed
+
 
 def run_tests():
-    """(built, passed, failed) over every test command."""
+    """Complete native runs with the baseline's frozen test inventory."""
     built, passed, failed = True, 0, 0
-    for cmd in TESTS:
-        r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
-        out = r.stdout + r.stderr
-        m = re.search(r"test result: \w+\. (\d+) passed; (\d+) failed", out)
-        if m is None:
-            built = False
-            continue
-        passed += int(m.group(1))
-        failed += int(m.group(2))
+    for index, cmd in enumerate(TESTS):
+        flags = ["--", "--format=pretty"]
+        if index == 2:
+            flags.extend(arg for name in KIOKUN_OTHER_RUNS for arg in ("--skip", name))
+        child = subprocess.Popen([*cmd, *flags], cwd=ROOT,
+                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                 text=True, start_new_session=True)
+        try:
+            out, _ = child.communicate(timeout=600)
+        except BaseException:
+            try:
+                os.killpg(child.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            child.communicate()
+            raise
+        valid, p, f = result_of(index, child.returncode, out)
+        if not valid or f:
+            print(out, flush=True)
+        built &= valid
+        passed += p
+        failed += f
     return built, passed, failed
 
 
 def main():
     import mutation_baseline  # keeps what each command says, for a red baseline
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(1))
+    watch = mutation_baseline.mutation_bound.start()
+    INVENTORIES.clear()
     built, passed, failed = run_tests()
     print(f"baseline: {passed} passed, {failed} failed")
-    if not built or failed or not passed:
+    if not built or failed or not passed or watch.stopped:
         print("FAIL: the unmutated baseline is not green; no mutant can mean anything")
         mutation_baseline.explain()
         return 1
 
-    survivors = 0
+    survivors = refused = killed = 0
     for what, path, anchor, replacement in MUTANTS:
         original = path.read_text()
         if original.count(anchor) != 1:
             print(f"{what}: ANCHOR NOT FOUND EXACTLY ONCE in {path.name}")
-            survivors += 1
+            refused += 1
             continue
-        try:
-            path.write_text(original.replace(anchor, replacement, 1))
+        with mutation_source.changed(path, original, original.replace(anchor, replacement, 1)):
             built, passed, failed = run_tests()
-        finally:
-            path.write_text(original)
-        if not built:
-            verdict = "KILLED (does not build)"
+        if not built or watch.stopped:
+            verdict = "REFUSED (invalid or stopped producer; no kill)"
+            refused += 1
         elif failed:
             verdict = f"KILLED ({failed} of {passed + failed} tests fail)"
+            killed += 1
         else:
             verdict = "SURVIVED"
             survivors += 1
         print(f"{what}: {verdict}")
 
-    print(f"{len(MUTANTS) - survivors} of {len(MUTANTS)} mutants killed")
-    return 1 if survivors else 0
+    print(f"{killed} of {len(MUTANTS)} mutants killed; {refused} refused; {survivors} survived")
+    return int(bool(survivors or refused))
 
 
 if __name__ == "__main__":

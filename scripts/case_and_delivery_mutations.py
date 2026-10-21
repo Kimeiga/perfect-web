@@ -103,13 +103,14 @@ def result_of(code, output):
         source = ROOT / "compiler/pw-core/tests/case_and_delivery.rs"
         lines = source.read_text().splitlines()
         for _, block in blocks:
-            sites = re.findall(r"panicked at ([^\n]+?):(\d+):\d+:", block)
+            sites = re.findall(r"panicked at ([^\n]+?):(\d+):(\d+):", block)
             if len(sites) != 1:
                 return False, 0, 0
-            path, line = sites[0]
+            path, line, column = sites[0]
             if ((ROOT / path).resolve() != source.resolve()
                     or not 1 <= int(line) <= len(lines)
-                    or not re.match(r"\s*assert(?:_eq|_ne)?!", lines[int(line) - 1])):
+                    or not (start := re.match(r"(\s*)assert(?:_eq|_ne)?!", lines[int(line) - 1]))
+                    or int(column) != len(start.group(1)) + 1):
                 return False, 0, 0
     return True, result.passed, result.failed
 

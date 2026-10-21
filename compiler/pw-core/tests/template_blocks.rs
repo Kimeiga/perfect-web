@@ -168,6 +168,11 @@ fn an_attribute_with_holes_is_text_and_values_in_its_context() {
     let ir = chunks(&src);
     let mut attrs = Vec::new();
     parts(&ir, "interpolated_attribute", &mut attrs);
+    assert_eq!(
+        attrs.len(),
+        2,
+        "the href and class retain their holes: {ir}"
+    );
     let href = attrs.iter().find(|a| a["name"] == "href").unwrap();
     assert_eq!(href["context"], "url");
     assert_eq!(
@@ -420,10 +425,19 @@ fn an_arms_binding_has_its_payloads_type() {
         "found: Option<Option<Hit>>",
         "{#match found}{:Some(inner)}{#if inner}<p>x</p>{/if}{:None}<p>-</p>{/match}",
     );
-    assert!(codes(&src).contains(&"PW0600"), "{:?}", diagnostics(&src));
+    assert_eq!(codes(&src), ["PW0600"], "{:?}", diagnostics(&src));
     let src = page(
         "found: Option<Hit>",
         "{#match found}{:Some(h)}{#if h.word}<p>x</p>{/if}{:None}<p>-</p>{/match}",
     );
     assert!(codes(&src).is_empty(), "{:?}", diagnostics(&src));
+    // The error arm has the declared error payload, too. A nested Option
+    // cannot serve as a condition, while the neighboring String can.
+    for (error, expected) in [("Option<Hit>", vec!["PW0600"]), ("String", vec![])] {
+        let src = page(
+            &format!("found: Result<Hit, {error}>"),
+            "{#match found}{:Ok(h)}<p>{h.word}</p>{:Err(problem)}{#if problem}<p>problem</p>{/if}{/match}",
+        );
+        assert_eq!(codes(&src), expected, "{:?}", diagnostics(&src));
+    }
 }

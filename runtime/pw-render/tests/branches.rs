@@ -79,13 +79,13 @@ fn a_match_renders_the_arm_its_case_names_with_the_payload_bound() {
     let t = found_page();
     let hit = Env::new().set("found", some(record(&[("word", "人")])));
     assert_eq!(
-        render(&t, &hit, &[]).unwrap(),
-        "<!--pw:s0--><p><!--pw:s1-->人<!--pw:e1--></p><!--pw:e0-->"
+        render(&t, &hit, &[]).as_deref(),
+        Ok("<!--pw:s0--><p><!--pw:s1-->人<!--pw:e1--></p><!--pw:e0-->")
     );
     let nothing = Env::new().set("found", none());
     assert_eq!(
-        render(&t, &nothing, &[]).unwrap(),
-        "<!--pw:s0--><p>-</p><!--pw:e0-->"
+        render(&t, &nothing, &[]).as_deref(),
+        Ok("<!--pw:s0--><p>-</p><!--pw:e0-->")
     );
 }
 
@@ -179,17 +179,17 @@ fn a_declared_case_renders_with_each_field_bound() {
         Some(Value::List(vec![Value::Int(3), Value::Int(4)])),
     );
     assert_eq!(
-        render(&t, &Env::new().set("shape", rect), &[]).unwrap(),
-        "<!--pw:s0--><p><!--pw:s1-->3<!--pw:e1-->x<!--pw:s2-->4<!--pw:e2--></p><!--pw:e0-->"
+        render(&t, &Env::new().set("shape", rect), &[]).as_deref(),
+        Ok("<!--pw:s0--><p><!--pw:s1-->3<!--pw:e1-->x<!--pw:s2-->4<!--pw:e2--></p><!--pw:e0-->")
     );
     let circle = case("circle", Some(Value::Int(2)));
     assert_eq!(
-        render(&t, &Env::new().set("shape", circle), &[]).unwrap(),
-        "<!--pw:s0--><p>r<!--pw:s3-->2<!--pw:e3--></p><!--pw:e0-->"
+        render(&t, &Env::new().set("shape", circle), &[]).as_deref(),
+        Ok("<!--pw:s0--><p>r<!--pw:s3-->2<!--pw:e3--></p><!--pw:e0-->")
     );
     assert_eq!(
-        render(&t, &Env::new().set("shape", case("empty", None)), &[]).unwrap(),
-        "<!--pw:s0--><p>-</p><!--pw:e0-->"
+        render(&t, &Env::new().set("shape", case("empty", None)), &[]).as_deref(),
+        Ok("<!--pw:s0--><p>-</p><!--pw:e0-->")
     );
     // A payload whose fields the arm does not have is refused, not bound
     // short.
@@ -214,10 +214,10 @@ fn a_conditional_renders_exactly_one_branch_and_refuses_a_variant() {
         "<!--pw:s0-->B<!--pw:e0-->"
     );
     // `Some(false)` is not a condition: `{#match}` takes it apart.
-    let err = render(&t, &Env::new().set("a", some(Value::Bool(false))), &[]).unwrap_err();
+    let result = render(&t, &Env::new().set("a", some(Value::Bool(false))), &[]);
     assert!(
-        matches!(err, Blocked::UnrepresentedConstruct { .. }),
-        "{err}"
+        matches!(result, Err(Blocked::UnrepresentedConstruct { .. })),
+        "{result:?}"
     );
 }
 

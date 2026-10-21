@@ -63,7 +63,9 @@ PW0337 repair; valid value comparisons and exhaustive matches stay clean.
 No production rule changes, and all six mutation operators remain.
 
 The campaign now requires the complete six-test inventory, native Cargo
-exit agreement and each failed test's assertion site in the test file.
+exit agreement and each failed test's assertion site in the test file,
+including the macro's starting column. An unwrap in an assertion operand
+on the same source line is therefore refused as well.
 Build errors, incomplete runs, foreign/setup panics and process stops are
 refused rather than credited. Five producer regressions cover these paths
 and source restoration. Reproduce with `cargo test --locked -p pw-core

@@ -163,6 +163,44 @@ Each value is escaped for its attribute's context:
 
 ## Consequences
 
+### Arm-type control repair, 2026-10-20
+
+ADR-0351 made the canonical value solver supply an arm's payload type when
+the declaration-only inference table lacks it. Removing that table's
+insertion therefore left all 12 checker tests passing: the behavior was
+still correct. The control now suppresses an arm binding's answer at
+`Types::of`, the shared boundary that chooses the declared or solved type.
+This preserves the original fault, an arm whose payload loses its type,
+and keeps all 16 operators. No production code changes.
+
+The arm regression now pairs `Option` and `Result` payloads: an optional
+payload used as a condition has exactly PW0600; neighboring string/record
+uses stay clean. The producer requires native Cargo exit agreement, the
+baseline's complete inventory for every selected suite, and assertion
+panic sites in those suites' test files, including the macro's starting
+column so an unwrap on the same line is not an assertion. Build errors, missing tests,
+setup panics and stopped processes are refused and never credited. Five
+producer regressions cover these paths and restoration.
+
+Four older controls also exposed unwrap/unwrap_err failures in their tests.
+The tests now compare the render's complete Result against the same exact
+HTML, assert the expected error kind directly, and assert the two attribute
+holes before inspecting them. These are behavior assertions; an incidental
+panic earns no credit. The active inventory remains 12 checker, 9 renderer
+and 10 kiokun tests. Four previously ignored kiokun whole-shard/benchmark
+tests are explicitly filtered from this selected run; no active test was
+removed. They retain their separate external-data/release-run obligations.
+
+Reproduce the focused regression with `cargo test --locked -p pw-core
+--test template_blocks`; the full unchanged 16-control inventory remains
+`python3 scripts/template_mutations.py`, recorded by `just e10-templates`.
+The assembled train's hosted whole recipe is required before landing.
+The local final run passes all 31 selected baseline tests and kills all
+16 controls by authenticated assertions, with 0 refused, 0 survivors and
+no stopped process. The five producer regressions pass as well.
+
+### Original consequences
+
 - The dev server's patch generator does not emit patches for the new parts.
   The store uses none of them, and kiokun's pages carry no script.
 - The Marko adapter refuses `{:else}` and `{#match}`, as it refuses `{#if}`.
