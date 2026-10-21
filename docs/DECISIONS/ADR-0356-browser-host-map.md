@@ -296,3 +296,31 @@ CI's per-host time is not measured here; train-11's verify will show it.
   `test_builds_before_suites.py` and `test_ci_scripts.py`,
   `host-metadata.mjs`, `host-plan.mjs`, and the header of its two evidence
   files, as in this file's name and title.
+
+
+## Train-12 reserved-role witness repair (2026-10-21)
+
+The hosted campaign at `f15117de` (verify `39526960864`) killed 53 of
+54 controls. The unchanged control "a test may name a reserved host"
+survived: TodoMVC now has a real host, and its former reserved-role negative
+had become a positive. No current registry role is reserved. This removed
+the witness, not the supported `rolesForTest` contract: its caller may
+supply a valid registry whose role has `reserved: true`.
+
+The existing declarations test now validates a private registry with the
+base role reserved, then requires both a fixed spec mapping and an
+annotated spec to refuse that role in all three engines. Explicit false
+and absent flags accept the same selections. The real TodoMVC positive
+remains. Production behavior, the strict producer, and all 54 original
+operators are unchanged.
+
+The targeted native proof is in
+`docs/evidence/tooling/browser-host-map-reserved-proof.txt`. The old full
+fast suite passed 25 cases with and without the original fault. With the
+new witness, the same fault produces exactly one `ERR_ASSERTION` failure
+in the intended declarations test, with the other 24 cases passing; after
+restoration all 25 pass. The native exits, complete unchanged named
+inventory, and zero skipped/cancelled/todo cases were checked. The Python
+host-map consumer, Node syntax check, and mutation-anchor check also pass.
+This is targeted proof; the complete 54-control campaign remains due on
+the combined hosted source. The failed historical report is retained.

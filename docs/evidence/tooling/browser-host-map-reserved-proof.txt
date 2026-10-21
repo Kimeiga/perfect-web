@@ -1,0 +1,888 @@
+Browser host map: reserved-role witness repair
+Base: 94f3a0e95f37c734c180136b4e92f1c8b5cde567
+
+Historical hosted verify 39526960864, e14-browser-host-map: 53 of 54 killed;
+only "a test may name a reserved host [fast]" survived. Original report:
+tracks/evidence/wit-unique/verify-39526960864/evidence-35/evidence/docs/evidence/E14/browser-host-map.txt
+No historical output was overwritten.
+
+Native command for every fast phase:
+  node --test --test-reporter=tap spikes/own-renderer/host-plan.test.mjs
+Original operator index 10, unchanged:
+  host-metadata.mjs: if (registry.roles[role].reserved === true) fail(
+                   -> if (false) fail(
+Fault planted/restored through mutation_source.changed; child run through
+producer_process.run. Exit, full ordered 25-name inventory, summary counts,
+zero skipped/cancelled/todo, and sole ERR_ASSERTION in the designated test
+were required. The original full suite passed both before and under fault.
+The repaired full suite passes, the fault yields exactly one assertion-red,
+and the restored full suite passes again. No build/runtime/timeout is credit.
+
+Focused commands:
+  node --check spikes/own-renderer/host-plan.test.mjs
+  python3 -m unittest discover -s scripts/tests -p test_browser_host_map.py -v
+  python3 scripts/mutation_anchors.py
+  git diff --check
+All 54 MUTANTS and strict producer are byte-identical to base. Production
+host-metadata.mjs is byte-identical to base. Complete 54-control rerun is due
+on combined hosted source; it was not run here.
+
+Source SHA256:
+7af59880a2791fc7fa0cbf39409b5c83ed5c058ad94c16df35ac59a2d9779a6b  scripts/browser_host_map_mutations.py
+1316e59c0ce0053c82c1dda41d30194438a66abf60112c91f87cce65884ceca0  spikes/own-renderer/host-metadata.mjs
+3c2cf289d508906b1bc10eac3ddea04ff5b367aa7e8db3a07223551d8fee9b45  spikes/own-renderer/host-plan.test.mjs
+
+===== /tmp/browser-host-map-original-baseline.txt =====
+TAP version 13
+# Subtest: registry covers the exact current spec inventory
+ok 1 - registry covers the exact current spec inventory
+  ---
+  duration_ms: 0.970389
+  type: 'test'
+  ...
+# Subtest: every spec's registered hosts are exactly the hosts its source reaches
+ok 2 - every spec's registered hosts are exactly the hosts its source reaches
+  ---
+  duration_ms: 4.002256
+  type: 'test'
+  ...
+# Subtest: a spec's hosts are read from its baseURL overrides, and an unnamed loopback port is refused
+ok 3 - a spec's hosts are read from its baseURL overrides, and an unnamed loopback port is refused
+  ---
+  duration_ms: 0.51087
+  type: 'test'
+  ...
+# Subtest: all host and provider listeners are disjoint across adjacent and multiple slots
+ok 4 - all host and provider listeners are disjoint across adjacent and multiple slots
+  ---
+  duration_ms: 2.132212
+  type: 'test'
+  ...
+# Subtest: TCP bound includes the final slot and largest concrete listener
+ok 5 - TCP bound includes the final slot and largest concrete listener
+  ---
+  duration_ms: 1.742332
+  type: 'test'
+  ...
+# Subtest: duplicate, fractional, negative and escaping concrete offsets refuse
+ok 6 - duplicate, fractional, negative and escaping concrete offsets refuse
+  ---
+  duration_ms: 1.13844
+  type: 'test'
+  ...
+# Subtest: provider dependencies are declared and engine compatible
+ok 7 - provider dependencies are declared and engine compatible
+  ---
+  duration_ms: 1.011703
+  type: 'test'
+  ...
+# Subtest: pure legacy port exports preserve every accepted within-slot offset
+ok 8 - pure legacy port exports preserve every accepted within-slot offset
+  ---
+  duration_ms: 2.402427
+  type: 'test'
+  ...
+# Subtest: a test's baseURL names the one registered host of its engine
+ok 9 - a test's baseURL names the one registered host of its engine
+  ---
+  duration_ms: 0.483068
+  type: 'test'
+  ...
+# Subtest: unknown selected spec, project, role and conflicting declarations refuse
+ok 10 - unknown selected spec, project, role and conflicting declarations refuse
+  ---
+  duration_ms: 1.035783
+  type: 'test'
+  ...
+# Subtest: schema, engines, role builds and spec mappings fail closed
+ok 11 - schema, engines, role builds and spec mappings fail closed
+  ---
+  duration_ms: 1.586022
+  type: 'test'
+  ...
+# Subtest: build checks preserve whole-build runtime and source freshness with concrete prerequisites
+ok 12 - build checks preserve whole-build runtime and source freshness with concrete prerequisites
+  ---
+  duration_ms: 3.346435
+  type: 'test'
+  ...
+# Subtest: only keyed external generated copies may be absent and existing copies remain hash checked
+ok 13 - only keyed external generated copies may be absent and existing copies remain hash checked
+  ---
+  duration_ms: 1.765234
+  type: 'test'
+  ...
+# Subtest: specs of an optional build that cannot be served are left out, each said with the build it lacks, and never dist's
+ok 14 - specs of an optional build that cannot be served are left out, each said with the build it lacks, and never dist's
+  ---
+  duration_ms: 1.854909
+  type: 'test'
+  ...
+# Subtest: a selection declares only its own hosts, refuses an unservable dist and drops an optional host only for tests that skip themselves
+ok 15 - a selection declares only its own hosts, refuses an unservable dist and drops an optional host only for tests that skip themselves
+  ---
+  duration_ms: 6.371419
+  type: 'test'
+  ...
+# Subtest: selected descriptors preserve memory identity blobs provider ports target and reuse policy
+ok 16 - selected descriptors preserve memory identity blobs provider ports target and reuse policy
+  ---
+  duration_ms: 3.983691
+  type: 'test'
+  ...
+# Subtest: PW_PERFORMANCE admits only the Chromium performance host
+ok 17 - PW_PERFORMANCE admits only the Chromium performance host
+  ---
+  duration_ms: 1.421389
+  type: 'test'
+  ...
+# Subtest: native collection framing preserves every opaque argument before and after separator
+ok 18 - native collection framing preserves every opaque argument before and after separator
+  ---
+  duration_ms: 0.119607
+  type: 'test'
+  ...
+# Subtest: collection receipts require exact issuer selection config completion and role identities
+ok 19 - collection receipts require exact issuer selection config completion and role identities
+  ---
+  duration_ms: 1.009966
+  type: 'test'
+  ...
+# Subtest: public collection reporter publishes only one successful complete callback sequence
+ok 20 - public collection reporter publishes only one successful complete callback sequence
+  ---
+  duration_ms: 1.679935
+  type: 'test'
+  ...
+# Subtest: spec metadata imports cannot recurse through the Playwright config
+ok 21 - spec metadata imports cannot recurse through the Playwright config
+  ---
+  duration_ms: 1.32024
+  type: 'test'
+  ...
+# Subtest: a host's command passes each word to its host as it is
+ok 22 - a host's command passes each word to its host as it is
+  ---
+  duration_ms: 16.193368
+  type: 'test'
+  ...
+# Killed
+# Subtest: a host's launcher keeps its host while its input is open and ends it when the input ends
+ok 23 - a host's launcher keeps its host while its input is open and ends it when the input ends
+  ---
+  duration_ms: 18.587821
+  type: 'test'
+  ...
+# Subtest: a host's launcher ends with its host's status, whatever its input
+ok 24 - a host's launcher ends with its host's status, whatever its input
+  ---
+  duration_ms: 12.516538
+  type: 'test'
+  ...
+# Killed
+# Subtest: a host's owner killed outright leaves its host listening nowhere
+ok 25 - a host's owner killed outright leaves its host listening nowhere
+  ---
+  duration_ms: 41.880749
+  type: 'test'
+  ...
+1..25
+# tests 25
+# suites 0
+# pass 25
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 169.721487
+
+===== /tmp/browser-host-map-original-survivor.txt =====
+Original unchanged operator: a test may name a reserved host
+Native status: 0
+TAP version 13
+# Subtest: registry covers the exact current spec inventory
+ok 1 - registry covers the exact current spec inventory
+  ---
+  duration_ms: 0.936562
+  type: 'test'
+  ...
+# Subtest: every spec's registered hosts are exactly the hosts its source reaches
+ok 2 - every spec's registered hosts are exactly the hosts its source reaches
+  ---
+  duration_ms: 3.873978
+  type: 'test'
+  ...
+# Subtest: a spec's hosts are read from its baseURL overrides, and an unnamed loopback port is refused
+ok 3 - a spec's hosts are read from its baseURL overrides, and an unnamed loopback port is refused
+  ---
+  duration_ms: 0.482936
+  type: 'test'
+  ...
+# Subtest: all host and provider listeners are disjoint across adjacent and multiple slots
+ok 4 - all host and provider listeners are disjoint across adjacent and multiple slots
+  ---
+  duration_ms: 2.214586
+  type: 'test'
+  ...
+# Subtest: TCP bound includes the final slot and largest concrete listener
+ok 5 - TCP bound includes the final slot and largest concrete listener
+  ---
+  duration_ms: 1.628712
+  type: 'test'
+  ...
+# Subtest: duplicate, fractional, negative and escaping concrete offsets refuse
+ok 6 - duplicate, fractional, negative and escaping concrete offsets refuse
+  ---
+  duration_ms: 1.02303
+  type: 'test'
+  ...
+# Subtest: provider dependencies are declared and engine compatible
+ok 7 - provider dependencies are declared and engine compatible
+  ---
+  duration_ms: 1.153251
+  type: 'test'
+  ...
+# Subtest: pure legacy port exports preserve every accepted within-slot offset
+ok 8 - pure legacy port exports preserve every accepted within-slot offset
+  ---
+  duration_ms: 2.295139
+  type: 'test'
+  ...
+# Subtest: a test's baseURL names the one registered host of its engine
+ok 9 - a test's baseURL names the one registered host of its engine
+  ---
+  duration_ms: 0.395288
+  type: 'test'
+  ...
+# Subtest: unknown selected spec, project, role and conflicting declarations refuse
+ok 10 - unknown selected spec, project, role and conflicting declarations refuse
+  ---
+  duration_ms: 1.03729
+  type: 'test'
+  ...
+# Subtest: schema, engines, role builds and spec mappings fail closed
+ok 11 - schema, engines, role builds and spec mappings fail closed
+  ---
+  duration_ms: 1.270856
+  type: 'test'
+  ...
+# Subtest: build checks preserve whole-build runtime and source freshness with concrete prerequisites
+ok 12 - build checks preserve whole-build runtime and source freshness with concrete prerequisites
+  ---
+  duration_ms: 2.304605
+  type: 'test'
+  ...
+# Subtest: only keyed external generated copies may be absent and existing copies remain hash checked
+ok 13 - only keyed external generated copies may be absent and existing copies remain hash checked
+  ---
+  duration_ms: 1.924758
+  type: 'test'
+  ...
+# Subtest: specs of an optional build that cannot be served are left out, each said with the build it lacks, and never dist's
+ok 14 - specs of an optional build that cannot be served are left out, each said with the build it lacks, and never dist's
+  ---
+  duration_ms: 1.792268
+  type: 'test'
+  ...
+# Subtest: a selection declares only its own hosts, refuses an unservable dist and drops an optional host only for tests that skip themselves
+ok 15 - a selection declares only its own hosts, refuses an unservable dist and drops an optional host only for tests that skip themselves
+  ---
+  duration_ms: 6.206657
+  type: 'test'
+  ...
+# Subtest: selected descriptors preserve memory identity blobs provider ports target and reuse policy
+ok 16 - selected descriptors preserve memory identity blobs provider ports target and reuse policy
+  ---
+  duration_ms: 4.188894
+  type: 'test'
+  ...
+# Subtest: PW_PERFORMANCE admits only the Chromium performance host
+ok 17 - PW_PERFORMANCE admits only the Chromium performance host
+  ---
+  duration_ms: 1.35565
+  type: 'test'
+  ...
+# Subtest: native collection framing preserves every opaque argument before and after separator
+ok 18 - native collection framing preserves every opaque argument before and after separator
+  ---
+  duration_ms: 0.120441
+  type: 'test'
+  ...
+# Subtest: collection receipts require exact issuer selection config completion and role identities
+ok 19 - collection receipts require exact issuer selection config completion and role identities
+  ---
+  duration_ms: 0.965273
+  type: 'test'
+  ...
+# Subtest: public collection reporter publishes only one successful complete callback sequence
+ok 20 - public collection reporter publishes only one successful complete callback sequence
+  ---
+  duration_ms: 1.647126
+  type: 'test'
+  ...
+# Subtest: spec metadata imports cannot recurse through the Playwright config
+ok 21 - spec metadata imports cannot recurse through the Playwright config
+  ---
+  duration_ms: 1.237795
+  type: 'test'
+  ...
+# Subtest: a host's command passes each word to its host as it is
+ok 22 - a host's command passes each word to its host as it is
+  ---
+  duration_ms: 15.437083
+  type: 'test'
+  ...
+# Killed
+# Subtest: a host's launcher keeps its host while its input is open and ends it when the input ends
+ok 23 - a host's launcher keeps its host while its input is open and ends it when the input ends
+  ---
+  duration_ms: 18.821615
+  type: 'test'
+  ...
+# Subtest: a host's launcher ends with its host's status, whatever its input
+ok 24 - a host's launcher ends with its host's status, whatever its input
+  ---
+  duration_ms: 11.568241
+  type: 'test'
+  ...
+# Killed
+# Subtest: a host's owner killed outright leaves its host listening nowhere
+ok 25 - a host's owner killed outright leaves its host listening nowhere
+  ---
+  duration_ms: 39.13661
+  type: 'test'
+  ...
+1..25
+# tests 25
+# suites 0
+# pass 25
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 163.474927
+
+
+===== /tmp/browser-host-map-repaired-proof.txt =====
+
+== new full fast baseline native exit 0
+TAP version 13
+# Subtest: registry covers the exact current spec inventory
+ok 1 - registry covers the exact current spec inventory
+  ---
+  duration_ms: 0.953854
+  type: 'test'
+  ...
+# Subtest: every spec's registered hosts are exactly the hosts its source reaches
+ok 2 - every spec's registered hosts are exactly the hosts its source reaches
+  ---
+  duration_ms: 3.932474
+  type: 'test'
+  ...
+# Subtest: a spec's hosts are read from its baseURL overrides, and an unnamed loopback port is refused
+ok 3 - a spec's hosts are read from its baseURL overrides, and an unnamed loopback port is refused
+  ---
+  duration_ms: 0.551967
+  type: 'test'
+  ...
+# Subtest: all host and provider listeners are disjoint across adjacent and multiple slots
+ok 4 - all host and provider listeners are disjoint across adjacent and multiple slots
+  ---
+  duration_ms: 2.097231
+  type: 'test'
+  ...
+# Subtest: TCP bound includes the final slot and largest concrete listener
+ok 5 - TCP bound includes the final slot and largest concrete listener
+  ---
+  duration_ms: 1.64268
+  type: 'test'
+  ...
+# Subtest: duplicate, fractional, negative and escaping concrete offsets refuse
+ok 6 - duplicate, fractional, negative and escaping concrete offsets refuse
+  ---
+  duration_ms: 1.078785
+  type: 'test'
+  ...
+# Subtest: provider dependencies are declared and engine compatible
+ok 7 - provider dependencies are declared and engine compatible
+  ---
+  duration_ms: 1.030424
+  type: 'test'
+  ...
+# Subtest: pure legacy port exports preserve every accepted within-slot offset
+ok 8 - pure legacy port exports preserve every accepted within-slot offset
+  ---
+  duration_ms: 2.492623
+  type: 'test'
+  ...
+# Subtest: a test's baseURL names the one registered host of its engine
+ok 9 - a test's baseURL names the one registered host of its engine
+  ---
+  duration_ms: 0.471444
+  type: 'test'
+  ...
+# Subtest: unknown selected spec, project, role and conflicting declarations refuse
+ok 10 - unknown selected spec, project, role and conflicting declarations refuse
+  ---
+  duration_ms: 3.30475
+  type: 'test'
+  ...
+# Subtest: schema, engines, role builds and spec mappings fail closed
+ok 11 - schema, engines, role builds and spec mappings fail closed
+  ---
+  duration_ms: 1.06733
+  type: 'test'
+  ...
+# Subtest: build checks preserve whole-build runtime and source freshness with concrete prerequisites
+ok 12 - build checks preserve whole-build runtime and source freshness with concrete prerequisites
+  ---
+  duration_ms: 3.358563
+  type: 'test'
+  ...
+# Subtest: only keyed external generated copies may be absent and existing copies remain hash checked
+ok 13 - only keyed external generated copies may be absent and existing copies remain hash checked
+  ---
+  duration_ms: 2.272877
+  type: 'test'
+  ...
+# Subtest: specs of an optional build that cannot be served are left out, each said with the build it lacks, and never dist's
+ok 14 - specs of an optional build that cannot be served are left out, each said with the build it lacks, and never dist's
+  ---
+  duration_ms: 2.40854
+  type: 'test'
+  ...
+# Subtest: a selection declares only its own hosts, refuses an unservable dist and drops an optional host only for tests that skip themselves
+ok 15 - a selection declares only its own hosts, refuses an unservable dist and drops an optional host only for tests that skip themselves
+  ---
+  duration_ms: 6.529614
+  type: 'test'
+  ...
+# Subtest: selected descriptors preserve memory identity blobs provider ports target and reuse policy
+ok 16 - selected descriptors preserve memory identity blobs provider ports target and reuse policy
+  ---
+  duration_ms: 4.106393
+  type: 'test'
+  ...
+# Subtest: PW_PERFORMANCE admits only the Chromium performance host
+ok 17 - PW_PERFORMANCE admits only the Chromium performance host
+  ---
+  duration_ms: 1.727684
+  type: 'test'
+  ...
+# Subtest: native collection framing preserves every opaque argument before and after separator
+ok 18 - native collection framing preserves every opaque argument before and after separator
+  ---
+  duration_ms: 0.169466
+  type: 'test'
+  ...
+# Subtest: collection receipts require exact issuer selection config completion and role identities
+ok 19 - collection receipts require exact issuer selection config completion and role identities
+  ---
+  duration_ms: 0.705702
+  type: 'test'
+  ...
+# Subtest: public collection reporter publishes only one successful complete callback sequence
+ok 20 - public collection reporter publishes only one successful complete callback sequence
+  ---
+  duration_ms: 1.903268
+  type: 'test'
+  ...
+# Subtest: spec metadata imports cannot recurse through the Playwright config
+ok 21 - spec metadata imports cannot recurse through the Playwright config
+  ---
+  duration_ms: 1.052797
+  type: 'test'
+  ...
+# Subtest: a host's command passes each word to its host as it is
+ok 22 - a host's command passes each word to its host as it is
+  ---
+  duration_ms: 17.737648
+  type: 'test'
+  ...
+# Killed
+# Subtest: a host's launcher keeps its host while its input is open and ends it when the input ends
+ok 23 - a host's launcher keeps its host while its input is open and ends it when the input ends
+  ---
+  duration_ms: 22.194233
+  type: 'test'
+  ...
+# Subtest: a host's launcher ends with its host's status, whatever its input
+ok 24 - a host's launcher ends with its host's status, whatever its input
+  ---
+  duration_ms: 14.566773
+  type: 'test'
+  ...
+# Killed
+# Subtest: a host's owner killed outright leaves its host listening nowhere
+ok 25 - a host's owner killed outright leaves its host listening nowhere
+  ---
+  duration_ms: 43.459431
+  type: 'test'
+  ...
+1..25
+# tests 25
+# suites 0
+# pass 25
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 184.780483
+
+
+== unchanged reserved-host operator native exit 1
+TAP version 13
+# Subtest: registry covers the exact current spec inventory
+ok 1 - registry covers the exact current spec inventory
+  ---
+  duration_ms: 0.982547
+  type: 'test'
+  ...
+# Subtest: every spec's registered hosts are exactly the hosts its source reaches
+ok 2 - every spec's registered hosts are exactly the hosts its source reaches
+  ---
+  duration_ms: 4.294268
+  type: 'test'
+  ...
+# Subtest: a spec's hosts are read from its baseURL overrides, and an unnamed loopback port is refused
+ok 3 - a spec's hosts are read from its baseURL overrides, and an unnamed loopback port is refused
+  ---
+  duration_ms: 0.555527
+  type: 'test'
+  ...
+# Subtest: all host and provider listeners are disjoint across adjacent and multiple slots
+ok 4 - all host and provider listeners are disjoint across adjacent and multiple slots
+  ---
+  duration_ms: 2.267223
+  type: 'test'
+  ...
+# Subtest: TCP bound includes the final slot and largest concrete listener
+ok 5 - TCP bound includes the final slot and largest concrete listener
+  ---
+  duration_ms: 1.753224
+  type: 'test'
+  ...
+# Subtest: duplicate, fractional, negative and escaping concrete offsets refuse
+ok 6 - duplicate, fractional, negative and escaping concrete offsets refuse
+  ---
+  duration_ms: 1.08455
+  type: 'test'
+  ...
+# Subtest: provider dependencies are declared and engine compatible
+ok 7 - provider dependencies are declared and engine compatible
+  ---
+  duration_ms: 1.106626
+  type: 'test'
+  ...
+# Subtest: pure legacy port exports preserve every accepted within-slot offset
+ok 8 - pure legacy port exports preserve every accepted within-slot offset
+  ---
+  duration_ms: 2.62312
+  type: 'test'
+  ...
+# Subtest: a test's baseURL names the one registered host of its engine
+ok 9 - a test's baseURL names the one registered host of its engine
+  ---
+  duration_ms: 0.411543
+  type: 'test'
+  ...
+# Subtest: unknown selected spec, project, role and conflicting declarations refuse
+not ok 10 - unknown selected spec, project, role and conflicting declarations refuse
+  ---
+  duration_ms: 1.465672
+  type: 'test'
+  location: '/home/haki/code/pw-wt/browser-host-map-proof/spikes/own-renderer/host-plan.test.mjs:169:1'
+  failureType: 'testCodeFailure'
+  error: 'Missing expected exception.'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  operator: 'throws'
+  stack: |-
+    TestContext.<anonymous> (file:///home/haki/code/pw-wt/browser-host-map-proof/spikes/own-renderer/host-plan.test.mjs:187:14)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: schema, engines, role builds and spec mappings fail closed
+ok 11 - schema, engines, role builds and spec mappings fail closed
+  ---
+  duration_ms: 1.373161
+  type: 'test'
+  ...
+# Subtest: build checks preserve whole-build runtime and source freshness with concrete prerequisites
+ok 12 - build checks preserve whole-build runtime and source freshness with concrete prerequisites
+  ---
+  duration_ms: 2.881483
+  type: 'test'
+  ...
+# Subtest: only keyed external generated copies may be absent and existing copies remain hash checked
+ok 13 - only keyed external generated copies may be absent and existing copies remain hash checked
+  ---
+  duration_ms: 1.934668
+  type: 'test'
+  ...
+# Subtest: specs of an optional build that cannot be served are left out, each said with the build it lacks, and never dist's
+ok 14 - specs of an optional build that cannot be served are left out, each said with the build it lacks, and never dist's
+  ---
+  duration_ms: 2.016807
+  type: 'test'
+  ...
+# Subtest: a selection declares only its own hosts, refuses an unservable dist and drops an optional host only for tests that skip themselves
+ok 15 - a selection declares only its own hosts, refuses an unservable dist and drops an optional host only for tests that skip themselves
+  ---
+  duration_ms: 6.858833
+  type: 'test'
+  ...
+# Subtest: selected descriptors preserve memory identity blobs provider ports target and reuse policy
+ok 16 - selected descriptors preserve memory identity blobs provider ports target and reuse policy
+  ---
+  duration_ms: 4.032013
+  type: 'test'
+  ...
+# Subtest: PW_PERFORMANCE admits only the Chromium performance host
+ok 17 - PW_PERFORMANCE admits only the Chromium performance host
+  ---
+  duration_ms: 1.411255
+  type: 'test'
+  ...
+# Subtest: native collection framing preserves every opaque argument before and after separator
+ok 18 - native collection framing preserves every opaque argument before and after separator
+  ---
+  duration_ms: 0.122819
+  type: 'test'
+  ...
+# Subtest: collection receipts require exact issuer selection config completion and role identities
+ok 19 - collection receipts require exact issuer selection config completion and role identities
+  ---
+  duration_ms: 1.03552
+  type: 'test'
+  ...
+# Subtest: public collection reporter publishes only one successful complete callback sequence
+ok 20 - public collection reporter publishes only one successful complete callback sequence
+  ---
+  duration_ms: 1.621316
+  type: 'test'
+  ...
+# Subtest: spec metadata imports cannot recurse through the Playwright config
+ok 21 - spec metadata imports cannot recurse through the Playwright config
+  ---
+  duration_ms: 1.300734
+  type: 'test'
+  ...
+# Subtest: a host's command passes each word to its host as it is
+ok 22 - a host's command passes each word to its host as it is
+  ---
+  duration_ms: 16.844732
+  type: 'test'
+  ...
+# Killed
+# Subtest: a host's launcher keeps its host while its input is open and ends it when the input ends
+ok 23 - a host's launcher keeps its host while its input is open and ends it when the input ends
+  ---
+  duration_ms: 23.140467
+  type: 'test'
+  ...
+# Subtest: a host's launcher ends with its host's status, whatever its input
+ok 24 - a host's launcher ends with its host's status, whatever its input
+  ---
+  duration_ms: 14.788288
+  type: 'test'
+  ...
+# Killed
+# Subtest: a host's owner killed outright leaves its host listening nowhere
+ok 25 - a host's owner killed outright leaves its host listening nowhere
+  ---
+  duration_ms: 41.893848
+  type: 'test'
+  ...
+1..25
+# tests 25
+# suites 0
+# pass 24
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 182.906667
+
+
+== restored source full fast baseline native exit 0
+TAP version 13
+# Subtest: registry covers the exact current spec inventory
+ok 1 - registry covers the exact current spec inventory
+  ---
+  duration_ms: 1.047005
+  type: 'test'
+  ...
+# Subtest: every spec's registered hosts are exactly the hosts its source reaches
+ok 2 - every spec's registered hosts are exactly the hosts its source reaches
+  ---
+  duration_ms: 4.083503
+  type: 'test'
+  ...
+# Subtest: a spec's hosts are read from its baseURL overrides, and an unnamed loopback port is refused
+ok 3 - a spec's hosts are read from its baseURL overrides, and an unnamed loopback port is refused
+  ---
+  duration_ms: 0.531333
+  type: 'test'
+  ...
+# Subtest: all host and provider listeners are disjoint across adjacent and multiple slots
+ok 4 - all host and provider listeners are disjoint across adjacent and multiple slots
+  ---
+  duration_ms: 2.134776
+  type: 'test'
+  ...
+# Subtest: TCP bound includes the final slot and largest concrete listener
+ok 5 - TCP bound includes the final slot and largest concrete listener
+  ---
+  duration_ms: 1.752473
+  type: 'test'
+  ...
+# Subtest: duplicate, fractional, negative and escaping concrete offsets refuse
+ok 6 - duplicate, fractional, negative and escaping concrete offsets refuse
+  ---
+  duration_ms: 1.062387
+  type: 'test'
+  ...
+# Subtest: provider dependencies are declared and engine compatible
+ok 7 - provider dependencies are declared and engine compatible
+  ---
+  duration_ms: 1.063398
+  type: 'test'
+  ...
+# Subtest: pure legacy port exports preserve every accepted within-slot offset
+ok 8 - pure legacy port exports preserve every accepted within-slot offset
+  ---
+  duration_ms: 2.363558
+  type: 'test'
+  ...
+# Subtest: a test's baseURL names the one registered host of its engine
+ok 9 - a test's baseURL names the one registered host of its engine
+  ---
+  duration_ms: 0.435567
+  type: 'test'
+  ...
+# Subtest: unknown selected spec, project, role and conflicting declarations refuse
+ok 10 - unknown selected spec, project, role and conflicting declarations refuse
+  ---
+  duration_ms: 3.088507
+  type: 'test'
+  ...
+# Subtest: schema, engines, role builds and spec mappings fail closed
+ok 11 - schema, engines, role builds and spec mappings fail closed
+  ---
+  duration_ms: 1.061083
+  type: 'test'
+  ...
+# Subtest: build checks preserve whole-build runtime and source freshness with concrete prerequisites
+ok 12 - build checks preserve whole-build runtime and source freshness with concrete prerequisites
+  ---
+  duration_ms: 2.889851
+  type: 'test'
+  ...
+# Subtest: only keyed external generated copies may be absent and existing copies remain hash checked
+ok 13 - only keyed external generated copies may be absent and existing copies remain hash checked
+  ---
+  duration_ms: 2.057239
+  type: 'test'
+  ...
+# Subtest: specs of an optional build that cannot be served are left out, each said with the build it lacks, and never dist's
+ok 14 - specs of an optional build that cannot be served are left out, each said with the build it lacks, and never dist's
+  ---
+  duration_ms: 2.436787
+  type: 'test'
+  ...
+# Subtest: a selection declares only its own hosts, refuses an unservable dist and drops an optional host only for tests that skip themselves
+ok 15 - a selection declares only its own hosts, refuses an unservable dist and drops an optional host only for tests that skip themselves
+  ---
+  duration_ms: 6.404706
+  type: 'test'
+  ...
+# Subtest: selected descriptors preserve memory identity blobs provider ports target and reuse policy
+ok 16 - selected descriptors preserve memory identity blobs provider ports target and reuse policy
+  ---
+  duration_ms: 3.884863
+  type: 'test'
+  ...
+# Subtest: PW_PERFORMANCE admits only the Chromium performance host
+ok 17 - PW_PERFORMANCE admits only the Chromium performance host
+  ---
+  duration_ms: 1.745808
+  type: 'test'
+  ...
+# Subtest: native collection framing preserves every opaque argument before and after separator
+ok 18 - native collection framing preserves every opaque argument before and after separator
+  ---
+  duration_ms: 0.155858
+  type: 'test'
+  ...
+# Subtest: collection receipts require exact issuer selection config completion and role identities
+ok 19 - collection receipts require exact issuer selection config completion and role identities
+  ---
+  duration_ms: 0.744301
+  type: 'test'
+  ...
+# Subtest: public collection reporter publishes only one successful complete callback sequence
+ok 20 - public collection reporter publishes only one successful complete callback sequence
+  ---
+  duration_ms: 2.088101
+  type: 'test'
+  ...
+# Subtest: spec metadata imports cannot recurse through the Playwright config
+ok 21 - spec metadata imports cannot recurse through the Playwright config
+  ---
+  duration_ms: 1.217888
+  type: 'test'
+  ...
+# Subtest: a host's command passes each word to its host as it is
+ok 22 - a host's command passes each word to its host as it is
+  ---
+  duration_ms: 16.902693
+  type: 'test'
+  ...
+# Killed
+# Subtest: a host's launcher keeps its host while its input is open and ends it when the input ends
+ok 23 - a host's launcher keeps its host while its input is open and ends it when the input ends
+  ---
+  duration_ms: 20.444615
+  type: 'test'
+  ...
+# Subtest: a host's launcher ends with its host's status, whatever its input
+ok 24 - a host's launcher ends with its host's status, whatever its input
+  ---
+  duration_ms: 14.207319
+  type: 'test'
+  ...
+# Killed
+# Subtest: a host's owner killed outright leaves its host listening nowhere
+ok 25 - a host's owner killed outright leaves its host listening nowhere
+  ---
+  duration_ms: 43.086226
+  type: 'test'
+  ...
+1..25
+# tests 25
+# suites 0
+# pass 25
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 182.586085
+
+VERIFIED: complete unchanged inventory; sole intended native ERR_ASSERTION; restored green; no cancellation, skip, or TODO.
+
+===== /tmp/browser-host-map-focused-python.txt =====
+test_the_host_maps_node_tests_pass (test_browser_host_map.HostMap) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.199s
+
+OK
+
+===== /tmp/browser-host-map-anchors.txt =====
+mutation anchors: 4364 mutants in 307 scripts, each matching once

@@ -173,6 +173,30 @@ test("unknown selected spec, project, role and conflicting declarations refuse",
   for (const annotations of [[], [{ type: "pw-host", description: "unknown" }], [{ type: "pw-host", description: "base" }, { type: "pw-host", description: "feed" }]]) {
     assert.throws(() => rolesForTest("page-policy.spec.mjs", "chromium", annotations), /host annotation|host role/);
   }
+  // A future app may reserve its role even when every current app is present.
+  // Both fixed spec mappings and explicit annotations obey that same flag.
+  const reserved = clone();
+  reserved.roles.base.reserved = true;
+  assert.doesNotThrow(() => validateRegistry(reserved));
+  const selections = [
+    ["signals.spec.mjs", []],
+    ["page-policy.spec.mjs", [{ type: "pw-host", description: "base" }]],
+  ];
+  for (const engine of ENGINES) {
+    for (const [file, annotations] of selections) {
+      assert.throws(() => rolesForTest(file, engine, annotations, reserved), /selected host role base is reserved/);
+    }
+  }
+  for (const present of [false, undefined]) {
+    if (present === undefined) delete reserved.roles.base.reserved;
+    else reserved.roles.base.reserved = present;
+    assert.doesNotThrow(() => validateRegistry(reserved));
+    for (const engine of ENGINES) {
+      for (const [file, annotations] of selections) {
+        assert.deepEqual(rolesForTest(file, engine, annotations, reserved), ["base"]);
+      }
+    }
+  }
   // TodoMVC's hosts serve its spec, its app on this branch (track `todomvc`).
   assert.deepEqual(rolesForTest("todomvc.spec.mjs", "firefox"), ["todomvc"]);
   assert.deepEqual(rolesForTest("signals.spec.mjs", "chromium"), ["base"]);
