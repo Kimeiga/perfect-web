@@ -1,0 +1,12 @@
+   Compiling pw-dev-server v0.0.0 (/home/haki/code/pw-wt/device-store-marker-investigation/spikes/own-renderer/server)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.57s
+     Running unittests src/main.rs (/home/haki/code/pw-wt/train-12/target/debug/deps/pw_dev_server-88c84baa3139d059)
+
+running 4 tests
+test tests::todomvc::no_host_holds_a_todo ... ok
+test tests::todomvc::the_document_says_what_the_device_keeps ... ok
+test tests::todomvc::the_host_renders_the_default_and_hides_what_the_device_decides ... ok
+test tests::todomvc::the_page_has_the_templates_markup ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 708 filtered out; finished in 0.75s
+

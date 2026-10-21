@@ -1,0 +1,142 @@
+e2e/feed.spec.mjs is not run: dist-feed is not built: run feed.sh
+e2e/guestbook.spec.mjs is not run: dist-guestbook is not built: run guestbook.sh
+e2e/identity.spec.mjs is not run: dist-feed is not built: run feed.sh
+e2e/keyed.spec.mjs is not run: dist-keyed is not built: run keyed-store.sh
+e2e/kiokun-site.spec.mjs is not run: dist-kiokun is not built: run kiokun-site.sh
+e2e/messages.spec.mjs is not run: dist-feed is not built: run feed.sh
+e2e/notifications.spec.mjs is not run: dist-feed is not built: run feed.sh
+e2e/uploads.spec.mjs is not run: dist-feed is not built: run feed.sh
+browser host map: 1 of 80 hosts for 50 selected tests
+
+Running 50 tests using 16 workers
+
+[1A[2K[1/50] [chromium] › e2e/todomvc.spec.mjs:106:1 › the field is focused when the page is loaded
+[1A[2K[2/50] [chromium] › e2e/todomvc.spec.mjs:90:1 › served without script: the header, the field, and a hidden main and footer
+[1A[2K[3/50] [chromium] › e2e/todomvc.spec.mjs:152:1 › a title is at most a thousand characters
+[1A[2K[4/50] [chromium] › e2e/todomvc.spec.mjs:163:1 › a title that is markup is shown as text
+[1A[2K[5/50] [chromium] › e2e/todomvc.spec.mjs:183:1 › the toggle-all completes the rest where some are completed
+[1A[2K[6/50] [chromium] › e2e/todomvc.spec.mjs:249:1 › the same checkbox, pressed again, un-completes it
+[1A[2K[7/50] [chromium] › e2e/todomvc.spec.mjs:172:1 › the toggle-all completes every todo, and again clears every one
+[1A[2K[8/50] [chromium] › e2e/todomvc.spec.mjs:62:1 › with no todos, main and footer are hidden, though they are there
+[1A[2K[9/50] [chromium] › e2e/todomvc.spec.mjs:129:1 › the text is trimmed
+[1A[2K[10/50] [chromium] › e2e/todomvc.spec.mjs:135:1 › a title that is nothing once trimmed creates no todo, and is left to be corrected
+[1A[2K[11/50] [chromium] › e2e/todomvc.spec.mjs:238:1 › a todo's checkbox completes it, toggling the class on its li
+[1A[2K[12/50] [chromium] › e2e/todomvc.spec.mjs:123:1 › new todos are appended to the bottom of the list
+[1A[2K[13/50] [chromium] › e2e/todomvc.spec.mjs:219:1 › the toggle-all, pressed, is not checked for a todo added once the completed are cleared
+[1A[2K[14/50] [chromium] › e2e/todomvc.spec.mjs:111:1 › Enter creates the todo, appends it, and clears the field
+[1A[2K[15/50] [chromium] › e2e/todomvc.spec.mjs:201:1 › the toggle-all, pressed, still follows the todos: unchecked when one is cleared, checked when all are
+[1A[2K[16/50] [chromium] › e2e/todomvc.spec.mjs:75:1 › with a todo, main and footer are shown; with none again, hidden again
+[1A[2K[17/50] [chromium] › e2e/todomvc.spec.mjs:259:1 › a checkbox another tab cleared is shown cleared, though this tab had pressed it
+[1A[2K[18/50] [chromium] › e2e/todomvc.spec.mjs:275:1 › hovering over a todo shows its remove button, which removes it
+[1A[2K[19/50] [chromium] › e2e/todomvc.spec.mjs:289:1 › a double press on the label begins editing: a field holds the title, and the other controls are hidden
+[1A[2K[20/50] [chromium] › e2e/todomvc.spec.mjs:308:1 › the edit field is focused as it appears, and is the one typed in
+[1A[2K[21/50] [chromium] › e2e/todomvc.spec.mjs:324:1 › Enter saves the edit and leaves editing
+[1A[2K[22/50] [chromium] › e2e/todomvc.spec.mjs:338:1 › blur saves the edit and leaves editing
+[1A[2K[23/50] [chromium] › e2e/todomvc.spec.mjs:351:1 › clicking away saves the edit too
+[1A[2K[24/50] [chromium] › e2e/todomvc.spec.mjs:377:1 › a completed todo being edited is shown completed, and stays so
+[1A[2K[25/50] [chromium] › e2e/todomvc.spec.mjs:362:1 › Enter or blur with nothing changed keeps the todo as it is
+[1A[2K[26/50] [chromium] › e2e/todomvc.spec.mjs:393:1 › the edit is trimmed
+[1A[2K[27/50] [chromium] › e2e/todomvc.spec.mjs:404:1 › an edit trimmed to nothing destroys the todo
+[1A[2K[28/50] [chromium] › e2e/todomvc.spec.mjs:415:1 › an edit emptied and left by blur destroys the todo too
+[1A[2K[29/50] [chromium] › e2e/todomvc.spec.mjs:425:1 › Escape leaves editing and discards the changes
+[1A[2K[30/50] [chromium] › e2e/todomvc.spec.mjs:444:1 › editing mode is not persisted: a reload shows no field
+[1A[2K[31/50] [chromium] › e2e/todomvc.spec.mjs:456:1 › editing another todo saves the first
+[1A[2K[32/50] [chromium] › e2e/todomvc.spec.mjs:471:1 › the counter says how many are left, the number in a strong
+[1A[2K[33/50] [chromium] › e2e/todomvc.spec.mjs:489:1 › clear completed shows its text and removes the completed
+[1A[2K[34/50] [chromium] › e2e/todomvc.spec.mjs:500:1 › clear completed is hidden where none is completed
+[1A[2K[35/50] [chromium] › e2e/todomvc.spec.mjs:513:1 › the todos are the framework's to keep: they outlive a reload, as they were
+[1A[2K[36/50] [chromium] › e2e/todomvc.spec.mjs:528:1 › the todos are kept in the browser's own storage, as TodoMVC's spec names them
+[1A[2K[37/50] [chromium] › e2e/todomvc.spec.mjs:555:1 › no request carries a todo: the server is told none
+[1A[2K[38/50] [chromium] › e2e/todomvc.spec.mjs:574:1 › a todo's row is one element across each change, matched by its key
+[1A[2K[39/50] [chromium] › e2e/todomvc.spec.mjs:608:1 › another visitor has a list of their own
+[1A[2K[40/50] [chromium] › e2e/todomvc.spec.mjs:621:1 › a second tab on the same device shows the same list, and each change reaches it
+[1A[2K[41/50] [chromium] › e2e/todomvc.spec.mjs:637:1 › all is the default route, its link selected
+[1A[2K[42/50] [chromium] › e2e/todomvc.spec.mjs:646:1 › #/active shows the active todos, #/completed the completed, and each link is selected
+[1A[2K[43/50] [chromium] › e2e/todomvc.spec.mjs:666:1 › the counter counts every todo whatever the filter shows
+[1A[2K[44/50] [chromium] › e2e/todomvc.spec.mjs:676:1 › an item updated while filtered is updated accordingly
+[1A[2K[45/50] [chromium] › e2e/todomvc.spec.mjs:705:1 › a todo added under a filter that shows it appears, and under one that does not, does not
+[1A[2K[46/50] [chromium] › e2e/todomvc.spec.mjs:727:1 › the back button respects the routes
+[1A[2K[47/50] [chromium] › e2e/todomvc.spec.mjs:747:1 › a page opened at a route shows it, and the route is kept on reload
+[1A[2K[48/50] [chromium] › e2e/todomvc.spec.mjs:772:1 › a fragment that is no route shows every todo
+[1A[2K[49/50] [chromium] › e2e/todomvc.spec.mjs:783:1 › the markup is the template's, which the official tests' selectors are written over
+[1A[2K[50/50] [chromium] › e2e/todomvc.spec.mjs:813:1 › the stylesheets are TodoMVC's own, and shown
+[1A[2K  1) [chromium] › e2e/todomvc.spec.mjs:183:1 › the toggle-all completes the rest where some are completed 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoHaveClass[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Locator: locator('.todo-list li').first()
+    Expected pattern: [32m/completed/[39m
+    Received string:  [31m""[39m
+    Timeout: 5000ms
+
+    Call log:
+    [2m  - Expect "toHaveClass" with timeout 5000ms[22m
+    [2m  - waiting for locator('.todo-list li').first()[22m
+    [2m    9 × locator resolved to <li class="" data-pw="3">…</li>[22m
+    [2m      - unexpected value ""[22m
+
+
+       at ../assertion-expect.mjs:31
+
+      29 |       return (...args) => {
+      30 |         try {
+    > 31 |           const result = Reflect.apply(matcher, object, args);
+         |                                  ^
+      32 |           return result && typeof result.then === "function"
+      33 |             ? result.catch(error => proven(error, name, isNot)) : result;
+      34 |         } catch (error) { return proven(error, name, isNot); }
+        at Proxy.toHaveClass (/home/haki/code/pw-wt/device-store-marker-investigation/spikes/own-renderer/assertion-expect.mjs:31:34)
+        at /home/haki/code/pw-wt/device-store-marker-investigation/spikes/own-renderer/e2e/todomvc.spec.mjs:192:63
+    [cause]: Error: PW_ASSERTION:dbb682e9e17780bb3ea0f0811c7d49b5f24cfb17cd4456746f253e979107c4ce
+        at proven (/home/haki/code/pw-wt/device-store-marker-investigation/spikes/own-renderer/assertion-expect.mjs:13:19)
+        at /home/haki/code/pw-wt/device-store-marker-investigation/spikes/own-renderer/assertion-expect.mjs:33:37
+        at /home/haki/code/pw-wt/device-store-marker-investigation/spikes/own-renderer/e2e/todomvc.spec.mjs:192:30
+
+    Error Context: test-results/todomvc-the-toggle-all-com-b863f-st-where-some-are-completed-chromium/error-context.md
+
+
+[1A[2K  2) [chromium] › e2e/todomvc.spec.mjs:574:1 › a todo's row is one element across each change, matched by its key 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoHaveClass[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Locator: locator('.todo-list li')
+    Timeout: 5000ms
+    [32m- Expected  - 2[39m
+    [31m+ Received  + 2[39m
+
+    [2m  Array [[22m
+    [32m-   /completed/,[39m
+    [32m-   /completed/,[39m
+    [31m+   "",[39m
+    [31m+   "",[39m
+    [2m  ][22m
+
+    Call log:
+    [2m  - Expect "toHaveClass" with timeout 5000ms[22m
+    [2m  - waiting for locator('.todo-list li')[22m
+    [2m    9 × locator resolved to 2 elements[22m
+
+
+       at ../assertion-expect.mjs:31
+
+      29 |       return (...args) => {
+      30 |         try {
+    > 31 |           const result = Reflect.apply(matcher, object, args);
+         |                                  ^
+      32 |           return result && typeof result.then === "function"
+      33 |             ? result.catch(error => proven(error, name, isNot)) : result;
+      34 |         } catch (error) { return proven(error, name, isNot); }
+        at Proxy.toHaveClass (/home/haki/code/pw-wt/device-store-marker-investigation/spikes/own-renderer/assertion-expect.mjs:31:34)
+        at /home/haki/code/pw-wt/device-store-marker-investigation/spikes/own-renderer/e2e/todomvc.spec.mjs:596:29
+    [cause]: Error: PW_ASSERTION:dbb682e9e17780bb3ea0f0811c7d49b5f24cfb17cd4456746f253e979107c4ce
+        at proven (/home/haki/code/pw-wt/device-store-marker-investigation/spikes/own-renderer/assertion-expect.mjs:13:19)
+        at /home/haki/code/pw-wt/device-store-marker-investigation/spikes/own-renderer/assertion-expect.mjs:33:37
+        at /home/haki/code/pw-wt/device-store-marker-investigation/spikes/own-renderer/e2e/todomvc.spec.mjs:596:3
+
+    Error Context: test-results/todomvc-a-todo-s-row-is-on-eb24b-h-change-matched-by-its-key-chromium/error-context.md
+
+
+[1A[2K  2 failed
+    [chromium] › e2e/todomvc.spec.mjs:183:1 › the toggle-all completes the rest where some are completed 
+    [chromium] › e2e/todomvc.spec.mjs:574:1 › a todo's row is one element across each change, matched by its key 
+  48 passed (8.0s)

@@ -184,9 +184,13 @@ test("the toggle-all completes the rest where some are completed", async ({ page
   await open(page);
   await add(page, ONE, TWO, THREE);
   await items(page).nth(1).locator(".toggle").check();
+  await expect(items(page).nth(0)).not.toHaveClass(/completed/);
   await expect(items(page).nth(1)).toHaveClass(/completed/);
-  await page.locator(".toggle-all").check({ force: true });
+  await expect(items(page).nth(2)).not.toHaveClass(/completed/);
+  await expect(page.locator(".toggle-all")).not.toBeChecked();
+  await page.locator(".toggle-all").click({ force: true });
   for (const n of [0, 1, 2]) await expect(items(page).nth(n)).toHaveClass(/completed/);
+  await expect(page.locator(".toggle-all")).toBeChecked();
 });
 
 // A checkbox a person has pressed holds its own state: the attribute the page
@@ -585,10 +589,20 @@ test("a todo's row is one element across each change, matched by its key", async
   // A box a person pressed follows what the list says after: all completed,
   // then none.
   await items(page).nth(0).locator(".toggle").check();
-  await page.locator(".toggle-all").check({ force: true });
-  await page.locator(".toggle-all").uncheck({ force: true });
+  await expect(items(page).nth(0)).toHaveClass(/completed/);
+  await expect(items(page).nth(1)).not.toHaveClass(/completed/);
+  await expect(page.locator(".toggle-all")).not.toBeChecked();
+  await page.locator(".toggle-all").click({ force: true });
+  await expect(items(page)).toHaveClass([/completed/, /completed/]);
+  await expect(items(page).nth(0).locator(".toggle")).toBeChecked();
+  await expect(items(page).nth(1).locator(".toggle")).toBeChecked();
+  await expect(page.locator(".toggle-all")).toBeChecked();
+  await page.locator(".toggle-all").click({ force: true });
   await expect(items(page).nth(0)).not.toHaveClass(/completed/);
+  await expect(items(page).nth(1)).not.toHaveClass(/completed/);
   await expect(items(page).nth(0).locator(".toggle")).not.toBeChecked();
+  await expect(items(page).nth(1).locator(".toggle")).not.toBeChecked();
+  await expect(page.locator(".toggle-all")).not.toBeChecked();
 });
 
 test("another visitor has a list of their own", async ({ page, browser, baseURL }) => {

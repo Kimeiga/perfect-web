@@ -1,0 +1,4 @@
+pw-render: 2 file(s) written to /home/runner/work/perfect-web/perfect-web/spikes/own-renderer/dist
+pw-render: 8 file(s) written to /home/runner/work/perfect-web/perfect-web/spikes/own-renderer/dist
+pw-render: 2 file(s) written to /home/runner/work/perfect-web/perfect-web/spikes/own-renderer/dist.again
+error: recipe `e14-todomvc` failed on line 133 with exit code 1
