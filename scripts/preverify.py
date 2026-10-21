@@ -380,11 +380,7 @@ def survivors(text: str) -> list[str]:
 def bound_lines(recipe: str, text: str) -> list[str]:
     """The lines of an evidence file where a mutation script's memory bound
     stopped a process, as `ci_summary.py` lists them."""
-    return [
-        f"{recipe}: {line[len(ci_summary.BOUND):]}"
-        for line in text.splitlines()
-        if line.startswith(ci_summary.BOUND) and line != ci_summary.UNTOUCHED
-    ]
+    return [f"{recipe}: {line}" for line in ci_summary.memory_failures(text)]
 
 
 def failing_lines(text: str, limit: int = 30) -> list[str]:
@@ -436,14 +432,15 @@ def result_of(recipe: str, lane: int, out: pathlib.Path, outcome: str, left: lis
             survived.append(f"{path} was written, and the runner's copy of it is missing")
             continue
         survived += survivors(text)
-        bound += bound_lines(recipe, text)
-    ok = judge(row["status"], survived)
+    invalid = ci_summary.recipe_memory_failures(out, row)
+    bound = [f"{recipe}: {line}" for line in invalid]
+    ok = judge(row["status"], survived + invalid)
     if ok:
         why = ""
     elif row["status"]:
         why = f"exit {row['status']}"
     else:
-        why = "; ".join(survived[:3])
+        why = "; ".join((survived + invalid)[:3])
     return Result(
         recipe, "ok" if ok else "FAILED", lane, why, row["status"], row["seconds"], row["wrote"],
         survived, bound, notes, str(out),
@@ -833,7 +830,7 @@ def render(results: list[Result], jobs: list[Job], meta: dict, setups: list[dict
     out += [""] if failed or lanes_down else []
     bound = [b for r in rows for b in r.bound]
     if bound:
-        out += ["Killed, perhaps by the memory bound alone, not by a test:", ""]
+        out += [ci_summary.BOUND_FAILURE, ""]
         out += [f"- {b}" for b in bound] + [""]
     left = [(r.recipe, n) for r in rows for n in r.notes]
     if left:

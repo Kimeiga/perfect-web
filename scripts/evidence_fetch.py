@@ -8,7 +8,7 @@ command produced it (its `produced by:` line, unchanged), at which commit,
 and where it ran, and a reader can open the run and its logs. A recipe run
 here again writes the file without it.
 
-A file a recipe that failed wrote is not copied: its output, never its
+A file a failed or memory-stopped recipe wrote is not copied: its output, never its
 evidence, whether its run's failure is known or not.
 
 Refused, before anything is copied:
@@ -25,7 +25,7 @@ Refused, before anything is copied:
   another run records that recipe, `--skip RECIPE` copies none of its
   files.
 
-Each recipe that ran to its end (exit 0) has its seconds kept in
+Each recipe that ran to its end (exit 0, no memory-guard failure) has its seconds kept in
 `scripts/ci_seconds.json`, which `ci_plan.py` deals the next runs by
 (ADR-0290). `--times-only` keeps them from any completed run, one that
 failed or was cancelled among them, and copies no evidence: a recipe's time
@@ -43,7 +43,8 @@ import sys
 import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-
+sys.path.insert(0, str(ROOT / "scripts"))
+import ci_summary  # shared recipe memory-guard validity, including historical runs
 # Each recipe's seconds, as `ci_plan.SECONDS` reads them.
 SECONDS = ROOT / "scripts/ci_seconds.json"
 
@@ -94,7 +95,7 @@ def refusal(run: dict, jobs: list[dict], known: list[str]) -> str | None:
 def timed(results: list[dict]) -> dict[str, int]:
     """Each recipe that ran to its end, and its seconds, from shards'
     `results.json`."""
-    return {r["recipe"]: round(r["seconds"]) for r in results if r.get("status") == 0}
+    return {r["recipe"]: round(r["seconds"]) for r in results if r.get("status") == 0 and not r.get("invalid")}
 
 
 def remember(seconds: dict[str, int], path: pathlib.Path) -> int:
@@ -129,7 +130,7 @@ def failed_files(results: list[dict]) -> set[str]:
     its evidence. Until 2026-10-12 a run fetched with `--known summary` copied
     it with the rest, and W8's merge took `e14-diffs`' output stopped at a
     patch that did not apply."""
-    return {w for r in results if r.get("status") != 0 for w in r.get("wrote", [])}
+    return {w for r in results if r.get("status") != 0 or r.get("invalid") for w in r.get("wrote", [])}
 
 
 def recorded(results: list[dict]) -> dict[str, str]:
@@ -169,7 +170,9 @@ def results_of(shards: list[pathlib.Path]) -> list[dict]:
     out = []
     for shard in shards:
         if (shard / "results.json").exists():
-            out.extend(json.loads((shard / "results.json").read_text()))
+            for row in json.loads((shard / "results.json").read_text()):
+                row["invalid"] = ci_summary.recipe_memory_failures(shard, row)
+                out.append(row)
     return out
 
 

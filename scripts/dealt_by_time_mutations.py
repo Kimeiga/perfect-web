@@ -345,8 +345,8 @@ MUTANTS = [
     (
         "a recipe that failed has its seconds kept",
         FETCH,
-        '    return {r["recipe"]: round(r["seconds"]) for r in results if r.get("status") == 0}\n',
-        '    return {r["recipe"]: round(r["seconds"]) for r in results}\n',
+        '    return {r["recipe"]: round(r["seconds"]) for r in results if r.get("status") == 0 and not r.get("invalid")}\n',
+        '    return {r["recipe"]: round(r["seconds"]) for r in results if not r.get("invalid")}\n',
     ),
     (
         "the seconds kept replace every other recipe's",

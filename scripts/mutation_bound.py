@@ -16,8 +16,9 @@ script's output says so where it happened, before the mutant's verdict:
 
       memory bound: stopped `graphs`, which held more than 4 GiB
 
-Its command fails as a test that cannot finish fails, and the mutant counts
-as killed, as PIT counts a mutant's memory error and Stryker its timeout.
+A stop invalidates the producer and earns no mutation kill. ADR-0292's
+train-12 amendment supersedes the historical policy that credited memory
+errors: a complete result with an actual assertion is required.
 
 **A kill by the bound is its own kind** (cargo-mutants reports a timeout
 apart from a test's kill, and a suite whose kills were the bound's would
@@ -29,7 +30,9 @@ line is the bound's, every run:
     memory bound: no process was stopped
     memory bound: a process was stopped in 1 of 19 mutants' runs, each perhaps killed by the bound alone: the renderer takes a node twice
 
-and `ci_summary.py` lists the second kind in the run's summary.
+and `ci_summary.py` rejects the second kind, any immediate stop, or a failed
+watcher. Fetch excludes that recipe's output and completed timing. Legacy
+verdict wording is retained as diagnostic history, never accepted as proof.
 
 Only the script's own processes are read, and one is stopped only where two
 readings agree that it is the script's: the list of processes, walked down

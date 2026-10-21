@@ -107,7 +107,8 @@ the hosts a run needs) and the allocator
    can run what is left, it is "not run", and fails the run. Each recipe is
    run by `scripts/ci_recipes.py`, CI's own runner, from the lane's tree.
 5. **The report is CI's.** A recipe fails on a non-zero exit or on a line
-   its evidence says survived (`ci_summary.SURVIVED`), and nothing else; a
+   its evidence says survived (`ci_summary.SURVIVED`), or a memory-guard failure
+   in its evidence or log (ADR-0292 train-12 amendment); a
    test holds the verdicts to `ci_summary.py`'s on the same artifacts. The
    summary has CI's shape (the count, each failure and why, what a memory
    bound stopped, the table sorted by recipe) with each recipe's lane and

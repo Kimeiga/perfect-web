@@ -270,9 +270,9 @@ MUTANTS = [
     ),
     (
         "a memory bound that stopped nothing is listed",
-        PV,
-        "        if line.startswith(ci_summary.BOUND) and line != ci_summary.UNTOUCHED\n",
-        "        if line.startswith(ci_summary.BOUND)\n",
+        ROOT / "scripts/ci_summary.py",
+        "        if (line.strip().startswith(BOUND) and line.strip() != UNTOUCHED)\n",
+        "        if line.strip().startswith(BOUND)\n",
     ),
     ("the failing lines are not capped", PV, "    return found[:limit]\n", "    return found\n"),
     (
@@ -301,16 +301,16 @@ MUTANTS = [
         '        return Result(recipe, "ok", lane, why, notes=notes, out=str(out))\n',
     ),
     ("a survivor is not read from the evidence", PV, "        survived += survivors(text)\n", "        survived += []\n"),
-    ("the memory bound is not read from the evidence", PV, "        bound += bound_lines(recipe, text)\n", "        bound += []\n"),
+    ("the memory bound is not read from the evidence", PV, '    invalid = ci_summary.recipe_memory_failures(out, row)\n', '    invalid = []\n'),
     ("an exit is not a failure's reason", PV, "    elif row[\"status\"]:\n        why = f\"exit {row['status']}\"\n", "    elif False:\n        why = f\"exit {row['status']}\"\n"),
-    ("five survivors are the reason", PV, '        why = "; ".join(survived[:3])\n', '        why = "; ".join(survived[:5])\n'),
+    ("five survivors are the reason", PV, '        why = "; ".join((survived + invalid)[:3])\n', '        why = "; ".join((survived + invalid)[:5])\n'),
     (
         "a recipe's seconds are not the runner's",
         PV,
         '        recipe, "ok" if ok else "FAILED", lane, why, row["status"], row["seconds"], row["wrote"],\n',
         '        recipe, "ok" if ok else "FAILED", lane, why, row["status"], 0.0, row["wrote"],\n',
     ),
-    ("a survivor is not weighed in the result", PV, '    ok = judge(row["status"], survived)\n', '    ok = judge(row["status"], [])\n'),
+    ("a survivor is not weighed in the result", PV, '    ok = judge(row["status"], survived + invalid)\n', '    ok = judge(row["status"], invalid)\n'),
     # -- processes
     (
         "a zombie is alive",
@@ -423,8 +423,8 @@ MUTANTS = [
     (
         "the memory bound is not listed",
         PV,
-        '    if bound:\n        out += ["Killed, perhaps by the memory bound alone, not by a test:", ""]\n',
-        '    if False:\n        out += ["Killed, perhaps by the memory bound alone, not by a test:", ""]\n',
+        '    if bound:\n        out += [ci_summary.BOUND_FAILURE, ""]\n',
+        '    if False:\n        out += [ci_summary.BOUND_FAILURE, ""]\n',
     ),
     (
         "what a recipe left running is not listed",

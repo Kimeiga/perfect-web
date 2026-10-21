@@ -6,6 +6,7 @@ kept; and every script that reports a red baseline says what failed. And
 no bytecode a mutant left decides what a later run runs (`Bytecode`).
 """
 
+import contextlib
 import importlib.util
 import io
 import pathlib
@@ -31,7 +32,15 @@ def load(name: str):
     return module
 
 
-baseline = load("mutation_baseline")
+# Import diagnostics, including the guard's atexit line, belong on stderr.
+# Native unittest discovery reserves stdout for its exact JSON inventory.
+with contextlib.redirect_stdout(sys.stderr):
+    baseline = load("mutation_baseline")
+# The guard resolves its output when it emits, including after discovery.
+# Route the existing watcher only; never start one that the tested import omitted.
+for thread in threading.enumerate():
+    if thread.name == "mutation-bound" and hasattr(thread, "watch"):
+        thread.watch.out = sys.stderr
 
 PANIC = (
     "running 3 tests\n"

@@ -1429,7 +1429,7 @@ class Judging(unittest.TestCase):
 
     def test_the_memory_bound_lines_are_listed_but_not_the_untouched_one(self):
         text = "memory bound: no process was stopped\nmemory bound: stopped `cargo`\nother\n"
-        self.assertEqual(pv.bound_lines("e14-x", text), ["e14-x: stopped `cargo`"])
+        self.assertEqual(pv.bound_lines("e14-x", text), ["e14-x: memory bound: stopped `cargo`"])
 
     def test_a_result_is_read_from_the_runners_record_and_its_evidence(self):
         out = recipe_out(self.temp, "e14-a", 0, {"docs/evidence/E14/a.txt": "ok\n"})
@@ -1613,7 +1613,7 @@ class Report(unittest.TestCase):
     def test_what_the_memory_bound_stopped_is_listed_apart(self):
         out = recipe_out(self.temp, "e14-a", 0, {"docs/evidence/E14/a.txt": "memory bound: stopped `cargo`, which held\n"})
         text = pv.render([pv.result_of("e14-a", 0, out, "done", [])], self.jobs, self.meta, [])
-        self.assertIn("Killed, perhaps by the memory bound alone, not by a test:\n\n- e14-a: stopped `cargo`, which held", text)
+        self.assertIn("Invalid producer: memory guard stopped a process or stopped watching; no kill:\n\n- e14-a: memory bound: stopped `cargo`, which held", text)
 
     def test_processes_a_recipe_left_are_listed_apart(self):
         out = recipe_out(self.temp, "e14-a", 0, {"docs/evidence/E14/a.txt": "fine\n"})

@@ -1123,9 +1123,8 @@ class Summary(unittest.TestCase):
     def test_a_run_whose_recipes_passed_passes(self) -> None:
         self.assertEqual(self.run_summary([[self.result(wrote=["a.txt"])]], {"a.txt": "3 of 3 mutants killed\n"}, 1), 0)
 
-    def test_a_kill_perhaps_the_memory_bounds_alone_is_listed_apart(self) -> None:
-        # A kind of its own (mutation_bound.py): not a failure, and not
-        # counted with a test's kills.
+    def test_a_kill_perhaps_the_memory_bounds_alone_fails_the_recipe(self) -> None:
+        # A stopped producer is invalid, even if its legacy runner says killed.
         stopped = (
             "  memory bound: stopped `graphs`, which held more than 4 GiB\n"
             "the renderer takes a node twice: KILLED (1 of 25 tests fail)\n"
@@ -1134,10 +1133,11 @@ class Summary(unittest.TestCase):
             "each perhaps killed by the bound alone: the renderer takes a node twice\n"
         )
         done = self.summary_of([[self.result(wrote=["a.txt"])]], {"a.txt": stopped}, 1)
-        self.assertEqual(done.returncode, 0)
+        self.assertEqual(done.returncode, 1)
+        self.assertIn("Invalid producer: memory guard", done.stdout)
+        self.assertIn("| `e14-x` | FAILED |", done.stdout)
         self.assertIn(
-            "Killed, perhaps by the memory bound alone, not by a test:\n\n"
-            "- e14-x: a process was stopped in 1 of 19 mutants' runs, each perhaps killed "
+            "- e14-x: memory bound: a process was stopped in 1 of 19 mutants' runs, each perhaps killed "
             "by the bound alone: the renderer takes a node twice\n",
             done.stdout,
         )
@@ -1516,6 +1516,127 @@ class VerifiedBase(unittest.TestCase):
             calls[1],
         )
 
+
+
+class BoundEvidence(unittest.TestCase):
+    STOP = "  memory bound: stopped `native-test`, which held more than 4 GiB\n"
+    FINAL = "memory bound: a process was stopped in 1 of 1 mutants' runs\n"
+    WATCH = "  the memory bound stopped watching: PermissionError('no /proc')\n"
+    CLEAN = "1 of 1 mutants killed\nmemory bound: no process was stopped\n"
+
+    def artifact(self, root, text, log="", status=0):
+        paths = ["docs/evidence/E14/stopped.txt", "docs/evidence/E14/stopped.wasm"]
+        good = "docs/evidence/E14/good.txt"
+        row = {"recipe": "e14-stopped", "status": status, "seconds": 17, "wrote": paths}
+        neighbor = {"recipe": "e14-good", "status": 0, "seconds": 23, "wrote": [good]}
+        for path, data in [(paths[0], text.encode()), (paths[1], b"\0asm"), (good, self.CLEAN.encode())]:
+            target = root / "evidence" / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(data)
+        (root / "logs").mkdir(exist_ok=True)
+        (root / "logs/e14-stopped.log").write_text(log)
+        (root / "results.json").write_text(json.dumps([row, neighbor]))
+        return row, neighbor
+
+    def summary(self, root):
+        return subprocess.run([sys.executable, str(SCRIPTS / "ci_summary.py"), str(root), "--shards", "1"],
+                              capture_output=True, text=True)
+
+    def test_summary_refuses_each_stop_and_failed_watcher(self):
+        for text in [self.STOP, self.FINAL, self.WATCH, self.STOP + self.CLEAN, self.WATCH + self.CLEAN]:
+            with self.subTest(text=text), tempfile.TemporaryDirectory() as tmp:
+                root = pathlib.Path(tmp)
+                self.artifact(root, text)
+                done = self.summary(root)
+                self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+                self.assertIn("**2 recipes, 1 failed**", done.stdout)
+                self.assertIn("| `e14-stopped` | FAILED |", done.stdout)
+                self.assertIn("| `e14-good` | ok |", done.stdout)
+
+    def test_recipe_log_alone_invalidates_summary_fetch_and_preverify(self):
+        import preverify
+        for text in [self.STOP, self.WATCH]:
+            with self.subTest(text=text), tempfile.TemporaryDirectory() as tmp:
+                root = pathlib.Path(tmp)
+                row, _ = self.artifact(root, self.CLEAN, log=text)
+                self.assertEqual(self.summary(root).returncode, 1)
+                rows = fetch.results_of([root])
+                self.assertEqual(rows[0]["status"], 0)
+                self.assertEqual(fetch.failed_files(rows), set(row["wrote"]))
+                self.assertEqual(fetch.timed(rows), {"e14-good": 23})
+                local = preverify.result_of("e14-stopped", 0, root, "done", [])
+                self.assertEqual(local.verdict, "FAILED")
+                self.assertIn(text.strip(), local.reason)
+                self.assertEqual(preverify.result_of("e14-good", 0, root, "done", []).verdict, "ok")
+
+    def test_fetch_excludes_all_outputs_and_completed_timing_of_stopped_recipe(self):
+        for text in [self.STOP, self.FINAL, self.WATCH]:
+            with self.subTest(text=text), tempfile.TemporaryDirectory() as tmp:
+                root = pathlib.Path(tmp)
+                row, _ = self.artifact(root, text)
+                rows = fetch.results_of([root])
+                self.assertEqual(fetch.failed_files(rows), set(row["wrote"]))
+                self.assertEqual(fetch.timed(rows), {"e14-good": 23})
+                self.assertEqual(rows[0]["status"], 0, "retain the producer's native status")
+
+    def test_bound_controls_require_a_complete_actual_intended_assertion(self):
+        import mutation_bound_mutations as controls
+        def result(**changes):
+            fields = dict(valid=True, body_errors=[], executed=1, assertion_failed=["intended"])
+            fields.update(changes)
+            return types.SimpleNamespace(result=types.SimpleNamespace(**fields))
+        self.assertEqual(controls.credit([result()], [["intended"]], False, "intended"), "KILLED")
+        for changes in [dict(valid=False), dict(body_errors=["setup error"]), dict(executed=0)]:
+            with self.subTest(changes=changes):
+                self.assertEqual(controls.credit([result(**changes)], [["intended"]], False, "intended"), "REFUSED")
+        self.assertEqual(controls.credit([result()], [["intended"]], True, "intended"), "REFUSED")
+        self.assertEqual(controls.credit([], [["intended"]], False, "intended"), "REFUSED")
+        self.assertEqual(controls.credit([result(assertion_failed=["another"])], [["intended"]], False, "intended"), "SURVIVED")
+        self.assertEqual(controls.credit([result(assertion_failed=[])], [["intended"]], False, "intended"), "SURVIVED")
+
+    def test_exact_no_stop_and_absent_guard_remain_valid(self):
+        import preverify
+        for text in [self.CLEAN, "ordinary successful recipe\n"]:
+            with self.subTest(text=text), tempfile.TemporaryDirectory() as tmp:
+                root = pathlib.Path(tmp)
+                self.artifact(root, text, log=text)
+                self.assertEqual(self.summary(root).returncode, 0)
+                rows = fetch.results_of([root])
+                self.assertEqual(fetch.failed_files(rows), set())
+                self.assertEqual(fetch.timed(rows), {"e14-stopped": 17, "e14-good": 23})
+                self.assertEqual(preverify.result_of("e14-stopped", 0, root, "done", []).verdict, "ok")
+
+    def test_known_summary_cannot_copy_stopped_recipe_from_historical_green_run(self):
+        import shutil
+        for conclusion in ["success", "failure"]:
+            with self.subTest(conclusion=conclusion), tempfile.TemporaryDirectory() as tmp:
+                root = pathlib.Path(tmp)
+                artifact = root / "artifact"
+                artifact.mkdir()
+                row, good = self.artifact(artifact, self.STOP)
+                destination = root / "checkout"
+                (destination / "scripts").mkdir(parents=True)
+                seconds = destination / "scripts/ci_seconds.json"
+                old = destination / row["wrote"][0]
+                old.parent.mkdir(parents=True)
+                old.write_text("prior evidence must remain")
+                run = {"headSha": "a" * 40, "url": "https://example.invalid/run/1", "status": "completed",
+                       "conclusion": conclusion, "jobs": [{"name": "summary", "conclusion": conclusion}]}
+                def gh(*args):
+                    if args[:2] == ("run", "view"):
+                        return json.dumps(run)
+                    self.assertEqual(args[:2], ("run", "download"))
+                    shutil.copytree(artifact, pathlib.Path(args[args.index("--dir") + 1]), dirs_exist_ok=True)
+                    return ""
+                with mock.patch.object(fetch, "ROOT", destination), mock.patch.object(fetch, "SECONDS", seconds), \
+                     mock.patch.object(fetch, "gh", side_effect=gh), mock.patch.object(fetch, "moved_on", return_value=set()), \
+                     mock.patch.object(fetch.subprocess, "run", return_value=types.SimpleNamespace(returncode=0, stdout=run["headSha"])), \
+                     mock.patch.object(sys, "argv", ["evidence_fetch.py", "1", "--known", "summary"]):
+                    self.assertEqual(fetch.main(), 0)
+                self.assertEqual(old.read_text(), "prior evidence must remain")
+                self.assertFalse((destination / row["wrote"][1]).exists())
+                self.assertEqual((destination / good["wrote"][0]).read_text(), self.CLEAN)
+                self.assertEqual(json.loads(seconds.read_text()), {"e14-good": 23})
 
 if __name__ == "__main__":
     unittest.main()

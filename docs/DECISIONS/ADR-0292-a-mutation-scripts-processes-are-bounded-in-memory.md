@@ -132,3 +132,54 @@ ADR-0281).
 - **Killing whatever holds the most when the machine runs short**, as an
   out-of-memory killer does. Whether a mutant counts as killed would then
   depend on what else the machine was doing.
+
+## Train-12 amendment: a stopped producer earns no kill (2026-10-21)
+
+This supersedes decisions 2 and 3's permission to credit a memory stop as a
+kill, and the matching historical acceptance and limitation statements.
+The memory guard protects the machine; only a complete producer with an
+actual test assertion can establish a mutation kill. A stopped producer,
+or a guard that stopped watching, invalidates that recipe even if its
+legacy runner exits zero and prints a full kill count. Bounds and existing
+operators remain unchanged; an operator that only exhausts memory must be
+reported and given an explicit bounded resource-contract witness before it
+can earn a kill.
+
+Native reproduction at `2925befbc247c6ca4e58f90f08d90d8f4e570720` gave summary
+exit 0, an `ok` recipe, no fetch exclusions and a completed timing for a
+status-zero artifact that explicitly recorded a bound stop. The raw command
+and output are retained with the integration evidence.
+
+`ci_summary.py` now owns detection of memory-guard failures in a recipe's
+copied evidence and log. This includes the indented immediate stop, a final
+stop summary and a watcher failure; only the exact no-stop line is benign.
+A later benign line cannot erase an earlier stop. The summary fails the
+recipe. Fetch excludes all its files and completed timings, including from
+historical successful runs or `--known summary`. The native exit status is
+preserved separately from this validity decision. Preverification uses the
+same reader, preserving ADR-0364's agreement with CI. A recipe without a
+memory-guard line remains valid under its existing contract.
+
+The bound's mutation controls use the canonical unittest receipt protocol:
+frozen complete inventories, native status agreement and real body
+assertions, with no credit for setup errors, crashes, skips, stops or a
+broken producer. Historical raw evidence is preserved; this amendment does
+not reinterpret its prior kills as current passing evidence.
+
+The import-time guard diagnostics in `test_mutation_baseline.py` are routed
+to stderr, including its existing watcher's final line. This preserves the
+guard and its output while leaving native discovery's stdout exclusively
+for its JSON inventory; malformed inventories continue to be refused.
+
+Local integration checks (raw [diagnostic probes](../evidence/tooling/memory-bound-summary.txt)):
+35 focused summary/fetch/preverification tests passed; the canonical producer
+accepted all 135 baseline tests (15 bound, 26 baseline, 94 CI). Three sampled
+controls for summary, fetch and receipt validity failed through their exact
+intended assertions, with every edited source restored byte-for-byte. The
+complete 31-control campaign and affected preverification/dealing campaigns
+remain required on GitHub; these local probes are not CI evidence of record.
+
+`just evidence-gates` passed all 907 tests with its two existing track skips;
+format, case and all 4,279 mutation anchors passed. A format-only round trip
+also confirmed the 31 description/full-ID verdicts agree with `evidence_counts`;
+that check is not a claim that the full campaign ran locally.

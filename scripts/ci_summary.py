@@ -5,9 +5,8 @@ mutant that survived. Writes a table to `$GITHUB_STEP_SUMMARY` where that is
 set, and exits 1 if any recipe failed, any mutant survived, or a shard left
 no results.
 
-It lists apart each recipe whose mutation script's memory bound stopped a
-process (`mutation_bound.py`): a mutant whose run that was is killed, but
-perhaps by the bound alone, not by a test. The list fails nothing.
+A memory-guard stop or failed watcher invalidates the recipe, even if a
+legacy runner exits zero and claims every mutant killed (ADR-0292 amendment).
 
     python3 scripts/ci_summary.py <artifacts-dir> --shards N
 """
@@ -24,7 +23,34 @@ SURVIVED = ("SURVIVED", "ANCHOR NOT FOUND")
 # A mutation script's last line, where its memory bound stopped a process.
 BOUND = "memory bound: "
 UNTOUCHED = "memory bound: no process was stopped"
+BOUND_FAILURE = "Invalid producer: memory guard stopped a process or stopped watching; no kill:"
 
+
+def memory_failures(text: str) -> list[str]:
+    """Read both immediate guard messages and its final summary, never a kill.
+
+    A benign final line cannot erase an earlier stop or failed watcher.
+    Indentation is part of the guard's immediate output, not a reason to
+    ignore it; recipes with no guard continue under their existing contract.
+    """
+    return list(dict.fromkeys(
+        line.strip() for line in text.splitlines()
+        if (line.strip().startswith(BOUND) and line.strip() != UNTOUCHED)
+        or line.strip().startswith("the memory bound stopped watching:")
+    ))
+
+
+def recipe_memory_failures(shard: pathlib.Path, row: dict) -> list[str]:
+    """One validity authority for summary, fetch and local preverification."""
+    found = []
+    paths = [shard / "evidence" / path for path in row.get("wrote", [])]
+    log = shard / "logs" / f"{row['recipe']}.log"
+    if log.exists():
+        paths.append(log)
+    for path in paths:
+        if path.is_file():
+            found += memory_failures(path.read_text(errors="replace"))
+    return list(dict.fromkeys(found))
 
 def shards_of(root: pathlib.Path) -> list[pathlib.Path]:
     """Each shard's directory: `evidence-N` under the root, or the root
@@ -51,18 +77,15 @@ def main() -> int:
     for shard in shards:
         for r in json.loads((shard / "results.json").read_text()):
             survived = []
+            invalid = recipe_memory_failures(shard, r)
+            bound += [f"{r['recipe']}: {line}" for line in invalid]
             for path in r["wrote"]:
                 text = (shard / "evidence" / path).read_text(errors="replace")
                 survived += [line.strip() for line in text.splitlines() if any(s in line for s in SURVIVED)]
-                bound += [
-                    f"{r['recipe']}: {line[len(BOUND):]}"
-                    for line in text.splitlines()
-                    if line.startswith(BOUND) and line != UNTOUCHED
-                ]
-            ok = r["status"] == 0 and not survived
+            ok = r["status"] == 0 and not survived and not invalid
             rows.append((r["recipe"], "ok" if ok else "FAILED", r["seconds"], len(r["wrote"])))
             if not ok:
-                why = f"exit {r['status']}" if r["status"] else "; ".join(survived[:3])
+                why = f"exit {r['status']}" if r["status"] else "; ".join((survived + invalid)[:3])
                 failed.append(f"{r['recipe']}: {why}")
     rows.sort()
     table = ["| recipe | result | seconds | files |", "|---|---|---|---|"]
@@ -70,7 +93,7 @@ def main() -> int:
     head = f"**{len(rows)} recipes, {len(failed)} failed**\n\n"
     body = head + "\n".join(f"- {f}" for f in failed) + ("\n\n" if failed else "")
     if bound:
-        body += "Killed, perhaps by the memory bound alone, not by a test:\n\n"
+        body += BOUND_FAILURE + "\n\n"
         body += "\n".join(f"- {b}" for b in bound) + "\n\n"
     body += "\n".join(table) + "\n"
     print(body)
