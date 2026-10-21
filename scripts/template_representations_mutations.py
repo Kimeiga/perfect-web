@@ -16,10 +16,12 @@ output. The source is restored after every mutant, whatever happens.
 
 import os
 import pathlib
-import re
 import signal
 import subprocess
 import sys
+import cargo_assertion_results
+import mutation_source
+import producer_process
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 TEMPLATE = ROOT / "compiler/pw-core/src/template_ir.rs"
@@ -62,126 +64,120 @@ MUTANTS = [
     ),
 ]
 
-CARGO = [
-    [
-        "cargo", "test", "--quiet", "--locked", "-p", "pw-core",
-        "--test", "template_representations",
-    ],
-    [
-        "cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--",
-        "an_opaque_values_representation",
-    ],
-]
-
-SPEC = ["e2e/feed.spec.mjs"]
-
-# How long one command may run. Past the bound it is killed with everything
-# it started, and the run counts as failing.
+CARGO = {
+    "core": ["cargo", "test", "--quiet", "--locked", "-p", "pw-core",
+             "--test", "template_representations", "--", "--format=pretty"],
+    "host": ["cargo", "test", "--quiet", "--locked", "-p", "pw-dev-server", "--",
+             "an_opaque_values_representation", "--format=pretty"],
+}
+SOURCES = {
+    "core": ROOT / "compiler/pw-core/tests/template_representations.rs",
+    "host": ROOT / "spikes/own-renderer/server/src/main.rs",
+}
+NAMES = {
+    "core": (
+        "a_generic_match_binding_reads_its_opaque_representation",
+        "a_records_field_named_value_is_a_field",
+        "a_representation_is_read_by_the_opaque_values_path",
+        "a_speculated_value_read_through_a_view_reads_its_representation",
+    ),
+    "host": ("tests::an_opaque_values_representation_is_rendered",),
+}
 BOUND = 1200
 
 
 def bounded(cmd, **kw):
-    """(output, returncode), or (output, None) when it ran past the bound."""
-    p = subprocess.Popen(cmd, start_new_session=True, stdout=subprocess.PIPE,
-                         stderr=subprocess.STDOUT, text=True, **kw)
+    """Native status, or None after a timeout; the shared owner reaps children."""
     try:
-        out, _ = p.communicate(timeout=BOUND)
-        return out, p.returncode
-    except subprocess.TimeoutExpired:
-        os.killpg(p.pid, signal.SIGKILL)
-        out, _ = p.communicate()
-        return out, None
+        result = producer_process.run(cmd, timeout=BOUND, **kw)
+        return result.stdout, result.returncode
+    except subprocess.TimeoutExpired as expired:
+        return expired.output, None
+
+
+def cargo_result(suite, code, out):
+    result = cargo_assertion_results.validate(code, out, root=ROOT,
+        sources=[SOURCES[suite]], expected=NAMES[suite])
+    return (True, result.passed, result.failed) if result.valid else (False, 0, 0)
 
 
 def cargo_tests():
-    """(built, passed, failed) over every test command."""
-    built, passed, failed = True, 0, 0
-    for cmd in CARGO:
+    """All five named results, with failures at actual test assertion sites."""
+    passed = failed = 0
+    for suite, cmd in CARGO.items():
         out, code = bounded(cmd, cwd=ROOT)
-        results = re.findall(r"test result: \w+\. (\d+) passed; (\d+) failed", out or "")
-        if code is None:
-            failed += 1
-            continue
-        if not results:
-            built = False
-            continue
-        for p, f in results:
-            passed += int(p)
-            failed += int(f)
-    return built, passed, failed
+        print(out, flush=True)
+        valid, good, bad = cargo_result(suite, code, out)
+        if not valid:
+            return False, 0, 0
+        passed += good
+        failed += bad
+    return True, passed, failed
 
 
 def build():
-    """The store's and the feed's pages, with the runtime they load, and the
-    server, as the source says."""
-    _, page = bounded(["bash", "spikes/own-renderer/run.sh"], cwd=ROOT,
-                      env={**os.environ, "BUILD_ONLY": "1"})
-    _, feed = bounded(["bash", "spikes/own-renderer/feed.sh"], cwd=ROOT)
-    _, server = bounded(["cargo", "build", "--quiet", "--locked", "-p", "pw-dev-server"], cwd=ROOT)
-    return page == 0 and feed == 0 and server == 0
+    """Restore the original campaign's store, feed and host build outputs."""
+    commands = [
+        (["bash", "spikes/own-renderer/run.sh"], {**os.environ, "BUILD_ONLY": "1"}),
+        (["bash", "spikes/own-renderer/feed.sh"], dict(os.environ)),
+        (["cargo", "build", "--quiet", "--locked", "-p", "pw-dev-server"], dict(os.environ)),
+    ]
+    for cmd, env in commands:
+        out, code = bounded(cmd, cwd=ROOT, env=env)
+        if code != 0:
+            print(out, flush=True)
+            return False
+    return True
 
 
-def browser_tests():
-    """(built, passed, failed) for the spec in three engines, after a build.
-    A spec skipped, as one whose build is stale is, ran nothing: not built."""
-    if not build():
-        return False, 0, 0
-    out, code = bounded(
-        ["pnpm", "exec", "playwright", "test", *SPEC, "--reporter=line"],
-        cwd=ROOT / "spikes/own-renderer",
-    )
-    if code is None:
-        return True, 0, 1
-    out = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", out)
-    passed = sum(int(n) for n in re.findall(r"(\d+) passed", out))
-    failed = sum(int(n) for n in re.findall(r"(\d+) failed", out))
-    return passed + failed > 0, passed, failed
+SUITES = {"cargo": cargo_tests}
 
 
-SUITES = {"cargo": cargo_tests, "browser": browser_tests}
+def controls():
+    import representations_producer_mutations
+    return representations_producer_mutations.main() == 0
 
 
 def main():
-    import mutation_baseline  # keeps what each command says, for a red baseline
-    # Stopped from outside, the source is still restored: SIGTERM raises
-    # here, and the `finally` below runs.
+    import mutation_baseline  # keep native output before running any producer
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(1))
+    watch = mutation_baseline.mutation_bound.start()
+    if not controls():
+        return 1
     for suite in sorted({m[1] for m in MUTANTS}):
-        built, passed, failed = SUITES[suite]()
+        valid, passed, failed = SUITES[suite]()
         print(f"baseline ({suite}): {passed} passed, {failed} failed", flush=True)
-        if not built or failed or not passed:
+        if not valid or failed or not passed or watch.stopped:
             print("FAIL: the unmutated baseline is not green; no mutant can mean anything")
             mutation_baseline.explain()
             return 1
 
-    survivors = 0
-    try:
-        for what, suite, path, anchor, replacement in MUTANTS:
-            original = path.read_text()
-            if original.count(anchor) != 1:
-                print(f"{what}: ANCHOR NOT FOUND EXACTLY ONCE in {path.name}")
-                survivors += 1
-                continue
-            try:
-                path.write_text(original.replace(anchor, replacement, 1))
-                built, passed, failed = SUITES[suite]()
-            finally:
-                path.write_text(original)
-            if not built:
-                verdict = "KILLED (does not build)"
-            elif failed:
-                verdict = f"KILLED ({failed} of {passed + failed} tests fail)"
-            else:
-                verdict = "SURVIVED"
-                survivors += 1
-            print(f"{what} [{suite}]: {verdict}", flush=True)
-    finally:
-        # The pages and the server as the source says, whatever a mutant
-        # left built.
-        build()
-
-    print(f"{len(MUTANTS) - survivors} of {len(MUTANTS)} mutants killed")
-    return 1 if survivors else 0
+    killed = refused = survivors = 0
+    for what, suite, path, anchor, replacement in MUTANTS:
+        original = path.read_text()
+        if original.count(anchor) != 1:
+            print(f"{what}: REFUSED (anchor not unique in {path.name})", flush=True)
+            refused += 1
+            continue
+        with mutation_source.changed(path, original, original.replace(anchor, replacement, 1)):
+            valid, passed, failed = SUITES[suite]()
+        if not valid or watch.stopped:
+            verdict = "REFUSED (invalid or stopped producer; no kill)"
+            refused += 1
+        elif failed:
+            verdict = f"KILLED ({failed} of {passed + failed} tests fail)"
+            killed += 1
+        else:
+            verdict = "SURVIVED"
+            survivors += 1
+        print(f"{what} [{suite}]: {verdict}", flush=True)
+        if watch.stopped:
+            return 1
+    if not build() or watch.stopped:
+        print("REFUSED: restored source did not build", flush=True)
+        refused += 1
+    print(f"{killed} of {len(MUTANTS)} mutants killed; {refused} refused; {survivors} survived", flush=True)
+    return int(bool(refused or survivors))
 
 
 if __name__ == "__main__":

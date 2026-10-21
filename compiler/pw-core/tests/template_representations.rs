@@ -75,11 +75,9 @@ fn feed(changes: &[(&str, &str)]) -> Vec<(String, String)> {
 /// Every path the template `name` reads a value by: a text part's, an
 /// attribute's, a block's subject, a loop's list, an instance's argument.
 fn paths(b: &pw_core::build::Build, name: &str) -> Vec<String> {
-    let t = b
-        .templates
-        .iter()
-        .find(|t| t.path == name)
-        .unwrap_or_else(|| panic!("no template {name}"));
+    let t = b.templates.iter().find(|t| t.path == name);
+    assert!(t.is_some(), "no template {name}");
+    let t = t.unwrap();
     let mut out = Vec::new();
     let mut stack = vec![serde_json::to_value(t).expect("serializes")];
     while let Some(v) = stack.pop() {
@@ -121,7 +119,9 @@ fn a_representation_is_read_by_the_opaque_values_path() {
         (VIEW, "        <p class=\"vid\">{post.id.value}</p>\n"),
     ]);
     assert_eq!(reported(&files), Vec::<String>::new());
-    let b = build(&files).unwrap_or_else(|e| panic!("{e}"));
+    let b = build(&files);
+    assert!(b.is_ok(), "the representation program builds: {b:?}");
+    let b = b.unwrap();
     // In a row, a whole attribute, an attribute's text and a text part; a
     // page's parameter, a query's value, a `{#match}` arm's binding under a
     // computed subject, and a view's parameter.
@@ -147,8 +147,9 @@ fn a_representation_is_read_by_the_opaque_values_path() {
         .pages
         .iter()
         .find(|p| p.page == "feed.app.PostPage~ui")
-        .and_then(|p| p.plan.as_ref().ok())
-        .expect("the thread page's plan");
+        .and_then(|p| p.plan.as_ref().ok());
+    assert!(thread.is_some(), "the thread page has a plan");
+    let thread = thread.unwrap();
     assert!(
         thread.parts.iter().any(|p| p.path == "thread.id"),
         "{:?}",
@@ -184,7 +185,9 @@ fn a_records_field_named_value_is_a_field() {
          <p id=\"whole\">{pair.outer}</p>",
     );
     assert_eq!(reported(&files), Vec::<String>::new());
-    let b = build(&files).unwrap_or_else(|e| panic!("{e}"));
+    let b = build(&files);
+    assert!(b.is_ok(), "the representation program builds: {b:?}");
+    let b = b.unwrap();
     let read_by = paths(&b, "t.P~ui");
     // The record's field is read as a field; an opaque type over another
     // opaque type is read by its own path, each `.value` its representation.
@@ -272,10 +275,70 @@ fn a_speculated_value_read_through_a_view_reads_its_representation() {
     // name, and the page's speculation was refused.
     let files = program(&[("t.pw", TALLY.to_string())]);
     assert_eq!(reported(&files), Vec::<String>::new());
-    let b = build(&files).unwrap_or_else(|e| panic!("{e}"));
+    let b = build(&files);
+    assert!(b.is_ok(), "the representation program builds: {b:?}");
+    let b = b.unwrap();
     assert!(paths(&b, "t.P~ui").contains(&"t.n".to_string()));
     assert!(
         b.speculations.iter().any(|s| s.page == "t.P~ui"),
         "the page's speculation"
     );
+}
+
+/// A caller-owned type parameter has no ResolvedType projection. The value
+/// solver still knows the opaque nominal head of the match binding, which is
+/// enough to read its representation by the value's own path (ADR-0232).
+#[test]
+fn a_generic_match_binding_reads_its_opaque_representation() {
+    let files = program(&[(
+        "generic.pw",
+        r#"module generic
+import List
+opaque type Id<T> = String
+fn first<T>(items: List<Id<T>>) -> String !{} {
+    match List.get(items, 0) { Some(item) => item.value, None => "none" }
+}
+"#
+        .to_string(),
+    )]);
+    assert_eq!(reported(&files), Vec::<String>::new());
+    let built = build(&files);
+    assert!(built.is_ok(), "the generic program builds: {built:?}");
+    let units: Vec<Unit> = files
+        .iter()
+        .map(|(path, src)| Unit {
+            path: path.clone(),
+            hir: lower_file(src, &parse_tree(src).green),
+            src: src.clone(),
+        })
+        .collect();
+    let hirs: Vec<_> = units.iter().map(|unit| &unit.hir).collect();
+    let ws = pw_core::resolve::Workspace::build(&hirs);
+    let sigs = pw_core::signatures::Signatures::build(&ws, &hirs);
+    let at = hirs.len() - 1;
+    let hir = hirs[at];
+    let mut reads = Vec::new();
+    for (id, decl) in hir.all_decls() {
+        if let Some(body_id) = decl.terms_body() {
+            let body = hir.body(body_id);
+            let types = pw_core::infer::Types::of_decl(&sigs, hir, id, body);
+            for (expr, node, _) in body.exprs() {
+                if let pw_core::hir::Expr::Field { base, name } = node {
+                    if name == "value" {
+                        assert!(
+                            types.of(body, *base).is_none(),
+                            "this witness reaches the nominal fallback"
+                        );
+                        reads.push(pw_core::template_ir::value_path_typed(
+                            (&sigs, &ws),
+                            (&hirs, at, id),
+                            body,
+                            expr,
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    assert_eq!(reads, vec![Some("item".to_string())]);
 }

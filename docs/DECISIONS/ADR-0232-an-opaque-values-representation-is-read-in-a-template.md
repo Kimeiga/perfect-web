@@ -70,3 +70,53 @@ Milestone: E14. Found by ADR-0231's probes.
 - **A `.value` neither typer types the base of.** It is read as a field, as
   before, and does not render.
 - **No existing program changes.** None read `.value` in a template.
+
+## Train-12 proof amendment (2026-10-20)
+
+Hosted run 39526960864 at `f15117de` preserved a real gap in this decision's
+proof: the original four-test baseline passed, but only three of the four
+controls failed. ADR-0351 now supplies the original concrete match binding's
+type through `Types::of`; removing decision 3's fallback no longer changes
+that old witness. The failed hosted report remains historical evidence.
+
+The fallback is still needed. In a valid generic function over
+`List<Id<T>>`, where `opaque type Id<T> = String`, `Some(item)` from
+`List.get(items, 0)` has a caller-owned type parameter. The value solver
+knows the opaque nominal head; its `ResolvedType` projection is absent.
+The new fourth core test checks that the whole program checks and builds,
+asserts this absent projection, and asks the existing public
+`value_path_typed` consumer for `item.value`. It must return `item`.
+The unchanged original fallback-removal operator instead returns
+`item.value`: exactly one native assertion fails while the other three
+core tests pass. No compiler behavior or operator has been changed.
+This is a generic function/path-consumer witness, not a claim that generic
+view declarations are supported by the syntax.
+
+All four original fault models remain byte-for-byte unchanged. The campaign
+now requires complete named Cargo inventories (four core tests and one host
+test), native exit agreement, and failure at an assertion macro's exact
+source line and column through the shared `cargo_assertion_results`
+authority. Build errors, ordinary panics, missing/ignored tests, timeouts,
+and memory-bound stops earn no kill. Expected build/template/plan results
+are asserted before extraction, preserving useful contract failures.
+`producer_process` owns process cancellation; `mutation_source` restores
+each changed source and preserves cancellation identity. The unused browser
+producer copy is removed; the original final store/feed/server restoration
+build is retained and its status now checked. Cancellation guarantees source
+restoration, not that generated build outputs have been rebuilt afterward.
+
+Ten focused producer consumer tests and ten independent assertion controls
+hold this wiring, including an explicit no-`KILLED` check for stopped
+producers as well as a failing campaign status. They reuse the existing
+native Cargo and Python receipt authorities rather than introducing another
+parser. The same recipe runs these controls before the original four.
+
+Local WSL proof on base `8017e328` plus this amendment's source changes:
+all five native baseline tests passed; all four original faults and all ten
+producer controls were killed by valid assertions, with zero refusals,
+survivors, or memory stops; the final restoration build succeeded. Exact
+commands, source hashes, the historical failed report, and native before/red/
+green output are retained in
+[`representations-proof.txt`](../evidence/tooling/representations-proof.txt).
+The hosted integration campaign remains a separate required check; this
+local result does not rewrite or relabel the original failed run.
