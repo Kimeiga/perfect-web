@@ -1,8 +1,8 @@
 ADR-0260 (track uploads) - an image on a post: a typed upload, a deployment's blob storage, served safely
 
 produced by: just e14-uploads
-commit: bfda9ae555a5e56b557be3d47cb0b69a861be7e6
-ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39658074296 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64, PostgreSQL 18.6)
+commit: 11d7917c4d1fc259ff99c340eac5551bc9120ca6
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39701638548 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64, PostgreSQL 18.6)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
@@ -57,28 +57,28 @@ test uploads::tests::nothing_is_claimed_where_nothing_is_declared ... ok
 test uploads::tests::the_dimensions_are_held ... ok
 test uploads::tests::the_kind_is_sniffed_and_never_the_senders ... ok
 test uploads::tests::the_size_is_held_before_and_after_the_body_is_read ... ok
-test tests::uploads::on_postgres_posting_an_image_with_none_attached_commits_nothing ... ok
 test tests::uploads::posting_an_image_with_none_attached_commits_nothing ... ok
+test tests::uploads::on_postgres_posting_an_image_with_none_attached_commits_nothing ... ok
 test tests::uploads::what_is_not_an_image_is_refused_whatever_it_is_called ... ok
-test result: ok. 50 passed; 0 failed; 0 ignored; 0 measured; 663 filtered out; finished in 8.47s
+test result: ok. 50 passed; 0 failed; 0 ignored; 0 measured; 663 filtered out; finished in 8.80s
 
 == the declaration and its checks (compiler/pw-core/tests/uploads.rs)
 
-test an_upload_that_states_its_limits_checks ... ok
 test a_build_writes_each_upload_for_its_host ... ok
+test an_upload_that_states_its_limits_checks ... ok
 test its_clauses_are_an_uploads_alone ... ok
 test a_form_that_sends_a_file_posts_it_to_an_upload ... ok
-test a_limit_is_a_literal_count ... ok
 test every_clause_is_stated ... ok
+test a_limit_is_a_literal_count ... ok
 test its_paths_are_literal_paths ... ok
-test two_uploads_are_at_two_paths ... ok
 test its_types_are_a_closed_set ... ok
 test its_paths_are_no_pages ... ok
-test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.72s
+test two_uploads_are_at_two_paths ... ok
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.16s
 
 == an image on a post in three engines (e2e/uploads.spec.mjs)
 
-  15 passed (41.6s)
+  15 passed (41.4s)
 
 == mutation controls (scripts/uploads_mutations.py)
 

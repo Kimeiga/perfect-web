@@ -1,15 +1,15 @@
 ADR-0272 - a region the browser fills while the runtime boots is bound
 
 produced by: just e14-stream-boot
-commit: bfda9ae555a5e56b557be3d47cb0b69a861be7e6
-ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39658074296 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 11d7917c4d1fc259ff99c340eac5551bc9120ca6
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39701638548 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
 
 == in the host's Chrome (e2e/stream.spec.mjs)
 
-  2 passed (13.9s)
+  2 passed (20.8s)
 
 == mutation controls (scripts/stream_boot_mutations.py)
 

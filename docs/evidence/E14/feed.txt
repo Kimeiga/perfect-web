@@ -1,8 +1,8 @@
 ADR-0220 - the feed reference app, served in browsers by the host that serves the store
 
 produced by: just e14-feed
-commit: bfda9ae555a5e56b557be3d47cb0b69a861be7e6
-ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39658074296 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 11d7917c4d1fc259ff99c340eac5551bc9120ca6
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39701638548 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 node: v22.21.1
 playwright: Version 1.58.0
@@ -12,11 +12,11 @@ playwright: Version 1.58.0
 test tests::a_guests_post_names_the_guest_to_every_reader ... ok
 test tests::the_feeds_page_opening_its_stream_is_not_told_to_reload ... ok
 test tests::a_page_carries_its_data_layers_style_and_no_other ... ok
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 710 filtered out; finished in 10.45s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 710 filtered out; finished in 10.16s
 
 == the feed in three engines (e2e/feed.spec.mjs)
 
-  66 passed (1.1m)
+  66 passed (1.0m)
 
 == mutation controls (scripts/feed_served_mutations.py)
 

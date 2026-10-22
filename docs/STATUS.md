@@ -134,9 +134,12 @@ evidence. No failed result is promoted by this summary.
   loads holds its press and, by ADR-0152, the presses after it. Repaired on
   `wip/press-modules`
   ([ADR-0382](DECISIONS/ADR-0382-a-page-loads-its-modules-within-the-deadline.md),
-  stacked on `wip/command-deadline`): seven failing-first tests and nine
-  strict controls pass locally in Chromium; its hosted verification is
-  still to run.
+  stacked on `wip/command-deadline`): its eight tests pass in three
+  engines and its ten controls are killed. Its verify
+  [39701638548](https://github.com/studiokimeiga/perfect-web/actions/runs/39701638548) at `11d7917c` **failed**: two of
+  ADR-0381's tests counted given-up sends by an event Firefox and WebKit do
+  not report, and a feed test timed out once in Chromium, not reproduced
+  here ([NEXT](NEXT.md)).
 - Hosted evidence does not prove the local-only performance, memory, load
   or Kiokun obligations. E14 agent benchmarking still requires the owner's
   model, budget and teaching choices. Neither performance universality nor

@@ -30,10 +30,29 @@ In order:
    that never loaded held its press and the presses after it. Repaired: a
    page's on-demand modules load within the deadline, a failed load is
    forgotten and asked for again under a new specifier, as a handler's is,
-   and a press whose speculation cannot load is sent unspeculated. Seven
-   failing-first tests and nine strict controls pass in Chromium.
-   Remaining: exact-commit CI, the reached recipes and three browser
-   engines on GitHub.
+   and a press whose speculation cannot load is sent unspeculated. Its
+   eight tests pass in three engines and its ten controls are killed, none
+   refused (`e14-press-modules`, verify 39701638548).
+
+   **Verify [39701638548](https://github.com/studiokimeiga/perfect-web/actions/runs/39701638548) at `11d7917c` failed**, in
+   `browser firefox`, `browser webkit` and `summary` (CI
+   [39701625541](https://github.com/studiokimeiga/perfect-web/actions/runs/39701625541) passed). Three of its 143 recipes
+   failed. Open; named `--known` where the run's other 140 recipes'
+   evidence was fetched, and the three failed recipes' files were not
+   copied:
+   - **Two of ADR-0381's tests, in Firefox and WebKit**
+     (`e14-command-deadline`, the two of `e10-browser`'s three runs its log
+     shows, and both browser jobs): they counted a command's given-up sends
+     by Playwright's `requestfailed`, which Firefox and WebKit do not
+     report for a request the page aborts while a route holds it
+     ("Expected: 1, Received: 0"; "Expected: 3, Received: 0"). They pass
+     in Chromium.
+   - **`feed.spec.mjs:691` in Chromium** (`e14-browser-host-map`: 1 failed,
+     110 passed): "a follow shows before the server answers, and is the
+     server's after" showed the follow's speculation, released its held
+     request, and timed out waiting for the answer. Not reproduced here:
+     40 serial runs of the test, and five runs of the recipe's three specs
+     in three engines (111 tests each), passed. Cause unknown.
 3. **E14-E, decision-ready** (`wip/e14-readiness`). The decision brief
    (`docs/milestones/E14-E-decision-brief.md`) and the changed-lines repair
    (Next.js's footprint was undercounted in T01, T06, T08 and T11) await

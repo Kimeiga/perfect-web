@@ -1,18 +1,18 @@
 NEXT 6c - a command the platform invokes, which no reader presses
 
 produced by: just e14-invoked-by
-commit: bfda9ae555a5e56b557be3d47cb0b69a861be7e6
-ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39658074296 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: 11d7917c4d1fc259ff99c340eac5551bc9120ca6
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39701638548 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
 
 == the clause and its refusals (compiler/pw-core/tests/invoked_by.rs)
 
 test a_command_the_platform_invokes_is_idempotent ... ok
 test a_command_the_platform_invokes_holds_no_reader_to_a_predicate ... ok
-test a_command_the_platform_invokes_says_so_in_its_contract ... ok
 test a_payments_command_is_told_at_its_invoked_by_clause ... ok
 test a_command_the_platform_invokes_is_given_what_the_host_has ... ok
 test no_page_presses_a_command_the_platform_invokes ... ok
+test a_command_the_platform_invokes_says_so_in_its_contract ... ok
 test one_command_answers_a_payments_outcome ... ok
 test only_the_platforms_invokers_and_only_on_a_command ... ok
 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
