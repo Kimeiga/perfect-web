@@ -13700,7 +13700,9 @@ public query Store(",
                 .or_default()
                 .hold_command = Some(at);
         };
-        let wait = std::time::Duration::from_millis(300);
+        // Long enough for the command to run first on a loaded machine: it is
+        // also how long the client waits for bytes that do not come.
+        let wait = std::time::Duration::from_millis(1000);
 
         hold(HoldAt::Before);
         let (answer, ended) = given_up(&s, &path, "session-9", "press-1", &body, wait);

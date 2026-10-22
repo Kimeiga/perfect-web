@@ -6,8 +6,9 @@ Each mutant undoes one piece: a handler's module, or the page's speculation
 module, waited for without a deadline; a failed speculation load kept, or
 asked for again under the same specifier, which the browser keeps failed; a
 failed renderer load kept; a press whose speculation cannot load failed
-rather than sent unspeculated; a page's computed values waited for without
-a deadline, kept failed, or asked for again under the same specifier.
+rather than sent unspeculated; a renderer load a press gave up on kept; a
+module's load timed by a send's deadline; a page's computed values kept
+failed, or asked for again under the same specifier.
 
 `e2e/press-modules.spec.mjs` and `e2e/computed-modules.spec.mjs`, in
 Chromium, must fail for each. Only complete
@@ -67,14 +68,20 @@ MUTANTS = [
     (
         "a failed renderer load is kept",
         RUNTIME,
-        "        renderer = null;\n",
+        "        if (renderer === loading) renderer = null;\n",
         "",
     ),
     (
-        "the computed values are waited for without a deadline",
+        "a renderer load a press gave up on is kept",
         RUNTIME,
-        '  computedModule = within(import(url), "the computed values").then(\n',
-        "  computedModule = import(url).then(\n",
+        "      forgetRenderer();\n",
+        "",
+    ),
+    (
+        "a module's load is timed by a send's deadline",
+        RUNTIME,
+        "    timer = setTimeout(() => reject(new Error(`${what}: none within ${loadDeadline} ms`)), loadDeadline);\n",
+        "    timer = setTimeout(() => reject(new Error(`${what}: none within ${sendDeadline} ms`)), sendDeadline);\n",
     ),
     (
         "a failed computed values load is kept",
@@ -91,11 +98,14 @@ MUTANTS = [
     (
         "a press whose speculation cannot load fails",
         RUNTIME,
-        "            const ids = await speculate(component, args, interaction).catch((error) => {\n"
-        "              log.push(`${component} sent unspeculated: ${error.message ?? error}`);\n"
-        "              return [];\n"
-        "            });\n",
-        "            const ids = await speculate(component, args, interaction);\n",
+        "  let module;\n"
+        "  try {\n"
+        "    module = await speculations();\n"
+        "  } catch (error) {\n"
+        "    log.push(`${component} sent unspeculated: ${error.message ?? error}`);\n"
+        "    return [];\n"
+        "  }\n",
+        "  const module = await speculations();\n",
     ),
 ]
 

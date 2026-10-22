@@ -50,30 +50,37 @@ waits" and extends ADR-0305's early answer.
 ## Decision
 
 1. **Each send of a command has a deadline for its whole answer**: ten
-   seconds from the send to the answer's last byte, its body included. Past
-   it the request is aborted (`AbortSignal.timeout`), and that is no answer,
-   as a request the network dropped is (ADR-0173). It is sent again with its
-   interaction while the command's `retry` clause allows; after the last, the
-   press fails as unreachable, its speculation taken back and its control
-   told (ADR-0302).
+   seconds from the send to the answer's last byte, a success's body
+   included. Past it the request is aborted (an `AbortController` and a
+   timer, which every browser the runtime runs in has; `AbortSignal.timeout`
+   is Safari 16's), and that is no answer, as a request the network dropped
+   is (ADR-0173). It is sent again with its interaction while the command's
+   `retry` clause allows; after the last, the press fails as unreachable,
+   its speculation taken back and its control told (ADR-0302). A refusal's
+   or an early answer's body (403, 409) is read under the same deadline, and
+   one that stalls is a refusal, as one cut off was.
 2. **Sending a timed-out request again is safe here.** Every command a page
    sends is `idempotent_by InteractionId` (PW0338), and the host answers a
    repeated interaction with the first's outcome (ADR-0121). A send given up
    after its command committed is answered, sent again, with that commit.
    This is what ky cannot assume of a request.
 3. **A send held for the one before it is waiting its turn.** Given up while
-   the command it names is unanswered, it is no outcome and no resend of the
-   `retry` clause's: as an early answer is (ADR-0305), it is sent again once
-   each command its page sent before it is answered or has failed, naming
-   none.
+   it named a command before it, whether that one is still unanswered or has
+   since failed, it is no outcome and no resend of the `retry` clause's: as
+   an early answer is (ADR-0305), it is sent again once each command its page
+   sent before it is answered or has failed, naming none. (Amended after the
+   review below: first written as "while the command it names is
+   unanswered", which a predecessor's own earlier deadline could end first.)
 4. **So every press settles in bounded time**: within its sends' deadlines and
    the waits between them (ADR-0173's), and, where its command waits its
    turn, the bound of the commands before it. Ten seconds with no `retry`;
    about 33 s for the store's `transport_only(max = 2, jitter = true)`.
 5. **The deadline is the platform's.** A command declares none. `?deadline=`
    lowers it, so that a test reaches it in a second or two, as `?keepalive=`
-   lowers the keepalive budget (ADR-0268); it never raises it, and what is no
-   time above zero asks for nothing.
+   lowers the keepalive budget (ADR-0268): never above ten seconds, never
+   below half of one, so that a link cannot make a page's presses fail at
+   once, and what is no time above zero asks for nothing. A module's load has
+   its own deadline and `?load-deadline=` (ADR-0382).
 6. **The host's test fault** `POST /bench/hold?next=command&at=before|after|body`
    holds the session's next command connection open, with no answer before
    the command runs or after it has committed, or with its answer's head and
@@ -104,24 +111,32 @@ waits" and extends ADR-0305's early answer.
 
 `just e14-command-deadline` records `docs/evidence/E14/command-deadline.txt`:
 
-- `e2e/command-deadline.spec.mjs`, 8 tests, in Chromium, Firefox and WebKit:
-  - `?deadline=` lowers the deadline and never raises it;
-  - a send held at the network is given up at its deadline and not before,
-    sent again with its interaction, its line shown meanwhile, and is the
-    server's;
+- `e2e/command-deadline.spec.mjs`, 10 tests, in Chromium, Firefox and WebKit:
+  - `?deadline=` and `?load-deadline=` each lower their own, never raise it
+    and never below half a second;
+  - a send held at the network is given up at its deadline, timed from its
+    own send to its abort, sent again with its interaction, its line shown
+    meanwhile, and settles as the server's;
   - a connection the host holds before the command runs, after it committed,
-    or partway through its answer's body: sent again, and one line;
-  - a press none of whose three sends is answered fails as unreachable, its
-    line taken away;
+    or partway through its answer's body: sent again, the resend answered
+    whole, the press settled, and one line;
+  - a press none of whose three sends is answered fails as unreachable, each
+    send given up at its deadline, its line taken away;
   - a clear held for an order that never reached the host waits its turn and
     runs once the order is given up, and no order is placed;
+  - a send held for the order is no retry of its own: the clear's request
+    and both resends follow it;
+  - a pick made after one with no `retry`, held by the host for it, runs
+    once the first has failed;
   - a command with no `retry` fails at its one send's deadline.
 
-  All eight fail at `e7664d2e`, each at an assertion, and pass here.
+  The first eight failed at `e7664d2e`, and the two added after the review
+  at the runtime before its repairs, each at an assertion; all pass here.
 - The host's fault: `tests::a_held_command_connection_is_answered_by_nothing_until_it_is_given_up`,
   which also requires that a hold ends with its connection.
-- `scripts/command_deadline_mutations.py`: strict native receipts; a build
-  failure, a timeout or an incomplete inventory earns no kill.
+- `scripts/command_deadline_mutations.py`: 18 controls, strict native
+  receipts; a build failure, a timeout or an incomplete inventory earns no
+  kill.
 - `scripts/command_order_mutations.py`'s two early-answer mutants are
   re-anchored, the turn's lines now standing in two places; the campaigns the
   change reaches run whole.
@@ -138,6 +153,14 @@ skipped; every reached campaign killed all its controls, command-order's 20
 and keepalive's 8 among them; the benchmark's twelve Pleris controls hold.
 The local red baseline at `e7664d2e` failed all eight tests, each at an
 assertion. Not landed: landing is the owner's to approve.
+
+**Reviewed 2026-10-21** by an independent read of the code after that
+record. Repaired: a held send's race with its predecessor's own deadline
+(decision 3), a deadline that `AbortSignal.timeout` would have left out of
+older browsers, a link able to lower the deadline to nothing (decision 5),
+and test assertions that measured the resend's jittered wait rather than the
+deadline, or asserted no failure before the press had settled. The record at
+`bfda9ae5` predates the repairs; the stack is verified again at its head.
 
 ## Not claimed
 
@@ -160,7 +183,11 @@ assertion. Not landed: landing is the owner's to approve.
   finished. The deadline makes that window likelier.
 - **A hidden page's timers fire late** (browsers throttle them, Chrome to once
   a minute under intensive throttling), so the bound is the browser's timer's.
-- **A handler's or a speculation's module that never loads** (`import()`)
-  still holds its press, and through ADR-0152 the presses after it: the same
-  class of failure, not yet bounded.
+- **A module a press needs** is ADR-0382's: before it, one that never loaded
+  held its press, and through ADR-0152 the presses after it.
+- **A refusal's or an early answer's body that stalls** (403, 409) is told as
+  a refusal, as one cut off was: the status came, and the body that says
+  what it means did not.
+- **A link can lower the deadline** to half a second with `?deadline=`, and
+  so fail a command slower than that on that page.
 - **A `timeout` declared on a command** is still refused (PW5105).

@@ -470,6 +470,10 @@ window.__pw = {
   keepalive: () => ({ inFlight: keptAlive, budget: keepaliveBudget }),
   /** How long each send of a command waits for its answer (ADR-0381). */
   deadline: () => sendDeadline,
+  /** How long a press's module may take to load (ADR-0382). */
+  loadDeadline: () => loadDeadline,
+  /** How many presses have not finished (ADR-0280's `pressing`). */
+  pressing: () => pressing.size,
   /** Each streamed region that settled after boot, and who filled it:
    * `browser` where the platform applied its patch, `runtime` where this
    * did (ADR-0148). */
@@ -573,7 +577,7 @@ function loadHandler(identity) {
 function within(loading, what) {
   let timer;
   const late = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`${what}: none within ${sendDeadline} ms`)), sendDeadline);
+    timer = setTimeout(() => reject(new Error(`${what}: none within ${loadDeadline} ms`)), loadDeadline);
   });
   return Promise.race([loading, late]).finally(() => clearTimeout(timer));
 }
@@ -645,7 +649,11 @@ async function send(component, args, interaction, retry, after, before) {
     let body;
     const keepalive = keptAlive + bytes <= keepaliveBudget;
     if (keepalive) keptAlive += bytes;
-    const unheard = AbortSignal.timeout(sendDeadline);
+    // A controller and a timer, which every browser this runtime runs in has
+    // (`AbortSignal.timeout` is Safari 16's). Left to fire: aborting a
+    // request already answered does nothing.
+    const unheard = new AbortController();
+    setTimeout(() => unheard.abort(), sendDeadline);
     try {
       response = await fetch(`/command/${encodeURIComponent(component)}`, {
         method: "POST",
@@ -668,17 +676,18 @@ async function send(component, args, interaction, retry, after, before) {
         },
         body: sent,
         keepalive,
-        signal: unheard,
+        signal: unheard.signal,
       });
       // An answer cut off in transit is no answer.
       if (response.ok) body = await response.text();
     } catch (error) {
       if (keepalive) keptAlive -= bytes;
       // **Held for the one before it, not lost** (ADR-0381): the host runs a
-      // command once the one it names has (ADR-0305), so a send given up
-      // while that one is unanswered was waiting its turn. As an early
-      // answer is, it is no outcome and no resend of the `retry` clause's.
-      if (unheard.aborted && unanswered.has(after)) {
+      // command once the one it names has run (ADR-0305), so a send given up
+      // while it named one was waiting its turn, whether that one has since
+      // been answered or failed. As an early answer is, it is no outcome and
+      // no resend of the `retry` clause's.
+      if (unheard.signal.aborted && after !== undefined) {
         log.push(`${component} sent again: no answer within ${sendDeadline} ms, the one before it unanswered`);
         await Promise.all(before);
         after = undefined;
@@ -686,7 +695,7 @@ async function send(component, args, interaction, retry, after, before) {
         continue;
       }
       if (!retry || attempt >= retry.max) throw new Unreachable(component, error);
-      const why = unheard.aborted ? ` within ${sendDeadline} ms` : ` (${error.message ?? error})`;
+      const why = unheard.signal.aborted ? ` within ${sendDeadline} ms` : ` (${error.message ?? error})`;
       log.push(`resent ${component}: no answer${why}`);
       await new Promise((resolve) => setTimeout(resolve, resendDelay(retry, attempt)));
       continue;
@@ -742,16 +751,23 @@ function resendDelay(retry, attempt) {
 }
 
 /**
- * **How long a send waits for its whole answer** (ADR-0381): ten seconds, as
- * ky gives an attempt and .NET's standard resilience handler does. A press
- * then settles within its sends' deadlines and the waits between them, which
- * its `retry` clause bounds: ten seconds with no retry, about 33 for the
- * store's two resends. `?deadline=` lowers it, so that a test reaches it in a
- * second or two, as `?keepalive=` lowers the keepalive budget; it never
- * raises it, and what is no time above zero asks for nothing.
+ * **How long a send waits for its whole answer, and a press's module for its
+ * load** (ADR-0381, ADR-0382): ten seconds each, as ky gives an attempt and
+ * .NET's standard resilience handler does. A press then settles within its
+ * sends' deadlines and the waits between them, which its `retry` clause
+ * bounds: ten seconds with no retry, about 33 for the store's two resends.
+ * `?deadline=` and `?load-deadline=` lower them, so that a test reaches them
+ * in a second or two, as `?keepalive=` lowers the keepalive budget: never
+ * above ten seconds, never below half of one, so that a link cannot make a
+ * page's presses fail at once; and what is no time above zero asks for
+ * nothing.
  */
-const askedDeadline = Number(new URLSearchParams(location.search).get("deadline"));
-const sendDeadline = askedDeadline > 0 ? Math.min(10_000, askedDeadline) : 10_000;
+function lowered(name) {
+  const asked = Number(new URLSearchParams(location.search).get(name));
+  return asked > 0 ? Math.min(10_000, Math.max(500, asked)) : 10_000;
+}
+const sendDeadline = lowered("deadline");
+const loadDeadline = lowered("load-deadline");
 
 // --- ADR-0122: optimistic transitions -----------------------------------
 //
@@ -810,6 +826,9 @@ function speculations() {
     (error) => {
       speculationModule = null;
       speculationAttempts += 1;
+      // A renderer still loading is forgotten with it: the next press asks
+      // for it again rather than wait on the load this one gave up.
+      forgetRenderer();
       throw error;
     },
   );
@@ -860,7 +879,17 @@ let nextSpeculation = 0;
 /** Before a command's request: show each of its transitions this page can,
  * each by the interaction its request carries (ADR-0172). */
 async function speculate(component, args, interaction) {
-  const module = await speculations();
+  // **Sent unspeculated where its module cannot load** (ADR-0382): a
+  // speculation only shows a press before its answer, and the page shows the
+  // server's value when it comes. Only the load is caught: what fails after
+  // it fails the press, as before.
+  let module;
+  try {
+    module = await speculations();
+  } catch (error) {
+    log.push(`${component} sent unspeculated: ${error.message ?? error}`);
+    return [];
+  }
   const ids = [];
   for (const s of module?.commands?.[component] ?? []) {
     const state = current(module, s.binding);
@@ -1348,20 +1377,32 @@ for (const live of parts.live ?? []) {
   if (live.owns?.length) arms.set(live.part, armOf(live));
 }
 let renderer = null;
+/** The renderer's exports, once loaded. */
+let rendererLoaded = null;
 
 /** The renderer, loaded with the first block a signal renders again. */
 function renderModule() {
+  if (rendererLoaded) return Promise.resolve(rendererLoaded);
+  if (renderer) return renderer;
   // Not kept failed (ADR-0382): the next need asks the network again.
-  renderer ??= fetch("/pw-render.wasm")
+  const loading = fetch("/pw-render.wasm")
     .then((r) => WebAssembly.instantiateStreaming(r, {}))
     .then(
-      ({ instance }) => instance.exports,
+      ({ instance }) => (rendererLoaded = instance.exports),
       (error) => {
-        renderer = null;
+        if (renderer === loading) renderer = null;
+        log.push(`renderer not loaded: ${error.message ?? error}`);
         throw error;
       },
     );
-  return renderer;
+  renderer = loading;
+  return loading;
+}
+
+/** **A renderer load a press gave up on** (ADR-0382): forgotten unless it
+ * has loaded, so the next need asks the network again. */
+function forgetRenderer() {
+  if (!rendererLoaded) renderer = null;
 }
 
 /** A path read from the signals' values: `greeting`, or `panel.item`. */
@@ -1826,10 +1867,12 @@ let computedModule = null;
  * first values with. Loaded when one of those signals first changes. */
 function computedValues() {
   if (computedModule) return computedModule;
-  // Within the deadline, and not kept failed (ADR-0382): the next change
-  // asks again, under another specifier, as a speculation's load does.
+  // Not kept failed (ADR-0382): the next change asks again, under another
+  // specifier, as a speculation's load does. No deadline: a press does not
+  // wait for it, and a page's boot does, where a value the device keeps is
+  // migrated by it; a slow load there is better waited for than failed.
   const url = computedAttempts === 0 ? parts.computed : `${parts.computed}?attempt=${computedAttempts}`;
-  computedModule = within(import(url), "the computed values").then(
+  computedModule = import(url).then(
     (module) => {
       log.push(`loaded ${parts.computed}`);
       return module;
@@ -2863,13 +2906,7 @@ function bindEvent(template, part) {
           // speculation is resolved by the answer, whatever it is.
           command: async (component, args, how = {}) => {
             const interaction = `${press}-${calls++}`;
-            // **Sent unspeculated where its speculation cannot load**
-            // (ADR-0382): a speculation only shows the press before its
-            // answer, and the page shows the server's value when it comes.
-            const ids = await speculate(component, args, interaction).catch((error) => {
-              log.push(`${component} sent unspeculated: ${error.message ?? error}`);
-              return [];
-            });
+            const ids = await speculate(component, args, interaction);
             let answer;
             try {
               answer = await command(component, args, interaction, how.retry);

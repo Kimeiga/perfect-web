@@ -6,8 +6,10 @@ Each mutant undoes one piece:
 - the deadline: a send given none; a send given up taken for an outcome; a
   send held for the one before it sent again as a retry, naming that one, or
   without waiting its turn;
-- `?deadline=`: raising the deadline, taking what is no time above zero, or
-  not read at all;
+- `?deadline=`: raising the deadline, taking what is no time above zero or
+  less than half a second, not read at all, or read from `?load-deadline=`;
+- a send held for the one before it: held only while that one is unanswered,
+  or counted as a retry;
 - the host's fault: `/bench/hold` arming nothing; `before` running the
   command; `after` sending the answer; `body` sending the whole body; a hold
   not taken; a hold outliving its connection.
@@ -46,23 +48,42 @@ MUTANTS = [
         "a send has no deadline",
         "browser",
         RUNTIME,
-        "        signal: unheard,\n",
+        "        signal: unheard.signal,\n",
         "",
     ),
     (
         "a send given up is an outcome, not no answer",
         "browser",
         RUNTIME,
-        "      const why = unheard.aborted ? ` within ${sendDeadline} ms` : ` (${error.message ?? error})`;\n",
-        "      if (unheard.aborted) throw new Unreachable(component, error);\n"
-        "      const why = unheard.aborted ? ` within ${sendDeadline} ms` : ` (${error.message ?? error})`;\n",
+        "      const why = unheard.signal.aborted ? ` within ${sendDeadline} ms` : ` (${error.message ?? error})`;\n",
+        "      if (unheard.signal.aborted) throw new Unreachable(component, error);\n"
+        "      const why = unheard.signal.aborted ? ` within ${sendDeadline} ms` : ` (${error.message ?? error})`;\n",
     ),
     (
         "a send held for the one before it is sent again as a retry",
         "browser",
         RUNTIME,
-        "      if (unheard.aborted && unanswered.has(after)) {\n",
+        "      if (unheard.signal.aborted && after !== undefined) {\n",
         "      if (false) {\n",
+    ),
+    (
+        "a send is held for the one before it only while that one is unanswered",
+        "browser",
+        RUNTIME,
+        "      if (unheard.signal.aborted && after !== undefined) {\n",
+        "      if (unheard.signal.aborted && unanswered.has(after)) {\n",
+    ),
+    (
+        "a send held for the one before it counts as a retry",
+        "browser",
+        RUNTIME,
+        "        log.push(`${component} sent again: no answer within ${sendDeadline} ms, the one before it unanswered`);\n"
+        "        await Promise.all(before);\n"
+        "        after = undefined;\n"
+        "        attempt -= 1;\n",
+        "        log.push(`${component} sent again: no answer within ${sendDeadline} ms, the one before it unanswered`);\n"
+        "        await Promise.all(before);\n"
+        "        after = undefined;\n",
     ),
     (
         "a send held for the one before it is sent again naming that one",
@@ -86,22 +107,36 @@ MUTANTS = [
         "`?deadline=` raises the deadline",
         "browser",
         RUNTIME,
-        "const sendDeadline = askedDeadline > 0 ? Math.min(10_000, askedDeadline) : 10_000;\n",
-        "const sendDeadline = askedDeadline > 0 ? Math.max(10_000, askedDeadline) : 10_000;\n",
+        "  return asked > 0 ? Math.min(10_000, Math.max(500, asked)) : 10_000;\n",
+        "  return asked > 0 ? Math.max(10_000, Math.max(500, asked)) : 10_000;\n",
     ),
     (
         "`?deadline=` takes what is no time above zero",
         "browser",
         RUNTIME,
-        "const sendDeadline = askedDeadline > 0 ? Math.min(10_000, askedDeadline) : 10_000;\n",
-        "const sendDeadline = askedDeadline >= 0 ? Math.min(10_000, askedDeadline) : 10_000;\n",
+        "  return asked > 0 ? Math.min(10_000, Math.max(500, asked)) : 10_000;\n",
+        "  return asked >= 0 ? Math.min(10_000, Math.max(500, asked)) : 10_000;\n",
     ),
     (
         "`?deadline=` is not read",
         "browser",
         RUNTIME,
-        'const askedDeadline = Number(new URLSearchParams(location.search).get("deadline"));\n',
-        "const askedDeadline = 0;\n",
+        '  const asked = Number(new URLSearchParams(location.search).get(name));\n',
+        "  const asked = 0;\n",
+    ),
+    (
+        "`?deadline=` and `?load-deadline=` take a time below half a second",
+        "browser",
+        RUNTIME,
+        "  return asked > 0 ? Math.min(10_000, Math.max(500, asked)) : 10_000;\n",
+        "  return asked > 0 ? Math.min(10_000, asked) : 10_000;\n",
+    ),
+    (
+        "a send's deadline is read from `?load-deadline=`",
+        "browser",
+        RUNTIME,
+        'const sendDeadline = lowered("deadline");\n',
+        'const sendDeadline = lowered("load-deadline");\n',
     ),
     (
         "`/bench/hold` arms nothing",

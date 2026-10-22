@@ -112,9 +112,10 @@ remains as stated above.
 
 ## Amended by ADR-0381 (2026-10-21)
 
-"A request that hangs waits" and "a cut-off answer is untested" no longer
-hold. Each send now has ten seconds for its whole answer, its body included;
-one that has none by then is aborted and is no answer, sent again by the
-`retry` clause's rule above (ADR-0381). `e2e/command-deadline.spec.mjs` holds
-a request at the network, and the host holds one before it runs, after it
-committed and partway through its answer's body (`/bench/hold`).
+"A request that hangs waits" no longer holds. Each send now has ten seconds
+for its whole answer, a success's body included; one that has none by then
+is aborted and is no answer, sent again by the `retry` clause's rule above
+(ADR-0381). `e2e/command-deadline.spec.mjs` holds a request at the network,
+and the host holds one before it runs, after it committed and partway
+through its answer's body (`/bench/hold`): a stalled body is tested. A
+connection reset partway through a body still is not.
