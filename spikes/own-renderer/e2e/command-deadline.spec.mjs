@@ -18,6 +18,9 @@ const ADD = "store.page.add_to_cart";
 const DEADLINE = 1500;
 /** A timer never fires early; the events that time it may each be late. */
 const SLACK = 400;
+/** A timer never fires early, and the page's own clock reads it to within a
+ * millisecond or two (a browser coarsens `performance.now()`). */
+const PAGE_SLACK = 100;
 
 /** A page, ready to be pressed. Polled: WebKit runs no animation frame
  * before its first paint (`slots.spec.mjs`). */
@@ -37,9 +40,9 @@ const logged = (page, prefix) =>
  * settled, its answer read and its arms run. */
 const pressing = (page) => page.evaluate(() => window.__pw.pressing());
 
-/** Each request the page sends for `component`: when it was sent, and given
- * up or answered whole; its interaction; and the one it names as before it
- * (ADR-0305). */
+/** Each request the page sends for `component`: when it was sent, and when
+ * it was answered whole; its interaction; and the one it names as before it
+ * (ADR-0305). Not when one was given up: `timed` reads that in the page. */
 function sent(page, component) {
   const requests = [];
   page.on("request", (r) => {
@@ -52,16 +55,46 @@ function sent(page, component) {
       after: headers["pw-after"] ?? null,
     });
   });
-  const ended = (key) => (r) => {
+  page.on("requestfinished", (r) => {
     const entry = requests.find((x) => x.request === r);
-    if (entry) entry[key] = Date.now();
-  };
-  page.on("requestfailed", ended("failed"));
-  page.on("requestfinished", ended("finished"));
+    if (entry) entry.finished = Date.now();
+  });
   return requests;
 }
-const given = (requests) => requests.filter((r) => r.failed !== undefined).length;
 const finished = (requests) => requests.filter((r) => r.finished !== undefined).length;
+
+/** **Each command send as the page times it**: when its `fetch` began, and
+ * when it was answered or rejected, on the page's own clock. Read in the
+ * page, because Playwright reports a request the page aborts while a route
+ * still holds it (`requestfailed`) in Chromium and not in Firefox or WebKit
+ * (verify 39701638548). Installed before the runtime loads. */
+async function timed(page) {
+  await page.addInitScript(() => {
+    const fetched = window.fetch;
+    window.__sends = [];
+    window.fetch = function (input, init) {
+      const url = typeof input === "string" ? input : input.url;
+      const answer = fetched.call(this, input, init);
+      if (!url.includes("/command/")) return answer;
+      const send = { url, at: performance.now() };
+      window.__sends.push(send);
+      answer.then(
+        () => (send.answered = performance.now()),
+        () => (send.rejected = performance.now()),
+      );
+      return answer;
+    };
+  });
+  return {
+    /** How many sends were given up or failed on their way. */
+    rejected: () => page.evaluate(() => window.__sends.filter((s) => s.rejected !== undefined).length),
+    /** How long each rejected send waited, in milliseconds. */
+    waited: () =>
+      page.evaluate(() =>
+        window.__sends.filter((s) => s.rejected !== undefined).map((s) => s.rejected - s.at),
+      ),
+  };
+}
 
 /** No answer, and no failure either: the request is held open until the
  * page gives up on it. */
@@ -93,6 +126,7 @@ test("`?deadline=` and `?load-deadline=` each lower their own, never raise it, a
 test("a send no answer comes for is given up at its deadline and sent again, its line shown meanwhile", async ({
   page,
 }) => {
+  const sends = await timed(page);
   await ready(page, `/stores/47?deadline=${DEADLINE}`);
   const requests = sent(page, ADD);
   let calls = 0;
@@ -106,9 +140,10 @@ test("a send no answer comes for is given up at its deadline and sent again, its
     await expect(page.locator("#cart-count")).toHaveText("1");
     // Given up at its deadline, not before and not long after, then sent
     // again with its interaction.
-    await expect.poll(() => given(requests), { timeout: 8_000 }).toBe(1);
-    expect(requests[0].failed - requests[0].at).toBeGreaterThanOrEqual(DEADLINE - SLACK);
-    expect(requests[0].failed - requests[0].at).toBeLessThan(DEADLINE + 2_000);
+    await expect.poll(sends.rejected, { timeout: 8_000 }).toBe(1);
+    const [waited] = await sends.waited();
+    expect(waited).toBeGreaterThanOrEqual(DEADLINE - PAGE_SLACK);
+    expect(waited).toBeLessThan(DEADLINE + 2_000);
     await expect.poll(() => requests.length, { timeout: 8_000 }).toBe(2);
     expect(requests[1].interaction).toBe(requests[0].interaction);
     expect(await logged(page, `resent ${ADD}: no answer within ${DEADLINE} ms`)).toBe(1);
@@ -157,6 +192,7 @@ for (const [at, what] of [
 test("a press none of whose sends is answered fails at its last send's deadline, its line taken away", async ({
   page,
 }) => {
+  const sends = await timed(page);
   await ready(page, `/stores/47?deadline=${DEADLINE}`);
   const requests = sent(page, ADD);
   await page.route(`**/command/${ADD}`, neverAnswered);
@@ -167,8 +203,10 @@ test("a press none of whose sends is answered fails at its last send's deadline,
     // more, one interaction, each given up at its own deadline.
     expect(requests.length).toBe(3);
     expect(new Set(requests.map((r) => r.interaction)).size).toBe(1);
-    await expect.poll(() => given(requests), { timeout: 4_000 }).toBe(3);
-    for (const r of requests) expect(r.failed - r.at).toBeGreaterThanOrEqual(DEADLINE - SLACK);
+    await expect.poll(sends.rejected, { timeout: 4_000 }).toBe(3);
+    for (const waited of await sends.waited()) {
+      expect(waited).toBeGreaterThanOrEqual(DEADLINE - PAGE_SLACK);
+    }
     expect(await logged(page, `resent ${ADD}: no answer within ${DEADLINE} ms`)).toBe(2);
     await expect(failed(page)).toHaveAttribute("data-pw-handler-error", "unreachable");
     await expect(lines(page)).toHaveCount(0);

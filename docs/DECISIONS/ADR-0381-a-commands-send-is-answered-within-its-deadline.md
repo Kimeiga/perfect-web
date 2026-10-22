@@ -162,6 +162,16 @@ and test assertions that measured the resend's jittered wait rather than the
 deadline, or asserted no failure before the press had settled. The record at
 `bfda9ae5` predates the repairs; the stack is verified again at its head.
 
+**Verified again at `11d7917c`, and failed** (2026-10-22, verify
+[39701638548](https://github.com/studiokimeiga/perfect-web/actions/runs/39701638548)): the two tests that time a given-up send
+counted it by Playwright's `requestfailed`, which Firefox and WebKit do not
+report for a request the page aborts while a route still holds it; Chromium
+does. Each send is now timed in the page, from its `fetch` to its
+rejection, on the page's own clock, which a browser coarsens by a
+millisecond or two: given up no more than 100 ms before its deadline, where
+Playwright's events allowed 400. The runtime is unchanged. Both tests pass
+in the three engines here, and the campaign, run whole, kills 18 of 18.
+
 ## Not claimed
 
 - **An outcome told as unknown.** A press whose sends are all given up is told

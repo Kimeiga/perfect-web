@@ -46,7 +46,10 @@ In order:
      by Playwright's `requestfailed`, which Firefox and WebKit do not
      report for a request the page aborts while a route holds it
      ("Expected: 1, Received: 0"; "Expected: 3, Received: 0"). They pass
-     in Chromium.
+     in Chromium. **Repaired** in the tests, the runtime unchanged: each
+     send is timed in the page, from its `fetch` to its rejection. Both
+     pass in the three engines here; `command_deadline_mutations.py`, run
+     whole, kills 18 of 18, none refused. To be verified on GitHub.
    - **`feed.spec.mjs:691` in Chromium** (`e14-browser-host-map`: 1 failed,
      110 passed): "a follow shows before the server answers, and is the
      server's after" showed the follow's speculation, released its held
