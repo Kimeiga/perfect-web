@@ -49,13 +49,28 @@ In order:
      in Chromium. **Repaired** in the tests, the runtime unchanged: each
      send is timed in the page, from its `fetch` to its rejection. Both
      pass in the three engines here; `command_deadline_mutations.py`, run
-     whole, kills 18 of 18, none refused. To be verified on GitHub.
+     whole, kills 18 of 18, none refused. Verified at `d57f18a1` (below).
    - **`feed.spec.mjs:691` in Chromium** (`e14-browser-host-map`: 1 failed,
      110 passed): "a follow shows before the server answers, and is the
      server's after" showed the follow's speculation, released its held
      request, and timed out waiting for the answer. Not reproduced here:
      40 serial runs of the test, and five runs of the recipe's three specs
-     in three engines (111 tests each), passed. Cause unknown.
+     in three engines (111 tests each), passed, and five more pinned to
+     four cores with two workers, as on a runner. Its one diagnostic rerun
+     on GitHub, `e14-browser-host-map` at `d57f18a1` (below), passed.
+     Cause unknown. Should it recur, its trace is kept (`kept-traces/`, the
+     verify run's `traces-*` artifact): read that first.
+
+   **Verified at `d57f18a1`** (2026-10-22): CI
+   [39808460517](https://github.com/studiokimeiga/perfect-web/actions/runs/39808460517) passed x64, ARM and licenses; verify
+   [39808499525](https://github.com/studiokimeiga/perfect-web/actions/runs/39808499525) passed the four recipes the repair
+   reaches, each exiting 0 (`e10-browser`, its three runs each 1,312 passed with 20 skipped;
+   `e14-browser-host-map`; `e14-command-deadline`; `e14-second-host`), and
+   the three full browser jobs. Its first attempt failed before any test in
+   `recipes 0` and `browser webkit`: installing `just` 1.58.0,
+   `extractions/setup-crate` found "no release for just matching version
+   specifier 1.58.0" in half a second, where the run's other five jobs found
+   it; those two jobs ran again. Its evidence is fetched.
 3. **E14-E, decision-ready** (`wip/e14-readiness`). The decision brief
    (`docs/milestones/E14-E-decision-brief.md`) and the changed-lines repair
    (Next.js's footprint was undercounted in T01, T06, T08 and T11) await

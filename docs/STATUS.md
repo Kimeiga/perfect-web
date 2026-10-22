@@ -139,8 +139,9 @@ evidence. No failed result is promoted by this summary.
   [39701638548](https://github.com/studiokimeiga/perfect-web/actions/runs/39701638548) at `11d7917c` **failed**: two of
   ADR-0381's tests counted given-up sends by an event Firefox and WebKit do
   not report, and a feed test timed out once in Chromium, not reproduced
-  here ([NEXT](NEXT.md)). The two tests now time each send in the page;
-  their repair is to be verified on GitHub.
+  here ([NEXT](NEXT.md)). The two tests now time each send in the page; at
+  `d57f18a1`, CI [39808460517](https://github.com/studiokimeiga/perfect-web/actions/runs/39808460517) and verify
+  [39808499525](https://github.com/studiokimeiga/perfect-web/actions/runs/39808499525) passed, the feed test among them.
 - Hosted evidence does not prove the local-only performance, memory, load
   or Kiokun obligations. E14 agent benchmarking still requires the owner's
   model, budget and teaching choices. Neither performance universality nor

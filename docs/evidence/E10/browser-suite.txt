@@ -1,43 +1,43 @@
 E10 - the store page, compiled commands and handlers, in browser engines: chromium firefox webkit
 
 produced by: just e10-browser "chromium firefox webkit" docs/evidence/E10/browser-suite.txt
-commit: bfda9ae555a5e56b557be3d47cb0b69a861be7e6
-ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39658074296 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
+commit: d57f18a1d515f48f88993af6976c7a4ca8265bdc
+ci: https://github.com/studiokimeiga/perfect-web/actions/runs/39808499525 (Ubuntu 24.04.5 LTS on GitHub Actions, x86_64)
 playwright: Version 1.58.0
 
 == run 1 of 3
 EVIDENCE localStorage limit (chromium): 5242880 UTF-16 code units
 EVIDENCE static-route-script-bytes=0 wasm-bytes=0
-EVIDENCE interactive-script-bytes=149603 brotli=39842
-EVIDENCE interactive-wasm-bytes=57951 brotli=21284
-EVIDENCE  script 149603 gzip=47005 brotli=39842 http://127.0.0.1:3148/pw-runtime.mjs
-EVIDENCE  wasm 57951 gzip=24939 brotli=21284 http://127.0.0.1:3148/pw-resume.wasm
 EVIDENCE renderer-wasm-bytes=386038 gzip=115553 brotli=91790
+EVIDENCE interactive-script-bytes=154052 brotli=40879
+EVIDENCE interactive-wasm-bytes=57951 brotli=21284
+EVIDENCE  script 154052 gzip=48376 brotli=40879 http://127.0.0.1:3148/pw-runtime.mjs
+EVIDENCE  wasm 57951 gzip=24939 brotli=21284 http://127.0.0.1:3148/pw-resume.wasm
 EVIDENCE localStorage limit (firefox): 5242880 UTF-16 code units
 EVIDENCE localStorage limit (webkit): 5242880 UTF-16 code units
   20 skipped
-  1282 passed (20.7m)
+  1312 passed (23.6m)
 == run 2 of 3
 EVIDENCE localStorage limit (chromium): 5242880 UTF-16 code units
 EVIDENCE static-route-script-bytes=0 wasm-bytes=0
 EVIDENCE renderer-wasm-bytes=386038 gzip=115553 brotli=91790
-EVIDENCE interactive-script-bytes=149603 brotli=39842
+EVIDENCE interactive-script-bytes=154052 brotli=40879
 EVIDENCE interactive-wasm-bytes=57951 brotli=21284
-EVIDENCE  script 149603 gzip=47005 brotli=39842 http://127.0.0.1:3148/pw-runtime.mjs
+EVIDENCE  script 154052 gzip=48376 brotli=40879 http://127.0.0.1:3148/pw-runtime.mjs
 EVIDENCE  wasm 57951 gzip=24939 brotli=21284 http://127.0.0.1:3148/pw-resume.wasm
 EVIDENCE localStorage limit (firefox): 5242880 UTF-16 code units
 EVIDENCE localStorage limit (webkit): 5242880 UTF-16 code units
   20 skipped
-  1282 passed (20.6m)
+  1312 passed (23.5m)
 == run 3 of 3
 EVIDENCE localStorage limit (chromium): 5242880 UTF-16 code units
 EVIDENCE static-route-script-bytes=0 wasm-bytes=0
 EVIDENCE renderer-wasm-bytes=386038 gzip=115553 brotli=91790
-EVIDENCE interactive-script-bytes=149603 brotli=39842
+EVIDENCE interactive-script-bytes=154052 brotli=40879
 EVIDENCE interactive-wasm-bytes=57951 brotli=21284
-EVIDENCE  script 149603 gzip=47005 brotli=39842 http://127.0.0.1:3148/pw-runtime.mjs
+EVIDENCE  script 154052 gzip=48376 brotli=40879 http://127.0.0.1:3148/pw-runtime.mjs
 EVIDENCE  wasm 57951 gzip=24939 brotli=21284 http://127.0.0.1:3148/pw-resume.wasm
 EVIDENCE localStorage limit (firefox): 5242880 UTF-16 code units
 EVIDENCE localStorage limit (webkit): 5242880 UTF-16 code units
   20 skipped
-  1282 passed (20.5m)
+  1312 passed (23.5m)
