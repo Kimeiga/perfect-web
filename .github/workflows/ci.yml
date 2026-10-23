@@ -42,8 +42,10 @@ jobs:
         run: |
           python3 -m compileall -q scripts research/failures/tools
           git diff --check
-      - name: Browser scope regression
-        run: python3 -m unittest discover -s scripts/tests -p 'test_quality_scope.py' -v
+      - name: Quality tool regression tests and historical fixtures
+        run: |
+          python3 -m unittest discover -s scripts/tests -p 'test_quality_*.py' -v
+          python3 scripts/quality_regressions.py
 
   # The main matrix. arm64 is not a formality: the project is developed on
   # Apple Silicon, so an x64-only CI would let an arch-specific assumption

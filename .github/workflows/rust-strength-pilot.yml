@@ -1,0 +1,69 @@
+# Opt-in research; do not turn this into a required gate without
+# comparing its kills/coverage against Pleris's existing tailored mutations.
+name: Rust test-strength pilot
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: "Allowlisted crate to analyze on the selected ref"
+        required: true
+        type: choice
+        options:
+          - pw-table-memory
+          - pw-core
+          - pw-resource
+      run_mutants:
+        description: "Run changed-line mutants after coverage (expensive)"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  pilot:
+    name: Changed Rust coverage and mutation pilot
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+      - name: Coverage of chosen crate
+        env:
+          PACKAGE: ${{ inputs.package }}
+        run: |
+          case "$PACKAGE" in pw-table-memory|pw-core|pw-resource) ;; *) exit 2;; esac
+          cargo llvm-cov --package "$PACKAGE" --tests --summary-only | tee coverage.txt
+      - uses: taiki-e/install-action@v2
+        if: inputs.run_mutants
+        with:
+          tool: cargo-mutants
+      - name: Mutants only in changed Rust
+        if: inputs.run_mutants
+        continue-on-error: true
+        env:
+          PACKAGE: ${{ inputs.package }}
+        run: |
+          case "$PACKAGE" in pw-table-memory|pw-core|pw-resource) ;; *) exit 2;; esac
+          git diff origin/master...HEAD > changed.patch
+          cargo mutants --package "$PACKAGE" --in-diff changed.patch --jobs 2 --timeout 90 | tee mutants-summary.txt
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: rust-strength-pilot
+          path: |
+            coverage.txt
+            changed.patch
+            mutants-summary.txt
+            mutants.out/
+          if-no-files-found: ignore
+          retention-days: 30

@@ -26,8 +26,11 @@ does not imply there were no security issues.
 
 ## Where next
 
-1. Replay dated pre-merge defects from representative PRs and train
-   integrations. Measure extra true findings versus false positives and cost.
+1. A replay manifest is now at `docs/quality/pr-regressions.json`. Validate
+   it with `python3 scripts/quality_regressions.py` and optionally replay a
+   specific case with `--replay <id>` in a full Rust checkout. The two
+   PR #12 Rust defects are reproducible candidates; descriptive historical
+   cases are not counted as detected until independently replayed.
 2. Pilot `cargo-mutants --in-diff` plus `cargo-llvm-cov` on one changed
    crate. The repo already runs hundreds of tailored mutation campaigns;
    generic mutants must add independent fault detection before promotion.
@@ -39,3 +42,12 @@ does not imply there were no security issues.
 Preflight locally with `just preflight`, or rely on hosted results when the
 pinned Rust toolchain is unavailable. Hosted CI is not background work by an
 agent: the branch's exact SHA must be checked before any merge.
+
+## Experimental coverage and mutation pilot
+
+Use GitHub's **Rust test-strength pilot** manual workflow on a selected
+feature branch and allowlisted crate. It records LLVM coverage and, on
+explicit opt-in, runs only mutants in the branch diff. Its results are
+advisory; generic mutation survivors do not automatically invalidate the
+specialized Pleris mutation suite. This workflow does not install Loom or
+claim exhaustive concurrency correctness.
