@@ -14,6 +14,7 @@ members = [
     "runtime/pw-resource",
     "runtime/pw-resume",
     "runtime/pw-resume-wasm",
+    "runtime/pw-table-memory",
     "runtime/pw-tasks",
     "runtime/pw-time",
     "spikes/compiler-diagnostic",

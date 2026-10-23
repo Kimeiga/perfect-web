@@ -1,0 +1,13 @@
+[package]
+name = "pw-table-memory"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+# D2 proof: execute the compiler's tables.json using a single generic
+# in-memory adapter. This is not yet connected to the development host.
+[dependencies]
+pw-core = { path = "../../compiler/pw-core" }
+serde_json.workspace = true
