@@ -40,6 +40,7 @@ jobs:
           if [ "$status" -gt 1 ]; then exit "$status"; fi
       - name: Summarize health
         run: |
+          # shellcheck disable=SC2016 # JS template placeholders must reach Node unchanged
           node -e 'const fs=require("fs"); const j=JSON.parse(fs.readFileSync("fallow-report.json","utf8")); const h=j.health?.health_score ?? {}; const s=j.check?.summary ?? {}; const d=j.dupes?.stats ?? {}; fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `# Fallow weekly report\n\n- Health: **${h.score ?? "n/a"} ${h.grade ?? ""}**\n- Issues: **${s.total_issues ?? 0}**\n- Dead files: **${s.unused_files ?? 0}**\n- Cycles: **${s.circular_dependencies ?? 0}**\n- Duplication: **${Number(d.duplication_percentage ?? 0).toFixed(1)}%**\n`);'
       - uses: actions/upload-artifact@v7
         with:

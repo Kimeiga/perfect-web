@@ -1,0 +1,61 @@
+{
+  "schema": 1,
+  "caveat": "Commit pairs are verified revisions in the same PR/train, not necessarily the original submitted PR head. A failed check and its fix are stronger evidence than a changed commit title.",
+  "cases": [
+    {
+      "id": "pr12-rustfmt",
+      "kind": "format",
+      "source": "https://github.com/studiokimeiga/perfect-web/pull/12",
+      "bad": "bf53edb9fb47698abedfbce4ef5b88eefdc7d820",
+      "fixed": "99659b25b8d95f914d80210b42ba539915a2563e",
+      "detector": "cargo fmt --all -- --check",
+      "replay": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "notes": "CI run 40008304032 failed fmt-check; subsequent rustfmt commit repaired the layout."
+    },
+    {
+      "id": "pr12-clippy",
+      "kind": "lint",
+      "source": "https://github.com/studiokimeiga/perfect-web/pull/12",
+      "bad": "99659b25b8d95f914d80210b42ba539915a2563e",
+      "fixed": "e7bfdbfe3e047165878034ab168c104d2156bdcb",
+      "detector": "cargo clippy -p pw-table-memory --all-targets -- -D warnings",
+      "replay": [
+        "cargo",
+        "clippy",
+        "-p",
+        "pw-table-memory",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "notes": "CI run 40010968719 rejected collapsible_if; follow-up repaired this specific lint."
+    },
+    {
+      "id": "pr9-locked-install",
+      "kind": "dependency",
+      "source": "https://github.com/studiokimeiga/perfect-web/pull/9",
+      "bad": "231731fad124be544196a9598d71845871cbd80f",
+      "fixed": "cf643b4fc3e724511180a455ea2729afa1c08cec",
+      "detector": "pnpm install --frozen-lockfile",
+      "notes": "PR revision subjects show a lockfile and reproducibility repair. SHA/behavior replay is not asserted here.",
+      "replay": null
+    },
+    {
+      "id": "train13-browser-cancellation",
+      "kind": "cross_browser",
+      "source": "https://github.com/studiokimeiga/perfect-web/blob/master/docs/diagnostics/train-13/acceptance-record-2026-10-22.md",
+      "bad": "11d7917c4d1fc259ff99c340eac5551bc9120ca6",
+      "fixed": "d57f18a1d515f48f88993af6976c7a4ca8265bdc",
+      "detector": "just e14-command-deadline across Chromium, Firefox and WebKit",
+      "notes": "Playwright requestfailed did not record page-aborted requests in Firefox/WebKit. Test now observes each send inside the page.",
+      "replay": null
+    }
+  ]
+}

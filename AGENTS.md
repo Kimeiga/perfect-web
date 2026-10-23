@@ -53,6 +53,24 @@ disagree, the charter wins.
 | `docs/milestones/E*.md` | Per-milestone question, gate, and measured result. |
 | `docs/evidence/E*/` | Raw command output backing each gate claim. |
 
+## Before submitting or merging a PR
+
+1. Write the behavior/invariant and a failing regression before the repair,
+   when practical. Include a valid neighboring case and a negative control.
+2. Before the first push, run `just preflight` and the affected tests and
+   recipes. If this environment cannot run them, say so in the PR and treat
+   hosted CI as pending, not successful. Prefer the cheapest applicable gate.
+3. Check an exact commit: no green result from a prior SHA, a cancelled job,
+   a skipped test, or an instrument that stopped early counts as passing.
+4. Ask a separate reviewer (agent or person) to look for missing cases,
+   authority/privacy leaks, resource lifetimes, races and tests that could
+   falsely pass. Review findings are hypotheses until reproduced.
+5. On every review or CI fix, add a regression that would have caught it
+   earlier when feasible. Record the cause in the PR and next prevention.
+
+The PR's affected browser/recipe verification, when planned, must finish
+before merging. Draft status is not an exemption.
+
 ## Commands
 
 `just doctor` is read-only and explains what is missing. Everything else:

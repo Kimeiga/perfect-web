@@ -15,6 +15,8 @@
 name: verify
 
 on:
+  pull_request:
+    branches: [master]
   push:
     # A track's branch too (ADR-0253, docs/PARALLEL.md), for what it changed.
     branches: [master, "track/**"]
@@ -53,8 +55,8 @@ on:
 # run of it covers another; it, the nightly and a dispatch, which plans the
 # recipes it names, each have a group of their own and are never cancelled.
 concurrency:
-  group: verify-${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/track/')) && github.ref || github.run_id }}
-  cancel-in-progress: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/track/') }}
+  group: verify-${{ ((github.event_name == 'push' && startsWith(github.ref, 'refs/heads/track/')) || github.event_name == 'pull_request') && github.ref || github.run_id }}
+  cancel-in-progress: ${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/track/')) || github.event_name == 'pull_request' }}
 
 env:
   CARGO_TERM_COLOR: never
@@ -117,6 +119,7 @@ jobs:
                 base=$(git merge-base origin/master "$GITHUB_SHA")
                 stale=""
                 case "$GITHUB_REF_NAME" in track/train-*) stale="--stale" ;; esac
+                # shellcheck disable=SC2086 # optional --stale flag is deliberately split
                 python3 scripts/ci_plan.py --shards 9 --changed "$base" "$GITHUB_SHA" --current $stale >> "$GITHUB_OUTPUT"
               # The chain's choice, from the newest commit pushed that a run
               # passed at: a train verified at its head is not verified again
@@ -136,6 +139,15 @@ jobs:
               else
                 python3 scripts/ci_plan.py --shards 17 --all >> "$GITHUB_OUTPUT"
               fi ;;
+            pull_request)
+              # Checkout is GitHub's test merge commit. Compare with the
+              # actual merge base to include every change introduced by the
+              # PR, regardless of how many commits were pushed.
+              base=$(git merge-base "origin/$GITHUB_BASE_REF" "$GITHUB_SHA")
+              python3 scripts/ci_plan.py --shards 9 --changed "$base" "$GITHUB_SHA" --current >> "$GITHUB_OUTPUT"
+              git diff --name-only "$base" "$GITHUB_SHA" |
+                python3 scripts/quality_scope.py --browser >> "$GITHUB_OUTPUT"
+              ;;
             schedule)
               # Skipped where a push's or a nightly's run has succeeded at
               # this exact commit, recipes and browser suites alike, and the
@@ -155,6 +167,7 @@ jobs:
               fi ;;
             *)
               if [ -n "$RECIPES" ]; then
+                # shellcheck disable=SC2086 # workflow-dispatch RECIPES is a space-separated list
                 python3 scripts/ci_plan.py --shards "$SHARDS" $RECIPES >> "$GITHUB_OUTPUT"
               else
                 python3 scripts/ci_plan.py --shards "$SHARDS" --all >> "$GITHUB_OUTPUT"
@@ -253,6 +266,7 @@ jobs:
             runner="$runner, PostgreSQL 18.6"
           fi
           echo "$runner" > ci-out-runner.txt
+          # shellcheck disable=SC2086 # names from the trusted plan are individual arguments
           python3 scripts/ci_recipes.py --out ci-out $RECIPES
           mv ci-out-runner.txt ci-out/runner.txt
       - uses: actions/upload-artifact@v7
