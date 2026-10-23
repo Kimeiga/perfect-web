@@ -882,7 +882,7 @@ models and budget.
 store in Next.js 16.3.8 and SvelteKit 2.70.3 (not the day-old 3.0.0) beside
 the Pleris store, held to one behavioural contract with mutant stores as
 negative controls. Found that the Pleris store's `optimistic` and
-`idempotent_by` are checked and not executed; the contract excludes both. Amended 2026-10-11: svelte-check is asked for its machine output, which it wrote by default only in an agent's session (`CLAUDECODE=1`), so every runner failed the recipe.
+`idempotent_by` are checked and not executed; the contract excludes both. Amended 2026-10-11: svelte-check is asked for its machine output, which it wrote by default only in an agent's session (`CLAUDECODE=1`), so every runner failed the recipe. Amended 2026-10-22: Next.js 16.4.1, for three advisories in 16.3.8 (two unauthenticated remote code executions, one denial of service) that no 16.3.x fixes.
 
 ## 2026-10-02: an idempotent command runs once per interaction (E14)
 

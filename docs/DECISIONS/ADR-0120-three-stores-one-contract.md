@@ -19,7 +19,8 @@ asserted in prose.
    server. Each baseline is self-contained, because an agent will work in an
    isolated copy of exactly one.
 2. **Versions**, verified on the npm registry on 2026-10-02 and pinned exactly:
-   Next.js 16.3.8 with React 19.3.0; SvelteKit **2.70.3** with Svelte 5.57.1,
+   Next.js 16.3.8 (16.4.1 since 2026-10-22, below) with React 19.3.0;
+   SvelteKit **2.70.3** with Svelte 5.57.1,
    Vite 8.3.2 and adapter-node 5.5.7; TypeScript 6.0.3; Playwright 1.58.0, as
    the own-renderer suite uses.
    - **Not SvelteKit 3.0.0**, released 2026-10-01. A benchmark of coding
@@ -91,3 +92,29 @@ found 0 errors and 0 warnings". The recipe now passes `--output machine`.
 Next.js 16.3.8, Vite 8 and Marko read the same variable. Marko adds a guide to
 its error messages. Next.js and Vite only detect the agent. No other recipe
 reads their output.
+
+## Amended, 2026-10-22: Next.js 16.4.1, for three advisories in 16.3.8
+
+On 2026-10-22 the Node audit (`just audit`, charter §3.6) began to fail on
+every branch: npm's advisory database now names next 16.3.8 in three
+advisories that Next.js's out-of-band release of 2026-10-14 fixed in 16.4.1
+and 15.5.28, with no patched 16.3.x
+([its notice](https://nextjs.org/blog/nextjs-security-update-october-14-2026)):
+
+- GHSA-673q-mjm6-r5xr, critical: remote code execution, unauthenticated,
+  where a `use cache` function returns typed arrays. This store has none.
+- GHSA-2464-fhr4-w9xw (CVE-2026-96889), critical: remote code execution
+  through the Image Optimization API's SVG path on glibc Linux, in the
+  libvips that `sharp` carries. The lockfile's `sharp` was already 0.35.5,
+  the notice's workaround, and this store optimizes no image.
+- GHSA-p3m5-59mp-jv5r, high: denial of service through a Server Action.
+  This store's cart is written by Server Actions.
+
+The baseline pins next 16.4.1, verified on the npm registry, React 19.3.0
+unchanged; the owner approved the download. `pnpm-lock.yaml` moves `next`,
+`@next/env` and the `@next/swc-*` binaries and nothing else. The store
+builds and typechecks on it, `scripts/audit-node.sh` reports no advisory but
+the two it documents, and `e14-contract` holds the store to the contract
+again. The Next.js findings E14's tasks rest on were read in 16.3.8's source;
+16.4.1's passes the same implicit tags to `unstable_cache` (T09). What was
+measured before this date, ADR-0342's among it, was measured on 16.3.8.
