@@ -42,3 +42,35 @@ GHSA-vfj7-8cjw-p6xm
     Revisit: when braces publishes a fixed release, when `@marko/vite` stops
     depending on micromatch, or when ADR-0002's deletion condition retires
     Marko at E7.
+
+GHSA-pfhg-q3qv-9q6r
+    SvelteKit <3.0.0 — enhanced forms on routes accepting double-slash paths
+    can navigate to an external origin (low severity).
+    https://github.com/sveltejs/kit/security/advisories/GHSA-pfhg-q3qv-9q6r
+
+    Why accepted temporarily: the only @sveltejs/kit dependency is the
+    undeployed E14 benchmark baseline, pinned to 2.70.3 under ADR-0120 for a
+    controlled agent comparison. It uses use:enhance with named ?/add and
+    ?/clear actions on /stores/[storeId], not a catch-all route accepting
+    double-slash paths. This allowance does not establish that 2.70.3 is safe
+    for general use or permit exposing the benchmark to untrusted traffic.
+
+    Revisit: when E14-E chooses baseline versions, before exposing the
+    baseline outside the local harness, or if a catch-all/enhanced action is
+    introduced. Upgrade SvelteKit and its adapter to compatible 3.x releases
+    and rerun the three-store contract; remove this allowance on migration.
+
+GHSA-27mw-82g8-phjj
+    SvelteKit <3.0.0 — untrusted cache-control passed to setHeaders while
+    prerendering can inject markup into the generated page (low severity).
+    https://github.com/sveltejs/kit/security/advisories/GHSA-27mw-82g8-phjj
+
+    Why accepted temporarily: the same undeployed, locally exercised E14
+    baseline has no prerender setting and does not call setHeaders or forward
+    a request-supplied cache-control value. Its only configured adapter is
+    adapter-node for the benchmark contract. This exception is not a claim
+    that all SvelteKit 2.x applications are unaffected.
+
+    Revisit: at E14-E, before deploying or exposing this baseline externally,
+    or if prerendering/setHeaders is introduced. Upgrade to compatible
+    SvelteKit >=3.0.0, rerun the contract and remove this allowance.
