@@ -225,6 +225,16 @@ fn actual_compiler_manifest_executes_without_app_specific_rust() {
     assert_eq!(table.bounded, Some(100));
 
     let db = pw_table_memory::MemoryTables::new(manifest).unwrap();
+    assert_eq!(
+        db.read(&get, &[serde_json::json!("missing")]).unwrap(),
+        serde_json::Value::Null,
+        "a missing compiled get must preserve Option::None",
+    );
+    assert_eq!(
+        db.read(&get_many, &[serde_json::json!([])]).unwrap(),
+        serde_json::json!([]),
+        "an empty compiled set read must return an empty list",
+    );
     let first = serde_json::json!({
         "id": "b", "name": "second", "slug": "second", "added": 20
     });
