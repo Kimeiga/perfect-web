@@ -185,3 +185,97 @@ fn migration_refusals_precede_unsupported_backend_diagnostics() {
     }
     std::fs::remove_dir_all(dir).unwrap();
 }
+
+
+#[test]
+fn actual_compiler_manifest_executes_without_app_specific_rust() {
+    // Use the checked-in application declaration, not a hand-built manifest.
+    // This catches drift between Pleris-generated host imports and the
+    // runtime adapter while keeping the adapter independent of this app.
+    let dir = std::env::temp_dir().join(format!("pw-cli-table-adapter-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let built = dir.join("built");
+    let source = root().join("examples/tables/Lists.pw");
+    let output = pw("build", &[Path::new("--out"), &built], &source);
+    assert!(output.status.success(), "{}", shown(&output));
+
+    let manifest: pw_core::tables::TablesJson =
+        serde_json::from_slice(&std::fs::read(built.join("tables.json")).unwrap()).unwrap();
+    assert_eq!(manifest.tables.len(), 1);
+    let table = &manifest.tables[0];
+    assert_eq!(table.schema.name, "Lists");
+    let named = |primitive| {
+        table
+            .functions
+            .iter()
+            .find(|f| f.primitive == primitive)
+            .expect("compiler emitted the primitive")
+            .import
+            .clone()
+    };
+    use pw_core::tables::Primitive;
+    let insert = named(Primitive::Insert);
+    let get = named(Primitive::Get);
+    let get_many = named(Primitive::GetMany);
+    let by_slug = named(Primitive::Index);
+    let all = named(Primitive::All);
+    let put = named(Primitive::Put);
+    let delete = named(Primitive::Delete);
+    assert_eq!(insert, "pw:tables/lists#insert");
+    assert_eq!(by_slug, "pw:tables/lists#by-slug");
+    assert_eq!(table.bounded, Some(100));
+
+    let db = pw_table_memory::MemoryTables::new(manifest).unwrap();
+    let first = serde_json::json!({
+        "id": "b", "name": "second", "slug": "second", "added": 20
+    });
+    let second = serde_json::json!({
+        "id": "a", "name": "first", "slug": "first", "added": 10
+    });
+    db.transaction(|tx| {
+        tx.write(&insert, &[first.clone()])?;
+        tx.write(&insert, &[second.clone()])?;
+        Ok(())
+    })
+    .unwrap();
+    assert_eq!(db.read(&get, &[serde_json::json!("a")]).unwrap(), second);
+    assert_eq!(
+        db.read(&get_many, &[serde_json::json!(["b", "a", "b"])])
+            .unwrap(),
+        serde_json::json!([second, first])
+    );
+    assert_eq!(
+        db.read(&by_slug, &[serde_json::json!("first")]).unwrap(),
+        second
+    );
+    assert_eq!(
+        db.read(&all, &[]).unwrap(),
+        serde_json::json!([second, first])
+    );
+
+    let duplicate_slug = serde_json::json!({
+        "id": "c", "name": "collision", "slug": "first", "added": 30
+    });
+    assert!(matches!(
+        db.transaction(|tx| tx.write(&insert, &[duplicate_slug])),
+        Err(pw_table_memory::Error::Conflict { .. })
+    ));
+    assert_eq!(
+        db.read(&all, &[]).unwrap(),
+        serde_json::json!([second, first]),
+        "a unique-index conflict must not publish a partial write"
+    );
+
+    let updated = serde_json::json!({
+        "id": "a", "name": "updated", "slug": "first", "added": 40
+    });
+    db.transaction(|tx| tx.write(&put, &[updated.clone()])).unwrap();
+    assert_eq!(
+        db.read(&all, &[]).unwrap(),
+        serde_json::json!([first, updated])
+    );
+    db.transaction(|tx| tx.write(&delete, &[serde_json::json!("b")]))
+        .unwrap();
+    assert_eq!(db.read(&all, &[]).unwrap(), serde_json::json!([updated]));
+    std::fs::remove_dir_all(dir).unwrap();
+}
