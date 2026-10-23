@@ -232,8 +232,8 @@ fn actual_compiler_manifest_executes_without_app_specific_rust() {
         "id": "a", "name": "first", "slug": "first", "added": 10
     });
     db.transaction(|tx| {
-        tx.write(&insert, &[first.clone()])?;
-        tx.write(&insert, &[second.clone()])?;
+        tx.write(&insert, std::slice::from_ref(&first))?;
+        tx.write(&insert, std::slice::from_ref(&second))?;
         Ok(())
     })
     .unwrap();
@@ -268,7 +268,7 @@ fn actual_compiler_manifest_executes_without_app_specific_rust() {
     let updated = serde_json::json!({
         "id": "a", "name": "updated", "slug": "first", "added": 40
     });
-    db.transaction(|tx| tx.write(&put, &[updated.clone()]))
+    db.transaction(|tx| tx.write(&put, std::slice::from_ref(&updated)))
         .unwrap();
     assert_eq!(
         db.read(&all, &[]).unwrap(),
