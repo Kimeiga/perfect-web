@@ -8,7 +8,9 @@ only collect baseline evidence.
 
 - `ci` runs a cheap Rust formatting, Python syntax and change-scope gate
   before installing the heavy toolchain. The full `just ci` still performs
-  Clippy, test-unit, compiler conformance and evidence checks.
+  Clippy, test-unit, compiler conformance and evidence checks. Feature-branch
+  CI runs on the PR instead of duplicating each feature push; track/wip
+  branches retain push CI even without a PR.
 - `verify` covers PRs against master, not just train branches. The existing
   dependency planner selects reached recipes; application/compiler/runtime
   changes also require the complete Chromium, Firefox and WebKit suites.

@@ -11,7 +11,9 @@ name: ci
 
 on:
   push:
-    branches: ["**"]
+    # Feature branches are checked once as PRs; track/wip branches retain
+    # hosted CI before they open a PR or enter a train.
+    branches: [master, "track/**", "wip/**"]
   pull_request:
   workflow_dispatch:
 
