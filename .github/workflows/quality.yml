@@ -34,7 +34,8 @@ jobs:
         if: always()
         env:
           RESULT: ${{ steps.ruff.outcome }}
-        run: echo "Ruff advisory outcome: $RESULT; triage before making required." >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          echo "Ruff advisory outcome: $RESULT; triage before making required." >> "$GITHUB_STEP_SUMMARY"
 
   workflow-syntax:
     name: actionlint (baseline)
@@ -55,7 +56,8 @@ jobs:
         if: always()
         env:
           RESULT: ${{ steps.actionlint.outcome }}
-        run: echo "actionlint advisory outcome: $RESULT; triage before making required." >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          echo "actionlint advisory outcome: $RESULT; triage before making required." >> "$GITHUB_STEP_SUMMARY"
 
   workflow-security:
     name: zizmor (baseline)
@@ -80,4 +82,5 @@ jobs:
         if: always()
         env:
           RESULT: ${{ steps.zizmor.outcome }}
-        run: echo "zizmor advisory outcome: $RESULT; triage before making required." >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          echo "zizmor advisory outcome: $RESULT; triage before making required." >> "$GITHUB_STEP_SUMMARY"
