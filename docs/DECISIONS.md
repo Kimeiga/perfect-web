@@ -3244,9 +3244,9 @@ Effect inference revisits readers only when dependency rows grow (landed with tr
 - Preserve canonical effect rows, performed metadata and convergence while replacing repeated whole-program sweeps with a deduplicated reader queue. Bounded alternating measurements establish the deep-chain improvement, not an application-wide speedup.
 
 [ADR-0381](DECISIONS/ADR-0381-a-commands-send-is-answered-within-its-deadline.md):
-A command's send is answered within its deadline, or it is no answer (track `command-deadline`; verified at `bfda9ae5`, not landed).
+A command's send is answered within its deadline, or it is no answer (track `command-deadline`; landed with train-13 at `360a4db5`, 2026-10-23).
 - Each send has ten seconds for its whole answer, its body included, and is then sent again as `retry` allows; a send held for the command before it waits its turn, as an early answer does. Every press settles in bounded time; an outcome the page cannot know is still told as "could not be sent".
 
 [ADR-0382](DECISIONS/ADR-0382-a-page-loads-its-modules-within-the-deadline.md):
-The modules a page loads when it first needs them are loaded within the deadline, and a failed load is not kept (track `press-modules`; not landed).
+The modules a page loads when it first needs them are loaded within the deadline, and a failed load is not kept (track `press-modules`; landed with train-13 at `360a4db5`, 2026-10-23).
 - A handler's module, the page's speculation module, its renderer and its computed values load within ADR-0381's deadline; a failed or given-up load is forgotten and asked for again under a new specifier, as a handler's is; a press whose speculation cannot load is sent unspeculated.

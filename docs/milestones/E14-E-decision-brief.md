@@ -43,8 +43,8 @@ repository by path (ADR-0124:84-86, `EVIDENCE_LEDGER.md:132`, open).
   All twelve tasks are gradable on Pleris today (E14.md).
 
 **Defects to repair before any paid run:**
-- **`changed_lines` missed every file an agent makes** (repaired on
-  `wip/e14-readiness`, `just e14-bench-footprint`). It read `git diff
+- **`changed_lines` missed every file an agent makes** (repaired, and
+  landed with train-13 on 2026-10-23; `just e14-bench-footprint`). It read `git diff
   --numstat`, which lists only tracked files. Measured on the committed
   patches: Next.js's T01 reference 27 lines, really 77; T06 3, really 48; T08
   32, really 52; T11 10, really 37 (their unsafe patches alike). Pleris's and
@@ -157,7 +157,7 @@ $2 / $10 / $0.10 / $2.50; Haiku 5.5 $0.10 / $0.50 / $0.01 / $0.125 up to
    unchanged.
 2. **A scripted tool-path control**: the reference applied through the
    adapter's own tools scores 1 on all 36 task and stack pairs; no-op 0.
-3. **`changed_lines`**: done on `wip/e14-readiness` (above).
+3. **`changed_lines`**: done, landed with train-13 (above).
 4. **An infrastructure class**: `failed_at: "infra"` for a flagged failure,
    a reserved exit code or a timeout, excluded from denominators.
 5. **A matrix runner**: `--dry-run`, resume, randomized block order with a

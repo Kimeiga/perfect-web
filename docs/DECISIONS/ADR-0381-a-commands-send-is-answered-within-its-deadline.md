@@ -172,6 +172,12 @@ millisecond or two: given up no more than 100 ms before its deadline, where
 Playwright's events allowed 400. The runtime is unchanged. Both tests pass
 in the three engines here, and the campaign, run whole, kills 18 of 18.
 
+**Verified at `d57f18a1`, and landed** (2026-10-23): CI [39808460517](https://github.com/studiokimeiga/perfect-web/actions/runs/39808460517)
+and verify [39808499525](https://github.com/studiokimeiga/perfect-web/actions/runs/39808499525) passed, the spec 30 of 30 in three engines
+and 18 of 18 controls killed, none refused. It landed on master with
+train-13 at `360a4db5`, after exact-commit CI and the track verification
+there ([acceptance record](../diagnostics/train-13/acceptance-record-2026-10-22.md)).
+
 ## Not claimed
 
 - **An outcome told as unknown.** A press whose sends are all given up is told

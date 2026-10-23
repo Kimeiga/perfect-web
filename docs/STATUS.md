@@ -2,9 +2,10 @@
 
 <!-- Charter §3.4 requires exactly these sections. Keep them. -->
 
-Reviewed 2026-10-21 against master `e7664d2eb01aa8c6e91df594bd7270a84a8bf8de`,
-train-12's landing, and its completed hosted runs. The
-[snapshot at that landing](STATUS-HISTORY-2026-10-21.md) and
+Reviewed 2026-10-23 against master `360a4db520836acdb207839861fa99ce1638e525`,
+train-13's landing, and its completed hosted runs. The
+[snapshot at that landing](STATUS-HISTORY-2026-10-23.md), the
+[one at train-12's](STATUS-HISTORY-2026-10-21.md) and
 [the prior ledger](STATUS-HISTORY-2026-10.md) remain verbatim, including
 failed runs, corrections and their original scope.
 
@@ -18,73 +19,67 @@ Pleris is taught to an agent. Compiler and browser tests establish no agent
 benchmark. Numbering remains engineering E0-E15, public proofs P0-P9 and
 risk experiments RQ-* ([charter](../PROJECT_CHARTER.md)).
 
-**Train-12 landed on master on 2026-10-21** at `e7664d2e`: generic-result
-and effect repairs, device-local data and TodoMVC, cross-host database
-checks, verification and producer repairs, security pins, component
-namespaces, keyed-read retry and effect convergence (ADR-0351, ADR-0365 to
-ADR-0380). The [acceptance record](diagnostics/train-12/acceptance-record-2026-10-21.md)
-states what its evidence proves and what it does not.
-
-**Train-13, verified, not landed** (`track/train-13`): `command-deadline`,
-`press-modules` and `e14-readiness`, merged at `c57e5570`, and the benchmark's
-Next.js baseline moved from 16.3.8 to 16.4.1 for three advisories (ADR-0120,
-amended). At `5a4378fe`, CI [39892760379](https://github.com/studiokimeiga/perfect-web/actions/runs/39892760379) and verify [39892771765](https://github.com/studiokimeiga/perfect-web/actions/runs/39892771765)
-passed. Its [acceptance record](diagnostics/train-13/acceptance-record-2026-10-22.md)
-holds each track's runs, the failed ones among them. The owner approved
-landing it once exact-commit CI and the track verification pass at its
-head.
-
-**Verified, not landed:** track `command-deadline` (`wip/command-deadline`,
-[ADR-0381](DECISIONS/ADR-0381-a-commands-send-is-answered-within-its-deadline.md)).
-Each send of a command now has ten seconds for its whole answer and is then
-sent again as `retry` allows, so a press settles in bounded time; a send held
-for the command before it waits its turn. At `bfda9ae5`, CI
-[39658029334](https://github.com/studiokimeiga/perfect-web/actions/runs/39658029334)
-and verify [39658074296](https://github.com/studiokimeiga/perfect-web/actions/runs/39658074296)
-passed (141 reached recipes, `e14-pleris-controls` and the three browser
-engines); the evidence is fetched at `973fbbcc`. Landing waits for the
-owner's approval and for exact-commit CI at the landed commit.
+**Train-13 landed on master on 2026-10-23** at `360a4db5`: a command's
+send is answered within its deadline
+([ADR-0381](DECISIONS/ADR-0381-a-commands-send-is-answered-within-its-deadline.md)),
+a page's on-demand modules load within it and a failed load is not kept
+([ADR-0382](DECISIONS/ADR-0382-a-page-loads-its-modules-within-the-deadline.md)),
+the benchmark counts the files a run makes, the E14-E
+[decision brief](milestones/E14-E-decision-brief.md) is ready for the owner,
+and the Next.js baseline is 16.4.1 for three advisories in 16.3.8
+([ADR-0120](DECISIONS/ADR-0120-three-stores-one-contract.md), amended). The
+[acceptance record](diagnostics/train-13/acceptance-record-2026-10-22.md) states what its evidence proves and what it
+does not.
 
 ## last passing commit
 
-**Latest verified master:** `e7664d2eb01aa8c6e91df594bd7270a84a8bf8de`
-(train-12), fast-forwarded from `track/train-12` without rewriting history.
+**Latest verified master:** `360a4db520836acdb207839861fa99ce1638e525`
+(train-13), fast-forwarded from `track/train-13` without rewriting history.
 
-- Exact-commit CI passed where the commit was published:
-  [39567756677](https://github.com/studiokimeiga/perfect-web/actions/runs/39567756677)
-  on `wip/train-12-state`,
-  [39575516309](https://github.com/studiokimeiga/perfect-web/actions/runs/39575516309)
-  on `track/train-12` and
-  [39584219053](https://github.com/studiokimeiga/perfect-web/actions/runs/39584219053)
-  on `master`, each with x64, ARM and license/advisory checks.
-- Automatic track verification
-  [39575516650](https://github.com/studiokimeiga/perfect-web/actions/runs/39575516650)
-  planned the four recipes the canonical plan still required, `e10-browser`
-  and the legacy `e8-wit`, `e10-component` and `e8-contracts`, and passed
-  them and the full Chromium, Firefox and WebKit jobs.
-- On master, verify
-  [39584218974](https://github.com/studiokimeiga/perfect-web/actions/runs/39584218974)
-  (push) and the scheduled
-  [39596027504](https://github.com/studiokimeiga/perfect-web/actions/runs/39596027504)
-  planned no recipe, the source's evidence being current (ADR-0281);
-  failure census
-  [39584219332](https://github.com/studiokimeiga/perfect-web/actions/runs/39584219332)
-  passed.
+- Exact-commit CI passed where the commit was published: [39899237285](https://github.com/studiokimeiga/perfect-web/actions/runs/39899237285)
+  on `wip/train-13`, [39904687494](https://github.com/studiokimeiga/perfect-web/actions/runs/39904687494) on `track/train-13` and
+  [39912441526](https://github.com/studiokimeiga/perfect-web/actions/runs/39912441526) on `master`, each with x64, ARM and license/advisory
+  checks.
+- Automatic track verification [39904687487](https://github.com/studiokimeiga/perfect-web/actions/runs/39904687487) planned `e10-browser`,
+  which every push plans (its record's path is a recipe parameter the
+  planner cannot read), and passed it and the full Chromium, Firefox and
+  WebKit jobs.
+- On master, verify [39912441532](https://github.com/studiokimeiga/perfect-web/actions/runs/39912441532) (push) planned no recipe and no
+  browser job, the track's run having passed at that exact commit.
 
-Before its record commit, the landed source `ec15e5b1` passed
-[CI 39558466827](https://github.com/studiokimeiga/perfect-web/actions/runs/39558466827)
-and [verify 39558474966](https://github.com/studiokimeiga/perfect-web/actions/runs/39558474966);
-the [acceptance record](diagnostics/train-12/acceptance-record-2026-10-21.md)
-reconciles the earlier eligible recipe records.
+Before its record commit, the source `5a4378fe` passed
+[CI 39892760379](https://github.com/studiokimeiga/perfect-web/actions/runs/39892760379) and
+[verify 39892771765](https://github.com/studiokimeiga/perfect-web/actions/runs/39892771765); the
+[acceptance record](diagnostics/train-13/acceptance-record-2026-10-22.md) holds each track's runs, the failed ones
+among them.
 
-**Previous landing:** `115895de63d336352cd9051a828257abb92afedb` (train-11,
-2026-10-20), with [CI 39489264202](https://github.com/studiokimeiga/perfect-web/actions/runs/39489264202)
-and [verify 39489264142](https://github.com/studiokimeiga/perfect-web/actions/runs/39489264142)
-at that exact commit. Older snapshots and failed or cancelled runs remain in
-the [landing snapshot](STATUS-HISTORY-2026-10-21.md#last-passing-commit) and
-the [last-passing ledger](STATUS-HISTORY-2026-10.md#last-passing-commit).
+**Previous landing:** `e7664d2eb01aa8c6e91df594bd7270a84a8bf8de` (train-12,
+2026-10-21), with [CI 39584219053](https://github.com/studiokimeiga/perfect-web/actions/runs/39584219053) and
+[verify 39584218974](https://github.com/studiokimeiga/perfect-web/actions/runs/39584218974) at that exact commit on master.
+Older snapshots and failed or cancelled runs remain in the
+[train-13 landing snapshot](STATUS-HISTORY-2026-10-23.md#last-passing-commit),
+the [train-12 one](STATUS-HISTORY-2026-10-21.md#last-passing-commit) and the
+[last-passing ledger](STATUS-HISTORY-2026-10.md#last-passing-commit).
 
 ## completed gate items
+
+On landed train-13:
+
+- A command's send is answered within ten seconds or sent again as its
+  `retry` allows, and a send held for the one before it waits its turn
+  ([ADR-0381](DECISIONS/ADR-0381-a-commands-send-is-answered-within-its-deadline.md)):
+  ten tests in three engines, 18 of 18 controls killed.
+- A page's on-demand modules load within the deadline and a failed load is
+  not kept
+  ([ADR-0382](DECISIONS/ADR-0382-a-page-loads-its-modules-within-the-deadline.md)):
+  eight tests in three engines, 10 of 10 controls killed.
+- The benchmark's footprint counts the files a run makes
+  ([ADR-0124](DECISIONS/ADR-0124-the-benchmark-harness-and-its-controls.md),
+  amended): Next.js's T01, T06, T08 and T11 had been undercounted.
+- The Next.js baseline is 16.4.1
+  ([ADR-0120](DECISIONS/ADR-0120-three-stores-one-contract.md), amended):
+  the contract (81 tests, 5 of 5 controls) and the museum (5 exhibits,
+  4 of 4 controls) pass on it.
 
 At train-12 source `ec15e5b1`, the latest complete campaign detects all
 43 TodoMVC, 62 device-storage and 50 second-host faults, plus TodoMVC's
@@ -129,33 +124,15 @@ evidence. No failed result is promoted by this summary.
 
 ## failing gate items
 
-- **On master, a command request that never settles holds its press, and
-  the page's order behind it** (ADR-0173's "not claimed"). The repair is
-  verified on `wip/command-deadline` and in train-13 (above), not landed. Its own limits
-  stay open after it lands: an unknown outcome is told as "could not be
-  sent", a command given up may still run after those behind it, and the
-  host's waits have no deadline (ADR-0381,
-  [KNOWN_LIMITATIONS](KNOWN_LIMITATIONS.md)).
-- **On master, a page's on-demand modules** (found 2026-10-21, reproduced
-  in Chromium): one failed load of a page's speculation module, renderer or
-  computed values is kept, so every later press that speculates, or change
-  that computes, fails the same way until reload; and a module that never
-  loads holds its press and, by ADR-0152, the presses after it. Repaired on
-  `wip/press-modules`
-  ([ADR-0382](DECISIONS/ADR-0382-a-page-loads-its-modules-within-the-deadline.md),
-  stacked on `wip/command-deadline`): its eight tests pass in three
-  engines and its ten controls are killed. Its verify
-  [39701638548](https://github.com/studiokimeiga/perfect-web/actions/runs/39701638548) at `11d7917c` **failed**: two of
-  ADR-0381's tests counted given-up sends by an event Firefox and WebKit do
-  not report, and a feed test timed out once in Chromium, not reproduced
-  here ([NEXT](NEXT.md)). The two tests now time each send in the page; at
-  `d57f18a1`, CI [39808460517](https://github.com/studiokimeiga/perfect-web/actions/runs/39808460517) and verify
-  [39808499525](https://github.com/studiokimeiga/perfect-web/actions/runs/39808499525) passed, the feed test among them.
-- **On master, CI's Node audit fails** since 2026-10-22: the benchmark
-  baseline's next 16.3.8 is named in GHSA-673q-mjm6-r5xr and
-  GHSA-2464-fhr4-w9xw (critical) and GHSA-p3m5-59mp-jv5r (high). Train-13
-  carries the bump to 16.4.1 ([39857310130](https://github.com/studiokimeiga/perfect-web/actions/runs/39857310130) failed at its merge, before
-  it).
+- **A command given up is told as unsent, and may still run** (ADR-0381's
+  "not claimed", landed with train-13): an unknown outcome is told as
+  "could not be sent", a command given up may still run after those behind
+  it, and the host's own waits have no deadline
+  ([KNOWN_LIMITATIONS](KNOWN_LIMITATIONS.md)).
+- **The computed values keep no deadline** (ADR-0382's "not claimed",
+  landed with train-13): a slow boot is waited for, and a device value's
+  migration that cannot load them leaves the value under its older key
+  ([KNOWN_LIMITATIONS](KNOWN_LIMITATIONS.md)).
 - **A follow once went unanswered in Chromium** (`feed.spec.mjs:691`,
   verify 39701638548 at `11d7917c`): its request released, the test timed
   out waiting for its answer. Not reproduced in fifty local runs, two
@@ -257,9 +234,10 @@ to older frame attribution.
 
 ## next three concrete tasks
 
-1. Land train-13 as the owner approved: exact-commit CI and the automatic
-   track verification at its head, then `master` fast-forwarded to it.
-2. E14-E: the owner's model, budget and teaching choices, from the decision
-   brief; run nothing paid on an assumed choice.
-3. Device-local durability (ADR-0366's boundary), and the remaining
-   [NEXT](NEXT.md) follow-ups, the unexplained feed timeout among them.
+1. E14-E: the owner's model, budget and teaching choices, from the
+   [decision brief](milestones/E14-E-decision-brief.md); run nothing paid on
+   an assumed choice.
+2. Device-local durability (ADR-0366's boundary).
+3. The remaining [NEXT](NEXT.md) follow-ups: the unexplained feed timeout,
+   and `e10-browser`, which every push plans because the planner cannot read
+   its record's path.

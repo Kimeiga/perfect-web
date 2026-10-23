@@ -105,4 +105,4 @@ sandbox ignores, and refuses changes git cannot list rather than count none
 `scripts/bench_footprint_mutations.py`, `just e14-bench-footprint`). The
 committed `harness-T01`, `T06`, `T08` and `T11` traces keep the old counts
 until `just e14-harness` records them again on a machine with the
-frameworks' stores.
+frameworks' stores. Landed with train-13 at `360a4db5`, 2026-10-23.

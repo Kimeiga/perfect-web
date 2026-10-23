@@ -104,6 +104,13 @@ it a device value's migration; the catch that sends a press unspeculated
 also took a failure after the module had loaded; and loads and sends shared
 one test knob, so a test's short send deadline bounded cold module loads.
 
+**Verified, and landed** (2026-10-23): `e14-press-modules` passed at
+`11d7917c` in verify [39701638548](https://github.com/studiokimeiga/perfect-web/actions/runs/39701638548), eight tests in three engines and
+ten of ten controls killed, none refused, in a run that failed elsewhere
+(ADR-0381's tests); at `d57f18a1`, verify [39808499525](https://github.com/studiokimeiga/perfect-web/actions/runs/39808499525) passed what the
+test repair reached. It landed on master with train-13 at `360a4db5`
+([acceptance record](../diagnostics/train-13/acceptance-record-2026-10-22.md)).
+
 ## Not claimed
 
 - **A press's other awaits**: a handler's own code, and its command's,

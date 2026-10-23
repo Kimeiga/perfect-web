@@ -2,7 +2,50 @@
 
 The next executable tasks, in order, with acceptance criteria. Charter §3.4.
 
-## Current, 2026-10-22: train-13
+## Current, 2026-10-23: after train-13's landing
+
+Train-13 landed on master at `360a4db5` on 2026-10-23, fast-forwarded from
+`track/train-13`. Its head passed exact-commit CI ([39899237285](https://github.com/studiokimeiga/perfect-web/actions/runs/39899237285) on
+`wip/train-13`, [39904687494](https://github.com/studiokimeiga/perfect-web/actions/runs/39904687494) on the track and [39912441526](https://github.com/studiokimeiga/perfect-web/actions/runs/39912441526) on
+master) and the automatic track verification ([39904687487](https://github.com/studiokimeiga/perfect-web/actions/runs/39904687487):
+`e10-browser` and the full Chromium, Firefox and WebKit jobs); master's
+verify [39912441532](https://github.com/studiokimeiga/perfect-web/actions/runs/39912441532) planned nothing, the track's run having passed at
+that commit. The [acceptance record](diagnostics/train-13/acceptance-record-2026-10-22.md) states its proof limits.
+
+In order:
+
+1. **E14-E**: the owner's choices of models, budget and teaching method,
+   from the [decision brief](milestones/E14-E-decision-brief.md); nothing
+   paid runs before them. The Next.js stack's task controls (`e14-harness`)
+   have not run on 16.4.1: its sandbox could not install offline when last
+   tried (2026-10-21).
+2. **Device-local durability** (ADR-0366): specify a durable-acknowledgement
+   boundary, or state a scope-limited guarantee, before changing the
+   runtime; test it against real navigation and reload races with the
+   privacy invariants held.
+3. **The follow that once went unanswered** (`feed.spec.mjs:691` in
+   Chromium, verify 39701638548, below): cause unknown; fifty local runs and
+   its diagnostic rerun on GitHub passed. Should it recur, read its kept
+   trace first. A raised bound, or a rerun until green, is no repair
+   ([PARALLEL](PARALLEL.md)).
+4. **`e10-browser` is planned at every push.** Its record's path is a recipe
+   parameter (`out=`), which `ci_plan.py` cannot read, so its evidence is
+   never current and each push runs its three whole-suite runs (74 minutes
+   in the track verification at `360a4db5`). Reading a recipe's default
+   parameters would let the planner judge it as it judges the others.
+5. **Installing `just` can fail on a runner.** `extractions/setup-crate`
+   found no `just` 1.58.0 release in two jobs of verify 39808499525 that the
+   run's other five jobs found; the two ran again. A pinned download, or a
+   cached binary, would not ask the releases API.
+
+The local-only performance/load/memory and Kiokun checks remain separate
+unproved work; keep their scope and the known backend/runtime limitations
+explicit.
+
+## Train-13, 2026-10-22
+
+Landed on master at `360a4db5` on 2026-10-23 (above). Kept as it stood
+before the landing.
 
 **Train-13** (`track/train-13`) merges three tracks onto master `e7664d2e`,
 each verified on GitHub at its own head. Its merged source `c57e5570` passed
