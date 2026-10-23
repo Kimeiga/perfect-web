@@ -167,6 +167,7 @@ jobs:
               fi ;;
             *)
               if [ -n "$RECIPES" ]; then
+                # shellcheck disable=SC2086 # workflow-dispatch RECIPES is a space-separated list
                 python3 scripts/ci_plan.py --shards "$SHARDS" $RECIPES >> "$GITHUB_OUTPUT"
               else
                 python3 scripts/ci_plan.py --shards "$SHARDS" --all >> "$GITHUB_OUTPUT"
