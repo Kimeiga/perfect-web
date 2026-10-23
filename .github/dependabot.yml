@@ -1,0 +1,28 @@
+# Version updates stay as reviewable PRs; never auto-merge into a compiler
+# whose correctness depends on specific upstream behavior.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 4
+    groups:
+      cargo-patches:
+        update-types: [patch]
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 4
+    groups:
+      npm-patches:
+        update-types: [patch]
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 4

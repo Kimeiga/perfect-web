@@ -1,0 +1,83 @@
+# Advisory stage: new scanner findings are first evaluated against Pleris's
+# historical regressions and existing tailored mutation campaigns.
+name: Quality analyzers
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+  schedule:
+    - cron: "23 8 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    name: Python Ruff (baseline)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Ruff static lint
+        id: ruff
+        uses: astral-sh/ruff-action@v4.1.0
+        continue-on-error: true
+        with:
+          version: "0.17.2"
+          args: "check --select E4,E7,E9,F --output-format github scripts research/failures/tools"
+      - name: Record baseline status
+        if: always()
+        env:
+          RESULT: ${{ steps.ruff.outcome }}
+        run: echo "Ruff advisory outcome: $RESULT; triage before making required." >> "$GITHUB_STEP_SUMMARY"
+
+  workflow-syntax:
+    name: actionlint (baseline)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      # The official versioned container includes shellcheck and pyflakes.
+      - name: Check workflow expressions and shell
+        id: actionlint
+        uses: docker://rhysd/actionlint:1.7.12
+        continue-on-error: true
+        with:
+          args: "-color"
+      - name: Record baseline status
+        if: always()
+        env:
+          RESULT: ${{ steps.actionlint.outcome }}
+        run: echo "actionlint advisory outcome: $RESULT; triage before making required." >> "$GITHUB_STEP_SUMMARY"
+
+  workflow-security:
+    name: zizmor (baseline)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Audit GitHub Actions security
+        id: zizmor
+        uses: zizmorcore/zizmor-action@cc914d7f3750a2d13d75c7f184a1060aa0e9d482 # v0.6.4
+        continue-on-error: true
+        with:
+          advanced-security: false
+          min-severity: high
+          min-confidence: high
+          version: v1.30.1
+      - name: Record baseline status
+        if: always()
+        env:
+          RESULT: ${{ steps.zizmor.outcome }}
+        run: echo "zizmor advisory outcome: $RESULT; triage before making required." >> "$GITHUB_STEP_SUMMARY"
