@@ -95,6 +95,11 @@ fmt:
 fmt-check:
     cargo fmt --all -- --check
 
+# Local pre-publication contract. Slower than CI's rustfmt-only first gate,
+# but catches Clippy and mutation-anchor problems before any PR is opened.
+preflight: fmt-check lint case-check mutation-anchors
+    @python3 -m compileall -q scripts research/failures/tools
+
 lint:
     cargo clippy --workspace --all-targets -- -D warnings
     # `pw-host`'s engine feature is not exercised by `just test`, because a

@@ -15,6 +15,8 @@
 name: verify
 
 on:
+  pull_request:
+    branches: [master]
   push:
     # A track's branch too (ADR-0253, docs/PARALLEL.md), for what it changed.
     branches: [master, "track/**"]
@@ -136,6 +138,15 @@ jobs:
               else
                 python3 scripts/ci_plan.py --shards 17 --all >> "$GITHUB_OUTPUT"
               fi ;;
+            pull_request)
+              # Checkout is GitHub's test merge commit. Compare with the
+              # actual merge base to include every change introduced by the
+              # PR, regardless of how many commits were pushed.
+              base=$(git merge-base "origin/$GITHUB_BASE_REF" "$GITHUB_SHA")
+              python3 scripts/ci_plan.py --shards 9 --changed "$base" "$GITHUB_SHA" --current >> "$GITHUB_OUTPUT"
+              git diff --name-only "$base" "$GITHUB_SHA" |
+                python3 scripts/quality_scope.py --browser >> "$GITHUB_OUTPUT"
+              ;;
             schedule)
               # Skipped where a push's or a nightly's run has succeeded at
               # this exact commit, recipes and browser suites alike, and the

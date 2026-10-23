@@ -24,10 +24,32 @@ env:
   RUSTFLAGS: "-D warnings"
 
 jobs:
+  # Stop before bootstrapping Koka/Wasmtime and compiling the workspace when
+  # format or baseline Python syntax is already broken. Full lint/tests still
+  # run in 'just ci'; this is a cheap first gate, not a substitute.
+  preflight:
+    name: fast preflight
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Rust format
+        run: cargo fmt --all -- --check
+      - name: Python syntax and patch whitespace
+        run: |
+          python3 -m compileall -q scripts research/failures/tools
+          git diff --check
+      - name: Browser scope regression
+        run: python3 -m unittest discover -s scripts/tests -p 'test_quality_scope.py' -v
+
   # The main matrix. arm64 is not a formality: the project is developed on
   # Apple Silicon, so an x64-only CI would let an arch-specific assumption
   # through in either direction.
   build:
+    needs: preflight
     name: ${{ matrix.runner }}
     runs-on: ${{ matrix.runner }}
     strategy:
