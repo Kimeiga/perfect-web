@@ -62,61 +62,117 @@ impl MemoryTables {
     pub fn new(manifest: TablesJson) -> Result<Self, Error> {
         let schema = Schema::of(manifest.tables.iter().map(|t| t.schema.clone()).collect());
         if manifest.hash != schema.hash || manifest.migration.to != schema.hash {
-            return Err(Error::Schema("tables.json and its schema hash disagree".into()));
+            return Err(Error::Schema(
+                "tables.json and its schema hash disagree".into(),
+            ));
         }
         // D2 deliberately handles one source per database. Combining sources
         // requires the separate Sources routing/transaction design.
         let sources: BTreeSet<_> = manifest.tables.iter().map(|t| &t.schema.source).collect();
         if sources.len() > 1 {
-            return Err(Error::Schema("multiple sources require separate adapters".into()));
+            return Err(Error::Schema(
+                "multiple sources require separate adapters".into(),
+            ));
         }
         let mut state = BTreeMap::new();
         let mut imports = BTreeSet::new();
         for table in &manifest.tables {
-            if state.insert(table.schema.name.clone(), Rows::new()).is_some() {
-                return Err(Error::Schema(format!("duplicate table {}", table.schema.name)));
+            if state
+                .insert(table.schema.name.clone(), Rows::new())
+                .is_some()
+            {
+                return Err(Error::Schema(format!(
+                    "duplicate table {}",
+                    table.schema.name
+                )));
             }
             if table.schema.key.is_empty() {
                 return Err(Error::Schema(format!("{} has no key", table.schema.name)));
             }
-            let fields: BTreeSet<_> = table.schema.fields.iter().map(|f| f.name.as_str()).collect();
+            let fields: BTreeSet<_> = table
+                .schema
+                .fields
+                .iter()
+                .map(|f| f.name.as_str())
+                .collect();
             if fields.len() != table.schema.fields.len() {
-                return Err(Error::Schema(format!("{} repeats a field", table.schema.name)));
+                return Err(Error::Schema(format!(
+                    "{} repeats a field",
+                    table.schema.name
+                )));
             }
-            for name in table.schema.key.iter()
+            for name in table
+                .schema
+                .key
+                .iter()
                 .chain(table.schema.order.iter())
                 .chain(table.schema.indexes.iter().flat_map(|i| &i.fields))
             {
-                let field = table.schema.fields.iter().find(|f| &f.name == name)
-                    .ok_or_else(|| Error::Schema(format!("{} has unknown field {name}", table.schema.name)))?;
-                if !matches!(&field.stored, Stored::Int { .. } | Stored::String { .. } | Stored::Bool) {
-                    return Err(Error::Schema(format!("{} selector {name} is not a supported scalar", table.schema.name)));
+                let field = table
+                    .schema
+                    .fields
+                    .iter()
+                    .find(|f| &f.name == name)
+                    .ok_or_else(|| {
+                        Error::Schema(format!("{} has unknown field {name}", table.schema.name))
+                    })?;
+                if !matches!(
+                    &field.stored,
+                    Stored::Int { .. } | Stored::String { .. } | Stored::Bool
+                ) {
+                    return Err(Error::Schema(format!(
+                        "{} selector {name} is not a supported scalar",
+                        table.schema.name
+                    )));
                 }
             }
             for f in &table.schema.fields {
                 if !supported(&f.stored) {
-                    return Err(Error::Schema(format!("{} field {} needs an unsupported storage encoding", table.schema.name, f.name)));
+                    return Err(Error::Schema(format!(
+                        "{} field {} needs an unsupported storage encoding",
+                        table.schema.name, f.name
+                    )));
                 }
             }
             for fun in &table.functions {
                 if !imports.insert(fun.import.as_str()) {
-                    return Err(Error::Schema(format!("duplicate host import {}", fun.import)));
+                    return Err(Error::Schema(format!(
+                        "duplicate host import {}",
+                        fun.import
+                    )));
                 }
                 if fun.primitive == Primitive::All && table.bounded.is_none() {
-                    return Err(Error::Schema(format!("{} grants an unbounded all()", table.schema.name)));
+                    return Err(Error::Schema(format!(
+                        "{} grants an unbounded all()",
+                        table.schema.name
+                    )));
                 }
                 let selector_fields = &fun.by;
-                if !matches!(fun.primitive, Primitive::All | Primitive::Insert | Primitive::Put)
-                    && selector_fields.is_empty()
+                if !matches!(
+                    fun.primitive,
+                    Primitive::All | Primitive::Insert | Primitive::Put
+                ) && selector_fields.is_empty()
                 {
-                    return Err(Error::Schema(format!("{} has an empty selector", fun.import)));
+                    return Err(Error::Schema(format!(
+                        "{} has an empty selector",
+                        fun.import
+                    )));
                 }
-                if selector_fields.iter().any(|field| !fields.contains(field.as_str())) {
-                    return Err(Error::Schema(format!("{} selects a missing field", fun.import)));
+                if selector_fields
+                    .iter()
+                    .any(|field| !fields.contains(field.as_str()))
+                {
+                    return Err(Error::Schema(format!(
+                        "{} selects a missing field",
+                        fun.import
+                    )));
                 }
             }
         }
-        Ok(Self { manifest, state: Mutex::new(state) })
+        Ok(Self {
+            manifest,
+            state: Mutex::new(state),
+        })
     }
 
     /// Read a compiler-emitted host import, with its arguments in function
@@ -136,7 +192,10 @@ impl MemoryTables {
         let mut guard = self.state.lock().map_err(|_| Error::StoragePoisoned)?;
         let mut staged = guard.clone();
         let answer = {
-            let mut tx = Transaction { manifest: &self.manifest, state: &mut staged };
+            let mut tx = Transaction {
+                manifest: &self.manifest,
+                state: &mut staged,
+            };
             let answer = action(&mut tx)?;
             validate_state(&self.manifest, &*tx.state)?;
             answer
@@ -170,15 +229,29 @@ impl Transaction<'_> {
     }
 }
 
-fn operation<'a>(manifest: &'a TablesJson, import: &str) -> Result<(&'a TableJson, &'a FunctionJson), Error> {
-    manifest.tables.iter()
-        .find_map(|t| t.functions.iter().find(|f| f.import == import).map(|f| (t, f)))
+fn operation<'a>(
+    manifest: &'a TablesJson,
+    import: &str,
+) -> Result<(&'a TableJson, &'a FunctionJson), Error> {
+    manifest
+        .tables
+        .iter()
+        .find_map(|t| {
+            t.functions
+                .iter()
+                .find(|f| f.import == import)
+                .map(|f| (t, f))
+        })
         .ok_or_else(|| Error::Input(format!("undeclared table operation {import}")))
 }
 
 fn supported(ty: &Stored) -> bool {
     match ty {
-        Stored::Int { .. } | Stored::String { .. } | Stored::Bool | Stored::Float | Stored::Unit => true,
+        Stored::Int { .. }
+        | Stored::String { .. }
+        | Stored::Bool
+        | Stored::Float
+        | Stored::Unit => true,
         Stored::Option(inner) | Stored::List(inner) => supported(inner),
         Stored::Record(fields) => fields.iter().all(|f| supported(&f.stored)),
         Stored::Map(_, _) | Stored::Set(_) | Stored::Cases(_) | Stored::Recursive(_) => false,
@@ -190,7 +263,10 @@ fn validates(value: &Value, ty: &Stored) -> bool {
         Stored::Int { at_least, at_most } => value.as_i64().is_some_and(|n| {
             at_least.is_none_or(|min| n >= min) && at_most.is_none_or(|max| n <= max)
         }),
-        Stored::String { min_length, max_length } => value.as_str().is_some_and(|s| {
+        Stored::String {
+            min_length,
+            max_length,
+        } => value.as_str().is_some_and(|s| {
             let n = i64::try_from(s.chars().count()).unwrap_or(i64::MAX);
             min_length.is_none_or(|min| n >= min) && max_length.is_none_or(|max| n <= max)
         }),
@@ -198,26 +274,38 @@ fn validates(value: &Value, ty: &Stored) -> bool {
         Stored::Float => value.as_f64().is_some_and(f64::is_finite),
         Stored::Unit => value.is_null(),
         Stored::Option(inner) => value.is_null() || validates(value, inner),
-        Stored::List(inner) => value.as_array().is_some_and(|xs| xs.iter().all(|v| validates(v, inner))),
+        Stored::List(inner) => value
+            .as_array()
+            .is_some_and(|xs| xs.iter().all(|v| validates(v, inner))),
         Stored::Record(fields) => value.as_object().is_some_and(|obj| {
-            obj.len() == fields.len() && fields.iter().all(|f| {
-                obj.get(&f.name).is_some_and(|v| validates(v, &f.stored))
-            })
+            obj.len() == fields.len()
+                && fields
+                    .iter()
+                    .all(|f| obj.get(&f.name).is_some_and(|v| validates(v, &f.stored)))
         }),
         Stored::Set(_) | Stored::Map(_, _) | Stored::Cases(_) | Stored::Recursive(_) => false,
     }
 }
 
 fn check_row(table: &TableJson, value: &Value) -> Result<(Key, Row), Error> {
-    let row = value.as_object().ok_or_else(|| Error::Input("row must be an object".into()))?;
+    let row = value
+        .as_object()
+        .ok_or_else(|| Error::Input("row must be an object".into()))?;
     if row.len() != table.schema.fields.len() {
-        return Err(Error::Input(format!("{} row fields do not match its schema", table.schema.name)));
+        return Err(Error::Input(format!(
+            "{} row fields do not match its schema",
+            table.schema.name
+        )));
     }
     for f in &table.schema.fields {
-        let v = row.get(&f.name)
-            .ok_or_else(|| Error::Input(format!("{} row is missing {}", table.schema.name, f.name)))?;
+        let v = row.get(&f.name).ok_or_else(|| {
+            Error::Input(format!("{} row is missing {}", table.schema.name, f.name))
+        })?;
         if !validates(v, &f.stored) {
-            return Err(Error::Input(format!("{} field {} fails its stored type or bound", table.schema.name, f.name)));
+            return Err(Error::Input(format!(
+                "{} field {} fails its stored type or bound",
+                table.schema.name, f.name
+            )));
         }
     }
     let key = row_key(row, &table.schema.key)?;
@@ -225,13 +313,24 @@ fn check_row(table: &TableJson, value: &Value) -> Result<(Key, Row), Error> {
 }
 
 fn row_key(row: &Row, fields: &[String]) -> Result<Key, Error> {
-    fields.iter().map(|f| Atom::parse(row.get(f)
-        .ok_or_else(|| Error::Input(format!("row is missing selector {f}")))?)).collect()
+    fields
+        .iter()
+        .map(|f| {
+            Atom::parse(
+                row.get(f)
+                    .ok_or_else(|| Error::Input(format!("row is missing selector {f}")))?,
+            )
+        })
+        .collect()
 }
 
 fn selector(by: &[String], args: &[Value]) -> Result<Key, Error> {
     if args.len() != by.len() {
-        return Err(Error::Input(format!("expected {} selector values, got {}", by.len(), args.len())));
+        return Err(Error::Input(format!(
+            "expected {} selector values, got {}",
+            by.len(),
+            args.len()
+        )));
     }
     args.iter().map(Atom::parse).collect()
 }
@@ -248,45 +347,78 @@ fn selections(by: &[String], args: &[Value], many: bool) -> Result<BTreeSet<Key>
         let key = if by.len() == 1 {
             vec![Atom::parse(value)?]
         } else {
-            let obj = value.as_object().ok_or_else(|| Error::Input("composite set selectors are records".into()))?;
+            let obj = value
+                .as_object()
+                .ok_or_else(|| Error::Input("composite set selectors are records".into()))?;
             if obj.len() != by.len() {
-                return Err(Error::Input("composite set selector fields do not match".into()));
+                return Err(Error::Input(
+                    "composite set selector fields do not match".into(),
+                ));
             }
-            by.iter().map(|f| Atom::parse(obj.get(f)
-                .ok_or_else(|| Error::Input(format!("set selector lacks {f}")))?)).collect::<Result<Key, _>>()?
+            by.iter()
+                .map(|f| {
+                    Atom::parse(
+                        obj.get(f)
+                            .ok_or_else(|| Error::Input(format!("set selector lacks {f}")))?,
+                    )
+                })
+                .collect::<Result<Key, _>>()?
         };
         out.insert(key);
     }
     Ok(out)
 }
 
-fn read(manifest: &TablesJson, state: &State, import: &str, args: &[Value]) -> Result<Value, Error> {
+fn read(
+    manifest: &TablesJson,
+    state: &State,
+    import: &str,
+    args: &[Value],
+) -> Result<Value, Error> {
     let (table, fun) = operation(manifest, import)?;
     if fun.primitive.writes() {
         return Err(Error::Input(format!("{import} is a write, not a read")));
     }
-    let rows = state.get(&table.schema.name).ok_or_else(|| Error::Schema("missing table state".into()))?;
+    let rows = state
+        .get(&table.schema.name)
+        .ok_or_else(|| Error::Schema("missing table state".into()))?;
     if fun.primitive == Primitive::All && table.bounded.is_none() {
         return Err(Error::Schema("whole-table read without a bound".into()));
     }
     if fun.primitive == Primitive::All && !args.is_empty() {
         return Err(Error::Input("all() takes no selector".into()));
     }
-    let keys = if fun.primitive == Primitive::All { BTreeSet::new() }
-        else { selections(&fun.by, args, fun.primitive.many())? };
-    let mut found: Vec<&Row> = rows.values().filter(|row| {
-        fun.primitive == Primitive::All || row_key(row, &fun.by)
-            .is_ok_and(|key| keys.contains(&key))
-    }).collect();
-    found.sort_by(|a, b| compare_rows(a, b, &fun.sorted_by, &table.schema.key));
-    let one = fun.primitive == Primitive::Get ||
-        (fun.primitive == Primitive::Index && table.schema.indexes.iter().any(|i| {
-            i.unique && i.fields == fun.by
-        }));
-    if one {
-        Ok(found.first().map_or(Value::Null, |row| Value::Object((*row).clone())))
+    let keys = if fun.primitive == Primitive::All {
+        BTreeSet::new()
     } else {
-        Ok(Value::Array(found.into_iter().map(|row| Value::Object(row.clone())).collect()))
+        selections(&fun.by, args, fun.primitive.many())?
+    };
+    let mut found: Vec<&Row> = rows
+        .values()
+        .filter(|row| {
+            fun.primitive == Primitive::All
+                || row_key(row, &fun.by).is_ok_and(|key| keys.contains(&key))
+        })
+        .collect();
+    found.sort_by(|a, b| compare_rows(a, b, &fun.sorted_by, &table.schema.key));
+    let one = fun.primitive == Primitive::Get
+        || (fun.primitive == Primitive::Index
+            && table
+                .schema
+                .indexes
+                .iter()
+                .any(|i| i.unique && i.fields == fun.by));
+    if one {
+        Ok(found
+            .first()
+            .map_or(Value::Null, |row| Value::Object((*row).clone())))
+    } else {
+        Ok(Value::Array(
+            found
+                .into_iter()
+                .map(|row| Value::Object(row.clone()))
+                .collect(),
+        ))
     }
 }
 
@@ -295,21 +427,35 @@ fn compare_rows(a: &Row, b: &Row, by: &[String], key: &[String]) -> Ordering {
         let left = a.get(field).and_then(|v| Atom::parse(v).ok());
         let right = b.get(field).and_then(|v| Atom::parse(v).ok());
         let comparison = left.cmp(&right);
-        if comparison != Ordering::Equal { return comparison; }
+        if comparison != Ordering::Equal {
+            return comparison;
+        }
     }
     Ordering::Equal
 }
 
-fn write(manifest: &TablesJson, state: &mut State, import: &str, args: &[Value]) -> Result<(), Error> {
+fn write(
+    manifest: &TablesJson,
+    state: &mut State,
+    import: &str,
+    args: &[Value],
+) -> Result<(), Error> {
     let (table, fun) = operation(manifest, import)?;
-    let rows = state.get_mut(&table.schema.name).ok_or_else(|| Error::Schema("missing table state".into()))?;
+    let rows = state
+        .get_mut(&table.schema.name)
+        .ok_or_else(|| Error::Schema("missing table state".into()))?;
     match fun.primitive {
         Primitive::Insert | Primitive::Put => {
-            let [value] = args else { return Err(Error::Input("insert/put expects one row".into())); };
+            let [value] = args else {
+                return Err(Error::Input("insert/put expects one row".into()));
+            };
             let (key, row) = check_row(table, value)?;
             if fun.primitive == Primitive::Insert {
                 if let Some(existing) = rows.get(&key) {
-                    return Err(Error::Conflict { table: table.schema.name.clone(), existing: Value::Object(existing.clone()) });
+                    return Err(Error::Conflict {
+                        table: table.schema.name.clone(),
+                        existing: Value::Object(existing.clone()),
+                    });
                 }
             }
             rows.insert(key, row);
@@ -329,16 +475,24 @@ fn write(manifest: &TablesJson, state: &mut State, import: &str, args: &[Value])
 
 fn validate_uniqueness(manifest: &TablesJson, state: &State) -> Result<(), Error> {
     for table in &manifest.tables {
-        let rows = state.get(&table.schema.name).ok_or_else(|| Error::Schema("missing table state".into()))?;
+        let rows = state
+            .get(&table.schema.name)
+            .ok_or_else(|| Error::Schema("missing table state".into()))?;
         if table.bounded.is_some_and(|bound| rows.len() as u64 > bound) {
-            return Err(Error::Input(format!("{} exceeds its declared bound", table.schema.name)));
+            return Err(Error::Input(format!(
+                "{} exceeds its declared bound",
+                table.schema.name
+            )));
         }
         for index in table.schema.indexes.iter().filter(|i| i.unique) {
             let mut seen = BTreeMap::<Key, &Row>::new();
             for row in rows.values() {
                 let key = row_key(row, &index.fields)?;
                 if let Some(existing) = seen.insert(key, row) {
-                    return Err(Error::Conflict { table: table.schema.name.clone(), existing: Value::Object(existing.clone()) });
+                    return Err(Error::Conflict {
+                        table: table.schema.name.clone(),
+                        existing: Value::Object(existing.clone()),
+                    });
                 }
             }
         }
@@ -349,19 +503,37 @@ fn validate_uniqueness(manifest: &TablesJson, state: &State) -> Result<(), Error
 fn validate_state(manifest: &TablesJson, state: &State) -> Result<(), Error> {
     validate_uniqueness(manifest, state)?;
     for table in &manifest.tables {
-        let rows = state.get(&table.schema.name).ok_or_else(|| Error::Schema("missing table state".into()))?;
+        let rows = state
+            .get(&table.schema.name)
+            .ok_or_else(|| Error::Schema("missing table state".into()))?;
         for reference in &table.schema.references {
-            let target = manifest.tables.iter().find(|t| t.schema.name == reference.table)
-                .ok_or_else(|| Error::Schema(format!("unknown referenced table {}", reference.table)))?;
+            let target = manifest
+                .tables
+                .iter()
+                .find(|t| t.schema.name == reference.table)
+                .ok_or_else(|| {
+                    Error::Schema(format!("unknown referenced table {}", reference.table))
+                })?;
             if target.schema.source != table.schema.source || target.schema.key.len() != 1 {
-                return Err(Error::Schema("cross-source or composite references are unsupported in memory D2".into()));
+                return Err(Error::Schema(
+                    "cross-source or composite references are unsupported in memory D2".into(),
+                ));
             }
-            let target_rows = state.get(&target.schema.name).ok_or_else(|| Error::Schema("missing target state".into()))?;
+            let target_rows = state
+                .get(&target.schema.name)
+                .ok_or_else(|| Error::Schema("missing target state".into()))?;
             for row in rows.values() {
-                let value = row.get(&reference.field).ok_or_else(|| Error::Schema("missing reference field".into()))?;
-                if value.is_null() { continue; }
+                let value = row
+                    .get(&reference.field)
+                    .ok_or_else(|| Error::Schema("missing reference field".into()))?;
+                if value.is_null() {
+                    continue;
+                }
                 if !target_rows.contains_key(&vec![Atom::parse(value)?]) {
-                    return Err(Error::Input(format!("{} references a missing {}", table.schema.name, target.schema.name)));
+                    return Err(Error::Input(format!(
+                        "{} references a missing {}",
+                        table.schema.name, target.schema.name
+                    )));
                 }
             }
         }
