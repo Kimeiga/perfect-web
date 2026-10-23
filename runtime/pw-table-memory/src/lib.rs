@@ -450,13 +450,13 @@ fn write(
                 return Err(Error::Input("insert/put expects one row".into()));
             };
             let (key, row) = check_row(table, value)?;
-            if fun.primitive == Primitive::Insert {
-                if let Some(existing) = rows.get(&key) {
-                    return Err(Error::Conflict {
-                        table: table.schema.name.clone(),
-                        existing: Value::Object(existing.clone()),
-                    });
-                }
+            if fun.primitive == Primitive::Insert
+                && let Some(existing) = rows.get(&key)
+            {
+                return Err(Error::Conflict {
+                    table: table.schema.name.clone(),
+                    existing: Value::Object(existing.clone()),
+                });
             }
             rows.insert(key, row);
         }
