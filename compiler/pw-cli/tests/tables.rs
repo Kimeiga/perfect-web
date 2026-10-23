@@ -186,7 +186,6 @@ fn migration_refusals_precede_unsupported_backend_diagnostics() {
     std::fs::remove_dir_all(dir).unwrap();
 }
 
-
 #[test]
 fn actual_compiler_manifest_executes_without_app_specific_rust() {
     // Use the checked-in application declaration, not a hand-built manifest.
@@ -269,7 +268,8 @@ fn actual_compiler_manifest_executes_without_app_specific_rust() {
     let updated = serde_json::json!({
         "id": "a", "name": "updated", "slug": "first", "added": 40
     });
-    db.transaction(|tx| tx.write(&put, &[updated.clone()])).unwrap();
+    db.transaction(|tx| tx.write(&put, &[updated.clone()]))
+        .unwrap();
     assert_eq!(
         db.read(&all, &[]).unwrap(),
         serde_json::json!([first, updated])
