@@ -8,6 +8,7 @@ overrides:
   nanoid@<3.3.18: 3.3.18
   brace-expansion@>=5.0.0 <5.0.12: 5.0.12
   cookie@<0.7.0: 0.7.2
+  zod: 4.6.7
 
 importers:
 
@@ -2559,8 +2560,8 @@ packages:
   zimmerframe@1.1.5:
     resolution: {integrity: sha512-msJxIvYDYcoNL+PJsu+7qmpDWsYmAxTY+2TNYXXF0hzBzBk0BMecOqDOG/EckUoKCuKwObfbugIl8QpqHDXeFA==}
 
-  zod@4.4.3:
-    resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
+  zod@4.6.7:
+    resolution: {integrity: sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg==}
 
 snapshots:
 
@@ -3690,7 +3691,7 @@ snapshots:
       browserslist: 4.28.7
       debug: 4.4.3(supports-color@10.2.2)
       esbuild: 0.28.2
-      zod: 4.4.3
+      zod: 4.6.7
     transitivePeerDependencies:
       - supports-color
 
@@ -4728,4 +4729,4 @@ snapshots:
 
   zimmerframe@1.1.5: {}
 
-  zod@4.4.3: {}
+  zod@4.6.7: {}
