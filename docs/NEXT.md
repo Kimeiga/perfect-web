@@ -2,7 +2,58 @@
 
 The next executable tasks, in order, with acceptance criteria. Charter §3.4.
 
-## Current, 2026-10-21: after train-12's landing
+## Current, 2026-10-22: train-13
+
+**Train-13** (`track/train-13`) merges three tracks onto master `e7664d2e`,
+each verified on GitHub at its own head. Its merged source `c57e5570` passed
+verify [39857464106](https://github.com/studiokimeiga/perfect-web/actions/runs/39857464106); its CI [39857310130](https://github.com/studiokimeiga/perfect-web/actions/runs/39857310130) failed only at the
+Node audit, which that day began to name the benchmark baseline's next
+16.3.8 in three advisories, two of them critical. With the owner's
+approval the baseline moved to 16.4.1 (ADR-0120, amended), and at
+`5a4378fe` CI [39892760379](https://github.com/studiokimeiga/perfect-web/actions/runs/39892760379) and verify [39892771765](https://github.com/studiokimeiga/perfect-web/actions/runs/39892771765) passed. The
+[acceptance record](diagnostics/train-13/acceptance-record-2026-10-22.md)
+states what its evidence proves and what it does not.
+
+- `command-deadline` ([ADR-0381](DECISIONS/ADR-0381-a-commands-send-is-answered-within-its-deadline.md)):
+  each send of a command is answered within ten seconds, or given up and
+  sent again as its `retry` allows; a send held for the one before it waits
+  its turn.
+- `press-modules` ([ADR-0382](DECISIONS/ADR-0382-a-page-loads-its-modules-within-the-deadline.md)):
+  a page's on-demand modules load within the deadline, a failed load is not
+  kept, and a press whose speculation cannot load is sent unspeculated.
+- `e14-readiness`: the benchmark counts the lines of every file a run makes
+  (Next.js's T01, T06, T08 and T11 were undercounted), and the E14-E
+  [decision brief](milestones/E14-E-decision-brief.md).
+
+In order:
+
+1. **Land train-13**, as the owner approved on 2026-10-22: exact-commit CI
+   and the automatic track verification at its head, then `master`
+   fast-forwarded to it without rewriting history. Until it lands, CI's
+   "licenses and advisories" fails on `master` and on every branch from it.
+2. **The follow that once went unanswered** (`feed.spec.mjs:691` in
+   Chromium, verify 39701638548, below): cause unknown; it passed fifty
+   local runs and its diagnostic rerun on GitHub. Should it recur, read its
+   kept trace first. A raised bound, or a rerun until green, is no repair
+   ([PARALLEL](PARALLEL.md)).
+3. **E14-E**: the owner's choices of models, budget and teaching method,
+   from the decision brief; nothing paid runs before them. The Next.js
+   stack's task controls (`e14-harness`) run only on the development
+   machine, where its sandbox could not install offline when last tried
+   (2026-10-21, corepack lacking pnpm 12.11.2); they have not run on 16.4.1.
+4. **Device-local durability** (ADR-0366): specify a durable-acknowledgement
+   boundary, or state a scope-limited guarantee, before changing the
+   runtime; test it against real navigation and reload races with the
+   privacy invariants held.
+
+The local-only performance/load/memory and Kiokun checks remain separate
+unproved work; keep their scope and the known backend/runtime limitations
+explicit.
+
+## After train-12's landing, 2026-10-21
+
+Kept as it stood when train-13 was assembled; its first three items are
+train-13's.
 
 Train-12 landed on master at `e7664d2e` on 2026-10-21. Its record commit
 passed exact-commit CI ([39567756677](https://github.com/studiokimeiga/perfect-web/actions/runs/39567756677),

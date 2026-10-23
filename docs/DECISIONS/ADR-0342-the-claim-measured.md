@@ -448,3 +448,15 @@ On train-9, 2026-10-15, and what the merge did:
 - **H07's mutation control**: `scripts/proof_mutations.py`'s fourth mutant
   takes back `PW0405`'s report of a read written in the loop, and the museum
   then says H07 is not refused (4 of 4 killed on the train).
+
+## Amended, 2026-10-22: the museum on Next.js 16.4.1
+
+The baseline moved from next 16.3.8 to 16.4.1 for three advisories
+([ADR-0120](ADR-0120-three-stores-one-contract.md), amended). What this ADR
+found in "the pinned version" was found in 16.3.8. 16.4.1's own defaults are
+the same `staleTimes { dynamic: 0, static: 300 }` (finding 7, read in its
+`config-shared.js`), and the museum, run at `5a4378fe` on 16.4.1 (verify
+[39892771765](https://github.com/studiokimeiga/perfect-web/actions/runs/39892771765)),
+reports 5 exhibits, 5 refused, 0 missed and 0 not as expected, J01's stale
+page shown on 16.4.1 and its repair holding there, and 4 of 4 controls
+killed. Finding 9's vercel/next.js#99028 was not read again for 16.4.1.

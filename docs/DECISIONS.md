@@ -3007,6 +3007,9 @@ the claim, measured: the bug museum and the head-to-head (track `proof`).
   misses first; five exhibits, H07's miss closed by ADR-0340's PW0405 on
   the same train. The head-to-head's protocol, TodoMVC first; its
   downloads wait for the owner.
+- Amended 2026-10-22: its findings were read in Next.js 16.3.8; on 16.4.1
+  the museum shows the same five, J01's stale page and its repair among
+  them.
 [ADR-0343](DECISIONS/ADR-0343-a-guide-whose-examples-compile.md):
 a guide whose examples compile (track `guide`; NEXT's developer
 experience).

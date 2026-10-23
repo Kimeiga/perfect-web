@@ -25,6 +25,15 @@ namespaces, keyed-read retry and effect convergence (ADR-0351, ADR-0365 to
 ADR-0380). The [acceptance record](diagnostics/train-12/acceptance-record-2026-10-21.md)
 states what its evidence proves and what it does not.
 
+**Train-13, verified, not landed** (`track/train-13`): `command-deadline`,
+`press-modules` and `e14-readiness`, merged at `c57e5570`, and the benchmark's
+Next.js baseline moved from 16.3.8 to 16.4.1 for three advisories (ADR-0120,
+amended). At `5a4378fe`, CI [39892760379](https://github.com/studiokimeiga/perfect-web/actions/runs/39892760379) and verify [39892771765](https://github.com/studiokimeiga/perfect-web/actions/runs/39892771765)
+passed. Its [acceptance record](diagnostics/train-13/acceptance-record-2026-10-22.md)
+holds each track's runs, the failed ones among them. The owner approved
+landing it once exact-commit CI and the track verification pass at its
+head.
+
 **Verified, not landed:** track `command-deadline` (`wip/command-deadline`,
 [ADR-0381](DECISIONS/ADR-0381-a-commands-send-is-answered-within-its-deadline.md)).
 Each send of a command now has ten seconds for its whole answer and is then
@@ -122,7 +131,7 @@ evidence. No failed result is promoted by this summary.
 
 - **On master, a command request that never settles holds its press, and
   the page's order behind it** (ADR-0173's "not claimed"). The repair is
-  verified on `wip/command-deadline` (above) and not landed. Its own limits
+  verified on `wip/command-deadline` and in train-13 (above), not landed. Its own limits
   stay open after it lands: an unknown outcome is told as "could not be
   sent", a command given up may still run after those behind it, and the
   host's waits have no deadline (ADR-0381,
@@ -142,6 +151,16 @@ evidence. No failed result is promoted by this summary.
   here ([NEXT](NEXT.md)). The two tests now time each send in the page; at
   `d57f18a1`, CI [39808460517](https://github.com/studiokimeiga/perfect-web/actions/runs/39808460517) and verify
   [39808499525](https://github.com/studiokimeiga/perfect-web/actions/runs/39808499525) passed, the feed test among them.
+- **On master, CI's Node audit fails** since 2026-10-22: the benchmark
+  baseline's next 16.3.8 is named in GHSA-673q-mjm6-r5xr and
+  GHSA-2464-fhr4-w9xw (critical) and GHSA-p3m5-59mp-jv5r (high). Train-13
+  carries the bump to 16.4.1 ([39857310130](https://github.com/studiokimeiga/perfect-web/actions/runs/39857310130) failed at its merge, before
+  it).
+- **A follow once went unanswered in Chromium** (`feed.spec.mjs:691`,
+  verify 39701638548 at `11d7917c`): its request released, the test timed
+  out waiting for its answer. Not reproduced in fifty local runs, two
+  concurrency profiles among them, nor in its diagnostic rerun on GitHub at
+  `d57f18a1`. Cause unknown; open in [NEXT](NEXT.md).
 - Hosted evidence does not prove the local-only performance, memory, load
   or Kiokun obligations. E14 agent benchmarking still requires the owner's
   model, budget and teaching choices. Neither performance universality nor
@@ -208,8 +227,11 @@ The PC's WSL `gh` credential failed during this integration and again on
 2026-10-21; authenticated Windows `gh.exe` works. Shared load affects timing;
 build caches can exhaust disk space. On 2026-10-21 the PC still ran
 development servers and `python3 -m http.server` processes that earlier
-sessions left a day before; a run checks that its ports are free rather than
-assuming its range is. Follow [PARALLEL](PARALLEL.md)'s bounded diagnostic
+sessions left a day before, and on 2026-10-22 four such servers and a
+dozen `http.server` processes, two days old; a run checks that its ports
+are free rather than assuming its range is. On 2026-10-22,
+`extractions/setup-crate` found no `just` 1.58.0 release in two jobs of
+verify 39808499525 that the run's other jobs found; the two ran again. Follow [PARALLEL](PARALLEL.md)'s bounded diagnostic
 rerun and owned cleanup rules; never loosen a bound to obtain a pass. No new
 platform-wide outage is asserted here.
 
@@ -235,13 +257,9 @@ to older frame attribution.
 
 ## next three concrete tasks
 
-1. With the owner's approval, land `wip/command-deadline` (verified at
-   `bfda9ae5`, evidence `973fbbcc`) once exact-commit CI passes at the
-   commit that lands; no other gate is outstanding.
-2. Verify track `press-modules` (ADR-0382) on GitHub: exact-commit CI and
-   the recipes the runtime change reaches, in three browser engines; then
-   land it with `command-deadline`, with the owner's approval.
-3. E14-E: the owner's model, budget and teaching choices, from the decision
-   brief and the changed-lines repair on `wip/e14-readiness`; run nothing paid
-   on an assumed choice. Then device-local durability (ADR-0366's boundary)
-   and the remaining [NEXT](NEXT.md) follow-ups.
+1. Land train-13 as the owner approved: exact-commit CI and the automatic
+   track verification at its head, then `master` fast-forwarded to it.
+2. E14-E: the owner's model, budget and teaching choices, from the decision
+   brief; run nothing paid on an assumed choice.
+3. Device-local durability (ADR-0366's boundary), and the remaining
+   [NEXT](NEXT.md) follow-ups, the unexplained feed timeout among them.
