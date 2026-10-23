@@ -119,6 +119,7 @@ jobs:
                 base=$(git merge-base origin/master "$GITHUB_SHA")
                 stale=""
                 case "$GITHUB_REF_NAME" in track/train-*) stale="--stale" ;; esac
+                # shellcheck disable=SC2086 # optional --stale flag is deliberately split
                 python3 scripts/ci_plan.py --shards 9 --changed "$base" "$GITHUB_SHA" --current $stale >> "$GITHUB_OUTPUT"
               # The chain's choice, from the newest commit pushed that a run
               # passed at: a train verified at its head is not verified again
@@ -264,6 +265,7 @@ jobs:
             runner="$runner, PostgreSQL 18.6"
           fi
           echo "$runner" > ci-out-runner.txt
+          # shellcheck disable=SC2086 # names from the trusted plan are individual arguments
           python3 scripts/ci_recipes.py --out ci-out $RECIPES
           mv ci-out-runner.txt ci-out/runner.txt
       - uses: actions/upload-artifact@v7
