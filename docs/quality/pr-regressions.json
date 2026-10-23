@@ -41,8 +41,8 @@
       "id": "pr9-locked-install",
       "kind": "dependency",
       "source": "https://github.com/studiokimeiga/perfect-web/pull/9",
-      "bad": "231731fad145f4a4d2dcc6f4f3c125ea06bd6fd1",
-      "fixed": "cf643b4fc3",
+      "bad": "231731fad124be544196a9598d71845871cbd80f",
+      "fixed": "cf643b4fc3e724511180a455ea2729afa1c08cec",
       "detector": "pnpm install --frozen-lockfile",
       "notes": "PR revision subjects show a lockfile and reproducibility repair. SHA/behavior replay is not asserted here.",
       "replay": null
