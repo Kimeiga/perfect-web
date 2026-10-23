@@ -1306,14 +1306,32 @@ class CurrentEvidence(unittest.TestCase):
             self.assertEqual(planned(["--changed", "b", "h"]), names)
             self.assertEqual(planned(["--changed", "b", "h", "--current"]), ["e10-affine-bindings"])
 
-    def test_the_workflow_plans_each_push_with_the_evidence(self) -> None:
+    def test_the_workflow_plans_each_push_and_pr_with_the_evidence(self) -> None:
         workflow = (SCRIPTS.parent / ".github/workflows/verify.yml").read_text()
-        pushes = [
-            line for line in workflow.splitlines()
-            if line.lstrip().startswith("python3 scripts/ci_plan.py") and "--changed" in line
-        ]
-        self.assertEqual(len(pushes), 2, pushes)
-        self.assertTrue(all("--current" in line for line in pushes), pushes)
+
+        def changed_plans(section: str) -> list[str]:
+            return [
+                line for line in section.splitlines()
+                if line.lstrip().startswith("python3 scripts/ci_plan.py")
+                and "--changed" in line
+            ]
+
+        # A PR adds its own planning arm. Do not count it as a third push,
+        # and do not allow any arm to reuse stale committed evidence.
+        push = workflow.split("            push)\n", 1)[1].split(
+            "            pull_request)\n", 1
+        )[0]
+        pr = workflow.split("            pull_request)\n", 1)[1].split(
+            "            schedule)\n", 1
+        )[0]
+        push_plans = changed_plans(push)
+        pr_plans = changed_plans(pr)
+        self.assertEqual(len(push_plans), 2, push_plans)
+        self.assertEqual(len(pr_plans), 1, pr_plans)
+        self.assertTrue(
+            all("--current" in line for line in [*push_plans, *pr_plans]),
+            [*push_plans, *pr_plans],
+        )
 
 
 class StaleEvidence(unittest.TestCase):
