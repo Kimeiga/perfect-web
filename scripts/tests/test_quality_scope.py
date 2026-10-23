@@ -2,11 +2,7 @@
 
 import unittest
 
-import pathlib
-import sys
-
-sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
-from quality_scope import browser_relevant
+from scripts.quality_scope import browser_relevant
 
 
 class BrowserScope(unittest.TestCase):

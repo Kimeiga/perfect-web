@@ -55,8 +55,8 @@ on:
 # run of it covers another; it, the nightly and a dispatch, which plans the
 # recipes it names, each have a group of their own and are never cancelled.
 concurrency:
-  group: verify-${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/track/')) && github.ref || github.run_id }}
-  cancel-in-progress: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/track/') }}
+  group: verify-${{ ((github.event_name == 'push' && startsWith(github.ref, 'refs/heads/track/')) || github.event_name == 'pull_request') && github.ref || github.run_id }}
+  cancel-in-progress: ${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/track/')) || github.event_name == 'pull_request' }}
 
 env:
   CARGO_TERM_COLOR: never

@@ -14,31 +14,37 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   python:
-    name: Python Ruff (baseline)
+    name: Python Ruff (new-only)
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
         with:
+          fetch-depth: 0
           persist-credentials: false
-      - name: Ruff static lint
-        id: ruff
+      - name: Install pinned Ruff
         uses: astral-sh/ruff-action@v4.1.0
-        continue-on-error: true
         with:
           version: "0.17.2"
-          args: "check --select E4,E7,E9,F --output-format github scripts research/failures/tools"
-      - name: Record baseline status
-        if: always()
+          args: "--version"
+      - name: Refuse newly introduced Ruff errors
+        if: github.event_name == 'pull_request'
         env:
-          RESULT: ${{ steps.ruff.outcome }}
-        run: |
-          echo "Ruff advisory outcome: $RESULT; triage before making required." >> "$GITHUB_STEP_SUMMARY"
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: python3 scripts/quality_delta.py --base "$BASE_SHA"
+      - name: Report existing Ruff baseline
+        if: github.event_name != 'pull_request'
+        continue-on-error: true
+        run: ruff check --select E4,E7,E9,F --output-format github scripts research/failures/tools
 
   workflow-syntax:
-    name: actionlint (baseline)
+    name: actionlint
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -49,7 +55,6 @@ jobs:
       - name: Check workflow expressions and shell
         id: actionlint
         uses: docker://rhysd/actionlint:1.7.12
-        continue-on-error: true
         with:
           args: "-color"
       - name: Record baseline status
@@ -57,7 +62,7 @@ jobs:
         env:
           RESULT: ${{ steps.actionlint.outcome }}
         run: |
-          echo "actionlint advisory outcome: $RESULT; triage before making required." >> "$GITHUB_STEP_SUMMARY"
+          echo "actionlint (required) outcome: $RESULT." >> "$GITHUB_STEP_SUMMARY"
 
   workflow-security:
     name: zizmor (baseline)

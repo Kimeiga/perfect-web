@@ -16,6 +16,10 @@ permissions:
   security-events: write
   actions: read
 
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   analyze:
     name: CodeQL ${{ matrix.language }}
