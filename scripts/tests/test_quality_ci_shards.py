@@ -1,4 +1,4 @@
-"""Fail if ARM64 CI sharding silently stops checking an original CI gate."""
+"""Keep architecture-sharded CI exhaustive, fail-closed, and immutable."""
 
 import pathlib
 import re
@@ -16,7 +16,10 @@ def recipe_dependencies(name: str) -> list[str]:
 
 
 class CiShardingContract(unittest.TestCase):
-    def test_sharded_arm_ci_omits_only_unit_tests(self) -> None:
+    def setUp(self) -> None:
+        self.workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+
+    def test_sharded_ci_omits_only_native_tests(self) -> None:
         full = recipe_dependencies("ci")
         without_unit = recipe_dependencies("ci-without-unit")
         self.assertEqual(full.count("test-unit"), 1)
@@ -26,28 +29,43 @@ class CiShardingContract(unittest.TestCase):
         )
         for required in ("lint", "test-compile", "mutation-anchors", "mutant-programs"):
             self.assertIn(required, without_unit)
+        self.assertEqual(self.workflow.count("just ci-without-unit\n"), 1)
 
-    def test_required_ci_aggregates_every_arm_native_shard(self) -> None:
-        workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
-        self.assertIn("just ci-without-unit", workflow)
-        self.assertIn("just ci\n", workflow)
-        for command in (
+    def test_both_required_checks_fail_closed(self) -> None:
+        for arch, native in (("ubuntu-24.04", "x64_native_unit"),
+                             ("ubuntu-24.04-arm", "arm_native_unit")):
+            self.assertEqual(self.workflow.count(f"    name: {arch}\n"), 1)
+            self.assertIn(
+                f"name: {arch}\n    needs: [build, {native}]\n    if: always()",
+                self.workflow,
+            )
+        # A matrix failure propagates to its needs result. All partitions
+        # must finish successfully; never convert cancelled/skipped into pass.
+        self.assertEqual(self.workflow.count('test "$BUILD_RESULT" = success'), 2)
+        self.assertEqual(
+            self.workflow.count('test "$NATIVE_TESTS_RESULT" = success'), 2,
+        )
+        self.assertIn("permissions:\n  contents: read", self.workflow)
+
+    def test_all_native_partitions_are_exhaustive(self) -> None:
+        commands = (
             "cargo test --locked -p pw-core --no-fail-fast",
             "cargo test --locked -p pw-dev-server --no-fail-fast",
             "cargo test --locked --workspace --exclude pw-core --exclude pw-dev-server --no-fail-fast",
-        ):
-            self.assertIn(command, workflow)
-        self.assertIn("name: ubuntu-24.04-arm\n    needs: [build, arm_native_unit]\n    if: always()", workflow)
-        self.assertIn('test "$BUILD_RESULT" = success', workflow)
-        self.assertIn('test "$NATIVE_TESTS_RESULT" = success', workflow)
+        )
+        for native in ("arm_native_unit", "x64_native_unit"):
+            block = self.workflow.split(f"  {native}:", 1)[1].split("\n  ", 1)[0]
+            for command in commands:
+                self.assertIn(command, block)
+            self.assertIn("group: [pw-core, pw-dev-server, rest]", block)
 
-    def test_new_arm_native_actions_are_commit_pinned(self) -> None:
-        workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
-        section = workflow.split("  arm_native_unit:", 1)[1].split("  arm_required:", 1)[0]
-        refs = re.findall(r"(?m)^\s+- uses: [^@\n]+@([^\s]+)", section)
-        self.assertGreaterEqual(len(refs), 6)
-        for ref in refs:
-            self.assertRegex(ref, r"^[0-9a-f]{40}$")
+    def test_new_native_actions_are_immutable(self) -> None:
+        for native in ("arm_native_unit", "x64_native_unit"):
+            block = self.workflow.split(f"  {native}:", 1)[1].split("\n  ", 1)[0]
+            refs = re.findall(r"(?m)^\s+- uses: [^@\n]+@([^\s]+)", block)
+            self.assertGreaterEqual(len(refs), 6)
+            for ref in refs:
+                self.assertRegex(ref, r"^[0-9a-f]{40}$")
 
 
 if __name__ == "__main__":
