@@ -45,13 +45,13 @@ def balanced(names, weights, num=SHARD_COUNT):
     return [sorted(group) for group in groups]
 
 
-def read_plan():
+def read_plan(weights_file=WEIGHTS):
     r = subprocess.run(
         ["cargo","metadata","--no-deps","--locked","--format-version","1"],
         cwd=ROOT,capture_output=True,text=True,check=True,timeout=90)
     source_files = {x.stem for x in (ROOT/"compiler/pw-core/tests").glob("*.rs")}
     targets = cargo_targets(json.loads(r.stdout), source_files)
-    evidence = json.loads(WEIGHTS.read_text())
+    evidence = json.loads(weights_file.read_text())
     if evidence.get("schema") != 1 or not isinstance(evidence.get("seconds"),dict):
         raise ValueError("historical test durations are invalid")
     groups = balanced(targets,evidence["seconds"])
@@ -63,9 +63,10 @@ def main():
     p.add_argument("--check",action="store_true")
     p.add_argument("--shard",type=int)
     p.add_argument("--out",type=Path)
+    p.add_argument("--weights-file",type=Path,default=WEIGHTS)
     a = p.parse_args()
     try:
-        groups,evidence = read_plan()
+        groups,evidence = read_plan(a.weights_file)
         if a.check:
             print(f"Validated {sum(map(len,groups))} distinct Cargo integration targets")
             for i,group in enumerate(groups):
