@@ -52,12 +52,17 @@ class ArmLinkerControls(unittest.TestCase):
         self.assertNotIn("CARGO_TARGET_WASM32", s)
 
     def test_original_partition_coverage(self):
-        for name in ("arm_native_unit", "x64_native_unit"):
-            job = block(self.workflow, name)
-            self.assertIn("group: [pw-core, pw-dev-server, rest]", job)
-            self.assertIn("cargo test --locked -p pw-core --no-fail-fast", job)
+        arm = block(self.workflow, "arm_native_unit")
+        self.assertIn("group: [pw-core, pw-dev-server, rest]", arm)
+        self.assertIn("cargo test --locked -p pw-core --no-fail-fast", arm)
+        x64 = block(self.workflow, "x64_native_unit")
+        self.assertIn("group: [pw-core-libdocs, pw-core-int-0", x64)
+        self.assertIn("cargo test --locked -p pw-core --lib --no-fail-fast", x64)
+        self.assertIn("cargo test --locked -p pw-core --doc --no-fail-fast", x64)
+        self.assertIn("python3 tools/perf_core/shard.py --shard", x64)
+        for job in (arm, x64):
             self.assertIn("cargo test --locked -p pw-dev-server --no-fail-fast", job)
             self.assertIn("cargo test --locked --workspace --exclude pw-core --exclude pw-dev-server --no-fail-fast", job)
-        self.assertNotIn("ci_arm_lld", block(self.workflow, "x64_native_unit"))
+        self.assertNotIn("ci_arm_lld", x64)
         self.assertIn("needs: [build, arm_native_unit]", block(self.workflow, "arm_required"))
         self.assertIn("needs: [build, x64_native_unit]", block(self.workflow, "x64_required"))

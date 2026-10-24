@@ -53,6 +53,12 @@ jobs:
         run: |
           python3 -m unittest discover -s scripts/tests -p 'test_quality_*.py' -v
           python3 scripts/quality_regressions.py
+      # Cargo owns integration-test discovery. Fail before expensive compilation
+      # if a new binary or an unexpected source file would be left unchecked.
+      - name: Prove x64 pw-core shard coverage against Cargo metadata
+        run: |
+          python3 -m unittest discover -s tools/perf_core -p 'test_*.py' -v
+          python3 tools/perf_core/shard.py --check
 
   # The main matrix. arm64 is not a formality: the project is developed on
   # Apple Silicon, so an x64-only CI would let an arch-specific assumption
@@ -190,9 +196,11 @@ jobs:
               ;;
           esac
 
-  # The x64 test profile remains unchanged: PR #43 measured a regression
-  # from disabling debug symbols on x64. PR #47 independently verified all
-  # 3374 x64 test outcomes under three disjoint Cargo package partitions.
+  # Keep x64's unchanged debug profile (PR #43 found no-debug slower).
+  # Experiment 40135659315 verified 1,812 pw-core passes and 2 ignored,
+  # with all 238 integration binaries exactly once, 3.2x lower test-gate
+  # wall time. The four integration groups plus lib/doctests replace only
+  # the previous sequential pw-core group. Both other groups are unchanged.
   x64_native_unit:
     needs: preflight
     name: x64 Rust tests (${{ matrix.group }})
@@ -201,7 +209,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        group: [pw-core, pw-dev-server, rest]
+        group: [pw-core-libdocs, pw-core-int-0, pw-core-int-1, pw-core-int-2, pw-core-int-3, pw-dev-server, rest]
     env:
       CARGO_TERM_COLOR: always
       CARGO_INCREMENTAL: '0'
@@ -217,7 +225,7 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           shared-key: x64-native-tests
-          save-if: ${{ matrix.group == 'pw-core' && github.ref == 'refs/heads/master' }}
+          save-if: ${{ matrix.group == 'pw-core-int-0' && github.ref == 'refs/heads/master' }}
       - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
         with:
           just-version: '1.58.0'
@@ -233,8 +241,14 @@ jobs:
         run: |
           set -euo pipefail
           case "${{ matrix.group }}" in
-            pw-core)
-              cargo test --locked -p pw-core --no-fail-fast
+            pw-core-libdocs)
+              cargo test --locked -p pw-core --lib --no-fail-fast
+              cargo test --locked -p pw-core --doc --no-fail-fast
+              ;;
+            pw-core-int-0|pw-core-int-1|pw-core-int-2|pw-core-int-3)
+              name="${{ matrix.group }}"
+              shard="${name##*-}"
+              python3 tools/perf_core/shard.py --shard "$shard"
               ;;
             pw-dev-server)
               cargo test --locked -p pw-dev-server --no-fail-fast
