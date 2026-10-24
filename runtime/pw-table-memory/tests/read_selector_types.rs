@@ -3,7 +3,7 @@ use pw_core::tables::{
     TableSchema, TablesJson,
 };
 use pw_table_memory::{Error, MemoryTables};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 fn field(name: &str, stored: Stored) -> FieldSchema {
     FieldSchema {
@@ -37,10 +37,13 @@ fn manifest() -> TablesJson {
         fields: vec![
             field("from", short_string()),
             field("to", short_string()),
-            field("rank", Stored::Int {
-                at_least: Some(0),
-                at_most: Some(9),
-            }),
+            field(
+                "rank",
+                Stored::Int {
+                    at_least: Some(0),
+                    at_most: Some(9),
+                },
+            ),
         ],
         key: vec!["from".into(), "to".into()],
         order: Some("rank".into()),
@@ -139,16 +142,8 @@ fn set_reads_refuse_one_bad_member_without_losing_valid_neighbors() {
             {"from": false, "to": "d"},
         ])],
     );
-    rejected(
-        &db,
-        many,
-        &[json!([{"from": "a", "to": "long"}])],
-    );
-    rejected(
-        &db,
-        "pw:tables/likes#of-from-many",
-        &[json!(["a", 1])],
-    );
+    rejected(&db, many, &[json!([{"from": "a", "to": "long"}])]);
+    rejected(&db, "pw:tables/likes#of-from-many", &[json!(["a", 1])]);
 
     assert_eq!(
         db.read(
