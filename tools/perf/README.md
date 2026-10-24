@@ -4,9 +4,14 @@ This is a deliberately separate build/test experiment; no CI or runtime
 defaults are changed. The GitHub workflow tests Ubuntu x64 and ARM with
 Rust 1.97.1. Each comparison uses pw-core, pw-table-memory and pw-host.
 
-- Test runner: prebuild, compare exact test-name multisets (including duplicate
-  names across binaries), preserve Cargo doctests, then alternate two runs
-  of Cargo and cargo-nextest 0.9.149.
+- Test runner: benchmark 11 specifically named pw-core integration binaries
+  (tables, bounded_tables, generic_effects, query_values, view_positions,
+  labels, policy_values, host_bindings, effects_through_values, build_id,
+  query_reads) instead of the 1,858-test selection that exceeded 1,100
+  seconds on x64 before the Nextest turn. Compare exact test-name multisets
+  (including duplicate names), preserve Cargo doctests, and alternate two
+  runs of Cargo and cargo-nextest 0.9.149. Results do **not** measure a full
+  workspace run.
 - Linker: compare runner default and distro-provided mold, with two fresh
   Cargo targets per variant in ABBA order, plus no-op incremental checks.
 - Compiler cache: compare fresh Cargo-target builds with no wrapper against

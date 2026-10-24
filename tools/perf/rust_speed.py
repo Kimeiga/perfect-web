@@ -15,9 +15,20 @@ import time
 
 PKGS = ("pw-core", "pw-table-memory", "pw-host")
 FLAGS = [part for name in PKGS for part in ("-p", name)]
+# The full pw-core integration suite exceeded 1,100 seconds on x64 before
+# reaching Nextest. Keep the build/link/cache comparisons on the full package
+# set, but compare *exactly the same bounded integration binaries* in the
+# test-runner pilot. An unrun suite is not an established Nextest speedup.
+RUNNER_TARGETS = (
+    "tables", "bounded_tables", "generic_effects", "query_values",
+    "view_positions", "labels", "policy_values", "host_bindings",
+    "effects_through_values", "build_id", "query_reads",
+)
+RUNNER_FLAGS = ["-p", "pw-core", *[part for name in RUNNER_TARGETS for part in ("--test", name)]]
 BUILD = ["cargo", "test", "--locked", "--no-run", "--lib", "--tests", *FLAGS]
-CARGO_RUN = ["cargo", "test", "--locked", "--no-fail-fast", "--lib", "--tests", *FLAGS]
-NEXT_RUN = ["cargo", "nextest", "run", "--locked", "--no-fail-fast", "--lib", "--tests", *FLAGS]
+RUNNER_BUILD = ["cargo", "test", "--locked", "--no-run", *RUNNER_FLAGS]
+CARGO_RUN = ["cargo", "test", "--locked", "--no-fail-fast", *RUNNER_FLAGS]
+NEXT_RUN = ["cargo", "nextest", "run", "--locked", "--no-fail-fast", *RUNNER_FLAGS]
 TIME_RE = re.compile(r"BENCH_TIME:(\d+(?:\.\d+)?):(\d+)")
 TEST_RE = re.compile(r"^(.+?): test$", re.MULTILINE)
 
@@ -146,11 +157,11 @@ class Benchmark:
 
     def test_runner(self):
         env = self.env()
-        self.measure("prebuild", BUILD, env)
-        self.measure("cargo_inventory", ["cargo", "test", "--locked", "--lib",
-                                          "--tests", *FLAGS, "--", "--list"], env)
-        args = ["cargo", "nextest", "list", "--locked", "--lib", "--tests",
-                *FLAGS, "--message-format", "json"]
+        self.measure("prebuild", RUNNER_BUILD, env)
+        self.measure("cargo_inventory", ["cargo", "test", "--locked",
+                                          *RUNNER_FLAGS, "--", "--list"], env)
+        args = ["cargo", "nextest", "list", "--locked",
+                *RUNNER_FLAGS, "--message-format", "json"]
         p = subprocess.run(args, capture_output=True, text=True, env=env,
                            timeout=240, check=False)
         (self.output / "nextest_list.json").write_text(p.stdout)
@@ -163,7 +174,8 @@ class Benchmark:
         if not comparison["equal"]:
             raise RuntimeError("test inventory mismatch: " + str(comparison))
         # Nextest excludes doctests; preserve these with Cargo in all adoption plans.
-        self.measure("cargo_doctests", ["cargo", "test", "--locked", "--doc", *FLAGS], env)
+        self.measure("cargo_doctests", ["cargo", "test", "--locked", "--doc",
+                                        "-p", "pw-core"], env)
         for i, order in ((1, ("cargo", "nextest")), (2, ("nextest", "cargo"))):
             for tool in order:
                 self.measure(f"{tool}_run_{i}", CARGO_RUN if tool == "cargo" else NEXT_RUN, env)

@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - "experiment/rust-toolchain-speed-*"
+      - "experiment/nextest-bounded-*"
     paths:
       - ".github/workflows/rust-speed-experiment.yml"
       - "tools/perf/**"
@@ -27,7 +28,9 @@ jobs:
       max-parallel: 2
       matrix:
         runner: [ubuntu-24.04, ubuntu-24.04-arm]
-        mode: [test-runner, linker, sccache]
+        # The broad mold/sccache experiment remains on its separate branch.
+        # This branch isolates the scoped test-runner question.
+        mode: [test-runner]
     env:
       CARGO_TERM_COLOR: never
       CARGO_PROFILE_DEV_DEBUG: "0"
