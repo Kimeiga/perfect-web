@@ -147,7 +147,7 @@ jobs:
   playwright-version-compatibility:
     name: Bun Playwright version (${{ matrix.version }})
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 12
     strategy:
       fail-fast: false
       matrix:
@@ -157,14 +157,11 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: '1.4.4'
-      - name: Install exact Playwright version in isolated scratch directory
+      - name: Install workspace and override Playwright only in ephemeral runner
         run: |
-          mkdir -p "$RUNNER_TEMP/pw-compat"
-          cd "$RUNNER_TEMP/pw-compat"
-          echo '{"private":true,"type":"module"}' > package.json
-          bun add --exact @playwright/test@${{ matrix.version }}
-      - name: Run Playwright under Bun against repository config
+          bun install --frozen-lockfile --ignore-scripts
+          cd spikes/pw-to-marko
+          bun add --dev --exact @playwright/test@${{ matrix.version }} --ignore-scripts
+      - name: Discover repository tests using Bun runtime
         working-directory: spikes/pw-to-marko
-        run: |
-          "$RUNNER_TEMP/pw-compat/node_modules/.bin/playwright" --version
-          bun "$RUNNER_TEMP/pw-compat/node_modules/@playwright/test/cli.js" test --list --config "$GITHUB_WORKSPACE/spikes/pw-to-marko/playwright.config.mjs"
+        run: bunx --bun playwright test --list
