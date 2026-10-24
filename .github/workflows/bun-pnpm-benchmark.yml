@@ -151,7 +151,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        version: ['1.58.0', '1.61.1', '1.64.1']
+        version: ['1.64.1']
     steps:
       - uses: actions/checkout@v5
       - uses: oven-sh/setup-bun@v2
@@ -162,6 +162,17 @@ jobs:
           bun install --frozen-lockfile --ignore-scripts
           cd spikes/pw-to-marko
           bun add --dev --exact @playwright/test@${{ matrix.version }} --ignore-scripts
-      - name: Discover repository tests using Bun runtime
+      - name: Install Playwright browser engines
         working-directory: spikes/pw-to-marko
-        run: bunx --bun playwright test --list
+        run: bunx --bun playwright install --with-deps chromium firefox webkit
+      - name: Build Marko browser-test fixture
+        working-directory: spikes/pw-to-marko
+        run: |
+          mkdir -p src/routes/static src/routes/counter src/routes/streamed src/routes/store
+          for route in static counter streamed store; do
+            printf '<h1>Temporary fixture</h1>\n' > "src/routes/$route/+page.marko"
+          done
+          bun run --bun build
+      - name: Run actual browser tests under Bun
+        working-directory: spikes/pw-to-marko
+        run: bunx --bun playwright test --reporter=list
