@@ -1,0 +1,134 @@
+# Stage two of the speed search: same-head, complete just ci on both CPUs.
+# Independent of PR #42's 29-test screening, and no production workflow changes.
+name: Full Rust CI speed validation
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/rust-full-ci-speed.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: full-rust-ci-speed-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  full-ci:
+    name: ${{ matrix.runner }} / ${{ matrix.variant }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 105
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            variant: baseline
+          - runner: ubuntu-24.04
+            variant: no-debug
+          - runner: ubuntu-24.04-arm
+            variant: baseline
+          - runner: ubuntu-24.04-arm
+            variant: no-debug
+          - runner: ubuntu-24.04-arm
+            variant: mold-no-debug
+    env:
+      CARGO_TERM_COLOR: never
+      CARGO_INCREMENTAL: '0'
+      RUSTFLAGS: '-D warnings'
+      CARGO_TARGET_DIR: ${{ runner.temp }}/pw-ci-cold-target
+      VARIANT: ${{ matrix.variant }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      # Only the registry cache is useful when CARGO_TARGET_DIR is isolated
+      # under runner.temp, as it is for every variant below. Never save
+      # this screening run's artifacts over the repository's existing cache.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: false
+      - uses: extractions/setup-just@v4
+        with:
+          just-version: '1.58.0'
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install pinned tools identical to normal CI
+        run: just bootstrap
+      - name: Configure selected variant
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p full-ci-results
+          case "$VARIANT" in
+            baseline) ;;
+            no-debug|mold-no-debug)
+              echo 'CARGO_PROFILE_DEV_DEBUG=0' >> "$GITHUB_ENV"
+              echo 'CARGO_PROFILE_TEST_DEBUG=0' >> "$GITHUB_ENV"
+              ;;
+            *) echo "unknown config $VARIANT" >&2; exit 2 ;;
+          esac
+          if [ "$VARIANT" = mold-no-debug ]; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq --no-install-recommends mold
+            mold --version | tee full-ci-results/linker-version.txt
+            echo 'RUSTFLAGS=-D warnings -C link-arg=-fuse-ld=mold' >> "$GITHUB_ENV"
+          fi
+          printf 'head=%s\nvariant=%s\narch=%s\ncpus=%s\n' "$(git rev-parse HEAD)" "$VARIANT" "$(uname -m)" "$(nproc)" | tee full-ci-results/context.txt
+          rustc --version | tee -a full-ci-results/context.txt
+          cargo --version | tee -a full-ci-results/context.txt
+      - name: Run complete just ci with unchanged test selection
+        shell: bash
+        run: |
+          set -uo pipefail
+          start=$(date +%s)
+          if just ci > full-ci-results/just-ci.log 2>&1; then
+            status=0
+          else
+            status=$?
+          fi
+          elapsed=$(( $(date +%s) - start ))
+          printf '%s\n' "$elapsed" > full-ci-results/just-ci.seconds
+          printf '%s\n' "$status" > full-ci-results/just-ci.status
+          printf '## Full just ci: %s on ${{ matrix.runner }}\n\n' "$VARIANT" >> "$GITHUB_STEP_SUMMARY"
+          printf '| Phase | Seconds | Exit |\n|---|---:|---:|\n| just ci | %s | %s |\n' "$elapsed" "$status" >> "$GITHUB_STEP_SUMMARY"
+          echo "just ci exit $status after $elapsed seconds"
+          grep -E '^ci: OK|test result: FAILED|^error:' full-ci-results/just-ci.log | tail -n 20 || true
+          printf 'rust_test_result_lines=%s\n' "$(grep -c '^test result:' full-ci-results/just-ci.log || true)" >> full-ci-results/context.txt
+          if [ "$status" -ne 0 ]; then
+            tail -n 60 full-ci-results/just-ci.log
+          fi
+          exit "$status"
+      - name: Run the separate Koka end-to-end CI gate
+        shell: bash
+        run: |
+          set -uo pipefail
+          start=$(date +%s)
+          if just spike-pw-to-koka > full-ci-results/koka.log 2>&1; then
+            status=0
+          else
+            status=$?
+          fi
+          elapsed=$(( $(date +%s) - start ))
+          printf '%s\n' "$elapsed" > full-ci-results/koka.seconds
+          printf '%s\n' "$status" > full-ci-results/koka.status
+          printf '| Koka backend | %s | %s |\n' "$elapsed" "$status" >> "$GITHUB_STEP_SUMMARY"
+          echo "Koka gate exit $status after $elapsed seconds"
+          tail -n 20 full-ci-results/koka.log
+          exit "$status"
+      - name: Upload benchmark measurements and failures
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: full-rust-ci-${{ matrix.runner }}-${{ matrix.variant }}
+          path: full-ci-results/
+          if-no-files-found: warn
+          retention-days: 7
