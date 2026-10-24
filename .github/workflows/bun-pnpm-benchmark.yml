@@ -143,3 +143,28 @@ jobs:
         working-directory: spikes/pw-to-marko
         run: |
           if [ "${{ matrix.runtime }}" = bun ]; then node node_modules/@playwright/test/cli.js test --list; else pnpm exec playwright test --list; fi
+
+  playwright-version-compatibility:
+    name: Bun Playwright version (${{ matrix.version }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ['1.58.0', '1.61.1', '1.64.1']
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.4'
+      - name: Install exact Playwright version in isolated scratch directory
+        run: |
+          mkdir -p "$RUNNER_TEMP/pw-compat"
+          cd "$RUNNER_TEMP/pw-compat"
+          echo '{"private":true,"type":"module"}' > package.json
+          bun add --exact @playwright/test@${{ matrix.version }}
+      - name: Run Playwright under Bun against repository config
+        working-directory: spikes/pw-to-marko
+        run: |
+          "$RUNNER_TEMP/pw-compat/node_modules/.bin/playwright" --version
+          bun "$RUNNER_TEMP/pw-compat/node_modules/@playwright/test/cli.js" test --list --config "$GITHUB_WORKSPACE/spikes/pw-to-marko/playwright.config.mjs"
