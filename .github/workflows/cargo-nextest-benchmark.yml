@@ -1,0 +1,151 @@
+# Isolated runner experiment. Do not change just ci until outcomes are compared.
+# Both runners execute the same native Rust targets; doctests are checked separately.
+name: Cargo vs Nextest benchmark
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/cargo-nextest-benchmark.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-runner-benchmark-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compare:
+    name: Rust runner comparison (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            first: cargo
+          - runner: ubuntu-24.04-arm
+            first: nextest
+    env:
+      CARGO_TERM_COLOR: never
+      RUSTFLAGS: "-D warnings"
+      TEST_ORDER: ${{ matrix.first }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: false
+      - uses: extractions/setup-just@v4
+        with:
+          just-version: '1.58.0'
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Bootstrap the same pinned tools as main CI
+        run: just bootstrap
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: nextest@0.9.149
+      - name: Compile native test binaries once, without running them
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p test-runner-results
+          echo "### Test-runner experiment: ${{ matrix.runner }}" >> "$GITHUB_STEP_SUMMARY"
+          printf 'Order: %s first. Same compiled test binaries; default runner parallelism.\n\n' "$TEST_ORDER" >> "$GITHUB_STEP_SUMMARY"
+          rustc --version
+          cargo --version
+          cargo nextest --version
+          start=$(date +%s)
+          cargo test --locked --workspace --lib --bins --tests --no-run
+          elapsed=$(( $(date +%s) - start ))
+          printf 'Test binary build (once): %s seconds.\n\n' "$elapsed" >> "$GITHUB_STEP_SUMMARY"
+      - name: Compare native tests and retain doctest coverage
+        shell: bash
+        run: |
+          set -uo pipefail
+          printf '| Runner | Exit status | Seconds |\n|---|---:|---:|\n' >> "$GITHUB_STEP_SUMMARY"
+          run_case() {
+            label="$1"
+            shift
+            start=$(date +%s)
+            if "$@" > "test-runner-results/$label.log" 2>&1; then
+              status=0
+            else
+              status=$?
+            fi
+            elapsed=$(( $(date +%s) - start ))
+            printf '%s\n' "$status" > "test-runner-results/$label.status"
+            printf '%s\n' "$elapsed" > "test-runner-results/$label.seconds"
+            printf '| %s | %s | %s |\n' "$label" "$status" "$elapsed" >> "$GITHUB_STEP_SUMMARY"
+            echo "--- $label: exit $status, $elapsed seconds ---"
+            tail -n 8 "test-runner-results/$label.log"
+          }
+          if [ "$TEST_ORDER" = cargo ]; then
+            run_case cargo cargo test --locked --workspace --lib --bins --tests --no-fail-fast
+            run_case nextest cargo nextest run --locked --workspace --lib --bins --tests --no-fail-fast
+          else
+            run_case nextest cargo nextest run --locked --workspace --lib --bins --tests --no-fail-fast
+            run_case cargo cargo test --locked --workspace --lib --bins --tests --no-fail-fast
+          fi
+          # Nextest does not execute doctests. The replacement CI path must retain these.
+          run_case doctests cargo test --locked --workspace --doc --no-fail-fast
+          python3 - <<'PY'
+          import pathlib
+          import re
+          import sys
+
+          root = pathlib.Path("test-runner-results")
+          failures = []
+          for name in ("cargo", "nextest", "doctests"):
+              status = int((root / f"{name}.status").read_text().strip())
+              if status:
+                  failures.append(f"{name} exited {status}")
+
+          cargo = (root / "cargo.log").read_text(errors="replace")
+          nextest = (root / "nextest.log").read_text(errors="replace")
+          results = re.findall(
+              r"(?m)^test result: ok\.\s+(\d+) passed;\s+\d+ failed;\s+(\d+) ignored;",
+              cargo,
+          )
+          summaries = re.findall(
+              r"Summary\s+\[[^\]]+\]\s+[\d,]+\s+tests? run:\s+([\d,]+) passed(?:,\s+([\d,]+) skipped)?",
+              nextest,
+          )
+          if not results or not summaries:
+              failures.append("could not parse both runners' native-test counts")
+          else:
+              cargo_pass = sum(int(p) for p, _ in results)
+              cargo_ignored = sum(int(i) for _, i in results)
+              nextest_pass, nextest_skipped = summaries[-1]
+              nextest_pass = int(nextest_pass.replace(",", ""))
+              nextest_skipped = int((nextest_skipped or "0").replace(",", ""))
+              print(f"Native cases: cargo {cargo_pass} passed, {cargo_ignored} ignored; "
+                    f"nextest {nextest_pass} passed, {nextest_skipped} skipped")
+              with open("/dev/stdout", "a", encoding="utf-8") as output:
+                  output.flush()
+              if (cargo_pass, cargo_ignored) != (nextest_pass, nextest_skipped):
+                  failures.append("native executed/ignored counts differ: investigate before migration")
+
+          if failures:
+              print("EXPERIMENT NOT YET EQUIVALENT: " + "; ".join(failures))
+              sys.exit(1)
+          print("Native counts and results agree; separate doctests passed.")
+          PY
+      - name: Upload benchmark logs, including any failed tests
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: cargo-nextest-${{ matrix.runner }}
+          path: test-runner-results/
+          if-no-files-found: warn
+          retention-days: 7
