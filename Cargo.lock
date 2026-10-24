@@ -1223,6 +1223,7 @@ dependencies = [
  "annotate-snippets",
  "pw-core",
  "pw-syntax",
+ "pw-table-memory",
  "serde_json",
 ]
 
