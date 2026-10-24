@@ -247,7 +247,10 @@ fn compiled_table_readers_have_exact_manifest_and_contract_imports() {
             let row = |id: &str, added: i64| {
                 pw_host::engine::Val::Record(vec![
                     ("id".into(), pw_host::engine::Val::String(id.into())),
-                    ("name".into(), pw_host::engine::Val::String(format!("List {id}"))),
+                    (
+                        "name".into(),
+                        pw_host::engine::Val::String(format!("List {id}")),
+                    ),
                     ("slug".into(), pw_host::engine::Val::String(id.into())),
                     ("added".into(), pw_host::engine::Val::S64(added)),
                 ])
