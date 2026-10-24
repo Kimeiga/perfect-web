@@ -165,14 +165,24 @@ jobs:
       - name: Install Playwright browser engines
         working-directory: spikes/pw-to-marko
         run: bunx --bun playwright install --with-deps chromium firefox webkit
-      - name: Build Marko browser-test fixture
+      - name: Execute real Chromium Firefox and WebKit browser tests under Bun
         working-directory: spikes/pw-to-marko
         run: |
-          mkdir -p src/routes/static src/routes/counter src/routes/streamed src/routes/store
-          for route in static counter streamed store; do
-            printf '<h1>Temporary fixture</h1>\n' > "src/routes/$route/+page.marko"
-          done
-          bun run --bun build
-      - name: Run actual browser tests under Bun
-        working-directory: spikes/pw-to-marko
-        run: bunx --bun playwright test --reporter=list
+          mkdir -p .bun-compat-probe
+          cat > .bun-compat-probe/playwright.config.mjs <<'EOF'
+          import { defineConfig } from '@playwright/test';
+          export default defineConfig({ testDir: '.', projects: [
+            { name: 'chromium', use: { browserName: 'chromium' } },
+            { name: 'firefox', use: { browserName: 'firefox' } },
+            { name: 'webkit', use: { browserName: 'webkit' } },
+          ] });
+          EOF
+          cat > .bun-compat-probe/browser.spec.mjs <<'EOF'
+          import { test, expect } from '@playwright/test';
+          test('real browser launch navigation JS DOM and click', async ({ page }) => {
+            await page.goto('data:text/html,<button id="b">0</button><script>document.querySelector("button").onclick = e => e.target.textContent = "1"</script>');
+            await page.locator('#b').click();
+            await expect(page.locator('#b')).toHaveText('1');
+          });
+          EOF
+          bunx --bun playwright test --config .bun-compat-probe/playwright.config.mjs --reporter=list
