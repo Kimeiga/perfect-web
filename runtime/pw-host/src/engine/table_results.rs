@@ -30,9 +30,10 @@ fn row(value: &Value) -> Result<Val, String> {
         let encoded = match value {
             Value::String(s) => Val::String(s.clone()),
             Value::Bool(b) => Val::Bool(*b),
-            Value::Number(n) => Val::S64(n.as_i64().ok_or_else(|| {
-                format!("table result field {name} is not a WIT s64")
-            })?),
+            Value::Number(n) => Val::S64(
+                n.as_i64()
+                    .ok_or_else(|| format!("table result field {name} is not a WIT s64"))?,
+            ),
             _ => {
                 return Err(format!(
                     "table result field {name} needs an unsupported WIT value"
@@ -60,9 +61,7 @@ pub fn encode_get_many(value: &Value) -> Result<Val, String> {
     let rows = value
         .as_array()
         .ok_or_else(|| "a get-many result must be a list".to_string())?;
-    Ok(Val::List(
-        rows.iter().map(row).collect::<Result<_, _>>()?,
-    ))
+    Ok(Val::List(rows.iter().map(row).collect::<Result<_, _>>()?))
 }
 
 #[cfg(test)]
