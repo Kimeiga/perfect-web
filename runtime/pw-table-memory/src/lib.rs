@@ -425,7 +425,6 @@ fn selections(by: &[String], args: &[Value], many: bool) -> Result<BTreeSet<Key>
     Ok(out)
 }
 
-
 fn typed_read_selections(
     table: &TableJson,
     fun: &FunctionJson,
