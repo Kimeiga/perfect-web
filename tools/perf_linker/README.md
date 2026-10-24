@@ -20,3 +20,10 @@ Run local script controls: python3 -m unittest discover -s tools/perf_linker
 The repository's Rust dependency, build profiles and compiler version
 remain unchanged. Promoting an accelerator to ARM CI requires a separate
 validated PR and compatibility with PR #46's sharding work.
+
+## x64 debug-info control
+
+This separate experiment benchmarks the same three linker choices under the
+**actual x64 CI dev/test debug-info profile** (Cargo defaults), not the
+zero-debug profile used by the previous experiment. It runs x64 only and
+retains the same Rust package selection and three-trial median controls.

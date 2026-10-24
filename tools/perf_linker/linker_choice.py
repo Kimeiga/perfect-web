@@ -42,10 +42,12 @@ class Benchmark:
 
     def env(self, variant):
         env = os.environ.copy()
-        for k in ("RUSTFLAGS", "RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER"):
+        # This experiment preserves x64 CI's default dev/test debug settings.
+        # The earlier link experiments set both to zero, unlike x64 CI.
+        for k in ("RUSTFLAGS", "RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER",
+                  "CARGO_PROFILE_DEV_DEBUG", "CARGO_PROFILE_TEST_DEBUG"):
             env.pop(k, None)
         env.update({"CARGO_TARGET_DIR": str(self.target), "CARGO_INCREMENTAL": "0",
-                    "CARGO_PROFILE_DEV_DEBUG": "0", "CARGO_PROFILE_TEST_DEBUG": "0",
                     "CARGO_TERM_COLOR": "never"})
         if VARIANTS[variant]:
             env["RUSTFLAGS"] = VARIANTS[variant]

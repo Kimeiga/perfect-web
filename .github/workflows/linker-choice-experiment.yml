@@ -2,7 +2,7 @@ name: Rust linker selection experiment
 
 on:
   push:
-    branches: ["experiment/linker-choice-*"]
+    branches: ["experiment/linker-x64-debug-*"]
     paths: [".github/workflows/linker-choice-experiment.yml", "tools/perf_linker/**"]
   workflow_dispatch:
 
@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+        runner: [ubuntu-24.04]
     steps:
       - uses: actions/checkout@v5
         with:
