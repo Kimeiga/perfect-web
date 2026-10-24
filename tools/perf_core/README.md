@@ -53,3 +53,19 @@ This exchanges additional runner capacity for shorter wall-clock latency;
 it does **not** imply a 3.3x reduction in total CI latency or compute use.
 The complete CI benefit depends on the other required x64 and ARM64 jobs,
 particularly the non-unit compiler/mutation gate.
+
+## ARM64 full-coverage sharding
+
+The independent ARM64 experiment run 40138974772 at d0914df2 used
+four measured integration shards and a complete lib/doctest job with
+Rust 1.97.1 and target-specific LLD. All 1,812 tests passed, with the
+same two intentional ignores as the unsharded run 40137683192.
+The slowest ARM shard completed in approximately 5.5 minutes, compared
+with an 18-minute ARM pw-core job. The ARM weight source is
+arm_weights.json (234 historically measured targets; newly introduced
+binaries are discovered and assigned even without weights).
+All original non-unit/Koka work and other native package partitions
+remain required. Extra concurrent runners can increase aggregate
+runner-minutes; compare complete CI wall-clock and expense after merge.
+
+Evidence: https://github.com/studiokimeiga/perfect-web/actions/runs/40138974772

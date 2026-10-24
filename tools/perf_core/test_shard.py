@@ -42,6 +42,14 @@ class Contracts(unittest.TestCase):
             with self.subTest(value=value),self.assertRaises(ValueError):
                 balanced(["a"],{"a":value})
 
+    def test_alternate_weights_can_change_allocation_without_missing_tests(self):
+        names=["a","b","c","d","e","f"]
+        alt={"a":100,"b":50,"c":25}
+        a=balanced(names,{},3)
+        b=balanced(names,alt,3)
+        self.assertNotEqual(a,b)
+        self.assertEqual(sorted(x for part in b for x in part),sorted(names))
+
     def test_duplicate_names_refused(self):
         with self.assertRaises(ValueError):
             balanced(["x","x"],{})
