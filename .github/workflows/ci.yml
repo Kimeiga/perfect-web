@@ -74,7 +74,16 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - uses: Swatinem/rust-cache@v2
+      - name: Configure ARM64 verified LLD
+        if: matrix.runner == 'ubuntu-24.04-arm'
+        run: bash scripts/ci_arm_lld.sh
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        if: matrix.runner != 'ubuntu-24.04-arm'
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        if: matrix.runner == 'ubuntu-24.04-arm'
+        with:
+          shared-key: arm-ci-lld18
 
       # tools/versions.lock pins just 1.58.0; unpinned, the action installs
       # whatever release is newest (charter §3.6).
@@ -145,9 +154,11 @@ jobs:
         with:
           toolchain: '1.97.1'
           components: rustfmt, clippy
+      - name: Configure ARM64 verified LLD
+        run: bash scripts/ci_arm_lld.sh
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          shared-key: arm-native-tests
+          shared-key: arm-native-tests-lld18
           save-if: ${{ matrix.group == 'pw-core' && github.ref == 'refs/heads/master' }}
       - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
         with:
