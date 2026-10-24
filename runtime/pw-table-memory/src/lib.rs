@@ -195,7 +195,7 @@ impl MemoryTables {
         granted: &pw_host::Granted,
     ) -> Result<Vec<String>, Error> {
         let linkable: BTreeSet<String> = pw_host::linkable(contract, granted).into_iter().collect();
-        let manifest_reads: BTreeSet<&str> = self
+        let manifest_reads: BTreeMap<&str, String> = self
             .manifest
             .tables
             .iter()
@@ -208,7 +208,12 @@ impl MemoryTables {
                     };
                     (function.effect == "read"
                         && function.import == format!("{}#{operation}", table.interface))
-                    .then_some(function.import.as_str())
+                    .then(|| {
+                        (
+                            function.import.as_str(),
+                            format!("database.read<{}>", table.schema.name),
+                        )
+                    })
                 })
             })
             .collect();
@@ -221,7 +226,8 @@ impl MemoryTables {
         {
             let key = import.key();
             if import.kind != pw_host::ImportKind::HostCapability
-                || !manifest_reads.contains(key.as_str())
+                || manifest_reads.get(key.as_str()).map(String::as_str)
+                    != Some(import.capability.as_str())
                 || !linkable.contains(&key)
             {
                 return Err(Error::Input(format!(

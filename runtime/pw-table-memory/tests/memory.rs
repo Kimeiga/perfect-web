@@ -475,3 +475,30 @@ fn table_host_refuses_ungranted_or_misclassified_read_and_manifest_mismatch() {
         Err(Error::Input(_))
     ));
 }
+
+#[test]
+fn table_host_refuses_wrong_table_capability_even_when_admitted() {
+    let db = MemoryTables::new(manifest()).unwrap();
+    let (mut contract, _) = admitted_table_reader(&["pw:tables/likes#get"]);
+    // A forged contract and topology may agree on a grant for another table.
+    // That does not authorize the compiler manifest's Likes table import.
+    contract.imports[0].capability = "database.read<Other>".into();
+    contract.required_capabilities[0].argument = Some("Other".into());
+    let topology = pw_host::Topology::from_json(
+        r#"{"nodes":[{"name":"origin","world":"origin","grants":["database.read<Other>"]}]}"#,
+    )
+    .unwrap();
+    let admission = pw_host::admit(
+        &contract,
+        &topology,
+        "origin",
+        &["pw:tables/likes#get".into()],
+    );
+    assert!(admission.is_admitted(), "{admission:?}");
+    let granted = pw_host::Granted::from(&admission, &Default::default()).unwrap();
+    assert!(pw_host::linkable(&contract, &granted).contains(&"pw:tables/likes#get".into()));
+    assert!(matches!(
+        db.read_host_imports(&contract, &granted),
+        Err(Error::Input(_))
+    ));
+}
