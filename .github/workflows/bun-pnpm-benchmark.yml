@@ -84,7 +84,7 @@ jobs:
           if [ "${{ matrix.runtime }}" = bun ]; then bun install --frozen-lockfile --ignore-scripts; else pnpm install --frozen-lockfile --ignore-scripts; fi
       - name: Root runtime test
         run: |
-          if [ "${{ matrix.runtime }}" = bun ]; then bun --test spikes/layout-phase-scheduler/test/loaf.test.mjs; else node --test spikes/layout-phase-scheduler/test/loaf.test.mjs; fi
+          if [ "${{ matrix.runtime }}" = bun ]; then bun test spikes/layout-phase-scheduler/test/loaf.test.mjs; else node --test spikes/layout-phase-scheduler/test/loaf.test.mjs; fi
       - name: SvelteKit typecheck and production build
         working-directory: benchmarks/baselines/sveltekit
         run: |
