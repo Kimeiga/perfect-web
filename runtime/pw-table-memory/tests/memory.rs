@@ -359,9 +359,7 @@ fn unused_imports_and_wrong_selectors_are_rejected() {
     ));
 }
 
-fn admitted_table_reader(
-    imports: &[&str],
-) -> (pw_host::ComponentContract, pw_host::Granted) {
+fn admitted_table_reader(imports: &[&str]) -> (pw_host::ComponentContract, pw_host::Granted) {
     let declared: Vec<Value> = imports
         .iter()
         .map(|key| {
@@ -423,8 +421,7 @@ fn table_host_refuses_unknown_writes_and_wildcard_imports() {
         "pw:tables/other#get",
         "pw:tables/*#get",
     ] {
-        let (contract, granted) =
-            admitted_table_reader(&["pw:tables/likes#get", denied]);
+        let (contract, granted) = admitted_table_reader(&["pw:tables/likes#get", denied]);
         assert!(
             matches!(
                 db.read_host_imports(&contract, &granted),
