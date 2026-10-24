@@ -1,0 +1,174 @@
+# Experimental speed screening only. This does not change production CI.
+# Full test-runner parity is measured independently in PR #41.
+name: Rust CI optimization matrix
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/rust-optimizer-matrix.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-optimizer-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  screen:
+    name: ${{ matrix.runner }} / ${{ matrix.variant }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+        variant:
+          - baseline
+          - no-debug
+          - mold
+          - lld
+          - codegen-32
+          - opt1
+          - mold-no-debug
+          - codegen32-no-debug
+          - sccache
+    env:
+      CARGO_TERM_COLOR: never
+      CARGO_INCREMENTAL: '0'
+      RUSTFLAGS: '-D warnings'
+      VARIANT: ${{ matrix.variant }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: extractions/setup-just@v4
+        with:
+          just-version: '1.58.0'
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install the pinned bootstrap dependencies
+        run: just bootstrap
+      - name: Install optional fast linker
+        if: matrix.variant == 'mold' || matrix.variant == 'mold-no-debug' || matrix.variant == 'lld'
+        run: |
+          sudo apt-get update -qq
+          if [ "$VARIANT" = lld ]; then
+            sudo apt-get install -y -qq --no-install-recommends lld
+            ld.lld --version
+          else
+            sudo apt-get install -y -qq --no-install-recommends mold
+            mold --version
+          fi
+      - uses: taiki-e/install-action@v2
+        if: matrix.variant == 'sccache'
+        with:
+          tool: sccache@0.18.0
+      - name: Configure isolated, comparable native builds
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "CARGO_TARGET_DIR=$RUNNER_TEMP/rust-optimizer-target" >> "$GITHUB_ENV"
+          mkdir -p rust-optimizer-results
+          case "$VARIANT" in
+            baseline) ;;
+            no-debug)
+              echo 'CARGO_PROFILE_DEV_DEBUG=0' >> "$GITHUB_ENV"
+              echo 'CARGO_PROFILE_TEST_DEBUG=0' >> "$GITHUB_ENV"
+              ;;
+            mold)
+              echo 'RUSTFLAGS=-D warnings -C link-arg=-fuse-ld=mold' >> "$GITHUB_ENV"
+              ;;
+            lld)
+              echo 'RUSTFLAGS=-D warnings -C link-arg=-fuse-ld=lld' >> "$GITHUB_ENV"
+              ;;
+            codegen-32)
+              echo 'CARGO_PROFILE_DEV_CODEGEN_UNITS=32' >> "$GITHUB_ENV"
+              echo 'CARGO_PROFILE_TEST_CODEGEN_UNITS=32' >> "$GITHUB_ENV"
+              ;;
+            opt1)
+              echo 'CARGO_PROFILE_DEV_OPT_LEVEL=1' >> "$GITHUB_ENV"
+              echo 'CARGO_PROFILE_TEST_OPT_LEVEL=1' >> "$GITHUB_ENV"
+              ;;
+            mold-no-debug)
+              echo 'RUSTFLAGS=-D warnings -C link-arg=-fuse-ld=mold' >> "$GITHUB_ENV"
+              echo 'CARGO_PROFILE_DEV_DEBUG=0' >> "$GITHUB_ENV"
+              echo 'CARGO_PROFILE_TEST_DEBUG=0' >> "$GITHUB_ENV"
+              ;;
+            codegen32-no-debug)
+              echo 'CARGO_PROFILE_DEV_CODEGEN_UNITS=32' >> "$GITHUB_ENV"
+              echo 'CARGO_PROFILE_TEST_CODEGEN_UNITS=32' >> "$GITHUB_ENV"
+              echo 'CARGO_PROFILE_DEV_DEBUG=0' >> "$GITHUB_ENV"
+              echo 'CARGO_PROFILE_TEST_DEBUG=0' >> "$GITHUB_ENV"
+              ;;
+            sccache)
+              echo "RUSTC_WRAPPER=$(command -v sccache)" >> "$GITHUB_ENV"
+              echo "SCCACHE_DIR=$RUNNER_TEMP/rust-optimizer-sccache" >> "$GITHUB_ENV"
+              echo 'SCCACHE_CACHE_SIZE=3G' >> "$GITHUB_ENV"
+              ;;
+            *) echo "unexpected benchmark variant: $VARIANT" >&2; exit 2 ;;
+          esac
+          printf 'branch commit: %s\n' "$(git rev-parse HEAD)" | tee rust-optimizer-results/environment.txt
+          printf 'variant: %s\narchitecture: %s\ncpus: %s\n' "$VARIANT" "$(uname -m)" "$(nproc)" | tee -a rust-optimizer-results/environment.txt
+          rustc --version | tee -a rust-optimizer-results/environment.txt
+          cargo --version | tee -a rust-optimizer-results/environment.txt
+          free -m | tee -a rust-optimizer-results/environment.txt
+      - name: Benchmark complete native test build and representative execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          out=rust-optimizer-results
+          echo "## $VARIANT on ${{ matrix.runner }}" >> "$GITHUB_STEP_SUMMARY"
+          printf '| Phase | Exit code | Wall seconds |\n|---|---:|---:|\n' >> "$GITHUB_STEP_SUMMARY"
+          measure() {
+            label="$1"
+            shift
+            start=$(date +%s)
+            if "$@" > "$out/$label.log" 2>&1; then
+              result=0
+            else
+              result=$?
+            fi
+            elapsed=$(( $(date +%s) - start ))
+            printf '%s\n' "$result" > "$out/$label.status"
+            printf '%s\n' "$elapsed" > "$out/$label.seconds"
+            printf '| %s | %s | %s |\n' "$label" "$result" "$elapsed" >> "$GITHUB_STEP_SUMMARY"
+            echo "--- $label: code=$result duration=${elapsed}s ---"
+            tail -n 10 "$out/$label.log"
+            return "$result"
+          }
+          if [ "$VARIANT" = sccache ]; then
+            sccache --start-server
+            sccache --zero-stats
+          fi
+          # Compile the same workspace native test targets in every arm/variant.
+          # This is deliberately separate from run time. All test binaries build.
+          measure compile cargo test --locked --workspace --lib --bins --tests --no-run
+          # The main CLI unit binary and a costly compiler integration suite
+          # are the screening workloads. This is NOT a full workspace test run.
+          measure cli-unit cargo test --locked -p pw-cli --bin pw -- --test-threads=2
+          measure compiler-source cargo test --locked -p pw-core --test checking_source -- --test-threads=2
+          # Evaluate incremental recompile and local sccache reuse on equivalent
+          # baselines. 'cargo clean -p' intentionally invalidates pw-core.
+          if [ "$VARIANT" = baseline ] || [ "$VARIANT" = sccache ]; then
+            cargo clean -p pw-core > "$out/partial-clean.log" 2>&1
+            measure pw-core-rebuild cargo test --locked -p pw-core --test checking_source --no-run
+          fi
+          if [ "$VARIANT" = sccache ]; then
+            sccache --show-stats | tee "$out/sccache-stats.txt"
+          fi
+          du -sh "$CARGO_TARGET_DIR" | tee "$out/target-size.txt"
+          cat "$out"/*.seconds
+      - name: Upload raw logs even if a test or tool fails
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: rust-optimizer-${{ matrix.runner }}-${{ matrix.variant }}
+          path: rust-optimizer-results/
+          if-no-files-found: warn
+          retention-days: 7
