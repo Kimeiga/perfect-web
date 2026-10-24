@@ -93,3 +93,53 @@ jobs:
         working-directory: benchmarks/baselines/next-react
         run: |
           if [ "${{ matrix.runtime }}" = bun ]; then bun run --bun typecheck && bun run --bun build; else pnpm typecheck && pnpm build; fi
+
+  marko-browser-tooling:
+    name: Marko and browser tooling (${{ matrix.runtime }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        runtime: [node, bun]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.4'
+      - name: Install dependencies without lifecycle scripts
+        run: |
+          if [ "${{ matrix.runtime }}" = bun ]; then bun install --frozen-lockfile --ignore-scripts; else pnpm install --frozen-lockfile --ignore-scripts; fi
+      - name: Marko production build
+        working-directory: spikes/marko-stream-resume
+        run: |
+          if [ "${{ matrix.runtime }}" = bun ]; then bun run --bun build; else pnpm build; fi
+      - name: Marko server smoke (HTTP static and streaming routes)
+        working-directory: spikes/marko-stream-resume
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ matrix.runtime }}" = bun ]; then PORT=4321 bun dist/index.mjs > /tmp/marko-server.log 2>&1 & else PORT=4321 node dist/index.mjs > /tmp/marko-server.log 2>&1 & fi
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:4321/static -o /tmp/marko-static.html; then break; fi
+            if ! kill -0 "$server_pid" 2>/dev/null; then cat /tmp/marko-server.log; exit 1; fi
+            sleep 0.25
+          done
+          test -s /tmp/marko-static.html
+          curl -fsS --max-time 10 http://127.0.0.1:4321/stream -o /tmp/marko-stream.html
+          test -s /tmp/marko-stream.html
+      - name: Playwright CLI discovery
+        working-directory: spikes/pw-to-marko
+        run: |
+          if [ "${{ matrix.runtime }}" = bun ]; then bunx --bun playwright test --list; else pnpm exec playwright test --list; fi
+      - name: Cypress CLI discovery
+        working-directory: spikes/todomvc-cypress
+        run: |
+          if [ "${{ matrix.runtime }}" = bun ]; then bunx --bun cypress --version; else pnpm exec cypress --version; fi
