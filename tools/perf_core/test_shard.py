@@ -30,7 +30,7 @@ class Contracts(unittest.TestCase):
         names=[f"t{i}" for i in range(200)]
         weights={"t0":200,"t1":120,"t2":60}
         plan=balanced(names,weights)
-        self.assertEqual(sorted(t for part in plan for t in part),names)
+        self.assertEqual(sorted(t for part in plan for t in part),sorted(names))
         self.assertTrue(all(part for part in plan))
 
     def test_stable_partition_order(self):
