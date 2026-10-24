@@ -139,7 +139,7 @@ jobs:
         working-directory: spikes/todomvc-cypress
         run: |
           if [ "${{ matrix.runtime }}" = bun ]; then bunx --bun cypress --version; else pnpm exec cypress --version; fi
-      - name: Playwright CLI discovery (Bun incompatibility currently expected)
+      - name: Playwright CLI discovery (Node runtime with Bun-managed dependencies)
         working-directory: spikes/pw-to-marko
         run: |
-          if [ "${{ matrix.runtime }}" = bun ]; then bunx --bun playwright test --list; else pnpm exec playwright test --list; fi
+          if [ "${{ matrix.runtime }}" = bun ]; then node node_modules/@playwright/test/cli.js test --list; else pnpm exec playwright test --list; fi
