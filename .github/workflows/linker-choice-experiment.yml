@@ -1,0 +1,55 @@
+name: Rust linker selection experiment
+
+on:
+  push:
+    branches: ["experiment/linker-choice-*"]
+    paths: [".github/workflows/linker-choice-experiment.yml", "tools/perf_linker/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linker-choice-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark:
+    name: linkers on ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.97.1"
+      - name: Verify result controls
+        run: python3 -m unittest discover -s tools/perf_linker -p "test_*.py" -v
+      - name: Install distro LLVM linker and mold
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends lld mold time
+          ld --version | head -n1
+          ld.lld --version
+          mold --version
+      - name: Three counterbalanced builds per linker
+        env:
+          RESULTS: ${{ runner.temp }}/linker-comparison
+        run: python3 tools/perf_linker/linker_choice.py "$RESULTS"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: linker-comparison-${{ matrix.runner }}
+          path: |
+            ${{ runner.temp }}/linker-comparison/*.json
+            ${{ runner.temp }}/linker-comparison/*.md
+            ${{ runner.temp }}/linker-comparison/*.log
+            ${{ runner.temp }}/linker-comparison/*.time
+          if-no-files-found: warn
+          retention-days: 14
