@@ -59,8 +59,7 @@ pub fn decode_read_arguments(args: &[Val]) -> Result<Vec<Value>, String> {
     args.iter()
         .enumerate()
         .map(|(index, value)| {
-            argument(value)
-                .map_err(|reason| format!("table read argument {}: {reason}", index + 1))
+            argument(value).map_err(|reason| format!("table read argument {}: {reason}", index + 1))
         })
         .collect()
 }
@@ -73,11 +72,7 @@ mod tests {
     #[test]
     fn get_keeps_scalar_key_values_and_types() {
         assert_eq!(
-            decode_read_arguments(&[
-                Val::S64(-7),
-                Val::Bool(false),
-                Val::String("item-1".into()),
-            ]),
+            decode_read_arguments(&[Val::S64(-7), Val::Bool(false), Val::String("item-1".into()),]),
             Ok(vec![json!(-7), json!(false), json!("item-1")])
         );
     }
@@ -116,10 +111,7 @@ mod tests {
             Val::Option(Some(Box::new(Val::String("key".into())))),
             Val::Tuple(vec![Val::S64(1)]),
             Val::List(vec![Val::List(vec![Val::S64(1)])]),
-            Val::List(vec![Val::Record(vec![(
-                "key".into(),
-                Val::Option(None),
-            )])]),
+            Val::List(vec![Val::Record(vec![("key".into(), Val::Option(None))])]),
         ] {
             assert!(decode_read_arguments(&[unsupported]).is_err());
         }
