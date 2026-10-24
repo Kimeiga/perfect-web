@@ -186,3 +186,50 @@ jobs:
           });
           EOF
           bunx --bun playwright test --config .bun-compat-probe/playwright.config.mjs --reporter=list
+
+  bun-full-marko-e2e:
+    name: Bun full generated Marko browser suite
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.4'
+      - name: Install Bun-managed workspace and isolated Playwright update
+        run: |
+          bun install --frozen-lockfile --ignore-scripts
+          cd spikes/pw-to-marko
+          bun add -d --exact @playwright/test@1.64.1 --ignore-scripts
+      - name: Compile actual WebAssembly and generate routes from .pw
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --locked -p pw-resume-wasm --target wasm32-unknown-unknown --release
+          mkdir -p spikes/pw-to-marko/public
+          cp target/wasm32-unknown-unknown/release/pw_resume_wasm.wasm spikes/pw-to-marko/public/pw-resume.wasm
+          root=spikes/pw-to-marko/src/routes
+          mkdir -p "$root"/{static,counter,streamed,store}
+          for spec in 'static hello-static HelloStatic' 'counter counter Counter' 'streamed streamed StreamedPage' 'store store StorePage'; do
+            read -r route example component <<< "$spec"
+            cargo run --locked --quiet -p pw-cli -- emit-marko "examples/$example/app.pw" --out "$root/$route"
+            mv "$root/$route/$component.marko" "$root/$route/+page.marko"
+          done
+      - name: Build actual generated Marko application with Bun
+        working-directory: spikes/pw-to-marko
+        run: bun run --bun build
+      - name: Install all Playwright browser engines
+        working-directory: spikes/pw-to-marko
+        run: bunx --bun playwright install --with-deps chromium firefox webkit
+      - name: Run repository Playwright suites on Bun including Bun-hosted Marko server
+        working-directory: spikes/pw-to-marko
+        shell: bash
+        run: |
+          set -euo pipefail
+          sed -i 's/command: `node dist\/index.mjs`/command: `bun dist\/index.mjs`/' playwright.config.mjs
+          grep -F 'command: `bun dist/index.mjs`' playwright.config.mjs
+          bunx --bun playwright test --reporter=list
