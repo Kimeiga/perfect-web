@@ -9,9 +9,9 @@ use std::sync::Arc;
 
 use serde_json::Value;
 
+use super::HostFn;
 use super::table_results::{encode_get, encode_get_many};
 use super::table_selectors::decode_read_arguments;
-use super::HostFn;
 
 /// The two read operations admitted for this initial table-host slice.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -46,8 +46,8 @@ mod tests {
 
     use serde_json::json;
 
-    use super::*;
     use super::super::Val;
+    use super::*;
 
     #[test]
     fn get_passes_typed_selectors_and_returns_wit_some_or_none() {
@@ -63,11 +63,14 @@ mod tests {
             Ok(vec![Val::Option(Some(Box::new(Val::Record(vec![
                 ("active".into(), Val::Bool(true)),
                 ("id".into(), Val::String("first".into())),
-            ]))) )])
+            ]))))])
         );
 
         let absent = host_fn(ReadKind::Get, Arc::new(|_| Ok(Value::Null)));
-        assert_eq!(absent(&[Val::String("missing".into())]), Ok(vec![Val::Option(None)]));
+        assert_eq!(
+            absent(&[Val::String("missing".into())]),
+            Ok(vec![Val::Option(None)])
+        );
     }
 
     #[test]
@@ -80,7 +83,10 @@ mod tests {
             }),
         );
         assert_eq!(
-            ordered(&[Val::List(vec![Val::String("two".into()), Val::String("one".into())])]),
+            ordered(&[Val::List(vec![
+                Val::String("two".into()),
+                Val::String("one".into())
+            ])]),
             Ok(vec![Val::List(vec![
                 Val::Record(vec![("id".into(), Val::String("two".into()))]),
                 Val::Record(vec![("id".into(), Val::String("one".into()))]),
