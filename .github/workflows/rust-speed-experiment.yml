@@ -1,0 +1,80 @@
+# Non-production controlled experiment. Only runs on experiment branch pushes.
+name: Rust speed experiment
+
+on:
+  push:
+    branches:
+      - "experiment/rust-toolchain-speed-*"
+    paths:
+      - ".github/workflows/rust-speed-experiment.yml"
+      - "tools/perf/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-speed-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark:
+    name: ${{ matrix.runner }} / ${{ matrix.mode }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 70
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+        mode: [test-runner, linker, sccache]
+    env:
+      CARGO_TERM_COLOR: never
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.97.1"
+      - name: Check benchmark report parser and adversarial fixtures
+        run: python3 -m unittest discover -s tools/perf -p "test_*.py" -v
+      - name: Ensure GNU time is available
+        run: |
+          if [ ! -x /usr/bin/time ]; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends time
+          fi
+          /usr/bin/time --version | head -n 1
+      - name: Install Nextest with verified checksums
+        if: matrix.mode == 'test-runner'
+        uses: taiki-e/install-action@v2
+        with:
+          tool: nextest@0.9.149
+          fallback: none
+      - name: Install Ubuntu mold
+        if: matrix.mode == 'linker'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends mold
+          mold --version
+      - name: Install sccache with verified checksums
+        if: matrix.mode == 'sccache'
+        uses: taiki-e/install-action@v2
+        with:
+          tool: sccache@0.18.0
+          fallback: none
+      - name: Measure same Rust workspace with baseline and candidate
+        env:
+          BENCH_MODE: ${{ matrix.mode }}
+          BENCH_OUTPUT: ${{ runner.temp }}/rust-speed-${{ matrix.mode }}
+        run: python3 tools/perf/rust_speed.py --mode "$BENCH_MODE" --output "$BENCH_OUTPUT"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: rust-speed-${{ matrix.runner }}-${{ matrix.mode }}
+          path: ${{ runner.temp }}/rust-speed-${{ matrix.mode }}
+          retention-days: 14
+          if-no-files-found: warn
