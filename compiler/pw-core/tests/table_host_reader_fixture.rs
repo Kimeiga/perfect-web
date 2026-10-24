@@ -258,7 +258,7 @@ fn compiled_table_readers_have_exact_manifest_and_contract_imports() {
             let expected_args = args.clone();
             let supplied_rows = rows.clone();
             let handler: pw_host::engine::HostFn = std::sync::Arc::new(move |received| {
-                assert_eq!(received, &expected_args);
+                assert_eq!(received, &expected_args[..]);
                 observed.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 Ok(vec![supplied_rows.clone()])
             });
