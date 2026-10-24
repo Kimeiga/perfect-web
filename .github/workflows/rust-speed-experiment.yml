@@ -75,6 +75,11 @@ jobs:
         if: always()
         with:
           name: rust-speed-${{ matrix.runner }}-${{ matrix.mode }}
-          path: ${{ runner.temp }}/rust-speed-${{ matrix.mode }}
+          path: |
+            ${{ runner.temp }}/rust-speed-${{ matrix.mode }}/*.json
+            ${{ runner.temp }}/rust-speed-${{ matrix.mode }}/*.log
+            ${{ runner.temp }}/rust-speed-${{ matrix.mode }}/*.time
+            ${{ runner.temp }}/rust-speed-${{ matrix.mode }}/*.md
+            ${{ runner.temp }}/rust-speed-${{ matrix.mode }}/*.stderr
           retention-days: 14
           if-no-files-found: warn

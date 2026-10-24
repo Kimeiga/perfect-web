@@ -229,6 +229,10 @@ class Benchmark:
             self.data["errors"].append(str(e)[:2000])
             print("BENCHMARK FAILURE:", e, file=sys.stderr)
         finally:
+            # Preserve logs and metrics, never upload huge compiled binaries or
+            # the local sccache object store as GitHub Actions artifacts.
+            self.clear()
+            shutil.rmtree(self.cache, ignore_errors=True)
             self.save()
             summary = self.summary()
             (self.output / "summary.md").write_text(summary)
