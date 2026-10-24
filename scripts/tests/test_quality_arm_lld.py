@@ -43,6 +43,9 @@ class ArmLinkerControls(unittest.TestCase):
             'exec cc -fuse-ld=lld "$@"',
             "cargo build --offline --locked",
             'test -s "$RUNNER_TEMP/pleris-arm-lld-probe-used"',
+            'CARGO_TARGET_DIR="$probe/native-target" cargo build --offline --locked',
+            '"$probe/native-target/debug/pleris-arm-lld-probe"',
+            'rm "$RUNNER_TEMP/pleris-arm-lld-probe-used"',
         ):
             self.assertIn(marker, s)
         self.assertNotIn("RUSTFLAGS=", s)

@@ -45,10 +45,20 @@ EOF
 export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER="$wrapper"
 cargo generate-lockfile --offline --manifest-path "$probe/Cargo.toml"
 touch "$RUNNER_TEMP/pleris-arm-lld-probe-active"
+
+# Explicit-target positive control.
 cargo build --offline --locked --manifest-path "$probe/Cargo.toml" \
   --target aarch64-unknown-linux-gnu
-rm "$RUNNER_TEMP/pleris-arm-lld-probe-active"
 test -s "$RUNNER_TEMP/pleris-arm-lld-probe-used"
 "$probe/target/aarch64-unknown-linux-gnu/debug/pleris-arm-lld-probe"
+
+# Required native-control: real CI invokes Cargo WITHOUT --target.
+# Reset the evidence so the explicit-target control cannot cause a false pass.
+rm "$RUNNER_TEMP/pleris-arm-lld-probe-used"
+CARGO_TARGET_DIR="$probe/native-target" cargo build --offline --locked \
+  --manifest-path "$probe/Cargo.toml"
+test -s "$RUNNER_TEMP/pleris-arm-lld-probe-used"
+"$probe/native-target/debug/pleris-arm-lld-probe"
+rm "$RUNNER_TEMP/pleris-arm-lld-probe-active"
 printf 'CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=%s\n' "$wrapper" >> "$GITHUB_ENV"
 echo "Cargo ARM native linker verified: $version"
