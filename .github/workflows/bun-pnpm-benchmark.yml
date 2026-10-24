@@ -135,11 +135,11 @@ jobs:
           test -s /tmp/marko-static.html
           curl -fsS --max-time 10 http://127.0.0.1:4321/stream -o /tmp/marko-stream.html
           test -s /tmp/marko-stream.html
-      - name: Playwright CLI discovery
-        working-directory: spikes/pw-to-marko
-        run: |
-          if [ "${{ matrix.runtime }}" = bun ]; then bunx --bun playwright test --list; else pnpm exec playwright test --list; fi
       - name: Cypress CLI discovery
         working-directory: spikes/todomvc-cypress
         run: |
           if [ "${{ matrix.runtime }}" = bun ]; then bunx --bun cypress --version; else pnpm exec cypress --version; fi
+      - name: Playwright CLI discovery (Bun incompatibility currently expected)
+        working-directory: spikes/pw-to-marko
+        run: |
+          if [ "${{ matrix.runtime }}" = bun ]; then bunx --bun playwright test --list; else pnpm exec playwright test --list; fi
