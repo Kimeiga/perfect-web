@@ -89,6 +89,14 @@ jobs:
       - name: Bootstrap pinned toolchain
         run: just bootstrap
 
+      # Full `just ci` experiment (draft PR #43): 29m02s vs 50m53s on
+      # Linux ARM64 with debug info disabled. x64 regressed in that experiment,
+      # so this is explicitly ARM64-only; no tests are removed.
+      - name: Disable Rust dev/test debug info on ARM64
+        if: matrix.runner == 'ubuntu-24.04-arm'
+        run: |
+          printf '%s\n' 'CARGO_PROFILE_DEV_DEBUG=0' 'CARGO_PROFILE_TEST_DEBUG=0' >> "$GITHUB_ENV"
+
       - name: CI
         run: just ci
 
