@@ -1,0 +1,82 @@
+# Non-production experiment. Does not change the compiler or required CI gates.
+name: Pleris mutant worker benchmark
+
+on:
+  push:
+    branches: ["experiment/mutant-workers-*"]
+    paths:
+      - ".github/workflows/mutant-worker-experiment.yml"
+      - "tools/perf_mutants/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mutant-workers-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark:
+    name: full 344-mutant census / ${{ matrix.workers }} workers
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        workers: [2, 4, 6]
+    env:
+      RUSTFLAGS: "-D warnings"
+      CARGO_INCREMENTAL: "0"
+      CARGO_TERM_COLOR: never
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: "1.97.1"
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: mutant-programs-experiment
+          save-if: false
+      - name: Validate negative controls and mutation summary parser
+        run: python3 -m unittest discover -s tools/perf_mutants -p "test_*.py" -v
+      - name: Compile the same pinned Pleris checker as main CI
+        run: cargo build --quiet --locked -p pw-cli
+      - name: Run the entire unmodified mutation source checker
+        env:
+          WORKERS: ${{ matrix.workers }}
+          OUTPUT: ${{ runner.temp }}/mutant-worker-${{ matrix.workers }}
+        run: python3 tools/perf_mutants/bench.py --workers "$WORKERS" --pw target/debug/pw --output "$OUTPUT"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: mutant-worker-${{ matrix.workers }}
+          path: |
+            ${{ runner.temp }}/mutant-worker-${{ matrix.workers }}/*.json
+            ${{ runner.temp }}/mutant-worker-${{ matrix.workers }}/*.log
+          if-no-files-found: warn
+          retention-days: 14
+
+  compare:
+    name: require complete identical mutation census
+    needs: benchmark
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Fail closed on any red or incomplete worker job
+        env:
+          RESULT: ${{ needs.benchmark.result }}
+        run: test "$RESULT" = success
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: mutant-worker-*
+          path: worker-results
+      - name: Verify identical full coverage and compare real wall time
+        run: python3 tools/perf_mutants/compare.py worker-results
