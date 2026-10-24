@@ -155,7 +155,13 @@ class DeviceProducers(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             source = Path(tmp) / 'source'; source.write_text('original')
             pidfile = Path(tmp) / 'pid'
-            child = "import os,time; from pathlib import Path; Path(" + repr(str(pidfile)) + ").write_text(str(os.getpid())); time.sleep(60)"
+            # Publish readiness by rename: existence now means the PID is complete,
+            # rather than an empty file between create() and write().
+            child = ("import os,time; from pathlib import Path; "
+                     "target=Path(" + repr(str(pidfile)) + "); "
+                     "ready=target.with_name(target.name+'.ready'); "
+                     "ready.write_text(str(os.getpid())); ready.replace(target); "
+                     "time.sleep(60)")
             program = "\n".join([
                 "import signal,sys", "from pathlib import Path", "sys.path.insert(0," + repr(str(ROOT / 'scripts')) + ")",
                 "import device_store_mutations as device", "signal.signal(signal.SIGTERM, lambda *_: sys.exit(1))",
