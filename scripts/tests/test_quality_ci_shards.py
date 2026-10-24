@@ -54,14 +54,16 @@ class CiShardingContract(unittest.TestCase):
             "cargo test --locked --workspace --exclude pw-core --exclude pw-dev-server --no-fail-fast",
         )
         for native in ("arm_native_unit", "x64_native_unit"):
-            block = self.workflow.split(f"  {native}:", 1)[1].split("\n  ", 1)[0]
+            tail = self.workflow.split(f"  {native}:", 1)[1]
+            block = re.split(r"(?m)^  [a-z_]+:", tail, maxsplit=1)[0]
             for command in commands:
                 self.assertIn(command, block)
             self.assertIn("group: [pw-core, pw-dev-server, rest]", block)
 
     def test_new_native_actions_are_immutable(self) -> None:
         for native in ("arm_native_unit", "x64_native_unit"):
-            block = self.workflow.split(f"  {native}:", 1)[1].split("\n  ", 1)[0]
+            tail = self.workflow.split(f"  {native}:", 1)[1]
+            block = re.split(r"(?m)^  [a-z_]+:", tail, maxsplit=1)[0]
             refs = re.findall(r"(?m)^\s+- uses: [^@\n]+@([^\s]+)", block)
             self.assertGreaterEqual(len(refs), 6)
             for ref in refs:
