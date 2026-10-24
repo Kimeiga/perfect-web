@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 def block(workflow, name):
     prefix = f"  {name}:\n"
     assert workflow.count(prefix) == 1
-    return re.split(r"(?m)^  [a-z_]+:\n", workflow.split(prefix, 1)[1], maxsplit=1)[0]
+    return re.split(r"(?m)^  [a-z0-9_]+:\n", workflow.split(prefix, 1)[1], maxsplit=1)[0]
 
 
 class ArmLinkerControls(unittest.TestCase):
