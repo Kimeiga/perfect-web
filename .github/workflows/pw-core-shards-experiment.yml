@@ -1,0 +1,133 @@
+name: pw-core measured shard experiment
+
+on:
+  push:
+    branches: ["experiment/pw-core-test-shards-*"]
+    paths:
+      - ".github/workflows/pw-core-shards-experiment.yml"
+      - "tools/perf_core/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pw-core-shards-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  plan:
+    name: Exhaustive Cargo test-target inventory
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: "1.97.1"
+      - name: Test plan controls and negative cases
+        run: python3 -m unittest discover -s tools/perf_core -p "test_*.py" -v
+      - name: Require exact exhaustive Cargo test binary coverage
+        run: python3 tools/perf_core/shard.py --check
+
+  integration:
+    name: pw-core integration shard ${{ matrix.shard }}
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: "1.97.1"
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: x64-native-tests
+          save-if: false
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+        with:
+          just-version: "1.58.0"
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Bootstrap pinned Pleris dependencies
+        run: just bootstrap
+      - name: Run every test from this disjoint Cargo binary partition
+        env:
+          SHARD: ${{ matrix.shard }}
+          OUT: ${{ runner.temp }}/pw-core-shards
+        run: python3 tools/perf_core/shard.py --shard "$SHARD" --out "$OUT"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: pw-core-shard-${{ matrix.shard }}
+          path: ${{ runner.temp }}/pw-core-shards/*.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  libdocs:
+    name: pw-core unit and Rust doctests
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: "1.97.1"
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: x64-native-tests
+          save-if: false
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+        with:
+          just-version: "1.58.0"
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Bootstrap pinned Pleris dependencies
+        run: just bootstrap
+      - name: Run all library unit tests and doctests unchanged
+        run: |
+          set -euo pipefail
+          cargo test --locked -p pw-core --lib --no-fail-fast
+          cargo test --locked -p pw-core --doc --no-fail-fast
+
+  complete:
+    name: All pw-core test partitions accounted for
+    needs: [plan, integration, libdocs]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Refuse missing, cancelled, skipped, and failed partitions
+        env:
+          PLAN: ${{ needs.plan.result }}
+          INTEGRATION: ${{ needs.integration.result }}
+          LIBDOC: ${{ needs.libdocs.result }}
+        run: |
+          set -euo pipefail
+          echo "plan=$PLAN integration=$INTEGRATION lib+doc=$LIBDOC"
+          test "$PLAN" = success
+          test "$INTEGRATION" = success
+          test "$LIBDOC" = success
