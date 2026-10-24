@@ -13,7 +13,7 @@ jobs:
   install-comparison:
     name: install comparison (Linux x64)
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v5
@@ -60,3 +60,36 @@ jobs:
           echo "Installation scripts disabled equally for both managers; excludes Cypress binary download." >> "$GITHUB_STEP_SUMMARY"
           echo "Bun migrates pnpm-lock.yaml in memory under --frozen-lockfile; original lockfile is unchanged." >> "$GITHUB_STEP_SUMMARY"
           git diff --exit-code -- package.json pnpm-lock.yaml pnpm-workspace.yaml
+
+  runtime-compatibility:
+    name: JS build and runtime (${{ matrix.runtime }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        runtime: [node, bun]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        run: |
+          if [ "${{ matrix.runtime }}" = bun ]; then bun install --frozen-lockfile --ignore-scripts; else pnpm install --frozen-lockfile --ignore-scripts; fi
+      - name: Root runtime test
+        run: |
+          if [ "${{ matrix.runtime }}" = bun ]; then bun --test spikes/layout-phase-scheduler/test/loaf.test.mjs; else node --test spikes/layout-phase-scheduler/test/loaf.test.mjs; fi
+      - name: SvelteKit typecheck and production build
+        working-directory: benchmarks/baselines/sveltekit
+        run: |
+          if [ "${{ matrix.runtime }}" = bun ]; then bun run --bun typecheck && bun run --bun build; else pnpm typecheck && pnpm build; fi
+      - name: Next.js typecheck and production build
+        working-directory: benchmarks/baselines/next-react
+        run: |
+          if [ "${{ matrix.runtime }}" = bun ]; then bun run --bun typecheck && bun run --bun build; else pnpm typecheck && pnpm build; fi
