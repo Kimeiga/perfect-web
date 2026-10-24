@@ -53,8 +53,11 @@ class ArmLinkerControls(unittest.TestCase):
 
     def test_original_partition_coverage(self):
         arm = block(self.workflow, "arm_native_unit")
-        self.assertIn("group: [pw-core, pw-dev-server, rest]", arm)
-        self.assertIn("cargo test --locked -p pw-core --no-fail-fast", arm)
+        self.assertIn("group: [pw-core-libdocs, pw-core-int-0", arm)
+        self.assertIn("cargo test --locked -p pw-core --lib --no-fail-fast", arm)
+        self.assertIn("cargo test --locked -p pw-core --doc --no-fail-fast", arm)
+        self.assertIn("python3 tools/perf_core/shard.py --shard", arm)
+        self.assertIn("tools/perf_core/arm_weights.json", arm)
         x64 = block(self.workflow, "x64_native_unit")
         self.assertIn("group: [pw-core-libdocs, pw-core-int-0", x64)
         self.assertIn("cargo test --locked -p pw-core --lib --no-fail-fast", x64)

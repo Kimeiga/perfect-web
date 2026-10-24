@@ -59,6 +59,7 @@ jobs:
         run: |
           python3 -m unittest discover -s tools/perf_core -p 'test_*.py' -v
           python3 tools/perf_core/shard.py --check
+          python3 tools/perf_core/shard.py --check --weights-file tools/perf_core/arm_weights.json
 
   # The main matrix. arm64 is not a formality: the project is developed on
   # Apple Silicon, so an x64-only CI would let an arch-specific assumption
@@ -131,11 +132,12 @@ jobs:
       - name: Koka backend end-to-end
         run: just spike-pw-to-koka
 
-  # Complete ARM64 native and doc tests run as three disjoint Cargo package
-  # partitions on independent machines. PR #45 verified equality with the
-  # unsharded cargo test --workspace: 3348 passed, 26 ignored, 363 result blocks.
-  # Keep the normal just ci recipe intact; the arm_required gate below replaces
-  # the old ARM64 CI check name and refuses success if ANY partition fails.
+  # ARM64 native and doc tests remain exhaustive. The isolated run
+  # 40138974772 demonstrated four integration partitions plus complete
+  # library/doctests: 1812 passed, 2 intentionally ignored, zero failures,
+  # and 238 distinct Cargo test binaries assigned exactly once. Other
+  # workspace packages keep the original pw-dev-server/rest partitions.
+  # Keep just ci intact and require every shard via the arm_required gate.
   arm_native_unit:
     needs: preflight
     name: ARM64 Rust tests (${{ matrix.group }})
@@ -144,7 +146,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        group: [pw-core, pw-dev-server, rest]
+        group: [pw-core-libdocs, pw-core-int-0, pw-core-int-1, pw-core-int-2, pw-core-int-3, pw-dev-server, rest]
     env:
       CARGO_TERM_COLOR: always
       CARGO_INCREMENTAL: '0'
@@ -165,7 +167,7 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           shared-key: arm-native-tests-lld18
-          save-if: ${{ matrix.group == 'pw-core' && github.ref == 'refs/heads/master' }}
+          save-if: ${{ matrix.group == 'pw-core-int-0' && github.ref == 'refs/heads/master' }}
       - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
         with:
           just-version: '1.58.0'
@@ -181,8 +183,14 @@ jobs:
         run: |
           set -euo pipefail
           case "${{ matrix.group }}" in
-            pw-core)
-              cargo test --locked -p pw-core --no-fail-fast
+            pw-core-libdocs)
+              cargo test --locked -p pw-core --lib --no-fail-fast
+              cargo test --locked -p pw-core --doc --no-fail-fast
+              ;;
+            pw-core-int-0|pw-core-int-1|pw-core-int-2|pw-core-int-3)
+              name="${{ matrix.group }}"
+              shard="${name##*-}"
+              python3 tools/perf_core/shard.py --shard "$shard" --weights-file tools/perf_core/arm_weights.json
               ;;
             pw-dev-server)
               cargo test --locked -p pw-dev-server --no-fail-fast

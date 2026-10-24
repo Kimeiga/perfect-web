@@ -53,8 +53,16 @@ class CiShardingContract(unittest.TestCase):
             "cargo test --locked --workspace --exclude pw-core --exclude pw-dev-server --no-fail-fast",
         )
         arm = self.workflow.split("  arm_native_unit:", 1)[1].split("  x64_native_unit:", 1)[0]
-        self.assertIn("group: [pw-core, pw-dev-server, rest]", arm)
-        self.assertIn("cargo test --locked -p pw-core --no-fail-fast", arm)
+        self.assertIn(
+            "group: [pw-core-libdocs, pw-core-int-0, pw-core-int-1, "
+            "pw-core-int-2, pw-core-int-3, pw-dev-server, rest]", arm,
+        )
+        self.assertIn("cargo test --locked -p pw-core --lib --no-fail-fast", arm)
+        self.assertIn("cargo test --locked -p pw-core --doc --no-fail-fast", arm)
+        self.assertIn("pw-core-int-0|pw-core-int-1|pw-core-int-2|pw-core-int-3)", arm)
+        self.assertIn('python3 tools/perf_core/shard.py --shard "$shard" --weights-file tools/perf_core/arm_weights.json', arm)
+        self.assertIn("shared-key: arm-native-tests-lld18", arm)
+        self.assertIn("matrix.group == 'pw-core-int-0'", arm)
 
         x64 = self.workflow.split("  x64_native_unit:", 1)[1].split("  x64_required:", 1)[0]
         self.assertIn(
@@ -73,6 +81,7 @@ class CiShardingContract(unittest.TestCase):
                 self.assertIn(command, job)
 
         self.assertIn("tools/perf_core/shard.py --check", self.workflow)
+        self.assertIn("tools/perf_core/shard.py --check --weights-file tools/perf_core/arm_weights.json", self.workflow)
         self.assertIn("unittest discover -s tools/perf_core", self.workflow)
 
     def test_new_native_actions_are_immutable(self) -> None:
