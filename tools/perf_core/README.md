@@ -53,3 +53,14 @@ This exchanges additional runner capacity for shorter wall-clock latency;
 it does **not** imply a 3.3x reduction in total CI latency or compute use.
 The complete CI benefit depends on the other required x64 and ARM64 jobs,
 particularly the non-unit compiler/mutation gate.
+
+## ARM64 trial on the stacked experimental branch
+
+This follow-on experiment uses the same exhaustive Cargo metadata inventory,
+measured LPT allocation and full lib/doctest controls on native Ubuntu ARM64.
+It uses the merged PR #49 target-specific LLD configuration, the same Rust
+warnings and no-debug ARM profiles, and a separate 4-way ARM weighting file
+(`arm_weights.json`) collected from an earlier passing ARM CI run. Unobserved
+new binaries use the fallback weight but are never excluded. The ARM job is
+not substituted for a required CI check until a complete parity comparison
+and end-to-end CI measurement justify adoption.

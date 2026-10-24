@@ -1,0 +1,143 @@
+# Experimental ARM64 test-binary sharding, NOT required CI.
+name: pw-core ARM64 measured sharding experiment
+
+on:
+  push:
+    branches: ["experiment/pw-core-arm-shards-*"]
+    paths:
+      - ".github/workflows/pw-core-arm-shards-experiment.yml"
+      - "tools/perf_core/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pw-core-arm-shards-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  inventory:
+    name: Validate exact ARM64 Cargo target coverage
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: '1.97.1'
+      - name: Check shard planner contract and negative cases
+        run: python3 -m unittest discover -s tools/perf_core -p "test_*.py" -v
+      - name: Require complete Cargo metadata inventory
+        run: python3 tools/perf_core/shard.py --check --weights-file tools/perf_core/arm_weights.json
+
+  integration:
+    name: ARM64 pw-core integration shard ${{ matrix.shard }}
+    needs: inventory
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: '1.97.1'
+          components: rustfmt, clippy
+      - name: Configure exact ARM64 LLD and verify Cargo uses it
+        run: bash scripts/ci_arm_lld.sh
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: arm-native-tests-lld18
+          save-if: false
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+        with:
+          just-version: '1.58.0'
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Bootstrap pinned Pleris toolchain
+        run: just bootstrap
+      - name: Run every unfiltered integration test in the assigned shard
+        env:
+          INDEX: ${{ matrix.shard }}
+          RESULTS: ${{ runner.temp }}/arm-shards
+        run: |
+          python3 tools/perf_core/shard.py --shard "$INDEX" \
+            --weights-file tools/perf_core/arm_weights.json --out "$RESULTS"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: pw-core-arm-shard-${{ matrix.shard }}
+          path: ${{ runner.temp }}/arm-shards/*.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  libdocs:
+    name: ARM64 pw-core lib and doctests
+    needs: inventory
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: '1.97.1'
+          components: rustfmt, clippy
+      - name: Configure exact ARM64 LLD and verify Cargo uses it
+        run: bash scripts/ci_arm_lld.sh
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: arm-native-tests-lld18
+          save-if: false
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+        with:
+          just-version: '1.58.0'
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Bootstrap pinned Pleris toolchain
+        run: just bootstrap
+      - name: Run original library unit tests and doctests
+        run: |
+          set -euo pipefail
+          cargo test --locked -p pw-core --lib --no-fail-fast
+          cargo test --locked -p pw-core --doc --no-fail-fast
+
+  complete:
+    name: All ARM64 pw-core tests proved
+    needs: [inventory, integration, libdocs]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Refuse any incomplete, cancelled, skipped or failing partition
+        env:
+          INVENTORY: ${{ needs.inventory.result }}
+          INTEGRATION: ${{ needs.integration.result }}
+          LIBDOCS: ${{ needs.libdocs.result }}
+        run: |
+          set -euo pipefail
+          printf 'inventory=%s integration=%s libdocs=%s\n' "$INVENTORY" "$INTEGRATION" "$LIBDOCS"
+          test "$INVENTORY" = success
+          test "$INTEGRATION" = success
+          test "$LIBDOCS" = success
