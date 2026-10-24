@@ -27,6 +27,19 @@ class TestBench(unittest.TestCase):
         }}
         self.assertFalse(inventory("x: test\ny: test", json.dumps(fixture))["equal"])
 
+    def test_ignored_case_is_listed_but_not_runnable(self):
+        fixture = {"rust-suites": {
+            "one": {"status": "listed", "testcases": {
+                "normal": {"ignored": False, "filter-match": {"status": "matches"}},
+                "heavy": {"ignored": True, "filter-match": {
+                    "status": "mismatch", "reason": "ignored"}},
+            }},
+        }}
+        result = inventory("heavy: test\\nnormal: test".replace("\\n", "\n"), json.dumps(fixture))
+        self.assertTrue(result["equal"])
+        self.assertEqual(result["nextest_ignored"], 1)
+        self.assertEqual(result["nextest_runnable"], 1)
+
     def test_zero_tests_refused(self):
         self.assertFalse(inventory("", json.dumps({"rust-suites": {}}))["equal"])
 

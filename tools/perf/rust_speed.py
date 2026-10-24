@@ -33,17 +33,30 @@ def inventory(cargo_text, nextest_text):
     if not isinstance(doc.get("rust-suites"), dict):
         raise ValueError("nextest list lacks rust-suites")
     nxt = Counter()
+    ignored, wrong_filters = [], []
     for suite in doc["rust-suites"].values():
         if suite.get("status") != "listed":
             raise ValueError("nextest returned an unlisted suite")
         for name, test in suite["testcases"].items():
-            if test.get("filter-match", {}).get("status") == "matches":
-                nxt[name] += 1
+            # Both libtest --list and Nextest JSON include ignored tests.
+            # Neither runner executes those by default. Never call an
+            # intentional ignore a missing test.
+            nxt[name] += 1
+            matching = test.get("filter-match", {})
+            if test.get("ignored"):
+                ignored.append(name)
+                if matching.get("reason") != "ignored":
+                    wrong_filters.append(name)
+            elif matching.get("status") != "matches":
+                wrong_filters.append(name)
     return {
         "cargo_count": sum(cargo.values()), "nextest_count": sum(nxt.values()),
-        "equal": bool(cargo) and cargo == nxt,
+        "nextest_ignored": len(ignored),
+        "nextest_runnable": sum(nxt.values()) - len(ignored),
+        "equal": bool(cargo) and cargo == nxt and not wrong_filters,
         "missing": list((cargo - nxt).elements())[:15],
         "extra": list((nxt - cargo).elements())[:15],
+        "unexpected_filter": wrong_filters[:15],
     }
 
 
