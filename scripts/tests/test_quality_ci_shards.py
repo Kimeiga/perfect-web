@@ -48,17 +48,32 @@ class CiShardingContract(unittest.TestCase):
         self.assertIn("permissions:\n  contents: read", self.workflow)
 
     def test_all_native_partitions_are_exhaustive(self) -> None:
-        commands = (
-            "cargo test --locked -p pw-core --no-fail-fast",
+        common = (
             "cargo test --locked -p pw-dev-server --no-fail-fast",
             "cargo test --locked --workspace --exclude pw-core --exclude pw-dev-server --no-fail-fast",
         )
-        for native in ("arm_native_unit", "x64_native_unit"):
-            tail = self.workflow.split(f"  {native}:", 1)[1]
-            block = re.split(r"(?m)^  [a-z_]+:", tail, maxsplit=1)[0]
-            for command in commands:
-                self.assertIn(command, block)
-            self.assertIn("group: [pw-core, pw-dev-server, rest]", block)
+        arm = self.workflow.split("  arm_native_unit:", 1)[1].split("  x64_native_unit:", 1)[0]
+        self.assertIn("group: [pw-core, pw-dev-server, rest]", arm)
+        self.assertIn("cargo test --locked -p pw-core --no-fail-fast", arm)
+
+        x64 = self.workflow.split("  x64_native_unit:", 1)[1].split("  x64_required:", 1)[0]
+        self.assertIn(
+            "group: [pw-core-libdocs, pw-core-int-0, pw-core-int-1, "
+            "pw-core-int-2, pw-core-int-3, pw-dev-server, rest]", x64,
+        )
+        self.assertIn("cargo test --locked -p pw-core --lib --no-fail-fast", x64)
+        self.assertIn("cargo test --locked -p pw-core --doc --no-fail-fast", x64)
+        self.assertIn("pw-core-int-0|pw-core-int-1|pw-core-int-2|pw-core-int-3)", x64)
+        self.assertIn('python3 tools/perf_core/shard.py --shard "$shard"', x64)
+        self.assertIn("shared-key: x64-native-tests", x64)
+        self.assertIn("matrix.group == 'pw-core-int-0'", x64)
+
+        for job in (arm, x64):
+            for command in common:
+                self.assertIn(command, job)
+
+        self.assertIn("tools/perf_core/shard.py --check", self.workflow)
+        self.assertIn("unittest discover -s tools/perf_core", self.workflow)
 
     def test_new_native_actions_are_immutable(self) -> None:
         for native in ("arm_native_unit", "x64_native_unit"):
