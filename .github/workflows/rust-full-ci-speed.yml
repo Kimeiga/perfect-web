@@ -38,7 +38,6 @@ jobs:
       CARGO_TERM_COLOR: never
       CARGO_INCREMENTAL: '0'
       RUSTFLAGS: '-D warnings'
-      CARGO_TARGET_DIR: ${{ runner.temp }}/pw-ci-cold-target
       VARIANT: ${{ matrix.variant }}
     steps:
       - uses: actions/checkout@v5
@@ -68,6 +67,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p full-ci-results
+          echo "CARGO_TARGET_DIR=$RUNNER_TEMP/pw-ci-cold-target" >> "$GITHUB_ENV"
           case "$VARIANT" in
             baseline) ;;
             no-debug|mold-no-debug)
