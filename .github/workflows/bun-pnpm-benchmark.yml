@@ -33,8 +33,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo "| Manager | Cache | Trial | Seconds |" >> "$GITHUB_STEP_SUMMARY"
-          echo "|---|---|---:|---:|" >> "$GITHUB_STEP_SUMMARY"
+          printf '%s\n' '| Manager | Cache | Trial | Seconds |' '|---|---|---:|---:|' >> "$GITHUB_STEP_SUMMARY"
           for manager in pnpm bun; do
             rm -rf node_modules
             if [ "$manager" = pnpm ]; then
@@ -56,9 +55,7 @@ jobs:
               echo "| $manager | $cache | $trial | $elapsed |" | tee -a "$GITHUB_STEP_SUMMARY"
             done
           done
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Installation scripts disabled equally for both managers; excludes Cypress binary download." >> "$GITHUB_STEP_SUMMARY"
-          echo "Bun migrates pnpm-lock.yaml in memory under --frozen-lockfile; original lockfile is unchanged." >> "$GITHUB_STEP_SUMMARY"
+          printf '\n%s\n%s\n' 'Installation scripts disabled equally for both managers; excludes Cypress binary download.' 'Bun migrates pnpm-lock.yaml in memory under --frozen-lockfile; original lockfile is unchanged.' >> "$GITHUB_STEP_SUMMARY"
           git diff --exit-code -- package.json pnpm-lock.yaml pnpm-workspace.yaml
 
   runtime-compatibility:
@@ -127,7 +124,7 @@ jobs:
           if [ "${{ matrix.runtime }}" = bun ]; then PORT=4321 bun dist/index.mjs > /tmp/marko-server.log 2>&1 & else PORT=4321 node dist/index.mjs > /tmp/marko-server.log 2>&1 & fi
           server_pid=$!
           trap 'kill "$server_pid" 2>/dev/null || true' EXIT
-          for i in $(seq 1 40); do
+          for ((i=1; i<=40; i++)); do
             if curl -fsS http://127.0.0.1:4321/static -o /tmp/marko-static.html; then break; fi
             if ! kill -0 "$server_pid" 2>/dev/null; then cat /tmp/marko-server.log; exit 1; fi
             sleep 0.25
@@ -188,11 +185,19 @@ jobs:
           bunx --bun playwright test --config .bun-compat-probe/playwright.config.mjs --reporter=list
 
   bun-full-marko-e2e:
-    name: Bun full generated Marko browser suite
+    name: Generated Marko E2E (${{ matrix.runtime }})
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        runtime: [node, bun]
     steps:
       - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
@@ -236,11 +241,15 @@ jobs:
       - name: Install all Playwright browser engines
         working-directory: spikes/pw-to-marko
         run: bunx --bun playwright install --with-deps chromium firefox webkit
-      - name: Run repository Playwright suites on Bun including Bun-hosted Marko server
+      - name: Run exact same generated Marko tests on selected JS runtime
         working-directory: spikes/pw-to-marko
         shell: bash
         run: |
           set -euo pipefail
-          sed -i 's/command: `node dist\/index.mjs`/command: `bun dist\/index.mjs`/' playwright.config.mjs
-          grep -F 'command: `bun dist/index.mjs`' playwright.config.mjs
-          bunx --bun playwright test --reporter=list
+          if [ "${{ matrix.runtime }}" = bun ]; then
+            sed -i 's/node dist\/index.mjs/bun dist\/index.mjs/' playwright.config.mjs
+            grep -F 'bun dist/index.mjs' playwright.config.mjs
+            bunx --bun playwright test --reporter=list
+          else
+            node node_modules/@playwright/test/cli.js test --reporter=list
+          fi
