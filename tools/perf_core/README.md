@@ -26,3 +26,30 @@ merging, and preserve the original parity baseline and rollback path.
 
 Evidence: https://github.com/studiokimeiga/perfect-web/actions/runs/40135659315
 Original: https://github.com/studiokimeiga/perfect-web/actions/runs/40127610536
+
+## Reproduced measured job breakdown
+
+The complete isolated trial on the exact commit in
+[GitHub Actions run 40135659315](https://github.com/studiokimeiga/perfect-web/actions/runs/40135659315)
+passed the Cargo target inventory, every integration group, and library and
+doctests. Reconciled libtest output: **1,812 passed, 2 intentionally ignored,
+0 failed**, with 238 distinct integration binaries. The job wall times were:
+
+| Parallel job | Wall time |
+|---|---:|
+| Integration shard 0 | 7.27 min |
+| Integration shard 1 | 7.07 min |
+| Integration shard 2 | 7.07 min |
+| Integration shard 3 | 4.97 min |
+| Library and doctests | 1.30 min |
+| Inventory planner | 0.30 min |
+
+The gate's wall-time critical path was approximately 7.3 minutes versus
+24.3 minutes for the prior single x64 `pw-core` job on master
+([baseline](https://github.com/studiokimeiga/perfect-web/actions/runs/40127610536)).
+However, the five worker jobs plus planning consumed approximately
+28 runner-minutes in total, compared with 24.3 for the unsharded job.
+This exchanges additional runner capacity for shorter wall-clock latency;
+it does **not** imply a 3.3x reduction in total CI latency or compute use.
+The complete CI benefit depends on the other required x64 and ARM64 jobs,
+particularly the non-unit compiler/mutation gate.
