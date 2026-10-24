@@ -1,0 +1,61 @@
+name: bun vs pnpm experiment
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/bun-pnpm-benchmark.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  install-comparison:
+    name: install comparison (Linux x64)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+      - uses: pnpm/action-setup@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Record versions
+        run: |
+          node --version
+          pnpm --version
+          bun --version
+      - name: Compare reproducible installs (scripts disabled)
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "| Manager | Cache | Trial | Seconds |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|---:|---:|" >> "$GITHUB_STEP_SUMMARY"
+          for manager in pnpm bun; do
+            rm -rf node_modules
+            if [ "$manager" = pnpm ]; then
+              rm -rf "$RUNNER_TEMP/pnpm-benchmark-store"
+            else
+              rm -rf "$RUNNER_TEMP/bun-benchmark-cache"
+            fi
+            for trial in 1 2 3; do
+              rm -rf node_modules
+              start=$(date +%s%N)
+              if [ "$manager" = pnpm ]; then
+                pnpm install --frozen-lockfile --ignore-scripts --store-dir "$RUNNER_TEMP/pnpm-benchmark-store"
+              else
+                BUN_INSTALL_CACHE_DIR="$RUNNER_TEMP/bun-benchmark-cache" bun install --frozen-lockfile --ignore-scripts
+              fi
+              finish=$(date +%s%N)
+              elapsed=$(awk -v a="$start" -v b="$finish" 'BEGIN {printf "%.3f", (b-a)/1000000000}')
+              if [ "$trial" = 1 ]; then cache=cold; else cache=warm; fi
+              echo "| $manager | $cache | $trial | $elapsed |" | tee -a "$GITHUB_STEP_SUMMARY"
+            done
+          done
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Installation scripts disabled equally for both managers; excludes Cypress binary download." >> "$GITHUB_STEP_SUMMARY"
+          echo "Bun migrates pnpm-lock.yaml in memory under --frozen-lockfile; original lockfile is unchanged." >> "$GITHUB_STEP_SUMMARY"
+          git diff --exit-code -- package.json pnpm-lock.yaml pnpm-workspace.yaml
