@@ -17,6 +17,11 @@ on:
   pull_request:
   workflow_dispatch:
 
+# This workflow only checks out code, runs tests and performs read-only audits.
+# Explicitly prohibit write-scoped GITHUB_TOKEN permissions.
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
